@@ -50,7 +50,7 @@ export const PARTS = {
     variants: ["dense"],
     tokens: ["--ak-chrome-bottom"],
     fork: "Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.",
-    file: "shell.js",
+    file: "shell-parts.js",
   },
   "callout": {
     parts: ["root","icon","words","title","text","after"],
@@ -314,7 +314,7 @@ export const PARTS = {
     variants: ["dense","plain","quiet"],
     tokens: ["--ak-section-pad","--ak-section-gap"],
     fork: "It IS the escape hatch: put your own markup in its body and keep the frame.",
-    file: "shell.js",
+    file: "shell-parts.js",
   },
   "segmented": {
     parts: ["root","option","ink"],
@@ -394,7 +394,7 @@ export const PARTS = {
     variants: ["dense","pill"],
     tokens: ["--ak-tabs-gap"],
     fork: "A row of buttons; copy .ak-tabs* out of shell.css and you give up the view transition.",
-    file: "shell.js",
+    file: "shell-parts.js",
   },
   "timeline": {
     parts: ["root","item","dot","body","when","title","sub","extra","aside"],

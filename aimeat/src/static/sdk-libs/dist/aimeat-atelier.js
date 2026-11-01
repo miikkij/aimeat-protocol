@@ -4768,55 +4768,6 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/margins.js
-  var MARGINS = ["a", "b", "c", "d", "e", "f", "g", "h"];
-  var DEFAULT_MARGIN = "a";
-  function margins(choice) {
-    const v = typeof choice === "string" ? choice.toLowerCase() : "";
-    const root = document.documentElement;
-    if (MARGINS.indexOf(v) >= 0) {
-      root.setAttribute("data-ak-margins", v);
-      return v;
-    }
-    root.removeAttribute("data-ak-margins");
-    return "";
-  }
-  function marginsOf(prefs) {
-    const v = prefs && typeof prefs.marginPattern === "string" ? prefs.marginPattern : void 0;
-    return v === void 0 ? DEFAULT_MARGIN : v;
-  }
-
-  // src/static/sdk-libs/atelier/shell-motion.js
-  var SVG_NS4 = "http://www.w3.org/2000/svg";
-  var MOTION_ATTR2 = "data-ak-motion";
-  function motionLabel() {
-    const said = t("lessMotion");
-    return said === "lessMotion" ? "Less motion" : said;
-  }
-  function motionIcon() {
-    const svg6 = document.createElementNS(SVG_NS4, "svg");
-    svg6.setAttribute("viewBox", "0 0 24 24");
-    svg6.setAttribute("width", "18");
-    svg6.setAttribute("height", "18");
-    svg6.setAttribute("fill", "none");
-    svg6.setAttribute("stroke", "currentColor");
-    svg6.setAttribute("stroke-width", "2");
-    svg6.setAttribute("stroke-linecap", "round");
-    svg6.setAttribute("aria-hidden", "true");
-    const lines = document.createElementNS(SVG_NS4, "path");
-    lines.setAttribute("class", "ak-app__motion-lines");
-    lines.setAttribute("d", "M4 7h15M4 12h11M4 17h7");
-    const slash = document.createElementNS(SVG_NS4, "path");
-    slash.setAttribute("class", "ak-app__motion-slash");
-    slash.setAttribute("d", "M20 4 5 20");
-    svg6.appendChild(lines);
-    svg6.appendChild(slash);
-    return svg6;
-  }
-  function motionIsLess() {
-    return document.documentElement.getAttribute(MOTION_ATTR2) === "less";
-  }
-
   // src/static/sdk-libs/atelier/scroll-edge.js
   var SCROLLERS = [
     ".ak-tabs",
@@ -4984,366 +4935,10 @@
     else watch();
   }
 
-  // src/static/sdk-libs/atelier/shell.js
-  var LOGO_INLINE_MAX = 8192;
-  function logoEl(src) {
-    if (typeof src !== "string" || !src.trim()) return null;
-    if (/^\s*data:/i.test(src) && (!/^\s*data:image\//i.test(src) || src.length > LOGO_INLINE_MAX)) {
-      console.warn("[atelier] app({ logo }) refuses this data: URI; an inline logo is a data:image of at most " + LOGO_INLINE_MAX + " characters, anything larger goes to storage as a URL.");
-      return null;
-    }
-    return el("img", { class: "ak-app__logo", src, alt: "", width: "32", height: "32", decoding: "async" });
-  }
-  function bottomEntries(items) {
-    return items.filter(function(it) {
-      return it.bottom === true || it.bottom !== false && !it.group;
-    });
-  }
+  // src/static/sdk-libs/atelier/shell-parts.js
   function tabLabel(spec, name, item) {
     const given = partValue(spec, name, item);
     return given === void 0 ? item.label : given;
-  }
-  var BOOT_POLL_MS = 300;
-  var SIGNIN_GRACE_MS = 2500;
-  var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
-  function ambientSpec(want) {
-    if (typeof want === "string") return { preset: want };
-    if (want && typeof want === "object") {
-      return {
-        preset: want.preset == null ? null : want.preset,
-        alpha: want.alpha,
-        speed: want.speed,
-        fps: want.fps,
-        gl: want.gl,
-        post: want.post
-      };
-    }
-    return { preset: null };
-  }
-  function app(spec) {
-    injectStyle();
-    if (spec.margins !== void 0) margins(spec.margins);
-    const state = { title: spec.title, look: spec.look || "vivid" };
-    const titleId = uid("ak-app-title");
-    const heading = el("span", { class: "ak-app__title", id: titleId, text: state.title });
-    const pill = el("span", { class: "ak-app__pill", id: "login" });
-    const motionBtn = el("button", {
-      type: "button",
-      class: "ak-app__motion",
-      "data-ak-noguard": true,
-      "aria-pressed": motionIsLess() ? "true" : "false",
-      title: motionLabel(),
-      "aria-label": motionLabel(),
-      on: {
-        click: function() {
-          setMotion(motionIsLess() ? "auto" : "less");
-        }
-      }
-    }, motionIcon());
-    const syncMotion = function() {
-      motionBtn.setAttribute("aria-pressed", motionIsLess() ? "true" : "false");
-    };
-    window.addEventListener("ak-motion", syncMotion);
-    const logo = logoEl(spec.logo);
-    const brand = logo ? el("span", { class: "ak-app__brand" }, [logo, heading]) : heading;
-    const helpBtn = spec.help && typeof spec.help.button === "function" ? spec.help.button() : null;
-    const bar2 = el("header", { class: "ak-app__bar" }, [brand, helpBtn, motionBtn, pill]);
-    let replaying = false;
-    const onBarClick = function(ev) {
-      if (replaying) return;
-      const start = (
-        /** @type {Element|null} */
-        ev.target
-      );
-      if (!start || typeof start.closest !== "function") return;
-      const btn = (
-        /** @type {HTMLElement|null} */
-        start.closest(MODE_BUTTON)
-      );
-      if (!btn || !bar2.contains(btn) || btn.getAttribute("aria-pressed") === "true") return;
-      ev.preventDefault();
-      ev.stopImmediatePropagation();
-      btn.setAttribute("data-ak-noguard", "");
-      const box = btn.getBoundingClientRect();
-      screenTransition("iris", function() {
-        replaying = true;
-        try {
-          btn.click();
-        } finally {
-          replaying = false;
-        }
-      }, { from: { x: box.left + box.width / 2, y: box.top + box.height / 2 } });
-    };
-    bar2.addEventListener("click", onBarClick, true);
-    const statusHost = el("div", { class: "ak-app__status" });
-    const sideMode = spec.nav === "side" && !!(spec.navItems && spec.navItems.length);
-    const main = el("main", { class: "ak-app__main" + (sideMode ? "" : " ak-scroll") });
-    const sideHost = sideMode ? el("aside", { class: "ak-app__side" }) : null;
-    const frame2 = sideMode ? el("div", { class: "ak-app__frame ak-scroll" }, [sideHost, main]) : null;
-    const footer = spec.footer != null ? el("footer", { class: "ak-app__foot", text: spec.footer }) : null;
-    const root = el("div", {
-      class: "ak-root ak-app" + (sideMode ? " ak-app--sidenav" : ""),
-      "data-ak-look": state.look,
-      "aria-labelledby": titleId
-    }, [bar2, statusHost, frame2 || main, footer]);
-    if (spec.motion === false) setMotionDefaults(root, false);
-    let nav = null;
-    let side = null;
-    function linked(items) {
-      return items.map(function(it) {
-        return Object.assign({}, it, {
-          onPick: function(picked) {
-            if (side) side.set({ value: picked.id });
-            if (nav) nav.set({ value: picked.id });
-            if (it.onPick) it.onPick(it);
-          }
-        });
-      });
-    }
-    if (spec.navItems && spec.navItems.length) {
-      const items = linked(spec.navItems);
-      const first = spec.navValue || items[0].id;
-      if (sideMode && sideHost) {
-        side = sideNav({ target: sideHost, items, value: first, label: spec.navLabel });
-      }
-      nav = bottomNav({ items: sideMode ? bottomEntries(items) : items, value: sideMode ? first : spec.navValue });
-      root.appendChild(nav.el);
-      root.classList.add("ak-app--bottomnav");
-    }
-    const mount = resolve(spec.target, document.body);
-    mount.appendChild(root);
-    const fullFrame = mount === document.body;
-    if (fullFrame) document.body.classList.add("ak-body");
-    let sky = null;
-    let weatherCtl = null;
-    function syncWeather() {
-      if (weatherCtl) weatherCtl.el.hidden = !sky || sky.preset() === "none";
-    }
-    function ensureSky(want) {
-      if (!sky) {
-        sky = ambient(Object.assign({ target: root }, ambientSpec(want)));
-        weatherCtl = weather({ kind: "cycle" });
-        weatherCtl.el.classList.add("ak-app__weather");
-        bar2.insertBefore(weatherCtl.el, motionBtn);
-      } else {
-        sky.set(Object.assign({ preset: null, alpha: null, speed: null, post: null }, ambientSpec(want)));
-      }
-      syncWeather();
-    }
-    root.addEventListener("ak-ambient-preset", syncWeather);
-    if (spec.ambient !== false) ensureSky(spec.ambient);
-    let statusCard = null;
-    let shownState = null;
-    function status(kind, opts) {
-      const o = opts || {};
-      const leaving = shownState;
-      shownState = kind;
-      if (statusCard) {
-        statusCard.destroy();
-        statusCard = null;
-      }
-      clear(statusHost);
-      if (kind === "none" || kind === "ready") {
-        statusHost.hidden = true;
-        if (leaving && leaving !== "ready" && leaving !== "none" && typeof requestAnimationFrame === "function") {
-          requestAnimationFrame(function() {
-            enter(main);
-          });
-        }
-        return;
-      }
-      statusHost.hidden = false;
-      if (kind === "loading") {
-        statusHost.appendChild(el("div", { class: "ak-loading", role: "status", "aria-live": "polite" }, [
-          el("span", { class: "ak-loading__pulse", "aria-hidden": "true" }),
-          el("span", { text: o.title || t("loading") })
-        ]));
-        return;
-      }
-      const kinds = {
-        empty: { title: o.title || t("empty"), hint: o.hint || t("emptyHint") },
-        error: { title: o.title || t("loadFailed"), hint: o.hint || t("loadFailedHint") },
-        // The sign-in card PRESENTS THE APP: its own name as the title and, when the app gave one,
-        // its tagline before the how-to — a first visitor learns what this is, not only that a
-        // login exists. (The second AEB review met a bare system sentence on an empty page.)
-        signin: {
-          title: o.title || state.title,
-          hint: o.hint != null ? o.hint : (spec.tagline ? spec.tagline + " " : "") + t("signIn") + " " + t("signInHint")
-        }
-      };
-      const chosen2 = kinds[kind] || kinds.error;
-      statusCard = emptyState({
-        target: statusHost,
-        tone: kind === "error" ? "error" : "quiet",
-        title: chosen2.title,
-        hint: chosen2.hint,
-        action: kind === "error" && o.onRetry ? { label: t("retry"), onClick: o.onRetry } : null
-      });
-    }
-    const requireLogin = spec.requireLogin !== false;
-    let booted = false;
-    let pollTimer = null;
-    let graceTimer = null;
-    function auth() {
-      const ns = (
-        /** @type {any} */
-        window.AIMEAT
-      );
-      return ns && ns.auth ? ns.auth : null;
-    }
-    function tryBoot() {
-      if (booted) return;
-      const a = auth();
-      const session = a && typeof a.getSession === "function" ? a.getSession() : null;
-      if (session && session.jwt) {
-        booted = true;
-        if (pollTimer) {
-          clearInterval(pollTimer);
-          pollTimer = null;
-        }
-        if (graceTimer) {
-          clearTimeout(graceTimer);
-          graceTimer = null;
-        }
-        root.classList.remove("ak-app--gate");
-        status("none");
-        if (spec.onReady) spec.onReady(session);
-      }
-    }
-    function startBoot() {
-      const a = auth();
-      if (a && typeof a.mountLoginButton === "function") {
-        a.mountLoginButton(pill, {
-          onLogin: function() {
-            tryBoot();
-          },
-          onLogout: function() {
-            if (requireLogin) {
-              booted = false;
-              root.classList.add("ak-app--gate");
-              status("signin");
-            }
-            if (spec.onLogout) spec.onLogout();
-            if (requireLogin) armPoll();
-          }
-        });
-      }
-      if (!requireLogin) {
-        booted = true;
-        status("none");
-        if (spec.onReady) spec.onReady(a && a.getSession ? a.getSession() : null);
-        return;
-      }
-      status("loading");
-      root.classList.add("ak-app--gate");
-      armPoll();
-      tryBoot();
-      graceTimer = setTimeout(function() {
-        graceTimer = null;
-        if (!booted) status("signin");
-      }, SIGNIN_GRACE_MS);
-    }
-    function armPoll() {
-      if (pollTimer) return;
-      pollTimer = setInterval(function() {
-        tryBoot();
-        if (booted && pollTimer) {
-          clearInterval(pollTimer);
-          pollTimer = null;
-        }
-      }, BOOT_POLL_MS);
-    }
-    const stopLang = i18n.onChange(function() {
-      heading.textContent = state.title;
-      motionBtn.setAttribute("title", motionLabel());
-      motionBtn.setAttribute("aria-label", motionLabel());
-    });
-    setTimeout(startBoot, 0);
-    return {
-      el: root,
-      main,
-      /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
-       *    quiet?: boolean, ambient?: AmbientWish }} patch */
-      set(patch) {
-        if (!patch) return;
-        if (patch.title != null) {
-          state.title = patch.title;
-          heading.textContent = state.title;
-        }
-        if ("ambient" in patch) {
-          if (patch.ambient === false) {
-            if (sky) {
-              sky.set({ preset: "none" });
-              syncWeather();
-            }
-          } else ensureSky(patch.ambient);
-        }
-        if (patch.look != null && patch.look !== state.look) {
-          state.look = patch.look;
-          const dress = function() {
-            root.setAttribute("data-ak-look", state.look);
-          };
-          if (patch.quiet) {
-            dress();
-          } else {
-            const cover = curtain({ kind: "halves", colour: "accent" });
-            cover.cover().then(dress).then(function() {
-              return cover.uncover();
-            }).then(function() {
-              cover.destroy();
-            }, function(err) {
-              cover.destroy();
-              throw err;
-            });
-          }
-        }
-        if (patch.density != null) root.classList.toggle("ak-app--compact", patch.density === "compact");
-      },
-      status,
-      t,
-      i18n,
-      /** The app's navigation (the side column and the phone's bottom bar together): move the
-       *  mark with `set({ value })`, change the counts with `set({ items })`. Null without navItems. */
-      get nav() {
-        if (!nav) return null;
-        return {
-          /** @param {{ value?: string, items?: any[] }} patch */
-          set(patch) {
-            if (!patch) return;
-            const next = patch.items ? linked(patch.items) : null;
-            if (side) side.set({ value: patch.value, items: next || void 0 });
-            if (nav) nav.set({ value: patch.value, items: next ? sideMode ? bottomEntries(next) : next : void 0 });
-          }
-        };
-      },
-      get ambient() {
-        return sky;
-      },
-      get weather() {
-        return weatherCtl;
-      },
-      destroy() {
-        stopLang();
-        window.removeEventListener("ak-motion", syncMotion);
-        root.removeEventListener("ak-ambient-preset", syncWeather);
-        if (sky) sky.destroy();
-        if (weatherCtl) weatherCtl.destroy();
-        bar2.removeEventListener("click", onBarClick, true);
-        if (pollTimer) {
-          clearInterval(pollTimer);
-          pollTimer = null;
-        }
-        if (graceTimer) {
-          clearTimeout(graceTimer);
-          graceTimer = null;
-        }
-        if (statusCard) statusCard.destroy();
-        if (nav) nav.destroy();
-        if (side) side.destroy();
-        if (fullFrame) document.body.classList.remove("ak-body");
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
   }
   function section(spec) {
     const s = spec || {};
@@ -5461,7 +5056,7 @@
           "data-ak-noguard": true,
           on: {
             click: function() {
-              if (item.id === state.value) {
+              if (item.action || item.id === state.value) {
                 if (item.onPick) item.onPick(item);
                 return;
               }
@@ -5487,3641 +5082,6 @@
       },
       destroy() {
         if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/motion.js
-  var STATE = /* @__PURE__ */ new WeakMap();
-  var REST = { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
-  function stateOf(node) {
-    let s = STATE.get(node);
-    if (!s) {
-      s = Object.assign({}, REST);
-      STATE.set(node, s);
-    }
-    return s;
-  }
-  function transformOf(s) {
-    return "translate(" + s.x + "px, " + s.y + "px) scale(" + s.scale + ") rotate(" + s.rotate + "deg)";
-  }
-  function springTokens(el2) {
-    if (!el2 || typeof getComputedStyle !== "function") return {};
-    let cs;
-    try {
-      cs = getComputedStyle(
-        /** @type {Element} */
-        el2
-      );
-    } catch {
-      return {};
-    }
-    if (!cs) return {};
-    const num2 = function(name) {
-      const v = parseFloat(cs.getPropertyValue(name));
-      return isFinite(v) && v > 0 ? v : void 0;
-    };
-    return { stiffness: num2("--ak-spring-stiffness"), damping: num2("--ak-spring-damping"), mass: num2("--ak-spring-mass") };
-  }
-  function springFrames(opts) {
-    const o = opts || {};
-    const look = o.stiffness && o.damping && o.mass ? {} : springTokens(o.el);
-    const k = o.stiffness || look.stiffness || 170;
-    const c = o.damping || look.damping || 20;
-    const m = o.mass || look.mass || 1;
-    const v0 = o.velocity || 0;
-    const w0 = Math.sqrt(k / m);
-    const zeta = c / (2 * Math.sqrt(k * m));
-    const step = 1 / 60;
-    const samples = [];
-    let t2 = 0;
-    let x;
-    let settled = 0;
-    while (t2 < 4) {
-      if (zeta < 1) {
-        const wd = w0 * Math.sqrt(1 - zeta * zeta);
-        const decay = Math.exp(-zeta * w0 * t2);
-        x = 1 - decay * (Math.cos(wd * t2) + (zeta * w0 - v0) / wd * Math.sin(wd * t2));
-      } else {
-        const decay = Math.exp(-w0 * t2);
-        x = 1 - decay * (1 + (w0 - v0) * t2);
-      }
-      samples.push(x);
-      settled = Math.abs(1 - x) < 1e-3 ? settled + 1 : 0;
-      if (settled > 6) break;
-      t2 += step;
-    }
-    samples.push(1);
-    return { samples, duration: Math.round(samples.length * step * 1e3) };
-  }
-  function spring(target, to, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const from = Object.assign({}, stateOf(node));
-    const dest = Object.assign({}, from, to || {});
-    const prior = (
-      /** @type {any} */
-      node.__akSpring
-    );
-    if (prior) {
-      const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
-      if (typeof p === "number") {
-        const at3 = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
-        Object.keys(from).forEach(function(key) {
-          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at3;
-        });
-      }
-      prior.cancel();
-    }
-    STATE.set(node, dest);
-    if (reducedMotion() || typeof node.animate !== "function") {
-      node.style.transform = transformOf(dest);
-      node.style.opacity = String(dest.opacity);
-      return { el: node, finished: Promise.resolve(), cancel() {
-      } };
-    }
-    const sf = springFrames(Object.assign({}, opts, { el: node }));
-    const frames = sf.samples.map(function(at3, i) {
-      const s = {};
-      Object.keys(from).forEach(function(key) {
-        s[key] = from[key] + (dest[key] - from[key]) * at3;
-      });
-      return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
-    });
-    const anim = (
-      /** @type {any} */
-      node.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" })
-    );
-    anim.__frames = sf.samples;
-    anim.__from = from;
-    anim.__to = dest;
-    node.__akSpring = anim;
-    const finished = anim.finished.then(function() {
-      node.style.transform = transformOf(dest);
-      node.style.opacity = String(dest.opacity);
-      anim.cancel();
-      if (
-        /** @type {any} */
-        node.__akSpring === anim
-      ) node.__akSpring = null;
-    }, function() {
-    });
-    return { el: node, finished, cancel() {
-      anim.cancel();
-    } };
-  }
-  function stagger(targets, opts) {
-    const o = opts || {};
-    const list3 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
-      /** @type {any} */
-      targets.length !== void 0 ? Array.prototype.slice.call(
-        /** @type {any} */
-        targets
-      ) : [targets]
-    );
-    const kids = list3.slice(0, o.max || 40);
-    if (!kids.length || reducedMotion() || typeof kids[0].animate !== "function") return { finished: Promise.resolve() };
-    const cs = getComputedStyle(kids[0]);
-    const dist = o.distance !== void 0 ? o.distance : parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 12;
-    const each = o.each !== void 0 ? o.each : parseFloat(cs.getPropertyValue("--ak-enter-stagger")) || 40;
-    const span = o.duration || (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.5;
-    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
-    const start = o.from === "down" ? "translateY(-" + dist + "px)" : o.from === "left" ? "translateX(-" + dist + "px)" : o.from === "right" ? "translateX(" + dist + "px)" : o.from === "scale" ? "scale(0.92)" : "translateY(" + dist + "px)";
-    const end = o.from === "scale" ? "scale(1)" : "translate(0, 0)";
-    let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
-    let timing = { duration: span, easing: ease, fill: "backwards" };
-    if (o.spring) {
-      const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-      frames = sf.samples.map(function(at3, i) {
-        return {
-          offset: i / (sf.samples.length - 1),
-          opacity: Math.min(1, at3 * 1.4),
-          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at3) + ")" : start.replace(/[-\d.]+px/, function(px) {
-            return (parseFloat(px) * (1 - at3)).toFixed(2) + "px";
-          })
-        };
-      });
-      timing = { duration: sf.duration, easing: "linear", fill: "backwards" };
-    }
-    const runs = kids.map(function(kid, i) {
-      return kid.animate(frames, Object.assign({}, timing, { delay: i * each })).finished;
-    });
-    return { finished: Promise.all(runs).then(function() {
-    }, function() {
-    }) };
-  }
-  function inView(target, fn, opts) {
-    const node = resolve(target);
-    const o = opts || {};
-    if (typeof IntersectionObserver !== "function") {
-      fn(
-        node,
-        /** @type {any} */
-        { isIntersecting: true, target: node }
-      );
-      return { el: node, destroy() {
-      } };
-    }
-    const io = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting) {
-          fn(node, entry);
-          if (o.once !== false) io.disconnect();
-        } else if (o.onLeave) {
-          o.onLeave(node);
-        }
-      });
-    }, { rootMargin: o.margin || "0px 0px -10% 0px", threshold: o.threshold || 0.15 });
-    io.observe(node);
-    return { el: node, destroy() {
-      io.disconnect();
-    } };
-  }
-  function nearestScroller(node) {
-    let p = node.parentElement;
-    while (p && p !== document.body) {
-      const oy = getComputedStyle(p).overflowY;
-      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
-      p = p.parentElement;
-    }
-    return window;
-  }
-  function scrollLink(target, frames, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const o = opts || {};
-    const subject = o.subject || node;
-    const scroller = o.scroller || nearestScroller(subject);
-    const lo = o.range ? o.range[0] : 0;
-    const hi = o.range ? o.range[1] : 1;
-    let last = 0;
-    if (reducedMotion() || typeof node.animate !== "function") {
-      return { el: node, progress() {
-        return 0;
-      }, destroy() {
-      } };
-    }
-    const anim = node.animate(frames, { duration: 1e3, easing: "linear", fill: "both" });
-    anim.pause();
-    const viewportH = function() {
-      return scroller === window ? window.innerHeight : (
-        /** @type {Element} */
-        scroller.clientHeight
-      );
-    };
-    const viewportTop = function() {
-      return scroller === window ? 0 : (
-        /** @type {Element} */
-        scroller.getBoundingClientRect().top
-      );
-    };
-    const tick = function() {
-      const r = subject.getBoundingClientRect();
-      const h = viewportH();
-      const raw = (viewportTop() + h - r.top) / Math.max(h + r.height, 1);
-      let p = (raw - lo) / Math.max(hi - lo, 1e-4);
-      p = Math.max(0, Math.min(1, p));
-      if (p !== last) {
-        last = p;
-        anim.currentTime = p * 1e3;
-      }
-    };
-    let rafId = 0;
-    const onScroll = function() {
-      if (!rafId) rafId = requestAnimationFrame(function() {
-        rafId = 0;
-        tick();
-      });
-    };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    tick();
-    return {
-      el: node,
-      progress() {
-        return last;
-      },
-      destroy() {
-        scroller.removeEventListener("scroll", onScroll);
-        window.removeEventListener("resize", onScroll);
-        if (rafId) cancelAnimationFrame(rafId);
-        anim.cancel();
-      }
-    };
-  }
-  function drag(target, handlers, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const h = handlers || {};
-    const o = opts || {};
-    const axis = o.axis || "both";
-    const threshold = o.threshold !== void 0 ? o.threshold : 4;
-    node.classList.add("ak-drag");
-    let active = null;
-    const clamp3 = function(v, range) {
-      return range ? Math.max(range[0], Math.min(range[1], v)) : v;
-    };
-    const down = function(e) {
-      if (e.button !== void 0 && e.button !== 0) return;
-      const s = stateOf(node);
-      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
-      if (
-        /** @type {any} */
-        node.__akSpring
-      ) node.__akSpring.cancel();
-      try {
-        node.setPointerCapture(e.pointerId);
-      } catch {
-      }
-    };
-    const move = function(e) {
-      if (!active || e.pointerId !== active.id) return;
-      let dx = e.clientX - active.x0;
-      let dy = e.clientY - active.y0;
-      if (!active.moved) {
-        if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
-        active.moved = true;
-        node.classList.add("ak-dragging");
-        if (h.onStart) h.onStart(node);
-      }
-      if (axis === "x") dy = 0;
-      if (axis === "y") dx = 0;
-      const now2 = performance.now();
-      const dt = Math.max(now2 - active.t, 1);
-      active.vx = (e.clientX - active.lx) / dt * 1e3;
-      active.vy = (e.clientY - active.ly) / dt * 1e3;
-      active.t = now2;
-      active.lx = e.clientX;
-      active.ly = e.clientY;
-      const s = stateOf(node);
-      s.x = clamp3(active.bx + dx, o.bounds && o.bounds.x);
-      s.y = clamp3(active.by + dy, o.bounds && o.bounds.y);
-      node.style.transform = transformOf(s);
-      if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
-      e.preventDefault();
-    };
-    const up = function(e) {
-      if (!active || e.pointerId !== active.id) return;
-      const was = active;
-      active = null;
-      node.classList.remove("ak-dragging");
-      try {
-        node.releasePointerCapture(e.pointerId);
-      } catch {
-      }
-      if (!was.moved) return;
-      const s = stateOf(node);
-      const dx = s.x - was.bx;
-      const dy = s.y - was.by;
-      if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
-      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-    };
-    node.addEventListener("pointerdown", down);
-    node.addEventListener("pointermove", move);
-    node.addEventListener("pointerup", up);
-    node.addEventListener("pointercancel", up);
-    return {
-      el: node,
-      destroy() {
-        node.removeEventListener("pointerdown", down);
-        node.removeEventListener("pointermove", move);
-        node.removeEventListener("pointerup", up);
-        node.removeEventListener("pointercancel", up);
-        node.classList.remove("ak-drag", "ak-dragging");
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/menu.js
-  var GAP = 6;
-  var EDGE = 8;
-  function placeAt(box, at3, o) {
-    const opts = o || {};
-    const w = box.offsetWidth;
-    const h = box.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let top = opts.placement === "above" ? at3.top - GAP - h : at3.bottom + GAP;
-    if (top + h > vh - EDGE && at3.top - GAP - h >= EDGE) top = at3.top - GAP - h;
-    if (top < EDGE && at3.bottom + GAP + h <= vh - EDGE) top = at3.bottom + GAP;
-    let left = opts.align === "end" ? at3.right - w : opts.align === "center" ? (at3.left + at3.right) / 2 - w / 2 : at3.left;
-    left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
-    top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
-    box.style.left = Math.round(left) + "px";
-    box.style.top = Math.round(top) + "px";
-    const ox = Math.max(0, Math.min(w, (at3.left + at3.right) / 2 - left));
-    const oy = top >= at3.bottom ? 0 : top + h <= at3.top ? h : h / 2;
-    return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
-  }
-  function openMotion(box, origin) {
-    box.style.transformOrigin = origin;
-    if (motionOff(box) || typeof box.animate !== "function") return;
-    const sf = springFrames({ el: box });
-    const frames = sf.samples.map(function(at3, i) {
-      const s = 0.9 + 0.1 * at3;
-      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at3 * 1.6) };
-    });
-    box.animate(frames, { duration: sf.duration, easing: "linear" });
-  }
-  function closeMotion(box, done) {
-    if (motionOff(box) || typeof box.animate !== "function") {
-      done();
-      return;
-    }
-    const pace3 = paceOf(box);
-    const anim = box.animate(
-      [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.95)" }],
-      { duration: Math.max(90, pace3.span * 0.6), easing: "ease-in", fill: "forwards" }
-    );
-    anim.onfinish = done;
-    anim.oncancel = done;
-  }
-  function outside(nodes, close) {
-    const hit = function(e) {
-      for (const n of nodes) if (n && n.contains(
-        /** @type {Node} */
-        e.target
-      )) return;
-      close();
-    };
-    document.addEventListener("pointerdown", hit, true);
-    return function() {
-      document.removeEventListener("pointerdown", hit, true);
-    };
-  }
-  function menu(spec) {
-    const s = spec || { items: [] };
-    const anchor = s.anchor ? (
-      /** @type {HTMLElement} */
-      resolve(s.anchor)
-    ) : null;
-    let items = s.items || [];
-    let box = null;
-    let mark = null;
-    let unhook = null;
-    let cursor = -1;
-    let picking = false;
-    if (anchor) {
-      anchor.setAttribute("aria-haspopup", "menu");
-      anchor.setAttribute("aria-expanded", "false");
-    }
-    function rows() {
-      return box ? (
-        /** @type {HTMLElement[]} */
-        Array.prototype.slice.call(box.querySelectorAll('.ak-menu__item:not([aria-disabled="true"])'))
-      ) : [];
-    }
-    function focusRow(i) {
-      const list3 = rows();
-      if (!list3.length) return;
-      cursor = (i + list3.length) % list3.length;
-      list3.forEach(function(r, j) {
-        r.classList.toggle("ak-menu__item--on", j === cursor);
-      });
-      list3[cursor].focus({ preventScroll: true });
-      if (mark) mark.sync();
-    }
-    function choose(item) {
-      if (picking || !item || item.disabled) return;
-      picking = true;
-      const finish = function() {
-        picking = false;
-        close(true);
-        if (item.run) item.run();
-        if (s.onPick) s.onPick(item.id, item);
-      };
-      if (!box || motionOff(box) || !mark || typeof mark.el.animate !== "function") {
-        finish();
-        return;
-      }
-      const blink = mark.el.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 1 }], { duration: 150, easing: "linear" });
-      blink.onfinish = finish;
-      blink.oncancel = finish;
-    }
-    function onKey(e) {
-      const list3 = rows();
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        focusRow(cursor + 1);
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        focusRow(cursor < 0 ? list3.length - 1 : cursor - 1);
-      } else if (e.key === "Home") {
-        e.preventDefault();
-        focusRow(0);
-      } else if (e.key === "End") {
-        e.preventDefault();
-        focusRow(list3.length - 1);
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        close(true);
-      } else if (e.key === "Tab") {
-        close(false);
-      } else if (e.key.length === 1 && /\S/.test(e.key)) {
-        const ch = e.key.toLowerCase();
-        for (let k = 1; k <= list3.length; k++) {
-          const j = (cursor + k) % list3.length;
-          if ((list3[j].textContent || "").trim().toLowerCase().indexOf(ch) === 0) {
-            focusRow(j);
-            break;
-          }
-        }
-      }
-    }
-    function build() {
-      const root = el("div", { class: "ak-root ak-menu", role: "menu", "data-ak-part": "root", "aria-label": s.label || null, tabindex: "-1", on: { keydown: onKey } });
-      items.forEach(function(it) {
-        if (it === "-") {
-          root.appendChild(el("div", { class: "ak-menu__sep", role: "separator", "data-ak-part": "separator" }));
-          return;
-        }
-        root.appendChild(el("button", {
-          type: "button",
-          role: "menuitem",
-          class: "ak-menu__item" + (it.danger ? " ak-menu__item--danger" : ""),
-          "data-ak-part": "item",
-          "data-ak-id": it.id,
-          tabindex: "-1",
-          "data-ak-noguard": true,
-          "aria-disabled": it.disabled ? "true" : null,
-          on: {
-            click: function() {
-              choose(it);
-            },
-            pointermove: function(e) {
-              if (it.disabled) return;
-              const i = rows().indexOf(
-                /** @type {HTMLElement} */
-                e.currentTarget
-              );
-              if (i >= 0 && i !== cursor) focusRow(i);
-            }
-          }
-        }, [
-          el("span", { class: "ak-menu__label", "data-ak-part": "label", text: it.label }),
-          it.hint ? el("span", { class: "ak-menu__hint", "data-ak-part": "hint", text: it.hint }) : null
-        ]));
-      });
-      return root;
-    }
-    function open(at3, fromKeys) {
-      if (box) return;
-      box = build();
-      document.body.appendChild(wearLook(box, anchor));
-      const r = at3 ? { left: at3.x, right: at3.x, top: at3.y, bottom: at3.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
-      const origin = placeAt(box, r, { align: s.align });
-      mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
-      openMotion(box, origin);
-      if (!motionOff(box)) {
-        const pace3 = paceOf(box);
-        rows().forEach(function(row, i) {
-          if (typeof row.animate === "function") {
-            row.animate(
-              [{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }],
-              { duration: pace3.span, delay: 20 + i * 18, easing: pace3.ease, fill: "backwards" }
-            );
-          }
-        });
-      }
-      if (anchor) anchor.setAttribute("aria-expanded", "true");
-      unhook = outside([box, anchor], function() {
-        close(false);
-      });
-      cursor = -1;
-      box.focus({ preventScroll: true });
-      if (fromKeys) focusRow(0);
-    }
-    function close(focusBack) {
-      if (!box) return;
-      const gone = box;
-      box = null;
-      if (mark) {
-        mark.destroy();
-        mark = null;
-      }
-      if (unhook) {
-        unhook();
-        unhook = null;
-      }
-      if (anchor) anchor.setAttribute("aria-expanded", "false");
-      closeMotion(gone, function() {
-        if (gone.parentNode) gone.parentNode.removeChild(gone);
-      });
-      if (focusBack && anchor) anchor.focus({ preventScroll: true });
-    }
-    const onAnchor = function(e) {
-      if (box) close(true);
-      else open(void 0, !!e && e.detail === 0);
-    };
-    const onAnchorKey = function(e) {
-      if (e.key === "ArrowDown" && !box) {
-        e.preventDefault();
-        open(void 0, true);
-      }
-    };
-    if (anchor) {
-      anchor.addEventListener("click", onAnchor);
-      anchor.addEventListener("keydown", onAnchorKey);
-    }
-    return {
-      open,
-      close,
-      isOpen() {
-        return !!box;
-      },
-      set(patch) {
-        if (patch && patch.items) {
-          items = patch.items;
-          if (box) {
-            close(false);
-            open();
-          }
-        }
-      },
-      destroy() {
-        close(false);
-        if (anchor) {
-          anchor.removeEventListener("click", onAnchor);
-          anchor.removeEventListener("keydown", onAnchorKey);
-        }
-      }
-    };
-  }
-  function contextMenu(target, spec) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label });
-    const onCtx = function(e) {
-      e.preventDefault();
-      m.close(false);
-      m.open({ x: e.clientX, y: e.clientY });
-    };
-    const onKey = function(e) {
-      if (e.key === "F10" && e.shiftKey) {
-        e.preventDefault();
-        const r = node.getBoundingClientRect();
-        m.close(false);
-        m.open({ x: r.left + 12, y: r.top + 12 }, true);
-      }
-    };
-    node.addEventListener("contextmenu", onCtx);
-    node.addEventListener("keydown", onKey);
-    return {
-      close() {
-        m.close(false);
-      },
-      destroy() {
-        m.destroy();
-        node.removeEventListener("contextmenu", onCtx);
-        node.removeEventListener("keydown", onKey);
-      }
-    };
-  }
-  function popover(spec) {
-    const anchor = (
-      /** @type {HTMLElement} */
-      resolve(spec.anchor)
-    );
-    let box = null;
-    let unhook = null;
-    anchor.setAttribute("aria-expanded", "false");
-    function open() {
-      if (box) return;
-      const body = typeof spec.content === "function" ? spec.content() : spec.content;
-      box = el(
-        "div",
-        {
-          class: "ak-root ak-popover",
-          role: "dialog",
-          "aria-label": spec.label || null,
-          "data-ak-part": "root",
-          tabindex: "-1",
-          on: { keydown: function(e) {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              close();
-              anchor.focus();
-            }
-          } }
-        },
-        [el("div", { class: "ak-popover__body", "data-ak-part": "body" }, body)]
-      );
-      document.body.appendChild(wearLook(box, anchor));
-      openMotion(box, placeAt(box, anchor.getBoundingClientRect(), { align: spec.align || "center" }));
-      anchor.setAttribute("aria-expanded", "true");
-      unhook = outside([box, anchor], close);
-      box.focus({ preventScroll: true });
-      if (spec.onOpen) spec.onOpen();
-    }
-    function close() {
-      if (!box) return;
-      const gone = box;
-      box = null;
-      if (unhook) {
-        unhook();
-        unhook = null;
-      }
-      anchor.setAttribute("aria-expanded", "false");
-      closeMotion(gone, function() {
-        if (gone.parentNode) gone.parentNode.removeChild(gone);
-      });
-      if (spec.onClose) spec.onClose();
-    }
-    const onClick = function() {
-      if (box) close();
-      else open();
-    };
-    anchor.addEventListener("click", onClick);
-    return { open, close, isOpen() {
-      return !!box;
-    }, destroy() {
-      close();
-      anchor.removeEventListener("click", onClick);
-    } };
-  }
-  function tooltip(target, text, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const o = opts || {};
-    const tip = el("div", { class: "ak-root ak-tooltip", role: "tooltip", "data-ak-part": "root", id: "ak-tip-" + Math.random().toString(36).slice(2, 8), text });
-    let timer = null;
-    let shown = false;
-    node.setAttribute("aria-describedby", tip.id);
-    function show() {
-      clearTimeout(timer);
-      if (shown) return;
-      shown = true;
-      document.body.appendChild(wearLook(tip, node));
-      openMotion(tip, placeAt(tip, node.getBoundingClientRect(), { align: "center", placement: o.placement || "above" }));
-    }
-    function hide() {
-      clearTimeout(timer);
-      if (!shown) return;
-      shown = false;
-      closeMotion(tip, function() {
-        if (!shown && tip.parentNode) tip.parentNode.removeChild(tip);
-      });
-    }
-    const enter2 = function() {
-      clearTimeout(timer);
-      timer = setTimeout(show, o.delay != null ? o.delay : 450);
-    };
-    const key = function(e) {
-      if (e.key === "Escape") hide();
-    };
-    node.addEventListener("pointerenter", enter2);
-    node.addEventListener("pointerleave", hide);
-    node.addEventListener("focus", show);
-    node.addEventListener("blur", hide);
-    node.addEventListener("keydown", key);
-    return {
-      set(next) {
-        tip.textContent = next;
-      },
-      destroy() {
-        hide();
-        node.removeEventListener("pointerenter", enter2);
-        node.removeEventListener("pointerleave", hide);
-        node.removeEventListener("focus", show);
-        node.removeEventListener("blur", hide);
-        node.removeEventListener("keydown", key);
-        node.removeAttribute("aria-describedby");
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/parts-ui.js
-  var toastHost = null;
-  function toast(spec) {
-    if (!toastHost || !toastHost.isConnected) {
-      toastHost = el("div", { class: "ak-root ak-toasts", role: "status", "aria-live": "polite" });
-      document.body.appendChild(toastHost);
-    }
-    wearLook(toastHost);
-    let timer = null;
-    const node = el("div", { class: "ak-toast" + (spec.tone ? " ak-toast--" + spec.tone : "") }, [
-      el("div", { class: "ak-toast__body" }, [
-        el("div", { class: "ak-toast__title" }, spec.title),
-        spec.sub ? el("div", { class: "ak-toast__sub" }, spec.sub) : null
-      ].filter(Boolean)),
-      spec.action ? el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: {
-        click: function() {
-          spec.action.onPick();
-          close();
-        }
-      } }, spec.action.label) : null
-    ].filter(Boolean));
-    const pace3 = paceOf(node);
-    function close() {
-      if (timer) clearTimeout(timer);
-      const drop = function() {
-        if (node.parentNode) node.parentNode.removeChild(node);
-      };
-      if (motionOff(node) || typeof node.animate !== "function") {
-        drop();
-        return;
-      }
-      const anim = node.animate(
-        [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(" + (pace3.dist || 8) + "px)" }],
-        { duration: pace3.span, easing: "ease-in" }
-      );
-      anim.onfinish = drop;
-      anim.oncancel = drop;
-    }
-    toastHost.appendChild(node);
-    fadeIn(node, pace3, 0);
-    enter(node);
-    const ttl = spec.ttl == null ? 6e3 : spec.ttl;
-    if (ttl > 0) timer = setTimeout(close, ttl);
-    return { el: node, close };
-  }
-  function palette(spec) {
-    const s = spec || { items: [] };
-    let root = null;
-    let box = null;
-    let list3 = null;
-    let mark = null;
-    let cursor = 0;
-    let shown = [];
-    let opener = null;
-    function keyOf3(it, i) {
-      return it.id || it.label || String(i);
-    }
-    function close(after) {
-      if (!root) return;
-      const gone = root;
-      const goneBox = box;
-      root = null;
-      box = null;
-      list3 = null;
-      if (mark) {
-        mark.destroy();
-        mark = null;
-      }
-      const drop = function() {
-        if (gone.parentNode) gone.parentNode.removeChild(gone);
-        if (after) after();
-      };
-      if (motionOff(gone) || typeof gone.animate !== "function") {
-        drop();
-        return;
-      }
-      gone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: "ease-in", fill: "forwards" });
-      closeMotion(goneBox, drop);
-    }
-    function runItem(it) {
-      if (!it.done || !box || motionOff(box) || typeof box.animate !== "function") {
-        close();
-        it.run();
-        if (it.done) toast({ title: it.done, tone: "ok", ttl: 3200 });
-        return;
-      }
-      const from = box.getBoundingClientRect();
-      const tw2 = Math.min(360, window.innerWidth - 32);
-      const to = { left: window.innerWidth - tw2 - 16, top: window.innerHeight - 72, width: tw2, height: 56 };
-      const dx = to.left - from.left;
-      const dy = to.top - from.top;
-      const sx = to.width / Math.max(from.width, 1);
-      const sy = to.height / Math.max(from.height, 1);
-      const sf = springFrames({ el: box });
-      const frames = sf.samples.map(function(at3, i) {
-        return {
-          offset: i / (sf.samples.length - 1),
-          transform: "translate(" + (dx * at3).toFixed(1) + "px, " + (dy * at3).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at3).toFixed(4) + ", " + (1 + (sy - 1) * at3).toFixed(4) + ")",
-          opacity: at3 > 0.85 ? 1 - (at3 - 0.85) / 0.15 : 1
-        };
-      });
-      box.style.transformOrigin = "0 0";
-      if (list3) list3.style.opacity = "0";
-      const gone = root;
-      root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(sf.duration, 260), easing: "ease-out", fill: "forwards" });
-      const anim = box.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" });
-      root = null;
-      box = null;
-      list3 = null;
-      if (mark) {
-        mark.destroy();
-        mark = null;
-      }
-      let handed = false;
-      const hand2 = function() {
-        if (handed) return;
-        handed = true;
-        if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
-        toast({ title: it.done, tone: "ok", ttl: 3200 });
-      };
-      it.run();
-      setTimeout(hand2, Math.min(sf.duration, 420));
-      anim.onfinish = hand2;
-    }
-    function highlight() {
-      if (!list3) return;
-      const rows = Array.prototype.slice.call(list3.querySelectorAll(".ak-palette__item:not(.ak-layout__ghost)"));
-      rows.forEach(function(row, i) {
-        row.setAttribute("aria-selected", i === cursor ? "true" : "false");
-      });
-      if (rows[cursor] && typeof rows[cursor].scrollIntoView === "function") rows[cursor].scrollIntoView({ block: "nearest" });
-      if (mark) mark.sync();
-    }
-    function paintList() {
-      if (!list3) return;
-      const host = list3;
-      settle(host, function() {
-        Array.prototype.slice.call(host.querySelectorAll(".ak-palette__item, .ak-palette__empty")).forEach(function(n) {
-          host.removeChild(n);
-        });
-        if (!shown.length) {
-          host.appendChild(el("li", { class: "ak-palette__empty", "data-ak-id": "__empty" }, s.empty || t("paletteEmpty")));
-          return;
-        }
-        shown.forEach(function(it, i) {
-          host.appendChild(el("li", { class: "ak-palette__item", role: "option", "data-ak-id": keyOf3(it, i), "aria-selected": "false", on: {
-            click: function() {
-              runItem(it);
-            },
-            pointermove: function() {
-              if (cursor !== i) {
-                cursor = i;
-                highlight();
-              }
-            }
-          } }, [el("span", {}, it.label), it.hint ? el("span", { class: "ak-palette__hint" }, it.hint) : null].filter(Boolean)));
-        });
-      }, { rows: ".ak-palette__item, .ak-palette__empty" });
-      highlight();
-    }
-    function open(from) {
-      if (root) return;
-      opener = from || null;
-      cursor = 0;
-      shown = s.items.slice();
-      list3 = el("ul", { class: "ak-palette__list", role: "listbox" });
-      const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || t("palettePlaceholder"), autocomplete: "off", on: {
-        input: function() {
-          const q = (
-            /** @type {HTMLInputElement} */
-            input.value.trim().toLowerCase()
-          );
-          shown = s.items.filter(function(it) {
-            return !q || (it.label + " " + (it.hint || "")).toLowerCase().indexOf(q) >= 0;
-          });
-          cursor = 0;
-          paintList();
-        },
-        keydown: function(e) {
-          if (e.key === "ArrowDown") {
-            e.preventDefault();
-            cursor = Math.min(cursor + 1, shown.length - 1);
-            highlight();
-          } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            cursor = Math.max(cursor - 1, 0);
-            highlight();
-          } else if (e.key === "Enter") {
-            e.preventDefault();
-            const it = shown[cursor];
-            if (it) runItem(it);
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            close(function() {
-              if (opener && opener.isConnected) opener.focus();
-            });
-          }
-        }
-      } });
-      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || t("paletteLabel") }, [input, list3]);
-      root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
-        if (e.target === root) close();
-      } } }, [box]);
-      document.body.appendChild(wearLook(root, opener));
-      mark = ink2(list3, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
-      paintList();
-      mark.jump();
-      growFrom(box, opener);
-      if (!motionOff(root) && typeof root.animate === "function") root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
-      input.focus();
-    }
-    const key = s.hotkey === void 0 ? "k" : s.hotkey;
-    const onKey = function(e) {
-      if (!key) return;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === key) {
-        e.preventDefault();
-        if (root) close();
-        else open();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    const anchor = s.anchor ? (
-      /** @type {HTMLElement} */
-      resolve(s.anchor)
-    ) : null;
-    const onAnchor = function() {
-      if (root) close();
-      else open(anchor);
-    };
-    if (anchor) anchor.addEventListener("click", onAnchor);
-    return {
-      open,
-      close() {
-        close();
-      },
-      destroy() {
-        close();
-        window.removeEventListener("keydown", onKey);
-        if (anchor) anchor.removeEventListener("click", onAnchor);
-      }
-    };
-  }
-  function growFrom(box, from) {
-    if (!from || !from.isConnected || motionOff(box) || typeof box.animate !== "function") {
-      openMotion(box, "50% 0");
-      return;
-    }
-    const a = from.getBoundingClientRect();
-    const b = box.getBoundingClientRect();
-    const sx = a.width / Math.max(b.width, 1);
-    const sy = a.height / Math.max(b.height, 1);
-    const dx = a.left - b.left;
-    const dy = a.top - b.top;
-    const sf = springFrames({ el: box });
-    box.style.transformOrigin = "0 0";
-    box.animate(sf.samples.map(function(at3, i) {
-      const k = 1 - at3;
-      return {
-        offset: i / (sf.samples.length - 1),
-        transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
-        opacity: Math.min(1, 0.4 + at3)
-      };
-    }), { duration: sf.duration, easing: "linear" });
-  }
-  function compare(spec) {
-    const s = spec || { before: {}, after: {} };
-    function layer(side, cls) {
-      const body = side.el ? side.el : side.image ? el("img", { src: side.image, alt: side.label || "" }) : el("span", {}, side.label || "");
-      return el("div", { class: "ak-compare__layer " + cls }, [body]);
-    }
-    const handle2 = el("button", { type: "button", class: "ak-compare__handle", "aria-label": t("compareLabel"), role: "slider", "aria-valuemin": "0", "aria-valuemax": "100" }, "⇄");
-    const root = el("div", { class: "ak-root ak-compare" }, [
-      layer(s.before || {}, "ak-compare__before"),
-      layer(s.after || {}, "ak-compare__after"),
-      s.before && s.before.label ? el("span", { class: "ak-compare__label ak-compare__label--before" }, s.before.label) : null,
-      s.after && s.after.label ? el("span", { class: "ak-compare__label ak-compare__label--after" }, s.after.label) : null,
-      el("div", { class: "ak-compare__bar" }),
-      handle2
-    ].filter(Boolean));
-    if (s.target) resolve(s.target).appendChild(root);
-    let pct = typeof s.value === "number" ? s.value : 50;
-    function set(v) {
-      pct = Math.max(0, Math.min(Number(v) || 0, 100));
-      root.style.setProperty("--ak-compare", pct + "%");
-      handle2.setAttribute("aria-valuenow", String(Math.round(pct)));
-      if (s.onChange) s.onChange(pct);
-    }
-    let dragging = false;
-    function at3(e) {
-      const r = root.getBoundingClientRect();
-      set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
-    }
-    root.addEventListener("pointerdown", function(e) {
-      dragging = true;
-      root.setPointerCapture(e.pointerId);
-      at3(e);
-    });
-    root.addEventListener("pointermove", function(e) {
-      if (dragging) at3(e);
-    });
-    root.addEventListener("pointerup", function() {
-      dragging = false;
-    });
-    root.addEventListener("pointercancel", function() {
-      dragging = false;
-    });
-    handle2.addEventListener("keydown", function(e) {
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        set(pct - 5);
-      }
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        set(pct + 5);
-      }
-    });
-    set(pct);
-    return { el: root, set, destroy() {
-      if (root.parentNode) root.parentNode.removeChild(root);
-    } };
-  }
-  function tour(spec) {
-    const s = spec || { steps: [] };
-    let i = -1;
-    let note = null;
-    let marked = null;
-    let frame2 = 0;
-    let before = null;
-    function follow() {
-      if (frame2) return;
-      frame2 = requestAnimationFrame(function() {
-        frame2 = 0;
-        place2();
-      });
-    }
-    function place2() {
-      if (!note || !marked) return;
-      const r = marked.getBoundingClientRect();
-      const w = note.offsetWidth || 260;
-      const top = r.bottom + 12;
-      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
-      note.style.top = (top + (note.offsetHeight || 0) > window.innerHeight ? Math.max(8, r.top - (note.offsetHeight || 0) - 12) : top) + "px";
-      note.style.left = left + "px";
-    }
-    function show(n) {
-      clearStep();
-      const step = s.steps[n];
-      if (!step) {
-        end();
-        return;
-      }
-      i = n;
-      const target = typeof step.target === "string" ? document.querySelector(step.target) : step.target;
-      if (!target) {
-        show(n + 1);
-        return;
-      }
-      marked = /** @type {HTMLElement} */
-      target;
-      marked.classList.add("ak-tour__mark");
-      if (!reducedMotion()) marked.scrollIntoView({ block: "center", behavior: "smooth" });
-      const last = n === s.steps.length - 1;
-      const L = Object.assign({ next: t("next"), done: t("done"), skip: t("tourSkip") }, s.labels || {});
-      note = el("div", { class: "ak-root ak-tour__note", role: "dialog", "aria-live": "polite" }, [
-        el("div", {}, [el("span", { class: "ak-tour__step" }, n + 1 + "/" + s.steps.length), el("span", {}, step.text)]),
-        el("div", { class: "ak-tour__nav" }, [
-          el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: function() {
-            if (last) end();
-            else show(n + 1);
-          } } }, last ? L.done : L.next),
-          last ? null : el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: end } }, L.skip)
-        ].filter(Boolean))
-      ]);
-      document.body.appendChild(wearLook(note, marked));
-      place2();
-      note.querySelector("button").focus({ preventScroll: true });
-    }
-    function clearStep() {
-      if (marked) marked.classList.remove("ak-tour__mark");
-      if (note && note.parentNode) note.parentNode.removeChild(note);
-      marked = null;
-      note = null;
-    }
-    function onKey(e) {
-      if (e.key === "Escape") end();
-    }
-    function end() {
-      clearStep();
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", place2);
-      window.removeEventListener("scroll", follow, true);
-      if (frame2) {
-        cancelAnimationFrame(frame2);
-        frame2 = 0;
-      }
-      if (before && before.isConnected && typeof before.focus === "function") before.focus({ preventScroll: true });
-      before = null;
-      if (i >= 0 && s.onDone) s.onDone();
-      i = -1;
-    }
-    function start() {
-      before = document.activeElement;
-      window.addEventListener("keydown", onKey);
-      window.addEventListener("resize", place2);
-      window.addEventListener("scroll", follow, { capture: true, passive: true });
-      show(0);
-    }
-    return { start, end };
-  }
-
-  // src/static/sdk-libs/_core/clipboard.js
-  async function copyText(text) {
-    const value = String(text == null ? "" : text);
-    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-      try {
-        await navigator.clipboard.writeText(value);
-        return true;
-      } catch {
-      }
-    }
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = value;
-      ta.setAttribute("readonly", "");
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      const ok = document.execCommand("copy");
-      document.body.removeChild(ta);
-      return !!ok;
-    } catch {
-      return false;
-    }
-  }
-
-  // src/static/sdk-libs/atelier/copy.js
-  function copy(text) {
-    const af = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.agentface;
-    if (af && typeof af.copyText === "function") {
-      return Promise.resolve().then(function() {
-        return af.copyText(text);
-      }).then(function(ok) {
-        return !!ok;
-      }, function() {
-        return false;
-      });
-    }
-    return copyText(text);
-  }
-  function selectForHand(node) {
-    if (!node || typeof document === "undefined" || typeof window === "undefined") return false;
-    try {
-      const sel = window.getSelection && window.getSelection();
-      if (!sel || typeof document.createRange !== "function" || typeof sel.addRange !== "function") return false;
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // src/static/sdk-libs/atelier/copy-upload-i18n.js
-  var STRINGS = {
-    en: {
-      "drop.label": "Drop the file, or press to pick",
-      "drop.tooBig": "{name} is over {mb} MB.",
-      "drop.wrongKind": "{name} is not a kind this takes.",
-      "upload.waiting": "Waiting",
-      "upload.sending": "Uploading…",
-      "upload.percent": "Uploading… {n}%",
-      "upload.saved": "Saved as {key}",
-      "upload.open": "Open",
-      "upload.failed": "Did not upload: {why}",
-      "copy.promptByHand": "The browser did not allow copying. The whole prompt is selected: press Ctrl+C, or Cmd+C on a Mac."
-    },
-    fi: {
-      "drop.label": "Pudota tiedosto tähän tai valitse se painamalla",
-      "drop.tooBig": "{name} on yli {mb} Mt.",
-      "drop.wrongKind": "Tämä ei ota vastaan tiedostoa {name}: tiedostotyyppi ei käy.",
-      "upload.waiting": "Odottaa vuoroaan",
-      "upload.sending": "Lähetetään…",
-      "upload.percent": "Lähetetään… {n} %",
-      "upload.saved": "Tallennettu nimellä {key}",
-      "upload.open": "Avaa",
-      "upload.failed": "Lähetys ei onnistunut: {why}",
-      "copy.promptByHand": "Selain ei sallinut kopiointia. Koko kehote on valittu: paina Ctrl+C tai Macissa Cmd+C."
-    },
-    es: {
-      "drop.label": "Suelta el archivo o presiona para elegirlo",
-      "drop.tooBig": "{name} pesa más de {mb} MB.",
-      "drop.wrongKind": "{name} no es de un tipo que se acepte aquí.",
-      "upload.waiting": "En espera",
-      "upload.sending": "Subiendo…",
-      "upload.percent": "Subiendo… {n} %",
-      "upload.saved": "Guardado como {key}",
-      "upload.open": "Abrir",
-      "upload.failed": "No se subió: {why}",
-      "copy.promptByHand": "El navegador no permitió copiar. La instrucción completa está seleccionada: pulsa Ctrl+C, o Cmd+C en un Mac."
-    }
-  };
-  function tu(key, vars) {
-    const hosted = i18n.t(key, vars);
-    if (hosted !== key) return hosted;
-    const lang2 = i18n.lang();
-    const table2 = (
-      /** @type {Record<string, string>} */
-      STRINGS[
-        /** @type {'en'|'fi'|'es'} */
-        lang2
-      ] || STRINGS.en
-    );
-    const text = table2[key] || STRINGS.en[key] || key;
-    if (!vars) return text;
-    return text.replace(/\{(\w+)\}/g, function(whole, name) {
-      return vars[name] == null ? whole : String(vars[name]);
-    });
-  }
-
-  // src/static/sdk-libs/atelier/workbench-parts.js
-  function parseAnswer(text) {
-    const s = String(text || "").replace(/```(?:json)?/gi, "");
-    const a = s.indexOf("{");
-    const b = s.lastIndexOf("}");
-    if (a < 0 || b <= a) return null;
-    try {
-      return JSON.parse(s.slice(a, b + 1));
-    } catch {
-      return null;
-    }
-  }
-  function button(label, cls, part, onClick) {
-    const b = el("button", { type: "button", class: "ak-btn" + (cls ? " " + cls : ""), "data-ak-part": part, "data-ak-noguard": true }, label);
-    b.addEventListener("click", function() {
-      whileBusy(b, Promise.resolve().then(onClick)).catch(function(err) {
-        toast({ title: String(err && err.message || err), tone: "err" });
-      });
-    });
-    return b;
-  }
-  function promptPanel(spec) {
-    const promptText = function() {
-      return typeof spec.prompt === "function" ? spec.prompt() : String(spec.prompt || "");
-    };
-    const answers = !!(spec.onResult && spec.expect !== null);
-    const root = el("div", { class: "ak-root ak-promptpanel" + (answers ? "" : " ak-promptpanel--one"), "data-ak-part": "root" });
-    const shortText = function() {
-      const lines = promptText().split("\n");
-      return lines[0].slice(0, 120) + "… (" + (lines.length === 1 ? t("promptLine1") : t("promptLines", { n: lines.length })) + ")";
-    };
-    const one = el("div", { class: "ak-promptpanel__col", "data-ak-part": "col" });
-    one.appendChild(el("div", { class: "ak-promptpanel__step", "data-ak-part": "step", text: answers ? t("promptStepCopy") : t("promptStepCopyOnly") }));
-    const preview = el("div", { class: "ak-promptpanel__preview", "data-ak-part": "preview", text: shortText() });
-    one.appendChild(preview);
-    const row = el("div", { class: "ak-promptpanel__row" });
-    let full = false;
-    function showFull(on2) {
-      full = on2;
-      preview.textContent = full ? promptText() : shortText();
-      preview.classList.toggle("ak-promptpanel__preview--full", full);
-      toggle2.textContent = full ? t("promptHide") : t("promptShowAll");
-    }
-    row.appendChild(button(spec.copyLabel || t("promptCopy"), "ak-btn--primary", "copy", function() {
-      return copy(promptText()).then(function(ok) {
-        if (ok) {
-          toast({ title: t("promptCopied"), tone: "ok" });
-          return;
-        }
-        showFull(true);
-        selectForHand(preview);
-        toast({ title: tu("copy.promptByHand"), tone: "warn", ttl: 8e3 });
-      });
-    }));
-    const toggle2 = button(t("promptShowAll"), "", "toggle", function() {
-      showFull(!full);
-    });
-    row.appendChild(toggle2);
-    one.appendChild(row);
-    root.appendChild(one);
-    if (answers) {
-      const two = el("div", { class: "ak-promptpanel__col", "data-ak-part": "col" });
-      const id = uid("ak-pp");
-      two.appendChild(el("label", { class: "ak-promptpanel__step", "data-ak-part": "step", for: id, text: t("promptStepPaste") }));
-      const area = el("textarea", { id, class: "ak-input ak-input--area ak-promptpanel__answer", "data-ak-part": "answer", rows: 4, placeholder: t("promptPastePh") });
-      two.appendChild(area);
-      const row2 = el("div", { class: "ak-promptpanel__row" });
-      row2.appendChild(button(spec.applyLabel || t("promptApply"), "ak-promptpanel__apply", "apply", function() {
-        const raw = (
-          /** @type {HTMLTextAreaElement} */
-          area.value
-        );
-        if (spec.expect === "json") {
-          const value = parseAnswer(raw);
-          if (value == null) throw new Error(t("promptNoJson"));
-          return spec.onResult && spec.onResult(value, raw);
-        }
-        return spec.onResult && spec.onResult(raw, raw);
-      }));
-      two.appendChild(row2);
-      root.appendChild(two);
-    }
-    if (spec.target) resolve(spec.target).appendChild(root);
-    return {
-      el: root,
-      destroy() {
-        clear(root);
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-  function queueRow(spec) {
-    const s = spec || { title: "" };
-    const root = el("span", { class: "ak-qrow", "data-ak-part": "root" });
-    const top = el("span", { class: "ak-qrow__top", "data-ak-part": "top" });
-    top.appendChild(el("span", { class: "ak-qrow__who", "data-ak-part": "who", text: s.who || "" }));
-    top.appendChild(el("span", { class: "ak-qrow__when", "data-ak-part": "when", text: whenText(s.when) }));
-    root.appendChild(top);
-    root.appendChild(el("span", { class: "ak-qrow__title", "data-ak-part": "title", text: s.title || "—" }));
-    const chips = el("span", { class: "ak-qrow__chips", "data-ak-part": "chips" });
-    (s.chips || []).forEach(function(c) {
-      if (c && c.text) chips.appendChild(el("span", { class: "ak-qrow__chip", "data-ak-part": "chip", text: c.text }));
-    });
-    if (s.note && s.note.text) {
-      const tone = ["warn", "err", "ok", "info"].indexOf(s.note.tone || "") >= 0 ? s.note.tone : "warn";
-      chips.appendChild(el("span", { class: "ak-qrow__note ak-tone-text--" + tone, "data-ak-part": "note", text: s.note.text }));
-    }
-    if (chips.firstChild) root.appendChild(chips);
-    return root;
-  }
-  function whenText(when2) {
-    if (when2 == null || when2 === "") return "";
-    if (typeof when2 === "string" && !/^\d{4}-\d{2}-\d{2}/.test(when2)) return when2;
-    const d = when2 instanceof Date ? when2 : new Date(when2);
-    if (isNaN(d.getTime())) return String(when2);
-    const pad = function(n) {
-      return String(n).padStart(2, "0");
-    };
-    return d.getDate() + "." + (d.getMonth() + 1) + ". " + pad(d.getHours()) + "." + pad(d.getMinutes());
-  }
-
-  // src/static/sdk-libs/atelier/ornament-geo.js
-  function R(n) {
-    return Math.round(n * 10) / 10;
-  }
-  function pathOf(pts) {
-    if (!pts.length) return "";
-    let d = "M" + R(pts[0][0]) + " " + R(pts[0][1]);
-    for (let i = 1; i < pts.length; i++) d += "L" + R(pts[i][0]) + " " + R(pts[i][1]);
-    return d;
-  }
-  function lengthOf(pts) {
-    let l = 0;
-    for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    return Math.ceil(l) + 2;
-  }
-  function turtle(x, y, h, len, kappa, ds) {
-    const step = ds || 1.5;
-    const n = Math.max(2, Math.ceil(len / step));
-    const pts = [[x, y]];
-    const hs = [h];
-    for (let i = 0; i < n; i++) {
-      h += kappa(i / n) * step;
-      x += Math.cos(h) * step;
-      y += Math.sin(h) * step;
-      pts.push([x, y]);
-      hs.push(h);
-    }
-    return { pts, hs, d: pathOf(pts), len: lengthOf(pts), end: { x, y, h } };
-  }
-  function at(t2, u) {
-    const i = Math.min(t2.pts.length - 1, Math.max(0, Math.round(u * (t2.pts.length - 1))));
-    return { x: t2.pts[i][0], y: t2.pts[i][1], h: t2.hs[i] };
-  }
-  function leafPath(s, wf) {
-    const w = s * (wf || 0.34);
-    return "M0 0C" + R(s * 0.18) + " " + R(-w) + " " + R(s * 0.62) + " " + R(-w * 0.8) + " " + R(s) + " 0C" + R(s * 0.62) + " " + R(w * 0.8) + " " + R(s * 0.18) + " " + R(w) + " 0 0Z";
-  }
-  function line(x0, y0, x1, y1, flip) {
-    const L = Math.max(1e-6, Math.hypot(x1 - x0, y1 - y0));
-    const tx = (x1 - x0) / L;
-    const ty = (y1 - y0) / L;
-    const nx = flip ? -ty : ty;
-    const ny = flip ? tx : -tx;
-    return { L, at: (s) => ({ x: x0 + tx * s, y: y0 + ty * s, tx, ty, nx, ny }) };
-  }
-  function arc(cx, cy, r, a0, a1) {
-    const dir = a1 > a0 ? 1 : -1;
-    return {
-      L: Math.abs(a1 - a0) * r,
-      at: (s) => {
-        const a = a0 + dir * s / r;
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        return { x: cx + r * c, y: cy + r * sn, tx: -sn * dir, ty: c * dir, nx: c, ny: sn };
-      }
-    };
-  }
-  function rrect(x, y, w, h, r) {
-    const rad = Math.max(0, Math.min(r, w / 2, h / 2));
-    const P = Math.PI;
-    const segs = [];
-    const edge = (x0, y0, tx, ty, len) => segs.push({ len, f: (t2) => ({ x: x0 + tx * t2, y: y0 + ty * t2, tx, ty, nx: ty, ny: -tx }) });
-    const bend = (cx, cy, a0) => segs.push({
-      len: P * rad / 2,
-      f: (t2) => {
-        const a = a0 + (rad > 0 ? t2 / rad : 0);
-        const c = Math.cos(a);
-        const sn = Math.sin(a);
-        return { x: cx + rad * c, y: cy + rad * sn, tx: -sn, ty: c, nx: c, ny: sn };
-      }
-    });
-    edge(x + rad, y, 1, 0, w - 2 * rad);
-    bend(x + w - rad, y + rad, -P / 2);
-    edge(x + w, y + rad, 0, 1, h - 2 * rad);
-    bend(x + w - rad, y + h - rad, 0);
-    edge(x + w - rad, y + h, -1, 0, w - 2 * rad);
-    bend(x + rad, y + h - rad, P / 2);
-    edge(x, y + h - rad, 0, -1, h - 2 * rad);
-    bend(x + rad, y + rad, P);
-    let L = 0;
-    for (const g of segs) L += g.len;
-    return {
-      L,
-      at: (s) => {
-        let rest = Math.max(0, Math.min(L, s));
-        for (let i = 0; i < segs.length - 1; i++) {
-          if (rest <= segs[i].len) return segs[i].f(rest);
-          rest -= segs[i].len;
-        }
-        const last = segs[segs.length - 1];
-        return last.f(Math.min(rest, last.len));
-      }
-    };
-  }
-  function roundedRectPath(x, y, w, h, r) {
-    const q = Math.max(0, Math.min(r, w / 2, h / 2));
-    const a = (ex, ey) => "A" + R(q) + " " + R(q) + " 0 0 1 " + R(ex) + " " + R(ey);
-    return "M" + R(x + q) + " " + R(y) + "H" + R(x + w - q) + a(x + w, y + q) + "V" + R(y + h - q) + a(x + w - q, y + h) + "H" + R(x + q) + a(x, y + h - q) + "V" + R(y + q) + a(x + q, y) + "Z";
-  }
-  function helix(base, L, amp, period, phase, ds) {
-    const step = ds || 2;
-    const k = 2 * Math.PI / period;
-    const n = Math.ceil(L / step);
-    const segs = [];
-    let cur = null;
-    for (let i = 0; i <= n; i++) {
-      const s = Math.min(L, i * step);
-      const b = base(s);
-      const th = k * s + phase;
-      const o = amp * Math.sin(th);
-      const front = Math.cos(th) >= 0;
-      const p = [b.x + b.nx * o, b.y + b.ny * o];
-      if (!cur || cur.front !== front) {
-        const last = cur ? cur.pts[cur.pts.length - 1] : null;
-        cur = { front, s0: last ? Math.max(0, s - step) : s, s1: s, pts: last ? [last] : [] };
-        segs.push(cur);
-      }
-      cur.pts.push(p);
-      cur.s1 = s;
-    }
-    return segs.filter((g) => g.pts.length > 1).map((g) => ({ front: g.front, s0: g.s0, s1: g.s1, d: pathOf(g.pts), len: lengthOf(g.pts) }));
-  }
-  function helixLeaves(base, L, amp, period, phase, opt) {
-    const k = 2 * Math.PI / period;
-    const a = opt.alpha || 0.9;
-    const every = Math.max(1, Math.round(opt.every || 1));
-    const from = opt.from || 0;
-    const endGap = opt.endGap || 0;
-    const cand = [];
-    for (let m = -1; m * period < L + period; m++) {
-      for (const t0 of [Math.PI / 3, 5 * Math.PI / 3]) {
-        const s = (t0 + 2 * Math.PI * m - phase) / k;
-        if (s >= from && s <= L - endGap) cand.push({ s, th: t0 });
-      }
-    }
-    cand.sort((p, q) => p.s - q.s);
-    const out = [];
-    cand.forEach((c, i) => {
-      if (i % every) return;
-      const b = base(c.s);
-      const o = amp * Math.sin(c.th);
-      const sg = o >= 0 ? 1 : -1;
-      const dx = b.tx * Math.cos(a) + b.nx * sg * Math.sin(a);
-      const dy = b.ty * Math.cos(a) + b.ny * sg * Math.sin(a);
-      out.push({ s: c.s, x: b.x + b.nx * o, y: b.y + b.ny * o, ang: Math.atan2(dy, dx), size: opt.size * (0.82 + 0.06 * (i * 5 % 4)) });
-    });
-    return out;
-  }
-
-  // src/static/sdk-libs/atelier/ornament-svg.js
-  var NS = "http://www.w3.org/2000/svg";
-  function svgEl2(tag, attrs, parent) {
-    const el2 = (
-      /** @type {SVGElement} */
-      document.createElementNS(NS, tag)
-    );
-    if (attrs) for (const k of Object.keys(attrs)) el2.setAttribute(k, String(attrs[k]));
-    if (parent) parent.appendChild(el2);
-    return el2;
-  }
-  var ROLE = {
-    ln: "ak-orn-ln",
-    dim: "ak-orn-dim",
-    hi: "ak-orn-hi",
-    vine: "ak-orn-vine",
-    vback: "ak-orn-vback",
-    gap: "ak-orn-gap",
-    gapc: "ak-orn-gapc",
-    band: "ak-orn-band",
-    hatch: "ak-orn-hatch",
-    leaf: "ak-orn-leaf",
-    rib: "ak-orn-rib",
-    petal: "ak-orn-petal",
-    prib: "ak-orn-prib",
-    dot: "ak-orn-dot",
-    vdot: "ak-orn-vdot",
-    card: "ak-orn-card",
-    solid: "ak-orn-solid",
-    tail: "ak-orn-tail",
-    crease: "ak-orn-crease",
-    ring: "ak-orn-ring"
-  };
-  function drawing(parent, w, h, opts) {
-    const o = opts || {};
-    const animate = o.animate !== false;
-    const speed = Math.max(0.25, Math.min(3, Number(o.speed) || 1));
-    const base = Math.max(0, Number(o.delay) || 0);
-    const v = o.view || { x: 0, y: 0, w, h };
-    const svg6 = svgEl2("svg", {
-      viewBox: R(v.x) + " " + R(v.y) + " " + R(v.w) + " " + R(v.h),
-      "aria-hidden": "true",
-      focusable: "false",
-      class: "ak-orn-svg" + (o.cls ? " " + o.cls : "")
-    }, parent);
-    if (o.viewBox !== true) {
-      svg6.setAttribute("width", String(R(v.w)));
-      svg6.setAttribute("height", String(R(v.h)));
-    }
-    const sec = (t2) => ((base + t2) / speed).toFixed(2) + "s";
-    const span = (t2) => (Math.max(0.05, t2) / speed).toFixed(2) + "s";
-    const group = (p, attrs) => svgEl2("g", attrs, p);
-    const stroke = (p, d, role, width, len, del, dur, lin, extra) => {
-      const el2 = svgEl2("path", { d, class: ROLE[role] + (extra && extra.butt ? " ak-orn-butt" : ""), "stroke-width": width }, p);
-      if (animate && len) {
-        el2.classList.add("ak-orn-grow");
-        if (lin) el2.classList.add("ak-orn-lin");
-        const s = (
-          /** @type {SVGElement & { style: CSSStyleDeclaration }} */
-          el2.style
-        );
-        s.strokeDasharray = String(len);
-        s.strokeDashoffset = String(len);
-        s.animationDelay = sec(del || 0);
-        s.animationDuration = span(dur || 1);
-      }
-      return el2;
-    };
-    const sprouting = (p, transform, del) => {
-      const outer = group(p, { transform });
-      const inner = group(outer);
-      if (animate) {
-        inner.classList.add("ak-orn-sprout");
-        inner.style.animationDelay = sec(del || 0);
-      }
-      return inner;
-    };
-    const leaf = (p, x, y, ang, size, del, wf, role) => {
-      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ") rotate(" + R(ang * 180 / Math.PI) + ")", del);
-      svgEl2("path", { d: leafPath(size, wf), class: ROLE[role || "leaf"] }, g);
-      svgEl2("path", { d: "M" + R(size * 0.12) + " 0L" + R(size * 0.8) + " 0", class: ROLE[role === "petal" ? "prib" : "rib"] }, g);
-      return g;
-    };
-    const bead = (p, x, y, r, del, role) => {
-      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ")", del);
-      svgEl2("circle", { r, class: ROLE[role || "dot"] }, g);
-      return g;
-    };
-    const rosette2 = (p, cx, cy, n, r0, size, ringR, del) => {
-      const g = sprouting(p, "translate(" + R(cx) + " " + R(cy) + ")", del);
-      if (ringR) svgEl2("circle", { r: ringR, class: ROLE.ln, "stroke-width": 1.4 }, g);
-      for (let i = 0; i < n; i++) {
-        svgEl2("path", { d: leafPath(size), class: ROLE.ln, "stroke-width": 0.8, transform: "rotate(" + R(360 * i / n) + ") translate(" + r0 + " 0)" }, g);
-      }
-      svgEl2("circle", { r: Math.max(1.6, r0 * 0.75), class: ROLE.dot }, g);
-      return g;
-    };
-    const fade = (el2, del) => {
-      if (animate) {
-        el2.classList.add("ak-orn-fade");
-        el2.style.animationDelay = sec(del || 0);
-      }
-      return el2;
-    };
-    const chain = (back, front, segs, L, t0, T, fronts, backRole, extra) => {
-      for (const g of segs) {
-        const del = t0 + T * g.s0 / L;
-        const dur = T * (g.s1 - g.s0) / L;
-        if (g.front) for (const [role, width] of fronts) stroke(front, g.d, role, width, g.len, del, dur, true, extra);
-        else if (backRole) stroke(back, g.d, backRole[0], backRole[1], g.len, del, dur, true, extra);
-      }
-    };
-    return { svg: svg6, group, stroke, leaf, bead, rosette: rosette2, fade, chain, animate };
-  }
-
-  // src/static/sdk-libs/atelier/ornament-frames.js
-  var PI = Math.PI;
-  function radiusOf(host, fallback) {
-    const r = host ? parseFloat(getComputedStyle(host).borderTopLeftRadius) : NaN;
-    return Number.isFinite(r) && r > 0 ? r : fallback;
-  }
-  function flower(d, parent, x, y, n, r0, size, del) {
-    for (let i = 0; i < n; i++) {
-      const a = 2 * PI * i / n;
-      d.leaf(parent, x + Math.cos(a) * r0, y + Math.sin(a) * r0, a, size, del + 0.04 * i);
-    }
-    d.bead(parent, x, y, Math.max(2, size * 0.32), del + 0.2);
-  }
-  function drawFrame(layers, w, h, _pad, p) {
-    const d = layers.under;
-    if (!d) return;
-    const k = Math.max(0.55, Math.min(1, Math.min(w, h) / 420));
-    const rect = (i) => "M" + R(i) + " " + R(i) + "H" + R(w - i) + "V" + R(h - i) + "H" + R(i) + "Z";
-    const rlen = (i) => Math.ceil(2 * (w + h - 4 * i)) + 4;
-    let hatch = "";
-    const hs = 10 * k;
-    for (let x = 3 * k; x <= w - hs - 2; x += 5 * k) hatch += "M" + R(x) + " " + R(hs - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8) + "M" + R(x) + " " + R(h - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8);
-    for (let y = hs + 1; y <= h - 3; y += 5 * k) hatch += "M1 " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8) + "M" + R(w - hs + 1) + " " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8);
-    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 1.2);
-    d.stroke(d.svg, rect(0), "ln", 1, rlen(0), 0, 1.8);
-    d.stroke(d.svg, rect(10 * k), "ln", 1.6, rlen(10 * k), 0.15, 1.8);
-    d.stroke(d.svg, rect(15 * k), "ln", 0.8, rlen(15 * k), 0.3, 1.8);
-    const t0 = 1.2;
-    const T = 2;
-    const Lc = Math.max(50, Math.min(135, Math.min(w, h) / k * 0.27));
-    const m = turtle(46, 34, 0, Lc, (u) => -15e-4 + 0.27 * 135 / Lc * Math.pow(u, 4));
-    const pa = at(m, 0.42);
-    const b = turtle(pa.x, pa.y, pa.h + 0.8, 62 * Lc / 135, (u) => (0.012 + 0.32 * u * u) * 135 / Lc);
-    const lush = p.leaves;
-    const corner = (g) => {
-      d.stroke(g, "M15 58A43 43 0 0 0 58 15", "ln", 1.2, 72, 0.9, 0.8);
-      d.stroke(g, "M15 64A49 49 0 0 0 64 15", "ln", 0.8, 80, 1, 0.8);
-      for (const view of ["translate(0 0)", "matrix(0 1 1 0 0 0)"]) {
-        const v = d.group(g, { transform: view });
-        d.stroke(v, m.d, "ln", 1.6, m.len, t0, T);
-        d.stroke(v, b.d, "ln", 1.2, b.len, t0 + 0.85, 1.3);
-        if (lush > 0) {
-          const onM = [[0.14, -1, 10], [0.3, 1, 12], [0.56, -1, 9], [0.7, 1, 11]];
-          if (lush > 1.5) onM.push([0.44, -1, 8], [0.82, 1, 8]);
-          for (const [u, side, s] of onM) {
-            const q = at(m, u);
-            d.leaf(v, q.x, q.y, q.h + side * 0.95, s, t0 + T * u * 0.9 + 0.2);
-          }
-          const qb = at(b, 0.3);
-          d.leaf(v, qb.x, qb.y, qb.h - 0.95, 9, t0 + 1.05 + 1.3 * 0.3);
-        }
-        d.bead(v, m.end.x, m.end.y, 2.2, t0 + T);
-        d.bead(v, b.end.x, b.end.y, 1.8, t0 + 2.15);
-      }
-      d.rosette(g, 34, 34, 8, 4, 7.5, 12, 0.7);
-    };
-    for (const [x, y, sx, sy] of [[0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1]]) {
-      corner(d.group(d.svg, { transform: "translate(" + R(x) + " " + R(y) + ") scale(" + R(sx * k * 100) / 100 + " " + R(sy * k * 100) / 100 + ")" }));
-    }
-    const mid = (tf, len, gain, s0) => {
-      const g = d.group(d.svg, { transform: tf });
-      for (const sx of [1, -1]) {
-        const s = turtle(sx * 4, 24, sx > 0 ? 0.35 : PI - 0.35, len, (u) => sx * (-0.02 + gain * u * u * u));
-        d.stroke(g, s.d, "ln", 1.4, s.len, s0, 1.6);
-        if (lush > 0) {
-          const p1 = at(s, 0.25);
-          const p2 = at(s, 0.5);
-          d.leaf(g, p1.x, p1.y, p1.h + sx * 0.95, 11, s0 + 0.5);
-          d.leaf(g, p2.x, p2.y, p2.h - sx * 0.95, 8, s0 + 0.9);
-        }
-        d.bead(g, s.end.x, s.end.y, 2, s0 + 1.6);
-      }
-      d.leaf(g, 0, 27, PI / 2, 20, s0 + 0.1);
-      d.bead(g, 0, 23, 3.2, s0);
-    };
-    const ks = R(k * 100) / 100;
-    if (w / k >= 2 * (46 + Lc) + 200) {
-      mid("translate(" + R(w / 2) + " 0) scale(" + ks + ")", 95, 0.28, 1.8);
-      mid("translate(" + R(w / 2) + " " + R(h) + ") scale(" + ks + " " + -ks + ")", 95, 0.28, 1.8);
-    }
-    if (h / k >= 2 * (46 + Lc) + 140) {
-      mid("translate(0 " + R(h / 2) + ") rotate(-90) scale(" + ks + ")", 64, 0.42, 1.9);
-      mid("translate(" + R(w) + " " + R(h / 2) + ") rotate(90) scale(" + ks + ")", 64, 0.42, 1.9);
-    }
-  }
-  function drawVineBorder(layers, w, h, pad, p, host) {
-    const d = layers.under;
-    if (!d) return;
-    const r = radiusOf(host, 18);
-    const x = pad.x;
-    const y = pad.y;
-    const base = rrect(x, y, w, h, r);
-    const L = base.L;
-    const per = L / Math.max(4, Math.round(L / 72));
-    const t0 = 1;
-    const T = Math.max(2.5, Math.min(6, L / 400));
-    d.fade(d.stroke(d.svg, roundedRectPath(x + 9, y + 9, w - 18, h - 18, Math.max(0, r - 9)), "dim", 0.8), 0.8);
-    const back = d.group(d.svg);
-    d.stroke(d.svg, roundedRectPath(x, y, w, h, r), "ln", 3, Math.ceil(L) + 4, 0, 1.2);
-    const front = d.group(d.svg);
-    d.chain(back, front, helix(base.at, L, 9, per, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
-    d.chain(back, front, helix(base.at, L, 7, per, PI, 2), L, t0 + 0.25, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
-    if (p.leaves > 0) {
-      const every = p.leaves > 1.5 ? 1 : 2;
-      for (const q of helixLeaves(base.at, L, 9, per, 0, { size: 13, alpha: 0.9, every, from: 6 })) {
-        d.leaf(front, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1);
-      }
-    }
-    const s0 = base.at(0);
-    flower(d, front, s0.x, s0.y, 5, 3, 11, t0 + T + 0.2);
-  }
-  function drawRope(layers, w, h, pad, p, host) {
-    const d = layers.under;
-    if (!d) return;
-    const base = rrect(pad.x, pad.y, w, h, radiusOf(host, 14));
-    const L = base.L;
-    const per = L / Math.max(4, Math.round(L / 34));
-    const n = Math.round(p.strands);
-    const T = Math.max(2, Math.min(5, L / 400));
-    const back = d.group(d.svg);
-    const front = d.group(d.svg);
-    for (let j = 0; j < n; j++) {
-      d.chain(back, front, helix(base.at, L, 6, per, j * 2 * PI / n, 1.5), L, 0.3, T, [["gapc", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
-    }
-  }
-  function drawJugend(layers, w, h, pad, p) {
-    const d = layers.under;
-    if (!d) return;
-    const k = Math.max(0.45, Math.min(1.4, h / 520));
-    const x0 = pad.x;
-    const yB = pad.y + h;
-    const ground = yB + 62 * k;
-    d.stroke(d.svg, roundedRectPath(x0, pad.y, w, h, 14 * k), "ln", 1.6, Math.ceil(2 * (w + h)) + 8, 0, 1.6);
-    d.stroke(d.svg, roundedRectPath(x0 + 8 * k, pad.y + 8 * k, w - 16 * k, h - 16 * k, 8 * k), "ln", 0.8, Math.ceil(2 * (w + h)) + 8, 0.15, 1.6);
-    d.fade(d.stroke(d.svg, "M" + R(x0 - 160 * k) + " " + R(ground) + "H" + R(x0 + w + 160 * k), "dim", 1), 0.2);
-    const UP = -PI / 2;
-    const TAU5 = 2 * PI;
-    const sx = x0 - 64 * k;
-    const stems = [
-      { dx: 0, h: UP, L: 540, t0: 0.6, k: (u) => 35e-4 * Math.cos(TAU5 * 1.2 * u) + 0.012 * Math.pow(u, 8), flower: "lily", lv: [[0.2, 1, 36], [0.34, -1, 30], [0.55, 1, 22], [0.7, -1, 16]] },
-      { dx: -14, h: UP - 0.12, L: 430, t0: 0.8, k: (u) => -4e-3 * Math.cos(TAU5 * u + 0.6) - 0.02 * Math.pow(u, 6), flower: "cup", lv: [[0.25, -1, 30], [0.5, 1, 22]] },
-      { dx: 4, h: UP + 0.02, L: 300, t0: 1, k: (u) => 6e-3 * Math.cos(TAU5 * 0.8 * u + 1) + 0.025 * Math.pow(u, 6), flower: "bud", lv: [[0.35, 1, 24]] }
-    ];
-    for (const tf of ["translate(0 0)", "translate(" + R(2 * (x0 + w / 2)) + " 0) scale(-1 1)"]) {
-      const g = d.group(d.svg, { transform: tf });
-      [[-0.38, 110], [-0.16, 88], [0.22, 96]].forEach(([a, s], i) => d.leaf(g, sx - 4 * k, ground, UP + a, s * k, 0.3 + i * 0.12, 0.13));
-      for (const st of stems) {
-        const dur = 2.6;
-        const t2 = turtle(sx + st.dx * k, ground, st.h, st.L * k, (u) => st.k(u) / k, 2);
-        const e = t2.end;
-        const bloom = st.t0 + dur + 0.1;
-        d.stroke(g, t2.d, "vine", 2, t2.len, st.t0, dur);
-        if (p.leaves > 0) {
-          for (const [u, side, s] of st.lv) {
-            const q = at(t2, u);
-            d.leaf(g, q.x, q.y, q.h + side * 0.45, s * k, st.t0 + dur * u * 0.85 + 0.1, 0.22);
-          }
-        }
-        if (st.flower === "lily") {
-          for (const a of [-1.5, 1.5]) d.leaf(g, e.x, e.y, e.h + a, 10 * k, bloom, 0.3, "petal");
-          for (const a of [-0.6, 0.6, 0]) d.leaf(g, e.x, e.y, e.h + a, 26 * k, bloom + 0.1, 0.42, "petal");
-          [-0.22, 0, 0.22].forEach((a, i) => {
-            const len = (30 + i % 2 * 6) * k;
-            const x2 = e.x + Math.cos(e.h + a) * len;
-            const y2 = e.y + Math.sin(e.h + a) * len;
-            d.stroke(g, "M" + R(e.x) + " " + R(e.y) + "L" + R(x2) + " " + R(y2), "ln", 1, Math.ceil(len) + 2, bloom + 0.5, 0.5);
-            d.bead(g, x2, y2, 2.2 * k, bloom + 0.9);
-          });
-        } else if (st.flower === "cup") {
-          const cx = e.x + Math.cos(e.h) * 9 * k;
-          const cy = e.y + Math.sin(e.h) * 9 * k;
-          for (let i = 0; i < 6; i++) d.leaf(g, cx, cy, e.h + i * TAU5 / 6, 15 * k, bloom + 0.05 * i, 0.5, "petal");
-          d.bead(g, cx, cy, 3.4 * k, bloom + 0.4);
-        } else {
-          for (const a of [-0.5, 0.5]) d.leaf(g, e.x, e.y, e.h + a, 9 * k, bloom, 0.3, "petal");
-          d.leaf(g, e.x, e.y, e.h, 17 * k, bloom + 0.1, 0.5, "petal");
-        }
-      }
-    }
-  }
-  function drawRibbon(layers, w, h, pad) {
-    const d = layers.under;
-    if (!d) return;
-    const u = h / 54;
-    const x0 = pad.x;
-    const x1 = pad.x + w;
-    const cx = pad.x + w / 2;
-    const y0 = pad.y;
-    const y1 = pad.y + h;
-    const a = Math.min(12 * u, h * 0.22);
-    const tails = d.group(d.svg);
-    for (const tf of ["translate(0 0)", "translate(" + R(2 * cx) + " 0) scale(-1 1)"]) {
-      const g = d.group(tails, { transform: tf });
-      const top = y0 + a + 20 * u;
-      const bot = y1 + a + 22 * u;
-      const inner = x1 - 14 * u;
-      const outer = x1 + 86 * u;
-      const tail = "M" + R(inner) + " " + R(top) + "H" + R(outer) + "L" + R(outer - 20 * u) + " " + R((top + bot) / 2) + "L" + R(outer) + " " + R(bot) + "H" + R(inner) + "Z";
-      d.stroke(g, tail, "tail", 1.2);
-      d.stroke(g, "M" + R(inner + 6 * u) + " " + R(top + 7 * u) + "H" + R(outer - 7 * u) + "M" + R(inner + 6 * u) + " " + R(bot - 7 * u) + "H" + R(outer - 7 * u), "dim", 0.8);
-      d.stroke(g, "M" + R(x1) + " " + R(y1 + a) + "L" + R(x1) + " " + R(bot) + "L" + R(inner) + " " + R(bot) + "Z", "crease", 1);
-    }
-    d.fade(tails, 0.7);
-    const band = d.group(d.svg);
-    if (d.animate) band.classList.add("ak-orn-unroll");
-    const q = (yc) => "Q" + R(cx) + " " + R(yc) + " ";
-    d.stroke(band, "M" + R(x0) + " " + R(y0 + a) + q(y0 - a) + R(x1) + " " + R(y0 + a) + "L" + R(x1) + " " + R(y1 + a) + q(y1 - a) + R(x0) + " " + R(y1 + a) + "Z", "solid", 1.4);
-    d.stroke(band, "M" + R(x0 + 7 * u) + " " + R(y0 + a + 6 * u) + q(y0 - a + 6 * u) + R(x1 - 7 * u) + " " + R(y0 + a + 6 * u) + "M" + R(x0 + 7 * u) + " " + R(y1 + a - 6 * u) + q(y1 - a - 6 * u) + R(x1 - 7 * u) + " " + R(y1 + a - 6 * u), "dim", 0.8);
-  }
-  var FRAME_FIGURES = {
-    frame: { params: ["leaves"], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawFrame } },
-    "vine-border": { params: ["leaves"], overlay: { pad: () => ({ x: 26, y: 26 }), draw: drawVineBorder } },
-    rope: { params: ["strands"], overlay: { pad: () => ({ x: 12, y: 12 }), draw: drawRope } },
-    jugend: {
-      params: ["leaves"],
-      overlay: {
-        pad: (_w, h) => {
-          const k = Math.max(0.45, Math.min(1.4, h / 520));
-          return { x: Math.ceil(200 * k), y: Math.ceil(76 * k) };
-        },
-        draw: drawJugend
-      }
-    },
-    ribbon: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 1.7 + 4), y: Math.ceil(h * 0.9) }), draw: drawRibbon } }
-  };
-
-  // src/static/sdk-libs/atelier/ornament-rounds.js
-  var PI2 = Math.PI;
-  var TAU3 = 2 * PI2;
-  var D = PI2 / 180;
-  function drawWreath(layers, w, h, pad, p) {
-    const d = layers.under;
-    if (!d) return;
-    const r = Math.min(w, h) / 2;
-    const k = r / 84;
-    const cx = pad.x + w / 2;
-    const cy = pad.y + h / 2;
-    const Rw = 118 * k;
-    const t0 = 1.1;
-    const T = 2.6;
-    d.stroke(d.svg, "M" + R(cx + r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx - r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx + r) + " " + R(cy), "ln", 1.6, Math.ceil(TAU3 * r) + 4, 0, 1.4);
-    const r2 = r - 7 * k;
-    d.stroke(d.svg, "M" + R(cx + r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx - r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx + r2) + " " + R(cy), "ln", 0.8, Math.ceil(TAU3 * r2) + 4, 0.15, 1.4);
-    let hatch = "";
-    for (let a = 0; a < 360; a += 4) {
-      const c = Math.cos(a * D);
-      const s = Math.sin(a * D);
-      hatch += "M" + R(cx + (r - 5.4 * k) * c) + " " + R(cy + (r - 5.4 * k) * s) + "L" + R(cx + (r - 1.6 * k) * c) + " " + R(cy + (r - 1.6 * k) * s);
-    }
-    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 0.8);
-    const back = d.group(d.svg);
-    const stems = d.group(d.svg);
-    const front = d.group(d.svg);
-    const leaves = d.group(d.svg);
-    [[95, 250, 1], [85, -70, -1]].forEach(([a0, a1, sx], bi) => {
-      const br = arc(cx, cy, Rw, a0 * D, a1 * D);
-      const pts = [];
-      for (let s = 0; s <= br.L; s += 2) {
-        const q = br.at(s);
-        pts.push([q.x, q.y]);
-      }
-      d.stroke(stems, pathOf(pts), "vine", 2 * Math.max(0.6, k), lengthOf(pts), t0, T, true);
-      d.chain(back, front, helix(br.at, br.L, 3.5 * k, 24 * k, 0, 1.5), br.L, t0 + 0.35, T, [["gap", 3], ["vine", 1]], ["vback", 0.8]);
-      if (p.leaves > 0) {
-        const step = (p.leaves > 1.5 ? 10 : 14) * k;
-        for (let i = 0, s2 = 12 * k; s2 < br.L - 8 * k; i++, s2 += step) {
-          const u = s2 / br.L;
-          const size = 16 * k * (1 - 0.45 * u);
-          const q2 = br.at(s2);
-          const q3 = br.at(Math.min(br.L, s2 + 6 * k));
-          const al = 0.8;
-          const del = t0 + T * u + 0.1;
-          d.leaf(leaves, q2.x, q2.y, Math.atan2(q2.ty * Math.cos(al) + q2.ny * Math.sin(al), q2.tx * Math.cos(al) + q2.nx * Math.sin(al)), size, del);
-          d.leaf(leaves, q3.x, q3.y, Math.atan2(q3.ty * Math.cos(al) - q3.ny * Math.sin(al), q3.tx * Math.cos(al) - q3.nx * Math.sin(al)), size * 0.9, del + 0.08);
-          if (i % 3 === 1) {
-            const qm = br.at(Math.min(br.L, s2 + 9 * k));
-            d.bead(leaves, qm.x + qm.nx * 7 * k, qm.y + qm.ny * 7 * k, 2.3 * k, del + 0.25, "vdot");
-            d.bead(leaves, qm.x + qm.nx * 11 * k + qm.tx * 3 * k, qm.y + qm.ny * 11 * k + qm.ty * 3 * k, 1.8 * k, del + 0.32, "vdot");
-          }
-        }
-      }
-      const e = br.at(br.L);
-      d.leaf(leaves, e.x, e.y, Math.atan2(e.ty, e.tx), 11 * k, t0 + T);
-      const s0 = br.at(0);
-      const tl = turtle(s0.x, s0.y, Math.atan2(-s0.ty, -s0.tx), 46 * k, () => sx * 0.028 / k);
-      const tp = tl.pts.slice().reverse();
-      if (bi === 1) d.stroke(stems, pathOf(tp), "gap", 6, tl.len, 0.6, 0.5);
-      d.stroke(stems, pathOf(tp), "vine", 2 * Math.max(0.6, k), tl.len, 0.6, 0.5);
-      d.bead(stems, tp[0][0], tp[0][1], 2.6 * k, 0.5);
-    });
-  }
-  function drawGuilloche(layers, w, h, pad) {
-    const d = layers.under;
-    if (!d) return;
-    const half = Math.min(w, h) / 2;
-    const k = half / 135;
-    const cx = pad.x + w / 2;
-    const cy = pad.y + h / 2;
-    const circle = (rr, width, del) => d.stroke(
-      d.svg,
-      "M" + R(cx + rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx - rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx + rr) + " " + R(cy),
-      "ln",
-      width,
-      Math.ceil(TAU3 * rr) + 4,
-      del,
-      1.5
-    );
-    circle(128 * k, 1.4, 0);
-    circle(133 * k, 0.8, 0.1);
-    circle(84 * k, 1, 0.5);
-    circle(88 * k, 0.6, 0.6);
-    const ring2 = (rb, amp, kk, n, t0, width) => {
-      for (let j = 0; j < n; j++) {
-        const ph = j * TAU3 / (kk * n);
-        const pts = [];
-        for (let i = 0; i <= 360; i++) {
-          const th = i * TAU3 / 360;
-          const rr = (rb + amp * Math.cos(kk * (th + ph))) * k;
-          pts.push([cx + rr * Math.cos(th), cy + rr * Math.sin(th)]);
-        }
-        d.stroke(d.svg, pathOf(pts), "ln", width, lengthOf(pts), t0 + j * 0.12, 2.4);
-      }
-    };
-    ring2(108, 14, 12, 8, 0.2, 0.7);
-    ring2(62, 10, 9, 6, 0.9, 0.7);
-    ring2(24, 12, 8, 5, 1.6, 0.8);
-    d.bead(d.svg, cx, cy, 3 * Math.max(0.6, k), 3.4);
-  }
-  function drawGuillocheBand(layers, w, h, pad) {
-    const d = layers.under;
-    if (!d) return;
-    const x0 = pad.x + 4;
-    const x1 = pad.x + w - 4;
-    const cy = pad.y + h / 2;
-    const half = h / 2 - 12;
-    d.stroke(d.svg, "M" + R(x0) + " " + R(pad.y + 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + 8) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 8) + "H" + R(x1), "ln", 0.8, Math.ceil(4 * (x1 - x0)) + 8, 0.3, 1.4);
-    if (half < 6) return;
-    const wl = Math.max(28, Math.min(72, half * 1.1));
-    for (let j = 0; j < 16; j++) {
-      const pts = [];
-      for (let x = x0; x <= x1; x += 2) {
-        const a = half * (0.72 + 0.28 * Math.cos(TAU3 * (x - (x0 + x1) / 2) / Math.max(120, (x1 - x0) / 2)));
-        pts.push([x, cy + a * Math.sin(TAU3 * (x - x0) / wl + j * PI2 / 8)]);
-      }
-      d.stroke(d.svg, pathOf(pts), "hatch", 0.6, lengthOf(pts), 0.6 + j * 0.06, 2.2);
-    }
-  }
-  function drawIvy(layers, w, h, pad, p) {
-    const back = layers.under;
-    const over = layers.over;
-    if (!back || !over) return;
-    const cx = pad.x + w / 2;
-    const amp = w / 2 + 4;
-    const period = Math.max(60, Math.min(160, w * 4));
-    const base = line(cx, pad.y + h - 2, cx, pad.y);
-    const L = base.L;
-    const t0 = 0.8;
-    const T = Math.max(2, Math.min(5, L / 140));
-    const size = Math.max(10, Math.min(20, w * 0.3));
-    const fronts = over.group(over.svg);
-    over.chain(back.svg, fronts, helix(base.at, L, amp, period, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
-    over.chain(back.svg, fronts, helix(base.at, L, amp - 1, period, 2.4, 2), L, t0 + 0.3, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
-    if (p.leaves > 0) {
-      for (const q of helixLeaves(base.at, L, amp, period, 0, { size, alpha: 0.9, from: 12, endGap: 4 })) {
-        over.leaf(fronts, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1, 0.42);
-      }
-      const top = base.at(L);
-      [-2.2, -1.57, -0.9].forEach((a, i) => over.leaf(fronts, top.x, top.y + 2, a, size * 0.75 - i, t0 + T + 0.1 * i, 0.42));
-    }
-  }
-  function drawWrap(layers, w, h, pad) {
-    const back = layers.under;
-    const d = layers.over;
-    if (!back || !d) return;
-    const cy = pad.y + h / 2;
-    const rr = h / 2;
-    let hatch = "";
-    for (const deg of [48, 60, 70, 80]) {
-      for (const sg of [-1, 1]) hatch += "M" + R(pad.x + 4) + " " + R(cy + sg * rr * Math.sin(deg * D)) + "H" + R(pad.x + w - 4);
-    }
-    back.stroke(back.svg, hatch, "hatch", 0.6);
-    const x0 = pad.x + Math.min(w * 0.12, h * 1.5);
-    const x1 = pad.x + w - Math.min(w * 0.12, h * 1.5);
-    const base = line(x0, cy, x1, cy);
-    const bw = h * 0.46;
-    const front = d.group(d.svg);
-    d.chain(front, front, helix(base.at, base.L, rr, h * 1.07, 0, 1), base.L, 0.6, Math.max(1, base.L / 200), [["ln", bw + 3], ["band", bw]], null, { butt: true });
-    for (const x of [x0 - h * 0.36, x1]) {
-      d.fade(d.stroke(d.svg, "M" + R(x) + " " + R(cy - rr - 3) + "h" + R(h * 0.36) + "v" + R(h + 6) + "h" + R(-h * 0.36) + "Z", "solid", 1.4), 0.4);
-    }
-  }
-  function drawBrackets(layers, w, h, pad, p) {
-    const d = layers.over;
-    if (!d) return;
-    const k = h / 44;
-    const cxc = pad.x + w / 2;
-    for (const tf of ["translate(0 0)", "translate(" + R(2 * cxc) + " 0) scale(-1 1)"]) {
-      const g = d.group(d.svg, { transform: tf });
-      const bx = pad.x - 12 * k;
-      const top = pad.y + 2;
-      const bot = pad.y + h - 2;
-      d.stroke(g, "M" + R(bx) + " " + R(top) + "Q" + R(bx - 16 * k) + " " + R((top + bot) / 2) + " " + R(bx) + " " + R(bot), "ln", 1.4, Math.ceil((bot - top) * 1.15) + 4, 0.2, 0.6);
-      const tc2 = turtle(bx, top, -0.6, 20 * k, (u) => (0.3 + 0.2 * u) / k);
-      const bc = turtle(bx, bot, 0.6, 20 * k, (u) => -(0.3 + 0.2 * u) / k);
-      d.stroke(g, tc2.d, "ln", 1.2, tc2.len, 0.7, 0.5);
-      d.stroke(g, bc.d, "ln", 1.2, bc.len, 0.7, 0.5);
-      if (p.leaves > 0) d.leaf(g, bx - 9 * k, (top + bot) / 2, PI2, 11 * k, 0.8);
-    }
-  }
-  var ROUND_FIGURES = {
-    wreath: { params: ["leaves"], overlay: { pad: (w, h) => {
-      const k = Math.min(w, h) / 168;
-      return { x: Math.ceil(72 * k), y: Math.ceil(84 * k) };
-    }, draw: drawWreath } },
-    guilloche: { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuilloche } },
-    "guilloche-band": { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuillocheBand } },
-    ivy: { params: ["leaves"], overlay: { pad: (w) => ({ x: Math.ceil(30 + Math.max(10, Math.min(20, w * 0.3))), y: 16 }), under: true, over: true, draw: drawIvy } },
-    wrap: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 0.5), y: 6 }), under: true, over: true, draw: drawWrap } },
-    brackets: { params: ["leaves"], overlay: { pad: (_w, h) => ({ x: Math.ceil(30 * h / 44), y: 4 }), under: false, over: true, draw: drawBrackets } }
-  };
-
-  // src/static/sdk-libs/atelier/ornament-lines.js
-  var PI3 = Math.PI;
-  var TAU4 = 2 * PI3;
-  function fillMount(host, height, cls, opts, draw) {
-    const box = document.createElement("span");
-    box.className = "ak-orn-strip " + cls;
-    box.setAttribute("aria-hidden", "true");
-    box.style.height = height + "px";
-    host.appendChild(box);
-    let lastW = -1;
-    let frame2 = 0;
-    const render = (animate) => {
-      const W7 = Math.round(box.getBoundingClientRect().width) || host.clientWidth || 0;
-      lastW = W7;
-      box.textContent = "";
-      if (W7 < 40) return;
-      draw(drawing(box, W7, height, { animate, speed: opts.speed, delay: opts.delay }), W7, height);
-    };
-    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
-      if (Math.abs(Math.round(box.getBoundingClientRect().width) - lastW) < 2) return;
-      cancelAnimationFrame(frame2);
-      frame2 = requestAnimationFrame(() => render(false));
-    }) : null;
-    if (ro) ro.observe(box);
-    return {
-      render,
-      teardown: () => {
-        if (ro) ro.disconnect();
-        cancelAnimationFrame(frame2);
-        box.remove();
-      }
-    };
-  }
-  function mountVineBar(host, p, opts) {
-    let value = p.value;
-    let apply2 = null;
-    const strip = fillMount(host, 96, "ak-orn-strip--bar", opts, (d, W7) => {
-      const y = 48;
-      const base = line(0, y, W7, y);
-      const L = base.L;
-      const period = Math.max(70, Math.min(110, W7 / 6));
-      const amp = 21;
-      const k = TAU4 / period;
-      const x0 = 20;
-      const bw = W7 - 40;
-      const segs = [];
-      const back = d.group(d.svg);
-      const budBack = d.group(d.svg);
-      svgEl2("rect", { x: x0, y: y - 11, width: R(bw), height: 22, rx: 11, class: "ak-orn-track" }, d.svg);
-      let hatch = "";
-      for (let x = x0 + 12; x <= x0 + bw - 14; x += 6) hatch += "M" + R(x) + " " + (y + 7) + "l6 -14";
-      svgEl2("path", { d: hatch, class: "ak-orn-hatch", "stroke-width": 0.8 }, d.svg);
-      const fill2 = svgEl2("rect", { x: x0 + 3, y: y - 8, width: 0, height: 16, rx: 8, class: "ak-orn-fill" }, d.svg);
-      const front = d.group(d.svg);
-      const add = (parent, gs, role, width) => {
-        for (const g of gs) {
-          const el2 = svgEl2("path", { d: g.d, class: "ak-orn-" + role + " ak-orn-dash", "stroke-width": width }, parent);
-          el2.style.strokeDasharray = String(g.len);
-          el2.style.strokeDashoffset = String(g.len);
-          segs.push({ el: el2, s0: g.s0, s1: g.s1, len: g.len });
-        }
-      };
-      for (const [a, ph, wf, wb, wg] of [[amp, 0, 2.4, 1.6, 6], [16, PI3, 1.2, 1, 4]]) {
-        const gs = helix(base.at, L, a, period, ph, 2);
-        add(back, gs.filter((g) => !g.front), "vback", wb);
-        const fr = gs.filter((g) => g.front);
-        add(front, fr, "gap", wg);
-        add(front, fr, "vine", wf);
-      }
-      const leaves = [];
-      if (p.leaves > 0) {
-        for (const q of helixLeaves(base.at, L, amp, period, 0, { size: 13, alpha: 0.95, from: 10, endGap: 6 })) {
-          const outer = svgEl2("g", { transform: "translate(" + R(q.x) + " " + R(q.y) + ") rotate(" + R(q.ang * 180 / PI3) + ")" }, front);
-          const inner = svgEl2("g", { class: "ak-orn-pop" }, outer);
-          svgEl2("path", { d: leafPath(q.size), class: "ak-orn-leaf" }, inner);
-          svgEl2("path", { d: "M" + R(q.size * 0.12) + " 0L" + R(q.size * 0.8) + " 0", class: "ak-orn-rib" }, inner);
-          leaves.push({ el: inner, s: q.s });
-        }
-      }
-      const budFront = d.group(d.svg);
-      const buds = [budBack, budFront].map((g) => {
-        const bloom = svgEl2("g", { class: "ak-orn-bloom" }, g);
-        for (let i = 0; i < 5; i++) svgEl2("path", { d: leafPath(9), class: "ak-orn-leaf", transform: "rotate(" + 72 * i + ") translate(2.5 0)" }, bloom);
-        svgEl2("circle", { r: 3.2, class: "ak-orn-vdot" }, g);
-        return { g, bloom };
-      });
-      apply2 = (v) => {
-        const rv = 14 + v * (L - 14);
-        for (const s of segs) {
-          const f2 = Math.max(0, Math.min(1, (rv - s.s0) / Math.max(1, s.s1 - s.s0)));
-          s.el.style.strokeDashoffset = String(Math.round(s.len * (1 - f2)));
-        }
-        for (const lf of leaves) lf.el.classList.toggle("ak-orn-open", lf.s <= rv - 4);
-        fill2.setAttribute("width", String(R(Math.max(0, (bw - 6) * v))));
-        const b = base.at(rv);
-        const th = k * rv;
-        const o = amp * Math.sin(th);
-        const inFront = Math.cos(th) >= 0;
-        buds.forEach((bd, i) => {
-          bd.g.setAttribute("transform", "translate(" + R(b.x + b.nx * o) + " " + R(b.y + b.ny * o) + ")");
-          bd.g.style.display = i === 1 === inFront ? "" : "none";
-          bd.bloom.classList.toggle("ak-orn-open", v >= 0.995);
-        });
-      };
-      apply2(value);
-    });
-    const clamp3 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
-    return {
-      render: (animate) => {
-        strip.render(animate);
-        if (!apply2) return;
-        if (animate) {
-          apply2(0);
-          requestAnimationFrame(() => requestAnimationFrame(() => apply2 && apply2(value)));
-        } else apply2(value);
-      },
-      set: (v) => {
-        value = clamp3(v);
-        if (apply2) apply2(value);
-      },
-      teardown: strip.teardown
-    };
-  }
-  function drawRail(d, W7) {
-    const y = 14;
-    const base = line(8, y, W7 - 8, y);
-    const T = Math.max(1.2, Math.min(3, W7 / 300));
-    const back = d.group(d.svg);
-    d.stroke(d.svg, "M8 " + y + "H" + R(W7 - 8), "ln", 1, Math.ceil(W7), 0, 0.8);
-    const front = d.group(d.svg);
-    d.chain(back, front, helix(base.at, base.L, 7, 44, 0, 1.5), base.L, 0.3, T, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
-    d.chain(back, front, helix(base.at, base.L, 6, 44, PI3, 1.5), base.L, 0.45, T, [["gap", 4], ["vine", 1]], ["vback", 0.8]);
-    for (const q of helixLeaves(base.at, base.L, 7, 44, 0, { size: 7.5, alpha: 0.95, every: 2, from: 6, endGap: 6 })) d.leaf(front, q.x, q.y, q.ang, q.size, 0.3 + T * q.s / base.L);
-    d.bead(d.svg, 5, y, 3, 0.1);
-    d.bead(d.svg, W7 - 5, y, 3, 0.3 + T);
-  }
-  function drawDivider(d, W7, H4, leaves) {
-    const y = H4 / 2;
-    const c = W7 / 2;
-    const reach = Math.min(W7 / 2 - 40, 420);
-    const d0 = 0.4;
-    const T = Math.max(1.2, Math.min(2.4, reach / 180));
-    const ends = [c + reach, c - reach];
-    const back = d.group(d.svg);
-    d.stroke(d.svg, "M" + R(c + 14) + " " + R(y) + "H" + R(ends[0]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
-    d.stroke(d.svg, "M" + R(c - 14) + " " + R(y) + "H" + R(ends[1]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
-    const front = d.group(d.svg);
-    for (const bs of [line(c + 14, y, ends[0], y), line(c - 14, y, ends[1], y, true)]) {
-      d.chain(back, front, helix(bs.at, bs.L, 6, 42, 0, 1.5), bs.L, d0, T, [["gap", 4], ["vine", 1.6]], ["vback", 1]);
-      if (leaves > 0) {
-        for (const q of helixLeaves(bs.at, bs.L, 6, 42, 0, { size: 7.5, alpha: 0.95, every: leaves > 1.5 ? 1 : 2, from: 8, endGap: 10 })) {
-          d.leaf(front, q.x, q.y, q.ang, q.size, d0 + T * q.s / bs.L + 0.1);
-        }
-      }
-    }
-    const cr = turtle(ends[0], y, 0, 40, (u) => -(0.02 + 0.42 * u * u));
-    const cl = turtle(ends[1], y, PI3, 40, (u) => 0.02 + 0.42 * u * u);
-    d.stroke(d.svg, cr.d, "ln", 1.2, cr.len, d0 + T - 0.2, 0.7);
-    d.stroke(d.svg, cl.d, "ln", 1.2, cl.len, d0 + T - 0.2, 0.7);
-    d.rosette(d.svg, c, y, 6, 3, 5, 9, 0.1);
-  }
-  function rope(d, back, front, base, n, amp, period, t0, T, fronts, backRole) {
-    for (let j = 0; j < n; j++) d.chain(back, front, helix(base.at, base.L, amp, period, j * TAU4 / n, 1.5), base.L, t0, T, fronts, backRole);
-  }
-  function drawBraid(d, W7, H4, strands) {
-    const y = H4 / 2;
-    const base = line(14, y, W7 - 14, y);
-    const back = d.group(d.svg);
-    const front = d.group(d.svg);
-    rope(d, back, front, base, Math.round(strands), 6, 34, 0.4, Math.max(1.2, Math.min(3, W7 / 300)), [["gap", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
-    for (const x of [8, W7 - 8]) {
-      const g = d.bead(d.svg, x, y, 2.6, x < W7 / 2 ? 0.3 : 2.4);
-      g.insertBefore(svgEl2("circle", { r: 7, class: "ak-orn-ring" }), g.firstChild);
-    }
-  }
-  function drawCord(d, W7) {
-    const y = 16;
-    const base = line(18, y, W7 - 18, y);
-    const back = d.group(d.svg);
-    const front = d.group(d.svg);
-    const T = Math.max(1, Math.min(2.4, W7 / 300));
-    rope(d, back, front, base, 2, 3.5, 20, 0.3, T, [["gap", 5], ["ln", 2.4], ["hi", 0.8]], ["dim", 1.6]);
-    let tassel = "";
-    for (let i = -3; i <= 3; i++) tassel += "M" + R(i * 1.6) + " 11L" + R(i * 2.6) + " 44";
-    for (const [x, del] of [[12, 0.3], [W7 - 12, 0.3 + T]]) {
-      const g = d.bead(d.svg, x, y, 4.5, del);
-      svgEl2("path", { d: tassel, class: "ak-orn-ln", "stroke-width": 1 }, g);
-      svgEl2("path", { d: "M-5 9H5", class: "ak-orn-ln", "stroke-width": 3 }, g);
-    }
-  }
-  function drawStrip(d, W7, H4) {
-    const y = H4 / 2;
-    d.stroke(d.svg, "M4 3H" + R(W7 - 4) + "M4 " + R(H4 - 3) + "H" + R(W7 - 4), "ln", 0.8, Math.ceil(2 * W7), 0, 1.2);
-    for (let m = 0; m < 8; m++) {
-      const pts = [];
-      for (let x = 4; x <= W7 - 4; x += 2) pts.push([x, y + 7 * Math.sin(TAU4 * (x - 4) / 28 + m * PI3 / 4)]);
-      d.stroke(d.svg, pathOf(pts), "ln", 0.6, lengthOf(pts), 0.3 + m * 0.08, 2.4);
-    }
-  }
-  var LINE_FIGURES = {
-    "vine-bar": { params: ["leaves", "value"], mount: mountVineBar },
-    "vine-rail": { params: [], mount: (host, _p, opts) => fillMount(host, 28, "ak-orn-strip--rail", opts, drawRail) },
-    divider: { params: ["leaves"], mount: (host, p, opts) => fillMount(host, 48, "ak-orn-strip--divider", opts, (d, W7, H4) => drawDivider(d, W7, H4, p.leaves)) },
-    braid: { params: ["strands"], mount: (host, p, opts) => fillMount(host, 32, "ak-orn-strip--braid", opts, (d, W7, H4) => drawBraid(d, W7, H4, p.strands)) },
-    cord: { params: [], mount: (host, _p, opts) => fillMount(host, 64, "ak-orn-strip--cord", opts, drawCord) },
-    "guilloche-strip": { params: [], mount: (host, _p, opts) => fillMount(host, 30, "ak-orn-strip--guilloche", opts, drawStrip) }
-  };
-
-  // src/static/sdk-libs/atelier/ornament-text.js
-  var PI4 = Math.PI;
-  function owned(render, teardown) {
-    return { render, teardown };
-  }
-  function slot(cls) {
-    const s = document.createElement("span");
-    s.className = cls;
-    s.setAttribute("aria-hidden", "true");
-    return s;
-  }
-  function flourishInto(d, leaves) {
-    const t0 = 0.3;
-    const m = turtle(8, 58, 0, 200, (u) => -4e-3 + 0.3 * Math.pow(u, 5));
-    const pa = at(m, 0.38);
-    const b1 = turtle(pa.x, pa.y, pa.h + 0.9, 80, (u) => 0.012 + 0.3 * u * u * u);
-    const pb = at(m, 0.15);
-    const b2 = turtle(pb.x, pb.y, pb.h - 0.9, 55, (u) => -(0.012 + 0.34 * u * u * u));
-    d.stroke(d.svg, m.d, "ln", 1.8, m.len, t0, 1.8);
-    d.stroke(d.svg, b2.d, "ln", 1.2, b2.len, t0 + 0.3, 1);
-    d.stroke(d.svg, b1.d, "ln", 1.2, b1.len, t0 + 0.7, 1.3);
-    if (leaves > 0) {
-      const marks = [
-        { t: m, u: 0.26, side: 1, s: 12, start: t0, dur: 1.8 },
-        { t: m, u: 0.5, side: -1, s: 11, start: t0, dur: 1.8 },
-        { t: m, u: 0.64, side: 1, s: 10, start: t0, dur: 1.8 },
-        { t: b1, u: 0.3, side: -1, s: 9, start: t0 + 0.7, dur: 1.3 },
-        { t: b2, u: 0.35, side: 1, s: 8, start: t0 + 0.3, dur: 1 }
-      ];
-      for (const mk of marks) {
-        const q = at(mk.t, mk.u);
-        d.leaf(d.svg, q.x, q.y, q.h + mk.side * 0.95, mk.s, mk.start + mk.dur * mk.u + 0.15);
-      }
-    }
-    d.bead(d.svg, 8, 58, 3.4, 0.1);
-    d.bead(d.svg, m.end.x, m.end.y, 2.6, t0 + 1.8);
-    d.bead(d.svg, b1.end.x, b1.end.y, 2, t0 + 2);
-    d.bead(d.svg, b2.end.x, b2.end.y, 2, t0 + 1.3);
-  }
-  function mountFlourish(host, p, opts) {
-    const left = slot("ak-orn-flourish ak-orn-flourish--left");
-    const right = slot("ak-orn-flourish ak-orn-flourish--right");
-    host.classList.add("ak-orn-flourished");
-    host.insertBefore(left, host.firstChild);
-    host.appendChild(right);
-    return owned((animate) => {
-      for (const s of [left, right]) {
-        s.textContent = "";
-        flourishInto(drawing(s, 200, 110, { animate, speed: opts.speed, delay: opts.delay, viewBox: true }), p.leaves);
-      }
-    }, () => {
-      left.remove();
-      right.remove();
-      host.classList.remove("ak-orn-flourished");
-    });
-  }
-  function mountSwash(host, p, opts) {
-    const s = slot("ak-orn-swash");
-    host.appendChild(s);
-    return owned((animate) => {
-      s.textContent = "";
-      const d = drawing(s, 300, 72, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
-      const sc = turtle(20, 26, PI4 + 0.1, 40, (u) => 0.3 * u * u);
-      const sm = turtle(20, 26, -0.1, 270, (u) => 7e-4 + 0.25 * Math.pow(u, 9));
-      d.stroke(d.svg, sc.d, "ln", 1.2, sc.len, 0.5, 0.5);
-      d.stroke(d.svg, sm.d, "ln", 1.6, sm.len, 0.6, 1.6);
-      if (p.leaves > 0) {
-        const q = at(sm, 0.55);
-        d.leaf(d.svg, q.x, q.y, q.h - 0.9, 9, 1.4);
-      }
-      d.bead(d.svg, sm.end.x, sm.end.y, 2, 2.2);
-    }, () => s.remove());
-  }
-  function firstLetter(root) {
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-      const text = n.nodeValue || "";
-      const i = text.search(/\S/);
-      if (i >= 0) return { node: (
-        /** @type {Text} */
-        n
-      ), index: i };
-    }
-    return null;
-  }
-  function mountDropcap(host, p, opts) {
-    const found = firstLetter(host);
-    if (!found) return owned(() => {
-    }, () => {
-    });
-    const { node, index } = found;
-    const text = node.nodeValue || "";
-    const letter = Array.from(text.slice(index))[0] || "";
-    const cap = document.createElement("span");
-    cap.className = "ak-orn-cap";
-    const art = slot("ak-orn-cap__art");
-    const glyph = document.createElement("span");
-    glyph.className = "ak-orn-cap__letter";
-    glyph.textContent = letter;
-    cap.appendChild(art);
-    cap.appendChild(glyph);
-    node.nodeValue = text.slice(index + letter.length);
-    const pre = text.slice(0, index);
-    node.parentNode.insertBefore(cap, node);
-    const preNode = pre ? node.parentNode.insertBefore(document.createTextNode(pre), cap) : null;
-    return owned((animate) => {
-      art.textContent = "";
-      const d = drawing(art, 124, 124, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
-      const box = rrect(8, 8, 108, 108, 10);
-      const per = box.L / Math.round(box.L / 34);
-      d.fade(d.stroke(d.svg, roundedRectPath(14, 14, 96, 96, 5), "dim", 0.8), 1.4);
-      const back = d.group(d.svg);
-      d.stroke(d.svg, roundedRectPath(8, 8, 108, 108, 10), "ln", 2, 420, 0.4, 1.2);
-      const front = d.group(d.svg);
-      d.chain(back, front, helix(box.at, box.L, 5, per, 0, 1.5), box.L, 1, 3, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
-      if (p.leaves > 0) {
-        for (const q of helixLeaves(box.at, box.L, 5, per, 0, { size: 6.5, alpha: 0.9, every: p.leaves > 1.5 ? 1 : 2 })) {
-          d.leaf(front, q.x, q.y, q.ang, q.size, 1 + 3 * q.s / box.L + 0.1);
-        }
-      }
-      if (animate) d.fade(glyph, 0.6);
-    }, () => {
-      node.nodeValue = text;
-      cap.remove();
-      if (preNode) preNode.remove();
-    });
-  }
-  function mountFleuron(host, p, opts) {
-    const s = slot("ak-orn-fleuron");
-    host.appendChild(s);
-    return owned((animate) => {
-      s.textContent = "";
-      const d = drawing(s, 160, 64, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
-      for (const sx of [1, -1]) {
-        const c = turtle(80 + sx * 4, 38, sx > 0 ? 0.3 : PI4 - 0.3, 70, (u) => -sx * (0.01 + 0.34 * u * u * u));
-        d.stroke(d.svg, c.d, "ln", 1.4, c.len, 0.3, 1.3);
-        if (p.leaves > 0) {
-          const q = at(c, 0.35);
-          d.leaf(d.svg, q.x, q.y, q.h + sx * 0.95, 10, 0.8);
-        }
-        d.bead(d.svg, c.end.x, c.end.y, 1.8, 1.6);
-        d.bead(d.svg, 80 + sx * 14, 52, 1.6, 0.5);
-      }
-      d.leaf(d.svg, 80, 34, -PI4 / 2, 22, 0.2);
-      d.bead(d.svg, 80, 44, 2.4, 0.1);
-    }, () => s.remove());
-  }
-  function mountDinkus(host, _p, opts) {
-    const s = slot("ak-orn-dinkus");
-    host.appendChild(s);
-    return owned((animate) => {
-      s.textContent = "";
-      const d = drawing(s, 200, 24, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
-      d.stroke(d.svg, "M20 12H64M136 12H180", "dim", 0.8, 120, 0.2, 0.8);
-      d.leaf(d.svg, 108, 12, 0, 14, 0.3);
-      d.leaf(d.svg, 92, 12, PI4, 14, 0.3);
-      d.bead(d.svg, 100, 12, 3.2, 0.2);
-      d.bead(d.svg, 128, 12, 1.6, 0.5);
-      d.bead(d.svg, 72, 12, 1.6, 0.5);
-    }, () => s.remove());
-  }
-  function mountBullets(host, _p, opts) {
-    host.classList.add("ak-orn-bullets");
-    const marks = [];
-    return owned((animate) => {
-      for (const m of marks) m.remove();
-      marks.length = 0;
-      Array.from(host.children).forEach((li, i) => {
-        if (li.tagName !== "LI") return;
-        const m = slot("ak-orn-bullet");
-        li.insertBefore(m, li.firstChild);
-        marks.push(m);
-        const d = drawing(m, 18, 18, { animate, speed: opts.speed, delay: opts.delay + i * 0.12, viewBox: true });
-        d.leaf(d.svg, 3, 15, -PI4 / 4, 16, 0, 0.36);
-      });
-    }, () => {
-      for (const m of marks) m.remove();
-      host.classList.remove("ak-orn-bullets");
-    });
-  }
-  var TEXT_FIGURES = {
-    flourish: { params: ["leaves"], mount: mountFlourish },
-    swash: { params: ["leaves"], mount: mountSwash },
-    dropcap: { params: ["leaves"], mount: mountDropcap },
-    fleuron: { params: ["leaves"], mount: mountFleuron },
-    dinkus: { params: [], mount: mountDinkus },
-    bullets: { params: [], mount: mountBullets }
-  };
-
-  // src/static/sdk-libs/atelier/ornament-set-pen.js
-  var f = (n) => Math.round(n * 10) / 10;
-  var dOf = (pts) => "M" + pts.map((p) => f(p[0]) + " " + f(p[1])).join(" L");
-  var lenOf = (pts) => {
-    let L = 0;
-    for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    return Math.ceil(L) + 2;
-  };
-  var poly = (pts) => dOf(pts) + " Z";
-  var circ = (x, y, r) => "M" + f(x - r) + " " + f(y) + " a" + f(r) + " " + f(r) + " 0 1 0 " + f(2 * r) + " 0 a" + f(r) + " " + f(r) + " 0 1 0 " + f(-2 * r) + " 0 Z";
-  var arc2 = (cx, cy, r, a0, a1, n) => {
-    const o = [];
-    for (let i = 0; i <= n; i++) {
-      const a = a0 + (a1 - a0) * i / n;
-      o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-    }
-    return o;
-  };
-  var bz = (a, b, c, d, n) => {
-    const o = [];
-    for (let i = 0; i <= n; i++) {
-      const u = i / n;
-      const v = 1 - u;
-      o.push([
-        v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0],
-        v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]
-      ]);
-    }
-    return o;
-  };
-  var hex = (cx, cy, r, a0) => {
-    const o = [];
-    for (let i = 0; i <= 6; i++) {
-      const a = (a0 || 0) + i * Math.PI / 3;
-      o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-    }
-    return o;
-  };
-  var HOW = { pop: "ak-orn-spop", turn: "ak-orn-sturn", shoot: "ak-orn-sshoot", spin: "ak-orn-sspin", fade: "ak-orn-sfade", drift: "ak-orn-sdrift", wipe: "ak-orn-swipe" };
-  function pen(svg6, o) {
-    const speed = Math.max(0.25, Math.min(3, Number(o.speed) || 1));
-    const base = Math.max(0, Number(o.delay) || 0);
-    const shift = o.shift || 0;
-    const sec = (t2) => ((base + Math.max(0, t2 - shift)) / speed).toFixed(2) + "s";
-    const span = (t2) => (Math.max(0.05, t2) / speed).toFixed(2) + "s";
-    let seed = o.seed || 1;
-    const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
-    const timed = (el2, cls, dl, du, ease) => {
-      el2.classList.add(cls);
-      const s = (
-        /** @type {any} */
-        el2.style
-      );
-      s.animationDelay = sec(dl);
-      s.animationDuration = span(du);
-      if (ease) s.animationTimingFunction = ease;
-    };
-    const line2 = (pts, role, width, dl, du) => {
-      if (pts.length < 2) return null;
-      const el2 = svgEl2("path", { d: dOf(pts), class: "ak-orn-k ak-orn-r-" + role, "stroke-width": width }, svg6);
-      if (o.animate) {
-        const len = lenOf(pts);
-        const s = (
-          /** @type {any} */
-          el2.style
-        );
-        s.strokeDasharray = String(len);
-        s.strokeDashoffset = String(len);
-        timed(el2, "ak-orn-grow", dl, du, o.ease);
-      }
-      return el2;
-    };
-    const shape = (d, role, dl, du, how) => {
-      const el2 = svgEl2("path", { d, class: "ak-orn-f ak-orn-r-" + role }, svg6);
-      if (o.animate) timed(el2, HOW[how || "pop"], dl, du || 0.5, !how || how === "pop" || how === "turn" || how === "spin" ? o.popEase : null);
-      return el2;
-    };
-    const stroke = (d, role, width, dl, du, how) => {
-      const el2 = svgEl2("path", { d, class: "ak-orn-k ak-orn-r-" + role, "stroke-width": width }, svg6);
-      if (o.animate) timed(el2, HOW[how || "fade"], dl, du, null);
-      return el2;
-    };
-    const rect = (x, y, w, h, role, opts) => {
-      const r = opts || {};
-      if (w <= 0 || h <= 0) return null;
-      const el2 = svgEl2("rect", {
-        x: f(x),
-        y: f(y),
-        width: f(w),
-        height: f(h),
-        rx: r.rx || 0,
-        class: (r.stroke ? "ak-orn-k" : "ak-orn-f") + " ak-orn-r-" + role,
-        "stroke-width": r.sw || 1
-      }, svg6);
-      if (o.animate && r.wipe) timed(el2, HOW.wipe, r.wipe[0], r.wipe[1], r.wipe[2] || o.ease);
-      return el2;
-    };
-    return { line: line2, shape, stroke, rect, rnd, poly, circ, arc: arc2, bz, hex, f };
-  }
-
-  // src/static/sdk-libs/atelier/ornament-sets-a.js
-  var PI5 = Math.PI;
-  var modern = {
-    id: "modern",
-    // A hairline drawn all round, two corner brackets growing out of their corners, one accent square.
-    frame(P, C) {
-      const x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
-      const arm2 = Math.min(64, C.w / 4, C.h / 3);
-      P.line([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]], "mute", 0.75, 0.1, 1.8);
-      P.line([[x0 - 10, y0 + arm2], [x0 - 10, y0 - 10], [x0 + arm2, y0 - 10]], "ink", 2, 0.35, 0.6);
-      P.line([[x1 + 10, y1 - arm2], [x1 + 10, y1 + 10], [x1 - arm2, y1 + 10]], "ink", 2, 0.55, 0.6);
-      P.shape(poly([[x1 + 4, y0 - 16], [x1 + 16, y0 - 16], [x1 + 16, y0 - 4], [x1 + 4, y0 - 4]]), "s1", 1.2);
-      for (let i = 0; i < 5; i++) P.line([[x0 + 24 + i * 10, y1 + 4], [x0 + 24 + i * 10, y1 + 12]], "mute", 1, 1.3 + i * 0.06, 0.2);
-    },
-    // An accent lead, a hairline, ticks every 44 px.
-    rule(P, D2) {
-      const span = D2.x1 - D2.x0;
-      P.line([[D2.x0, D2.y], [D2.x1, D2.y]], "mute", 0.75, 0.3, 1.1);
-      P.line([[D2.x0, D2.y], [D2.x0 + Math.min(48, span / 4), D2.y]], "s1", 3, 0.2, 0.45);
-      for (let x = D2.x0 + 88; x <= D2.x1 + 0.1; x += 44) P.line([[x, D2.y - 4], [x, D2.y + 4]], "ink", 1, 0.5 + (x - D2.x0) / span * 0.8, 0.15);
-    },
-    // An outlined track, a ruler under it and a marker at the value.
-    bar(P, B) {
-      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "ink", { stroke: true });
-      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4] });
-      for (let i = 0; i <= 10; i++) {
-        const x = B.x + B.w * i / 10, h = i % 5 === 0 ? 10 : 5;
-        P.line([[x, B.y + B.h + 5], [x, B.y + B.h + 5 + h]], i % 5 === 0 ? "ink" : "mute", 1, 0.5 + i * 0.05, 0.15);
-      }
-      const vx = B.x + B.w * B.v;
-      P.line([[vx, B.y - 10], [vx, B.y + B.h + 2]], "ink", 1.5, 1.8, 0.3);
-      P.shape(poly([[vx - 5, B.y - 18], [vx + 5, B.y - 18], [vx, B.y - 10]]), "s1", 1.9);
-    },
-    // Open squares, the first one filled with the accent.
-    bullet(P, p, i) {
-      P.line([[p[0] - 5, p[1] - 5], [p[0] + 5, p[1] - 5], [p[0] + 5, p[1] + 5], [p[0] - 5, p[1] + 5], [p[0] - 5, p[1] - 5]], "ink", 1.5, 0.9 + i * 0.15, 0.4);
-      if (i === 0) P.shape(poly([[p[0] - 2.5, p[1] - 2.5], [p[0] + 2.5, p[1] - 2.5], [p[0] + 2.5, p[1] + 2.5], [p[0] - 2.5, p[1] + 2.5]]), "s1", 1.4);
-    },
-    // A ruler along the foot.
-    strip(P, S) {
-      const span = S.x1 - S.x0;
-      P.line([[S.x0, S.y], [S.x1, S.y]], "mute", 0.75, 0.6, 1.4);
-      for (let x = S.x0; x <= S.x1 + 0.1; x += 16) {
-        const big = Math.round((x - S.x0) / 16) % 5 === 0;
-        P.line([[x, S.y], [x, S.y - (big ? 10 : 5)]], big ? "ink" : "mute", 1, 0.7 + (x - S.x0) / span, 0.12);
-      }
-    }
-  };
-  var futuristic = {
-    id: "futuristic",
-    // A chamfered outline drawn from the top-left cut both ways at once, readout ticks, a segmented arc, a crosshair.
-    frame(P, C) {
-      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12, k = 18;
-      P.line([[x0 + k, y0], [x1 - k, y0], [x1, y0 + k], [x1, y1 - k], [x1 - k, y1]], "s1", 1.5, 0.1, 1.2);
-      P.line([[x0 + k, y0], [x0, y0 + k], [x0, y1 - k], [x0 + k, y1], [x1 - k, y1]], "s1", 1.5, 0.1, 1.2);
-      P.line([[x0 - 6, y0 + k + 6], [x0 + k + 6, y0 - 6]], "s2", 3, 1.1, 0.25);
-      P.line([[x1 - k - 6, y1 + 6], [x1 + 6, y1 - k - 6]], "s2", 3, 1.25, 0.25);
-      const ticks = Math.max(4, Math.min(12, Math.floor((C.w - 2 * k) / 16)));
-      for (let i = 0; i < ticks; i++) {
-        const x = x1 - k - 10 - i * 8;
-        P.line([[x, y0 - 4], [x, y0 - (i % 3 === 0 ? 11 : 7)]], i % 3 === 0 ? "s1" : "pale", 1.2, 1 + i * 0.04, 0.15);
-      }
-      for (let s = 0; s < 4; s++) {
-        const a0 = PI5 / 2 + s * PI5 / 8 + 0.05;
-        P.line(arc2(x0, y1, 26, a0, a0 + PI5 / 8 - 0.1, 6), s === 3 ? "s2" : "s1", 2, 1.2 + s * 0.1, 0.2);
-      }
-      const hx = x1 - 34, hy = y1 + 22;
-      P.line(arc2(hx, hy, 7, 0, PI5 * 2, 28), "s1", 1.2, 1.5, 0.4);
-      P.line([[hx - 14, hy], [hx - 4, hy]], "pale", 1, 1.7, 0.15);
-      P.line([[hx + 4, hy], [hx + 14, hy]], "pale", 1, 1.7, 0.15);
-      P.line([[hx, hy - 14], [hx, hy - 4]], "pale", 1, 1.75, 0.15);
-      P.line([[hx, hy + 4], [hx, hy + 14]], "pale", 1, 1.75, 0.15);
-    },
-    // Two lines run to a centre diamond, brackets close the ends.
-    rule(P, D2) {
-      const mid = (D2.x0 + D2.x1) / 2;
-      P.line([[D2.x0 + 10, D2.y], [mid - 16, D2.y]], "s1", 1.2, 0.3, 0.6);
-      P.line([[D2.x1 - 10, D2.y], [mid + 16, D2.y]], "s1", 1.2, 0.3, 0.6);
-      P.line([[mid, D2.y - 8], [mid + 8, D2.y], [mid, D2.y + 8], [mid - 8, D2.y], [mid, D2.y - 8]], "s2", 1.5, 0.8, 0.4);
-      P.shape(poly([[mid, D2.y - 3.5], [mid + 3.5, D2.y], [mid, D2.y + 3.5], [mid - 3.5, D2.y]]), "s2", 1.1);
-      P.line([[D2.x0 + 6, D2.y - 6], [D2.x0, D2.y - 6], [D2.x0, D2.y + 6], [D2.x0 + 6, D2.y + 6]], "mute", 1.2, 0.2, 0.3);
-      P.line([[D2.x1 - 6, D2.y - 6], [D2.x1, D2.y - 6], [D2.x1, D2.y + 6], [D2.x1 - 6, D2.y + 6]], "mute", 1.2, 0.2, 0.3);
-    },
-    // Blocks; the filled ones light up in turn, the last lit block in the second colour.
-    bar(P, B) {
-      const n = Math.max(8, Math.round(24 * B.w / 356)), g = 3, bw = (B.w - (n - 1) * g) / n, lit = Math.round(n * B.v);
-      for (let i = 0; i < n; i++) {
-        const x = B.x + i * (bw + g), r = [[x, B.y], [x + bw, B.y], [x + bw, B.y + B.h], [x, B.y + B.h]];
-        if (i < lit) P.shape(poly(r), i === lit - 1 ? "s2" : "s1", 0.5 + i * 0.06 * 24 / n, 0.25);
-        else P.line(r.concat([r[0]]), "pale", 1, 0.5 + i * 0.03 * 24 / n, 0.2);
-      }
-      P.line([[B.x - 6, B.y - 4], [B.x - 10, B.y - 4], [B.x - 10, B.y + B.h + 4], [B.x - 6, B.y + B.h + 4]], "mute", 1.2, 0.4, 0.3);
-      P.line([[B.x + B.w + 6, B.y - 4], [B.x + B.w + 10, B.y - 4], [B.x + B.w + 10, B.y + B.h + 4], [B.x + B.w + 6, B.y + B.h + 4]], "mute", 1.2, 0.4, 0.3);
-    },
-    // Hexagons, the first one with a lit core.
-    bullet(P, p, i) {
-      P.line(hex(p[0], p[1], 7, PI5 / 6), "s1", 1.4, 0.9 + i * 0.15, 0.45);
-      if (i === 0) P.shape(poly(hex(p[0], p[1], 3, PI5 / 6).slice(0, 6)), "s2", 1.4);
-    },
-    // A dim rail with nodes; lit runs between them in turn.
-    strip(P, S) {
-      const nodes = [0, 112, 248, 416, 552, 696, 832].map((u) => S.x0 + u / 832 * (S.x1 - S.x0));
-      P.line([[S.x0, S.y], [S.x1, S.y]], "pale", 1, 0.5, 1.2);
-      for (let i = 0; i < nodes.length - 1; i++) P.line([[nodes[i] + 6, S.y], [nodes[i + 1] - 6, S.y]], i % 2 ? "s2" : "s1", 2, 0.9 + i * 0.22, 0.3);
-      nodes.forEach((x, i) => P.line(arc2(x, S.y, 4, 0, PI5 * 2, 16), "s1", 1.4, 0.8 + i * 0.22, 0.2));
-    }
-  };
-  function via(P, x, y, r, role, dl) {
-    P.line(arc2(x, y, r, 0, PI5 * 2, 18), role, 1.4, dl, 0.2);
-    if (P.rnd() > 0.5) P.shape(circ(x, y, r * 0.45), "s3", dl + 0.2, 0.3);
-  }
-  var cyberpunk = {
-    id: "cyberpunk",
-    seed: 31,
-    // A neon outline with a shifted ghost of three of its runs; traces leave every side, turn at 45 degrees and end in a via.
-    frame(P, C) {
-      const x0 = C.x - 10, y0 = C.y - 10, x1 = C.x + C.w + 10, y1 = C.y + C.h + 10;
-      const kx = (x1 - x0) / 420, ky = (y1 - y0) / 268;
-      P.line([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]], "s1", 1.6, 0.1, 1.1);
-      P.line([[x0 + 40 * kx, y0 - 3], [x0 + 170 * kx, y0 - 3]], "s2", 1.2, 1, 0.12);
-      P.line([[x1 + 3, y0 + 60 * ky], [x1 + 3, y0 + 130 * ky]], "s2", 1.2, 1.1, 0.12);
-      P.line([[x1 - 210 * kx, y1 + 3], [x1 - 120 * kx, y1 + 3]], "s2", 1.2, 1.2, 0.12);
-      [40, 84, 150, 204].forEach((u, i) => {
-        const y = y0 + u * ky, s = i % 2 ? 1 : -1;
-        P.line([[x0, y], [x0 - 8, y], [x0 - 18, y + 10 * s], [x0 - 26, y + 10 * s]], i % 2 ? "s2" : "s1", 1.3, 0.6 + i * 0.1, 0.35);
-        via(P, x0 - 30, y + 10 * s, 3.5, "s2", 0.95 + i * 0.1);
-      });
-      [60, 110, 290, 340].forEach((u, i) => {
-        const x = x0 + u * kx;
-        P.line([[x, y1], [x, y1 + 8], [x + 12, y1 + 20], [x + 12, y1 + 34]], i % 2 ? "s1" : "s2", 1.3, 0.7 + i * 0.1, 0.35);
-        via(P, x + 12, y1 + 38, 3.5, "s1", 1.05 + i * 0.1);
-      });
-      [30, 72].forEach((u, i) => {
-        const y = y0 + u * ky;
-        P.line([[x1, y], [x1 + 10, y], [x1 + 20, y + 10], [x1 + 30, y + 10]], "s2", 1.3, 0.8 + i * 0.1, 0.3);
-        via(P, x1 + 34, y + 10, 3.5, "s2", 1.1 + i * 0.1);
-      });
-      [250, 290].forEach((u, i) => {
-        const x = x0 + u * kx;
-        P.line([[x, y0], [x, y0 - 4], [x + 6, y0 - 10]], "s1", 1.3, 0.9 + i * 0.1, 0.25);
-        via(P, x + 9, y0 - 13, 3, "s1", 1.15 + i * 0.1);
-      });
-    },
-    // A three-line bus with one 45-degree jog, a via at each end of each line.
-    rule(P, D2) {
-      const mid = (D2.x0 + D2.x1) / 2;
-      ["s1", "s2", "s1"].forEach((role, j) => {
-        const y = D2.y - 7 + j * 5;
-        P.line([[D2.x0 + 6, y], [mid - 8, y], [mid, y + 8], [D2.x1 - 6, y + 8]], role, 1.3, 0.3 + j * 0.08, 0.9);
-        P.line(arc2(D2.x0 + 3, y, 2.5, 0, PI5 * 2, 12), role, 1, 0.25, 0.15);
-        P.line(arc2(D2.x1 - 3, y + 8, 2.5, 0, PI5 * 2, 12), role, 1, 1.2, 0.15);
-      });
-    },
-    // A neon track, a ghost of its edges, data packets in the filled run, a cursor at the value.
-    bar(P, B) {
-      const vx = B.x + B.w * B.v;
-      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true });
-      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4, "steps(12, end)"] });
-      P.line([[B.x, B.y - 3], [vx, B.y - 3]], "s2", 1, 1.3, 0.2);
-      if (vx - 60 > B.x + 40) P.line([[B.x + 40, B.y + B.h + 3], [vx - 60, B.y + B.h + 3]], "s2", 1, 1.4, 0.2);
-      for (let i = 0, x = B.x + 14; x + 6 < vx - 10; i++, x += 36) P.shape(poly([[x, B.y + 3], [x + 6, B.y + 3], [x + 6, B.y + B.h - 3], [x, B.y + B.h - 3]]), "s3", 1.5 + i * 0.07, 0.2);
-      P.line([[vx + 2, B.y - 7], [vx + 2, B.y + B.h + 7]], "s2", 2, 1.9, 0.15);
-    },
-    // A via with a short stub, the first one lit.
-    bullet(P, p, i) {
-      P.line(arc2(p[0], p[1], 5, 0, PI5 * 2, 20), "s1", 1.5, 0.9 + i * 0.15, 0.3);
-      P.line([[p[0] + 5, p[1]], [p[0] + 9, p[1] - 4], [p[0] + 14, p[1] - 4]], "s2", 1.3, 1.1 + i * 0.15, 0.2);
-      if (i === 0) P.shape(circ(p[0], p[1], 2.2), "s3", 1.3);
-    },
-    // Three traces along the foot, each jogging twice at its own places.
-    strip(P, S) {
-      const k = (S.x1 - S.x0) / 832;
-      [[S.y - 10, "s2"], [S.y, "s1"], [S.y + 10, "pale"]].forEach((row, j) => {
-        const y = (
-          /** @type {number} */
-          row[0]
-        ), role = (
-          /** @type {string} */
-          row[1]
-        );
-        const a = S.x0 + (80 + P.rnd() * 260) * k, b = Math.min(S.x1 - 12, a + (180 + P.rnd() * 260) * k), s = j === 1 ? 1 : -1;
-        P.line([[S.x0, y], [a, y], [a + 6, y + 6 * s], [b, y + 6 * s], [b + 6, y], [S.x1, y]], role, 1.4, 0.5 + j * 0.12, 1.4);
-        via(P, S.x1 + 4, y, 3, role, 1.9 + j * 0.1);
-      });
-    }
-  };
-  function wave(a, b, amp, per, ph) {
-    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, o = [];
-    for (let s = 0; s <= len; s += 3) {
-      const w = amp * Math.sin(2 * PI5 * s / per + ph);
-      o.push([a[0] + dx * s / len + nx * w, a[1] + dy * s / len + ny * w]);
-    }
-    return o;
-  }
-  function star(x, y, r) {
-    const o = [];
-    for (let i = 0; i < 10; i++) {
-      const a = -PI5 / 2 + i * PI5 / 5, q = i % 2 ? r * 0.45 : r;
-      o.push([x + q * Math.cos(a), y + q * Math.sin(a)]);
-    }
-    return poly(o);
-  }
-  var vibrant = {
-    id: "vibrant",
-    seed: 5,
-    barH: 16,
-    popEase: "cubic-bezier(.3,1.7,.5,1)",
-    // One thick wavy ribbon per side, each in its own colour, then confetti round the card.
-    frame(P, C) {
-      const x0 = C.x - 16, y0 = C.y - 16, x1 = C.x + C.w + 16, y1 = C.y + C.h + 16;
-      P.line(wave([x0 + 18, y0], [x1 - 18, y0], 4, 40, 0), "s1", 6, 0.1, 0.7);
-      P.line(wave([x1, y0 + 18], [x1, y1 - 18], 4, 40, 0), "s3", 6, 0.45, 0.55);
-      P.line(wave([x1 - 18, y1], [x0 + 18, y1], 4, 40, 0), "s2", 6, 0.75, 0.7);
-      P.line(wave([x0, y1 - 18], [x0, y0 + 18], 4, 40, 0), "s4", 6, 1.1, 0.55);
-      const map2 = (v, lo, len, size, at3) => v < lo ? at3 + (v - lo) : v > lo + len ? at3 + size + (v - lo - len) : at3 + (v - lo) / len * size;
-      const roles = ["s1", "s3", "s2", "s4"];
-      [[34, 250], [26, 330], [40, 420], [30, 470], [110, 516], [190, 526], [290, 512], [380, 528], [440, 516], [500, 250], [508, 330], [496, 410], [512, 470]].forEach((q, i) => {
-        const x = map2(q[0], 64, 400, C.w, C.x), y = map2(q[1], 232, 248, C.h, C.y), role = roles[i % 4], kind = i % 3, dl = 1.3 + i * 0.05;
-        if (kind === 0) P.shape(circ(x, y, 3 + P.rnd() * 2.5), role, dl);
-        else if (kind === 1) P.shape(poly([[x, y - 5], [x + 5, y + 4], [x - 5, y + 4]]), role, dl);
-        else P.line([[x - 6, y], [x - 2, y - 4], [x + 2, y], [x + 6, y - 4]], role, 2.5, dl, 0.25);
-      });
-    },
-    // Two waves half a period apart, a dot at each end.
-    rule(P, D2) {
-      P.line(wave([D2.x0 + 10, D2.y], [D2.x1 - 10, D2.y], 5, 36, 0), "s1", 4, 0.3, 1);
-      P.line(wave([D2.x0 + 10, D2.y], [D2.x1 - 10, D2.y], 5, 36, PI5), "s4", 4, 0.45, 1);
-      P.shape(circ(D2.x0 + 2, D2.y, 4.5), "s3", 0.25);
-      P.shape(circ(D2.x1 - 2, D2.y, 4.5), "s3", 1.4);
-    },
-    // A rounded track, a wave riding the filled run, a star where it ends.
-    bar(P, B) {
-      const vx = B.x + B.w * B.v, my = B.y + B.h / 2;
-      P.rect(B.x, B.y, B.w, B.h, "t3", { rx: B.h / 2 });
-      P.rect(B.x, B.y, B.w * B.v, B.h, "s3", { rx: B.h / 2, wipe: [0.5, 1.4, "cubic-bezier(.3,1.3,.5,1)"] });
-      if (vx - 14 > B.x + 10) P.line(wave([B.x + 10, my], [vx - 14, my], 2.5, 18, 0), "s4", 2.5, 1.2, 0.7);
-      P.shape(star(vx + 2, B.y - 8, 9), "s1", 1.9, 0.6);
-    },
-    // Dots in three colours, each with a small bounce beside it.
-    bullet(P, p, i) {
-      P.shape(circ(p[0], p[1], 7), ["s1", "s2", "s4"][i % 3], 0.9 + i * 0.15, 0.6);
-      P.shape(circ(p[0] + 6, p[1] - 6, 2.5), "s3", 1.1 + i * 0.15, 0.4);
-    },
-    // A zigzag in four colour runs.
-    strip(P, S) {
-      const run = (S.x1 - S.x0) / 4, roles = ["s1", "s3", "s2", "s4"];
-      for (let k = 0; k < 4; k++) {
-        const o = [];
-        for (let x = S.x0 + k * run; x <= S.x0 + (k + 1) * run + 0.1; x += 12) o.push([x, S.y + (Math.round((x - S.x0) / 12) % 2 ? -7 : 7)]);
-        P.line(o, roles[k], 5, 0.6 + k * 0.3, 0.35);
-      }
-    }
-  };
-  var SETS_A = [modern, futuristic, cyberpunk, vibrant];
-
-  // src/static/sdk-libs/atelier/ornament-sets-b.js
-  var PI6 = Math.PI;
-  function hand(P, pts, amp) {
-    const p1 = P.rnd() * 6, p2 = P.rnd() * 6, o = [];
-    let s = 0;
-    for (let i = 1; i < pts.length; i++) {
-      const a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
-      for (let u = 0; u < len; u += 4) {
-        const w = amp * (0.6 * Math.sin((s + u) / 23 + p1) + 0.4 * Math.sin((s + u) / 9 + p2));
-        o.push([a[0] + dx * u / len + nx * w, a[1] + dy * u / len + ny * w]);
-      }
-      s += len;
-    }
-    o.push(pts[pts.length - 1]);
-    return o;
-  }
-  function petal(x, y, s, a) {
-    const raw = bz([0, -s], [s * 0.6, -s * 0.3], [s * 0.5, s * 0.5], [0, s * 0.5], 10).concat(bz([0, s * 0.5], [-s * 0.5, s * 0.5], [-s * 0.6, -s * 0.3], [0, -s], 10));
-    const c = Math.cos(a), sn = Math.sin(a);
-    return poly(raw.map((p) => [x + p[0] * c - p[1] * sn, y + p[0] * sn + p[1] * c]));
-  }
-  var emotional = {
-    id: "emotional",
-    seed: 13,
-    ease: "cubic-bezier(.35,0,.25,1)",
-    popEase: "cubic-bezier(.3,1.4,.55,1)",
-    // The outline twice by hand, each pass a little off the other; a curl at the top left, petals falling at the lower right.
-    frame(P, C) {
-      const x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
-      P.line(hand(P, [[x0 + 30, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0], [x0 + 60, y0 + 1]], 1.8), "s1", 1.6, 0.1, 2.2);
-      P.line(hand(P, [[x0 + 4, y0 + 3], [x1 - 3, y0 - 2], [x1 + 3, y1 - 4], [x0 - 2, y1 + 3], [x0 + 3, y0 - 3], [x0 + 30, y0 - 2]], 2.4), "s2", 1, 0.5, 2.2);
-      P.line(bz([x0 + 30, y0], [x0 - 4, y0 - 2], [x0 - 26, y0 - 4], [x0 - 22, y0 + 14], 16).concat(bz([x0 - 22, y0 + 14], [x0 - 18, y0 + 30], [x0 + 4, y0 + 22], [x0 - 4, y0 + 10], 14)), "s1", 1.6, 2.1, 0.6);
-      [[x1 - 8, y1 + 20, 9, 2.4, "s1"], [x1 + 18, y1 + 6, 7, 3.1, "s3"], [x1 - 40, y1 + 34, 6, 1.9, "s2"], [x1 + 12, y1 + 38, 8, 2.7, "s3"]].forEach((q, i) => P.shape(
-        petal(
-          /** @type {number} */
-          q[0],
-          /** @type {number} */
-          q[1],
-          /** @type {number} */
-          q[2],
-          /** @type {number} */
-          q[3]
-        ),
-        /** @type {string} */
-        q[4],
-        2 + i * 0.25,
-        0.9,
-        "drift"
-      ));
-    },
-    // A handwritten line that ties one loop in the middle.
-    rule(P, D2) {
-      const mid = (D2.x0 + D2.x1) / 2;
-      const loop = bz([mid - 34, D2.y], [mid + 12, D2.y + 2], [mid + 14, D2.y - 24], [mid, D2.y - 24], 16).concat(bz([mid, D2.y - 24], [mid - 14, D2.y - 24], [mid - 10, D2.y + 2], [mid + 34, D2.y], 16));
-      P.line(hand(P, [[D2.x0, D2.y + 2], [mid - 34, D2.y]], 1.2).concat(loop).concat(hand(P, [[mid + 34, D2.y], [D2.x1, D2.y - 2]], 1.2)), "s1", 1.8, 0.3, 1.6);
-    },
-    // A soft pencil track, a thicker stroke over the value, a petal where it stops.
-    bar(P, B) {
-      const vx = B.x + B.w * B.v, my = B.y + B.h / 2;
-      P.line(hand(P, [[B.x, my], [B.x + B.w, my]], 1), "pale", 2, 0.3, 1);
-      if (vx > B.x + 6) P.line(hand(P, [[B.x + 2, my], [vx, my]], 1.4), "s1", 6, 0.7, 1.2);
-      P.shape(petal(vx + 10, my - 8, 7, 2.2), "s3", 1.9, 0.9, "drift");
-    },
-    // Petals in the three soft colours.
-    bullet(P, p, i) {
-      P.shape(petal(p[0], p[1], 8, -0.5 + i % 3 * 0.3), ["s1", "s2", "s3"][i % 3], 0.9 + i * 0.2, 0.7, "drift");
-    },
-    // A quiet line that beats once in the middle.
-    strip(P, S) {
-      const sm = (S.x0 + S.x1) / 2, y = S.y;
-      const beat = [[S.x0, y], [sm - 60, y]].concat(bz([sm - 60, y], [sm - 44, y], [sm - 40, y + 8], [sm - 30, y + 6], 6)).concat(bz([sm - 30, y + 6], [sm - 18, y + 4], [sm - 16, y - 26], [sm - 4, y - 24], 8)).concat(bz([sm - 4, y - 24], [sm + 8, y - 22], [sm + 8, y + 14], [sm + 22, y + 12], 8)).concat(bz([sm + 22, y + 12], [sm + 34, y + 10], [sm + 40, y], [sm + 60, y], 6)).concat([[S.x1, y]]);
-      P.line(hand(P, beat, 0.6), "s1", 2, 0.6, 2.4);
-    }
-  };
-  var diamond = (x, y, r) => poly([[x, y - r], [x + r * 0.7, y], [x, y + r], [x - r * 0.7, y]]);
-  function taper(pts, wf) {
-    let tot = 0;
-    for (let i = 1; i < pts.length; i++) tot += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-    const left = [], right = [];
-    let s = 0;
-    for (let i = 0; i < pts.length; i++) {
-      if (i > 0) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
-      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, w = wf(s / (tot || 1)) / 2;
-      left.push([pts[i][0] - dy / len * w, pts[i][1] + dx / len * w]);
-      right.push([pts[i][0] + dy / len * w, pts[i][1] - dx / len * w]);
-    }
-    return poly(left.concat(right.reverse()));
-  }
-  var seg = (a, b, n) => {
-    const o = [];
-    for (let i = 0; i <= n; i++) o.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]);
-    return o;
-  };
-  var dramatic = {
-    id: "dramatic",
-    ease: "cubic-bezier(.7,0,.2,1)",
-    // A heavy rule opened from the top centre both ways, a fine inner rule, swashes and a diamond on top, rays under the card.
-    frame(P, C) {
-      const cx = C.x + C.w / 2, x0 = C.x - 18, y0 = C.y - 18, x1 = C.x + C.w + 18, y1 = C.y + C.h + 18;
-      const reach = Math.min(150, C.w / 2 - 10);
-      P.line([[cx, y0], [x1, y0], [x1, y1], [cx, y1]], "s2", 3, 0.1, 1.1);
-      P.line([[cx, y0], [x0, y0], [x0, y1], [cx, y1]], "s2", 3, 0.1, 1.1);
-      P.line([[C.x - 8, C.y - 8], [C.x + C.w + 8, C.y - 8], [C.x + C.w + 8, C.y + C.h + 8], [C.x - 8, C.y + C.h + 8], [C.x - 8, C.y - 8]], "s2", 0.8, 0.9, 1.3);
-      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q, i) => P.shape(diamond(q[0], q[1], 7), "s1", 1.1 + i * 0.05));
-      for (const sx of [-1, 1]) {
-        P.line(seg([cx + sx * 12, y0 - 6], [cx + sx * reach, y0 - 6], 20), "s2", 0.8, 1.2, 0.5);
-        P.shape(taper(seg([cx + sx * 12, y0 - 6], [cx + sx * reach, y0 - 6], 30), (u) => 6 * (1 - u)), "s2", 1.5, 0.7, "fade");
-      }
-      P.shape(diamond(cx, y0 - 6, 14), "s1", 1, 0.6);
-      for (let i = 0; i < 11; i++) {
-        const a = PI6 * (0.18 + 0.64 * i / 10), r1 = i % 2 ? 16 : 30;
-        P.line([[cx + 6 * Math.cos(a), y1 + 6 * Math.sin(a)], [cx + r1 * Math.cos(a), y1 + r1 * Math.sin(a)]], "s2", 1, 1.4 + Math.abs(i - 5) * 0.05, 0.3);
-      }
-    },
-    // A blade, thickest in the middle, a hairline under it and a diamond at its heart.
-    rule(P, D2) {
-      const mid = (D2.x0 + D2.x1) / 2, inset = Math.min(50, (D2.x1 - D2.x0) / 6);
-      P.line(seg([D2.x0, D2.y], [D2.x1, D2.y], 2), "s2", 0.8, 0.3, 0.8);
-      P.shape(taper(seg([D2.x0, D2.y], [D2.x1, D2.y], 60), (u) => 7 * Math.sin(PI6 * u)), "s1", 0.9, 0.8, "fade");
-      P.line(seg([D2.x0 + inset, D2.y + 9], [D2.x1 - inset, D2.y + 9], 2), "s2", 0.8, 1.1, 0.6);
-      P.line([[mid, D2.y - 10], [mid + 7, D2.y], [mid, D2.y + 10], [mid - 7, D2.y], [mid, D2.y - 10]], "s2", 1.5, 1.4, 0.4);
-    },
-    // A dark track in a fine rule, a mark at the value with a diamond, a hairline under the track.
-    bar(P, B) {
-      const vx = B.x + B.w * B.v;
-      P.rect(B.x, B.y, B.w, B.h, "deep");
-      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s2", { stroke: true });
-      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.6] });
-      P.line([[vx, B.y - 12], [vx, B.y + B.h + 12]], "s2", 1.5, 2, 0.25);
-      P.shape(diamond(vx, B.y - 16, 6), "s2", 2.1);
-      P.line(seg([B.x, B.y + B.h + 6], [B.x + B.w, B.y + B.h + 6], 2), "s2", 0.6, 0.6, 1);
-    },
-    // Diamonds inside fine outlines.
-    bullet(P, p, i) {
-      P.line([[p[0], p[1] - 9], [p[0] + 6, p[1]], [p[0], p[1] + 9], [p[0] - 6, p[1]], [p[0], p[1] - 9]], "s2", 1.2, 0.9 + i * 0.15, 0.35);
-      P.shape(diamond(p[0], p[1], 4.5), "s1", 1.15 + i * 0.15);
-    },
-    // Two swords drawn out from a centre diamond.
-    strip(P, S) {
-      const sm = (S.x0 + S.x1) / 2;
-      P.line(seg([sm - 16, S.y], [S.x0, S.y], 2), "s2", 0.8, 0.5, 0.9);
-      P.line(seg([sm + 16, S.y], [S.x1, S.y], 2), "s2", 0.8, 0.5, 0.9);
-      P.shape(taper(seg([sm - 16, S.y], [S.x0 + 20, S.y], 50), (u) => 5 * (1 - u)), "s2", 1.2, 0.7, "fade");
-      P.shape(taper(seg([sm + 16, S.y], [S.x1 - 20, S.y], 50), (u) => 5 * (1 - u)), "s2", 1.2, 0.7, "fade");
-      P.shape(diamond(sm, S.y, 12), "s1", 0.4, 0.6);
-      P.shape(diamond(S.x0, S.y, 5), "s1", 1.4);
-      P.shape(diamond(S.x1, S.y, 5), "s1", 1.4);
-    }
-  };
-  var mirX = (pts, mx) => pts.map((p) => [2 * mx - p[0], p[1]]);
-  var mirY = (pts, my) => pts.map((p) => [p[0], 2 * my - p[1]]);
-  function rosette(P, x, y, r, n, role, dl) {
-    for (let i = 0; i < n; i++) {
-      const a = i * 2 * PI6 / n, c = Math.cos(a), s = Math.sin(a);
-      const lens = bz([0, 0], [r * 0.3, -r * 0.36], [r * 0.75, -r * 0.3], [r, 0], 8).concat(bz([r, 0], [r * 0.75, r * 0.3], [r * 0.3, r * 0.36], [0, 0], 8));
-      P.shape(poly(lens.map((p) => [x + p[0] * c - p[1] * s, y + p[0] * s + p[1] * c])), role, dl, 0.6, "turn");
-    }
-    P.shape(circ(x, y, r * 0.22), "ground", dl + 0.15, 0.4);
-  }
-  var symmetrical = {
-    id: "symmetrical",
-    popEase: "cubic-bezier(.3,1.4,.55,1)",
-    // Both halves drawn from the top centre and meeting at the bottom centre, an inner rule the same way, rosettes on the corners, mirrored scrolls.
-    frame(P, C) {
-      const cx = C.x + C.w / 2, cy = C.y + C.h / 2, x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
-      const half = [[cx, y0], [x1, y0], [x1, y1], [cx, y1]];
-      P.line(half, "s1", 1.5, 0.1, 1.4);
-      P.line(mirX(half, cx), "s1", 1.5, 0.1, 1.4);
-      const inner = [[cx, y0 + 7], [x1 - 7, y0 + 7], [x1 - 7, y1 - 7], [cx, y1 - 7]];
-      P.line(inner, "s2", 0.8, 0.5, 1.4);
-      P.line(mirX(inner, cx), "s2", 0.8, 0.5, 1.4);
-      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q) => rosette(P, q[0], q[1], 11, 8, "s1", 1.4));
-      const curl = bz([cx, y0], [cx - 14, y0 - 16], [cx - 40, y0 - 14], [cx - 40, y0 - 4], 16).concat(bz([cx - 40, y0 - 4], [cx - 40, y0 + 1], [cx - 32, y0 + 1], [cx - 32, y0 - 5], 8));
-      for (const c of [curl, mirX(curl, cx), mirY(curl, cy), mirX(mirY(curl, cy), cx)]) P.line(c, "s2", 1.4, 1, 0.6);
-      const side = bz([x0, cy], [x0 - 14, cy - 10], [x0 - 14, cy - 30], [x0 - 5, cy - 34], 14);
-      for (const c of [side, mirY(side, cy), mirX(side, cx), mirX(mirY(side, cy), cx)]) P.line(c, "s2", 1.4, 1.1, 0.5);
-      P.shape(circ(cx, y0, 3), "s2", 1.5);
-      P.shape(circ(cx, y1, 3), "s2", 1.5);
-    },
-    // A rosette in the middle, lines growing out to both ends, a scroll at each end.
-    rule(P, D2) {
-      const mid = (D2.x0 + D2.x1) / 2;
-      rosette(P, mid, D2.y, 10, 8, "s2", 0.2);
-      P.line([[mid + 14, D2.y], [D2.x1 - 20, D2.y]], "s1", 1.4, 0.5, 0.9);
-      P.line([[mid - 14, D2.y], [D2.x0 + 20, D2.y]], "s1", 1.4, 0.5, 0.9);
-      const end = bz([D2.x1 - 20, D2.y], [D2.x1 - 6, D2.y], [D2.x1, D2.y - 12], [D2.x1 - 10, D2.y - 12], 10);
-      P.line(end, "s1", 1.4, 1.35, 0.35);
-      P.line(mirX(end, mid), "s1", 1.4, 1.35, 0.35);
-      [0.33, 0.66].forEach((k) => {
-        P.shape(circ(mid + (D2.x1 - 20 - mid) * k, D2.y, 2.5), "s2", 0.8 + k);
-        P.shape(circ(mid - (mid - D2.x0 - 20) * k, D2.y, 2.5), "s2", 0.8 + k);
-      });
-    },
-    // A rounded track, mirrored end brackets and a mark at the middle.
-    bar(P, B) {
-      const bm = B.x + B.w / 2, by = B.y + B.h / 2;
-      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true, rx: B.h / 2 });
-      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { rx: (B.h - 2) / 2, wipe: [0.5, 1.4] });
-      const cap = [[B.x + B.w + 6, B.y - 5], [B.x + B.w + 11, by], [B.x + B.w + 6, B.y + B.h + 5]];
-      P.line(cap, "s2", 1.4, 0.4, 0.3);
-      P.line(mirX(cap, bm), "s2", 1.4, 0.4, 0.3);
-      P.line([[bm, B.y - 8], [bm, B.y - 2]], "s2", 1.4, 0.3, 0.2);
-      P.line([[bm, B.y + B.h + 2], [bm, B.y + B.h + 8]], "s2", 1.4, 0.3, 0.2);
-    },
-    // Four-petal rosettes.
-    bullet(P, p, i) {
-      rosette(P, p[0], p[1], 8, 4, i === 0 ? "s1" : "s2", 0.9 + i * 0.15);
-    },
-    // From the middle outward: rosettes at the centre and the quarters, diamonds between, all in pairs.
-    strip(P, S) {
-      const sm = (S.x0 + S.x1) / 2, q = (S.x1 - S.x0) / 4;
-      P.line([[sm + 14, S.y], [S.x1, S.y]], "s1", 1, 0.5, 1.2);
-      P.line([[sm - 14, S.y], [S.x0, S.y]], "s1", 1, 0.5, 1.2);
-      rosette(P, sm, S.y, 12, 8, "s1", 0.3);
-      [1, 2].forEach((k) => {
-        rosette(P, sm + q * k, S.y, k === 1 ? 8 : 6, 6, "s2", 0.6 + k * 0.5);
-        rosette(P, sm - q * k, S.y, k === 1 ? 8 : 6, 6, "s2", 0.6 + k * 0.5);
-      });
-      [0.5, 1.5].forEach((k) => {
-        const dl = 0.6 + k * 0.5;
-        [sm + q * k, sm - q * k].forEach((x) => P.shape(poly([[x, S.y - 5], [x + 4, S.y], [x, S.y + 5], [x - 4, S.y]]), "s1", dl));
-      });
-    }
-  };
-  function loopRound(P, x0, y0, x1, y1, amp, over, mess) {
-    const per = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0], [x0 + over, y0]], o = [];
-    let v = 0;
-    for (let i = 1; i < per.length; i++) {
-      const a = per[i - 1], b = per[i], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
-      for (let u = 0; u < len; u += 7) {
-        v = v * 0.8 + (P.rnd() - 0.5) * amp * mess;
-        o.push([a[0] + dx * u / len + nx * v, a[1] + dy * u / len + ny * v]);
-      }
-    }
-    return o;
-  }
-  function knot(P, x, y, r, steps2, mess) {
-    const o = [];
-    let a = P.rnd() * 6;
-    for (let i = 0; i < steps2; i++) {
-      a += 0.6 + P.rnd() * 0.7;
-      const q = r * (0.4 + P.rnd() * 0.6 * mess);
-      o.push([x + q * Math.cos(a), y + q * Math.sin(a)]);
-    }
-    return o;
-  }
-  function walk(P, xa, xb, y, amp, loops, mess) {
-    const o = [];
-    let v = 0, x = xa;
-    while (x < xb) {
-      v = v * 0.85 + (P.rnd() - 0.5) * amp * mess;
-      o.push([x, y + v]);
-      if (loops && P.rnd() < 0.06) {
-        const r = 4 + P.rnd() * 5;
-        for (let k = 1; k <= 10; k++) {
-          const a = PI6 / 2 + k * 2 * PI6 / 10;
-          o.push([x + r * Math.cos(a), y + v - r + r * Math.sin(a)]);
-        }
-      }
-      x += 5 + P.rnd() * 6;
-    }
-    o.push([xb, y]);
-    return o;
-  }
-  var chaotic = {
-    id: "chaotic",
-    seed: 2026,
-    ease: "cubic-bezier(.5,.1,.5,.9)",
-    popEase: "cubic-bezier(.2,2,.5,1)",
-    // Three scribbled loops in three inks, a knot on the top-right corner, a splatter at the lower left.
-    frame(P, C, p) {
-      const x0 = C.x - 10, y0 = C.y - 10, x1 = C.x + C.w + 10, y1 = C.y + C.h + 10, m = p.mess;
-      P.line(loopRound(P, x0, y0, x1, y1, 6, 40, m), "ink", 1.4, 0.1, 1.6);
-      P.line(loopRound(P, x0 - 4, y0 + 3, x1 + 5, y1 - 2, 9, 70, m), "s1", 2.2, 0.5, 1.4);
-      P.line(loopRound(P, x0 + 3, y0 - 5, x1 - 2, y1 + 6, 7, 20, m), "s2", 1.1, 0.9, 1.3);
-      P.line(knot(P, x1 + 2, y0 + 2, 16, 26, m), "ink", 1.3, 1.6, 0.7);
-      for (let i = 0; i < 14; i++) {
-        const a = P.rnd() * PI6 * 2, q = 6 + P.rnd() * 34;
-        P.shape(circ(x0 + 10 + q * Math.cos(a) * 0.9, y1 + 8 + q * Math.sin(a) * 0.5, 0.8 + P.rnd() * 3.2), ["ink", "s1", "s2"][i % 3], 1.5 + P.rnd() * 0.6);
-      }
-    },
-    // A wandering line that ties a few small loops on its way, an echo under it.
-    rule(P, D2, p) {
-      P.line(walk(P, D2.x0, D2.x1, D2.y, 6, true, p.mess), "ink", 1.6, 0.3, 1.5);
-      P.line(walk(P, D2.x0 + 20, D2.x1 - 30, D2.y + 5, 5, false, p.mess), "s2", 1, 0.7, 1.2);
-    },
-    // A scribbled outline and a zigzag hatched over the value.
-    bar(P, B, p) {
-      const vx = B.x + B.w * B.v, hz = [];
-      P.line(loopRound(P, B.x - 2, B.y - 2, B.x + B.w + 2, B.y + B.h + 2, 2.5, 30, p.mess), "ink", 1.2, 0.3, 1.1);
-      for (let x = B.x + 2, k = 0; x < vx; x += 3 + P.rnd() * 3, k++) hz.push([x, k % 2 ? B.y + B.h - P.rnd() * 2 : B.y + P.rnd() * 2]);
-      P.line(hz, "s1", 1.6, 0.8, 1.2);
-    },
-    // Small knots in the three inks.
-    bullet(P, pt, i, p) {
-      P.line(knot(P, pt[0], pt[1], 6, 12, p.mess), ["ink", "s1", "s2"][i % 3], 1.5, 0.9 + i * 0.15, 0.5);
-    },
-    // Three walks that cross one another along the foot.
-    strip(P, S, p) {
-      [["ink", 1.4], ["s1", 2], ["s2", 1.2]].forEach((q, i) => P.line(
-        walk(P, S.x0, S.x1, S.y + (i - 1) * 4, 9, i === 0, p.mess),
-        /** @type {string} */
-        q[0],
-        /** @type {number} */
-        q[1],
-        0.5 + i * 0.2,
-        1.8
-      ));
-    }
-  };
-  var SETS_B = [emotional, dramatic, symmetrical, chaotic];
-
-  // src/static/sdk-libs/atelier/ornament-sets-c.js
-  var PI7 = Math.PI;
-  var DEG = PI7 / 180;
-  var chev = (x, y, h) => [[x, y - h / 2], [x + h * 0.45, y], [x, y + h / 2]];
-  var velocity = {
-    id: "velocity",
-    seed: 99,
-    ease: "cubic-bezier(.7,0,.25,1)",
-    // Speed lines trail off the left edge, the top edge shoots across into a chevron, two lines run under the card, chevrons point on.
-    frame(P, C) {
-      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12;
-      const n = Math.max(4, Math.min(12, Math.round(C.h / 27)));
-      for (let i = 0; i < n; i++) {
-        const y = C.y + 16 + i * (C.h - 32) / Math.max(1, n - 1), len = 12 + P.rnd() * 34;
-        P.line([[x0 - 4 - len, y], [x0 - 4, y]], i % 3 === 1 ? "s2" : "pale", i % 3 === 1 ? 2 : 1.4, 0.05 + i * 0.04, 0.25);
-      }
-      P.line([[x0, y0], [x1 - 6, y0]], "s2", 2.5, 0.2, 0.45);
-      P.line(chev(x1 - 6, y0, 14), "s1", 2.5, 0.62, 0.15);
-      P.line([[x0 + 20, y1], [x1, y1]], "pale", 1.4, 0.35, 0.45);
-      P.line([[x0 + Math.min(120, C.w / 3), y1 + 7], [x1 - 30, y1 + 7]], "s1", 1.6, 0.5, 0.4);
-      ["s1", "s2", "pale"].forEach((role, i) => P.line(chev(x1 + 10 + i * 13, C.y + C.h / 2, 18), role, 2.6, 0.8 + i * 0.08, 0.15));
-    },
-    // A streak that thickens toward its point, with two thinner lines riding beside it.
-    rule(P, D2) {
-      const tail = D2.x0, head = D2.x1 - 14, wmax = 7, top = [], bot = [], span = D2.x1 - D2.x0;
-      for (let x = tail; x <= head; x += 6) {
-        const u = (x - tail) / (head - tail), w = wmax * Math.pow(u, 1.6) / 2;
-        top.push([x, D2.y - w]);
-        bot.push([x, D2.y + w]);
-      }
-      P.shape(poly(top.concat([[D2.x1, D2.y]]).concat(bot.reverse())), "s1", 0.3, 0.55, "shoot");
-      P.line([[D2.x0 + span * 0.34, D2.y - 9], [D2.x1 - span * 0.17, D2.y - 9]], "s2", 1.3, 0.45, 0.35);
-      P.line([[D2.x0 + span * 0.17, D2.y + 9], [D2.x1 - span * 0.34, D2.y + 9]], "pale", 1.3, 0.5, 0.35);
-    },
-    // A pale track, a striped fill, a chevron at the value with speed lines trailing it.
-    bar(P, B) {
-      const vx = B.x + B.w * B.v, my = B.y + B.h / 2, fw = B.w * B.v;
-      P.rect(B.x, B.y, B.w, B.h, "pale");
-      P.rect(B.x, B.y, fw, B.h, "s1", { wipe: [0.5, 1] });
-      const slant = B.h * Math.tan(25 * DEG);
-      let d = "";
-      for (let x = B.x + 4; x + slant < B.x + fw - 1; x += 14) d += "M" + P.f(x) + " " + P.f(B.y + B.h) + " L" + P.f(x + slant) + " " + P.f(B.y);
-      if (d) P.stroke(d, "d1", 3, 1.5, 0.35, "fade");
-      P.shape(poly([[vx - 4, B.y - 6], [vx + 8, my], [vx - 4, B.y + B.h + 6], [vx + 1, my]]), "s2", 1.4, 0.3, "shoot");
-      if (vx - 14 > B.x) P.line([[Math.max(B.x, vx - 70), B.y - 7], [vx - 14, B.y - 7]], "s2", 1.4, 1.3, 0.25);
-      if (vx - 30 > B.x) P.line([[Math.max(B.x, vx - 110), B.y + B.h + 7], [vx - 30, B.y + B.h + 7]], "pale", 1.4, 1.35, 0.25);
-    },
-    // Chevrons.
-    bullet(P, p, i) {
-      P.line(chev(p[0] - 3, p[1], 14), i === 0 ? "s1" : "s2", 2.6, 0.9 + i * 0.1, 0.18);
-    },
-    // A burst of speed lines along the foot, quicker at the far end.
-    strip(P, S) {
-      const k = (S.x1 - S.x0) / 832;
-      for (let i = 0; i < 16; i++) {
-        const y = S.y - 14 + P.rnd() * 28, a = S.x0 + P.rnd() * 600 * k, len = (60 + P.rnd() * 200) * k, b = Math.min(S.x1, a + len);
-        P.line([[a, y], [b, y]], i % 5 === 0 ? "s1" : i % 2 ? "s2" : "pale", i % 5 === 0 ? 2.2 : 1.4, 0.5 + i * 0.06, 0.3 - i * 8e-3);
-      }
-    }
-  };
-  function stepped(x0, y0, x1, y1, s) {
-    const cx = (x0 + x1) / 2;
-    return [
-      [cx, y0],
-      [x1 - 2 * s, y0],
-      [x1 - 2 * s, y0 + s],
-      [x1 - s, y0 + s],
-      [x1 - s, y0 + 2 * s],
-      [x1, y0 + 2 * s],
-      [x1, y1 - 2 * s],
-      [x1 - s, y1 - 2 * s],
-      [x1 - s, y1 - s],
-      [x1 - 2 * s, y1 - s],
-      [x1 - 2 * s, y1],
-      [x0 + 2 * s, y1],
-      [x0 + 2 * s, y1 - s],
-      [x0 + s, y1 - s],
-      [x0 + s, y1 - 2 * s],
-      [x0, y1 - 2 * s],
-      [x0, y0 + 2 * s],
-      [x0 + s, y0 + 2 * s],
-      [x0 + s, y0 + s],
-      [x0 + 2 * s, y0 + s],
-      [x0 + 2 * s, y0],
-      [cx, y0]
-    ];
-  }
-  function fan(P, x, y, r, n, dir, role, dl) {
-    P.line(arc2(x, y, r, 0, dir * PI7, 24), role, 1.2, dl, 0.5);
-    P.line(arc2(x, y, r * 0.55, 0, dir * PI7, 16), role, 1, dl + 0.1, 0.4);
-    for (let i = 1; i < n; i++) {
-      const a = dir * PI7 * i / n;
-      P.line([[x + r * 0.2 * Math.cos(a), y + r * 0.2 * Math.sin(a)], [x + r * Math.cos(a), y + r * Math.sin(a)]], role, 1, dl + 0.2 + Math.abs(i - n / 2) * 0.04, 0.3);
-    }
-  }
-  var artDeco = {
-    id: "art-deco",
-    barH: 16,
-    popEase: "cubic-bezier(.3,1.4,.55,1)",
-    // Three stepped rules, the outer one heaviest, a rising sun on top and a setting one below.
-    frame(P, C) {
-      const cx = C.x + C.w / 2;
-      P.line(stepped(C.x - 20, C.y - 20, C.x + C.w + 20, C.y + C.h + 20, 7), "s1", 1.6, 0.1, 1.8);
-      P.line(stepped(C.x - 14, C.y - 14, C.x + C.w + 14, C.y + C.h + 14, 6), "s1", 0.8, 0.3, 1.8);
-      P.line(stepped(C.x - 8, C.y - 8, C.x + C.w + 8, C.y + C.h + 8, 5), "h1", 0.6, 0.5, 1.8);
-      fan(P, cx, C.y - 20, 28, 9, -1, "s1", 1.4);
-      fan(P, cx, C.y + C.h + 20, 18, 7, 1, "s1", 1.6);
-    },
-    // Three lines from each end close in on a small sun and a diamond.
-    rule(P, D2) {
-      const mid = (D2.x0 + D2.x1) / 2, inset = Math.min(36, (D2.x1 - D2.x0) / 10);
-      [-5, 0, 5].forEach((o, j) => {
-        const ins = j === 1 ? 0 : inset;
-        P.line([[D2.x0 + ins, D2.y + o], [mid - 26, D2.y + o]], "s1", j === 1 ? 1.2 : 0.7, 0.3 + j * 0.06, 0.8);
-        P.line([[D2.x1 - ins, D2.y + o], [mid + 26, D2.y + o]], "s1", j === 1 ? 1.2 : 0.7, 0.3 + j * 0.06, 0.8);
-      });
-      fan(P, mid, D2.y - 2, 16, 7, -1, "s1", 1);
-      P.shape(poly([[mid, D2.y + 2], [mid + 6, D2.y + 9], [mid, D2.y + 16], [mid - 6, D2.y + 9]]), "s1", 1.4);
-    },
-    // A double rule round the track, the fill inside it, stepped marks under the quarters.
-    bar(P, B) {
-      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true });
-      P.rect(B.x + 2.5, B.y + 2.5, B.w - 5, B.h - 5, "s1", { stroke: true });
-      P.rect(B.x + 5, B.y + 5, (B.w - 10) * B.v, B.h - 10, "s1", { wipe: [0.5, 1.4] });
-      for (let i = 0; i <= 4; i++) {
-        const x = B.x + B.w * i / 4, y = B.y + B.h + 6;
-        P.line([[x - 6, y + 8], [x - 6, y + 4], [x - 3, y + 4], [x - 3, y], [x + 3, y], [x + 3, y + 4], [x + 6, y + 4], [x + 6, y + 8]], "s1", 1, 0.6 + i * 0.12, 0.3);
-      }
-    },
-    // Quarter suns.
-    bullet(P, p, i) {
-      const x = p[0] - 6, y = p[1] + 6;
-      P.line(arc2(x, y, 12, -PI7 / 2, 0, 10), "s1", 1.2, 0.9 + i * 0.15, 0.3);
-      for (let k = 1; k < 4; k++) {
-        const a = -PI7 / 2 * k / 4;
-        P.line([[x + 3 * Math.cos(a), y + 3 * Math.sin(a)], [x + 12 * Math.cos(a), y + 12 * Math.sin(a)]], "s1", 1, 1.05 + i * 0.15 + k * 0.03, 0.2);
-      }
-    },
-    // A row of scallops over a straight rule, every other one holding a sun.
-    strip(P, S) {
-      const y = S.y + 10, n = Math.max(6, Math.round(16 * (S.x1 - S.x0) / 832)), w = (S.x1 - S.x0) / n;
-      P.line([[S.x0, y], [S.x1, y]], "s1", 1, 0.4, 1.4);
-      for (let i = 0; i < n; i++) {
-        const x = S.x0 + w * (i + 0.5), dl = 0.6 + i * 0.06 * 16 / n;
-        P.line(arc2(x, y, w / 2, PI7, 2 * PI7, 14), i % 2 ? "h1" : "s1", 1, dl, 0.3);
-        if (i % 2 === 0) for (let k = 1; k < 5; k++) {
-          const a = PI7 + PI7 * k / 5;
-          P.line([[x + 4 * Math.cos(a), y + 4 * Math.sin(a)], [x + (w / 2 - 4) * Math.cos(a), y + (w / 2 - 4) * Math.sin(a)]], "s1", 0.8, dl + 0.2, 0.2);
-        }
-      }
-    }
-  };
-  var ARM_SPEED = 260;
-  function arm(P, x, y, dir, len, s, br, role, dl) {
-    const c = Math.cos(dir * DEG), sn = Math.sin(dir * DEG);
-    P.line([[x, y], [x + c * len, y + sn * len]], role, 1.4, dl, len / ARM_SPEED);
-    for (let d = 12; d < len - 4; d += 13) {
-      const bl = br * Math.pow(1 - d / len, 0.8) + 3, px = x + c * d, py = y + sn * d, when2 = dl + d / ARM_SPEED;
-      (s === 0 ? [1, -1] : [s]).forEach((side) => {
-        const a = (dir + side * 60) * DEG;
-        P.line([[px, py], [px + Math.cos(a) * bl, py + Math.sin(a) * bl]], role, 1, when2, 0.2);
-        if (bl > 10) {
-          const tx = px + Math.cos(a) * bl * 0.55, ty = py + Math.sin(a) * bl * 0.55, a2 = dir * DEG;
-          P.line([[tx, ty], [tx + Math.cos(a2) * bl * 0.35, ty + Math.sin(a2) * bl * 0.35]], role, 0.8, when2 + 0.15, 0.15);
-        }
-      });
-    }
-  }
-  function flake(P, x, y, r, role, dl) {
-    for (let i = 0; i < 6; i++) {
-      const a = (i * 60 + 30) * DEG;
-      P.line([[x, y], [x + r * Math.cos(a), y + r * Math.sin(a)]], role, 1.1, dl, 0.25);
-      const mx = x + r * 0.6 * Math.cos(a), my = y + r * 0.6 * Math.sin(a);
-      [-1, 1].forEach((sd) => {
-        const b = a + sd * 60 * DEG;
-        P.line([[mx, my], [mx + r * 0.3 * Math.cos(b), my + r * 0.3 * Math.sin(b)]], role, 0.9, dl + 0.2, 0.15);
-      });
-    }
-    P.line(hex(x, y, r * 0.3), role, 1, dl + 0.1, 0.25);
-  }
-  var crystal = {
-    id: "crystal",
-    popEase: "cubic-bezier(.3,1.3,.55,1)",
-    // From every corner an arm grows along each edge, branching outward; a crystal sits in each corner.
-    frame(P, C) {
-      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12;
-      const lx = Math.min(150, (x1 - x0) * 0.36), ly = Math.min(110, (y1 - y0) * 0.41);
-      arm(P, x0, y0, 0, lx, -1, 16, "s1", 0.2);
-      arm(P, x0, y0, 90, ly, 1, 14, "s2", 0.2);
-      arm(P, x1, y0, 180, lx, 1, 16, "s1", 0.35);
-      arm(P, x1, y0, 90, ly, -1, 14, "s2", 0.35);
-      arm(P, x1, y1, 180, lx, -1, 16, "s1", 0.5);
-      arm(P, x1, y1, 270, ly, 1, 14, "s2", 0.5);
-      arm(P, x0, y1, 0, lx, 1, 16, "s1", 0.65);
-      arm(P, x0, y1, 270, ly, -1, 14, "s2", 0.65);
-      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q, i) => {
-        P.shape(poly(hex(q[0], q[1], 7).slice(0, 6)), "s3", 0.1 + i * 0.15, 0.6, "spin");
-        P.line(hex(q[0], q[1], 11), "s1", 1, 0.3 + i * 0.15, 0.4);
-      });
-    },
-    // A flake in the middle with branching arms growing out both ways.
-    rule(P, D2) {
-      const mid = (D2.x0 + D2.x1) / 2;
-      flake(P, mid, D2.y, 13, "s3", 0.2);
-      arm(P, mid + 16, D2.y, 0, D2.x1 - mid - 16, 0, 11, "s1", 0.5);
-      arm(P, mid - 16, D2.y, 180, mid - 16 - D2.x0, 0, 11, "s1", 0.5);
-    },
-    // A light track, twigs frosting the filled run, a faceted point at the value.
-    bar(P, B) {
-      const vx = B.x + B.w * B.v, my = B.y + B.h / 2, a = -60 * DEG;
-      P.rect(B.x, B.y, B.w, B.h, "paper");
-      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "t1", { stroke: true });
-      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4] });
-      for (let x = B.x + 14; x < vx - 10; x += 18) {
-        P.line([[x, B.y - 1], [x + Math.cos(a) * 9, B.y - 1 + Math.sin(a) * 9]], "s2", 1, 1 + (x - B.x) / 400, 0.15);
-        P.line([[x + 9, B.y + B.h + 1], [x + 9 + Math.cos(-a) * 7, B.y + B.h + 1 + Math.sin(-a) * 7]], "s2", 1, 1.05 + (x - B.x) / 400, 0.15);
-      }
-      P.shape(poly([[vx - 4, B.y - 7], [vx + 8, B.y - 2], [vx + 14, my], [vx + 8, B.y + B.h + 2], [vx - 4, B.y + B.h + 7]]), "s3", 1.9, 0.5, "spin");
-      P.line([[vx - 4, B.y - 7], [vx + 4, my], [vx - 4, B.y + B.h + 7]], "paper", 1, 2.2, 0.2);
-    },
-    // Small flakes.
-    bullet(P, p, i) {
-      flake(P, p[0], p[1], 8, i === 0 ? "s3" : "s1", 0.9 + i * 0.15);
-    },
-    // A band of facets between two rules, every third one filled.
-    strip(P, S) {
-      const step = 16, top = S.y - 8, bot = S.y + 8, zz = [];
-      P.line([[S.x0, top], [S.x1, top]], "s1", 0.8, 0.5, 1.2);
-      P.line([[S.x0, bot], [S.x1, bot]], "s1", 0.8, 0.5, 1.2);
-      for (let x = S.x0, k = 0; x <= S.x1 + 0.1; x += step, k++) zz.push([x, k % 2 ? top : bot]);
-      P.line(zz, "s2", 1, 0.7, 1.6);
-      for (let k = 0; k + 2 < zz.length; k += 3) P.shape(poly([zz[k], zz[k + 1], zz[k + 2]]), k % 2 ? "t3" : "t2", 0.8 + k * 0.03, 0.4, "spin");
-    }
-  };
-  var SETS_C = [velocity, artDeco, crystal];
-
-  // src/static/sdk-libs/atelier/ornament-sets.js
-  var SETS = [...SETS_A, ...SETS_B, ...SETS_C];
-  var SET_IDS = SETS.map((s) => s.id);
-  var SET_ROLES_LIST = ["frame", "rule", "bar", "bullets", "strip"];
-  var knobs = (style, role) => {
-    const out = role === "bar" ? ["value"] : [];
-    if (style.id === "chaotic") out.push("mess");
-    return out;
-  };
-  var penFor = (svg6, style, animate, p, shift) => {
-    svg6.classList.add("ak-orn-pal-" + style.id);
-    return pen(svg6, {
-      animate,
-      speed: p.speed,
-      delay: p.delay,
-      shift: shift || 0,
-      ease: style.ease || null,
-      popEase: style.popEase || null,
-      seed: style.seed || 1
-    });
-  };
-  function figuresOf(style) {
-    const out = {};
-    out[style.id + "-frame"] = {
-      params: knobs(style, "frame"),
-      overlay: {
-        pad: () => ({ x: 64, y: 64 }),
-        draw: (layers, w, h, pad, p) => {
-          const d = layers.under;
-          if (d) style.frame(penFor(d.svg, style, d.animate, p, 0), { x: pad.x, y: pad.y, w, h }, p);
-        }
-      }
-    };
-    const run = (role, height, y, shift) => ({
-      params: knobs(style, role),
-      mount: (host, p, opts) => fillMount(host, height, "ak-orn-strip--set", opts, (d, W7) => {
-        style[role](penFor(d.svg, style, d.animate, p, shift), { x0: 12, x1: W7 - 12, y }, p);
-      })
-    });
-    out[style.id + "-rule"] = run("rule", 44, 24, 0.2);
-    out[style.id + "-bar"] = {
-      params: knobs(style, "bar"),
-      mount: (host, p, opts) => {
-        let value = p.value;
-        const bh = style.barH || 12;
-        const strip = fillMount(host, 56, "ak-orn-strip--set ak-orn-strip--setbar", opts, (d, W7) => {
-          style.bar(penFor(d.svg, style, d.animate, p, 0.3), { x: 18, y: (56 - bh) / 2, w: W7 - 36, h: bh, v: value }, p);
-        });
-        return {
-          render: strip.render,
-          set: (v) => {
-            value = Math.max(0, Math.min(1, Number(v) || 0));
-            strip.render(false);
-          },
-          teardown: strip.teardown
-        };
-      }
-    };
-    out[style.id + "-bullets"] = {
-      params: knobs(style, "bullets"),
-      mount: (host, p, opts) => {
-        host.classList.add("ak-orn-bullets");
-        const marks = [];
-        const clear2 = () => {
-          for (const m of marks) m.remove();
-          marks.length = 0;
-        };
-        return {
-          render: (animate) => {
-            clear2();
-            let i = 0;
-            for (const li of Array.from(host.children)) {
-              if (li.tagName !== "LI") continue;
-              const m = document.createElement("span");
-              m.className = "ak-orn-sbullet";
-              m.setAttribute("aria-hidden", "true");
-              li.insertBefore(m, li.firstChild);
-              marks.push(m);
-              const d = drawing(m, 30, 24, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
-              style.bullet(penFor(d.svg, style, animate, p, 0.85), [11, 12], i, p);
-              i++;
-            }
-          },
-          teardown: () => {
-            clear2();
-            host.classList.remove("ak-orn-bullets");
-          }
-        };
-      }
-    };
-    out[style.id + "-strip"] = run("strip", 64, 32, 0.4);
-    return out;
-  }
-  var SET_FIGURES = Object.assign({}, ...SETS.map(figuresOf));
-
-  // src/static/sdk-libs/atelier/ornament.js
-  var ORN_PARAMS = {
-    speed: { min: 0.25, max: 3, default: 1 },
-    delay: { min: 0, max: 5, default: 0 },
-    leaves: { min: 0, max: 2, default: 1 },
-    value: { min: 0, max: 1, default: 0.64 },
-    strands: { min: 2, max: 4, default: 3 },
-    mess: { min: 0.5, max: 2, default: 1 }
-  };
-  var ORNAMENT_SET_IDS = SET_IDS;
-  var FIGURES = { ...FRAME_FIGURES, ...ROUND_FIGURES, ...LINE_FIGURES, ...TEXT_FIGURES, ...SET_FIGURES };
-  var ORNAMENT_IDS = Object.keys(FIGURES);
-  function ornamentParams(id, given) {
-    const fig = FIGURES[id];
-    const g = given || {};
-    const out = {};
-    for (const name of Object.keys(ORN_PARAMS)) {
-      const b = ORN_PARAMS[
-        /** @type {keyof typeof ORN_PARAMS} */
-        name
-      ];
-      const takes = name === "speed" || name === "delay" || fig && fig.params.indexOf(name) >= 0;
-      const n = Number(g[name]);
-      out[name] = takes && Number.isFinite(n) ? Math.max(b.min, Math.min(b.max, n)) : b.default;
-    }
-    return (
-      /** @type {OrnParams} */
-      /** @type {unknown} */
-      out
-    );
-  }
-  function hostFor(el2) {
-    if (getComputedStyle(el2).position === "static") el2.classList.add("ak-orn-host");
-    else el2.classList.add("ak-orn-host--placed");
-  }
-  function mountOverlay(host, fig, p, animate) {
-    hostFor(host);
-    const spec = fig.overlay;
-    const make = (cls) => {
-      const box = document.createElement("span");
-      box.className = "ak-orn-layer " + cls;
-      box.setAttribute("aria-hidden", "true");
-      host.appendChild(box);
-      return box;
-    };
-    const under = spec.under !== false ? make("ak-orn-layer--under") : null;
-    const over = spec.over ? make("ak-orn-layer--over") : null;
-    let lastW = -1;
-    let lastH = -1;
-    const render = (grow) => {
-      const w = host.offsetWidth;
-      const h = host.offsetHeight;
-      lastW = w;
-      lastH = h;
-      if (w < 8 || h < 8) return;
-      const pad = spec.pad(w, h);
-      const W7 = w + 2 * pad.x;
-      const H4 = h + 2 * pad.y;
-      const opts = { animate: grow, speed: p.speed, delay: p.delay, view: { x: pad.x, y: pad.y, w, h } };
-      const layers = { under: null, over: null };
-      for (
-        const [key, box] of
-        /** @type {Array<['under' | 'over', HTMLElement | null]>} */
-        [["under", under], ["over", over]]
-      ) {
-        if (!box) continue;
-        box.textContent = "";
-        box.style.left = "0px";
-        box.style.top = "0px";
-        box.style.width = w + "px";
-        box.style.height = h + "px";
-        layers[key] = drawing(box, W7, H4, opts);
-      }
-      spec.draw(layers, w, h, pad, p, host);
-    };
-    render(animate);
-    let frame2 = 0;
-    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
-      if (Math.abs(host.offsetWidth - lastW) < 2 && Math.abs(host.offsetHeight - lastH) < 2) return;
-      cancelAnimationFrame(frame2);
-      frame2 = requestAnimationFrame(() => render(false));
-    }) : null;
-    if (ro) ro.observe(host);
-    return {
-      render,
-      teardown: () => {
-        if (ro) ro.disconnect();
-        cancelAnimationFrame(frame2);
-        if (under) under.remove();
-        if (over) over.remove();
-        host.classList.remove("ak-orn-host", "ak-orn-host--placed");
-      }
-    };
-  }
-  function ornament(target, id, opts) {
-    const host = (
-      /** @type {HTMLElement | null} */
-      typeof target === "string" ? document.querySelector(target) : target
-    );
-    const fig = FIGURES[id];
-    if (!host || !fig) return null;
-    const prev = (
-      /** @type {any} */
-      host.__akOrnament
-    );
-    if (prev && typeof prev.destroy === "function") prev.destroy();
-    const p = ornamentParams(id, opts);
-    const animate = !(opts && opts.animate === false) && !reducedMotion();
-    const mounted = "overlay" in fig ? mountOverlay(host, fig, p, animate) : (
-      /** @type {InlineFigure} */
-      fig.mount(host, p, { speed: p.speed, delay: p.delay })
-    );
-    if (!("overlay" in fig)) mounted.render(animate);
-    host.setAttribute("data-ak-ornament", id);
-    if (opts && opts.palette === "look") host.classList.add("ak-orn-lookpal");
-    const handle2 = {
-      id,
-      el: host,
-      replay: () => mounted.render(!reducedMotion()),
-      set: (v) => {
-        if (typeof /** @type {any} */
-        mounted.set === "function") mounted.set(v);
-      },
-      destroy: () => {
-        mounted.teardown();
-        host.removeAttribute("data-ak-ornament");
-        host.classList.remove("ak-orn-lookpal");
-        if (
-          /** @type {any} */
-          host.__akOrnament === handle2
-        ) delete /** @type {any} */
-        host.__akOrnament;
-      }
-    };
-    host.__akOrnament = handle2;
-    return handle2;
-  }
-  function ornamentSet(set, targets, opts) {
-    if (SET_IDS.indexOf(set) < 0) return null;
-    const handles = {};
-    for (const role of SET_ROLES_LIST) {
-      const el2 = targets && /** @type {any} */
-      targets[role];
-      if (!el2) continue;
-      const h = ornament(el2, set + "-" + role, opts);
-      if (h) handles[role] = h;
-    }
-    const all = () => Object.values(handles).filter(Boolean);
-    return {
-      set,
-      handles,
-      replay: () => {
-        for (const h of all()) h.replay();
-      },
-      update: (v) => {
-        if (handles.bar) handles.bar.set(v);
-      },
-      destroy: () => {
-        for (const h of all()) h.destroy();
       }
     };
   }
@@ -9588,448 +5548,6 @@
     };
   }
 
-  // src/static/sdk-libs/atelier/aide.js
-  var SOURCE_CHARS_MAX = 2e3;
-  var CONTEXT_CHARS_MAX = 8e3;
-  var PANEL_BLOCKS_MAX = 8;
-  var HISTORY_TURNS = 12;
-  var ANSWER_SCHEMA = {
-    type: "object",
-    properties: {
-      reply: { type: "string" },
-      action: {
-        type: "object",
-        properties: { id: { type: "string" }, params: { type: "object" } },
-        required: ["id"]
-      },
-      panel: { type: "object" }
-    },
-    required: ["reply"]
-  };
-  function aide(spec) {
-    const s = spec || {};
-    const history = [];
-    let firstSend = true;
-    const log = el("div", { class: "ak-aide__log", role: "log", "aria-live": "polite" });
-    const input = (
-      /** @type {HTMLTextAreaElement} */
-      el("textarea", {
-        class: "ak-input ak-input--area ak-aide__input",
-        rows: 2,
-        placeholder: t("aidePlaceholder"),
-        "aria-label": t("aidePlaceholder")
-      })
-    );
-    const sendBtn = el("button", {
-      type: "button",
-      class: "ak-btn ak-btn--primary",
-      on: { click: function() {
-        send2();
-      } }
-    }, t("send"));
-    input.addEventListener("keydown", function(ev) {
-      if (ev.key === "Enter" && !ev.shiftKey) {
-        ev.preventDefault();
-        send2();
-      }
-    });
-    const notice = el("p", { class: "ak-aide__notice" });
-    const root = el("section", { class: "ak-root ak-aide", "aria-label": "Aide" }, [
-      el("header", { class: "ak-aide__head" }, [
-        el("h2", { class: "ak-section__title", text: t("aideTitle") }),
-        notice
-      ]),
-      log,
-      el("div", { class: "ak-aide__row" }, [input, sendBtn])
-    ]);
-    if (s.target) resolve(s.target).appendChild(root);
-    enter(root);
-    const aiNs = (
-      /** @type {any} */
-      window.AIMEAT && /** @type {any} */
-      window.AIMEAT.ai
-    );
-    if (aiNs && typeof aiNs.chatNotice === "function") {
-      try {
-        aiNs.chatNotice({ target: notice });
-      } catch (err) {
-        console.warn("aimeat-atelier: the AI notice did not render", err);
-      }
-    } else {
-      notice.textContent = t("aideNotice");
-    }
-    if (s.intro) bubble("assistant", s.intro, null);
-    function bubble(who, text, provenance) {
-      const b = el("div", { class: "ak-aide__msg ak-aide__msg--" + who }, [
-        el("p", { class: "ak-aide__text", text })
-      ]);
-      if (who === "assistant" && provenance && aiNs && typeof aiNs.disclose === "function") {
-        const tag = el("span", { class: "ak-aide__label" });
-        b.appendChild(tag);
-        try {
-          aiNs.disclose(provenance, { target: tag });
-        } catch (err) {
-          console.warn("aimeat-atelier: the provenance label did not render", err);
-        }
-      }
-      log.appendChild(b);
-      log.scrollTop = log.scrollHeight;
-      return b;
-    }
-    async function contextText() {
-      const parts = [];
-      const names = Object.keys(s.sources || {});
-      let budget = CONTEXT_CHARS_MAX;
-      for (const name of names) {
-        if (budget <= 0) break;
-        let data;
-        try {
-          data = await Promise.resolve().then(s.sources[name]);
-        } catch (err) {
-          console.warn('aimeat-atelier: aide source "' + name + '" failed', err);
-          continue;
-        }
-        const chunk = JSON.stringify(data).slice(0, Math.min(SOURCE_CHARS_MAX, budget));
-        budget -= chunk.length;
-        parts.push("SOURCE " + name + ": " + chunk);
-      }
-      return parts.join("\n");
-    }
-    function actionsText() {
-      const list3 = s.actions || [];
-      if (!list3.length) return "This app declares no actions: answer with words only.";
-      return "ACTIONS you may propose (a person confirms before anything runs):\n" + list3.map(function(a) {
-        const params = a.params ? " params: " + JSON.stringify(a.params) : "";
-        return '- id "' + a.id + '": ' + a.summary + params;
-      }).join("\n");
-    }
-    async function send2() {
-      const text = input.value.trim();
-      if (!text) return;
-      if (!aiNs || typeof aiNs.completeJson !== "function") {
-        bubble("assistant", t("aideNoAi"), null);
-        return;
-      }
-      const available = await aiNs.isAvailable().catch(function() {
-        return false;
-      });
-      if (!available) {
-        bubble("assistant", t("aideNoAi"), null);
-        return;
-      }
-      input.value = "";
-      bubble("user", text, null);
-      history.push({ who: "user", text });
-      const thinking = bubble("assistant", "…", null);
-      const prompt2 = [
-        'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
-        "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
-        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps }.',
-        'A panel block is exactly { "id": "<short-slug>", "component": "<one of: list, statRow, table, timeline, figure, cardGrid>", "props": { "source": "<one of the SOURCE names below>", "title": "<a heading>" } } — no other component names, and only source names that appear below.',
-        actionsText(),
-        "DATA the screen shows right now:",
-        await contextText(),
-        "CONVERSATION so far:",
-        history.slice(-HISTORY_TURNS).map(function(h) {
-          return h.who + ": " + h.text;
-        }).join("\n")
-      ].join("\n\n");
-      let out;
-      try {
-        out = await aiNs.completeJson({
-          prompt: prompt2,
-          schema: ANSWER_SCHEMA,
-          app_id: s.appId || s.appName || "atelier-aide",
-          confirm: firstSend
-        });
-        firstSend = false;
-      } catch (err) {
-        thinking.remove();
-        const code = err && /** @type {any} */
-        err.code;
-        bubble("assistant", code === "SPEND_CANCELLED" ? t("cancel") + "." : t("aideFailed"), null);
-        return;
-      }
-      thinking.remove();
-      const body = out && out.data ? out.data : out;
-      const answer = body && body.parsed ? body.parsed : body;
-      const reply = answer && typeof answer.reply === "string" ? answer.reply : t("aideFailed");
-      const b = bubble("assistant", reply, body && body.provenance || out && out.provenance || null);
-      history.push({ who: "assistant", text: reply });
-      if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
-      if (answer && answer.panel) renderPanel(answer.panel, b);
-    }
-    function offerAction(proposed, into) {
-      const declared2 = (s.actions || []).find(function(a) {
-        return a.id === proposed.id;
-      });
-      if (!declared2) {
-        into.appendChild(el("p", { class: "ak-aide__text", text: t("aideUnknownAction") }));
-        return;
-      }
-      const row = el("div", { class: "ak-aide__confirm" }, [
-        el("span", { text: declared2.summary }),
-        el("button", {
-          type: "button",
-          class: "ak-btn ak-btn--primary",
-          on: { click: async function() {
-            clear(row);
-            row.appendChild(el("span", { text: "…" }));
-            try {
-              const result = await Promise.resolve(declared2.run ? declared2.run(proposed.params || {}) : null);
-              clear(row);
-              row.appendChild(el("span", { text: typeof result === "string" ? result : t("ready") }));
-            } catch (err) {
-              clear(row);
-              row.appendChild(el("span", { text: t("aideFailed") + " " + String(err && /** @type {any} */
-              err.message || "") }));
-            }
-          } }
-        }, t("aideRun")),
-        el("button", {
-          type: "button",
-          class: "ak-btn ak-btn--ghost",
-          on: { click: function() {
-            row.remove();
-          } }
-        }, t("cancel"))
-      ]);
-      into.appendChild(row);
-    }
-    function renderPanel(panel, into) {
-      if (!panel || !Array.isArray(panel.blocks) || panel.blocks.length === 0 || panel.blocks.length > PANEL_BLOCKS_MAX) return;
-      const ns = (
-        /** @type {any} */
-        window.AIMEAT
-      );
-      if (!ns || !ns.atelier || typeof ns.atelier.mosaic !== "function") return;
-      const host = el("div", { class: "ak-aide__panel" });
-      into.appendChild(host);
-      try {
-        const handle2 = ns.atelier.mosaic({ target: host, layout: { v: 1, blocks: panel.blocks }, sources: s.sources || {} });
-        root.addEventListener("ak-destroy", function() {
-          handle2.destroy();
-        }, { once: true });
-      } catch (err) {
-        console.warn("aimeat-atelier: a generated panel did not render — the words above stand alone.", err);
-        host.remove();
-      }
-    }
-    return {
-      el: root,
-      open() {
-        input.focus();
-      },
-      destroy() {
-        root.dispatchEvent(new Event("ak-destroy"));
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/timeline.js
-  var MACHINE_MOMENT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|^(?:[A-Za-z]{3},? )?\d{1,2} [A-Za-z]{3} \d{4}\b|^[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{4}\b/;
-  function fmtTs(ts) {
-    if (ts == null || ts === "") return null;
-    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return calendar(ts, { dateStyle: "medium" });
-    if (typeof ts === "string" && !MACHINE_MOMENT.test(ts)) return ts;
-    const d = ts instanceof Date ? ts : new Date(ts);
-    if (Number.isNaN(d.getTime())) return String(ts);
-    return dateTime(d, { dateStyle: "medium", timeStyle: "short" });
-  }
-  function timeline(spec) {
-    const fmt2 = spec.format || fmtTs;
-    const root = el("ol", { class: "ak-root ak-timeline", "data-ak-part": "root" });
-    applyVariant(root, spec, ["dense", "plain"]);
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function fillItem(node, item) {
-      clear(node);
-      const whole = partValue(spec, "item", item);
-      if (whole !== void 0) {
-        fillPart(node, whole);
-        return;
-      }
-      node.appendChild(partEl("span", "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "dot", { "aria-hidden": "true" }));
-      const body = partEl("div", "ak-timeline__body", "body");
-      slotInto(body, spec, "when", hasPart(spec, "when") ? null : fmt2(item.ts), { cls: "ak-timeline__when", args: [item] });
-      slotInto(body, spec, "title", item.title, { cls: "ak-timeline__title", args: [item] });
-      slotInto(body, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-timeline__sub", args: [item] });
-      slotInto(body, spec, "extra", null, { cls: "ak-timeline__extra", args: [item] });
-      node.appendChild(body);
-      slotInto(node, spec, "aside", null, { cls: "ak-timeline__aside", args: [item] });
-    }
-    function buildItem(item) {
-      const node = el("li", { class: "ak-timeline__item", "data-ak-part": "item" });
-      fillItem(node, item);
-      return node;
-    }
-    function render(items) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      if (!items.length) {
-        clear(root);
-        const e = spec.empty || {};
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: e.title || t("empty"),
-          hint: e.hint || t("emptyHint")
-        });
-        return;
-      }
-      keyedRows(root, items, {
-        key: function(item, i) {
-          return item.id != null ? String(item.id) : "ev-" + i;
-        },
-        build: buildItem,
-        update: fillItem
-      });
-    }
-    render(spec.items || []);
-    return {
-      el: root,
-      /** @param {{ items: TimelineItem[] }} patch */
-      set(patch) {
-        if (!patch || !patch.items) return;
-        render(patch.items);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/agentic.js
-  function agentsNs() {
-    const ns = (
-      /** @type {any} */
-      window.AIMEAT
-    );
-    return ns && ns.agents && typeof ns.agents.createTask === "function" ? ns.agents : null;
-  }
-  function delegate(spec) {
-    const status = el("span", { class: "ak-delegate__status", "aria-live": "polite" });
-    const btn = (
-      /** @type {HTMLButtonElement} */
-      el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--ghost",
-        on: { click: run }
-      }, "✦ " + (spec.label || t("delegateGo")))
-    );
-    const root = el("div", { class: "ak-root ak-delegate" }, [btn, status]);
-    if (spec.target) resolve(spec.target).appendChild(root);
-    enter(root);
-    let stopWatch = null;
-    async function run() {
-      const agents = agentsNs();
-      if (!agents) {
-        status.textContent = t("delegateNoAgents");
-        return;
-      }
-      btn.disabled = true;
-      status.textContent = "…";
-      try {
-        const created = await agents.createTask(spec.agent, {
-          title: spec.task.title,
-          description: spec.task.description
-        }, { confirm: true });
-        const id = created && (created.id || created.task_id);
-        status.textContent = t("delegateHanded") + " (" + spec.agent + ")";
-        if (id && typeof agents.watch === "function") {
-          stopWatch = agents.watch(spec.agent, id, function(task) {
-            if (task.status === "done") {
-              status.textContent = t("ready");
-              btn.disabled = false;
-              if (stopWatch) {
-                stopWatch();
-                stopWatch = null;
-              }
-              if (spec.onDone) spec.onDone({ task, deliverable: null });
-            } else if (task.status === "failed" || task.status === "stalled") {
-              status.textContent = t("delegateFailed");
-              btn.disabled = false;
-              if (stopWatch) {
-                stopWatch();
-                stopWatch = null;
-              }
-            } else if (task.status === "declined") {
-              status.textContent = t("delegateDeclined");
-              btn.disabled = false;
-              if (stopWatch) {
-                stopWatch();
-                stopWatch = null;
-              }
-            }
-          });
-        } else {
-          btn.disabled = false;
-        }
-      } catch (err) {
-        const code = err && /** @type {any} */
-        err.code;
-        status.textContent = code === "SPEND_CANCELLED" ? t("cancel") + "." : t("delegateFailed");
-        btn.disabled = false;
-      }
-    }
-    return {
-      el: root,
-      destroy() {
-        if (stopWatch) stopWatch();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-  function agentActivity(spec) {
-    const root = el("div", { class: "ak-root ak-agentactivity" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let inner = null;
-    async function refresh() {
-      const agents = agentsNs();
-      if (inner && inner.destroy) inner.destroy();
-      clear(root);
-      if (!agents) {
-        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone"), hint: t("delegateNoAgents") });
-        return;
-      }
-      let tasks;
-      try {
-        tasks = await agents.tasks(spec.agent, {});
-      } catch (err) {
-        console.warn("aimeat-atelier: agent activity could not be read", err);
-        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
-        return;
-      }
-      const rows = (tasks || []).slice(0, spec.limit || 8).map(function(task) {
-        return {
-          id: String(task.id || task.title),
-          ts: task.updated_at || task.created_at || (/* @__PURE__ */ new Date()).toISOString(),
-          title: task.title || task.description || "",
-          sub: task.status,
-          tone: task.status === "failed" ? "err" : task.status === "done" ? "ok" : "warn"
-        };
-      });
-      if (!rows.length) {
-        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
-        return;
-      }
-      inner = timeline({ target: root, items: rows });
-    }
-    refresh();
-    return {
-      el: root,
-      refresh,
-      destroy() {
-        if (inner && inner.destroy) inner.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
   // src/static/sdk-libs/atelier/list.js
   var LIST_VARIANTS = ["dense", "numbered", "plain"];
   var DETAIL_MARKED = ".ak-listdetail__title";
@@ -10441,6 +5959,4671 @@
     };
   }
 
+  // src/static/sdk-libs/atelier/table.js
+  var TABLE_VARIANTS = ["dense", "plain", "lined"];
+  var RECORD = /* @__PURE__ */ new WeakMap();
+  function table(spec) {
+    const columns = spec.columns || [];
+    let rows = spec.rows || [];
+    const keyOf3 = spec.key || function(row, i) {
+      if (row && row.id != null) return String(row.id);
+      const first = columns[0] && row ? row[columns[0].key] : null;
+      return first == null ? "row-" + i : String(first);
+    };
+    let sort = null;
+    const thead = el("thead", { "data-ak-part": "head" });
+    const tbody = el("tbody", { "data-ak-part": "body" });
+    const tableEl = el("table", { class: "ak-table__table", "data-ak-part": "table" }, [
+      spec.caption ? el("caption", { class: "ak-sr-only", "data-ak-part": "caption", text: spec.caption }) : null,
+      thead,
+      tbody
+    ]);
+    const root = el("div", { class: "ak-root ak-table", "data-ak-part": "root" }, tableEl);
+    applyVariant(root, spec, TABLE_VARIANTS);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function renderHead() {
+      clear(thead);
+      const tr = el("tr");
+      for (const col of columns) {
+        const sorted = sort && sort.key === col.key ? sort.dir === 1 ? "ascending" : "descending" : null;
+        const th = el("th", {
+          scope: "col",
+          class: col.align === "right" ? "ak-table__num" : null,
+          "data-ak-part": "headcell",
+          "data-ak-key": col.key,
+          "aria-sort": sorted
+        });
+        const given = partValue(spec, "head", col);
+        const heading = given === void 0 ? col.label : given;
+        if (col.sortable) {
+          const btn = el("button", {
+            type: "button",
+            class: "ak-table__sort",
+            "data-ak-part": "sort",
+            "data-ak-noguard": true,
+            on: {
+              click: function() {
+                sort = sort && sort.key === col.key ? { key: col.key, dir: sort.dir === 1 ? -1 : 1 } : { key: col.key, dir: 1 };
+                renderHead();
+                renderBody();
+              }
+            }
+          });
+          if (!fillPart(btn, heading)) btn.textContent = col.label;
+          if (sorted) btn.appendChild(document.createTextNode(sorted === "ascending" ? " ↑" : " ↓"));
+          th.appendChild(btn);
+        } else if (!fillPart(th, heading)) {
+          th.textContent = col.label;
+        }
+        tr.appendChild(th);
+      }
+      thead.appendChild(tr);
+    }
+    function sortedRows() {
+      if (!sort) return rows;
+      const key = sort.key;
+      const dir = sort.dir;
+      return rows.slice().sort(function(a, b) {
+        const av = a[key];
+        const bv = b[key];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+        return String(av).localeCompare(String(bv)) * dir;
+      });
+    }
+    function fillRow2(tr, row) {
+      clear(tr);
+      const wholeRow = partValue(spec, "row", row);
+      if (wholeRow !== void 0) {
+        fillPart(tr, wholeRow);
+        return;
+      }
+      for (const col of columns) {
+        const raw = row[col.key];
+        const given = partValue(spec, "cell", raw, row, col);
+        const own = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
+        const td2 = el("td", {
+          class: col.align === "right" ? "ak-table__num" : null,
+          "data-ak-part": "cell",
+          "data-ak-key": col.key
+        });
+        fillPart(td2, given === void 0 ? own : given);
+        tr.appendChild(td2);
+      }
+    }
+    function renderBody() {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      tableEl.hidden = !rows.length;
+      if (!rows.length) {
+        clear(tbody);
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint")
+        });
+        return;
+      }
+      const pickable = typeof spec.onPick === "function";
+      keyedRows(tbody, sortedRows(), {
+        key: keyOf3,
+        build: function(row) {
+          const tr = el("tr", {
+            class: pickable ? "ak-table__row--pick" : null,
+            "data-ak-part": "row",
+            tabindex: pickable ? "0" : null,
+            on: pickable ? {
+              click: function() {
+                if (spec.onPick) spec.onPick(RECORD.get(tr));
+              },
+              keydown: function(ev) {
+                if (ev.key === "Enter" && spec.onPick) spec.onPick(RECORD.get(tr));
+              }
+            } : null
+          });
+          RECORD.set(tr, row);
+          fillRow2(tr, row);
+          return tr;
+        },
+        update: function(tr, row) {
+          RECORD.set(tr, row);
+          fillRow2(tr, row);
+        }
+      });
+    }
+    renderHead();
+    renderBody();
+    return {
+      el: root,
+      /** @param {{ rows?: any[] }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.rows) {
+          rows = patch.rows;
+          renderBody();
+        }
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  var SEARCH_DEBOUNCE_MS = 250;
+  function searchBar(spec) {
+    let timer = null;
+    const input = el("input", {
+      type: "search",
+      class: "ak-input ak-search__input",
+      "data-ak-part": "input",
+      placeholder: spec.placeholder || t("search"),
+      "aria-label": spec.label || t("search"),
+      on: {
+        input: function() {
+          if (!spec.onChange) return;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(function() {
+            timer = null;
+            if (spec.onChange) spec.onChange(inputEl.value);
+          }, SEARCH_DEBOUNCE_MS);
+        },
+        keydown: function(ev) {
+          if (ev.key === "Enter" && spec.onSubmit) {
+            ev.preventDefault();
+            spec.onSubmit(inputEl.value);
+          }
+        }
+      }
+    });
+    const inputEl = (
+      /** @type {HTMLInputElement} */
+      input
+    );
+    if (spec.value != null) inputEl.value = spec.value;
+    const clearBtn = el("button", {
+      type: "button",
+      class: "ak-search__clear",
+      "data-ak-part": "clear",
+      "aria-label": t("close"),
+      "data-ak-noguard": true,
+      on: {
+        click: function() {
+          inputEl.value = "";
+          inputEl.focus();
+          if (spec.onChange) spec.onChange("");
+        }
+      }
+    }, "×");
+    const root = el("div", { class: "ak-root ak-search", role: "search", "data-ak-part": "root" }, [input, clearBtn]);
+    applyVariant(root, spec, ["dense", "plain"]);
+    slotInto(root, spec, "aside", null, { cls: "ak-search__aside" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    return {
+      el: root,
+      /** @param {{ value?: string }} patch */
+      set(patch) {
+        if (patch && patch.value != null) inputEl.value = patch.value;
+      },
+      destroy() {
+        if (timer) clearTimeout(timer);
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/timeline.js
+  var MACHINE_MOMENT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|^(?:[A-Za-z]{3},? )?\d{1,2} [A-Za-z]{3} \d{4}\b|^[A-Za-z]{3} [A-Za-z]{3} \d{2} \d{4}\b/;
+  function fmtTs(ts) {
+    if (ts == null || ts === "") return null;
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) return calendar(ts, { dateStyle: "medium" });
+    if (typeof ts === "string" && !MACHINE_MOMENT.test(ts)) return ts;
+    const d = ts instanceof Date ? ts : new Date(ts);
+    if (Number.isNaN(d.getTime())) return String(ts);
+    return dateTime(d, { dateStyle: "medium", timeStyle: "short" });
+  }
+  function timeline(spec) {
+    const fmt2 = spec.format || fmtTs;
+    const root = el("ol", { class: "ak-root ak-timeline", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function fillItem(node, item) {
+      clear(node);
+      const whole = partValue(spec, "item", item);
+      if (whole !== void 0) {
+        fillPart(node, whole);
+        return;
+      }
+      node.appendChild(partEl("span", "ak-timeline__dot ak-timeline__dot--" + (item.tone || "plain"), "dot", { "aria-hidden": "true" }));
+      const body = partEl("div", "ak-timeline__body", "body");
+      slotInto(body, spec, "when", hasPart(spec, "when") ? null : fmt2(item.ts), { cls: "ak-timeline__when", args: [item] });
+      slotInto(body, spec, "title", item.title, { cls: "ak-timeline__title", args: [item] });
+      slotInto(body, spec, "sub", item.sub == null ? null : item.sub, { cls: "ak-timeline__sub", args: [item] });
+      slotInto(body, spec, "extra", null, { cls: "ak-timeline__extra", args: [item] });
+      node.appendChild(body);
+      slotInto(node, spec, "aside", null, { cls: "ak-timeline__aside", args: [item] });
+    }
+    function buildItem(item) {
+      const node = el("li", { class: "ak-timeline__item", "data-ak-part": "item" });
+      fillItem(node, item);
+      return node;
+    }
+    function render(items) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      if (!items.length) {
+        clear(root);
+        const e = spec.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("empty"),
+          hint: e.hint || t("emptyHint")
+        });
+        return;
+      }
+      keyedRows(root, items, {
+        key: function(item, i) {
+          return item.id != null ? String(item.id) : "ev-" + i;
+        },
+        build: buildItem,
+        update: fillItem
+      });
+    }
+    render(spec.items || []);
+    return {
+      el: root,
+      /** @param {{ items: TimelineItem[] }} patch */
+      set(patch) {
+        if (!patch || !patch.items) return;
+        render(patch.items);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/chart-core.js
+  var SVG_NS4 = "http://www.w3.org/2000/svg";
+  function svg(name, attrs) {
+    const node = document.createElementNS(SVG_NS4, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  var SERIES_VARS = ["var(--ak-accent)", "var(--ak-spectrum-2)", "var(--ak-spectrum-3)", "var(--ak-accent-2)"];
+  function tickStep(span) {
+    const raw = span / 4;
+    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    for (const m of [1, 2, 5, 10]) {
+      if (raw <= m * pow) return m * pow;
+    }
+    return 10 * pow;
+  }
+  function fmtTick(v) {
+    if (Math.abs(v) >= 1e3) return num(v / 1e3, { maximumFractionDigits: 1 }) + "k";
+    return num(v, { maximumFractionDigits: 2 });
+  }
+  function smoothPath(pts) {
+    if (pts.length < 2) return pts.length ? `M ${pts[0].x} ${pts[0].y}` : "";
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x} ${p2.y}`;
+    }
+    return d;
+  }
+  var defsCounter = 0;
+  function defsFor(node, seriesCount) {
+    const stamp3 = ++defsCounter;
+    const defs = svg("defs", {});
+    const sheenId = `ak-sheen-${stamp3}`;
+    const sheen2 = svg("linearGradient", { id: sheenId, x1: 0, y1: 0, x2: 0, y2: 1 });
+    const s1 = svg("stop", { offset: "0", "stop-opacity": "0.22" });
+    s1.style.stopColor = "var(--ak-chart-sheen)";
+    const s2 = svg("stop", { offset: "1", "stop-opacity": "0" });
+    s2.style.stopColor = "var(--ak-chart-sheen)";
+    sheen2.appendChild(s1);
+    sheen2.appendChild(s2);
+    defs.appendChild(sheen2);
+    for (let i = 0; i < seriesCount; i++) {
+      const fade = svg("linearGradient", { id: `ak-fade-${stamp3}-${i}`, x1: 0, y1: 0, x2: 0, y2: 1 });
+      const f1 = svg("stop", { offset: "0", "stop-opacity": "0.20" });
+      f1.style.stopColor = SERIES_VARS[i % SERIES_VARS.length];
+      const f2 = svg("stop", { offset: "1", "stop-opacity": "0" });
+      f2.style.stopColor = SERIES_VARS[i % SERIES_VARS.length];
+      fade.appendChild(f1);
+      fade.appendChild(f2);
+      defs.appendChild(fade);
+    }
+    node.appendChild(defs);
+    return { sheen: `url(#${sheenId})`, fade: (i) => `url(#ak-fade-${stamp3}-${i % SERIES_VARS.length})` };
+  }
+
+  // src/static/sdk-libs/atelier/chart-shapes.js
+  var TONES2 = { ok: "var(--ak-ok-text)", warn: "var(--ak-warn-text)", err: "var(--ak-err-text)" };
+  function renderDonut(ctx, data) {
+    const slices = (data && Array.isArray(data.slices) ? data.slices : []).filter((s) => s && typeof s.value === "number" && s.value > 0);
+    if (!slices.length) return ctx.empty();
+    const total = slices.reduce((sum, s) => sum + s.value, 0);
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + slices.map((s) => s.label + " " + s.value).join(", "));
+    const R2 = 88;
+    const STROKE = 26;
+    const C = 2 * Math.PI * R2;
+    const GAP2 = 4;
+    const wrap2 = el("div", { class: "ak-chart__donutwrap" });
+    const node = svg("svg", { viewBox: "0 0 230 230", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
+    node.appendChild(svg("circle", { cx: 115, cy: 115, r: R2, class: "ak-chart__ring", "stroke-width": STROKE }));
+    let offset = 0;
+    slices.forEach((s, i) => {
+      const frac = s.value / total;
+      const ring2 = svg("circle", {
+        cx: 115,
+        cy: 115,
+        r: R2,
+        class: "ak-chart__slice",
+        style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
+        "stroke-width": STROKE,
+        "stroke-linecap": slices.length > 1 ? "round" : "butt",
+        "stroke-dasharray": `${Math.max(frac * C - GAP2, 0.5)} ${C}`,
+        "stroke-dashoffset": String(-offset * C),
+        transform: "rotate(-90 115 115)"
+      });
+      if (!ctx.still()) {
+        ring2.classList.add("ak-chart__slice--enter");
+        ring2.style.animationDelay = `${i * 70}ms`;
+      }
+      node.appendChild(ring2);
+      offset += frac;
+    });
+    wrap2.appendChild(node);
+    const centre = el("div", { class: "ak-chart__centre" }, [
+      el("b", { text: fmtTick(total) }),
+      data.delta && data.delta.text ? el("span", { class: "ak-chart__delta", text: String(data.delta.text) }) : null
+    ]);
+    if (data.delta && TONES2[data.delta.tone]) {
+      centre.lastChild.style.color = TONES2[data.delta.tone];
+    }
+    wrap2.appendChild(centre);
+    ctx.root.appendChild(wrap2);
+    const legend = el(
+      "figcaption",
+      { class: "ak-chart__legend" },
+      slices.map((s) => el("span", { class: "ak-chart__key" }, [
+        el("span", { class: "ak-chart__swatch" }),
+        el("span", { text: `${s.label} · ${fmtTick(s.value)}` })
+      ]))
+    );
+    slices.forEach((s, i) => {
+      const sw = legend.children[i] && legend.children[i].firstChild;
+      if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+    });
+    ctx.root.appendChild(legend);
+  }
+  function renderCalendar(ctx, data) {
+    const days = (data && Array.isArray(data.days) ? data.days : []).map((d) => ({ date: new Date(d.date), value: Number(d.value) || 0 })).filter((d) => !isNaN(d.date.getTime())).sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (!days.length) return ctx.empty();
+    const max = days.reduce((m, d) => Math.max(m, d.value), 0) || 1;
+    const start = new Date(days[0].date);
+    start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+    const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 864e5) + 1;
+    const weeks = Math.min(Math.ceil(spanDays / 7), 53);
+    const CELL = 13;
+    const GAP2 = 3;
+    const width = weeks * (CELL + GAP2) + GAP2;
+    const height = 7 * (CELL + GAP2) + GAP2 + 16;
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + days.length + " d");
+    const byKey = /* @__PURE__ */ new Map();
+    for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
+    const node = svg("svg", { viewBox: `0 0 ${width} ${height}`, class: "ak-chart__svg ak-chart__svg--calendar", "aria-hidden": "true" });
+    const cursor = new Date(start);
+    const monthAt = [];
+    for (let w = 0; w < weeks; w++) {
+      for (let dow = 0; dow < 7; dow++) {
+        const key = cursor.toISOString().slice(0, 10);
+        const value = byKey.get(key);
+        if (cursor.getDate() === 1) monthAt.push({ w, m: cursor.getMonth() });
+        const cell = svg("rect", {
+          x: GAP2 + w * (CELL + GAP2),
+          y: GAP2 + dow * (CELL + GAP2),
+          width: CELL,
+          height: CELL,
+          rx: 3,
+          class: "ak-chart__day" + (value === void 0 ? " ak-chart__day--blank" : "")
+        });
+        if (value !== void 0) {
+          cell.setAttribute("style", `fill: var(--ak-accent); fill-opacity: ${(0.15 + 0.85 * (value / max)).toFixed(3)}`);
+        }
+        node.appendChild(cell);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    const MONTHS = [t("m1"), t("m2"), t("m3"), t("m4"), t("m5"), t("m6"), t("m7"), t("m8"), t("m9"), t("m10"), t("m11"), t("m12")];
+    for (const mark of monthAt) {
+      const label = svg("text", { x: GAP2 + mark.w * (CELL + GAP2), y: height - 4, class: "ak-chart__tick" });
+      label.textContent = MONTHS[mark.m];
+      node.appendChild(label);
+    }
+    ctx.root.appendChild(node);
+    const ramp3 = el("figcaption", { class: "ak-chart__ramp" }, [
+      el("span", { text: t("heatLess") }),
+      ...[0.15, 0.43, 0.71, 1].map((o) => {
+        const sw = el("span", { class: "ak-chart__rampcell" });
+        sw.style.opacity = String(o);
+        return sw;
+      }),
+      el("span", { text: t("heatMore") })
+    ]);
+    ctx.root.appendChild(ramp3);
+  }
+  function renderScatter(ctx, data) {
+    const points = (data && Array.isArray(data.points) ? data.points : []).filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
+    if (!points.length) return ctx.empty();
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + points.length + " pts");
+    const W7 = 560;
+    const H4 = 300;
+    const PAD3 = { top: 16, right: 16, bottom: 36, left: 50 };
+    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+    for (const p of points) {
+      if (p.x < xMin) xMin = p.x;
+      if (p.x > xMax) xMax = p.x;
+      if (p.y < yMin) yMin = p.y;
+      if (p.y > yMax) yMax = p.y;
+    }
+    if (xMax === xMin) xMax = xMin + 1;
+    if (yMax === yMin) yMax = yMin + 1;
+    const xStep = tickStep(xMax - xMin);
+    const yStep = tickStep(yMax - yMin);
+    xMin = Math.floor(xMin / xStep) * xStep;
+    xMax = Math.ceil(xMax / xStep) * xStep;
+    yMin = Math.floor(yMin / yStep) * yStep;
+    yMax = Math.ceil(yMax / yStep) * yStep;
+    const X = (v) => PAD3.left + (W7 - PAD3.left - PAD3.right) * ((v - xMin) / (xMax - xMin));
+    const Y = (v) => PAD3.top + (H4 - PAD3.top - PAD3.bottom) * (1 - (v - yMin) / (yMax - yMin));
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    for (let v = yMin; v <= yMax + yStep / 2; v += yStep) {
+      node.appendChild(svg("line", { x1: PAD3.left, x2: W7 - PAD3.right, y1: Y(v), y2: Y(v), class: "ak-chart__grid" }));
+      const tk = svg("text", { x: PAD3.left - 8, y: Y(v) + 4, class: "ak-chart__tick", "text-anchor": "end" });
+      tk.textContent = fmtTick(v);
+      node.appendChild(tk);
+    }
+    for (let v = xMin; v <= xMax + xStep / 2; v += xStep) {
+      const tk = svg("text", { x: X(v), y: H4 - PAD3.bottom + 16, class: "ak-chart__tick", "text-anchor": "middle" });
+      tk.textContent = fmtTick(v);
+      node.appendChild(tk);
+    }
+    if (points.length >= 3) {
+      const n = points.length;
+      let sx = 0, sy = 0, sxy = 0, sxx = 0;
+      for (const p of points) {
+        sx += p.x;
+        sy += p.y;
+        sxy += p.x * p.y;
+        sxx += p.x * p.x;
+      }
+      const slope = (n * sxy - sx * sy) / Math.max(n * sxx - sx * sx, 1e-9);
+      const icept = (sy - slope * sx) / n;
+      node.appendChild(svg("line", {
+        x1: X(xMin),
+        y1: Y(slope * xMin + icept),
+        x2: X(xMax),
+        y2: Y(slope * xMax + icept),
+        class: "ak-chart__trend"
+      }));
+    }
+    const still2 = ctx.still();
+    points.forEach((p, i) => {
+      const dot = svg("circle", { cx: X(p.x), cy: Y(p.y), r: 6, class: "ak-chart__point" });
+      if (p.label) {
+        const cap = svg("title", {});
+        cap.textContent = String(p.label);
+        dot.appendChild(cap);
+      }
+      if (!still2) {
+        dot.classList.add("ak-chart__point--enter");
+        dot.style.animationDelay = `${i * 22}ms`;
+      }
+      node.appendChild(dot);
+    });
+    ctx.root.appendChild(node);
+    if (data.xLabel || data.yLabel) {
+      ctx.root.appendChild(el("figcaption", { class: "ak-chart__legend" }, [
+        data.xLabel ? el("span", { class: "ak-chart__key", text: `x · ${data.xLabel}` }) : null,
+        data.yLabel ? el("span", { class: "ak-chart__key", text: `y · ${data.yLabel}` }) : null
+      ]));
+    }
+  }
+  function renderFunnel(ctx, data) {
+    const steps2 = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && typeof s.value === "number" && s.value >= 0);
+    if (!steps2.length || steps2[0].value <= 0) return ctx.empty();
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps2.map((s) => s.label + " " + s.value).join(", "));
+    const W7 = 460;
+    const STEP_H = 44;
+    const GAP2 = 7;
+    const BAND = 340;
+    const CX = 195;
+    const H4 = steps2.length * (STEP_H + GAP2) - GAP2 + 8;
+    const first = steps2[0].value;
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const still2 = ctx.still();
+    const half = (v) => Math.max(v / first * BAND, 18) / 2;
+    steps2.forEach((s, i) => {
+      const y = 4 + i * (STEP_H + GAP2);
+      const topHalf = half(s.value);
+      const nxt = steps2[i + 1];
+      const botHalf = nxt ? half(nxt.value) : topHalf;
+      const band = svg("path", {
+        d: `M${CX - topHalf} ${y} L${CX + topHalf} ${y} L${CX + botHalf} ${y + STEP_H} L${CX - botHalf} ${y + STEP_H} Z`,
+        class: "ak-chart__funnelband"
+      });
+      band.style.fill = SERIES_VARS[i % SERIES_VARS.length];
+      if (!still2) {
+        band.classList.add("ak-chart__band--enter");
+        band.style.animationDelay = `${i * 80}ms`;
+      }
+      node.appendChild(band);
+      const name = svg("text", { x: CX, y: y + STEP_H / 2 + 5, class: "ak-chart__funnellabel", "text-anchor": "middle" });
+      name.textContent = `${s.label} · ${fmtTick(s.value)}`;
+      node.appendChild(name);
+      const pct = svg("text", { x: W7 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
+      pct.textContent = Math.round(s.value / first * 100) + " %";
+      node.appendChild(pct);
+    });
+    ctx.root.appendChild(node);
+  }
+  function squarify(items, x, y, w, h) {
+    const out = [];
+    let rest = items.slice();
+    while (rest.length) {
+      const along = Math.min(w, h);
+      let row = [rest[0]];
+      let sum = rest[0].v;
+      const total = rest.reduce((a, b) => a + b.v, 0);
+      const worst = (r, s) => {
+        const side2 = s / total * (w * h) / along;
+        let bad = 0;
+        for (const it of r) {
+          const other = it.v / s * along;
+          bad = Math.max(bad, side2 / other, other / side2);
+        }
+        return bad;
+      };
+      while (rest.length > row.length) {
+        const cand = rest[row.length];
+        if (worst(row.concat(cand), sum + cand.v) <= worst(row, sum)) {
+          row.push(cand);
+          sum += cand.v;
+        } else break;
+      }
+      const side = sum / total * (w * h) / along;
+      let run = 0;
+      for (const it of row) {
+        const span = it.v / sum * along;
+        out.push(w <= h ? { it, x: x + run, y, w: span, h: side } : { it, x, y: y + run, w: side, h: span });
+        run += span;
+      }
+      if (w <= h) {
+        y += side;
+        h -= side;
+      } else {
+        x += side;
+        w -= side;
+      }
+      rest = rest.slice(row.length);
+    }
+    return out;
+  }
+  function renderTreemap(ctx, data) {
+    const items = (data && Array.isArray(data.items) ? data.items : []).filter((s) => s && typeof s.value === "number" && s.value > 0).sort((a, b) => b.value - a.value);
+    if (!items.length) return ctx.empty();
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + items.map((s) => s.label + " " + s.value).join(", "));
+    const W7 = 560;
+    const H4 = 320;
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W7 - 4, H4 - 4);
+    const still2 = ctx.still();
+    cells.forEach((c, n) => {
+      const G = 2.5;
+      const rect = svg("rect", {
+        x: c.x + G,
+        y: c.y + G,
+        width: Math.max(c.w - G * 2, 1),
+        height: Math.max(c.h - G * 2, 1),
+        rx: 6,
+        class: "ak-chart__cell"
+      });
+      rect.style.fill = SERIES_VARS[c.it.i % SERIES_VARS.length];
+      const cap = svg("title", {});
+      cap.textContent = `${c.it.s.label} · ${fmtTick(c.it.s.value)}`;
+      rect.appendChild(cap);
+      if (!still2) {
+        rect.classList.add("ak-chart__band--enter");
+        rect.style.animationDelay = `${n * 45}ms`;
+      }
+      node.appendChild(rect);
+      if (c.w > 86 && c.h > 44) {
+        const name = svg("text", { x: c.x + 12, y: c.y + 24, class: "ak-chart__cellname" });
+        name.textContent = String(c.it.s.label);
+        node.appendChild(name);
+        const val = svg("text", { x: c.x + 12, y: c.y + 42, class: "ak-chart__cellvalue" });
+        val.textContent = fmtTick(c.it.s.value);
+        node.appendChild(val);
+      }
+    });
+    ctx.root.appendChild(node);
+  }
+  function renderFlow(ctx, data) {
+    const nodes = (data && Array.isArray(data.nodes) ? data.nodes : []).filter((n) => n && n.id);
+    const links = (data && Array.isArray(data.links) ? data.links : []).filter((l) => l && l.from && l.to && typeof l.value === "number" && l.value > 0);
+    if (!nodes.length || !links.length) return ctx.empty();
+    const byId = new Map(nodes.map((n) => [n.id, { n, in: 0, out: 0, depth: 0 }]));
+    for (const l of links) {
+      const a = byId.get(l.from);
+      const b = byId.get(l.to);
+      if (!a || !b) continue;
+      a.out += l.value;
+      b.in += l.value;
+    }
+    for (let pass = 0; pass < nodes.length; pass++) {
+      let moved = false;
+      for (const l of links) {
+        const a = byId.get(l.from);
+        const b = byId.get(l.to);
+        if (a && b && b.depth < a.depth + 1 && a.depth + 1 < nodes.length) {
+          b.depth = a.depth + 1;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    const maxDepth = Math.max(...[...byId.values()].map((m) => m.depth));
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + nodes.map((n) => n.label || n.id).join(", "));
+    const W7 = 560;
+    const H4 = 320;
+    const NODE_W = 12;
+    const PAD_Y = 10;
+    const cols = [];
+    for (const m of byId.values()) (cols[m.depth] = cols[m.depth] || []).push(m);
+    const scale = (H4 - PAD_Y * 2 - 8 * Math.max(...cols.map((c) => (c || []).length - 1), 0)) / Math.max(...cols.map((c) => (c || []).reduce((a, m) => a + Math.max(m.in, m.out), 0)), 1e-9);
+    const colX = (d) => 8 + (maxDepth ? (W7 - NODE_W - 16) * (d / maxDepth) : 0);
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    let colourIdx = 0;
+    for (const col of cols) {
+      if (!col) continue;
+      col.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out));
+      let y = PAD_Y;
+      for (const m of col) {
+        m.h = Math.max(Math.max(m.in, m.out) * scale, 4);
+        m.x = colX(m.depth);
+        m.y = y;
+        m.colour = SERIES_VARS[colourIdx++ % SERIES_VARS.length];
+        m.spentOut = 0;
+        m.spentIn = 0;
+        y += m.h + 8;
+      }
+    }
+    for (const l of links) {
+      const a = byId.get(l.from);
+      const b = byId.get(l.to);
+      if (!a || !b) continue;
+      const th = l.value * scale;
+      const y1 = a.y + a.spentOut + th / 2;
+      const y2 = b.y + b.spentIn + th / 2;
+      a.spentOut += th;
+      b.spentIn += th;
+      const x1 = a.x + NODE_W;
+      const x2 = b.x;
+      const mid = (x1 + x2) / 2;
+      const ribbon = svg("path", {
+        d: `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`,
+        class: "ak-chart__ribbon",
+        "stroke-width": Math.max(th, 1.5)
+      });
+      ribbon.style.stroke = a.colour;
+      node.appendChild(ribbon);
+    }
+    for (const m of byId.values()) {
+      const bar2 = svg("rect", { x: m.x, y: m.y, width: NODE_W, height: m.h, rx: 4, class: "ak-chart__flownode" });
+      bar2.style.fill = m.colour;
+      node.appendChild(bar2);
+      const last = m.depth === maxDepth;
+      const name = svg("text", {
+        x: last ? m.x - 6 : m.x + NODE_W + 6,
+        y: m.y + Math.min(m.h / 2 + 4, m.h + 2),
+        class: "ak-chart__flowlabel",
+        "text-anchor": last ? "end" : "start"
+      });
+      name.textContent = `${m.n.label || m.n.id} · ${fmtTick(Math.max(m.in, m.out))}`;
+      node.appendChild(name);
+    }
+    ctx.root.appendChild(node);
+  }
+  function renderRadar(ctx, data) {
+    const axes = (data && Array.isArray(data.axes) ? data.axes : []).slice(0, 10);
+    const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length).slice(0, 4);
+    if (axes.length < 3 || !series.length) return ctx.empty();
+    const max = typeof data.max === "number" && data.max > 0 ? data.max : series.reduce((m, s) => s.values.reduce((m2, v) => Math.max(m2, Number(v) || 0), m), 0) || 1;
+    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + series.map((s) => s.label).join(", "));
+    const W7 = 460;
+    const H4 = 340;
+    const CX = W7 / 2;
+    const CY = H4 / 2 + 4;
+    const R2 = 118;
+    const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
+    const at3 = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
+    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
+    for (const frac of [0.25, 0.5, 0.75, 1]) {
+      node.appendChild(svg("polygon", {
+        points: axes.map((a, i) => at3(i, R2 * frac)).join(" "),
+        class: "ak-chart__radarring"
+      }));
+    }
+    axes.forEach((label, i) => {
+      node.appendChild(svg("line", {
+        x1: CX,
+        y1: CY,
+        x2: CX + Math.cos(angle(i)) * R2,
+        y2: CY + Math.sin(angle(i)) * R2,
+        class: "ak-chart__radarspoke"
+      }));
+      const lx = CX + Math.cos(angle(i)) * (R2 + 16);
+      const ly = CY + Math.sin(angle(i)) * (R2 + 16);
+      const cap = svg("text", {
+        x: lx.toFixed(1),
+        y: (ly + 4).toFixed(1),
+        class: "ak-chart__tick",
+        "text-anchor": Math.abs(Math.cos(angle(i))) < 0.3 ? "middle" : Math.cos(angle(i)) > 0 ? "start" : "end"
+      });
+      cap.textContent = String(label);
+      node.appendChild(cap);
+    });
+    const still2 = ctx.still();
+    series.forEach((s, si) => {
+      const points = axes.map((a, i) => at3(i, R2 * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
+      const shape = svg("polygon", { points, class: "ak-chart__radarshape" });
+      shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
+      shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
+      if (!still2) {
+        shape.classList.add("ak-chart__band--enter");
+        shape.style.animationDelay = `${si * 120}ms`;
+      }
+      node.appendChild(shape);
+    });
+    ctx.root.appendChild(node);
+    const legend = el(
+      "figcaption",
+      { class: "ak-chart__legend" },
+      series.map((s) => el("span", { class: "ak-chart__key" }, [
+        el("span", { class: "ak-chart__swatch" }),
+        el("span", { text: String(s.label) })
+      ]))
+    );
+    series.forEach((s, i) => {
+      const sw = legend.children[i] && legend.children[i].firstChild;
+      if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+    });
+    ctx.root.appendChild(legend);
+  }
+
+  // src/static/sdk-libs/atelier/motion.js
+  var STATE = /* @__PURE__ */ new WeakMap();
+  var REST = { x: 0, y: 0, scale: 1, rotate: 0, opacity: 1 };
+  function stateOf(node) {
+    let s = STATE.get(node);
+    if (!s) {
+      s = Object.assign({}, REST);
+      STATE.set(node, s);
+    }
+    return s;
+  }
+  function transformOf(s) {
+    return "translate(" + s.x + "px, " + s.y + "px) scale(" + s.scale + ") rotate(" + s.rotate + "deg)";
+  }
+  function springTokens(el2) {
+    if (!el2 || typeof getComputedStyle !== "function") return {};
+    let cs;
+    try {
+      cs = getComputedStyle(
+        /** @type {Element} */
+        el2
+      );
+    } catch {
+      return {};
+    }
+    if (!cs) return {};
+    const num2 = function(name) {
+      const v = parseFloat(cs.getPropertyValue(name));
+      return isFinite(v) && v > 0 ? v : void 0;
+    };
+    return { stiffness: num2("--ak-spring-stiffness"), damping: num2("--ak-spring-damping"), mass: num2("--ak-spring-mass") };
+  }
+  function springFrames(opts) {
+    const o = opts || {};
+    const look = o.stiffness && o.damping && o.mass ? {} : springTokens(o.el);
+    const k = o.stiffness || look.stiffness || 170;
+    const c = o.damping || look.damping || 20;
+    const m = o.mass || look.mass || 1;
+    const v0 = o.velocity || 0;
+    const w0 = Math.sqrt(k / m);
+    const zeta = c / (2 * Math.sqrt(k * m));
+    const step = 1 / 60;
+    const samples = [];
+    let t2 = 0;
+    let x;
+    let settled = 0;
+    while (t2 < 4) {
+      if (zeta < 1) {
+        const wd = w0 * Math.sqrt(1 - zeta * zeta);
+        const decay = Math.exp(-zeta * w0 * t2);
+        x = 1 - decay * (Math.cos(wd * t2) + (zeta * w0 - v0) / wd * Math.sin(wd * t2));
+      } else {
+        const decay = Math.exp(-w0 * t2);
+        x = 1 - decay * (1 + (w0 - v0) * t2);
+      }
+      samples.push(x);
+      settled = Math.abs(1 - x) < 1e-3 ? settled + 1 : 0;
+      if (settled > 6) break;
+      t2 += step;
+    }
+    samples.push(1);
+    return { samples, duration: Math.round(samples.length * step * 1e3) };
+  }
+  function spring(target, to, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const from = Object.assign({}, stateOf(node));
+    const dest = Object.assign({}, from, to || {});
+    const prior = (
+      /** @type {any} */
+      node.__akSpring
+    );
+    if (prior) {
+      const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
+      if (typeof p === "number") {
+        const at3 = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
+        Object.keys(from).forEach(function(key) {
+          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at3;
+        });
+      }
+      prior.cancel();
+    }
+    STATE.set(node, dest);
+    if (reducedMotion() || typeof node.animate !== "function") {
+      node.style.transform = transformOf(dest);
+      node.style.opacity = String(dest.opacity);
+      return { el: node, finished: Promise.resolve(), cancel() {
+      } };
+    }
+    const sf = springFrames(Object.assign({}, opts, { el: node }));
+    const frames = sf.samples.map(function(at3, i) {
+      const s = {};
+      Object.keys(from).forEach(function(key) {
+        s[key] = from[key] + (dest[key] - from[key]) * at3;
+      });
+      return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
+    });
+    const anim = (
+      /** @type {any} */
+      node.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" })
+    );
+    anim.__frames = sf.samples;
+    anim.__from = from;
+    anim.__to = dest;
+    node.__akSpring = anim;
+    const finished = anim.finished.then(function() {
+      node.style.transform = transformOf(dest);
+      node.style.opacity = String(dest.opacity);
+      anim.cancel();
+      if (
+        /** @type {any} */
+        node.__akSpring === anim
+      ) node.__akSpring = null;
+    }, function() {
+    });
+    return { el: node, finished, cancel() {
+      anim.cancel();
+    } };
+  }
+  function stagger(targets, opts) {
+    const o = opts || {};
+    const list3 = typeof targets === "string" ? Array.prototype.slice.call(document.querySelectorAll(targets)) : (
+      /** @type {any} */
+      targets.length !== void 0 ? Array.prototype.slice.call(
+        /** @type {any} */
+        targets
+      ) : [targets]
+    );
+    const kids = list3.slice(0, o.max || 40);
+    if (!kids.length || reducedMotion() || typeof kids[0].animate !== "function") return { finished: Promise.resolve() };
+    const cs = getComputedStyle(kids[0]);
+    const dist = o.distance !== void 0 ? o.distance : parseFloat(cs.getPropertyValue("--ak-enter-distance")) || 12;
+    const each = o.each !== void 0 ? o.each : parseFloat(cs.getPropertyValue("--ak-enter-stagger")) || 40;
+    const span = o.duration || (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 1.5;
+    const ease = (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)";
+    const start = o.from === "down" ? "translateY(-" + dist + "px)" : o.from === "left" ? "translateX(-" + dist + "px)" : o.from === "right" ? "translateX(" + dist + "px)" : o.from === "scale" ? "scale(0.92)" : "translateY(" + dist + "px)";
+    const end = o.from === "scale" ? "scale(1)" : "translate(0, 0)";
+    let frames = [{ opacity: 0, transform: start }, { opacity: 1, transform: end }];
+    let timing = { duration: span, easing: ease, fill: "backwards" };
+    if (o.spring) {
+      const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
+      frames = sf.samples.map(function(at3, i) {
+        return {
+          offset: i / (sf.samples.length - 1),
+          opacity: Math.min(1, at3 * 1.4),
+          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at3) + ")" : start.replace(/[-\d.]+px/, function(px) {
+            return (parseFloat(px) * (1 - at3)).toFixed(2) + "px";
+          })
+        };
+      });
+      timing = { duration: sf.duration, easing: "linear", fill: "backwards" };
+    }
+    const runs = kids.map(function(kid, i) {
+      return kid.animate(frames, Object.assign({}, timing, { delay: i * each })).finished;
+    });
+    return { finished: Promise.all(runs).then(function() {
+    }, function() {
+    }) };
+  }
+  function inView(target, fn, opts) {
+    const node = resolve(target);
+    const o = opts || {};
+    if (typeof IntersectionObserver !== "function") {
+      fn(
+        node,
+        /** @type {any} */
+        { isIntersecting: true, target: node }
+      );
+      return { el: node, destroy() {
+      } };
+    }
+    const io = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          fn(node, entry);
+          if (o.once !== false) io.disconnect();
+        } else if (o.onLeave) {
+          o.onLeave(node);
+        }
+      });
+    }, { rootMargin: o.margin || "0px 0px -10% 0px", threshold: o.threshold || 0.15 });
+    io.observe(node);
+    return { el: node, destroy() {
+      io.disconnect();
+    } };
+  }
+  function nearestScroller(node) {
+    let p = node.parentElement;
+    while (p && p !== document.body) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+      p = p.parentElement;
+    }
+    return window;
+  }
+  function scrollLink(target, frames, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const subject = o.subject || node;
+    const scroller = o.scroller || nearestScroller(subject);
+    const lo = o.range ? o.range[0] : 0;
+    const hi = o.range ? o.range[1] : 1;
+    let last = 0;
+    if (reducedMotion() || typeof node.animate !== "function") {
+      return { el: node, progress() {
+        return 0;
+      }, destroy() {
+      } };
+    }
+    const anim = node.animate(frames, { duration: 1e3, easing: "linear", fill: "both" });
+    anim.pause();
+    const viewportH = function() {
+      return scroller === window ? window.innerHeight : (
+        /** @type {Element} */
+        scroller.clientHeight
+      );
+    };
+    const viewportTop = function() {
+      return scroller === window ? 0 : (
+        /** @type {Element} */
+        scroller.getBoundingClientRect().top
+      );
+    };
+    const tick = function() {
+      const r = subject.getBoundingClientRect();
+      const h = viewportH();
+      const raw = (viewportTop() + h - r.top) / Math.max(h + r.height, 1);
+      let p = (raw - lo) / Math.max(hi - lo, 1e-4);
+      p = Math.max(0, Math.min(1, p));
+      if (p !== last) {
+        last = p;
+        anim.currentTime = p * 1e3;
+      }
+    };
+    let rafId = 0;
+    const onScroll = function() {
+      if (!rafId) rafId = requestAnimationFrame(function() {
+        rafId = 0;
+        tick();
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    tick();
+    return {
+      el: node,
+      progress() {
+        return last;
+      },
+      destroy() {
+        scroller.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        if (rafId) cancelAnimationFrame(rafId);
+        anim.cancel();
+      }
+    };
+  }
+  function drag(target, handlers, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const h = handlers || {};
+    const o = opts || {};
+    const axis = o.axis || "both";
+    const threshold = o.threshold !== void 0 ? o.threshold : 4;
+    node.classList.add("ak-drag");
+    let active = null;
+    const clamp3 = function(v, range) {
+      return range ? Math.max(range[0], Math.min(range[1], v)) : v;
+    };
+    const down = function(e) {
+      if (e.button !== void 0 && e.button !== 0) return;
+      const s = stateOf(node);
+      active = { id: e.pointerId, x0: e.clientX, y0: e.clientY, bx: s.x, by: s.y, moved: false, t: performance.now(), lx: e.clientX, ly: e.clientY, vx: 0, vy: 0 };
+      if (
+        /** @type {any} */
+        node.__akSpring
+      ) node.__akSpring.cancel();
+      try {
+        node.setPointerCapture(e.pointerId);
+      } catch {
+      }
+    };
+    const move = function(e) {
+      if (!active || e.pointerId !== active.id) return;
+      let dx = e.clientX - active.x0;
+      let dy = e.clientY - active.y0;
+      if (!active.moved) {
+        if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
+        active.moved = true;
+        node.classList.add("ak-dragging");
+        if (h.onStart) h.onStart(node);
+      }
+      if (axis === "x") dy = 0;
+      if (axis === "y") dx = 0;
+      const now2 = performance.now();
+      const dt = Math.max(now2 - active.t, 1);
+      active.vx = (e.clientX - active.lx) / dt * 1e3;
+      active.vy = (e.clientY - active.ly) / dt * 1e3;
+      active.t = now2;
+      active.lx = e.clientX;
+      active.ly = e.clientY;
+      const s = stateOf(node);
+      s.x = clamp3(active.bx + dx, o.bounds && o.bounds.x);
+      s.y = clamp3(active.by + dy, o.bounds && o.bounds.y);
+      node.style.transform = transformOf(s);
+      if (h.onMove) h.onMove(s.x - active.bx, s.y - active.by, node);
+      e.preventDefault();
+    };
+    const up = function(e) {
+      if (!active || e.pointerId !== active.id) return;
+      const was = active;
+      active = null;
+      node.classList.remove("ak-dragging");
+      try {
+        node.releasePointerCapture(e.pointerId);
+      } catch {
+      }
+      if (!was.moved) return;
+      const s = stateOf(node);
+      const dx = s.x - was.bx;
+      const dy = s.y - was.by;
+      if (h.onEnd) h.onEnd(dx, dy, { x: was.vx, y: was.vy }, node);
+      if (o.back !== false) spring(node, { x: was.bx, y: was.by }, { stiffness: o.stiffness, damping: o.damping, mass: o.mass });
+    };
+    node.addEventListener("pointerdown", down);
+    node.addEventListener("pointermove", move);
+    node.addEventListener("pointerup", up);
+    node.addEventListener("pointercancel", up);
+    return {
+      el: node,
+      destroy() {
+        node.removeEventListener("pointerdown", down);
+        node.removeEventListener("pointermove", move);
+        node.removeEventListener("pointerup", up);
+        node.removeEventListener("pointercancel", up);
+        node.classList.remove("ak-drag", "ak-dragging");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/chart-motion.js
+  var LATEST_DRAW = 2500;
+  function drawWhenSeen(root, node) {
+    const lines = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__line"));
+    const rest = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__area, .ak-chart__dot"));
+    if (motionOff(root) || !lines.length) return;
+    lines.forEach(function(line2) {
+      const len = typeof line2.getTotalLength === "function" ? line2.getTotalLength() : 0;
+      if (!len) return;
+      line2.setAttribute("stroke-dasharray", String(len));
+      line2.setAttribute("stroke-dashoffset", String(len));
+      line2.classList.add("ak-chart__line--enter");
+    });
+    rest.forEach(function(n) {
+      n.classList.add("ak-chart__late");
+    });
+    let drawn = false;
+    let late = null;
+    let watch3 = null;
+    const draw = function() {
+      if (drawn) return;
+      drawn = true;
+      clearTimeout(late);
+      if (watch3) watch3.destroy();
+      requestAnimationFrame(function() {
+        lines.forEach(function(line2) {
+          line2.classList.add("ak-chart__line--drawn");
+        });
+        rest.forEach(function(n) {
+          n.classList.add("ak-chart__late--in");
+        });
+      });
+    };
+    watch3 = inView(root, draw);
+    if (!drawn) late = setTimeout(draw, LATEST_DRAW);
+  }
+  function hoverRig(root, node, geom) {
+    const guide = svg("line", { x1: 0, x2: 0, y1: geom.top, y2: geom.bottom, class: "ak-chart__guide" });
+    node.appendChild(guide);
+    const marks = geom.points.map(function(p) {
+      const c = svg("circle", { cx: 0, cy: 0, r: 4.5, class: "ak-chart__hover", style: "stroke:" + p.colour });
+      node.appendChild(c);
+      return c;
+    });
+    const gx = liveSpring(function(x) {
+      guide.setAttribute("x1", x.toFixed(2));
+      guide.setAttribute("x2", x.toFixed(2));
+      marks.forEach(function(m) {
+        m.setAttribute("cx", x.toFixed(2));
+      });
+    }, { el: root, precision: 0.05 });
+    const gy = geom.points.map(function(_p, k) {
+      return liveSpring(function(y) {
+        marks[k].setAttribute("cy", y.toFixed(2));
+      }, { el: root, precision: 0.05 });
+    });
+    let tipSpring = null;
+    let showing = false;
+    let lastTip = null;
+    return {
+      at(i, tip, tipLeft) {
+        if (!tipSpring || lastTip !== tip) {
+          lastTip = tip;
+          tipSpring = liveSpring(function(x) {
+            tip.style.left = x.toFixed(1) + "px";
+          }, { el: root, precision: 0.1 });
+        }
+        if (!showing) {
+          gx.jump(geom.x(i));
+          gy.forEach(function(s, k) {
+            s.jump(geom.points[k].y(i));
+          });
+          tipSpring.jump(tipLeft);
+          showing = true;
+          node.classList.add("ak-chart__svg--reading");
+          tip.classList.add("ak-chart__tip--on");
+          return;
+        }
+        gx.set(geom.x(i));
+        gy.forEach(function(s, k) {
+          s.set(geom.points[k].y(i));
+        });
+        tipSpring.set(tipLeft);
+      },
+      hide(tip) {
+        showing = false;
+        node.classList.remove("ak-chart__svg--reading");
+        tip.classList.remove("ak-chart__tip--on");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/chart.js
+  var W = 560;
+  var H = 300;
+  var PAD = { top: 16, right: 14, bottom: 34, left: 46 };
+  function chart(spec) {
+    const kind = ["donut", "calendar", "scatter", "funnel", "treemap", "flow", "radar"].indexOf(spec.kind) >= 0 ? spec.kind : "axes";
+    const root = el("figure", {
+      class: "ak-root ak-chart" + (spec.presentation === "mural" ? " ak-chart--mural" : ""),
+      role: "img"
+    });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    const ctx = {
+      root,
+      still: () => reducedMotion(),
+      empty: () => {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+      },
+      title: spec.title
+    };
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      if (kind === "donut") return renderDonut(ctx, data);
+      if (kind === "calendar") return renderCalendar(ctx, data);
+      if (kind === "scatter") return renderScatter(ctx, data);
+      if (kind === "funnel") return renderFunnel(ctx, data);
+      if (kind === "treemap") return renderTreemap(ctx, data);
+      if (kind === "flow") return renderFlow(ctx, data);
+      if (kind === "radar") return renderRadar(ctx, data);
+      renderAxes(data);
+    }
+    function renderAxes(data) {
+      const labels = data && Array.isArray(data.labels) ? data.labels : [];
+      const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length > 0);
+      if (!labels.length || !series.length) return ctx.empty();
+      const stacked = !!data.stacked;
+      const horizontal = !!data.horizontal;
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + series.map((s) => s.label).join(", "));
+      const bars = series.filter((s) => (s.kind || "bar") === "bar");
+      const lines = series.filter((s) => s.kind === "line" || s.kind === "area");
+      let min = 0;
+      let max = 0;
+      if (stacked && bars.length) {
+        for (let i = 0; i < labels.length; i++) {
+          let up = 0;
+          let down = 0;
+          for (const s of bars) {
+            const v = s.values[i] || 0;
+            if (v >= 0) up += v;
+            else down += v;
+          }
+          if (up > max) max = up;
+          if (down < min) min = down;
+        }
+        for (const s of lines) for (const v of s.values) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      } else {
+        for (const s of series) for (const v of s.values) {
+          if (v < min) min = v;
+          if (v > max) max = v;
+        }
+      }
+      if (max === min) max = min + 1;
+      const step = tickStep(max - min);
+      min = Math.floor(min / step) * step;
+      max = Math.ceil(max / step) * step;
+      const width = horizontal ? H : W;
+      const height = horizontal ? W : H;
+      const pad = horizontal ? { top: 14, right: 20, bottom: 16, left: 86 } : PAD;
+      const innerAlong = horizontal ? height - pad.top - pad.bottom : width - pad.left - pad.right;
+      const innerCross = horizontal ? width - pad.left - pad.right : height - pad.top - pad.bottom;
+      const along = (i) => (horizontal ? pad.top : pad.left) + innerAlong * i / labels.length;
+      const slot2 = innerAlong / labels.length;
+      const cross = (v) => horizontal ? pad.left + innerCross * ((v - min) / (max - min)) : pad.top + innerCross * (1 - (v - min) / (max - min));
+      const node = svg("svg", { viewBox: `0 0 ${horizontal ? width : W} ${horizontal ? height : H}`, class: "ak-chart__svg", "aria-hidden": "true" });
+      const defs = defsFor(node, series.length);
+      for (let v = min; v <= max + step / 2; v += step) {
+        const g = cross(v);
+        node.appendChild(horizontal ? svg("line", { x1: g, x2: g, y1: pad.top, y2: height - pad.bottom, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }) : svg("line", { x1: pad.left, x2: width - pad.right, y1: g, y2: g, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }));
+        const tick = horizontal ? svg("text", { x: g, y: height - pad.bottom + 14, class: "ak-chart__tick", "text-anchor": "middle" }) : svg("text", { x: pad.left - 8, y: g + 4, class: "ak-chart__tick", "text-anchor": "end" });
+        tick.textContent = fmtTick(v);
+        node.appendChild(tick);
+      }
+      labels.forEach((label, i) => {
+        const tx = horizontal ? svg("text", { x: pad.left - 10, y: along(i) + slot2 / 2 + 4, class: "ak-chart__tick", "text-anchor": "end" }) : svg("text", { x: along(i) + slot2 / 2, y: height - pad.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
+        tx.textContent = String(label);
+        node.appendChild(tx);
+      });
+      const still2 = ctx.still();
+      for (const s of series) {
+        if (s.kind !== "area" || horizontal) continue;
+        const si = series.indexOf(s);
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
+        const path = smoothPath(pts) + ` L ${pts[pts.length - 1].x} ${cross(0)} L ${pts[0].x} ${cross(0)} Z`;
+        node.appendChild(svg("path", { d: path, class: "ak-chart__area", fill: defs.fade(si) }));
+      }
+      const groupPad = slot2 * 0.16;
+      const radius = Math.min(7, Math.max(3, (slot2 - groupPad * 2) / (stacked ? 1 : Math.max(bars.length, 1)) * 0.28));
+      if (stacked) {
+        const stackW = Math.max(slot2 - groupPad * 2, 2);
+        for (let i = 0; i < labels.length; i++) {
+          let acc = 0;
+          bars.forEach((s, bi) => {
+            const v = s.values[i] || 0;
+            if (!v) return;
+            const from = cross(acc);
+            const to = cross(acc + v);
+            acc += v;
+            const topMost = bi === bars.length - 1;
+            const rect = barRect(along(i) + groupPad, from, to, stackW, topMost ? radius : 0);
+            rect.setAttribute("style", `fill:${SERIES_VARS[series.indexOf(s) % SERIES_VARS.length]}`);
+            decorateBar(rect, i);
+            node.appendChild(rect);
+            if (topMost) node.appendChild(sheenOver(rect));
+          });
+        }
+      } else {
+        const barW = bars.length ? (slot2 - groupPad * 2) / bars.length : 0;
+        bars.forEach((s, bi) => {
+          const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+          s.values.slice(0, labels.length).forEach((v, i) => {
+            const rect = barRect(along(i) + groupPad + bi * barW + 1, cross(0), cross(v), Math.max(barW - 2, 1), radius);
+            rect.setAttribute("style", `fill:${colour}`);
+            decorateBar(rect, i);
+            node.appendChild(rect);
+            node.appendChild(sheenOver(rect));
+          });
+        });
+      }
+      function barRect(alongPos, fromCross, toCross, thickness, r) {
+        const lo = Math.min(fromCross, toCross);
+        const span = Math.max(Math.abs(toCross - fromCross), 0.5);
+        return horizontal ? svg("rect", { x: lo, y: alongPos, width: span, height: thickness, rx: r, class: "ak-chart__bar" }) : svg("rect", { x: alongPos, y: lo, width: thickness, height: span, rx: r, class: "ak-chart__bar" });
+      }
+      function sheenOver(rect) {
+        const s = (
+          /** @type {SVGRectElement} */
+          rect.cloneNode(false)
+        );
+        s.setAttribute("style", `fill:${defs.sheen}`);
+        s.setAttribute("class", "ak-chart__sheen");
+        return s;
+      }
+      function decorateBar(rect, i) {
+        if (!still2) {
+          rect.classList.add("ak-chart__bar--enter");
+          rect.style.transformOrigin = horizontal ? `${cross(0)}px center` : `center ${cross(0)}px`;
+          rect.style.animationDelay = `${i * 36}ms`;
+        }
+      }
+      for (const s of lines) {
+        if (horizontal) continue;
+        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
+        const line2 = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
+        node.appendChild(line2);
+        const last = pts[pts.length - 1];
+        node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
+      }
+      root.appendChild(node);
+      legendFor(series);
+      if (!horizontal) {
+        const rig = hoverRig(root, node, {
+          top: pad.top,
+          bottom: H - pad.bottom,
+          x: (i) => along(i) + slot2 / 2,
+          points: lines.map((s) => ({ colour: SERIES_VARS[series.indexOf(s) % SERIES_VARS.length], y: (i) => cross(s.values[i] ?? 0) }))
+        });
+        wireTooltip(node, labels, series, along, slot2, rig);
+      }
+      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot2);
+      if (!still2) drawWhenSeen(root, node);
+    }
+    function legendFor(series) {
+      const legend = el(
+        "figcaption",
+        { class: "ak-chart__legend" },
+        series.map((s) => el("span", { class: "ak-chart__key" }, [
+          el("span", { class: "ak-chart__swatch" + (s.kind === "line" || s.kind === "area" ? " ak-chart__swatch--line" : "") }),
+          el("span", { text: s.label })
+        ]))
+      );
+      series.forEach((s, i) => {
+        const sw = legend.children[i] && legend.children[i].firstChild;
+        if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
+      });
+      root.appendChild(legend);
+    }
+    function wireTooltip(node, labels, series, along, slot2, rig) {
+      const tip = el("div", { class: "ak-chart__tip" });
+      root.appendChild(tip);
+      let shownAt = -1;
+      node.addEventListener("pointermove", (ev) => {
+        const box = node.getBoundingClientRect();
+        const sx = (ev.clientX - box.left) * (W / box.width);
+        const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot2)));
+        if (i !== shownAt) {
+          shownAt = i;
+          clear(tip);
+          tip.appendChild(el("div", { class: "ak-chart__tip-label", text: String(labels[i]) }));
+          series.forEach((s, si) => {
+            const row = el("div", { class: "ak-chart__tip-row" }, [
+              el("span", { class: "ak-chart__tip-swatch" }),
+              el("span", { text: s.label }),
+              el("b", { text: fmtTick(s.values[i] ?? 0) })
+            ]);
+            row.firstChild.style.background = SERIES_VARS[si % SERIES_VARS.length];
+            tip.appendChild(row);
+          });
+        }
+        const rootBox = root.getBoundingClientRect();
+        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
+        tip.style.top = `${box.top - rootBox.top + 6}px`;
+        rig.at(i, tip, Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2)));
+      });
+      node.addEventListener("pointerleave", () => {
+        shownAt = -1;
+        rig.hide(tip);
+      });
+    }
+    function noteBubble(node, note, labels, along, slot2) {
+      const i = labels.indexOf(note.label);
+      if (i < 0 || !note.text) return;
+      const bubble = el("div", { class: "ak-chart__note" }, [
+        el("span", { class: "ak-chart__note-label", text: String(note.label) }),
+        el("span", { text: String(note.text) })
+      ]);
+      root.appendChild(bubble);
+      requestAnimationFrame(() => {
+        const box = node.getBoundingClientRect();
+        const rootBox = root.getBoundingClientRect();
+        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
+        bubble.style.left = `${Math.max(8, Math.min(rootBox.width - bubble.offsetWidth - 8, px - bubble.offsetWidth / 2))}px`;
+        bubble.style.top = `${box.top - rootBox.top + 4}px`;
+      });
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: object|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/matrix.js
+  var TONES3 = ["ok", "warn", "err", "accent", "plain"];
+  function matrix(spec) {
+    const root = el("div", { class: "ak-root ak-matrix" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const cols = data && Array.isArray(data.cols) ? data.cols : [];
+      const rows = data && Array.isArray(data.rows) ? data.rows : [];
+      if (!cols.length || !rows.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      const table2 = el("table", { class: "ak-matrix__table" });
+      const head = el("tr", {}, [el("th", { class: "ak-matrix__corner", scope: "col" })]);
+      for (const col of cols) {
+        head.appendChild(el("th", { class: "ak-matrix__col", scope: "col", text: col.label }));
+      }
+      table2.appendChild(el("thead", {}, [head]));
+      const body = el("tbody", {});
+      for (const row of rows) {
+        const cellsByCol = new Map((row.cells || []).map((c) => [c.col, c]));
+        const tr = el("tr", {
+          class: "ak-matrix__row",
+          ...spec.onPick ? { tabindex: "0", role: "button" } : {}
+        });
+        const label = el("th", { class: "ak-matrix__label", scope: "row" }, [
+          el("span", { text: row.label }),
+          row.badge != null ? el("span", { class: "ak-badge ak-matrix__badge" + (row.tone ? " ak-matrix__cell--" + row.tone : ""), text: row.badge }) : null
+        ]);
+        tr.appendChild(label);
+        for (const col of cols) {
+          const cell = cellsByCol.get(col.id);
+          const tone = cell && TONES3.includes(cell.tone || "") ? cell.tone : cell ? "plain" : null;
+          tr.appendChild(el("td", { class: "ak-matrix__cell" }, [
+            tone === null ? null : el("span", {
+              class: "ak-matrix__chip ak-matrix__cell--" + tone,
+              text: cell && cell.label != null ? cell.label : "●",
+              ...cell && cell.label == null ? { "aria-label": tone } : {}
+            })
+          ]));
+        }
+        if (spec.onPick) {
+          const pick = () => spec.onPick(row);
+          tr.addEventListener("click", pick);
+          tr.addEventListener("keydown", (ev) => {
+            if (
+              /** @type {KeyboardEvent} */
+              ev.key === "Enter" || /** @type {KeyboardEvent} */
+              ev.key === " "
+            ) {
+              ev.preventDefault();
+              pick();
+            }
+          });
+        }
+        body.appendChild(tr);
+      }
+      table2.appendChild(body);
+      root.appendChild(el("div", { class: "ak-matrix__scroll" }, [table2]));
+      enter(root);
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: MatrixData|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/graph.js
+  var W2 = 720;
+  var H2 = 420;
+  var PAD2 = 46;
+  var PILL_H = 34;
+  var GUTTER = 4;
+  var LABEL_MAX = 24;
+  var SVG_NS5 = "http://www.w3.org/2000/svg";
+  function svg2(name, attrs) {
+    const node = document.createElementNS(SVG_NS5, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  function pillLabel(label) {
+    const text = String(label == null ? "" : label);
+    return text.length > LABEL_MAX ? text.slice(0, LABEL_MAX - 1) + "…" : text;
+  }
+  function pillWidth(label) {
+    return Math.min(Math.max(pillLabel(label).length * 7.6 + 26, 60), 190);
+  }
+  function clamp2(v, lo, hi) {
+    if (hi < lo) return (lo + hi) / 2;
+    return Math.min(Math.max(v, lo), hi);
+  }
+  function place(nodes, widths) {
+    const out = /* @__PURE__ */ new Map();
+    let widest = 0;
+    for (const w of widths.values()) widest = Math.max(widest, w);
+    const padX = Math.min(Math.max(PAD2, widest / 2 + GUTTER), W2 / 2 - GUTTER);
+    const padY = Math.max(PAD2, PILL_H / 2 + GUTTER);
+    const ringed = nodes.filter((n) => typeof n.x !== "number" || typeof n.y !== "number");
+    let ringIndex = 0;
+    for (const node of nodes) {
+      let x;
+      let y;
+      if (typeof node.x === "number" && typeof node.y === "number") {
+        x = padX + Math.min(Math.max(node.x, 0), 100) / 100 * (W2 - padX * 2);
+        y = padY + Math.min(Math.max(node.y, 0), 100) / 100 * (H2 - padY * 2);
+      } else {
+        const angle = 2 * Math.PI * ringIndex / Math.max(ringed.length, 1) - Math.PI / 2;
+        x = W2 / 2 + Math.cos(angle) * (W2 / 2 - padX);
+        y = H2 / 2 + Math.sin(angle) * (H2 / 2 - padY);
+        ringIndex++;
+      }
+      const half = (widths.get(node.id) || 60) / 2;
+      out.set(node.id, {
+        x: clamp2(x, half + GUTTER, W2 - half - GUTTER),
+        y: clamp2(y, PILL_H / 2 + GUTTER, H2 - PILL_H / 2 - GUTTER)
+      });
+    }
+    return out;
+  }
+  function graph(spec) {
+    const root = el("figure", { class: "ak-root ak-graph", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const nodes = data && Array.isArray(data.nodes) ? data.nodes.filter((n) => n && n.id) : [];
+      const edges = data && Array.isArray(data.edges) ? data.edges : [];
+      if (!nodes.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + nodes.map((n) => n.label).join(", "));
+      const widths = /* @__PURE__ */ new Map();
+      for (const item of nodes) widths.set(item.id, pillWidth(item.label));
+      const at3 = place(nodes, widths);
+      const node = svg2("svg", { viewBox: `0 0 ${W2} ${H2}`, class: "ak-graph__svg", "aria-hidden": "true" });
+      for (const edge of edges) {
+        const a = at3.get(edge.from);
+        const b = at3.get(edge.to);
+        if (!a || !b) continue;
+        node.appendChild(svg2("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "ak-graph__edge" }));
+        if (edge.label) {
+          const text = svg2("text", {
+            x: (a.x + b.x) / 2,
+            y: (a.y + b.y) / 2 - 5,
+            class: "ak-graph__edgelabel",
+            "text-anchor": "middle"
+          });
+          text.textContent = edge.label;
+          node.appendChild(text);
+        }
+      }
+      for (const item of nodes) {
+        const p = at3.get(item.id);
+        const width = widths.get(item.id);
+        const g = svg2("g", { class: "ak-graph__node ak-graph__node--" + (item.tone || "plain"), transform: `translate(${p.x}, ${p.y})` });
+        g.appendChild(svg2("rect", { x: -width / 2, y: -PILL_H / 2, width, height: PILL_H, rx: PILL_H / 2, class: "ak-graph__pill" }));
+        const label = svg2("text", { x: 0, y: 5, class: "ak-graph__label", "text-anchor": "middle" });
+        label.textContent = pillLabel(item.label);
+        g.appendChild(label);
+        if (spec.onPick) {
+          g.setAttribute("role", "button");
+          g.setAttribute("tabindex", "0");
+          g.addEventListener("click", () => spec.onPick(item));
+          g.addEventListener("keydown", (ev) => {
+            if (
+              /** @type {KeyboardEvent} */
+              ev.key === "Enter"
+            ) spec.onPick(item);
+          });
+        }
+        node.appendChild(g);
+      }
+      root.appendChild(node);
+      enter(root);
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: GraphData|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/waveform.js
+  var W3 = 720;
+  var H3 = 120;
+  var SVG_NS6 = "http://www.w3.org/2000/svg";
+  function svg3(name, attrs) {
+    const node = document.createElementNS(SVG_NS6, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  function waveform(spec) {
+    const root = el("figure", { class: "ak-root ak-waveform", role: "img" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const values = data && Array.isArray(data.values) ? data.values.filter((v) => typeof v === "number" && Number.isFinite(v)).map((v) => Math.max(v, 0)) : [];
+      if (!values.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      root.setAttribute("aria-label", spec.title || t("empty"));
+      const max = data && typeof data.max === "number" && data.max > 0 ? data.max : Math.max(...values, 1e-4);
+      const node = svg3("svg", { viewBox: `0 0 ${W3} ${H3}`, class: "ak-waveform__svg", "aria-hidden": "true", preserveAspectRatio: "none" });
+      const slot2 = W3 / values.length;
+      const barW = Math.max(Math.min(slot2 * 0.62, 14), 1.5);
+      values.forEach((v, i) => {
+        const half = Math.max(Math.min(v / max, 1) * (H3 - 8) / 2, 1.2);
+        const strength = Math.round(Math.min(v / max, 1) * 100);
+        node.appendChild(svg3("rect", {
+          x: i * slot2 + (slot2 - barW) / 2,
+          y: H3 / 2 - half,
+          width: barW,
+          height: half * 2,
+          rx: barW / 2,
+          class: "ak-waveform__bar",
+          style: `fill: color-mix(in oklab, var(--ak-accent) ${strength}%, var(--ak-ink-dim))`
+        }));
+      });
+      root.appendChild(node);
+    }
+    render(spec.data);
+    return {
+      el: root,
+      /** @param {{ data: { values: number[], max?: number }|null }} patch */
+      set(patch) {
+        if (!patch) return;
+        render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
+  // src/static/sdk-libs/atelier/scene3d.js
+  var threePromise = null;
+  function ensureThree() {
+    if (window.THREE && window.THREE.Addons) return Promise.resolve(window.THREE);
+    if (threePromise) return threePromise;
+    threePromise = new Promise(function(ok, fail) {
+      const s = document.createElement("script");
+      s.src = NODE_URL + "/lib/three-world@1.min.js";
+      s.onload = function() {
+        ok(window.THREE);
+      };
+      s.onerror = function() {
+        threePromise = null;
+        fail(new Error("three-world failed to load"));
+      };
+      document.head.appendChild(s);
+    });
+    return threePromise;
+  }
+  var loadersPromise = null;
+  function ensureLoaders() {
+    return ensureThree().then(function(THREE) {
+      if (THREE.Addons.GLTFLoader) return THREE;
+      if (loadersPromise) return loadersPromise;
+      loadersPromise = new Promise(function(ok, fail) {
+        const s = document.createElement("script");
+        s.src = NODE_URL + "/lib/three-world-loaders@1.min.js";
+        s.onload = function() {
+          ok(THREE);
+        };
+        s.onerror = function() {
+          loadersPromise = null;
+          fail(new Error("three-world-loaders failed to load"));
+        };
+        document.head.appendChild(s);
+      });
+      return loadersPromise;
+    });
+  }
+  function easeOut(x) {
+    return 1 - Math.pow(1 - x, 3);
+  }
+  function scene3d(spec) {
+    const kind = ["sky", "bars", "model", "globe"].indexOf(spec.kind) >= 0 ? spec.kind : "orb";
+    const root = el("figure", { class: "ak-root ak-scene", "data-ak-scene": kind });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    if (spec.title) root.appendChild(el("figcaption", { class: "ak-scene__title" }, spec.title));
+    const stage = el("div", { class: "ak-scene__stage" });
+    root.appendChild(stage);
+    const wait = skeleton({ target: stage, rows: 2 });
+    let destroyed = false;
+    let world = null;
+    (kind === "model" ? ensureLoaders() : ensureThree()).then(function(THREE) {
+      if (destroyed) return;
+      wait.destroy();
+      world = buildWorld(THREE, stage, kind, spec, root);
+      world.rebuild(spec.data || null);
+    }).catch(function() {
+      if (destroyed) return;
+      wait.destroy();
+      emptyState({
+        target: stage,
+        title: spec.empty && spec.empty.title || "3D is resting",
+        hint: spec.empty && spec.empty.hint || "The scene library could not load here."
+      });
+    });
+    return {
+      el: root,
+      set: function(patch) {
+        if (world && patch && "data" in patch) world.rebuild(patch.data || null);
+      },
+      destroy: function() {
+        destroyed = true;
+        if (world) world.dispose();
+        root.remove();
+      }
+    };
+  }
+  function buildWorld(THREE, stage, kind, spec, root) {
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    stage.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
+    const controls = new THREE.Addons.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = !reducedMotion();
+    controls.enablePan = false;
+    controls.enableZoom = kind === "bars" || kind === "model" || kind === "globe";
+    if (kind === "sky") {
+      controls.enableZoom = false;
+      controls.rotateSpeed = -0.35;
+    }
+    if (kind === "model") {
+      renderer.toneMappingExposure = 1.15;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new THREE.Addons.RoomEnvironment(), 0.04).texture;
+      const inkC = new THREE.Color(tokenColor(root, "--ak-ink"));
+      const bgC = new THREE.Color(tokenColor(root, "--ak-bg"));
+      const luma2 = (c) => c.r + c.g + c.b;
+      scene.background = luma2(inkC) < luma2(bgC) ? inkC : bgC;
+    }
+    let raf = 0;
+    let entranceUntil = 0;
+    let settleUntil = 0;
+    let disposed = false;
+    const clock = { start: 0 };
+    function frame2(now2) {
+      raf = 0;
+      if (disposed) return;
+      const entering = now2 < entranceUntil;
+      if (entering) {
+        const p = easeOut(Math.min(1, (now2 - clock.start) / (entranceUntil - clock.start)));
+        applyEntrance(p);
+      }
+      controls.update();
+      renderer.render(scene, camera);
+      if (entering || now2 < settleUntil) raf = requestAnimationFrame(frame2);
+    }
+    function wake(settleMs) {
+      settleUntil = Math.max(settleUntil, performance.now() + (settleMs || 0));
+      if (!raf) raf = requestAnimationFrame(frame2);
+    }
+    controls.addEventListener("start", function() {
+      wake(60 * 1e3);
+    });
+    controls.addEventListener("end", function() {
+      settleUntil = performance.now() + (controls.enableDamping ? 1600 : 0);
+    });
+    const ro = new ResizeObserver(function() {
+      const w = stage.clientWidth || 1;
+      const h = stage.clientHeight || 1;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      wake(0);
+    });
+    ro.observe(stage);
+    let group = new THREE.Group();
+    scene.add(group);
+    let applyEntrance = function() {
+    };
+    function disposeGroup() {
+      group.traverse(function(o) {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) {
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach(function(m) {
+            m.dispose();
+          });
+        }
+      });
+      scene.remove(group);
+      group = new THREE.Group();
+      scene.add(group);
+    }
+    function frameCamera(cols) {
+      if (kind === "model") {
+        camera.position.set(2.6, 1.7, 4.6);
+        controls.target.set(0, 1.1, 0);
+        controls.update();
+        return;
+      }
+      if (kind === "globe") {
+        camera.position.set(0, 2.4, 8.4);
+        controls.target.set(0, 0, 0);
+      } else if (kind === "sky") {
+        camera.position.set(0, 2, 0.5);
+        controls.target.set(0, 16, -22);
+      } else if (kind === "bars") {
+        camera.position.set(cols * 2.2, cols * 2, cols * 3.2);
+        controls.target.set(0, 1.4, 0);
+      } else {
+        camera.position.set(0, 1.2, 11.5);
+        controls.target.set(0, 0, 0);
+      }
+      controls.update();
+    }
+    function rebuild(data) {
+      disposeGroup();
+      const accent = tokenColor(root, "--ak-accent");
+      const ink3 = tokenColor(root, "--ak-ink");
+      const surface = tokenColor(root, "--ak-surface-2", "--ak-surface");
+      scene.fog = null;
+      let barCols = 3;
+      if (kind === "model") {
+        const url = data && data.url ? String(data.url) : "";
+        if (!url) {
+          applyEntrance = function() {
+          };
+          wake(0);
+          return;
+        }
+        const shimmer = skeleton({ target: stage, rows: 2 });
+        new THREE.Addons.GLTFLoader().load(url, function(gltf) {
+          shimmer.destroy();
+          const model = gltf.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const size = box.getSize(new THREE.Vector3());
+          const centre = box.getCenter(new THREE.Vector3());
+          const scale = 2.6 / Math.max(size.x, size.y, size.z, 1e-6);
+          model.scale.setScalar(scale);
+          model.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale);
+          group.add(model);
+          const c = document.createElement("canvas");
+          c.width = c.height = 128;
+          const g2 = c.getContext("2d");
+          const grad = g2.createRadialGradient(64, 64, 8, 64, 64, 64);
+          const channels = function(s) {
+            return (s.match(/\d+/g) || ["0", "0", "0"]).map(Number);
+          };
+          const inkCh = channels(ink3);
+          const surfCh = channels(surface);
+          const shadow = (inkCh[0] + inkCh[1] + inkCh[2] <= surfCh[0] + surfCh[1] + surfCh[2] ? inkCh : surfCh).map(function(v) {
+            return Math.round(v * 0.3);
+          }).join(",");
+          grad.addColorStop(0, "rgba(" + shadow + ",0.42)");
+          grad.addColorStop(1, "rgba(" + shadow + ",0)");
+          g2.fillStyle = grad;
+          g2.fillRect(0, 0, 128, 128);
+          const disc = new THREE.Mesh(
+            new THREE.PlaneGeometry(3.6, 3.6).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
+          );
+          disc.position.y = 1e-3;
+          group.add(disc);
+          applyEntrance = function(p) {
+            model.rotation.y = (1 - p) * 1.2;
+            model.position.y = -box.min.y * scale + (1 - p) * 0.35;
+          };
+          frameCamera(3);
+          clock.start = performance.now();
+          entranceUntil = reducedMotion() ? clock.start : clock.start + 900;
+          if (reducedMotion()) applyEntrance(1);
+          wake(reducedMotion() ? 0 : 950);
+        }, void 0, function() {
+          shimmer.destroy();
+          emptyState({
+            target: stage,
+            title: spec.empty && spec.empty.title || "3D is resting",
+            hint: spec.empty && spec.empty.hint || "The model could not load from its address."
+          });
+        });
+        applyEntrance = function() {
+        };
+        return;
+      }
+      if (kind === "globe") {
+        const R2 = 3;
+        const accentC = new THREE.Color(accent);
+        const inkC = new THREE.Color(ink3);
+        const surfaceC = new THREE.Color(surface);
+        const ball = new THREE.Group();
+        group.add(ball);
+        ball.add(new THREE.Mesh(
+          new THREE.SphereGeometry(R2 - 0.02, 48, 32),
+          new THREE.MeshStandardMaterial({ color: surfaceC.clone().lerp(inkC, 0.05), roughness: 0.9, metalness: 0.02 })
+        ));
+        ball.add(new THREE.Mesh(
+          new THREE.SphereGeometry(R2 * 1.045, 48, 32),
+          new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false })
+        ));
+        const gratMat = new THREE.LineBasicMaterial({ color: inkC, transparent: true, opacity: 0.22 });
+        const toV = function(lat, lon, r) {
+          return new THREE.Vector3().setFromSphericalCoords(
+            r || R2,
+            THREE.MathUtils.degToRad(90 - lat),
+            THREE.MathUtils.degToRad(lon + 180)
+          );
+        };
+        for (let lat = -60; lat <= 60; lat += 20) {
+          const pts = [];
+          for (let lon = 0; lon <= 360; lon += 6) pts.push(toV(lat, lon));
+          ball.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat));
+        }
+        for (let lon = 0; lon < 360; lon += 20) {
+          const pts = [];
+          for (let lat = -90; lat <= 90; lat += 6) pts.push(toV(lat, lon));
+          ball.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat));
+        }
+        const points = (data && Array.isArray(data.points) ? data.points : []).filter(function(p) {
+          return p && typeof p.lat === "number" && typeof p.lon === "number";
+        });
+        const dotGeo = new THREE.SphereGeometry(0.085, 12, 8);
+        const dotMat = new THREE.MeshBasicMaterial({ color: accentC });
+        for (const p of points) {
+          const dot = new THREE.Mesh(dotGeo, dotMat);
+          dot.position.copy(toV(p.lat, p.lon, R2 + 0.02));
+          ball.add(dot);
+        }
+        const routes = (data && Array.isArray(data.routes) ? data.routes : []).filter(function(r2) {
+          return r2 && Array.isArray(r2.from) && Array.isArray(r2.to);
+        });
+        const arcMat = new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.7 });
+        for (const r2 of routes) {
+          const a = toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, R2 + 0.02);
+          const b = toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, R2 + 0.02);
+          const sum = a.clone().add(b);
+          if (sum.lengthSq() < 1e-6) sum.set(0, R2, 0);
+          const lift = R2 + 0.25 + a.distanceTo(b) * 0.3;
+          const mid = sum.normalize().multiplyScalar(lift);
+          const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+          ball.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.025, 6, false), arcMat));
+        }
+        const centre = new THREE.Vector3();
+        for (const p of points) centre.add(toV(p.lat, p.lon, 1));
+        for (const r2 of routes) {
+          centre.add(toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, 1));
+          centre.add(toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, 1));
+        }
+        const baseY = centre.lengthSq() > 1e-6 ? -Math.atan2(centre.x, centre.z) : 0;
+        ball.rotation.y = baseY;
+        applyEntrance = function(p) {
+          ball.rotation.y = baseY + (1 - p) * 1.4;
+          ball.scale.setScalar(0.6 + 0.4 * p);
+        };
+      } else if (kind === "sky") {
+        const sky = new THREE.Addons.Sky();
+        sky.scale.setScalar(300);
+        group.add(sky);
+        const dark = root.closest('[data-theme="dark"]') !== null || matchMedia("(prefers-color-scheme: dark)").matches && root.closest('[data-theme="light"]') === null;
+        const elevation = dark ? 1.6 : 18;
+        const phi = THREE.MathUtils.degToRad(90 - elevation);
+        const theta = THREE.MathUtils.degToRad(160);
+        const sun = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
+        sky.material.uniforms.sunPosition.value.copy(sun);
+        sky.material.uniforms.turbidity.value = dark ? 6 : 8;
+        sky.material.uniforms.rayleigh.value = dark ? 0.6 : 2.2;
+        applyEntrance = function() {
+        };
+      } else if (kind === "bars") {
+        const items = data && data.items || [];
+        const n = Math.min(items.length, 64);
+        if (n === 0) {
+          applyEntrance = function() {
+          };
+        } else {
+          const max = items.reduce(function(m, it) {
+            return Math.max(m, Number(it.value) || 0);
+          }, 0) || 1;
+          const box = new THREE.BoxGeometry(0.8, 1, 0.8);
+          box.translate(0, 0.5, 0);
+          const mat = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.08 });
+          const mesh = new THREE.InstancedMesh(box, mat, n);
+          const cols = Math.ceil(Math.sqrt(n));
+          barCols = cols;
+          const accentC = new THREE.Color(accent);
+          const surfaceC = new THREE.Color(surface);
+          const heights = [];
+          const m4 = new THREE.Matrix4();
+          for (let i = 0; i < n; i++) {
+            const h = 0.15 + 4.6 * ((Number(items[i].value) || 0) / max);
+            heights.push(h);
+            const x = (i % cols - (cols - 1) / 2) * 1.15;
+            const z = (Math.floor(i / cols) - (Math.ceil(n / cols) - 1) / 2) * 1.15;
+            m4.makeScale(1, 1e-3, 1).setPosition(x, 0, z);
+            mesh.setMatrixAt(i, m4);
+            mesh.setColorAt(i, surfaceC.clone().lerp(accentC, 0.25 + 0.75 * (heights[i] / 4.75)));
+          }
+          if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+          group.add(mesh);
+          const ground = new THREE.Mesh(
+            new THREE.CylinderGeometry(cols * 0.95 + 1, cols * 0.95 + 1, 0.12, 48),
+            new THREE.MeshStandardMaterial({ color: new THREE.Color(surface), roughness: 0.9 })
+          );
+          ground.position.y = -0.06;
+          group.add(ground);
+          applyEntrance = function(p) {
+            const v = new THREE.Matrix4();
+            for (let i = 0; i < n; i++) {
+              mesh.getMatrixAt(i, v);
+              const pos = new THREE.Vector3().setFromMatrixPosition(v);
+              v.makeScale(1, Math.max(1e-3, heights[i] * p), 1).setPosition(pos.x, 0, pos.z);
+              mesh.setMatrixAt(i, v);
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+          };
+        }
+      } else {
+        const geo = new THREE.IcosahedronGeometry(3.1, 1);
+        const body = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+          color: new THREE.Color(accent),
+          flatShading: true,
+          roughness: 0.35,
+          metalness: 0.15
+        }));
+        const frame3 = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geo),
+          new THREE.LineBasicMaterial({ color: new THREE.Color(ink3), transparent: true, opacity: 0.35 })
+        );
+        group.add(body, frame3);
+        applyEntrance = function(p) {
+          const s = 0.25 + 0.75 * p;
+          group.scale.setScalar(s);
+          group.rotation.y = (1 - p) * 0.9;
+        };
+      }
+      if (kind !== "sky") {
+        const sun = new THREE.DirectionalLight();
+        sun.intensity = 2.2;
+        sun.position.set(4, 8, 6);
+        const fill2 = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink3), 0.7);
+        group.add(sun, fill2);
+      }
+      frameCamera(barCols);
+      clock.start = performance.now();
+      entranceUntil = reducedMotion() ? clock.start : clock.start + 750;
+      if (reducedMotion()) applyEntrance(1);
+      wake(reducedMotion() ? 0 : 800);
+    }
+    return {
+      rebuild,
+      dispose: function() {
+        if (disposed) return;
+        disposed = true;
+        if (raf) cancelAnimationFrame(raf);
+        ro.disconnect();
+        controls.dispose();
+        disposeGroup();
+        renderer.dispose();
+        renderer.forceContextLoss();
+        clear(stage);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/disclose.js
+  function slideOpen(panel, opening, span, ease) {
+    if (reducedMotion() || typeof panel.animate !== "function") {
+      panel.style.height = opening ? "auto" : "0px";
+      return;
+    }
+    const from = panel.getBoundingClientRect().height;
+    panel.style.height = "auto";
+    const to = opening ? panel.getBoundingClientRect().height : 0;
+    panel.style.height = from + "px";
+    const anim = panel.animate(
+      [{ height: from + "px", opacity: opening ? 0.4 : 1 }, { height: to + "px", opacity: opening ? 1 : 0.4 }],
+      { duration: span, easing: ease }
+    );
+    const settle4 = function() {
+      panel.style.height = opening ? "auto" : "0px";
+    };
+    anim.onfinish = settle4;
+    anim.oncancel = settle4;
+  }
+  function reveal(spec) {
+    const root = el("div", { class: "ak-root ak-reveal" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const single = spec.mode !== "many";
+    const panes = /* @__PURE__ */ new Map();
+    function motion() {
+      const cs = getComputedStyle(root);
+      return {
+        span: parseFloat(cs.getPropertyValue("--ak-motion")) || 200,
+        ease: (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)"
+      };
+    }
+    function setOpen(id, want) {
+      const pane = panes.get(id);
+      if (!pane) return;
+      const isOpen = pane.head.getAttribute("aria-expanded") === "true";
+      if (isOpen === want) return;
+      const { span, ease } = motion();
+      if (want && single) {
+        for (const [otherId, other] of panes) {
+          if (otherId !== id && other.head.getAttribute("aria-expanded") === "true") {
+            other.head.setAttribute("aria-expanded", "false");
+            slideOpen(other.panel, false, span, ease);
+          }
+        }
+      }
+      pane.head.setAttribute("aria-expanded", String(want));
+      slideOpen(pane.panel, want, span, ease);
+    }
+    function render(items) {
+      clear(root);
+      panes.clear();
+      const openIds = spec.open || [];
+      for (const item of items) {
+        const panelId = "ak-rv-" + uid();
+        const headId = panelId + "-h";
+        const startOpen = openIds.indexOf(item.id) >= 0;
+        const head = el("button", {
+          type: "button",
+          class: "ak-reveal__head",
+          id: headId,
+          "aria-expanded": String(startOpen),
+          "aria-controls": panelId,
+          on: {
+            click: function() {
+              setOpen(item.id, head.getAttribute("aria-expanded") !== "true");
+            }
+          }
+        }, [
+          el("span", { class: "ak-reveal__titles" }, [
+            el("span", { class: "ak-reveal__title", text: item.title }),
+            item.sub != null ? el("span", { class: "ak-reveal__sub", text: item.sub }) : null
+          ]),
+          el("span", { class: "ak-reveal__chevron", "aria-hidden": "true" }, "⌄")
+        ]);
+        const panel = el("div", {
+          class: "ak-reveal__panel",
+          id: panelId,
+          role: "region",
+          "aria-labelledby": headId
+        });
+        const inner = el("div", { class: "ak-reveal__inner" });
+        if (item.text) inner.appendChild(el("p", { class: "ak-reveal__text", text: item.text }));
+        if (item.body) item.body(inner);
+        panel.appendChild(inner);
+        panel.style.height = startOpen ? "auto" : "0px";
+        root.appendChild(el("div", { class: "ak-reveal__pane" }, [head, panel]));
+        panes.set(item.id, { head, panel });
+      }
+      enter(root);
+    }
+    render(spec.items || []);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && patch.items) render(patch.items);
+      },
+      open(id) {
+        setOpen(id, true);
+      },
+      close(id) {
+        setOpen(id, false);
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function drawer(spec) {
+    const side = spec.side === "right" ? "right" : spec.side === "bottom" ? "bottom" : "left";
+    const node = (
+      /** @type {HTMLDialogElement} */
+      el("dialog", {
+        class: "ak-root ak-drawer ak-drawer--" + side,
+        "aria-label": spec.title || t("menu")
+      })
+    );
+    const panel = el("div", { class: "ak-drawer__panel" });
+    const head = el("div", { class: "ak-drawer__head" }, [
+      el("span", { class: "ak-drawer__title", text: spec.title || t("menu") }),
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost ak-drawer__x",
+        "aria-label": t("close"),
+        on: { click: function() {
+          close();
+        } }
+      }, "✕")
+    ]);
+    panel.appendChild(head);
+    const list3 = el("nav", { class: "ak-drawer__list" });
+    for (const item of spec.items || []) {
+      list3.appendChild(el("button", {
+        type: "button",
+        class: "ak-drawer__item",
+        ...item.current ? { "aria-current": "page" } : {},
+        on: {
+          click: function() {
+            if (spec.onPick) spec.onPick(item.id);
+            close();
+          }
+        }
+      }, [
+        el("span", { class: "ak-drawer__label", text: item.label }),
+        item.sub != null ? el("span", { class: "ak-drawer__sub", text: item.sub }) : null
+      ]));
+    }
+    if ((spec.items || []).length) panel.appendChild(list3);
+    if (spec.body) {
+      const host = el("div", { class: "ak-drawer__body" });
+      spec.body(host);
+      panel.appendChild(host);
+    }
+    node.appendChild(panel);
+    document.body.appendChild(wearLook(node, document.activeElement));
+    const travel3 = side === "bottom" ? "0, 100%" : side === "right" ? "100%, 0" : "-100%, 0";
+    function motion() {
+      const cs = getComputedStyle(node);
+      return {
+        span: parseFloat(cs.getPropertyValue("--ak-motion")) || 200,
+        ease: (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)"
+      };
+    }
+    function open() {
+      if (node.open) return;
+      node.showModal();
+      if (reducedMotion() || typeof panel.animate !== "function") return;
+      const { span, ease } = motion();
+      panel.animate(
+        [{ transform: "translate(" + travel3 + ")" }, { transform: "none" }],
+        { duration: span * 1.4, easing: ease }
+      );
+    }
+    function close() {
+      if (!node.open) return;
+      const done = function() {
+        if (node.open) node.close();
+        if (spec.onClose) spec.onClose();
+      };
+      if (reducedMotion() || typeof panel.animate !== "function") return done();
+      const { span, ease } = motion();
+      const anim = panel.animate(
+        [{ transform: "none" }, { transform: "translate(" + travel3 + ")" }],
+        { duration: span, easing: ease }
+      );
+      anim.onfinish = done;
+      anim.oncancel = done;
+    }
+    node.addEventListener("cancel", function(ev) {
+      ev.preventDefault();
+      close();
+    });
+    node.addEventListener("click", function(ev) {
+      if (ev.target === node) close();
+    });
+    return {
+      el: node,
+      open,
+      close,
+      destroy() {
+        if (node.open) node.close();
+        if (node.parentNode) node.parentNode.removeChild(node);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/mosaic-bind.js
+  function patchFor(kind, data) {
+    if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
+    if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
+    if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
+    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule" || kind === "steps" || kind === "rating" || kind === "crt" || kind === "ring" || kind === "crew" || kind === "poll" || kind === "thread" || kind === "calendar" || kind === "priceTable" || kind === "facets") {
+      return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
+    }
+    if (kind === "health" || kind === "queue") {
+      return { data: { items: Array.isArray(data) ? data : data && data.items || [] } };
+    }
+    return { items: Array.isArray(data) ? data : [] };
+  }
+  function derivedColumns(rows) {
+    if (!rows.length) return [];
+    return Object.keys(rows[0]).filter(function(key) {
+      return key !== "id";
+    }).map(function(key) {
+      return { key, label: key, sortable: true };
+    });
+  }
+  var LIVE_MIN_INTERVAL_MS = 4e3;
+  var LIVE_DEFAULT_INTERVAL_MS = 8e3;
+  function wireLive(spec, refresh) {
+    const live = spec.live;
+    if (!live || typeof live !== "object") return function() {
+    };
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    if (!ns || !ns.live || typeof ns.live.subscribe !== "function") return function() {
+    };
+    const offs = [];
+    for (const name of Object.keys(live)) {
+      const conf = live[name] || {};
+      const domains = Array.isArray(conf.domains) && conf.domains.length ? conf.domains : ["memory"];
+      const wantsMemory = domains.indexOf("memory") >= 0;
+      if (wantsMemory && !conf.keyPrefix) {
+        console.warn('aimeat-atelier: live source "' + name + '" subscribes to memory without a keyPrefix — refused (that would re-fetch on every write anyone makes).');
+        continue;
+      }
+      const minIntervalMs = Math.max(Number(conf.minIntervalMs) || LIVE_DEFAULT_INTERVAL_MS, LIVE_MIN_INTERVAL_MS);
+      offs.push(ns.live.subscribe(domains, function() {
+        refresh(name);
+      }, {
+        keyPrefix: conf.keyPrefix,
+        minIntervalMs
+      }));
+    }
+    return function() {
+      for (const off of offs) {
+        try {
+          off();
+        } catch {
+        }
+      }
+    };
+  }
+
+  // src/static/sdk-libs/_core/public-fetch.js
+  var signedInOnly = false;
+  function sessionJwt() {
+    const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
+    const s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+    return s && s.jwt || null;
+  }
+  function withSession(init, jwt) {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", "Bearer " + jwt);
+    return { ...init, headers };
+  }
+  async function publicFetch(url, init = {}) {
+    const early = signedInOnly ? sessionJwt() : null;
+    const r = await fetch(url, early ? withSession(init, early) : init);
+    if (r.status !== 401 || early) return r;
+    if (!(r.headers.get("content-type") || "").includes("json")) return r;
+    const body = await r.clone().json();
+    if (!body || !body.error || body.error.code !== "SIGN_IN_REQUIRED") return r;
+    signedInOnly = true;
+    const jwt = sessionJwt();
+    return jwt ? fetch(url, withSession(init, jwt)) : r;
+  }
+
+  // src/static/sdk-libs/_core/app-ref.js
+  function appRef() {
+    try {
+      const node = document.getElementById("aimeat-app-ref");
+      if (!node) return null;
+      const raw = node.textContent || "";
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
+      }
+      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // src/static/sdk-libs/atelier/mosaic-layout.js
+  async function loadLayout(owner, filename) {
+    try {
+      const base = APEX_URL || "";
+      const res = await publicFetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui?catalogue=none");
+      if (!res.ok) return null;
+      const body = await res.json();
+      return body && body.data && body.data.layout || null;
+    } catch {
+      return null;
+    }
+  }
+  function labelOf(block) {
+    const p = block.props || {};
+    return p.title || p.caption || block.component;
+  }
+  function applyViewerOverlay(layout, o) {
+    if (!o) return layout;
+    const out = {
+      v: layout.v,
+      look: layout.look,
+      nav: o.nav || layout.nav,
+      choreography: layout.choreography,
+      tokens: layout.tokens,
+      ambient: layout.ambient,
+      meta: layout.meta,
+      blocks: layout.blocks.slice()
+    };
+    if (Array.isArray(o.hidden) && o.hidden.length) {
+      out.blocks = out.blocks.filter(function(b) {
+        return o.hidden.indexOf(b.id) < 0;
+      });
+    }
+    if (Array.isArray(o.order) && o.order.length) {
+      out.blocks.sort(function(a, b) {
+        const ia = o.order.indexOf(a.id);
+        const ib = o.order.indexOf(b.id);
+        return (ia < 0 ? o.order.length : ia) - (ib < 0 ? o.order.length : ib);
+      });
+    }
+    return out;
+  }
+
+  // src/static/sdk-libs/atelier/aide.js
+  var SOURCE_CHARS_MAX = 2e3;
+  var CONTEXT_CHARS_MAX = 8e3;
+  var PANEL_BLOCKS_MAX = 8;
+  var HISTORY_TURNS = 12;
+  var ANSWER_SCHEMA = {
+    type: "object",
+    properties: {
+      reply: { type: "string" },
+      action: {
+        type: "object",
+        properties: { id: { type: "string" }, params: { type: "object" } },
+        required: ["id"]
+      },
+      panel: { type: "object" }
+    },
+    required: ["reply"]
+  };
+  function aide(spec) {
+    const s = spec || {};
+    const history = [];
+    let firstSend = true;
+    const log = el("div", { class: "ak-aide__log", role: "log", "aria-live": "polite" });
+    const input = (
+      /** @type {HTMLTextAreaElement} */
+      el("textarea", {
+        class: "ak-input ak-input--area ak-aide__input",
+        rows: 2,
+        placeholder: t("aidePlaceholder"),
+        "aria-label": t("aidePlaceholder")
+      })
+    );
+    const sendBtn = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--primary",
+      on: { click: function() {
+        send2();
+      } }
+    }, t("send"));
+    input.addEventListener("keydown", function(ev) {
+      if (ev.key === "Enter" && !ev.shiftKey) {
+        ev.preventDefault();
+        send2();
+      }
+    });
+    const notice = el("p", { class: "ak-aide__notice" });
+    const root = el("section", { class: "ak-root ak-aide", "aria-label": "Aide" }, [
+      el("header", { class: "ak-aide__head" }, [
+        el("h2", { class: "ak-section__title", text: t("aideTitle") }),
+        notice
+      ]),
+      log,
+      el("div", { class: "ak-aide__row" }, [input, sendBtn])
+    ]);
+    if (s.target) resolve(s.target).appendChild(root);
+    enter(root);
+    const aiNs = (
+      /** @type {any} */
+      window.AIMEAT && /** @type {any} */
+      window.AIMEAT.ai
+    );
+    if (aiNs && typeof aiNs.chatNotice === "function") {
+      try {
+        aiNs.chatNotice({ target: notice });
+      } catch (err) {
+        console.warn("aimeat-atelier: the AI notice did not render", err);
+      }
+    } else {
+      notice.textContent = t("aideNotice");
+    }
+    if (s.intro) bubble("assistant", s.intro, null);
+    function bubble(who, text, provenance) {
+      const b = el("div", { class: "ak-aide__msg ak-aide__msg--" + who }, [
+        el("p", { class: "ak-aide__text", text })
+      ]);
+      if (who === "assistant" && provenance && aiNs && typeof aiNs.disclose === "function") {
+        const tag = el("span", { class: "ak-aide__label" });
+        b.appendChild(tag);
+        try {
+          aiNs.disclose(provenance, { target: tag });
+        } catch (err) {
+          console.warn("aimeat-atelier: the provenance label did not render", err);
+        }
+      }
+      log.appendChild(b);
+      log.scrollTop = log.scrollHeight;
+      return b;
+    }
+    async function contextText() {
+      const parts = [];
+      const names = Object.keys(s.sources || {});
+      let budget = CONTEXT_CHARS_MAX;
+      for (const name of names) {
+        if (budget <= 0) break;
+        let data;
+        try {
+          data = await Promise.resolve().then(s.sources[name]);
+        } catch (err) {
+          console.warn('aimeat-atelier: aide source "' + name + '" failed', err);
+          continue;
+        }
+        const chunk = JSON.stringify(data).slice(0, Math.min(SOURCE_CHARS_MAX, budget));
+        budget -= chunk.length;
+        parts.push("SOURCE " + name + ": " + chunk);
+      }
+      return parts.join("\n");
+    }
+    function actionsText() {
+      const list3 = s.actions || [];
+      if (!list3.length) return "This app declares no actions: answer with words only.";
+      return "ACTIONS you may propose (a person confirms before anything runs):\n" + list3.map(function(a) {
+        const params = a.params ? " params: " + JSON.stringify(a.params) : "";
+        return '- id "' + a.id + '": ' + a.summary + params;
+      }).join("\n");
+    }
+    async function send2() {
+      const text = input.value.trim();
+      if (!text) return;
+      if (!aiNs || typeof aiNs.completeJson !== "function") {
+        bubble("assistant", t("aideNoAi"), null);
+        return;
+      }
+      const available = await aiNs.isAvailable().catch(function() {
+        return false;
+      });
+      if (!available) {
+        bubble("assistant", t("aideNoAi"), null);
+        return;
+      }
+      input.value = "";
+      bubble("user", text, null);
+      history.push({ who: "user", text });
+      const thinking = bubble("assistant", "…", null);
+      const prompt2 = [
+        'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
+        "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
+        'Answer as JSON: { "reply": "<plain words for the person>", "action"?: { "id", "params" }, "panel"?: { "blocks": [...] } when a visual answer helps }.',
+        'A panel block is exactly { "id": "<short-slug>", "component": "<one of: list, statRow, table, timeline, figure, cardGrid>", "props": { "source": "<one of the SOURCE names below>", "title": "<a heading>" } } — no other component names, and only source names that appear below.',
+        actionsText(),
+        "DATA the screen shows right now:",
+        await contextText(),
+        "CONVERSATION so far:",
+        history.slice(-HISTORY_TURNS).map(function(h) {
+          return h.who + ": " + h.text;
+        }).join("\n")
+      ].join("\n\n");
+      let out;
+      try {
+        out = await aiNs.completeJson({
+          prompt: prompt2,
+          schema: ANSWER_SCHEMA,
+          app_id: s.appId || s.appName || "atelier-aide",
+          confirm: firstSend
+        });
+        firstSend = false;
+      } catch (err) {
+        thinking.remove();
+        const code = err && /** @type {any} */
+        err.code;
+        bubble("assistant", code === "SPEND_CANCELLED" ? t("cancel") + "." : t("aideFailed"), null);
+        return;
+      }
+      thinking.remove();
+      const body = out && out.data ? out.data : out;
+      const answer = body && body.parsed ? body.parsed : body;
+      const reply = answer && typeof answer.reply === "string" ? answer.reply : t("aideFailed");
+      const b = bubble("assistant", reply, body && body.provenance || out && out.provenance || null);
+      history.push({ who: "assistant", text: reply });
+      if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
+      if (answer && answer.panel) renderPanel(answer.panel, b);
+    }
+    function offerAction(proposed, into) {
+      const declared2 = (s.actions || []).find(function(a) {
+        return a.id === proposed.id;
+      });
+      if (!declared2) {
+        into.appendChild(el("p", { class: "ak-aide__text", text: t("aideUnknownAction") }));
+        return;
+      }
+      const row = el("div", { class: "ak-aide__confirm" }, [
+        el("span", { text: declared2.summary }),
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--primary",
+          on: { click: async function() {
+            clear(row);
+            row.appendChild(el("span", { text: "…" }));
+            try {
+              const result = await Promise.resolve(declared2.run ? declared2.run(proposed.params || {}) : null);
+              clear(row);
+              row.appendChild(el("span", { text: typeof result === "string" ? result : t("ready") }));
+            } catch (err) {
+              clear(row);
+              row.appendChild(el("span", { text: t("aideFailed") + " " + String(err && /** @type {any} */
+              err.message || "") }));
+            }
+          } }
+        }, t("aideRun")),
+        el("button", {
+          type: "button",
+          class: "ak-btn ak-btn--ghost",
+          on: { click: function() {
+            row.remove();
+          } }
+        }, t("cancel"))
+      ]);
+      into.appendChild(row);
+    }
+    function renderPanel(panel, into) {
+      if (!panel || !Array.isArray(panel.blocks) || panel.blocks.length === 0 || panel.blocks.length > PANEL_BLOCKS_MAX) return;
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      if (!ns || !ns.atelier || typeof ns.atelier.mosaic !== "function") return;
+      const host = el("div", { class: "ak-aide__panel" });
+      into.appendChild(host);
+      try {
+        const handle2 = ns.atelier.mosaic({ target: host, layout: { v: 1, blocks: panel.blocks }, sources: s.sources || {} });
+        root.addEventListener("ak-destroy", function() {
+          handle2.destroy();
+        }, { once: true });
+      } catch (err) {
+        console.warn("aimeat-atelier: a generated panel did not render — the words above stand alone.", err);
+        host.remove();
+      }
+    }
+    return {
+      el: root,
+      open() {
+        input.focus();
+      },
+      destroy() {
+        root.dispatchEvent(new Event("ak-destroy"));
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/mosaic-canvas.js
+  var CANVAS_MIN = 0.35;
+  var CANVAS_MAX = 1.6;
+  var CANVAS_STEP = 1.18;
+  function projectCanvas(units, morph3) {
+    const field = el("div", { class: "ak-mosaic__field" });
+    const cam = { x: 0, y: 0, scale: 0.6 };
+    let focused = null;
+    function apply2() {
+      field.style.transform = "translate(" + cam.x + "px," + cam.y + "px) scale(" + cam.scale + ")";
+    }
+    const viewport = el("div", { class: "ak-mosaic__canvas" }, field);
+    units.forEach(function(u) {
+      const cover = el("button", {
+        type: "button",
+        class: "ak-mosaic__tilecover",
+        "data-ak-noguard": true,
+        "aria-label": t("open") + ": " + u.label,
+        on: { click: function() {
+          focus(u);
+        } }
+      });
+      u.tile = el("div", { class: "ak-mosaic__tile" }, [
+        el("span", { class: "ak-mosaic__tilelabel", text: u.label }),
+        u.el,
+        cover
+      ]);
+      field.appendChild(u.tile);
+    });
+    const focusHost = el("div", { class: "ak-mosaic__focus", hidden: true });
+    const backBtn = el("button", {
+      type: "button",
+      class: "ak-btn ak-btn--ghost",
+      "data-ak-noguard": true,
+      on: { click: function() {
+        unfocus();
+      } }
+    }, "↩ " + t("back"));
+    function focus(u) {
+      morph3(u.el, function() {
+        focused = u;
+        focusHost.hidden = false;
+        viewport.hidden = true;
+        zoombar.hidden = true;
+        clear(focusHost);
+        focusHost.appendChild(backBtn);
+        focusHost.appendChild(u.el);
+        enter(focusHost);
+      });
+    }
+    function unfocus() {
+      if (!focused) return;
+      const u = focused;
+      morph3(u.el, function() {
+        focused = null;
+        u.tile.insertBefore(u.el, u.tile.lastChild);
+        focusHost.hidden = true;
+        viewport.hidden = false;
+        zoombar.hidden = false;
+      });
+    }
+    let drag2 = null;
+    viewport.addEventListener("pointerdown", function(ev) {
+      const at3 = (
+        /** @type {Element|null} */
+        ev.target instanceof Element ? ev.target : null
+      );
+      if (at3 && at3.closest(".ak-mosaic__tilecover")) return;
+      drag2 = { x: ev.clientX, y: ev.clientY };
+      viewport.setPointerCapture(ev.pointerId);
+    });
+    viewport.addEventListener("pointermove", function(ev) {
+      if (!drag2) return;
+      cam.x += ev.clientX - drag2.x;
+      cam.y += ev.clientY - drag2.y;
+      drag2 = { x: ev.clientX, y: ev.clientY };
+      apply2();
+    });
+    viewport.addEventListener("pointerup", function() {
+      drag2 = null;
+    });
+    viewport.addEventListener("wheel", function(ev) {
+      ev.preventDefault();
+      const factor = ev.deltaY < 0 ? CANVAS_STEP : 1 / CANVAS_STEP;
+      const next = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
+      const rect = viewport.getBoundingClientRect();
+      const px = ev.clientX - rect.left;
+      const py = ev.clientY - rect.top;
+      cam.x = px - (px - cam.x) * (next / cam.scale);
+      cam.y = py - (py - cam.y) * (next / cam.scale);
+      cam.scale = next;
+      apply2();
+    }, { passive: false });
+    function zoomBtn(label, aria, factor) {
+      return el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        "aria-label": aria,
+        "data-ak-noguard": true,
+        on: {
+          click: function() {
+            cam.scale = factor === 0 ? 0.6 : Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
+            if (factor === 0) {
+              cam.x = 0;
+              cam.y = 0;
+            }
+            apply2();
+          }
+        }
+      }, label);
+    }
+    const zoombar = el("div", { class: "ak-mosaic__zoombar" }, [
+      zoomBtn("−", t("zoomOut"), 1 / CANVAS_STEP),
+      zoomBtn("⤢", t("fitView"), 0),
+      zoomBtn("+", t("zoomIn"), CANVAS_STEP)
+    ]);
+    apply2();
+    return el("div", { class: "ak-mosaic__canvaswrap" }, [viewport, zoombar, focusHost]);
+  }
+
+  // src/static/sdk-libs/atelier/mosaic-projections.js
+  var PINNED = ["position", "box-sizing", "margin", "top", "left", "width", "height"];
+  function unitSwapper(box, units, live) {
+    let epoch = 0;
+    const restore = function() {
+      const on2 = live();
+      for (const u of units) {
+        for (const name of PINNED) u.el.style.removeProperty(name);
+        u.el.hidden = u.el !== on2;
+        box.appendChild(u.el);
+      }
+    };
+    return function(from, to, settle4) {
+      if (from === to) {
+        to.hidden = false;
+        settle4();
+        return;
+      }
+      if (typeof document.startViewTransition === "function" && !reducedMotion()) {
+        transition(function() {
+          from.hidden = true;
+          to.hidden = false;
+          settle4();
+        });
+        return;
+      }
+      if (reducedMotion()) {
+        from.hidden = true;
+        to.hidden = false;
+        settle4();
+        return;
+      }
+      to.hidden = false;
+      if (to.parentNode) to.parentNode.removeChild(to);
+      const mine = ++epoch;
+      const move = panelTransition(from, to, "crossfade");
+      settle4();
+      const tidy = function() {
+        if (mine === epoch) restore();
+      };
+      move.then(tidy, tidy);
+    };
+  }
+  function projectStack(units, alive) {
+    const box = el("div", { class: "ak-mosaic__units ak-mosaic__units--grid" });
+    for (const u of units) {
+      u.el.classList.add("ak-mosaic__unit--" + (u.block.span || "full"));
+      box.appendChild(u.el);
+    }
+    if (!reducedMotion() && typeof IntersectionObserver === "function") {
+      const io = new IntersectionObserver(function(entries) {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("ak-reveal--in");
+            io.unobserve(entry.target);
+          }
+        }
+      }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
+      for (const u of units) {
+        u.el.classList.add("ak-reveal");
+        io.observe(u.el);
+      }
+      alive.cleanup.push(function() {
+        io.disconnect();
+      });
+    }
+    return box;
+  }
+  function projectOverlay(units, alive) {
+    const box = el("div", { class: "ak-mosaic__units" });
+    for (const u of units) {
+      u.el.hidden = true;
+      box.appendChild(u.el);
+    }
+    let current2 = 0;
+    let open = false;
+    const items = [];
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
+    const heading = el("h2", { class: "ak-mosaic__unittitle" });
+    const panel = el("div", {
+      class: "ak-mosaic__overlay",
+      role: "dialog",
+      "aria-label": t("menu"),
+      on: { click: function(ev) {
+        if (ev.target === panel) close();
+      } }
+    });
+    panel.hidden = true;
+    const trigger = el("button", {
+      type: "button",
+      class: "ak-mosaic__overlaytrigger",
+      "aria-expanded": "false",
+      "data-ak-noguard": true,
+      on: { click: function() {
+        if (open) {
+          close();
+        } else {
+          show();
+        }
+      } }
+    }, t("menu"));
+    const closeBtn = el("button", {
+      type: "button",
+      class: "ak-mosaic__overlayclose",
+      "aria-label": t("close"),
+      "data-ak-noguard": true,
+      on: { click: function() {
+        close();
+      } }
+    }, "×");
+    panel.appendChild(closeBtn);
+    function mark() {
+      items.forEach(function(btn, i) {
+        btn.classList.toggle("ak-mosaic__overlayitem--on", i === current2);
+        if (i === current2) btn.setAttribute("aria-current", "true");
+        else btn.removeAttribute("aria-current");
+      });
+      heading.textContent = units[current2] ? units[current2].label : "";
+    }
+    function show(index) {
+      if (typeof index === "number") {
+        swap(units[current2].el, units[index].el, function() {
+          current2 = index;
+          mark();
+          enter(units[current2].el);
+        });
+        close();
+        return;
+      }
+      open = true;
+      panel.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      enter(panel);
+      const on2 = (
+        /** @type {HTMLElement|null} */
+        panel.querySelector(".ak-mosaic__overlayitem--on") || panel.querySelector("button")
+      );
+      if (on2) on2.focus();
+    }
+    function close() {
+      open = false;
+      panel.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      trigger.focus();
+    }
+    function onKey(ev) {
+      if (ev.key === "Escape" && open) close();
+    }
+    document.addEventListener("keydown", onKey);
+    alive.cleanup.push(function() {
+      document.removeEventListener("keydown", onKey);
+    });
+    units.forEach(function(u, i) {
+      const btn = el("button", {
+        type: "button",
+        class: "ak-mosaic__overlayitem",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          show(i);
+        } }
+      }, [
+        el("span", { class: "ak-mosaic__overlaynum", text: String(i + 1).padStart(2, "0") }),
+        u.label
+      ]);
+      items.push(btn);
+      panel.appendChild(btn);
+    });
+    if (units.length) units[0].el.hidden = false;
+    mark();
+    return el("div", { class: "ak-mosaic__overlaywrap" }, [
+      el("div", { class: "ak-mosaic__overlaybar" }, [heading, trigger]),
+      box,
+      panel
+    ]);
+  }
+  function projectRail(units) {
+    const box = el("div", { class: "ak-mosaic__units" });
+    for (const u of units) {
+      u.el.hidden = true;
+      box.appendChild(u.el);
+    }
+    let current2 = 0;
+    const items = [];
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
+    function show(index) {
+      if (index === current2 && !units[index].el.hidden) return;
+      swap(units[current2].el, units[index].el, function() {
+        current2 = index;
+        items.forEach(function(btn, i) {
+          btn.classList.toggle("ak-mosaic__railitem--on", i === index);
+        });
+        enter(units[current2].el);
+      });
+    }
+    const rail = el("nav", { class: "ak-mosaic__rail" }, units.map(function(u, i) {
+      const btn = el("button", {
+        type: "button",
+        class: "ak-mosaic__railitem" + (i === 0 ? " ak-mosaic__railitem--on" : ""),
+        "data-ak-noguard": true,
+        on: { click: function() {
+          show(i);
+        } }
+      }, u.label);
+      items.push(btn);
+      return btn;
+    }));
+    if (units.length) units[0].el.hidden = false;
+    return el("div", { class: "ak-mosaic__railwrap" }, [rail, box]);
+  }
+  function projectPicker(units, mode, alive) {
+    const box = el("div", { class: "ak-mosaic__units" });
+    for (const u of units) {
+      u.el.hidden = true;
+      box.appendChild(u.el);
+    }
+    let current2 = 0;
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
+    function show(index) {
+      if (index === current2 && !units[index].el.hidden) return;
+      swap(units[current2].el, units[index].el, function() {
+        current2 = index;
+        enter(units[current2].el);
+      });
+    }
+    const items = units.map(function(u, i) {
+      return { id: String(i), label: u.label };
+    });
+    const chrome = mode === "tabs" ? tabs({ items, value: "0", onChange: function(id) {
+      show(Number(id));
+    } }) : bottomNav({
+      items: items.map(function(item, i) {
+        return { id: item.id, label: item.label, onPick: function() {
+          show(i);
+        } };
+      }),
+      value: "0"
+    });
+    alive.handles.push(chrome);
+    if (units.length) units[0].el.hidden = false;
+    return el(
+      "div",
+      { class: "ak-mosaic__picker ak-mosaic__picker--" + mode },
+      mode === "tabs" ? [chrome.el, box] : [box, chrome.el]
+    );
+  }
+  function projectDeck(units, alive) {
+    const strip = el("div", { class: "ak-mosaic__deck", role: "group" });
+    const dots = el("div", { class: "ak-mosaic__dots", "aria-hidden": "true" });
+    units.forEach(function(u, i) {
+      strip.appendChild(el("div", { class: "ak-mosaic__deckcard", "aria-label": u.label }, u.el));
+      dots.appendChild(el("span", { class: "ak-mosaic__dot" + (i === 0 ? " ak-mosaic__dot--on" : "") }));
+    });
+    const onScroll = function() {
+      const i = Math.round(strip.scrollLeft / Math.max(1, strip.clientWidth));
+      Array.prototype.forEach.call(dots.children, function(dot, j) {
+        dot.classList.toggle("ak-mosaic__dot--on", j === i);
+      });
+    };
+    strip.addEventListener("scroll", onScroll, { passive: true });
+    alive.cleanup.push(function() {
+      strip.removeEventListener("scroll", onScroll);
+    });
+    return el("div", { class: "ak-mosaic__deckwrap" }, [strip, dots]);
+  }
+  function projectFlow(units) {
+    const box = el("div", { class: "ak-mosaic__units" });
+    for (const u of units) {
+      u.el.hidden = true;
+      box.appendChild(u.el);
+    }
+    let current2 = 0;
+    const where = el("span", { class: "ak-mosaic__flowstep", "aria-live": "polite" });
+    const swap = unitSwapper(box, units, function() {
+      return units[current2] ? units[current2].el : null;
+    });
+    function show(index) {
+      const step = Math.max(0, Math.min(units.length - 1, index));
+      swap(units[current2].el, units[step].el, function() {
+        current2 = step;
+        where.textContent = current2 + 1 + " / " + units.length;
+        prev.disabled = current2 === 0;
+        next.disabled = current2 === units.length - 1;
+        enter(units[current2].el);
+      });
+    }
+    const prev = (
+      /** @type {HTMLButtonElement} */
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          show(current2 - 1);
+        } }
+      }, t("previous"))
+    );
+    const next = (
+      /** @type {HTMLButtonElement} */
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--primary",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          show(current2 + 1);
+        } }
+      }, t("next"))
+    );
+    if (units.length) {
+      units[0].el.hidden = false;
+      where.textContent = "1 / " + units.length;
+      prev.disabled = true;
+      next.disabled = units.length === 1;
+    }
+    return el("div", { class: "ak-mosaic__flow" }, [
+      box,
+      el("div", { class: "ak-mosaic__flowbar" }, [prev, where, next])
+    ]);
+  }
+
+  // src/static/sdk-libs/atelier/ops.js
+  var JOB = /* @__PURE__ */ new WeakMap();
+  var SVG_NS7 = "http://www.w3.org/2000/svg";
+  function svg4(name, attrs) {
+    const node = document.createElementNS(SVG_NS7, name);
+    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
+    return node;
+  }
+  var TONES4 = ["ok", "warn", "err", "plain"];
+  function toneOf2(value) {
+    return TONES4.indexOf(value) >= 0 ? value : "plain";
+  }
+  function health(spec) {
+    const root = el("div", { class: "ak-root ak-health", role: "list", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const items = data && Array.isArray(data.items) ? data.items : [];
+      if (!items.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      for (const item of items) {
+        const tone = toneOf2(item.tone);
+        const row = el(spec.onPick ? "button" : "div", {
+          class: "ak-health__row",
+          role: "listitem",
+          "data-ak-part": "row",
+          type: spec.onPick ? "button" : void 0
+        }, partEl("span", "ak-health__lamp ak-health__lamp--" + tone, "lamp", { "aria-hidden": "true" }));
+        const name = partEl("span", "ak-health__name", "name");
+        slotInto(name, spec, "label", item.label || item.id, { cls: "ak-health__label", args: [item] });
+        slotInto(name, spec, "sub", item.sub || null, { cls: "ak-health__sub", args: [item] });
+        row.appendChild(name);
+        slotInto(row, spec, "reading", item.reading == null ? null : String(item.reading), { cls: "ak-health__reading", args: [item] });
+        slotInto(row, spec, "aside", null, { cls: "ak-health__aside", args: [item] });
+        row.appendChild(el("span", { class: "ak-sr-only", text: tone === "ok" ? t("opsOk") : tone === "err" ? t("opsDown") : tone === "warn" ? t("opsWarn") : "" }));
+        if (spec.onPick) row.addEventListener("click", function() {
+          spec.onPick(item);
+        });
+        root.appendChild(row);
+      }
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+  var QUEUE_STATES = ["waiting", "running", "done", "failed"];
+  var QUEUE_TONE = { waiting: "plain", running: "warn", done: "ok", failed: "err" };
+  function fillJob(row, item, spec) {
+    const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
+    clear(row);
+    const whole = partValue(spec, "row", item);
+    if (whole !== void 0) {
+      fillPart(row, whole);
+      return;
+    }
+    slotInto(row, spec, "state", t("queue." + s), { cls: "ak-queue__state ak-queue__state--" + s, args: [item] });
+    const words = partEl("span", "ak-queue__words", "words");
+    slotInto(words, spec, "title", item.title || item.id, { cls: "ak-queue__title", args: [item] });
+    slotInto(words, spec, "sub", item.sub || null, { cls: "ak-queue__sub", args: [item] });
+    slotInto(words, spec, "extra", null, { cls: "ak-queue__extra", args: [item] });
+    row.appendChild(words);
+    slotInto(row, spec, "aside", null, { cls: "ak-queue__aside", args: [item] });
+  }
+  function queue(spec) {
+    const root = el("div", { class: "ak-root ak-queue", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
+    const strip = el("div", { class: "ak-queue__strip", role: "status", "data-ak-part": "strip" });
+    const list3 = el("div", { class: "ak-queue__list", role: "list", "data-ak-part": "list" });
+    root.appendChild(strip);
+    root.appendChild(list3);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      const items = data && Array.isArray(data.items) ? data.items : [];
+      if (!items.length) {
+        clear(strip);
+        keyedRows(list3, [], { key: function() {
+          return "";
+        }, build: function() {
+          return el("div");
+        } });
+        strip.hidden = true;
+        list3.hidden = true;
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      strip.hidden = false;
+      list3.hidden = false;
+      const counts = {};
+      for (const item of items) {
+        const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
+        counts[s] = (counts[s] || 0) + 1;
+      }
+      clear(strip);
+      for (const s of QUEUE_STATES) {
+        if (!counts[s]) continue;
+        strip.appendChild(el(
+          "span",
+          { class: "ak-queue__count ak-queue__count--" + QUEUE_TONE[s] },
+          [el("strong", { text: String(counts[s]) }), el("span", { text: " " + t("queue." + s) })]
+        ));
+      }
+      keyedRows(list3, items, {
+        key: function(item, i) {
+          return item && item.id != null ? String(item.id) : "job-" + i;
+        },
+        build: function(item) {
+          const row = el(spec.onPick ? "button" : "div", {
+            class: "ak-queue__row",
+            role: "listitem",
+            "data-ak-part": "row",
+            type: spec.onPick ? "button" : void 0
+          });
+          JOB.set(row, item);
+          fillJob(row, item, spec);
+          if (spec.onPick) row.addEventListener("click", function() {
+            spec.onPick(JOB.get(row));
+          });
+          return row;
+        },
+        update: function(row, item) {
+          JOB.set(row, item);
+          fillJob(row, item, spec);
+        }
+      });
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+  function gauge(spec) {
+    const root = el("figure", { class: "ak-root ak-gauge", role: "img", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    const R2 = 96;
+    const CX = 120;
+    const CY = 118;
+    function pointAt(frac, radius) {
+      const rad = Math.PI + Math.PI * Math.max(0, Math.min(1, frac));
+      return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
+    }
+    function arcPath(fromFrac, toFrac, radius) {
+      const [x1, y1] = pointAt(fromFrac, radius);
+      const [x2, y2] = pointAt(toFrac, radius);
+      return "M " + x1.toFixed(1) + " " + y1.toFixed(1) + " A " + radius + " " + radius + " 0 0 1 " + x2.toFixed(1) + " " + y2.toFixed(1);
+    }
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      if (!data || typeof data.value !== "number") {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+        return;
+      }
+      const min = typeof data.min === "number" ? data.min : 0;
+      const max = typeof data.max === "number" && data.max > min ? data.max : min + 100;
+      const frac = Math.max(0, Math.min(1, (data.value - min) / (max - min)));
+      const bands = Array.isArray(data.bands) && data.bands.length ? data.bands : [];
+      let tone = "plain";
+      for (const band of bands) {
+        if (data.value <= band.upTo) {
+          tone = toneOf2(band.tone);
+          break;
+        }
+      }
+      if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf2(bands[bands.length - 1].tone);
+      root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
+      const node = svg4("svg", { viewBox: "0 0 240 132", class: "ak-gauge__svg", "aria-hidden": "true" });
+      node.appendChild(svg4("path", { d: arcPath(0, 1, R2), class: "ak-gauge__track" }));
+      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R2), class: "ak-gauge__value ak-gauge__value--" + tone });
+      node.appendChild(value);
+      for (const band of bands.slice(0, -1)) {
+        const f2 = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
+        const [x1, y1] = pointAt(f2, R2 - 12);
+        const [x2, y2] = pointAt(f2, R2 + 12);
+        node.appendChild(svg4("line", { x1, y1, x2, y2, class: "ak-gauge__tickmark" }));
+      }
+      const [dx, dy] = pointAt(frac, R2);
+      node.appendChild(svg4("circle", { cx: dx, cy: dy, r: 8, class: "ak-gauge__marker ak-gauge__marker--" + tone }));
+      root.appendChild(node);
+      if (!reducedMotion()) {
+        const len = (
+          /** @type {SVGPathElement} */
+          value.getTotalLength()
+        );
+        value.setAttribute("stroke-dasharray", String(len));
+        value.setAttribute("stroke-dashoffset", String(len));
+        requestAnimationFrame(function() {
+          value.classList.add("ak-gauge__value--drawn");
+        });
+      }
+      root.appendChild(el("figcaption", { class: "ak-gauge__words" }, [
+        el(
+          "span",
+          { class: "ak-gauge__reading ak-gauge__reading--" + tone },
+          [el("strong", { text: String(data.value) }), data.unit ? el("span", { text: data.unit }) : null]
+        ),
+        data.label ? el("span", { class: "ak-gauge__label", text: data.label }) : null,
+        data.sub ? el("span", { class: "ak-gauge__label", text: data.sub }) : null
+      ]));
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/materials.js
+  function handle(node, off) {
+    return { el: node, destroy() {
+      off();
+    } };
+  }
+  function spotlight(target) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    node.classList.add("ak-mat--spot");
+    const move = (e) => {
+      const r = node.getBoundingClientRect();
+      node.style.setProperty("--ak-spot-x", Math.round((e.clientX - r.left) / Math.max(r.width, 1) * 100) + "%");
+      node.style.setProperty("--ak-spot-y", Math.round((e.clientY - r.top) / Math.max(r.height, 1) * 100) + "%");
+    };
+    const leave = () => {
+      node.style.removeProperty("--ak-spot-x");
+      node.style.removeProperty("--ak-spot-y");
+    };
+    if (!reducedMotion()) {
+      node.addEventListener("pointermove", move);
+      node.addEventListener("pointerleave", leave);
+    }
+    return handle(node, () => {
+      node.removeEventListener("pointermove", move);
+      node.removeEventListener("pointerleave", leave);
+      leave();
+    });
+  }
+  function tilt(target, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const max = opts && opts.max || 10;
+    const lift = opts && opts.lift || 5;
+    node.classList.add("ak-move--tilt");
+    const move = (e) => {
+      const r = node.getBoundingClientRect();
+      const px = (e.clientX - r.left) / Math.max(r.width, 1) - 0.5;
+      const py = (e.clientY - r.top) / Math.max(r.height, 1) - 0.5;
+      node.style.transform = "perspective(650px) rotateX(" + (-py * max * 2).toFixed(2) + "deg) rotateY(" + (px * max * 2).toFixed(2) + "deg) translateY(-" + lift + "px)";
+    };
+    const leave = () => {
+      node.style.transform = "";
+    };
+    if (!reducedMotion()) {
+      node.addEventListener("pointermove", move);
+      node.addEventListener("pointerleave", leave);
+    }
+    return handle(node, () => {
+      node.removeEventListener("pointermove", move);
+      node.removeEventListener("pointerleave", leave);
+      leave();
+    });
+  }
+  function sheen(target) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    if (reducedMotion()) return false;
+    node.classList.add("ak-move--sheen");
+    node.classList.remove("is-sheening");
+    void node.offsetWidth;
+    node.classList.add("is-sheening");
+    const done = () => {
+      node.classList.remove("is-sheening");
+      node.removeEventListener("animationend", done);
+    };
+    node.addEventListener("animationend", done);
+    return true;
+  }
+  function odometer(target, value) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const next = String(value);
+    const prev = node.getAttribute("data-odo") != null ? String(node.getAttribute("data-odo")) : node.textContent.trim();
+    node.setAttribute("data-odo", next);
+    if (prev === next || reducedMotion() || typeof node.animate !== "function") {
+      node.textContent = next;
+      return false;
+    }
+    node.classList.add("ak-odo");
+    const reel = el("span", { class: "ak-odo__reel" }, [el("span", {}, prev), el("span", {}, next)]);
+    node.textContent = "";
+    node.appendChild(reel);
+    const h = reel.firstChild ? (
+      /** @type {HTMLElement} */
+      reel.firstChild.offsetHeight
+    ) : 0;
+    const cs = getComputedStyle(node);
+    const span = (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 3.5;
+    const anim = reel.animate([{ transform: "translateY(0)" }, { transform: "translateY(-" + h + "px)" }], {
+      duration: span,
+      easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
+      fill: "forwards"
+    });
+    const settle4 = () => {
+      node.textContent = next;
+    };
+    anim.addEventListener("finish", settle4);
+    anim.addEventListener("cancel", settle4);
+    return true;
+  }
+  function thumb(target) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    node.classList.add("ak-thumb");
+    const pill = el("span", { class: "ak-thumb__pill", "aria-hidden": "true" });
+    node.insertBefore(pill, node.firstChild);
+    const update = () => {
+      const on2 = node.querySelector('[aria-selected="true"], [aria-pressed="true"], [aria-current], .is-on');
+      if (!on2) {
+        node.style.setProperty("--ak-thumb-w", "0px");
+        return;
+      }
+      const r = (
+        /** @type {HTMLElement} */
+        on2
+      );
+      node.style.setProperty("--ak-thumb-left", r.offsetLeft + "px");
+      node.style.setProperty("--ak-thumb-top", r.offsetTop + "px");
+      node.style.setProperty("--ak-thumb-w", r.offsetWidth + "px");
+      node.style.setProperty("--ak-thumb-h", r.offsetHeight + "px");
+    };
+    const mo = typeof MutationObserver === "function" ? new MutationObserver(update) : null;
+    if (mo) mo.observe(node, { attributes: true, subtree: true, attributeFilter: ["aria-selected", "aria-pressed", "aria-current", "class"] });
+    update();
+    return { el: node, update, destroy() {
+      if (mo) mo.disconnect();
+      if (pill.parentNode) pill.parentNode.removeChild(pill);
+      node.classList.remove("ak-thumb");
+    } };
+  }
+  function deal(targets) {
+    let list3;
+    if (typeof targets === "string") list3 = Array.prototype.slice.call(document.querySelectorAll(targets));
+    else if (targets instanceof Element) list3 = [
+      /** @type {HTMLElement} */
+      targets
+    ];
+    else list3 = Array.prototype.slice.call(targets || []);
+    if (reducedMotion()) return 0;
+    list3.forEach((node, i) => {
+      node.style.setProperty("--ak-deal-i", String(i));
+      node.classList.remove("ak-move--deal");
+      void node.offsetWidth;
+      node.classList.add("ak-move--deal");
+      const done = () => {
+        node.classList.remove("ak-move--deal");
+        node.style.removeProperty("--ak-deal-i");
+        node.removeEventListener("animationend", done);
+      };
+      node.addEventListener("animationend", done);
+    });
+    return list3.length;
+  }
+
+  // src/static/sdk-libs/atelier/flow-parts.js
+  var CARRY = { stiffness: 320, damping: 28 };
+  var TONES5 = ["ok", "warn", "err", "accent"];
+  var KINDS = ["info", "ok", "warn", "err"];
+  function rowsOf(data) {
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
+    return [];
+  }
+  function pace(node, multiple) {
+    return (parseFloat(getComputedStyle(node).getPropertyValue("--ak-motion")) || 200) * multiple;
+  }
+  function flipFrom(node, dx, dy, opts) {
+    spring(node, { x: dx, y: dy }, opts).cancel();
+    return spring(node, { x: 0, y: 0 }, opts || CARRY);
+  }
+  function sortable(spec) {
+    const s = spec || {};
+    const root = el("div", { class: "ak-root ak-sortable" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const body = el("div", { class: "ak-sortable__rows" });
+    let hands = [];
+    const held = /* @__PURE__ */ new Map();
+    let emptyCard = null;
+    function rows() {
+      return (
+        /** @type {HTMLElement[]} */
+        Array.prototype.slice.call(body.children)
+      );
+    }
+    function gap() {
+      return parseFloat(getComputedStyle(body).rowGap) || 0;
+    }
+    function tell() {
+      if (s.onReorder) s.onReorder(rows().map(function(r) {
+        return r.getAttribute("data-id");
+      }));
+    }
+    function place2(row, index) {
+      const all = rows();
+      const before = all.map(function(r) {
+        return r.offsetTop;
+      });
+      const others = all.filter(function(r) {
+        return r !== row;
+      });
+      body.insertBefore(row, others[index] || null);
+      all.forEach(function(r, i) {
+        const stood = held.get(r) || 0;
+        const travel3 = before[i] - r.offsetTop + stood;
+        if (travel3 || stood) flipFrom(r, 0, travel3, CARRY);
+      });
+      held.clear();
+    }
+    function wanted(row, dy) {
+      const middle = row.offsetTop + dy + row.offsetHeight / 2;
+      let index = 0;
+      rows().forEach(function(r) {
+        if (r !== row && middle > r.offsetTop + r.offsetHeight / 2) index += 1;
+      });
+      return index;
+    }
+    function carry(row) {
+      return drag(row, {
+        onStart: function() {
+          row.classList.add("is-carried");
+        },
+        onMove: function(dx, dy) {
+          const all = rows();
+          const at3 = all.indexOf(row);
+          const others = all.filter(function(r) {
+            return r !== row;
+          });
+          const want = Math.max(0, Math.min(wanted(row, dy), others.length));
+          const step = row.offsetHeight + gap();
+          others.forEach(function(r, i) {
+            let to = 0;
+            if (want > at3 && i >= at3 && i < want) to = -step;
+            else if (want < at3 && i >= want && i < at3) to = step;
+            if ((held.get(r) || 0) === to) return;
+            held.set(r, to);
+            spring(r, { y: to }, CARRY);
+          });
+        },
+        onEnd: function(dx, dy) {
+          row.classList.remove("is-carried");
+          const all = rows();
+          const at3 = all.indexOf(row);
+          const want = Math.max(0, Math.min(wanted(row, dy), all.length - 1));
+          held.set(row, dy);
+          place2(row, want);
+          if (want !== at3) tell();
+        }
+      }, { axis: "y", back: false });
+    }
+    function nudge(row, dir) {
+      const all = rows();
+      const to = all.indexOf(row) + dir;
+      if (to < 0 || to >= all.length) return;
+      place2(row, to);
+      tell();
+    }
+    function onGripKey(ev) {
+      if (!ev.altKey) return;
+      const dir = ev.key === "ArrowUp" ? -1 : ev.key === "ArrowDown" ? 1 : 0;
+      if (!dir) return;
+      const grip = (
+        /** @type {HTMLElement} */
+        ev.currentTarget
+      );
+      const row = (
+        /** @type {HTMLElement} */
+        grip.closest(".ak-sortable__row")
+      );
+      if (!row) return;
+      ev.preventDefault();
+      nudge(row, dir);
+      grip.focus();
+    }
+    function buildRow(item) {
+      const kids = [];
+      if (s.handle !== false) {
+        kids.push(el("button", {
+          type: "button",
+          class: "ak-sortable__grip",
+          "data-ak-noguard": true,
+          "aria-label": t("sortMove", { label: String(item.label || item.id) }),
+          on: { keydown: onGripKey }
+        }, [el("span", { class: "ak-sortable__gripmark", "aria-hidden": "true" })]));
+      }
+      kids.push(el("span", { class: "ak-sortable__text" }, [
+        el("span", { class: "ak-sortable__label", text: String(item.label || item.id) }),
+        item.sub != null ? el("span", { class: "ak-sortable__sub", text: String(item.sub) }) : null
+      ].filter(Boolean)));
+      return el("div", {
+        class: "ak-sortable__row" + (TONES5.indexOf(item.tone) >= 0 ? " ak-sortable__row--" + item.tone : ""),
+        "data-id": String(item.id)
+      }, kids);
+    }
+    function render(data) {
+      hands.forEach(function(h) {
+        h.destroy();
+      });
+      hands = [];
+      held.clear();
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      clear(body);
+      const items = rowsOf(data).filter(function(it) {
+        return it && it.id != null;
+      });
+      if (!items.length) {
+        const e = s.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || s.title || t("sortEmpty"),
+          hint: e.hint
+        });
+        return;
+      }
+      if (s.title) root.appendChild(el("div", { class: "ak-sortable__title", text: s.title }));
+      root.appendChild(body);
+      items.forEach(function(item) {
+        body.appendChild(buildRow(item));
+      });
+      rows().forEach(function(r) {
+        hands.push(carry(r));
+      });
+      enter(body);
+    }
+    render(s.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        hands.forEach(function(h) {
+          h.destroy();
+        });
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function startOfDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }
+  function dayLabel(when2) {
+    if (!when2) return t("earlier");
+    const days = Math.round((startOfDay(/* @__PURE__ */ new Date()) - startOfDay(when2)) / 864e5);
+    if (days === 0) return t("today");
+    if (days === 1) return t("yesterday");
+    if (typeof when2.toLocaleDateString !== "function") return when2.toISOString().slice(0, 10);
+    const sameYear = when2.getFullYear() === (/* @__PURE__ */ new Date()).getFullYear();
+    return date(when2, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
+  }
+  function clockOf(when2) {
+    if (!when2) return "";
+    if (typeof when2.toLocaleTimeString !== "function") return when2.toISOString().slice(11, 16);
+    return time(when2, { hour: "2-digit", minute: "2-digit" });
+  }
+  function notices(spec) {
+    const s = spec || {};
+    const root = el("div", { class: "ak-root ak-notices" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const head = el("div", { class: "ak-notices__head" });
+    const body = el("div", { class: "ak-notices__body" });
+    const markAll = el("button", {
+      type: "button",
+      class: "ak-btn ak-notices__markall",
+      text: t("noticesMarkAll"),
+      on: { click: function() {
+        markRead();
+      } }
+    }, null);
+    const shown = /* @__PURE__ */ new Map();
+    let dated = [];
+    let mounted = false;
+    let emptyCard = null;
+    function kindOf(kind) {
+      return KINDS.indexOf(kind) >= 0 ? kind : "info";
+    }
+    function settle4(dot) {
+      if (!dot || dot.hidden) return;
+      const done = function() {
+        dot.hidden = true;
+      };
+      if (reducedMotion() || typeof dot.animate !== "function") {
+        done();
+        return;
+      }
+      const anim = dot.animate([
+        { opacity: 1, transform: "scale(1)" },
+        { opacity: 0, transform: "scale(0.4)" }
+      ], { duration: pace(dot, 1.2), easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "forwards" });
+      anim.addEventListener("finish", done);
+      anim.addEventListener("cancel", done);
+    }
+    function markRead() {
+      const ids = dated.filter(function(u) {
+        return !u.item.read;
+      }).map(function(u) {
+        return u.item.id;
+      });
+      if (!ids.length) return;
+      ids.forEach(function(id) {
+        const rec = shown.get(String(id));
+        if (!rec) return;
+        rec.item.read = true;
+        rec.node.classList.remove("is-unread");
+        settle4(rec.dot);
+      });
+      if (markAll.parentNode) markAll.parentNode.removeChild(markAll);
+      if (s.onRead) s.onRead(ids);
+    }
+    function fillItem(rec, u) {
+      rec.item = u.item;
+      rec.title.textContent = String(u.item.title || u.item.id);
+      rec.text.textContent = u.item.text != null ? String(u.item.text) : "";
+      rec.text.hidden = u.item.text == null || u.item.text === "";
+      rec.time.textContent = clockOf(u.when);
+      rec.node.className = "ak-notices__item ak-notices__item--" + kindOf(u.item.kind) + (u.item.read ? "" : " is-unread");
+      rec.dot.hidden = !!u.item.read;
+    }
+    function buildItem(u) {
+      const rec = (
+        /** @type {any} */
+        {
+          node: null,
+          item: u.item,
+          dot: el("span", { class: "ak-notices__dot", "aria-hidden": "true" }),
+          title: el("span", { class: "ak-notices__itemtitle" }),
+          text: el("span", { class: "ak-notices__text" }),
+          time: el("span", { class: "ak-notices__time" })
+        }
+      );
+      rec.node = el(u.item.href ? "a" : "button", {
+        class: "ak-notices__item",
+        type: u.item.href ? null : "button",
+        href: u.item.href || null,
+        "data-ak-noguard": true,
+        on: { click: function() {
+          if (s.onOpen) s.onOpen(rec.item);
+        } }
+      }, [
+        el("span", { class: "ak-notices__mark", "aria-hidden": "true" }),
+        el("span", { class: "ak-notices__words" }, [rec.title, rec.text]),
+        el("span", { class: "ak-notices__side" }, [rec.time, rec.dot])
+      ]);
+      fillItem(rec, u);
+      return rec;
+    }
+    function render(data) {
+      dated = rowsOf(data).filter(function(it) {
+        return it && it.id != null;
+      }).map(function(it) {
+        const when2 = new Date(it.at);
+        return { item: it, when: isNaN(when2.getTime()) ? null : when2 };
+      }).sort(function(a, b) {
+        return (b.when ? b.when.getTime() : 0) - (a.when ? a.when.getTime() : 0);
+      });
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      clear(head);
+      clear(body);
+      if (!dated.length) {
+        shown.clear();
+        const e = s.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("noticesEmpty"),
+          hint: e.hint || t("noticesEmptyHint")
+        });
+        return;
+      }
+      if (s.title) head.appendChild(el("div", { class: "ak-notices__title", text: s.title }));
+      if (dated.some(function(u) {
+        return !u.item.read;
+      })) head.appendChild(markAll);
+      root.appendChild(head);
+      root.appendChild(body);
+      const live = {};
+      dated.forEach(function(u) {
+        live[String(u.item.id)] = 1;
+      });
+      Array.from(shown.keys()).forEach(function(id) {
+        if (!live[id]) shown.delete(id);
+      });
+      const fresh = [];
+      let heading = null;
+      dated.forEach(function(u) {
+        const label = dayLabel(u.when);
+        if (label !== heading) {
+          body.appendChild(el("div", { class: "ak-notices__day", text: label }));
+          heading = label;
+        }
+        const id = String(u.item.id);
+        let rec = shown.get(id);
+        if (!rec) {
+          rec = buildItem(u);
+          shown.set(id, rec);
+          fresh.push(rec.node);
+        } else {
+          fillItem(rec, u);
+        }
+        body.appendChild(rec.node);
+      });
+      if (!mounted) enter(body);
+      else if (fresh.length) stagger(fresh, { from: "up" });
+      mounted = true;
+    }
+    render(s.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function facets(spec) {
+    const s = spec || {};
+    const root = el("div", { class: "ak-root ak-facets" });
+    if (s.target) resolve(s.target).appendChild(root);
+    const groups = el("div", { class: "ak-facets__groups" });
+    const summary = el("div", { class: "ak-facets__summary" });
+    const tally = el("span", { class: "ak-facets__tally" });
+    const clearAll = el("button", {
+      type: "button",
+      class: "ak-btn ak-facets__clear",
+      text: t("facetsClear"),
+      on: { click: function() {
+        reset();
+      } }
+    }, null);
+    const chips = /* @__PURE__ */ new Map();
+    let picked = {};
+    let mounted = false;
+    let emptyCard = null;
+    function adopt(source) {
+      picked = {};
+      Object.keys(source || {}).forEach(function(key) {
+        const list3 = source[key];
+        if (Array.isArray(list3) && list3.length) picked[key] = list3.slice();
+      });
+    }
+    adopt(s.selected);
+    function selection() {
+      const out = {};
+      Object.keys(picked).forEach(function(key) {
+        out[key] = picked[key].slice();
+      });
+      return out;
+    }
+    function paint() {
+      chips.forEach(function(rec) {
+        const on2 = (picked[rec.facet.id] || []).indexOf(rec.option.id) >= 0;
+        rec.chip.setAttribute("aria-pressed", on2 ? "true" : "false");
+      });
+      const n = Object.keys(picked).reduce(function(sum, key) {
+        return sum + picked[key].length;
+      }, 0);
+      clear(summary);
+      tally.textContent = n === 0 ? t("facetsNone") : n === 1 ? t("facets1") : t("facetsN", { n });
+      summary.appendChild(tally);
+      if (n) {
+        summary.appendChild(el("span", { class: "ak-facets__sep", "aria-hidden": "true" }, "·"));
+        summary.appendChild(clearAll);
+      }
+    }
+    function toggle2(rec) {
+      const facet = rec.facet;
+      const list3 = picked[facet.id] ? picked[facet.id].slice() : [];
+      const at3 = list3.indexOf(rec.option.id);
+      if (facet.multi) {
+        if (at3 >= 0) list3.splice(at3, 1);
+        else list3.push(rec.option.id);
+      } else if (at3 >= 0) {
+        list3.length = 0;
+      } else {
+        list3.length = 0;
+        list3.push(rec.option.id);
+      }
+      if (list3.length) picked[facet.id] = list3;
+      else delete picked[facet.id];
+      paint();
+      if (s.onChange) s.onChange(selection());
+    }
+    function reset() {
+      picked = {};
+      paint();
+      if (s.onClear) s.onClear();
+      if (s.onChange) s.onChange(selection());
+    }
+    function buildChip(facet, option) {
+      const rec = (
+        /** @type {any} */
+        {
+          chip: null,
+          facet,
+          option,
+          label: el("span", { class: "ak-facets__chiplabel" }),
+          count: el("span", { class: "ak-facets__chipcount" })
+        }
+      );
+      rec.chip = el("button", {
+        type: "button",
+        class: "ak-facets__chip",
+        "aria-pressed": "false",
+        "data-ak-noguard": true,
+        on: { click: function() {
+          toggle2(rec);
+        } }
+      }, [rec.label, rec.count]);
+      return rec;
+    }
+    function render(data) {
+      const defs = (data && Array.isArray(data.facets) ? data.facets : []).filter(function(f2) {
+        return f2 && f2.id;
+      });
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      clear(groups);
+      if (!defs.length) {
+        chips.clear();
+        const e = s.empty || {};
+        emptyCard = emptyState({
+          target: root,
+          tone: "quiet",
+          title: e.title || t("facetsEmpty"),
+          hint: e.hint
+        });
+        return;
+      }
+      if (s.title) root.appendChild(el("div", { class: "ak-facets__title", text: s.title }));
+      root.appendChild(groups);
+      const live = {};
+      defs.forEach(function(facet) {
+        const row = el("div", { class: "ak-facets__chips", role: "group", "aria-label": String(facet.label || facet.id) });
+        (Array.isArray(facet.options) ? facet.options : []).filter(function(o) {
+          return o && o.id;
+        }).forEach(function(option) {
+          const key = facet.id + "\0" + option.id;
+          live[key] = 1;
+          let rec = chips.get(key);
+          if (!rec) {
+            chips.set(key, rec = buildChip(facet, option));
+          } else {
+            rec.facet = facet;
+            rec.option = option;
+          }
+          rec.label.textContent = String(option.label || option.id);
+          if (typeof option.count === "number") {
+            rec.count.hidden = false;
+            odometer(rec.count, option.count);
+          } else {
+            rec.count.hidden = true;
+            rec.count.removeAttribute("data-odo");
+            rec.count.textContent = "";
+          }
+          row.appendChild(rec.chip);
+        });
+        groups.appendChild(el("div", { class: "ak-facets__group" }, [
+          el("div", { class: "ak-facets__label", text: String(facet.label || facet.id) }),
+          row
+        ]));
+      });
+      Array.from(chips.keys()).forEach(function(key) {
+        if (!live[key]) chips.delete(key);
+      });
+      root.appendChild(summary);
+      paint();
+      if (!mounted) enter(groups);
+      mounted = true;
+    }
+    render(s.data);
+    return {
+      el: root,
+      set(patch) {
+        if (!patch) return;
+        if ("selected" in patch) adopt(patch.selected);
+        if ("data" in patch) render(patch.data);
+        else if ("selected" in patch) paint();
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/planner-lanes.js
+  function scheduleLanes(events) {
+    const out = events.map(() => ({ lane: 0, lanes: 1 }));
+    const order = events.map((_, i) => i).sort((a, b) => events[a].fromMin - events[b].fromMin || events[b].toMin - events[a].toMin || a - b);
+    let group = [];
+    let laneEnds = [];
+    let groupEnd = -Infinity;
+    const close = () => {
+      for (const i of group) out[i].lanes = laneEnds.length;
+      group = [];
+      laneEnds = [];
+      groupEnd = -Infinity;
+    };
+    for (const i of order) {
+      const e = events[i];
+      if (group.length && e.fromMin >= groupEnd) close();
+      let lane = laneEnds.findIndex((end) => end <= e.fromMin);
+      if (lane < 0) {
+        lane = laneEnds.length;
+        laneEnds.push(e.toMin);
+      } else laneEnds[lane] = e.toMin;
+      out[i].lane = lane;
+      group.push(i);
+      groupEnd = Math.max(groupEnd, e.toMin);
+    }
+    close();
+    return out;
+  }
+
+  // src/static/sdk-libs/atelier/planner.js
+  var TONES6 = ["ok", "warn", "err", "accent"];
+  var CARD_SPRING = { stiffness: 300, damping: 26 };
+  function toneOf3(value, fallback) {
+    return TONES6.indexOf(value) >= 0 ? value : fallback || "accent";
+  }
+  function emptyInto(root, spec) {
+    const e = spec.empty || {};
+    return emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
+  }
+  function kanban(spec) {
+    const root = el("div", { class: "ak-root ak-kanban", "data-ak-part": "root" });
+    applyVariant(root, spec, ["dense", "plain"]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    let current2 = null;
+    const arrived = /* @__PURE__ */ new Set();
+    function moveCard(cardId, toColumn) {
+      if (!current2) return;
+      const card = (current2.cards || []).find((c) => c && c.id === cardId);
+      if (!card || card.column === toColumn) return;
+      const was = root.querySelector(`[data-card="${cardId}"]`);
+      const from = was ? was.getBoundingClientRect() : null;
+      card.column = toColumn;
+      render(current2);
+      const again = (
+        /** @type {HTMLElement} */
+        root.querySelector(`[data-card="${cardId}"]`)
+      );
+      if (again) {
+        if (from) {
+          again.classList.remove("ak-kanban__card--enter");
+          again.style.animationDelay = "";
+          const to = again.getBoundingClientRect();
+          flipFrom(again, from.left - to.left, from.top - to.top, CARD_SPRING);
+        }
+        again.focus();
+      }
+      if (spec.onMove) spec.onMove(cardId, toColumn);
+    }
+    function render(data) {
+      current2 = data;
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const columns = data && Array.isArray(data.columns) ? data.columns.filter((c) => c && c.id) : [];
+      const cards = data && Array.isArray(data.cards) ? data.cards.filter((c) => c && c.id) : [];
+      if (!columns.length) {
+        emptyCard = emptyInto(root, spec);
+        return;
+      }
+      const movable = !!spec.onMove;
+      columns.forEach((col, colIdx) => {
+        const inCol = cards.filter((c) => c.column === col.id);
+        const lane = el("div", { class: "ak-kanban__col", "data-ak-part": "col", "data-col": col.id, role: "group", "aria-label": `${col.label} · ${inCol.length}` });
+        const head = partEl("div", "ak-kanban__head ak-kanban__head--" + toneOf3(col.tone, "accent"), "head");
+        slotInto(head, spec, "colhead", col.label || col.id, { cls: "ak-kanban__colname", args: [col, inCol] });
+        head.appendChild(el("span", { class: "ak-kanban__count", "data-ak-part": "count", text: String(inCol.length) }));
+        lane.appendChild(head);
+        const well = el("div", { class: "ak-kanban__well", "data-ak-part": "well" });
+        if (movable) {
+          well.addEventListener("dragover", (ev) => {
+            ev.preventDefault();
+            well.classList.add("ak-kanban__well--over");
+          });
+          well.addEventListener("dragleave", () => well.classList.remove("ak-kanban__well--over"));
+          well.addEventListener("drop", (ev) => {
+            ev.preventDefault();
+            well.classList.remove("ak-kanban__well--over");
+            const id = ev.dataTransfer ? ev.dataTransfer.getData("text/plain") : "";
+            if (id) moveCard(id, col.id);
+          });
+        }
+        inCol.forEach((card, i) => {
+          const node = el("div", {
+            class: "ak-kanban__card" + (TONES6.indexOf(card.tone) >= 0 ? " ak-kanban__card--" + card.tone : ""),
+            "data-ak-part": "card",
+            "data-card": card.id,
+            tabindex: movable ? "0" : void 0,
+            role: movable ? "button" : void 0
+          });
+          const whole = partValue(spec, "card", card);
+          if (whole !== void 0) {
+            fillPart(node, whole);
+          } else {
+            slotInto(node, spec, "cardtitle", card.title || card.id, { cls: "ak-kanban__cardtitle", args: [card] });
+            slotInto(node, spec, "cardsub", card.sub || null, { cls: "ak-kanban__cardsub", args: [card] });
+            slotInto(node, spec, "extra", null, { cls: "ak-kanban__extra", args: [card] });
+            slotInto(node, spec, "badge", card.badge || null, { cls: "ak-kanban__badge", args: [card] });
+            slotInto(node, spec, "aside", null, { cls: "ak-kanban__aside", args: [card] });
+          }
+          if (!motionOff(root) && !arrived.has(card.id)) {
+            arrived.add(card.id);
+            node.classList.add("ak-kanban__card--enter");
+            node.style.animationDelay = `${Math.min(i * 40, 500)}ms`;
+          }
+          if (movable) {
+            node.draggable = true;
+            node.addEventListener("dragstart", (ev) => {
+              if (ev.dataTransfer) {
+                ev.dataTransfer.setData("text/plain", card.id);
+                ev.dataTransfer.effectAllowed = "move";
+              }
+              node.classList.add("ak-kanban__card--lift");
+            });
+            node.addEventListener("dragend", () => node.classList.remove("ak-kanban__card--lift"));
+            node.addEventListener("keydown", (ev) => {
+              const dir = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+              if (!dir) return;
+              const next = columns[colIdx + dir];
+              if (next) {
+                ev.preventDefault();
+                moveCard(card.id, next.id);
+              }
+            });
+          }
+          well.appendChild(node);
+        });
+        lane.appendChild(well);
+        root.appendChild(lane);
+      });
+    }
+    render(spec.data || null);
+    return {
+      el: root,
+      set: (patch) => {
+        if (patch && "data" in patch) render(patch.data || null);
+      },
+      destroy: () => root.remove()
+    };
+  }
+  var DAY_MS = 864e5;
+  function day(value) {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function plan(spec) {
+    const root = el("div", { class: "ak-root ak-plan", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const rows = (data && Array.isArray(data.rows) ? data.rows : []).map((r) => ({
+        label: r && r.label || "",
+        spans: (r && Array.isArray(r.spans) ? r.spans : []).map((s) => ({ from: day(s.from), to: day(s.to), label: s.label, tone: s.tone })).filter((s) => s.from && s.to && s.to.getTime() >= s.from.getTime())
+      })).filter((r) => r.spans.length);
+      if (!rows.length) {
+        emptyCard = emptyInto(root, spec);
+        return;
+      }
+      let min = data.start ? day(data.start) : null;
+      let max = data.end ? day(data.end) : null;
+      for (const r of rows) for (const s of r.spans) {
+        if (!min || s.from < min) min = s.from;
+        if (!max || s.to > max) max = s.to;
+      }
+      const span = Math.max(max.getTime() - min.getTime(), DAY_MS);
+      const X = (d) => Math.min(Math.max((d.getTime() - min.getTime()) / span, 0), 1) * 100;
+      const head = el("div", { class: "ak-plan__months" });
+      const cursor = new Date(min.getFullYear(), min.getMonth(), 1);
+      while (cursor.getTime() <= max.getTime()) {
+        if (cursor.getTime() >= min.getTime()) {
+          const mark = el("span", { class: "ak-plan__month", text: t("m" + (cursor.getMonth() + 1)) });
+          mark.style.left = X(cursor) + "%";
+          head.appendChild(mark);
+        }
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+      root.appendChild(head);
+      const body = el("div", { class: "ak-plan__rows" });
+      rows.forEach((r, ri) => {
+        const lane = el("div", { class: "ak-plan__row" }, [
+          el("span", { class: "ak-plan__rowname", text: r.label })
+        ]);
+        const track = el("span", { class: "ak-plan__track" });
+        r.spans.forEach((s, si) => {
+          const left = X(s.from);
+          const width = Math.max(X(new Date(s.to.getTime() + DAY_MS)) - left, 1.2);
+          const bar2 = el("span", {
+            class: "ak-plan__span ak-plan__span--" + toneOf3(s.tone, "accent"),
+            title: (s.label ? s.label + " · " : "") + `${s.from.toISOString().slice(0, 10)} → ${s.to.toISOString().slice(0, 10)}`
+          }, s.label && width > 8 ? [el("span", { class: "ak-plan__spanlabel", text: s.label })] : []);
+          bar2.style.left = left + "%";
+          bar2.style.width = width + "%";
+          if (!reducedMotion()) {
+            bar2.classList.add("ak-plan__span--enter");
+            bar2.style.animationDelay = `${(ri * 2 + si) * 60}ms`;
+          }
+          track.appendChild(bar2);
+        });
+        lane.appendChild(track);
+        body.appendChild(lane);
+      });
+      const today = data.today ? day(data.today) : /* @__PURE__ */ new Date();
+      if (today && today.getTime() >= min.getTime() && today.getTime() <= max.getTime()) {
+        const line2 = el("span", { class: "ak-plan__today", title: t("today") });
+        line2.style.left = X(today) + "%";
+        body.appendChild(line2);
+      }
+      root.appendChild(body);
+    }
+    render(spec.data || null);
+    return {
+      el: root,
+      set: (patch) => {
+        if (patch && "data" in patch) render(patch.data || null);
+      },
+      destroy: () => root.remove()
+    };
+  }
+  function minutes(value) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(value || ""));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  }
+  function schedule(spec) {
+    const root = el("div", { class: "ak-root ak-schedule", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const days = (data && Array.isArray(data.days) && data.days.length ? data.days : ["Mon", "Tue", "Wed", "Thu", "Fri"]).slice(0, 7);
+      const events = (data && Array.isArray(data.events) ? data.events : []).map((e) => ({ ...e, fromMin: minutes(e.from), toMin: minutes(e.to) })).filter((e) => e && typeof e.day === "number" && e.day >= 0 && e.day < days.length && e.fromMin !== null && e.toMin !== null && e.toMin > e.fromMin);
+      if (!events.length) {
+        emptyCard = emptyInto(root, spec);
+        return;
+      }
+      const open = minutes(data.from) ?? Math.max(Math.floor(Math.min(...events.map((e) => e.fromMin)) / 60) * 60 - 60, 0);
+      const close = minutes(data.to) ?? Math.min(Math.ceil(Math.max(...events.map((e) => e.toMin)) / 60) * 60 + 60, 1440);
+      const span = Math.max(close - open, 60);
+      const Y = (m) => Math.min(Math.max((m - open) / span, 0), 1) * 100;
+      const grid2 = el("div", { class: "ak-schedule__grid" });
+      const hours = el("div", { class: "ak-schedule__hours" });
+      for (let m = Math.ceil(open / 60) * 60; m <= close; m += 60) {
+        const line2 = el("span", { class: "ak-schedule__hour", text: `${String(Math.floor(m / 60)).padStart(2, "0")}:00` });
+        line2.style.top = Y(m) + "%";
+        hours.appendChild(line2);
+      }
+      grid2.appendChild(hours);
+      days.forEach((label, di) => {
+        const inDay = events.filter((e) => e.day === di);
+        const col = el("div", { class: "ak-schedule__day", role: "group", "aria-label": `${label} · ${inDay.length}` }, [
+          el("span", { class: "ak-schedule__dayname", text: label })
+        ]);
+        const well = el("div", { class: "ak-schedule__well" });
+        const places = scheduleLanes(inDay);
+        inDay.forEach((e, i) => {
+          const { lane, lanes } = places[i];
+          const block = el(spec.onPick ? "button" : "span", {
+            class: "ak-schedule__event ak-schedule__event--" + toneOf3(e.tone, "accent") + (lanes > 1 ? " ak-schedule__event--shared" : "") + (lanes > 2 ? " ak-schedule__event--tight" : ""),
+            type: spec.onPick ? "button" : void 0,
+            title: `${e.label} · ${e.from}–${e.to}`,
+            // A third of a narrow day has no room for the name, so the name is also said aloud.
+            "aria-label": lanes > 2 ? `${e.label} · ${e.from}–${e.to}` : void 0
+          }, [
+            el("span", { class: "ak-schedule__eventname", text: e.label }),
+            // A short booking has room for its name only, and so has one that shares its hours
+            // with two others; the title carries the hours anyway.
+            e.toMin - e.fromMin >= 75 && lanes <= 2 ? el("span", { class: "ak-schedule__eventtime", text: `${e.from}–${e.to}` }) : null
+          ]);
+          block.style.top = Y(e.fromMin) + "%";
+          block.style.height = Math.max(Y(e.toMin) - Y(e.fromMin), 4) + "%";
+          if (lanes > 1) {
+            block.style.insetInlineStart = `calc(3px + (100% - 6px) * ${lane} / ${lanes})`;
+            block.style.insetInlineEnd = "auto";
+            block.style.width = `calc((100% - 6px) / ${lanes} - ${lane < lanes - 1 ? 2 : 0}px)`;
+          }
+          if (spec.onPick) block.addEventListener("click", () => spec.onPick(e));
+          if (!reducedMotion()) {
+            block.classList.add("ak-schedule__event--enter");
+            block.style.animationDelay = `${(di * 3 + i) * 50}ms`;
+          }
+          well.appendChild(block);
+        });
+        col.appendChild(well);
+        grid2.appendChild(col);
+      });
+      root.appendChild(grid2);
+    }
+    render(spec.data || null);
+    return {
+      el: root,
+      set: (patch) => {
+        if (patch && "data" in patch) render(patch.data || null);
+      },
+      destroy: () => root.remove()
+    };
+  }
+  function steps(spec) {
+    const root = el("ol", { class: "ak-root ak-steps", "data-ak-part": "root" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let emptyCard = null;
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      const items = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && s.label);
+      if (!items.length) {
+        emptyCard = emptyInto(root, spec);
+        return;
+      }
+      const current2 = Math.min(Math.max(Number(data.current) || 0, 0), items.length - 1);
+      items.forEach((s, i) => {
+        const state = i < current2 ? "done" : i === current2 ? "now" : "ahead";
+        root.appendChild(el("li", {
+          class: "ak-steps__step ak-steps__step--" + state,
+          "aria-current": state === "now" ? "step" : void 0
+        }, [
+          el("span", { class: "ak-steps__dot", "aria-hidden": "true" }, state === "done" ? "✓" : String(i + 1)),
+          el("span", { class: "ak-steps__words" }, [
+            el("span", { class: "ak-steps__label", text: s.label }),
+            s.sub ? el("span", { class: "ak-steps__sub", text: s.sub }) : null
+          ])
+        ]));
+      });
+    }
+    render(spec.data || null);
+    return {
+      el: root,
+      set: (patch) => {
+        if (patch && "data" in patch) render(patch.data || null);
+      },
+      destroy: () => root.remove()
+    };
+  }
+
+  // src/static/sdk-libs/atelier/konsole.js
+  var CAP_DEFAULT = 400;
+  var TONES7 = ["ok", "warn", "err", "plain"];
+  function stamp2(ts) {
+    if (ts == null) return "";
+    const d = ts instanceof Date ? ts : new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return time(d, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  function konsole(spec) {
+    const cap = typeof spec.cap === "number" && spec.cap > 0 ? Math.min(spec.cap, 2e3) : CAP_DEFAULT;
+    const root = el("div", { class: "ak-root ak-console" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    const vane = el("div", { class: "ak-console__vane", role: "log", "aria-live": "polite", tabindex: "0" });
+    root.appendChild(vane);
+    let emptyCard = null;
+    function atTail() {
+      return vane.scrollHeight - vane.scrollTop - vane.clientHeight < 24;
+    }
+    function lineNode(line2, entering) {
+      const tone = TONES7.indexOf(line2.tone) >= 0 ? line2.tone : "plain";
+      const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
+        line2.ts != null ? el("span", { class: "ak-console__ts", text: stamp2(line2.ts) }) : null,
+        el("span", { class: "ak-console__text", text: String(line2.text == null ? "" : line2.text) })
+      ]);
+      if (entering && !reducedMotion()) node.classList.add("ak-console__line--enter");
+      return node;
+    }
+    function trim() {
+      while (vane.children.length > cap) vane.removeChild(vane.firstChild);
+    }
+    function render(data) {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(vane);
+      const lines = data && Array.isArray(data.lines) ? data.lines : [];
+      if (!lines.length) {
+        const e = spec.empty || {};
+        emptyCard = emptyState({ target: vane, tone: "quiet", title: e.title || t("consoleEmpty"), hint: e.hint || "" });
+        return;
+      }
+      for (const line2 of lines.slice(-cap)) vane.appendChild(lineNode(line2, false));
+      vane.scrollTop = vane.scrollHeight;
+    }
+    render(spec.data);
+    return {
+      el: root,
+      set(patch) {
+        if (patch && "data" in patch) render(patch.data);
+      },
+      /** @param {Array<{ ts?: any, tone?: string, text: string }>} lines */
+      append(lines) {
+        if (!Array.isArray(lines) || !lines.length) return;
+        if (emptyCard) {
+          emptyCard.destroy();
+          emptyCard = null;
+        }
+        const follow = atTail();
+        for (const line2 of lines) vane.appendChild(lineNode(line2, true));
+        trim();
+        if (follow) vane.scrollTop = vane.scrollHeight;
+      },
+      destroy() {
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/controls.js
   var KNOB_STRETCH = 0.3;
   var STRETCH_MAX = 22;
@@ -10792,7 +10975,7 @@
   }
 
   // src/static/sdk-libs/atelier/ai-task-i18n.js
-  var STRINGS2 = {
+  var STRINGS = {
     en: {
       "aiTask.title": "Ask the AI",
       "aiTask.inputLabel": "Your text",
@@ -10953,12 +11136,12 @@
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS2[
+      STRINGS[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS2.en
+      ] || STRINGS.en
     );
-    const text = table2[key] || STRINGS2.en[key] || key;
+    const text = table2[key] || STRINGS.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -12478,7 +12661,7 @@ Known schemas:
     }
     return s;
   }
-  function at2(value, path) {
+  function at(value, path) {
     let v = (
       /** @type {any} */
       value
@@ -12577,7 +12760,7 @@ Known schemas:
         if (nested.indexOf(e) >= 0) continue;
         const path = segments(e.instanceLocation);
         const here = path.join(".");
-        const value = at2(data, path);
+        const value = at(data, path);
         if (kw === "required" || kw === "dependencies" && /does not have/.test(e.error)) {
           const names = quoted(e.error);
           const field = (here ? here + "." : "") + names[names.length - 1];
@@ -13253,4011 +13436,8 @@ Known schemas:
     };
   }
 
-  // src/static/sdk-libs/atelier/table.js
-  var TABLE_VARIANTS = ["dense", "plain", "lined"];
-  var RECORD = /* @__PURE__ */ new WeakMap();
-  function table(spec) {
-    const columns = spec.columns || [];
-    let rows = spec.rows || [];
-    const keyOf3 = spec.key || function(row, i) {
-      if (row && row.id != null) return String(row.id);
-      const first = columns[0] && row ? row[columns[0].key] : null;
-      return first == null ? "row-" + i : String(first);
-    };
-    let sort = null;
-    const thead = el("thead", { "data-ak-part": "head" });
-    const tbody = el("tbody", { "data-ak-part": "body" });
-    const tableEl = el("table", { class: "ak-table__table", "data-ak-part": "table" }, [
-      spec.caption ? el("caption", { class: "ak-sr-only", "data-ak-part": "caption", text: spec.caption }) : null,
-      thead,
-      tbody
-    ]);
-    const root = el("div", { class: "ak-root ak-table", "data-ak-part": "root" }, tableEl);
-    applyVariant(root, spec, TABLE_VARIANTS);
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function renderHead() {
-      clear(thead);
-      const tr = el("tr");
-      for (const col of columns) {
-        const sorted = sort && sort.key === col.key ? sort.dir === 1 ? "ascending" : "descending" : null;
-        const th = el("th", {
-          scope: "col",
-          class: col.align === "right" ? "ak-table__num" : null,
-          "data-ak-part": "headcell",
-          "data-ak-key": col.key,
-          "aria-sort": sorted
-        });
-        const given = partValue(spec, "head", col);
-        const heading = given === void 0 ? col.label : given;
-        if (col.sortable) {
-          const btn = el("button", {
-            type: "button",
-            class: "ak-table__sort",
-            "data-ak-part": "sort",
-            "data-ak-noguard": true,
-            on: {
-              click: function() {
-                sort = sort && sort.key === col.key ? { key: col.key, dir: sort.dir === 1 ? -1 : 1 } : { key: col.key, dir: 1 };
-                renderHead();
-                renderBody();
-              }
-            }
-          });
-          if (!fillPart(btn, heading)) btn.textContent = col.label;
-          if (sorted) btn.appendChild(document.createTextNode(sorted === "ascending" ? " ↑" : " ↓"));
-          th.appendChild(btn);
-        } else if (!fillPart(th, heading)) {
-          th.textContent = col.label;
-        }
-        tr.appendChild(th);
-      }
-      thead.appendChild(tr);
-    }
-    function sortedRows() {
-      if (!sort) return rows;
-      const key = sort.key;
-      const dir = sort.dir;
-      return rows.slice().sort(function(a, b) {
-        const av = a[key];
-        const bv = b[key];
-        if (av == null && bv == null) return 0;
-        if (av == null) return 1;
-        if (bv == null) return -1;
-        if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
-        return String(av).localeCompare(String(bv)) * dir;
-      });
-    }
-    function fillRow2(tr, row) {
-      clear(tr);
-      const wholeRow = partValue(spec, "row", row);
-      if (wholeRow !== void 0) {
-        fillPart(tr, wholeRow);
-        return;
-      }
-      for (const col of columns) {
-        const raw = row[col.key];
-        const given = partValue(spec, "cell", raw, row, col);
-        const own = col.format ? col.format(raw, row) : raw == null ? "" : String(raw);
-        const td2 = el("td", {
-          class: col.align === "right" ? "ak-table__num" : null,
-          "data-ak-part": "cell",
-          "data-ak-key": col.key
-        });
-        fillPart(td2, given === void 0 ? own : given);
-        tr.appendChild(td2);
-      }
-    }
-    function renderBody() {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      tableEl.hidden = !rows.length;
-      if (!rows.length) {
-        clear(tbody);
-        const e = spec.empty || {};
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: e.title || t("empty"),
-          hint: e.hint || t("emptyHint")
-        });
-        return;
-      }
-      const pickable = typeof spec.onPick === "function";
-      keyedRows(tbody, sortedRows(), {
-        key: keyOf3,
-        build: function(row) {
-          const tr = el("tr", {
-            class: pickable ? "ak-table__row--pick" : null,
-            "data-ak-part": "row",
-            tabindex: pickable ? "0" : null,
-            on: pickable ? {
-              click: function() {
-                if (spec.onPick) spec.onPick(RECORD.get(tr));
-              },
-              keydown: function(ev) {
-                if (ev.key === "Enter" && spec.onPick) spec.onPick(RECORD.get(tr));
-              }
-            } : null
-          });
-          RECORD.set(tr, row);
-          fillRow2(tr, row);
-          return tr;
-        },
-        update: function(tr, row) {
-          RECORD.set(tr, row);
-          fillRow2(tr, row);
-        }
-      });
-    }
-    renderHead();
-    renderBody();
-    return {
-      el: root,
-      /** @param {{ rows?: any[] }} patch */
-      set(patch) {
-        if (!patch) return;
-        if (patch.rows) {
-          rows = patch.rows;
-          renderBody();
-        }
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-  var SEARCH_DEBOUNCE_MS = 250;
-  function searchBar(spec) {
-    let timer = null;
-    const input = el("input", {
-      type: "search",
-      class: "ak-input ak-search__input",
-      "data-ak-part": "input",
-      placeholder: spec.placeholder || t("search"),
-      "aria-label": spec.label || t("search"),
-      on: {
-        input: function() {
-          if (!spec.onChange) return;
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(function() {
-            timer = null;
-            if (spec.onChange) spec.onChange(inputEl.value);
-          }, SEARCH_DEBOUNCE_MS);
-        },
-        keydown: function(ev) {
-          if (ev.key === "Enter" && spec.onSubmit) {
-            ev.preventDefault();
-            spec.onSubmit(inputEl.value);
-          }
-        }
-      }
-    });
-    const inputEl = (
-      /** @type {HTMLInputElement} */
-      input
-    );
-    if (spec.value != null) inputEl.value = spec.value;
-    const clearBtn = el("button", {
-      type: "button",
-      class: "ak-search__clear",
-      "data-ak-part": "clear",
-      "aria-label": t("close"),
-      "data-ak-noguard": true,
-      on: {
-        click: function() {
-          inputEl.value = "";
-          inputEl.focus();
-          if (spec.onChange) spec.onChange("");
-        }
-      }
-    }, "×");
-    const root = el("div", { class: "ak-root ak-search", role: "search", "data-ak-part": "root" }, [input, clearBtn]);
-    applyVariant(root, spec, ["dense", "plain"]);
-    slotInto(root, spec, "aside", null, { cls: "ak-search__aside" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    return {
-      el: root,
-      /** @param {{ value?: string }} patch */
-      set(patch) {
-        if (patch && patch.value != null) inputEl.value = patch.value;
-      },
-      destroy() {
-        if (timer) clearTimeout(timer);
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/chart-core.js
-  var SVG_NS5 = "http://www.w3.org/2000/svg";
-  function svg(name, attrs) {
-    const node = document.createElementNS(SVG_NS5, name);
-    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
-    return node;
-  }
-  var SERIES_VARS = ["var(--ak-accent)", "var(--ak-spectrum-2)", "var(--ak-spectrum-3)", "var(--ak-accent-2)"];
-  function tickStep(span) {
-    const raw = span / 4;
-    const pow = Math.pow(10, Math.floor(Math.log10(raw)));
-    for (const m of [1, 2, 5, 10]) {
-      if (raw <= m * pow) return m * pow;
-    }
-    return 10 * pow;
-  }
-  function fmtTick(v) {
-    if (Math.abs(v) >= 1e3) return num(v / 1e3, { maximumFractionDigits: 1 }) + "k";
-    return num(v, { maximumFractionDigits: 2 });
-  }
-  function smoothPath(pts) {
-    if (pts.length < 2) return pts.length ? `M ${pts[0].x} ${pts[0].y}` : "";
-    let d = `M ${pts[0].x} ${pts[0].y}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[Math.max(0, i - 1)];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[Math.min(pts.length - 1, i + 2)];
-      const c1x = p1.x + (p2.x - p0.x) / 6;
-      const c1y = p1.y + (p2.y - p0.y) / 6;
-      const c2x = p2.x - (p3.x - p1.x) / 6;
-      const c2y = p2.y - (p3.y - p1.y) / 6;
-      d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2.x} ${p2.y}`;
-    }
-    return d;
-  }
-  var defsCounter = 0;
-  function defsFor(node, seriesCount) {
-    const stamp3 = ++defsCounter;
-    const defs = svg("defs", {});
-    const sheenId = `ak-sheen-${stamp3}`;
-    const sheen2 = svg("linearGradient", { id: sheenId, x1: 0, y1: 0, x2: 0, y2: 1 });
-    const s1 = svg("stop", { offset: "0", "stop-opacity": "0.22" });
-    s1.style.stopColor = "var(--ak-chart-sheen)";
-    const s2 = svg("stop", { offset: "1", "stop-opacity": "0" });
-    s2.style.stopColor = "var(--ak-chart-sheen)";
-    sheen2.appendChild(s1);
-    sheen2.appendChild(s2);
-    defs.appendChild(sheen2);
-    for (let i = 0; i < seriesCount; i++) {
-      const fade = svg("linearGradient", { id: `ak-fade-${stamp3}-${i}`, x1: 0, y1: 0, x2: 0, y2: 1 });
-      const f1 = svg("stop", { offset: "0", "stop-opacity": "0.20" });
-      f1.style.stopColor = SERIES_VARS[i % SERIES_VARS.length];
-      const f2 = svg("stop", { offset: "1", "stop-opacity": "0" });
-      f2.style.stopColor = SERIES_VARS[i % SERIES_VARS.length];
-      fade.appendChild(f1);
-      fade.appendChild(f2);
-      defs.appendChild(fade);
-    }
-    node.appendChild(defs);
-    return { sheen: `url(#${sheenId})`, fade: (i) => `url(#ak-fade-${stamp3}-${i % SERIES_VARS.length})` };
-  }
-
-  // src/static/sdk-libs/atelier/chart-shapes.js
-  var TONES2 = { ok: "var(--ak-ok-text)", warn: "var(--ak-warn-text)", err: "var(--ak-err-text)" };
-  function renderDonut(ctx, data) {
-    const slices = (data && Array.isArray(data.slices) ? data.slices : []).filter((s) => s && typeof s.value === "number" && s.value > 0);
-    if (!slices.length) return ctx.empty();
-    const total = slices.reduce((sum, s) => sum + s.value, 0);
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + slices.map((s) => s.label + " " + s.value).join(", "));
-    const R2 = 88;
-    const STROKE = 26;
-    const C = 2 * Math.PI * R2;
-    const GAP2 = 4;
-    const wrap2 = el("div", { class: "ak-chart__donutwrap" });
-    const node = svg("svg", { viewBox: "0 0 230 230", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
-    node.appendChild(svg("circle", { cx: 115, cy: 115, r: R2, class: "ak-chart__ring", "stroke-width": STROKE }));
-    let offset = 0;
-    slices.forEach((s, i) => {
-      const frac = s.value / total;
-      const ring2 = svg("circle", {
-        cx: 115,
-        cy: 115,
-        r: R2,
-        class: "ak-chart__slice",
-        style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
-        "stroke-width": STROKE,
-        "stroke-linecap": slices.length > 1 ? "round" : "butt",
-        "stroke-dasharray": `${Math.max(frac * C - GAP2, 0.5)} ${C}`,
-        "stroke-dashoffset": String(-offset * C),
-        transform: "rotate(-90 115 115)"
-      });
-      if (!ctx.still()) {
-        ring2.classList.add("ak-chart__slice--enter");
-        ring2.style.animationDelay = `${i * 70}ms`;
-      }
-      node.appendChild(ring2);
-      offset += frac;
-    });
-    wrap2.appendChild(node);
-    const centre = el("div", { class: "ak-chart__centre" }, [
-      el("b", { text: fmtTick(total) }),
-      data.delta && data.delta.text ? el("span", { class: "ak-chart__delta", text: String(data.delta.text) }) : null
-    ]);
-    if (data.delta && TONES2[data.delta.tone]) {
-      centre.lastChild.style.color = TONES2[data.delta.tone];
-    }
-    wrap2.appendChild(centre);
-    ctx.root.appendChild(wrap2);
-    const legend = el(
-      "figcaption",
-      { class: "ak-chart__legend" },
-      slices.map((s) => el("span", { class: "ak-chart__key" }, [
-        el("span", { class: "ak-chart__swatch" }),
-        el("span", { text: `${s.label} · ${fmtTick(s.value)}` })
-      ]))
-    );
-    slices.forEach((s, i) => {
-      const sw = legend.children[i] && legend.children[i].firstChild;
-      if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
-    });
-    ctx.root.appendChild(legend);
-  }
-  function renderCalendar(ctx, data) {
-    const days = (data && Array.isArray(data.days) ? data.days : []).map((d) => ({ date: new Date(d.date), value: Number(d.value) || 0 })).filter((d) => !isNaN(d.date.getTime())).sort((a, b) => a.date.getTime() - b.date.getTime());
-    if (!days.length) return ctx.empty();
-    const max = days.reduce((m, d) => Math.max(m, d.value), 0) || 1;
-    const start = new Date(days[0].date);
-    start.setDate(start.getDate() - (start.getDay() + 6) % 7);
-    const spanDays = Math.round((days[days.length - 1].date.getTime() - start.getTime()) / 864e5) + 1;
-    const weeks = Math.min(Math.ceil(spanDays / 7), 53);
-    const CELL = 13;
-    const GAP2 = 3;
-    const width = weeks * (CELL + GAP2) + GAP2;
-    const height = 7 * (CELL + GAP2) + GAP2 + 16;
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + days.length + " d");
-    const byKey = /* @__PURE__ */ new Map();
-    for (const d of days) byKey.set(d.date.toISOString().slice(0, 10), d.value);
-    const node = svg("svg", { viewBox: `0 0 ${width} ${height}`, class: "ak-chart__svg ak-chart__svg--calendar", "aria-hidden": "true" });
-    const cursor = new Date(start);
-    const monthAt = [];
-    for (let w = 0; w < weeks; w++) {
-      for (let dow = 0; dow < 7; dow++) {
-        const key = cursor.toISOString().slice(0, 10);
-        const value = byKey.get(key);
-        if (cursor.getDate() === 1) monthAt.push({ w, m: cursor.getMonth() });
-        const cell = svg("rect", {
-          x: GAP2 + w * (CELL + GAP2),
-          y: GAP2 + dow * (CELL + GAP2),
-          width: CELL,
-          height: CELL,
-          rx: 3,
-          class: "ak-chart__day" + (value === void 0 ? " ak-chart__day--blank" : "")
-        });
-        if (value !== void 0) {
-          cell.setAttribute("style", `fill: var(--ak-accent); fill-opacity: ${(0.15 + 0.85 * (value / max)).toFixed(3)}`);
-        }
-        node.appendChild(cell);
-        cursor.setDate(cursor.getDate() + 1);
-      }
-    }
-    const MONTHS = [t("m1"), t("m2"), t("m3"), t("m4"), t("m5"), t("m6"), t("m7"), t("m8"), t("m9"), t("m10"), t("m11"), t("m12")];
-    for (const mark of monthAt) {
-      const label = svg("text", { x: GAP2 + mark.w * (CELL + GAP2), y: height - 4, class: "ak-chart__tick" });
-      label.textContent = MONTHS[mark.m];
-      node.appendChild(label);
-    }
-    ctx.root.appendChild(node);
-    const ramp3 = el("figcaption", { class: "ak-chart__ramp" }, [
-      el("span", { text: t("heatLess") }),
-      ...[0.15, 0.43, 0.71, 1].map((o) => {
-        const sw = el("span", { class: "ak-chart__rampcell" });
-        sw.style.opacity = String(o);
-        return sw;
-      }),
-      el("span", { text: t("heatMore") })
-    ]);
-    ctx.root.appendChild(ramp3);
-  }
-  function renderScatter(ctx, data) {
-    const points = (data && Array.isArray(data.points) ? data.points : []).filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
-    if (!points.length) return ctx.empty();
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + points.length + " pts");
-    const W7 = 560;
-    const H4 = 300;
-    const PAD3 = { top: 16, right: 16, bottom: 36, left: 50 };
-    let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
-    for (const p of points) {
-      if (p.x < xMin) xMin = p.x;
-      if (p.x > xMax) xMax = p.x;
-      if (p.y < yMin) yMin = p.y;
-      if (p.y > yMax) yMax = p.y;
-    }
-    if (xMax === xMin) xMax = xMin + 1;
-    if (yMax === yMin) yMax = yMin + 1;
-    const xStep = tickStep(xMax - xMin);
-    const yStep = tickStep(yMax - yMin);
-    xMin = Math.floor(xMin / xStep) * xStep;
-    xMax = Math.ceil(xMax / xStep) * xStep;
-    yMin = Math.floor(yMin / yStep) * yStep;
-    yMax = Math.ceil(yMax / yStep) * yStep;
-    const X = (v) => PAD3.left + (W7 - PAD3.left - PAD3.right) * ((v - xMin) / (xMax - xMin));
-    const Y = (v) => PAD3.top + (H4 - PAD3.top - PAD3.bottom) * (1 - (v - yMin) / (yMax - yMin));
-    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    for (let v = yMin; v <= yMax + yStep / 2; v += yStep) {
-      node.appendChild(svg("line", { x1: PAD3.left, x2: W7 - PAD3.right, y1: Y(v), y2: Y(v), class: "ak-chart__grid" }));
-      const tk = svg("text", { x: PAD3.left - 8, y: Y(v) + 4, class: "ak-chart__tick", "text-anchor": "end" });
-      tk.textContent = fmtTick(v);
-      node.appendChild(tk);
-    }
-    for (let v = xMin; v <= xMax + xStep / 2; v += xStep) {
-      const tk = svg("text", { x: X(v), y: H4 - PAD3.bottom + 16, class: "ak-chart__tick", "text-anchor": "middle" });
-      tk.textContent = fmtTick(v);
-      node.appendChild(tk);
-    }
-    if (points.length >= 3) {
-      const n = points.length;
-      let sx = 0, sy = 0, sxy = 0, sxx = 0;
-      for (const p of points) {
-        sx += p.x;
-        sy += p.y;
-        sxy += p.x * p.y;
-        sxx += p.x * p.x;
-      }
-      const slope = (n * sxy - sx * sy) / Math.max(n * sxx - sx * sx, 1e-9);
-      const icept = (sy - slope * sx) / n;
-      node.appendChild(svg("line", {
-        x1: X(xMin),
-        y1: Y(slope * xMin + icept),
-        x2: X(xMax),
-        y2: Y(slope * xMax + icept),
-        class: "ak-chart__trend"
-      }));
-    }
-    const still2 = ctx.still();
-    points.forEach((p, i) => {
-      const dot = svg("circle", { cx: X(p.x), cy: Y(p.y), r: 6, class: "ak-chart__point" });
-      if (p.label) {
-        const cap = svg("title", {});
-        cap.textContent = String(p.label);
-        dot.appendChild(cap);
-      }
-      if (!still2) {
-        dot.classList.add("ak-chart__point--enter");
-        dot.style.animationDelay = `${i * 22}ms`;
-      }
-      node.appendChild(dot);
-    });
-    ctx.root.appendChild(node);
-    if (data.xLabel || data.yLabel) {
-      ctx.root.appendChild(el("figcaption", { class: "ak-chart__legend" }, [
-        data.xLabel ? el("span", { class: "ak-chart__key", text: `x · ${data.xLabel}` }) : null,
-        data.yLabel ? el("span", { class: "ak-chart__key", text: `y · ${data.yLabel}` }) : null
-      ]));
-    }
-  }
-  function renderFunnel(ctx, data) {
-    const steps2 = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && typeof s.value === "number" && s.value >= 0);
-    if (!steps2.length || steps2[0].value <= 0) return ctx.empty();
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + steps2.map((s) => s.label + " " + s.value).join(", "));
-    const W7 = 460;
-    const STEP_H = 44;
-    const GAP2 = 7;
-    const BAND = 340;
-    const CX = 195;
-    const H4 = steps2.length * (STEP_H + GAP2) - GAP2 + 8;
-    const first = steps2[0].value;
-    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    const still2 = ctx.still();
-    const half = (v) => Math.max(v / first * BAND, 18) / 2;
-    steps2.forEach((s, i) => {
-      const y = 4 + i * (STEP_H + GAP2);
-      const topHalf = half(s.value);
-      const nxt = steps2[i + 1];
-      const botHalf = nxt ? half(nxt.value) : topHalf;
-      const band = svg("path", {
-        d: `M${CX - topHalf} ${y} L${CX + topHalf} ${y} L${CX + botHalf} ${y + STEP_H} L${CX - botHalf} ${y + STEP_H} Z`,
-        class: "ak-chart__funnelband"
-      });
-      band.style.fill = SERIES_VARS[i % SERIES_VARS.length];
-      if (!still2) {
-        band.classList.add("ak-chart__band--enter");
-        band.style.animationDelay = `${i * 80}ms`;
-      }
-      node.appendChild(band);
-      const name = svg("text", { x: CX, y: y + STEP_H / 2 + 5, class: "ak-chart__funnellabel", "text-anchor": "middle" });
-      name.textContent = `${s.label} · ${fmtTick(s.value)}`;
-      node.appendChild(name);
-      const pct = svg("text", { x: W7 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
-      pct.textContent = Math.round(s.value / first * 100) + " %";
-      node.appendChild(pct);
-    });
-    ctx.root.appendChild(node);
-  }
-  function squarify(items, x, y, w, h) {
-    const out = [];
-    let rest = items.slice();
-    while (rest.length) {
-      const along = Math.min(w, h);
-      let row = [rest[0]];
-      let sum = rest[0].v;
-      const total = rest.reduce((a, b) => a + b.v, 0);
-      const worst = (r, s) => {
-        const side2 = s / total * (w * h) / along;
-        let bad = 0;
-        for (const it of r) {
-          const other = it.v / s * along;
-          bad = Math.max(bad, side2 / other, other / side2);
-        }
-        return bad;
-      };
-      while (rest.length > row.length) {
-        const cand = rest[row.length];
-        if (worst(row.concat(cand), sum + cand.v) <= worst(row, sum)) {
-          row.push(cand);
-          sum += cand.v;
-        } else break;
-      }
-      const side = sum / total * (w * h) / along;
-      let run = 0;
-      for (const it of row) {
-        const span = it.v / sum * along;
-        out.push(w <= h ? { it, x: x + run, y, w: span, h: side } : { it, x, y: y + run, w: side, h: span });
-        run += span;
-      }
-      if (w <= h) {
-        y += side;
-        h -= side;
-      } else {
-        x += side;
-        w -= side;
-      }
-      rest = rest.slice(row.length);
-    }
-    return out;
-  }
-  function renderTreemap(ctx, data) {
-    const items = (data && Array.isArray(data.items) ? data.items : []).filter((s) => s && typeof s.value === "number" && s.value > 0).sort((a, b) => b.value - a.value);
-    if (!items.length) return ctx.empty();
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + items.map((s) => s.label + " " + s.value).join(", "));
-    const W7 = 560;
-    const H4 = 320;
-    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    const cells = squarify(items.map((s, i) => ({ v: s.value, s, i })), 2, 2, W7 - 4, H4 - 4);
-    const still2 = ctx.still();
-    cells.forEach((c, n) => {
-      const G = 2.5;
-      const rect = svg("rect", {
-        x: c.x + G,
-        y: c.y + G,
-        width: Math.max(c.w - G * 2, 1),
-        height: Math.max(c.h - G * 2, 1),
-        rx: 6,
-        class: "ak-chart__cell"
-      });
-      rect.style.fill = SERIES_VARS[c.it.i % SERIES_VARS.length];
-      const cap = svg("title", {});
-      cap.textContent = `${c.it.s.label} · ${fmtTick(c.it.s.value)}`;
-      rect.appendChild(cap);
-      if (!still2) {
-        rect.classList.add("ak-chart__band--enter");
-        rect.style.animationDelay = `${n * 45}ms`;
-      }
-      node.appendChild(rect);
-      if (c.w > 86 && c.h > 44) {
-        const name = svg("text", { x: c.x + 12, y: c.y + 24, class: "ak-chart__cellname" });
-        name.textContent = String(c.it.s.label);
-        node.appendChild(name);
-        const val = svg("text", { x: c.x + 12, y: c.y + 42, class: "ak-chart__cellvalue" });
-        val.textContent = fmtTick(c.it.s.value);
-        node.appendChild(val);
-      }
-    });
-    ctx.root.appendChild(node);
-  }
-  function renderFlow(ctx, data) {
-    const nodes = (data && Array.isArray(data.nodes) ? data.nodes : []).filter((n) => n && n.id);
-    const links = (data && Array.isArray(data.links) ? data.links : []).filter((l) => l && l.from && l.to && typeof l.value === "number" && l.value > 0);
-    if (!nodes.length || !links.length) return ctx.empty();
-    const byId = new Map(nodes.map((n) => [n.id, { n, in: 0, out: 0, depth: 0 }]));
-    for (const l of links) {
-      const a = byId.get(l.from);
-      const b = byId.get(l.to);
-      if (!a || !b) continue;
-      a.out += l.value;
-      b.in += l.value;
-    }
-    for (let pass = 0; pass < nodes.length; pass++) {
-      let moved = false;
-      for (const l of links) {
-        const a = byId.get(l.from);
-        const b = byId.get(l.to);
-        if (a && b && b.depth < a.depth + 1 && a.depth + 1 < nodes.length) {
-          b.depth = a.depth + 1;
-          moved = true;
-        }
-      }
-      if (!moved) break;
-    }
-    const maxDepth = Math.max(...[...byId.values()].map((m) => m.depth));
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + nodes.map((n) => n.label || n.id).join(", "));
-    const W7 = 560;
-    const H4 = 320;
-    const NODE_W = 12;
-    const PAD_Y = 10;
-    const cols = [];
-    for (const m of byId.values()) (cols[m.depth] = cols[m.depth] || []).push(m);
-    const scale = (H4 - PAD_Y * 2 - 8 * Math.max(...cols.map((c) => (c || []).length - 1), 0)) / Math.max(...cols.map((c) => (c || []).reduce((a, m) => a + Math.max(m.in, m.out), 0)), 1e-9);
-    const colX = (d) => 8 + (maxDepth ? (W7 - NODE_W - 16) * (d / maxDepth) : 0);
-    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    let colourIdx = 0;
-    for (const col of cols) {
-      if (!col) continue;
-      col.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out));
-      let y = PAD_Y;
-      for (const m of col) {
-        m.h = Math.max(Math.max(m.in, m.out) * scale, 4);
-        m.x = colX(m.depth);
-        m.y = y;
-        m.colour = SERIES_VARS[colourIdx++ % SERIES_VARS.length];
-        m.spentOut = 0;
-        m.spentIn = 0;
-        y += m.h + 8;
-      }
-    }
-    for (const l of links) {
-      const a = byId.get(l.from);
-      const b = byId.get(l.to);
-      if (!a || !b) continue;
-      const th = l.value * scale;
-      const y1 = a.y + a.spentOut + th / 2;
-      const y2 = b.y + b.spentIn + th / 2;
-      a.spentOut += th;
-      b.spentIn += th;
-      const x1 = a.x + NODE_W;
-      const x2 = b.x;
-      const mid = (x1 + x2) / 2;
-      const ribbon = svg("path", {
-        d: `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`,
-        class: "ak-chart__ribbon",
-        "stroke-width": Math.max(th, 1.5)
-      });
-      ribbon.style.stroke = a.colour;
-      node.appendChild(ribbon);
-    }
-    for (const m of byId.values()) {
-      const bar2 = svg("rect", { x: m.x, y: m.y, width: NODE_W, height: m.h, rx: 4, class: "ak-chart__flownode" });
-      bar2.style.fill = m.colour;
-      node.appendChild(bar2);
-      const last = m.depth === maxDepth;
-      const name = svg("text", {
-        x: last ? m.x - 6 : m.x + NODE_W + 6,
-        y: m.y + Math.min(m.h / 2 + 4, m.h + 2),
-        class: "ak-chart__flowlabel",
-        "text-anchor": last ? "end" : "start"
-      });
-      name.textContent = `${m.n.label || m.n.id} · ${fmtTick(Math.max(m.in, m.out))}`;
-      node.appendChild(name);
-    }
-    ctx.root.appendChild(node);
-  }
-  function renderRadar(ctx, data) {
-    const axes = (data && Array.isArray(data.axes) ? data.axes : []).slice(0, 10);
-    const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length).slice(0, 4);
-    if (axes.length < 3 || !series.length) return ctx.empty();
-    const max = typeof data.max === "number" && data.max > 0 ? data.max : series.reduce((m, s) => s.values.reduce((m2, v) => Math.max(m2, Number(v) || 0), m), 0) || 1;
-    ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + series.map((s) => s.label).join(", "));
-    const W7 = 460;
-    const H4 = 340;
-    const CX = W7 / 2;
-    const CY = H4 / 2 + 4;
-    const R2 = 118;
-    const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
-    const at3 = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
-    const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
-    for (const frac of [0.25, 0.5, 0.75, 1]) {
-      node.appendChild(svg("polygon", {
-        points: axes.map((a, i) => at3(i, R2 * frac)).join(" "),
-        class: "ak-chart__radarring"
-      }));
-    }
-    axes.forEach((label, i) => {
-      node.appendChild(svg("line", {
-        x1: CX,
-        y1: CY,
-        x2: CX + Math.cos(angle(i)) * R2,
-        y2: CY + Math.sin(angle(i)) * R2,
-        class: "ak-chart__radarspoke"
-      }));
-      const lx = CX + Math.cos(angle(i)) * (R2 + 16);
-      const ly = CY + Math.sin(angle(i)) * (R2 + 16);
-      const cap = svg("text", {
-        x: lx.toFixed(1),
-        y: (ly + 4).toFixed(1),
-        class: "ak-chart__tick",
-        "text-anchor": Math.abs(Math.cos(angle(i))) < 0.3 ? "middle" : Math.cos(angle(i)) > 0 ? "start" : "end"
-      });
-      cap.textContent = String(label);
-      node.appendChild(cap);
-    });
-    const still2 = ctx.still();
-    series.forEach((s, si) => {
-      const points = axes.map((a, i) => at3(i, R2 * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
-      const shape = svg("polygon", { points, class: "ak-chart__radarshape" });
-      shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
-      shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
-      if (!still2) {
-        shape.classList.add("ak-chart__band--enter");
-        shape.style.animationDelay = `${si * 120}ms`;
-      }
-      node.appendChild(shape);
-    });
-    ctx.root.appendChild(node);
-    const legend = el(
-      "figcaption",
-      { class: "ak-chart__legend" },
-      series.map((s) => el("span", { class: "ak-chart__key" }, [
-        el("span", { class: "ak-chart__swatch" }),
-        el("span", { text: String(s.label) })
-      ]))
-    );
-    series.forEach((s, i) => {
-      const sw = legend.children[i] && legend.children[i].firstChild;
-      if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
-    });
-    ctx.root.appendChild(legend);
-  }
-
-  // src/static/sdk-libs/atelier/chart-motion.js
-  var LATEST_DRAW = 2500;
-  function drawWhenSeen(root, node) {
-    const lines = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__line"));
-    const rest = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__area, .ak-chart__dot"));
-    if (motionOff(root) || !lines.length) return;
-    lines.forEach(function(line2) {
-      const len = typeof line2.getTotalLength === "function" ? line2.getTotalLength() : 0;
-      if (!len) return;
-      line2.setAttribute("stroke-dasharray", String(len));
-      line2.setAttribute("stroke-dashoffset", String(len));
-      line2.classList.add("ak-chart__line--enter");
-    });
-    rest.forEach(function(n) {
-      n.classList.add("ak-chart__late");
-    });
-    let drawn = false;
-    let late = null;
-    let watch3 = null;
-    const draw = function() {
-      if (drawn) return;
-      drawn = true;
-      clearTimeout(late);
-      if (watch3) watch3.destroy();
-      requestAnimationFrame(function() {
-        lines.forEach(function(line2) {
-          line2.classList.add("ak-chart__line--drawn");
-        });
-        rest.forEach(function(n) {
-          n.classList.add("ak-chart__late--in");
-        });
-      });
-    };
-    watch3 = inView(root, draw);
-    if (!drawn) late = setTimeout(draw, LATEST_DRAW);
-  }
-  function hoverRig(root, node, geom) {
-    const guide = svg("line", { x1: 0, x2: 0, y1: geom.top, y2: geom.bottom, class: "ak-chart__guide" });
-    node.appendChild(guide);
-    const marks = geom.points.map(function(p) {
-      const c = svg("circle", { cx: 0, cy: 0, r: 4.5, class: "ak-chart__hover", style: "stroke:" + p.colour });
-      node.appendChild(c);
-      return c;
-    });
-    const gx = liveSpring(function(x) {
-      guide.setAttribute("x1", x.toFixed(2));
-      guide.setAttribute("x2", x.toFixed(2));
-      marks.forEach(function(m) {
-        m.setAttribute("cx", x.toFixed(2));
-      });
-    }, { el: root, precision: 0.05 });
-    const gy = geom.points.map(function(_p, k) {
-      return liveSpring(function(y) {
-        marks[k].setAttribute("cy", y.toFixed(2));
-      }, { el: root, precision: 0.05 });
-    });
-    let tipSpring = null;
-    let showing = false;
-    let lastTip = null;
-    return {
-      at(i, tip, tipLeft) {
-        if (!tipSpring || lastTip !== tip) {
-          lastTip = tip;
-          tipSpring = liveSpring(function(x) {
-            tip.style.left = x.toFixed(1) + "px";
-          }, { el: root, precision: 0.1 });
-        }
-        if (!showing) {
-          gx.jump(geom.x(i));
-          gy.forEach(function(s, k) {
-            s.jump(geom.points[k].y(i));
-          });
-          tipSpring.jump(tipLeft);
-          showing = true;
-          node.classList.add("ak-chart__svg--reading");
-          tip.classList.add("ak-chart__tip--on");
-          return;
-        }
-        gx.set(geom.x(i));
-        gy.forEach(function(s, k) {
-          s.set(geom.points[k].y(i));
-        });
-        tipSpring.set(tipLeft);
-      },
-      hide(tip) {
-        showing = false;
-        node.classList.remove("ak-chart__svg--reading");
-        tip.classList.remove("ak-chart__tip--on");
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/chart.js
-  var W = 560;
-  var H = 300;
-  var PAD = { top: 16, right: 14, bottom: 34, left: 46 };
-  function chart(spec) {
-    const kind = ["donut", "calendar", "scatter", "funnel", "treemap", "flow", "radar"].indexOf(spec.kind) >= 0 ? spec.kind : "axes";
-    const root = el("figure", {
-      class: "ak-root ak-chart" + (spec.presentation === "mural" ? " ak-chart--mural" : ""),
-      role: "img"
-    });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    const ctx = {
-      root,
-      still: () => reducedMotion(),
-      empty: () => {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-      },
-      title: spec.title
-    };
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      if (kind === "donut") return renderDonut(ctx, data);
-      if (kind === "calendar") return renderCalendar(ctx, data);
-      if (kind === "scatter") return renderScatter(ctx, data);
-      if (kind === "funnel") return renderFunnel(ctx, data);
-      if (kind === "treemap") return renderTreemap(ctx, data);
-      if (kind === "flow") return renderFlow(ctx, data);
-      if (kind === "radar") return renderRadar(ctx, data);
-      renderAxes(data);
-    }
-    function renderAxes(data) {
-      const labels = data && Array.isArray(data.labels) ? data.labels : [];
-      const series = (data && Array.isArray(data.series) ? data.series : []).filter((s) => s && Array.isArray(s.values) && s.values.length > 0);
-      if (!labels.length || !series.length) return ctx.empty();
-      const stacked = !!data.stacked;
-      const horizontal = !!data.horizontal;
-      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + series.map((s) => s.label).join(", "));
-      const bars = series.filter((s) => (s.kind || "bar") === "bar");
-      const lines = series.filter((s) => s.kind === "line" || s.kind === "area");
-      let min = 0;
-      let max = 0;
-      if (stacked && bars.length) {
-        for (let i = 0; i < labels.length; i++) {
-          let up = 0;
-          let down = 0;
-          for (const s of bars) {
-            const v = s.values[i] || 0;
-            if (v >= 0) up += v;
-            else down += v;
-          }
-          if (up > max) max = up;
-          if (down < min) min = down;
-        }
-        for (const s of lines) for (const v of s.values) {
-          if (v < min) min = v;
-          if (v > max) max = v;
-        }
-      } else {
-        for (const s of series) for (const v of s.values) {
-          if (v < min) min = v;
-          if (v > max) max = v;
-        }
-      }
-      if (max === min) max = min + 1;
-      const step = tickStep(max - min);
-      min = Math.floor(min / step) * step;
-      max = Math.ceil(max / step) * step;
-      const width = horizontal ? H : W;
-      const height = horizontal ? W : H;
-      const pad = horizontal ? { top: 14, right: 20, bottom: 16, left: 86 } : PAD;
-      const innerAlong = horizontal ? height - pad.top - pad.bottom : width - pad.left - pad.right;
-      const innerCross = horizontal ? width - pad.left - pad.right : height - pad.top - pad.bottom;
-      const along = (i) => (horizontal ? pad.top : pad.left) + innerAlong * i / labels.length;
-      const slot2 = innerAlong / labels.length;
-      const cross = (v) => horizontal ? pad.left + innerCross * ((v - min) / (max - min)) : pad.top + innerCross * (1 - (v - min) / (max - min));
-      const node = svg("svg", { viewBox: `0 0 ${horizontal ? width : W} ${horizontal ? height : H}`, class: "ak-chart__svg", "aria-hidden": "true" });
-      const defs = defsFor(node, series.length);
-      for (let v = min; v <= max + step / 2; v += step) {
-        const g = cross(v);
-        node.appendChild(horizontal ? svg("line", { x1: g, x2: g, y1: pad.top, y2: height - pad.bottom, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }) : svg("line", { x1: pad.left, x2: width - pad.right, y1: g, y2: g, class: v === 0 ? "ak-chart__zero" : "ak-chart__grid" }));
-        const tick = horizontal ? svg("text", { x: g, y: height - pad.bottom + 14, class: "ak-chart__tick", "text-anchor": "middle" }) : svg("text", { x: pad.left - 8, y: g + 4, class: "ak-chart__tick", "text-anchor": "end" });
-        tick.textContent = fmtTick(v);
-        node.appendChild(tick);
-      }
-      labels.forEach((label, i) => {
-        const tx = horizontal ? svg("text", { x: pad.left - 10, y: along(i) + slot2 / 2 + 4, class: "ak-chart__tick", "text-anchor": "end" }) : svg("text", { x: along(i) + slot2 / 2, y: height - pad.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
-        tx.textContent = String(label);
-        node.appendChild(tx);
-      });
-      const still2 = ctx.still();
-      for (const s of series) {
-        if (s.kind !== "area" || horizontal) continue;
-        const si = series.indexOf(s);
-        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
-        const path = smoothPath(pts) + ` L ${pts[pts.length - 1].x} ${cross(0)} L ${pts[0].x} ${cross(0)} Z`;
-        node.appendChild(svg("path", { d: path, class: "ak-chart__area", fill: defs.fade(si) }));
-      }
-      const groupPad = slot2 * 0.16;
-      const radius = Math.min(7, Math.max(3, (slot2 - groupPad * 2) / (stacked ? 1 : Math.max(bars.length, 1)) * 0.28));
-      if (stacked) {
-        const stackW = Math.max(slot2 - groupPad * 2, 2);
-        for (let i = 0; i < labels.length; i++) {
-          let acc = 0;
-          bars.forEach((s, bi) => {
-            const v = s.values[i] || 0;
-            if (!v) return;
-            const from = cross(acc);
-            const to = cross(acc + v);
-            acc += v;
-            const topMost = bi === bars.length - 1;
-            const rect = barRect(along(i) + groupPad, from, to, stackW, topMost ? radius : 0);
-            rect.setAttribute("style", `fill:${SERIES_VARS[series.indexOf(s) % SERIES_VARS.length]}`);
-            decorateBar(rect, i);
-            node.appendChild(rect);
-            if (topMost) node.appendChild(sheenOver(rect));
-          });
-        }
-      } else {
-        const barW = bars.length ? (slot2 - groupPad * 2) / bars.length : 0;
-        bars.forEach((s, bi) => {
-          const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
-          s.values.slice(0, labels.length).forEach((v, i) => {
-            const rect = barRect(along(i) + groupPad + bi * barW + 1, cross(0), cross(v), Math.max(barW - 2, 1), radius);
-            rect.setAttribute("style", `fill:${colour}`);
-            decorateBar(rect, i);
-            node.appendChild(rect);
-            node.appendChild(sheenOver(rect));
-          });
-        });
-      }
-      function barRect(alongPos, fromCross, toCross, thickness, r) {
-        const lo = Math.min(fromCross, toCross);
-        const span = Math.max(Math.abs(toCross - fromCross), 0.5);
-        return horizontal ? svg("rect", { x: lo, y: alongPos, width: span, height: thickness, rx: r, class: "ak-chart__bar" }) : svg("rect", { x: alongPos, y: lo, width: thickness, height: span, rx: r, class: "ak-chart__bar" });
-      }
-      function sheenOver(rect) {
-        const s = (
-          /** @type {SVGRectElement} */
-          rect.cloneNode(false)
-        );
-        s.setAttribute("style", `fill:${defs.sheen}`);
-        s.setAttribute("class", "ak-chart__sheen");
-        return s;
-      }
-      function decorateBar(rect, i) {
-        if (!still2) {
-          rect.classList.add("ak-chart__bar--enter");
-          rect.style.transformOrigin = horizontal ? `${cross(0)}px center` : `center ${cross(0)}px`;
-          rect.style.animationDelay = `${i * 36}ms`;
-        }
-      }
-      for (const s of lines) {
-        if (horizontal) continue;
-        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
-        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
-        const line2 = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
-        node.appendChild(line2);
-        const last = pts[pts.length - 1];
-        node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
-      }
-      root.appendChild(node);
-      legendFor(series);
-      if (!horizontal) {
-        const rig = hoverRig(root, node, {
-          top: pad.top,
-          bottom: H - pad.bottom,
-          x: (i) => along(i) + slot2 / 2,
-          points: lines.map((s) => ({ colour: SERIES_VARS[series.indexOf(s) % SERIES_VARS.length], y: (i) => cross(s.values[i] ?? 0) }))
-        });
-        wireTooltip(node, labels, series, along, slot2, rig);
-      }
-      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot2);
-      if (!still2) drawWhenSeen(root, node);
-    }
-    function legendFor(series) {
-      const legend = el(
-        "figcaption",
-        { class: "ak-chart__legend" },
-        series.map((s) => el("span", { class: "ak-chart__key" }, [
-          el("span", { class: "ak-chart__swatch" + (s.kind === "line" || s.kind === "area" ? " ak-chart__swatch--line" : "") }),
-          el("span", { text: s.label })
-        ]))
-      );
-      series.forEach((s, i) => {
-        const sw = legend.children[i] && legend.children[i].firstChild;
-        if (sw) sw.style.background = SERIES_VARS[i % SERIES_VARS.length];
-      });
-      root.appendChild(legend);
-    }
-    function wireTooltip(node, labels, series, along, slot2, rig) {
-      const tip = el("div", { class: "ak-chart__tip" });
-      root.appendChild(tip);
-      let shownAt = -1;
-      node.addEventListener("pointermove", (ev) => {
-        const box = node.getBoundingClientRect();
-        const sx = (ev.clientX - box.left) * (W / box.width);
-        const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot2)));
-        if (i !== shownAt) {
-          shownAt = i;
-          clear(tip);
-          tip.appendChild(el("div", { class: "ak-chart__tip-label", text: String(labels[i]) }));
-          series.forEach((s, si) => {
-            const row = el("div", { class: "ak-chart__tip-row" }, [
-              el("span", { class: "ak-chart__tip-swatch" }),
-              el("span", { text: s.label }),
-              el("b", { text: fmtTick(s.values[i] ?? 0) })
-            ]);
-            row.firstChild.style.background = SERIES_VARS[si % SERIES_VARS.length];
-            tip.appendChild(row);
-          });
-        }
-        const rootBox = root.getBoundingClientRect();
-        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
-        tip.style.top = `${box.top - rootBox.top + 6}px`;
-        rig.at(i, tip, Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2)));
-      });
-      node.addEventListener("pointerleave", () => {
-        shownAt = -1;
-        rig.hide(tip);
-      });
-    }
-    function noteBubble(node, note, labels, along, slot2) {
-      const i = labels.indexOf(note.label);
-      if (i < 0 || !note.text) return;
-      const bubble = el("div", { class: "ak-chart__note" }, [
-        el("span", { class: "ak-chart__note-label", text: String(note.label) }),
-        el("span", { text: String(note.text) })
-      ]);
-      root.appendChild(bubble);
-      requestAnimationFrame(() => {
-        const box = node.getBoundingClientRect();
-        const rootBox = root.getBoundingClientRect();
-        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
-        bubble.style.left = `${Math.max(8, Math.min(rootBox.width - bubble.offsetWidth - 8, px - bubble.offsetWidth / 2))}px`;
-        bubble.style.top = `${box.top - rootBox.top + 4}px`;
-      });
-    }
-    render(spec.data);
-    return {
-      el: root,
-      /** @param {{ data: object|null }} patch */
-      set(patch) {
-        if (!patch) return;
-        render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/matrix.js
-  var TONES3 = ["ok", "warn", "err", "accent", "plain"];
-  function matrix(spec) {
-    const root = el("div", { class: "ak-root ak-matrix" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const cols = data && Array.isArray(data.cols) ? data.cols : [];
-      const rows = data && Array.isArray(data.rows) ? data.rows : [];
-      if (!cols.length || !rows.length) {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-        return;
-      }
-      const table2 = el("table", { class: "ak-matrix__table" });
-      const head = el("tr", {}, [el("th", { class: "ak-matrix__corner", scope: "col" })]);
-      for (const col of cols) {
-        head.appendChild(el("th", { class: "ak-matrix__col", scope: "col", text: col.label }));
-      }
-      table2.appendChild(el("thead", {}, [head]));
-      const body = el("tbody", {});
-      for (const row of rows) {
-        const cellsByCol = new Map((row.cells || []).map((c) => [c.col, c]));
-        const tr = el("tr", {
-          class: "ak-matrix__row",
-          ...spec.onPick ? { tabindex: "0", role: "button" } : {}
-        });
-        const label = el("th", { class: "ak-matrix__label", scope: "row" }, [
-          el("span", { text: row.label }),
-          row.badge != null ? el("span", { class: "ak-badge ak-matrix__badge" + (row.tone ? " ak-matrix__cell--" + row.tone : ""), text: row.badge }) : null
-        ]);
-        tr.appendChild(label);
-        for (const col of cols) {
-          const cell = cellsByCol.get(col.id);
-          const tone = cell && TONES3.includes(cell.tone || "") ? cell.tone : cell ? "plain" : null;
-          tr.appendChild(el("td", { class: "ak-matrix__cell" }, [
-            tone === null ? null : el("span", {
-              class: "ak-matrix__chip ak-matrix__cell--" + tone,
-              text: cell && cell.label != null ? cell.label : "●",
-              ...cell && cell.label == null ? { "aria-label": tone } : {}
-            })
-          ]));
-        }
-        if (spec.onPick) {
-          const pick = () => spec.onPick(row);
-          tr.addEventListener("click", pick);
-          tr.addEventListener("keydown", (ev) => {
-            if (
-              /** @type {KeyboardEvent} */
-              ev.key === "Enter" || /** @type {KeyboardEvent} */
-              ev.key === " "
-            ) {
-              ev.preventDefault();
-              pick();
-            }
-          });
-        }
-        body.appendChild(tr);
-      }
-      table2.appendChild(body);
-      root.appendChild(el("div", { class: "ak-matrix__scroll" }, [table2]));
-      enter(root);
-    }
-    render(spec.data);
-    return {
-      el: root,
-      /** @param {{ data: MatrixData|null }} patch */
-      set(patch) {
-        if (!patch) return;
-        render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/graph.js
-  var W2 = 720;
-  var H2 = 420;
-  var PAD2 = 46;
-  var PILL_H = 34;
-  var GUTTER = 4;
-  var LABEL_MAX = 24;
-  var SVG_NS6 = "http://www.w3.org/2000/svg";
-  function svg2(name, attrs) {
-    const node = document.createElementNS(SVG_NS6, name);
-    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
-    return node;
-  }
-  function pillLabel(label) {
-    const text = String(label == null ? "" : label);
-    return text.length > LABEL_MAX ? text.slice(0, LABEL_MAX - 1) + "…" : text;
-  }
-  function pillWidth(label) {
-    return Math.min(Math.max(pillLabel(label).length * 7.6 + 26, 60), 190);
-  }
-  function clamp2(v, lo, hi) {
-    if (hi < lo) return (lo + hi) / 2;
-    return Math.min(Math.max(v, lo), hi);
-  }
-  function place(nodes, widths) {
-    const out = /* @__PURE__ */ new Map();
-    let widest = 0;
-    for (const w of widths.values()) widest = Math.max(widest, w);
-    const padX = Math.min(Math.max(PAD2, widest / 2 + GUTTER), W2 / 2 - GUTTER);
-    const padY = Math.max(PAD2, PILL_H / 2 + GUTTER);
-    const ringed = nodes.filter((n) => typeof n.x !== "number" || typeof n.y !== "number");
-    let ringIndex = 0;
-    for (const node of nodes) {
-      let x;
-      let y;
-      if (typeof node.x === "number" && typeof node.y === "number") {
-        x = padX + Math.min(Math.max(node.x, 0), 100) / 100 * (W2 - padX * 2);
-        y = padY + Math.min(Math.max(node.y, 0), 100) / 100 * (H2 - padY * 2);
-      } else {
-        const angle = 2 * Math.PI * ringIndex / Math.max(ringed.length, 1) - Math.PI / 2;
-        x = W2 / 2 + Math.cos(angle) * (W2 / 2 - padX);
-        y = H2 / 2 + Math.sin(angle) * (H2 / 2 - padY);
-        ringIndex++;
-      }
-      const half = (widths.get(node.id) || 60) / 2;
-      out.set(node.id, {
-        x: clamp2(x, half + GUTTER, W2 - half - GUTTER),
-        y: clamp2(y, PILL_H / 2 + GUTTER, H2 - PILL_H / 2 - GUTTER)
-      });
-    }
-    return out;
-  }
-  function graph(spec) {
-    const root = el("figure", { class: "ak-root ak-graph", role: "img" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const nodes = data && Array.isArray(data.nodes) ? data.nodes.filter((n) => n && n.id) : [];
-      const edges = data && Array.isArray(data.edges) ? data.edges : [];
-      if (!nodes.length) {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-        return;
-      }
-      root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + nodes.map((n) => n.label).join(", "));
-      const widths = /* @__PURE__ */ new Map();
-      for (const item of nodes) widths.set(item.id, pillWidth(item.label));
-      const at3 = place(nodes, widths);
-      const node = svg2("svg", { viewBox: `0 0 ${W2} ${H2}`, class: "ak-graph__svg", "aria-hidden": "true" });
-      for (const edge of edges) {
-        const a = at3.get(edge.from);
-        const b = at3.get(edge.to);
-        if (!a || !b) continue;
-        node.appendChild(svg2("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "ak-graph__edge" }));
-        if (edge.label) {
-          const text = svg2("text", {
-            x: (a.x + b.x) / 2,
-            y: (a.y + b.y) / 2 - 5,
-            class: "ak-graph__edgelabel",
-            "text-anchor": "middle"
-          });
-          text.textContent = edge.label;
-          node.appendChild(text);
-        }
-      }
-      for (const item of nodes) {
-        const p = at3.get(item.id);
-        const width = widths.get(item.id);
-        const g = svg2("g", { class: "ak-graph__node ak-graph__node--" + (item.tone || "plain"), transform: `translate(${p.x}, ${p.y})` });
-        g.appendChild(svg2("rect", { x: -width / 2, y: -PILL_H / 2, width, height: PILL_H, rx: PILL_H / 2, class: "ak-graph__pill" }));
-        const label = svg2("text", { x: 0, y: 5, class: "ak-graph__label", "text-anchor": "middle" });
-        label.textContent = pillLabel(item.label);
-        g.appendChild(label);
-        if (spec.onPick) {
-          g.setAttribute("role", "button");
-          g.setAttribute("tabindex", "0");
-          g.addEventListener("click", () => spec.onPick(item));
-          g.addEventListener("keydown", (ev) => {
-            if (
-              /** @type {KeyboardEvent} */
-              ev.key === "Enter"
-            ) spec.onPick(item);
-          });
-        }
-        node.appendChild(g);
-      }
-      root.appendChild(node);
-      enter(root);
-    }
-    render(spec.data);
-    return {
-      el: root,
-      /** @param {{ data: GraphData|null }} patch */
-      set(patch) {
-        if (!patch) return;
-        render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/waveform.js
-  var W3 = 720;
-  var H3 = 120;
-  var SVG_NS7 = "http://www.w3.org/2000/svg";
-  function svg3(name, attrs) {
-    const node = document.createElementNS(SVG_NS7, name);
-    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
-    return node;
-  }
-  function waveform(spec) {
-    const root = el("figure", { class: "ak-root ak-waveform", role: "img" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const values = data && Array.isArray(data.values) ? data.values.filter((v) => typeof v === "number" && Number.isFinite(v)).map((v) => Math.max(v, 0)) : [];
-      if (!values.length) {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-        return;
-      }
-      root.setAttribute("aria-label", spec.title || t("empty"));
-      const max = data && typeof data.max === "number" && data.max > 0 ? data.max : Math.max(...values, 1e-4);
-      const node = svg3("svg", { viewBox: `0 0 ${W3} ${H3}`, class: "ak-waveform__svg", "aria-hidden": "true", preserveAspectRatio: "none" });
-      const slot2 = W3 / values.length;
-      const barW = Math.max(Math.min(slot2 * 0.62, 14), 1.5);
-      values.forEach((v, i) => {
-        const half = Math.max(Math.min(v / max, 1) * (H3 - 8) / 2, 1.2);
-        const strength = Math.round(Math.min(v / max, 1) * 100);
-        node.appendChild(svg3("rect", {
-          x: i * slot2 + (slot2 - barW) / 2,
-          y: H3 / 2 - half,
-          width: barW,
-          height: half * 2,
-          rx: barW / 2,
-          class: "ak-waveform__bar",
-          style: `fill: color-mix(in oklab, var(--ak-accent) ${strength}%, var(--ak-ink-dim))`
-        }));
-      });
-      root.appendChild(node);
-    }
-    render(spec.data);
-    return {
-      el: root,
-      /** @param {{ data: { values: number[], max?: number }|null }} patch */
-      set(patch) {
-        if (!patch) return;
-        render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/_core/config.js
-  function cfg() {
-    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
-  }
-  function resolveNodeUrl() {
-    const meta = document.querySelector('meta[name="aimeat-node"]');
-    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
-    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
-    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
-      return self.origin;
-    }
-    return cfg().baseUrl;
-  }
-  var NODE_URL = resolveNodeUrl();
-  var APEX_URL = cfg().baseUrl;
-  var NODE_ID = cfg().nodeId;
-  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
-
-  // src/static/sdk-libs/atelier/scene3d.js
-  var threePromise = null;
-  function ensureThree() {
-    if (window.THREE && window.THREE.Addons) return Promise.resolve(window.THREE);
-    if (threePromise) return threePromise;
-    threePromise = new Promise(function(ok, fail) {
-      const s = document.createElement("script");
-      s.src = NODE_URL + "/lib/three-world@1.min.js";
-      s.onload = function() {
-        ok(window.THREE);
-      };
-      s.onerror = function() {
-        threePromise = null;
-        fail(new Error("three-world failed to load"));
-      };
-      document.head.appendChild(s);
-    });
-    return threePromise;
-  }
-  var loadersPromise = null;
-  function ensureLoaders() {
-    return ensureThree().then(function(THREE) {
-      if (THREE.Addons.GLTFLoader) return THREE;
-      if (loadersPromise) return loadersPromise;
-      loadersPromise = new Promise(function(ok, fail) {
-        const s = document.createElement("script");
-        s.src = NODE_URL + "/lib/three-world-loaders@1.min.js";
-        s.onload = function() {
-          ok(THREE);
-        };
-        s.onerror = function() {
-          loadersPromise = null;
-          fail(new Error("three-world-loaders failed to load"));
-        };
-        document.head.appendChild(s);
-      });
-      return loadersPromise;
-    });
-  }
-  function easeOut(x) {
-    return 1 - Math.pow(1 - x, 3);
-  }
-  function scene3d(spec) {
-    const kind = ["sky", "bars", "model", "globe"].indexOf(spec.kind) >= 0 ? spec.kind : "orb";
-    const root = el("figure", { class: "ak-root ak-scene", "data-ak-scene": kind });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    if (spec.title) root.appendChild(el("figcaption", { class: "ak-scene__title" }, spec.title));
-    const stage = el("div", { class: "ak-scene__stage" });
-    root.appendChild(stage);
-    const wait = skeleton({ target: stage, rows: 2 });
-    let destroyed = false;
-    let world = null;
-    (kind === "model" ? ensureLoaders() : ensureThree()).then(function(THREE) {
-      if (destroyed) return;
-      wait.destroy();
-      world = buildWorld(THREE, stage, kind, spec, root);
-      world.rebuild(spec.data || null);
-    }).catch(function() {
-      if (destroyed) return;
-      wait.destroy();
-      emptyState({
-        target: stage,
-        title: spec.empty && spec.empty.title || "3D is resting",
-        hint: spec.empty && spec.empty.hint || "The scene library could not load here."
-      });
-    });
-    return {
-      el: root,
-      set: function(patch) {
-        if (world && patch && "data" in patch) world.rebuild(patch.data || null);
-      },
-      destroy: function() {
-        destroyed = true;
-        if (world) world.dispose();
-        root.remove();
-      }
-    };
-  }
-  function buildWorld(THREE, stage, kind, spec, root) {
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    stage.appendChild(renderer.domElement);
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 400);
-    const controls = new THREE.Addons.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = !reducedMotion();
-    controls.enablePan = false;
-    controls.enableZoom = kind === "bars" || kind === "model" || kind === "globe";
-    if (kind === "sky") {
-      controls.enableZoom = false;
-      controls.rotateSpeed = -0.35;
-    }
-    if (kind === "model") {
-      renderer.toneMappingExposure = 1.15;
-      const pmrem = new THREE.PMREMGenerator(renderer);
-      scene.environment = pmrem.fromScene(new THREE.Addons.RoomEnvironment(), 0.04).texture;
-      const inkC = new THREE.Color(tokenColor(root, "--ak-ink"));
-      const bgC = new THREE.Color(tokenColor(root, "--ak-bg"));
-      const luma2 = (c) => c.r + c.g + c.b;
-      scene.background = luma2(inkC) < luma2(bgC) ? inkC : bgC;
-    }
-    let raf = 0;
-    let entranceUntil = 0;
-    let settleUntil = 0;
-    let disposed = false;
-    const clock = { start: 0 };
-    function frame2(now2) {
-      raf = 0;
-      if (disposed) return;
-      const entering = now2 < entranceUntil;
-      if (entering) {
-        const p = easeOut(Math.min(1, (now2 - clock.start) / (entranceUntil - clock.start)));
-        applyEntrance(p);
-      }
-      controls.update();
-      renderer.render(scene, camera);
-      if (entering || now2 < settleUntil) raf = requestAnimationFrame(frame2);
-    }
-    function wake(settleMs) {
-      settleUntil = Math.max(settleUntil, performance.now() + (settleMs || 0));
-      if (!raf) raf = requestAnimationFrame(frame2);
-    }
-    controls.addEventListener("start", function() {
-      wake(60 * 1e3);
-    });
-    controls.addEventListener("end", function() {
-      settleUntil = performance.now() + (controls.enableDamping ? 1600 : 0);
-    });
-    const ro = new ResizeObserver(function() {
-      const w = stage.clientWidth || 1;
-      const h = stage.clientHeight || 1;
-      renderer.setSize(w, h, false);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      wake(0);
-    });
-    ro.observe(stage);
-    let group = new THREE.Group();
-    scene.add(group);
-    let applyEntrance = function() {
-    };
-    function disposeGroup() {
-      group.traverse(function(o) {
-        if (o.geometry) o.geometry.dispose();
-        if (o.material) {
-          (Array.isArray(o.material) ? o.material : [o.material]).forEach(function(m) {
-            m.dispose();
-          });
-        }
-      });
-      scene.remove(group);
-      group = new THREE.Group();
-      scene.add(group);
-    }
-    function frameCamera(cols) {
-      if (kind === "model") {
-        camera.position.set(2.6, 1.7, 4.6);
-        controls.target.set(0, 1.1, 0);
-        controls.update();
-        return;
-      }
-      if (kind === "globe") {
-        camera.position.set(0, 2.4, 8.4);
-        controls.target.set(0, 0, 0);
-      } else if (kind === "sky") {
-        camera.position.set(0, 2, 0.5);
-        controls.target.set(0, 16, -22);
-      } else if (kind === "bars") {
-        camera.position.set(cols * 2.2, cols * 2, cols * 3.2);
-        controls.target.set(0, 1.4, 0);
-      } else {
-        camera.position.set(0, 1.2, 11.5);
-        controls.target.set(0, 0, 0);
-      }
-      controls.update();
-    }
-    function rebuild(data) {
-      disposeGroup();
-      const accent = tokenColor(root, "--ak-accent");
-      const ink3 = tokenColor(root, "--ak-ink");
-      const surface = tokenColor(root, "--ak-surface-2", "--ak-surface");
-      scene.fog = null;
-      let barCols = 3;
-      if (kind === "model") {
-        const url = data && data.url ? String(data.url) : "";
-        if (!url) {
-          applyEntrance = function() {
-          };
-          wake(0);
-          return;
-        }
-        const shimmer = skeleton({ target: stage, rows: 2 });
-        new THREE.Addons.GLTFLoader().load(url, function(gltf) {
-          shimmer.destroy();
-          const model = gltf.scene;
-          const box = new THREE.Box3().setFromObject(model);
-          const size = box.getSize(new THREE.Vector3());
-          const centre = box.getCenter(new THREE.Vector3());
-          const scale = 2.6 / Math.max(size.x, size.y, size.z, 1e-6);
-          model.scale.setScalar(scale);
-          model.position.set(-centre.x * scale, -box.min.y * scale, -centre.z * scale);
-          group.add(model);
-          const c = document.createElement("canvas");
-          c.width = c.height = 128;
-          const g2 = c.getContext("2d");
-          const grad = g2.createRadialGradient(64, 64, 8, 64, 64, 64);
-          const channels = function(s) {
-            return (s.match(/\d+/g) || ["0", "0", "0"]).map(Number);
-          };
-          const inkCh = channels(ink3);
-          const surfCh = channels(surface);
-          const shadow = (inkCh[0] + inkCh[1] + inkCh[2] <= surfCh[0] + surfCh[1] + surfCh[2] ? inkCh : surfCh).map(function(v) {
-            return Math.round(v * 0.3);
-          }).join(",");
-          grad.addColorStop(0, "rgba(" + shadow + ",0.42)");
-          grad.addColorStop(1, "rgba(" + shadow + ",0)");
-          g2.fillStyle = grad;
-          g2.fillRect(0, 0, 128, 128);
-          const disc = new THREE.Mesh(
-            new THREE.PlaneGeometry(3.6, 3.6).rotateX(-Math.PI / 2),
-            new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false })
-          );
-          disc.position.y = 1e-3;
-          group.add(disc);
-          applyEntrance = function(p) {
-            model.rotation.y = (1 - p) * 1.2;
-            model.position.y = -box.min.y * scale + (1 - p) * 0.35;
-          };
-          frameCamera(3);
-          clock.start = performance.now();
-          entranceUntil = reducedMotion() ? clock.start : clock.start + 900;
-          if (reducedMotion()) applyEntrance(1);
-          wake(reducedMotion() ? 0 : 950);
-        }, void 0, function() {
-          shimmer.destroy();
-          emptyState({
-            target: stage,
-            title: spec.empty && spec.empty.title || "3D is resting",
-            hint: spec.empty && spec.empty.hint || "The model could not load from its address."
-          });
-        });
-        applyEntrance = function() {
-        };
-        return;
-      }
-      if (kind === "globe") {
-        const R2 = 3;
-        const accentC = new THREE.Color(accent);
-        const inkC = new THREE.Color(ink3);
-        const surfaceC = new THREE.Color(surface);
-        const ball = new THREE.Group();
-        group.add(ball);
-        ball.add(new THREE.Mesh(
-          new THREE.SphereGeometry(R2 - 0.02, 48, 32),
-          new THREE.MeshStandardMaterial({ color: surfaceC.clone().lerp(inkC, 0.05), roughness: 0.9, metalness: 0.02 })
-        ));
-        ball.add(new THREE.Mesh(
-          new THREE.SphereGeometry(R2 * 1.045, 48, 32),
-          new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false })
-        ));
-        const gratMat = new THREE.LineBasicMaterial({ color: inkC, transparent: true, opacity: 0.22 });
-        const toV = function(lat, lon, r) {
-          return new THREE.Vector3().setFromSphericalCoords(
-            r || R2,
-            THREE.MathUtils.degToRad(90 - lat),
-            THREE.MathUtils.degToRad(lon + 180)
-          );
-        };
-        for (let lat = -60; lat <= 60; lat += 20) {
-          const pts = [];
-          for (let lon = 0; lon <= 360; lon += 6) pts.push(toV(lat, lon));
-          ball.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat));
-        }
-        for (let lon = 0; lon < 360; lon += 20) {
-          const pts = [];
-          for (let lat = -90; lat <= 90; lat += 6) pts.push(toV(lat, lon));
-          ball.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat));
-        }
-        const points = (data && Array.isArray(data.points) ? data.points : []).filter(function(p) {
-          return p && typeof p.lat === "number" && typeof p.lon === "number";
-        });
-        const dotGeo = new THREE.SphereGeometry(0.085, 12, 8);
-        const dotMat = new THREE.MeshBasicMaterial({ color: accentC });
-        for (const p of points) {
-          const dot = new THREE.Mesh(dotGeo, dotMat);
-          dot.position.copy(toV(p.lat, p.lon, R2 + 0.02));
-          ball.add(dot);
-        }
-        const routes = (data && Array.isArray(data.routes) ? data.routes : []).filter(function(r2) {
-          return r2 && Array.isArray(r2.from) && Array.isArray(r2.to);
-        });
-        const arcMat = new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.7 });
-        for (const r2 of routes) {
-          const a = toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, R2 + 0.02);
-          const b = toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, R2 + 0.02);
-          const sum = a.clone().add(b);
-          if (sum.lengthSq() < 1e-6) sum.set(0, R2, 0);
-          const lift = R2 + 0.25 + a.distanceTo(b) * 0.3;
-          const mid = sum.normalize().multiplyScalar(lift);
-          const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
-          ball.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.025, 6, false), arcMat));
-        }
-        const centre = new THREE.Vector3();
-        for (const p of points) centre.add(toV(p.lat, p.lon, 1));
-        for (const r2 of routes) {
-          centre.add(toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, 1));
-          centre.add(toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, 1));
-        }
-        const baseY = centre.lengthSq() > 1e-6 ? -Math.atan2(centre.x, centre.z) : 0;
-        ball.rotation.y = baseY;
-        applyEntrance = function(p) {
-          ball.rotation.y = baseY + (1 - p) * 1.4;
-          ball.scale.setScalar(0.6 + 0.4 * p);
-        };
-      } else if (kind === "sky") {
-        const sky = new THREE.Addons.Sky();
-        sky.scale.setScalar(300);
-        group.add(sky);
-        const dark = root.closest('[data-theme="dark"]') !== null || matchMedia("(prefers-color-scheme: dark)").matches && root.closest('[data-theme="light"]') === null;
-        const elevation = dark ? 1.6 : 18;
-        const phi = THREE.MathUtils.degToRad(90 - elevation);
-        const theta = THREE.MathUtils.degToRad(160);
-        const sun = new THREE.Vector3().setFromSphericalCoords(1, phi, theta);
-        sky.material.uniforms.sunPosition.value.copy(sun);
-        sky.material.uniforms.turbidity.value = dark ? 6 : 8;
-        sky.material.uniforms.rayleigh.value = dark ? 0.6 : 2.2;
-        applyEntrance = function() {
-        };
-      } else if (kind === "bars") {
-        const items = data && data.items || [];
-        const n = Math.min(items.length, 64);
-        if (n === 0) {
-          applyEntrance = function() {
-          };
-        } else {
-          const max = items.reduce(function(m, it) {
-            return Math.max(m, Number(it.value) || 0);
-          }, 0) || 1;
-          const box = new THREE.BoxGeometry(0.8, 1, 0.8);
-          box.translate(0, 0.5, 0);
-          const mat = new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.08 });
-          const mesh = new THREE.InstancedMesh(box, mat, n);
-          const cols = Math.ceil(Math.sqrt(n));
-          barCols = cols;
-          const accentC = new THREE.Color(accent);
-          const surfaceC = new THREE.Color(surface);
-          const heights = [];
-          const m4 = new THREE.Matrix4();
-          for (let i = 0; i < n; i++) {
-            const h = 0.15 + 4.6 * ((Number(items[i].value) || 0) / max);
-            heights.push(h);
-            const x = (i % cols - (cols - 1) / 2) * 1.15;
-            const z = (Math.floor(i / cols) - (Math.ceil(n / cols) - 1) / 2) * 1.15;
-            m4.makeScale(1, 1e-3, 1).setPosition(x, 0, z);
-            mesh.setMatrixAt(i, m4);
-            mesh.setColorAt(i, surfaceC.clone().lerp(accentC, 0.25 + 0.75 * (heights[i] / 4.75)));
-          }
-          if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-          group.add(mesh);
-          const ground = new THREE.Mesh(
-            new THREE.CylinderGeometry(cols * 0.95 + 1, cols * 0.95 + 1, 0.12, 48),
-            new THREE.MeshStandardMaterial({ color: new THREE.Color(surface), roughness: 0.9 })
-          );
-          ground.position.y = -0.06;
-          group.add(ground);
-          applyEntrance = function(p) {
-            const v = new THREE.Matrix4();
-            for (let i = 0; i < n; i++) {
-              mesh.getMatrixAt(i, v);
-              const pos = new THREE.Vector3().setFromMatrixPosition(v);
-              v.makeScale(1, Math.max(1e-3, heights[i] * p), 1).setPosition(pos.x, 0, pos.z);
-              mesh.setMatrixAt(i, v);
-            }
-            mesh.instanceMatrix.needsUpdate = true;
-          };
-        }
-      } else {
-        const geo = new THREE.IcosahedronGeometry(3.1, 1);
-        const body = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-          color: new THREE.Color(accent),
-          flatShading: true,
-          roughness: 0.35,
-          metalness: 0.15
-        }));
-        const frame3 = new THREE.LineSegments(
-          new THREE.EdgesGeometry(geo),
-          new THREE.LineBasicMaterial({ color: new THREE.Color(ink3), transparent: true, opacity: 0.35 })
-        );
-        group.add(body, frame3);
-        applyEntrance = function(p) {
-          const s = 0.25 + 0.75 * p;
-          group.scale.setScalar(s);
-          group.rotation.y = (1 - p) * 0.9;
-        };
-      }
-      if (kind !== "sky") {
-        const sun = new THREE.DirectionalLight();
-        sun.intensity = 2.2;
-        sun.position.set(4, 8, 6);
-        const fill2 = new THREE.HemisphereLight(new THREE.Color(surface), new THREE.Color(ink3), 0.7);
-        group.add(sun, fill2);
-      }
-      frameCamera(barCols);
-      clock.start = performance.now();
-      entranceUntil = reducedMotion() ? clock.start : clock.start + 750;
-      if (reducedMotion()) applyEntrance(1);
-      wake(reducedMotion() ? 0 : 800);
-    }
-    return {
-      rebuild,
-      dispose: function() {
-        if (disposed) return;
-        disposed = true;
-        if (raf) cancelAnimationFrame(raf);
-        ro.disconnect();
-        controls.dispose();
-        disposeGroup();
-        renderer.dispose();
-        renderer.forceContextLoss();
-        clear(stage);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/disclose.js
-  function slideOpen(panel, opening, span, ease) {
-    if (reducedMotion() || typeof panel.animate !== "function") {
-      panel.style.height = opening ? "auto" : "0px";
-      return;
-    }
-    const from = panel.getBoundingClientRect().height;
-    panel.style.height = "auto";
-    const to = opening ? panel.getBoundingClientRect().height : 0;
-    panel.style.height = from + "px";
-    const anim = panel.animate(
-      [{ height: from + "px", opacity: opening ? 0.4 : 1 }, { height: to + "px", opacity: opening ? 1 : 0.4 }],
-      { duration: span, easing: ease }
-    );
-    const settle4 = function() {
-      panel.style.height = opening ? "auto" : "0px";
-    };
-    anim.onfinish = settle4;
-    anim.oncancel = settle4;
-  }
-  function reveal(spec) {
-    const root = el("div", { class: "ak-root ak-reveal" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    const single = spec.mode !== "many";
-    const panes = /* @__PURE__ */ new Map();
-    function motion() {
-      const cs = getComputedStyle(root);
-      return {
-        span: parseFloat(cs.getPropertyValue("--ak-motion")) || 200,
-        ease: (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)"
-      };
-    }
-    function setOpen(id, want) {
-      const pane = panes.get(id);
-      if (!pane) return;
-      const isOpen = pane.head.getAttribute("aria-expanded") === "true";
-      if (isOpen === want) return;
-      const { span, ease } = motion();
-      if (want && single) {
-        for (const [otherId, other] of panes) {
-          if (otherId !== id && other.head.getAttribute("aria-expanded") === "true") {
-            other.head.setAttribute("aria-expanded", "false");
-            slideOpen(other.panel, false, span, ease);
-          }
-        }
-      }
-      pane.head.setAttribute("aria-expanded", String(want));
-      slideOpen(pane.panel, want, span, ease);
-    }
-    function render(items) {
-      clear(root);
-      panes.clear();
-      const openIds = spec.open || [];
-      for (const item of items) {
-        const panelId = "ak-rv-" + uid();
-        const headId = panelId + "-h";
-        const startOpen = openIds.indexOf(item.id) >= 0;
-        const head = el("button", {
-          type: "button",
-          class: "ak-reveal__head",
-          id: headId,
-          "aria-expanded": String(startOpen),
-          "aria-controls": panelId,
-          on: {
-            click: function() {
-              setOpen(item.id, head.getAttribute("aria-expanded") !== "true");
-            }
-          }
-        }, [
-          el("span", { class: "ak-reveal__titles" }, [
-            el("span", { class: "ak-reveal__title", text: item.title }),
-            item.sub != null ? el("span", { class: "ak-reveal__sub", text: item.sub }) : null
-          ]),
-          el("span", { class: "ak-reveal__chevron", "aria-hidden": "true" }, "⌄")
-        ]);
-        const panel = el("div", {
-          class: "ak-reveal__panel",
-          id: panelId,
-          role: "region",
-          "aria-labelledby": headId
-        });
-        const inner = el("div", { class: "ak-reveal__inner" });
-        if (item.text) inner.appendChild(el("p", { class: "ak-reveal__text", text: item.text }));
-        if (item.body) item.body(inner);
-        panel.appendChild(inner);
-        panel.style.height = startOpen ? "auto" : "0px";
-        root.appendChild(el("div", { class: "ak-reveal__pane" }, [head, panel]));
-        panes.set(item.id, { head, panel });
-      }
-      enter(root);
-    }
-    render(spec.items || []);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && patch.items) render(patch.items);
-      },
-      open(id) {
-        setOpen(id, true);
-      },
-      close(id) {
-        setOpen(id, false);
-      },
-      destroy() {
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-  function drawer(spec) {
-    const side = spec.side === "right" ? "right" : spec.side === "bottom" ? "bottom" : "left";
-    const node = (
-      /** @type {HTMLDialogElement} */
-      el("dialog", {
-        class: "ak-root ak-drawer ak-drawer--" + side,
-        "aria-label": spec.title || t("menu")
-      })
-    );
-    const panel = el("div", { class: "ak-drawer__panel" });
-    const head = el("div", { class: "ak-drawer__head" }, [
-      el("span", { class: "ak-drawer__title", text: spec.title || t("menu") }),
-      el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--ghost ak-drawer__x",
-        "aria-label": t("close"),
-        on: { click: function() {
-          close();
-        } }
-      }, "✕")
-    ]);
-    panel.appendChild(head);
-    const list3 = el("nav", { class: "ak-drawer__list" });
-    for (const item of spec.items || []) {
-      list3.appendChild(el("button", {
-        type: "button",
-        class: "ak-drawer__item",
-        ...item.current ? { "aria-current": "page" } : {},
-        on: {
-          click: function() {
-            if (spec.onPick) spec.onPick(item.id);
-            close();
-          }
-        }
-      }, [
-        el("span", { class: "ak-drawer__label", text: item.label }),
-        item.sub != null ? el("span", { class: "ak-drawer__sub", text: item.sub }) : null
-      ]));
-    }
-    if ((spec.items || []).length) panel.appendChild(list3);
-    if (spec.body) {
-      const host = el("div", { class: "ak-drawer__body" });
-      spec.body(host);
-      panel.appendChild(host);
-    }
-    node.appendChild(panel);
-    document.body.appendChild(wearLook(node, document.activeElement));
-    const travel3 = side === "bottom" ? "0, 100%" : side === "right" ? "100%, 0" : "-100%, 0";
-    function motion() {
-      const cs = getComputedStyle(node);
-      return {
-        span: parseFloat(cs.getPropertyValue("--ak-motion")) || 200,
-        ease: (cs.getPropertyValue("--ak-ease") || "").trim() || "cubic-bezier(0.2, 0.7, 0.3, 1)"
-      };
-    }
-    function open() {
-      if (node.open) return;
-      node.showModal();
-      if (reducedMotion() || typeof panel.animate !== "function") return;
-      const { span, ease } = motion();
-      panel.animate(
-        [{ transform: "translate(" + travel3 + ")" }, { transform: "none" }],
-        { duration: span * 1.4, easing: ease }
-      );
-    }
-    function close() {
-      if (!node.open) return;
-      const done = function() {
-        if (node.open) node.close();
-        if (spec.onClose) spec.onClose();
-      };
-      if (reducedMotion() || typeof panel.animate !== "function") return done();
-      const { span, ease } = motion();
-      const anim = panel.animate(
-        [{ transform: "none" }, { transform: "translate(" + travel3 + ")" }],
-        { duration: span, easing: ease }
-      );
-      anim.onfinish = done;
-      anim.oncancel = done;
-    }
-    node.addEventListener("cancel", function(ev) {
-      ev.preventDefault();
-      close();
-    });
-    node.addEventListener("click", function(ev) {
-      if (ev.target === node) close();
-    });
-    return {
-      el: node,
-      open,
-      close,
-      destroy() {
-        if (node.open) node.close();
-        if (node.parentNode) node.parentNode.removeChild(node);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/mosaic-bind.js
-  function patchFor(kind, data) {
-    if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
-    if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
-    if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
-    if (kind === "chart" || kind === "matrix" || kind === "graph" || kind === "waveform" || kind === "gauge" || kind === "console" || kind === "atlas" || kind === "map" || kind === "scene3d" || kind === "kanban" || kind === "plan" || kind === "schedule" || kind === "steps" || kind === "rating" || kind === "crt" || kind === "ring" || kind === "crew" || kind === "poll" || kind === "thread" || kind === "calendar" || kind === "priceTable" || kind === "facets") {
-      return { data: data && typeof data === "object" && !Array.isArray(data) ? data : null };
-    }
-    if (kind === "health" || kind === "queue") {
-      return { data: { items: Array.isArray(data) ? data : data && data.items || [] } };
-    }
-    return { items: Array.isArray(data) ? data : [] };
-  }
-  function derivedColumns(rows) {
-    if (!rows.length) return [];
-    return Object.keys(rows[0]).filter(function(key) {
-      return key !== "id";
-    }).map(function(key) {
-      return { key, label: key, sortable: true };
-    });
-  }
-  var LIVE_MIN_INTERVAL_MS = 4e3;
-  var LIVE_DEFAULT_INTERVAL_MS = 8e3;
-  function wireLive(spec, refresh) {
-    const live = spec.live;
-    if (!live || typeof live !== "object") return function() {
-    };
-    const ns = (
-      /** @type {any} */
-      window.AIMEAT
-    );
-    if (!ns || !ns.live || typeof ns.live.subscribe !== "function") return function() {
-    };
-    const offs = [];
-    for (const name of Object.keys(live)) {
-      const conf = live[name] || {};
-      const domains = Array.isArray(conf.domains) && conf.domains.length ? conf.domains : ["memory"];
-      const wantsMemory = domains.indexOf("memory") >= 0;
-      if (wantsMemory && !conf.keyPrefix) {
-        console.warn('aimeat-atelier: live source "' + name + '" subscribes to memory without a keyPrefix — refused (that would re-fetch on every write anyone makes).');
-        continue;
-      }
-      const minIntervalMs = Math.max(Number(conf.minIntervalMs) || LIVE_DEFAULT_INTERVAL_MS, LIVE_MIN_INTERVAL_MS);
-      offs.push(ns.live.subscribe(domains, function() {
-        refresh(name);
-      }, {
-        keyPrefix: conf.keyPrefix,
-        minIntervalMs
-      }));
-    }
-    return function() {
-      for (const off of offs) {
-        try {
-          off();
-        } catch {
-        }
-      }
-    };
-  }
-
-  // src/static/sdk-libs/_core/public-fetch.js
-  var signedInOnly = false;
-  function sessionJwt() {
-    const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
-    const s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
-    return s && s.jwt || null;
-  }
-  function withSession(init, jwt) {
-    const headers = new Headers(init.headers);
-    headers.set("Authorization", "Bearer " + jwt);
-    return { ...init, headers };
-  }
-  async function publicFetch(url, init = {}) {
-    const early = signedInOnly ? sessionJwt() : null;
-    const r = await fetch(url, early ? withSession(init, early) : init);
-    if (r.status !== 401 || early) return r;
-    if (!(r.headers.get("content-type") || "").includes("json")) return r;
-    const body = await r.clone().json();
-    if (!body || !body.error || body.error.code !== "SIGN_IN_REQUIRED") return r;
-    signedInOnly = true;
-    const jwt = sessionJwt();
-    return jwt ? fetch(url, withSession(init, jwt)) : r;
-  }
-
-  // src/static/sdk-libs/_core/app-ref.js
-  function appRef() {
-    try {
-      const node = document.getElementById("aimeat-app-ref");
-      if (!node) return null;
-      const raw = node.textContent || "";
-      let parsed;
-      try {
-        parsed = JSON.parse(raw);
-      } catch {
-        parsed = JSON.parse(raw.replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
-      }
-      return parsed && parsed.owner && parsed.app_id ? { owner: String(parsed.owner), filename: String(parsed.app_id) } : null;
-    } catch {
-      return null;
-    }
-  }
-
-  // src/static/sdk-libs/atelier/mosaic-layout.js
-  async function loadLayout(owner, filename) {
-    try {
-      const base = APEX_URL || "";
-      const res = await publicFetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui?catalogue=none");
-      if (!res.ok) return null;
-      const body = await res.json();
-      return body && body.data && body.data.layout || null;
-    } catch {
-      return null;
-    }
-  }
-  function labelOf(block) {
-    const p = block.props || {};
-    return p.title || p.caption || block.component;
-  }
-  function applyViewerOverlay(layout, o) {
-    if (!o) return layout;
-    const out = {
-      v: layout.v,
-      look: layout.look,
-      nav: o.nav || layout.nav,
-      choreography: layout.choreography,
-      tokens: layout.tokens,
-      ambient: layout.ambient,
-      meta: layout.meta,
-      blocks: layout.blocks.slice()
-    };
-    if (Array.isArray(o.hidden) && o.hidden.length) {
-      out.blocks = out.blocks.filter(function(b) {
-        return o.hidden.indexOf(b.id) < 0;
-      });
-    }
-    if (Array.isArray(o.order) && o.order.length) {
-      out.blocks.sort(function(a, b) {
-        const ia = o.order.indexOf(a.id);
-        const ib = o.order.indexOf(b.id);
-        return (ia < 0 ? o.order.length : ia) - (ib < 0 ? o.order.length : ib);
-      });
-    }
-    return out;
-  }
-
-  // src/static/sdk-libs/atelier/mosaic-canvas.js
-  var CANVAS_MIN = 0.35;
-  var CANVAS_MAX = 1.6;
-  var CANVAS_STEP = 1.18;
-  function projectCanvas(units, morph3) {
-    const field = el("div", { class: "ak-mosaic__field" });
-    const cam = { x: 0, y: 0, scale: 0.6 };
-    let focused = null;
-    function apply2() {
-      field.style.transform = "translate(" + cam.x + "px," + cam.y + "px) scale(" + cam.scale + ")";
-    }
-    const viewport = el("div", { class: "ak-mosaic__canvas" }, field);
-    units.forEach(function(u) {
-      const cover = el("button", {
-        type: "button",
-        class: "ak-mosaic__tilecover",
-        "data-ak-noguard": true,
-        "aria-label": t("open") + ": " + u.label,
-        on: { click: function() {
-          focus(u);
-        } }
-      });
-      u.tile = el("div", { class: "ak-mosaic__tile" }, [
-        el("span", { class: "ak-mosaic__tilelabel", text: u.label }),
-        u.el,
-        cover
-      ]);
-      field.appendChild(u.tile);
-    });
-    const focusHost = el("div", { class: "ak-mosaic__focus", hidden: true });
-    const backBtn = el("button", {
-      type: "button",
-      class: "ak-btn ak-btn--ghost",
-      "data-ak-noguard": true,
-      on: { click: function() {
-        unfocus();
-      } }
-    }, "↩ " + t("back"));
-    function focus(u) {
-      morph3(u.el, function() {
-        focused = u;
-        focusHost.hidden = false;
-        viewport.hidden = true;
-        zoombar.hidden = true;
-        clear(focusHost);
-        focusHost.appendChild(backBtn);
-        focusHost.appendChild(u.el);
-        enter(focusHost);
-      });
-    }
-    function unfocus() {
-      if (!focused) return;
-      const u = focused;
-      morph3(u.el, function() {
-        focused = null;
-        u.tile.insertBefore(u.el, u.tile.lastChild);
-        focusHost.hidden = true;
-        viewport.hidden = false;
-        zoombar.hidden = false;
-      });
-    }
-    let drag2 = null;
-    viewport.addEventListener("pointerdown", function(ev) {
-      const at3 = (
-        /** @type {Element|null} */
-        ev.target instanceof Element ? ev.target : null
-      );
-      if (at3 && at3.closest(".ak-mosaic__tilecover")) return;
-      drag2 = { x: ev.clientX, y: ev.clientY };
-      viewport.setPointerCapture(ev.pointerId);
-    });
-    viewport.addEventListener("pointermove", function(ev) {
-      if (!drag2) return;
-      cam.x += ev.clientX - drag2.x;
-      cam.y += ev.clientY - drag2.y;
-      drag2 = { x: ev.clientX, y: ev.clientY };
-      apply2();
-    });
-    viewport.addEventListener("pointerup", function() {
-      drag2 = null;
-    });
-    viewport.addEventListener("wheel", function(ev) {
-      ev.preventDefault();
-      const factor = ev.deltaY < 0 ? CANVAS_STEP : 1 / CANVAS_STEP;
-      const next = Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
-      const rect = viewport.getBoundingClientRect();
-      const px = ev.clientX - rect.left;
-      const py = ev.clientY - rect.top;
-      cam.x = px - (px - cam.x) * (next / cam.scale);
-      cam.y = py - (py - cam.y) * (next / cam.scale);
-      cam.scale = next;
-      apply2();
-    }, { passive: false });
-    function zoomBtn(label, aria, factor) {
-      return el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--ghost",
-        "aria-label": aria,
-        "data-ak-noguard": true,
-        on: {
-          click: function() {
-            cam.scale = factor === 0 ? 0.6 : Math.max(CANVAS_MIN, Math.min(CANVAS_MAX, cam.scale * factor));
-            if (factor === 0) {
-              cam.x = 0;
-              cam.y = 0;
-            }
-            apply2();
-          }
-        }
-      }, label);
-    }
-    const zoombar = el("div", { class: "ak-mosaic__zoombar" }, [
-      zoomBtn("−", t("zoomOut"), 1 / CANVAS_STEP),
-      zoomBtn("⤢", t("fitView"), 0),
-      zoomBtn("+", t("zoomIn"), CANVAS_STEP)
-    ]);
-    apply2();
-    return el("div", { class: "ak-mosaic__canvaswrap" }, [viewport, zoombar, focusHost]);
-  }
-
-  // src/static/sdk-libs/atelier/mosaic-projections.js
-  var PINNED = ["position", "box-sizing", "margin", "top", "left", "width", "height"];
-  function unitSwapper(box, units, live) {
-    let epoch = 0;
-    const restore = function() {
-      const on2 = live();
-      for (const u of units) {
-        for (const name of PINNED) u.el.style.removeProperty(name);
-        u.el.hidden = u.el !== on2;
-        box.appendChild(u.el);
-      }
-    };
-    return function(from, to, settle4) {
-      if (from === to) {
-        to.hidden = false;
-        settle4();
-        return;
-      }
-      if (typeof document.startViewTransition === "function" && !reducedMotion()) {
-        transition(function() {
-          from.hidden = true;
-          to.hidden = false;
-          settle4();
-        });
-        return;
-      }
-      if (reducedMotion()) {
-        from.hidden = true;
-        to.hidden = false;
-        settle4();
-        return;
-      }
-      to.hidden = false;
-      if (to.parentNode) to.parentNode.removeChild(to);
-      const mine = ++epoch;
-      const move = panelTransition(from, to, "crossfade");
-      settle4();
-      const tidy = function() {
-        if (mine === epoch) restore();
-      };
-      move.then(tidy, tidy);
-    };
-  }
-  function projectStack(units, alive) {
-    const box = el("div", { class: "ak-mosaic__units ak-mosaic__units--grid" });
-    for (const u of units) {
-      u.el.classList.add("ak-mosaic__unit--" + (u.block.span || "full"));
-      box.appendChild(u.el);
-    }
-    if (!reducedMotion() && typeof IntersectionObserver === "function") {
-      const io = new IntersectionObserver(function(entries) {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("ak-reveal--in");
-            io.unobserve(entry.target);
-          }
-        }
-      }, { threshold: 0, rootMargin: "0px 0px -12% 0px" });
-      for (const u of units) {
-        u.el.classList.add("ak-reveal");
-        io.observe(u.el);
-      }
-      alive.cleanup.push(function() {
-        io.disconnect();
-      });
-    }
-    return box;
-  }
-  function projectOverlay(units, alive) {
-    const box = el("div", { class: "ak-mosaic__units" });
-    for (const u of units) {
-      u.el.hidden = true;
-      box.appendChild(u.el);
-    }
-    let current2 = 0;
-    let open = false;
-    const items = [];
-    const swap = unitSwapper(box, units, function() {
-      return units[current2] ? units[current2].el : null;
-    });
-    const heading = el("h2", { class: "ak-mosaic__unittitle" });
-    const panel = el("div", {
-      class: "ak-mosaic__overlay",
-      role: "dialog",
-      "aria-label": t("menu"),
-      on: { click: function(ev) {
-        if (ev.target === panel) close();
-      } }
-    });
-    panel.hidden = true;
-    const trigger = el("button", {
-      type: "button",
-      class: "ak-mosaic__overlaytrigger",
-      "aria-expanded": "false",
-      "data-ak-noguard": true,
-      on: { click: function() {
-        if (open) {
-          close();
-        } else {
-          show();
-        }
-      } }
-    }, t("menu"));
-    const closeBtn = el("button", {
-      type: "button",
-      class: "ak-mosaic__overlayclose",
-      "aria-label": t("close"),
-      "data-ak-noguard": true,
-      on: { click: function() {
-        close();
-      } }
-    }, "×");
-    panel.appendChild(closeBtn);
-    function mark() {
-      items.forEach(function(btn, i) {
-        btn.classList.toggle("ak-mosaic__overlayitem--on", i === current2);
-        if (i === current2) btn.setAttribute("aria-current", "true");
-        else btn.removeAttribute("aria-current");
-      });
-      heading.textContent = units[current2] ? units[current2].label : "";
-    }
-    function show(index) {
-      if (typeof index === "number") {
-        swap(units[current2].el, units[index].el, function() {
-          current2 = index;
-          mark();
-          enter(units[current2].el);
-        });
-        close();
-        return;
-      }
-      open = true;
-      panel.hidden = false;
-      trigger.setAttribute("aria-expanded", "true");
-      enter(panel);
-      const on2 = (
-        /** @type {HTMLElement|null} */
-        panel.querySelector(".ak-mosaic__overlayitem--on") || panel.querySelector("button")
-      );
-      if (on2) on2.focus();
-    }
-    function close() {
-      open = false;
-      panel.hidden = true;
-      trigger.setAttribute("aria-expanded", "false");
-      trigger.focus();
-    }
-    function onKey(ev) {
-      if (ev.key === "Escape" && open) close();
-    }
-    document.addEventListener("keydown", onKey);
-    alive.cleanup.push(function() {
-      document.removeEventListener("keydown", onKey);
-    });
-    units.forEach(function(u, i) {
-      const btn = el("button", {
-        type: "button",
-        class: "ak-mosaic__overlayitem",
-        "data-ak-noguard": true,
-        on: { click: function() {
-          show(i);
-        } }
-      }, [
-        el("span", { class: "ak-mosaic__overlaynum", text: String(i + 1).padStart(2, "0") }),
-        u.label
-      ]);
-      items.push(btn);
-      panel.appendChild(btn);
-    });
-    if (units.length) units[0].el.hidden = false;
-    mark();
-    return el("div", { class: "ak-mosaic__overlaywrap" }, [
-      el("div", { class: "ak-mosaic__overlaybar" }, [heading, trigger]),
-      box,
-      panel
-    ]);
-  }
-  function projectRail(units) {
-    const box = el("div", { class: "ak-mosaic__units" });
-    for (const u of units) {
-      u.el.hidden = true;
-      box.appendChild(u.el);
-    }
-    let current2 = 0;
-    const items = [];
-    const swap = unitSwapper(box, units, function() {
-      return units[current2] ? units[current2].el : null;
-    });
-    function show(index) {
-      if (index === current2 && !units[index].el.hidden) return;
-      swap(units[current2].el, units[index].el, function() {
-        current2 = index;
-        items.forEach(function(btn, i) {
-          btn.classList.toggle("ak-mosaic__railitem--on", i === index);
-        });
-        enter(units[current2].el);
-      });
-    }
-    const rail = el("nav", { class: "ak-mosaic__rail" }, units.map(function(u, i) {
-      const btn = el("button", {
-        type: "button",
-        class: "ak-mosaic__railitem" + (i === 0 ? " ak-mosaic__railitem--on" : ""),
-        "data-ak-noguard": true,
-        on: { click: function() {
-          show(i);
-        } }
-      }, u.label);
-      items.push(btn);
-      return btn;
-    }));
-    if (units.length) units[0].el.hidden = false;
-    return el("div", { class: "ak-mosaic__railwrap" }, [rail, box]);
-  }
-  function projectPicker(units, mode, alive) {
-    const box = el("div", { class: "ak-mosaic__units" });
-    for (const u of units) {
-      u.el.hidden = true;
-      box.appendChild(u.el);
-    }
-    let current2 = 0;
-    const swap = unitSwapper(box, units, function() {
-      return units[current2] ? units[current2].el : null;
-    });
-    function show(index) {
-      if (index === current2 && !units[index].el.hidden) return;
-      swap(units[current2].el, units[index].el, function() {
-        current2 = index;
-        enter(units[current2].el);
-      });
-    }
-    const items = units.map(function(u, i) {
-      return { id: String(i), label: u.label };
-    });
-    const chrome = mode === "tabs" ? tabs({ items, value: "0", onChange: function(id) {
-      show(Number(id));
-    } }) : bottomNav({
-      items: items.map(function(item, i) {
-        return { id: item.id, label: item.label, onPick: function() {
-          show(i);
-        } };
-      }),
-      value: "0"
-    });
-    alive.handles.push(chrome);
-    if (units.length) units[0].el.hidden = false;
-    return el(
-      "div",
-      { class: "ak-mosaic__picker ak-mosaic__picker--" + mode },
-      mode === "tabs" ? [chrome.el, box] : [box, chrome.el]
-    );
-  }
-  function projectDeck(units, alive) {
-    const strip = el("div", { class: "ak-mosaic__deck", role: "group" });
-    const dots = el("div", { class: "ak-mosaic__dots", "aria-hidden": "true" });
-    units.forEach(function(u, i) {
-      strip.appendChild(el("div", { class: "ak-mosaic__deckcard", "aria-label": u.label }, u.el));
-      dots.appendChild(el("span", { class: "ak-mosaic__dot" + (i === 0 ? " ak-mosaic__dot--on" : "") }));
-    });
-    const onScroll = function() {
-      const i = Math.round(strip.scrollLeft / Math.max(1, strip.clientWidth));
-      Array.prototype.forEach.call(dots.children, function(dot, j) {
-        dot.classList.toggle("ak-mosaic__dot--on", j === i);
-      });
-    };
-    strip.addEventListener("scroll", onScroll, { passive: true });
-    alive.cleanup.push(function() {
-      strip.removeEventListener("scroll", onScroll);
-    });
-    return el("div", { class: "ak-mosaic__deckwrap" }, [strip, dots]);
-  }
-  function projectFlow(units) {
-    const box = el("div", { class: "ak-mosaic__units" });
-    for (const u of units) {
-      u.el.hidden = true;
-      box.appendChild(u.el);
-    }
-    let current2 = 0;
-    const where = el("span", { class: "ak-mosaic__flowstep", "aria-live": "polite" });
-    const swap = unitSwapper(box, units, function() {
-      return units[current2] ? units[current2].el : null;
-    });
-    function show(index) {
-      const step = Math.max(0, Math.min(units.length - 1, index));
-      swap(units[current2].el, units[step].el, function() {
-        current2 = step;
-        where.textContent = current2 + 1 + " / " + units.length;
-        prev.disabled = current2 === 0;
-        next.disabled = current2 === units.length - 1;
-        enter(units[current2].el);
-      });
-    }
-    const prev = (
-      /** @type {HTMLButtonElement} */
-      el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--ghost",
-        "data-ak-noguard": true,
-        on: { click: function() {
-          show(current2 - 1);
-        } }
-      }, t("previous"))
-    );
-    const next = (
-      /** @type {HTMLButtonElement} */
-      el("button", {
-        type: "button",
-        class: "ak-btn ak-btn--primary",
-        "data-ak-noguard": true,
-        on: { click: function() {
-          show(current2 + 1);
-        } }
-      }, t("next"))
-    );
-    if (units.length) {
-      units[0].el.hidden = false;
-      where.textContent = "1 / " + units.length;
-      prev.disabled = true;
-      next.disabled = units.length === 1;
-    }
-    return el("div", { class: "ak-mosaic__flow" }, [
-      box,
-      el("div", { class: "ak-mosaic__flowbar" }, [prev, where, next])
-    ]);
-  }
-
-  // src/static/sdk-libs/atelier/ops.js
-  var JOB = /* @__PURE__ */ new WeakMap();
-  var SVG_NS8 = "http://www.w3.org/2000/svg";
-  function svg4(name, attrs) {
-    const node = document.createElementNS(SVG_NS8, name);
-    for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
-    return node;
-  }
-  var TONES4 = ["ok", "warn", "err", "plain"];
-  function toneOf2(value) {
-    return TONES4.indexOf(value) >= 0 ? value : "plain";
-  }
-  function health(spec) {
-    const root = el("div", { class: "ak-root ak-health", role: "list", "data-ak-part": "root" });
-    applyVariant(root, spec, ["dense", "plain"]);
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const items = data && Array.isArray(data.items) ? data.items : [];
-      if (!items.length) {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-        return;
-      }
-      for (const item of items) {
-        const tone = toneOf2(item.tone);
-        const row = el(spec.onPick ? "button" : "div", {
-          class: "ak-health__row",
-          role: "listitem",
-          "data-ak-part": "row",
-          type: spec.onPick ? "button" : void 0
-        }, partEl("span", "ak-health__lamp ak-health__lamp--" + tone, "lamp", { "aria-hidden": "true" }));
-        const name = partEl("span", "ak-health__name", "name");
-        slotInto(name, spec, "label", item.label || item.id, { cls: "ak-health__label", args: [item] });
-        slotInto(name, spec, "sub", item.sub || null, { cls: "ak-health__sub", args: [item] });
-        row.appendChild(name);
-        slotInto(row, spec, "reading", item.reading == null ? null : String(item.reading), { cls: "ak-health__reading", args: [item] });
-        slotInto(row, spec, "aside", null, { cls: "ak-health__aside", args: [item] });
-        row.appendChild(el("span", { class: "ak-sr-only", text: tone === "ok" ? t("opsOk") : tone === "err" ? t("opsDown") : tone === "warn" ? t("opsWarn") : "" }));
-        if (spec.onPick) row.addEventListener("click", function() {
-          spec.onPick(item);
-        });
-        root.appendChild(row);
-      }
-    }
-    render(spec.data);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && "data" in patch) render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        root.remove();
-      }
-    };
-  }
-  var QUEUE_STATES = ["waiting", "running", "done", "failed"];
-  var QUEUE_TONE = { waiting: "plain", running: "warn", done: "ok", failed: "err" };
-  function fillJob(row, item, spec) {
-    const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
-    clear(row);
-    const whole = partValue(spec, "row", item);
-    if (whole !== void 0) {
-      fillPart(row, whole);
-      return;
-    }
-    slotInto(row, spec, "state", t("queue." + s), { cls: "ak-queue__state ak-queue__state--" + s, args: [item] });
-    const words = partEl("span", "ak-queue__words", "words");
-    slotInto(words, spec, "title", item.title || item.id, { cls: "ak-queue__title", args: [item] });
-    slotInto(words, spec, "sub", item.sub || null, { cls: "ak-queue__sub", args: [item] });
-    slotInto(words, spec, "extra", null, { cls: "ak-queue__extra", args: [item] });
-    row.appendChild(words);
-    slotInto(row, spec, "aside", null, { cls: "ak-queue__aside", args: [item] });
-  }
-  function queue(spec) {
-    const root = el("div", { class: "ak-root ak-queue", "data-ak-part": "root" });
-    applyVariant(root, spec, ["dense", "plain"]);
-    const strip = el("div", { class: "ak-queue__strip", role: "status", "data-ak-part": "strip" });
-    const list3 = el("div", { class: "ak-queue__list", role: "list", "data-ak-part": "list" });
-    root.appendChild(strip);
-    root.appendChild(list3);
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      const items = data && Array.isArray(data.items) ? data.items : [];
-      if (!items.length) {
-        clear(strip);
-        keyedRows(list3, [], { key: function() {
-          return "";
-        }, build: function() {
-          return el("div");
-        } });
-        strip.hidden = true;
-        list3.hidden = true;
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-        return;
-      }
-      strip.hidden = false;
-      list3.hidden = false;
-      const counts = {};
-      for (const item of items) {
-        const s = QUEUE_STATES.indexOf(item.state) >= 0 ? item.state : "waiting";
-        counts[s] = (counts[s] || 0) + 1;
-      }
-      clear(strip);
-      for (const s of QUEUE_STATES) {
-        if (!counts[s]) continue;
-        strip.appendChild(el(
-          "span",
-          { class: "ak-queue__count ak-queue__count--" + QUEUE_TONE[s] },
-          [el("strong", { text: String(counts[s]) }), el("span", { text: " " + t("queue." + s) })]
-        ));
-      }
-      keyedRows(list3, items, {
-        key: function(item, i) {
-          return item && item.id != null ? String(item.id) : "job-" + i;
-        },
-        build: function(item) {
-          const row = el(spec.onPick ? "button" : "div", {
-            class: "ak-queue__row",
-            role: "listitem",
-            "data-ak-part": "row",
-            type: spec.onPick ? "button" : void 0
-          });
-          JOB.set(row, item);
-          fillJob(row, item, spec);
-          if (spec.onPick) row.addEventListener("click", function() {
-            spec.onPick(JOB.get(row));
-          });
-          return row;
-        },
-        update: function(row, item) {
-          JOB.set(row, item);
-          fillJob(row, item, spec);
-        }
-      });
-    }
-    render(spec.data);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && "data" in patch) render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        root.remove();
-      }
-    };
-  }
-  function gauge(spec) {
-    const root = el("figure", { class: "ak-root ak-gauge", role: "img", "data-ak-part": "root" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    const R2 = 96;
-    const CX = 120;
-    const CY = 118;
-    function pointAt(frac, radius) {
-      const rad = Math.PI + Math.PI * Math.max(0, Math.min(1, frac));
-      return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
-    }
-    function arcPath(fromFrac, toFrac, radius) {
-      const [x1, y1] = pointAt(fromFrac, radius);
-      const [x2, y2] = pointAt(toFrac, radius);
-      return "M " + x1.toFixed(1) + " " + y1.toFixed(1) + " A " + radius + " " + radius + " 0 0 1 " + x2.toFixed(1) + " " + y2.toFixed(1);
-    }
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      if (!data || typeof data.value !== "number") {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-        return;
-      }
-      const min = typeof data.min === "number" ? data.min : 0;
-      const max = typeof data.max === "number" && data.max > min ? data.max : min + 100;
-      const frac = Math.max(0, Math.min(1, (data.value - min) / (max - min)));
-      const bands = Array.isArray(data.bands) && data.bands.length ? data.bands : [];
-      let tone = "plain";
-      for (const band of bands) {
-        if (data.value <= band.upTo) {
-          tone = toneOf2(band.tone);
-          break;
-        }
-      }
-      if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf2(bands[bands.length - 1].tone);
-      root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
-      const node = svg4("svg", { viewBox: "0 0 240 132", class: "ak-gauge__svg", "aria-hidden": "true" });
-      node.appendChild(svg4("path", { d: arcPath(0, 1, R2), class: "ak-gauge__track" }));
-      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R2), class: "ak-gauge__value ak-gauge__value--" + tone });
-      node.appendChild(value);
-      for (const band of bands.slice(0, -1)) {
-        const f2 = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
-        const [x1, y1] = pointAt(f2, R2 - 12);
-        const [x2, y2] = pointAt(f2, R2 + 12);
-        node.appendChild(svg4("line", { x1, y1, x2, y2, class: "ak-gauge__tickmark" }));
-      }
-      const [dx, dy] = pointAt(frac, R2);
-      node.appendChild(svg4("circle", { cx: dx, cy: dy, r: 8, class: "ak-gauge__marker ak-gauge__marker--" + tone }));
-      root.appendChild(node);
-      if (!reducedMotion()) {
-        const len = (
-          /** @type {SVGPathElement} */
-          value.getTotalLength()
-        );
-        value.setAttribute("stroke-dasharray", String(len));
-        value.setAttribute("stroke-dashoffset", String(len));
-        requestAnimationFrame(function() {
-          value.classList.add("ak-gauge__value--drawn");
-        });
-      }
-      root.appendChild(el("figcaption", { class: "ak-gauge__words" }, [
-        el(
-          "span",
-          { class: "ak-gauge__reading ak-gauge__reading--" + tone },
-          [el("strong", { text: String(data.value) }), data.unit ? el("span", { text: data.unit }) : null]
-        ),
-        data.label ? el("span", { class: "ak-gauge__label", text: data.label }) : null,
-        data.sub ? el("span", { class: "ak-gauge__label", text: data.sub }) : null
-      ]));
-    }
-    render(spec.data);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && "data" in patch) render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        root.remove();
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/materials.js
-  function handle(node, off) {
-    return { el: node, destroy() {
-      off();
-    } };
-  }
-  function spotlight(target) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    node.classList.add("ak-mat--spot");
-    const move = (e) => {
-      const r = node.getBoundingClientRect();
-      node.style.setProperty("--ak-spot-x", Math.round((e.clientX - r.left) / Math.max(r.width, 1) * 100) + "%");
-      node.style.setProperty("--ak-spot-y", Math.round((e.clientY - r.top) / Math.max(r.height, 1) * 100) + "%");
-    };
-    const leave = () => {
-      node.style.removeProperty("--ak-spot-x");
-      node.style.removeProperty("--ak-spot-y");
-    };
-    if (!reducedMotion()) {
-      node.addEventListener("pointermove", move);
-      node.addEventListener("pointerleave", leave);
-    }
-    return handle(node, () => {
-      node.removeEventListener("pointermove", move);
-      node.removeEventListener("pointerleave", leave);
-      leave();
-    });
-  }
-  function tilt(target, opts) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const max = opts && opts.max || 10;
-    const lift = opts && opts.lift || 5;
-    node.classList.add("ak-move--tilt");
-    const move = (e) => {
-      const r = node.getBoundingClientRect();
-      const px = (e.clientX - r.left) / Math.max(r.width, 1) - 0.5;
-      const py = (e.clientY - r.top) / Math.max(r.height, 1) - 0.5;
-      node.style.transform = "perspective(650px) rotateX(" + (-py * max * 2).toFixed(2) + "deg) rotateY(" + (px * max * 2).toFixed(2) + "deg) translateY(-" + lift + "px)";
-    };
-    const leave = () => {
-      node.style.transform = "";
-    };
-    if (!reducedMotion()) {
-      node.addEventListener("pointermove", move);
-      node.addEventListener("pointerleave", leave);
-    }
-    return handle(node, () => {
-      node.removeEventListener("pointermove", move);
-      node.removeEventListener("pointerleave", leave);
-      leave();
-    });
-  }
-  function sheen(target) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    if (reducedMotion()) return false;
-    node.classList.add("ak-move--sheen");
-    node.classList.remove("is-sheening");
-    void node.offsetWidth;
-    node.classList.add("is-sheening");
-    const done = () => {
-      node.classList.remove("is-sheening");
-      node.removeEventListener("animationend", done);
-    };
-    node.addEventListener("animationend", done);
-    return true;
-  }
-  function odometer(target, value) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    const next = String(value);
-    const prev = node.getAttribute("data-odo") != null ? String(node.getAttribute("data-odo")) : node.textContent.trim();
-    node.setAttribute("data-odo", next);
-    if (prev === next || reducedMotion() || typeof node.animate !== "function") {
-      node.textContent = next;
-      return false;
-    }
-    node.classList.add("ak-odo");
-    const reel = el("span", { class: "ak-odo__reel" }, [el("span", {}, prev), el("span", {}, next)]);
-    node.textContent = "";
-    node.appendChild(reel);
-    const h = reel.firstChild ? (
-      /** @type {HTMLElement} */
-      reel.firstChild.offsetHeight
-    ) : 0;
-    const cs = getComputedStyle(node);
-    const span = (parseFloat(cs.getPropertyValue("--ak-motion")) || 200) * 3.5;
-    const anim = reel.animate([{ transform: "translateY(0)" }, { transform: "translateY(-" + h + "px)" }], {
-      duration: span,
-      easing: "cubic-bezier(0.2, 0.7, 0.3, 1)",
-      fill: "forwards"
-    });
-    const settle4 = () => {
-      node.textContent = next;
-    };
-    anim.addEventListener("finish", settle4);
-    anim.addEventListener("cancel", settle4);
-    return true;
-  }
-  function thumb(target) {
-    const node = (
-      /** @type {HTMLElement} */
-      resolve(target)
-    );
-    node.classList.add("ak-thumb");
-    const pill = el("span", { class: "ak-thumb__pill", "aria-hidden": "true" });
-    node.insertBefore(pill, node.firstChild);
-    const update = () => {
-      const on2 = node.querySelector('[aria-selected="true"], [aria-pressed="true"], [aria-current], .is-on');
-      if (!on2) {
-        node.style.setProperty("--ak-thumb-w", "0px");
-        return;
-      }
-      const r = (
-        /** @type {HTMLElement} */
-        on2
-      );
-      node.style.setProperty("--ak-thumb-left", r.offsetLeft + "px");
-      node.style.setProperty("--ak-thumb-top", r.offsetTop + "px");
-      node.style.setProperty("--ak-thumb-w", r.offsetWidth + "px");
-      node.style.setProperty("--ak-thumb-h", r.offsetHeight + "px");
-    };
-    const mo = typeof MutationObserver === "function" ? new MutationObserver(update) : null;
-    if (mo) mo.observe(node, { attributes: true, subtree: true, attributeFilter: ["aria-selected", "aria-pressed", "aria-current", "class"] });
-    update();
-    return { el: node, update, destroy() {
-      if (mo) mo.disconnect();
-      if (pill.parentNode) pill.parentNode.removeChild(pill);
-      node.classList.remove("ak-thumb");
-    } };
-  }
-  function deal(targets) {
-    let list3;
-    if (typeof targets === "string") list3 = Array.prototype.slice.call(document.querySelectorAll(targets));
-    else if (targets instanceof Element) list3 = [
-      /** @type {HTMLElement} */
-      targets
-    ];
-    else list3 = Array.prototype.slice.call(targets || []);
-    if (reducedMotion()) return 0;
-    list3.forEach((node, i) => {
-      node.style.setProperty("--ak-deal-i", String(i));
-      node.classList.remove("ak-move--deal");
-      void node.offsetWidth;
-      node.classList.add("ak-move--deal");
-      const done = () => {
-        node.classList.remove("ak-move--deal");
-        node.style.removeProperty("--ak-deal-i");
-        node.removeEventListener("animationend", done);
-      };
-      node.addEventListener("animationend", done);
-    });
-    return list3.length;
-  }
-
-  // src/static/sdk-libs/atelier/flow-parts.js
-  var CARRY = { stiffness: 320, damping: 28 };
-  var TONES5 = ["ok", "warn", "err", "accent"];
-  var KINDS = ["info", "ok", "warn", "err"];
-  function rowsOf(data) {
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.items)) return data.items;
-    return [];
-  }
-  function pace(node, multiple) {
-    return (parseFloat(getComputedStyle(node).getPropertyValue("--ak-motion")) || 200) * multiple;
-  }
-  function flipFrom(node, dx, dy, opts) {
-    spring(node, { x: dx, y: dy }, opts).cancel();
-    return spring(node, { x: 0, y: 0 }, opts || CARRY);
-  }
-  function sortable(spec) {
-    const s = spec || {};
-    const root = el("div", { class: "ak-root ak-sortable" });
-    if (s.target) resolve(s.target).appendChild(root);
-    const body = el("div", { class: "ak-sortable__rows" });
-    let hands = [];
-    const held = /* @__PURE__ */ new Map();
-    let emptyCard = null;
-    function rows() {
-      return (
-        /** @type {HTMLElement[]} */
-        Array.prototype.slice.call(body.children)
-      );
-    }
-    function gap() {
-      return parseFloat(getComputedStyle(body).rowGap) || 0;
-    }
-    function tell() {
-      if (s.onReorder) s.onReorder(rows().map(function(r) {
-        return r.getAttribute("data-id");
-      }));
-    }
-    function place2(row, index) {
-      const all = rows();
-      const before = all.map(function(r) {
-        return r.offsetTop;
-      });
-      const others = all.filter(function(r) {
-        return r !== row;
-      });
-      body.insertBefore(row, others[index] || null);
-      all.forEach(function(r, i) {
-        const stood = held.get(r) || 0;
-        const travel3 = before[i] - r.offsetTop + stood;
-        if (travel3 || stood) flipFrom(r, 0, travel3, CARRY);
-      });
-      held.clear();
-    }
-    function wanted(row, dy) {
-      const middle = row.offsetTop + dy + row.offsetHeight / 2;
-      let index = 0;
-      rows().forEach(function(r) {
-        if (r !== row && middle > r.offsetTop + r.offsetHeight / 2) index += 1;
-      });
-      return index;
-    }
-    function carry(row) {
-      return drag(row, {
-        onStart: function() {
-          row.classList.add("is-carried");
-        },
-        onMove: function(dx, dy) {
-          const all = rows();
-          const at3 = all.indexOf(row);
-          const others = all.filter(function(r) {
-            return r !== row;
-          });
-          const want = Math.max(0, Math.min(wanted(row, dy), others.length));
-          const step = row.offsetHeight + gap();
-          others.forEach(function(r, i) {
-            let to = 0;
-            if (want > at3 && i >= at3 && i < want) to = -step;
-            else if (want < at3 && i >= want && i < at3) to = step;
-            if ((held.get(r) || 0) === to) return;
-            held.set(r, to);
-            spring(r, { y: to }, CARRY);
-          });
-        },
-        onEnd: function(dx, dy) {
-          row.classList.remove("is-carried");
-          const all = rows();
-          const at3 = all.indexOf(row);
-          const want = Math.max(0, Math.min(wanted(row, dy), all.length - 1));
-          held.set(row, dy);
-          place2(row, want);
-          if (want !== at3) tell();
-        }
-      }, { axis: "y", back: false });
-    }
-    function nudge(row, dir) {
-      const all = rows();
-      const to = all.indexOf(row) + dir;
-      if (to < 0 || to >= all.length) return;
-      place2(row, to);
-      tell();
-    }
-    function onGripKey(ev) {
-      if (!ev.altKey) return;
-      const dir = ev.key === "ArrowUp" ? -1 : ev.key === "ArrowDown" ? 1 : 0;
-      if (!dir) return;
-      const grip = (
-        /** @type {HTMLElement} */
-        ev.currentTarget
-      );
-      const row = (
-        /** @type {HTMLElement} */
-        grip.closest(".ak-sortable__row")
-      );
-      if (!row) return;
-      ev.preventDefault();
-      nudge(row, dir);
-      grip.focus();
-    }
-    function buildRow(item) {
-      const kids = [];
-      if (s.handle !== false) {
-        kids.push(el("button", {
-          type: "button",
-          class: "ak-sortable__grip",
-          "data-ak-noguard": true,
-          "aria-label": t("sortMove", { label: String(item.label || item.id) }),
-          on: { keydown: onGripKey }
-        }, [el("span", { class: "ak-sortable__gripmark", "aria-hidden": "true" })]));
-      }
-      kids.push(el("span", { class: "ak-sortable__text" }, [
-        el("span", { class: "ak-sortable__label", text: String(item.label || item.id) }),
-        item.sub != null ? el("span", { class: "ak-sortable__sub", text: String(item.sub) }) : null
-      ].filter(Boolean)));
-      return el("div", {
-        class: "ak-sortable__row" + (TONES5.indexOf(item.tone) >= 0 ? " ak-sortable__row--" + item.tone : ""),
-        "data-id": String(item.id)
-      }, kids);
-    }
-    function render(data) {
-      hands.forEach(function(h) {
-        h.destroy();
-      });
-      hands = [];
-      held.clear();
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      clear(body);
-      const items = rowsOf(data).filter(function(it) {
-        return it && it.id != null;
-      });
-      if (!items.length) {
-        const e = s.empty || {};
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: e.title || s.title || t("sortEmpty"),
-          hint: e.hint
-        });
-        return;
-      }
-      if (s.title) root.appendChild(el("div", { class: "ak-sortable__title", text: s.title }));
-      root.appendChild(body);
-      items.forEach(function(item) {
-        body.appendChild(buildRow(item));
-      });
-      rows().forEach(function(r) {
-        hands.push(carry(r));
-      });
-      enter(body);
-    }
-    render(s.data);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && "data" in patch) render(patch.data);
-      },
-      destroy() {
-        hands.forEach(function(h) {
-          h.destroy();
-        });
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-  function startOfDay(d) {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  }
-  function dayLabel(when2) {
-    if (!when2) return t("earlier");
-    const days = Math.round((startOfDay(/* @__PURE__ */ new Date()) - startOfDay(when2)) / 864e5);
-    if (days === 0) return t("today");
-    if (days === 1) return t("yesterday");
-    if (typeof when2.toLocaleDateString !== "function") return when2.toISOString().slice(0, 10);
-    const sameYear = when2.getFullYear() === (/* @__PURE__ */ new Date()).getFullYear();
-    return date(when2, sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
-  }
-  function clockOf(when2) {
-    if (!when2) return "";
-    if (typeof when2.toLocaleTimeString !== "function") return when2.toISOString().slice(11, 16);
-    return time(when2, { hour: "2-digit", minute: "2-digit" });
-  }
-  function notices(spec) {
-    const s = spec || {};
-    const root = el("div", { class: "ak-root ak-notices" });
-    if (s.target) resolve(s.target).appendChild(root);
-    const head = el("div", { class: "ak-notices__head" });
-    const body = el("div", { class: "ak-notices__body" });
-    const markAll = el("button", {
-      type: "button",
-      class: "ak-btn ak-notices__markall",
-      text: t("noticesMarkAll"),
-      on: { click: function() {
-        markRead();
-      } }
-    }, null);
-    const shown = /* @__PURE__ */ new Map();
-    let dated = [];
-    let mounted = false;
-    let emptyCard = null;
-    function kindOf(kind) {
-      return KINDS.indexOf(kind) >= 0 ? kind : "info";
-    }
-    function settle4(dot) {
-      if (!dot || dot.hidden) return;
-      const done = function() {
-        dot.hidden = true;
-      };
-      if (reducedMotion() || typeof dot.animate !== "function") {
-        done();
-        return;
-      }
-      const anim = dot.animate([
-        { opacity: 1, transform: "scale(1)" },
-        { opacity: 0, transform: "scale(0.4)" }
-      ], { duration: pace(dot, 1.2), easing: "cubic-bezier(0.2, 0.7, 0.3, 1)", fill: "forwards" });
-      anim.addEventListener("finish", done);
-      anim.addEventListener("cancel", done);
-    }
-    function markRead() {
-      const ids = dated.filter(function(u) {
-        return !u.item.read;
-      }).map(function(u) {
-        return u.item.id;
-      });
-      if (!ids.length) return;
-      ids.forEach(function(id) {
-        const rec = shown.get(String(id));
-        if (!rec) return;
-        rec.item.read = true;
-        rec.node.classList.remove("is-unread");
-        settle4(rec.dot);
-      });
-      if (markAll.parentNode) markAll.parentNode.removeChild(markAll);
-      if (s.onRead) s.onRead(ids);
-    }
-    function fillItem(rec, u) {
-      rec.item = u.item;
-      rec.title.textContent = String(u.item.title || u.item.id);
-      rec.text.textContent = u.item.text != null ? String(u.item.text) : "";
-      rec.text.hidden = u.item.text == null || u.item.text === "";
-      rec.time.textContent = clockOf(u.when);
-      rec.node.className = "ak-notices__item ak-notices__item--" + kindOf(u.item.kind) + (u.item.read ? "" : " is-unread");
-      rec.dot.hidden = !!u.item.read;
-    }
-    function buildItem(u) {
-      const rec = (
-        /** @type {any} */
-        {
-          node: null,
-          item: u.item,
-          dot: el("span", { class: "ak-notices__dot", "aria-hidden": "true" }),
-          title: el("span", { class: "ak-notices__itemtitle" }),
-          text: el("span", { class: "ak-notices__text" }),
-          time: el("span", { class: "ak-notices__time" })
-        }
-      );
-      rec.node = el(u.item.href ? "a" : "button", {
-        class: "ak-notices__item",
-        type: u.item.href ? null : "button",
-        href: u.item.href || null,
-        "data-ak-noguard": true,
-        on: { click: function() {
-          if (s.onOpen) s.onOpen(rec.item);
-        } }
-      }, [
-        el("span", { class: "ak-notices__mark", "aria-hidden": "true" }),
-        el("span", { class: "ak-notices__words" }, [rec.title, rec.text]),
-        el("span", { class: "ak-notices__side" }, [rec.time, rec.dot])
-      ]);
-      fillItem(rec, u);
-      return rec;
-    }
-    function render(data) {
-      dated = rowsOf(data).filter(function(it) {
-        return it && it.id != null;
-      }).map(function(it) {
-        const when2 = new Date(it.at);
-        return { item: it, when: isNaN(when2.getTime()) ? null : when2 };
-      }).sort(function(a, b) {
-        return (b.when ? b.when.getTime() : 0) - (a.when ? a.when.getTime() : 0);
-      });
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      clear(head);
-      clear(body);
-      if (!dated.length) {
-        shown.clear();
-        const e = s.empty || {};
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: e.title || t("noticesEmpty"),
-          hint: e.hint || t("noticesEmptyHint")
-        });
-        return;
-      }
-      if (s.title) head.appendChild(el("div", { class: "ak-notices__title", text: s.title }));
-      if (dated.some(function(u) {
-        return !u.item.read;
-      })) head.appendChild(markAll);
-      root.appendChild(head);
-      root.appendChild(body);
-      const live = {};
-      dated.forEach(function(u) {
-        live[String(u.item.id)] = 1;
-      });
-      Array.from(shown.keys()).forEach(function(id) {
-        if (!live[id]) shown.delete(id);
-      });
-      const fresh = [];
-      let heading = null;
-      dated.forEach(function(u) {
-        const label = dayLabel(u.when);
-        if (label !== heading) {
-          body.appendChild(el("div", { class: "ak-notices__day", text: label }));
-          heading = label;
-        }
-        const id = String(u.item.id);
-        let rec = shown.get(id);
-        if (!rec) {
-          rec = buildItem(u);
-          shown.set(id, rec);
-          fresh.push(rec.node);
-        } else {
-          fillItem(rec, u);
-        }
-        body.appendChild(rec.node);
-      });
-      if (!mounted) enter(body);
-      else if (fresh.length) stagger(fresh, { from: "up" });
-      mounted = true;
-    }
-    render(s.data);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && "data" in patch) render(patch.data);
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-  function facets(spec) {
-    const s = spec || {};
-    const root = el("div", { class: "ak-root ak-facets" });
-    if (s.target) resolve(s.target).appendChild(root);
-    const groups = el("div", { class: "ak-facets__groups" });
-    const summary = el("div", { class: "ak-facets__summary" });
-    const tally = el("span", { class: "ak-facets__tally" });
-    const clearAll = el("button", {
-      type: "button",
-      class: "ak-btn ak-facets__clear",
-      text: t("facetsClear"),
-      on: { click: function() {
-        reset();
-      } }
-    }, null);
-    const chips = /* @__PURE__ */ new Map();
-    let picked = {};
-    let mounted = false;
-    let emptyCard = null;
-    function adopt(source) {
-      picked = {};
-      Object.keys(source || {}).forEach(function(key) {
-        const list3 = source[key];
-        if (Array.isArray(list3) && list3.length) picked[key] = list3.slice();
-      });
-    }
-    adopt(s.selected);
-    function selection() {
-      const out = {};
-      Object.keys(picked).forEach(function(key) {
-        out[key] = picked[key].slice();
-      });
-      return out;
-    }
-    function paint() {
-      chips.forEach(function(rec) {
-        const on2 = (picked[rec.facet.id] || []).indexOf(rec.option.id) >= 0;
-        rec.chip.setAttribute("aria-pressed", on2 ? "true" : "false");
-      });
-      const n = Object.keys(picked).reduce(function(sum, key) {
-        return sum + picked[key].length;
-      }, 0);
-      clear(summary);
-      tally.textContent = n === 0 ? t("facetsNone") : n === 1 ? t("facets1") : t("facetsN", { n });
-      summary.appendChild(tally);
-      if (n) {
-        summary.appendChild(el("span", { class: "ak-facets__sep", "aria-hidden": "true" }, "·"));
-        summary.appendChild(clearAll);
-      }
-    }
-    function toggle2(rec) {
-      const facet = rec.facet;
-      const list3 = picked[facet.id] ? picked[facet.id].slice() : [];
-      const at3 = list3.indexOf(rec.option.id);
-      if (facet.multi) {
-        if (at3 >= 0) list3.splice(at3, 1);
-        else list3.push(rec.option.id);
-      } else if (at3 >= 0) {
-        list3.length = 0;
-      } else {
-        list3.length = 0;
-        list3.push(rec.option.id);
-      }
-      if (list3.length) picked[facet.id] = list3;
-      else delete picked[facet.id];
-      paint();
-      if (s.onChange) s.onChange(selection());
-    }
-    function reset() {
-      picked = {};
-      paint();
-      if (s.onClear) s.onClear();
-      if (s.onChange) s.onChange(selection());
-    }
-    function buildChip(facet, option) {
-      const rec = (
-        /** @type {any} */
-        {
-          chip: null,
-          facet,
-          option,
-          label: el("span", { class: "ak-facets__chiplabel" }),
-          count: el("span", { class: "ak-facets__chipcount" })
-        }
-      );
-      rec.chip = el("button", {
-        type: "button",
-        class: "ak-facets__chip",
-        "aria-pressed": "false",
-        "data-ak-noguard": true,
-        on: { click: function() {
-          toggle2(rec);
-        } }
-      }, [rec.label, rec.count]);
-      return rec;
-    }
-    function render(data) {
-      const defs = (data && Array.isArray(data.facets) ? data.facets : []).filter(function(f2) {
-        return f2 && f2.id;
-      });
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      clear(groups);
-      if (!defs.length) {
-        chips.clear();
-        const e = s.empty || {};
-        emptyCard = emptyState({
-          target: root,
-          tone: "quiet",
-          title: e.title || t("facetsEmpty"),
-          hint: e.hint
-        });
-        return;
-      }
-      if (s.title) root.appendChild(el("div", { class: "ak-facets__title", text: s.title }));
-      root.appendChild(groups);
-      const live = {};
-      defs.forEach(function(facet) {
-        const row = el("div", { class: "ak-facets__chips", role: "group", "aria-label": String(facet.label || facet.id) });
-        (Array.isArray(facet.options) ? facet.options : []).filter(function(o) {
-          return o && o.id;
-        }).forEach(function(option) {
-          const key = facet.id + "\0" + option.id;
-          live[key] = 1;
-          let rec = chips.get(key);
-          if (!rec) {
-            chips.set(key, rec = buildChip(facet, option));
-          } else {
-            rec.facet = facet;
-            rec.option = option;
-          }
-          rec.label.textContent = String(option.label || option.id);
-          if (typeof option.count === "number") {
-            rec.count.hidden = false;
-            odometer(rec.count, option.count);
-          } else {
-            rec.count.hidden = true;
-            rec.count.removeAttribute("data-odo");
-            rec.count.textContent = "";
-          }
-          row.appendChild(rec.chip);
-        });
-        groups.appendChild(el("div", { class: "ak-facets__group" }, [
-          el("div", { class: "ak-facets__label", text: String(facet.label || facet.id) }),
-          row
-        ]));
-      });
-      Array.from(chips.keys()).forEach(function(key) {
-        if (!live[key]) chips.delete(key);
-      });
-      root.appendChild(summary);
-      paint();
-      if (!mounted) enter(groups);
-      mounted = true;
-    }
-    render(s.data);
-    return {
-      el: root,
-      set(patch) {
-        if (!patch) return;
-        if ("selected" in patch) adopt(patch.selected);
-        if ("data" in patch) render(patch.data);
-        else if ("selected" in patch) paint();
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        if (root.parentNode) root.parentNode.removeChild(root);
-      }
-    };
-  }
-
-  // src/static/sdk-libs/atelier/planner-lanes.js
-  function scheduleLanes(events) {
-    const out = events.map(() => ({ lane: 0, lanes: 1 }));
-    const order = events.map((_, i) => i).sort((a, b) => events[a].fromMin - events[b].fromMin || events[b].toMin - events[a].toMin || a - b);
-    let group = [];
-    let laneEnds = [];
-    let groupEnd = -Infinity;
-    const close = () => {
-      for (const i of group) out[i].lanes = laneEnds.length;
-      group = [];
-      laneEnds = [];
-      groupEnd = -Infinity;
-    };
-    for (const i of order) {
-      const e = events[i];
-      if (group.length && e.fromMin >= groupEnd) close();
-      let lane = laneEnds.findIndex((end) => end <= e.fromMin);
-      if (lane < 0) {
-        lane = laneEnds.length;
-        laneEnds.push(e.toMin);
-      } else laneEnds[lane] = e.toMin;
-      out[i].lane = lane;
-      group.push(i);
-      groupEnd = Math.max(groupEnd, e.toMin);
-    }
-    close();
-    return out;
-  }
-
-  // src/static/sdk-libs/atelier/planner.js
-  var TONES6 = ["ok", "warn", "err", "accent"];
-  var CARD_SPRING = { stiffness: 300, damping: 26 };
-  function toneOf3(value, fallback) {
-    return TONES6.indexOf(value) >= 0 ? value : fallback || "accent";
-  }
-  function emptyInto(root, spec) {
-    const e = spec.empty || {};
-    return emptyState({ target: root, tone: "quiet", title: e.title || t("empty"), hint: e.hint || t("emptyHint") });
-  }
-  function kanban(spec) {
-    const root = el("div", { class: "ak-root ak-kanban", "data-ak-part": "root" });
-    applyVariant(root, spec, ["dense", "plain"]);
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    let current2 = null;
-    const arrived = /* @__PURE__ */ new Set();
-    function moveCard(cardId, toColumn) {
-      if (!current2) return;
-      const card = (current2.cards || []).find((c) => c && c.id === cardId);
-      if (!card || card.column === toColumn) return;
-      const was = root.querySelector(`[data-card="${cardId}"]`);
-      const from = was ? was.getBoundingClientRect() : null;
-      card.column = toColumn;
-      render(current2);
-      const again = (
-        /** @type {HTMLElement} */
-        root.querySelector(`[data-card="${cardId}"]`)
-      );
-      if (again) {
-        if (from) {
-          again.classList.remove("ak-kanban__card--enter");
-          again.style.animationDelay = "";
-          const to = again.getBoundingClientRect();
-          flipFrom(again, from.left - to.left, from.top - to.top, CARD_SPRING);
-        }
-        again.focus();
-      }
-      if (spec.onMove) spec.onMove(cardId, toColumn);
-    }
-    function render(data) {
-      current2 = data;
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const columns = data && Array.isArray(data.columns) ? data.columns.filter((c) => c && c.id) : [];
-      const cards = data && Array.isArray(data.cards) ? data.cards.filter((c) => c && c.id) : [];
-      if (!columns.length) {
-        emptyCard = emptyInto(root, spec);
-        return;
-      }
-      const movable = !!spec.onMove;
-      columns.forEach((col, colIdx) => {
-        const inCol = cards.filter((c) => c.column === col.id);
-        const lane = el("div", { class: "ak-kanban__col", "data-ak-part": "col", "data-col": col.id, role: "group", "aria-label": `${col.label} · ${inCol.length}` });
-        const head = partEl("div", "ak-kanban__head ak-kanban__head--" + toneOf3(col.tone, "accent"), "head");
-        slotInto(head, spec, "colhead", col.label || col.id, { cls: "ak-kanban__colname", args: [col, inCol] });
-        head.appendChild(el("span", { class: "ak-kanban__count", "data-ak-part": "count", text: String(inCol.length) }));
-        lane.appendChild(head);
-        const well = el("div", { class: "ak-kanban__well", "data-ak-part": "well" });
-        if (movable) {
-          well.addEventListener("dragover", (ev) => {
-            ev.preventDefault();
-            well.classList.add("ak-kanban__well--over");
-          });
-          well.addEventListener("dragleave", () => well.classList.remove("ak-kanban__well--over"));
-          well.addEventListener("drop", (ev) => {
-            ev.preventDefault();
-            well.classList.remove("ak-kanban__well--over");
-            const id = ev.dataTransfer ? ev.dataTransfer.getData("text/plain") : "";
-            if (id) moveCard(id, col.id);
-          });
-        }
-        inCol.forEach((card, i) => {
-          const node = el("div", {
-            class: "ak-kanban__card" + (TONES6.indexOf(card.tone) >= 0 ? " ak-kanban__card--" + card.tone : ""),
-            "data-ak-part": "card",
-            "data-card": card.id,
-            tabindex: movable ? "0" : void 0,
-            role: movable ? "button" : void 0
-          });
-          const whole = partValue(spec, "card", card);
-          if (whole !== void 0) {
-            fillPart(node, whole);
-          } else {
-            slotInto(node, spec, "cardtitle", card.title || card.id, { cls: "ak-kanban__cardtitle", args: [card] });
-            slotInto(node, spec, "cardsub", card.sub || null, { cls: "ak-kanban__cardsub", args: [card] });
-            slotInto(node, spec, "extra", null, { cls: "ak-kanban__extra", args: [card] });
-            slotInto(node, spec, "badge", card.badge || null, { cls: "ak-kanban__badge", args: [card] });
-            slotInto(node, spec, "aside", null, { cls: "ak-kanban__aside", args: [card] });
-          }
-          if (!motionOff(root) && !arrived.has(card.id)) {
-            arrived.add(card.id);
-            node.classList.add("ak-kanban__card--enter");
-            node.style.animationDelay = `${Math.min(i * 40, 500)}ms`;
-          }
-          if (movable) {
-            node.draggable = true;
-            node.addEventListener("dragstart", (ev) => {
-              if (ev.dataTransfer) {
-                ev.dataTransfer.setData("text/plain", card.id);
-                ev.dataTransfer.effectAllowed = "move";
-              }
-              node.classList.add("ak-kanban__card--lift");
-            });
-            node.addEventListener("dragend", () => node.classList.remove("ak-kanban__card--lift"));
-            node.addEventListener("keydown", (ev) => {
-              const dir = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
-              if (!dir) return;
-              const next = columns[colIdx + dir];
-              if (next) {
-                ev.preventDefault();
-                moveCard(card.id, next.id);
-              }
-            });
-          }
-          well.appendChild(node);
-        });
-        lane.appendChild(well);
-        root.appendChild(lane);
-      });
-    }
-    render(spec.data || null);
-    return {
-      el: root,
-      set: (patch) => {
-        if (patch && "data" in patch) render(patch.data || null);
-      },
-      destroy: () => root.remove()
-    };
-  }
-  var DAY_MS = 864e5;
-  function day(value) {
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? null : d;
-  }
-  function plan(spec) {
-    const root = el("div", { class: "ak-root ak-plan", "data-ak-part": "root" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const rows = (data && Array.isArray(data.rows) ? data.rows : []).map((r) => ({
-        label: r && r.label || "",
-        spans: (r && Array.isArray(r.spans) ? r.spans : []).map((s) => ({ from: day(s.from), to: day(s.to), label: s.label, tone: s.tone })).filter((s) => s.from && s.to && s.to.getTime() >= s.from.getTime())
-      })).filter((r) => r.spans.length);
-      if (!rows.length) {
-        emptyCard = emptyInto(root, spec);
-        return;
-      }
-      let min = data.start ? day(data.start) : null;
-      let max = data.end ? day(data.end) : null;
-      for (const r of rows) for (const s of r.spans) {
-        if (!min || s.from < min) min = s.from;
-        if (!max || s.to > max) max = s.to;
-      }
-      const span = Math.max(max.getTime() - min.getTime(), DAY_MS);
-      const X = (d) => Math.min(Math.max((d.getTime() - min.getTime()) / span, 0), 1) * 100;
-      const head = el("div", { class: "ak-plan__months" });
-      const cursor = new Date(min.getFullYear(), min.getMonth(), 1);
-      while (cursor.getTime() <= max.getTime()) {
-        if (cursor.getTime() >= min.getTime()) {
-          const mark = el("span", { class: "ak-plan__month", text: t("m" + (cursor.getMonth() + 1)) });
-          mark.style.left = X(cursor) + "%";
-          head.appendChild(mark);
-        }
-        cursor.setMonth(cursor.getMonth() + 1);
-      }
-      root.appendChild(head);
-      const body = el("div", { class: "ak-plan__rows" });
-      rows.forEach((r, ri) => {
-        const lane = el("div", { class: "ak-plan__row" }, [
-          el("span", { class: "ak-plan__rowname", text: r.label })
-        ]);
-        const track = el("span", { class: "ak-plan__track" });
-        r.spans.forEach((s, si) => {
-          const left = X(s.from);
-          const width = Math.max(X(new Date(s.to.getTime() + DAY_MS)) - left, 1.2);
-          const bar2 = el("span", {
-            class: "ak-plan__span ak-plan__span--" + toneOf3(s.tone, "accent"),
-            title: (s.label ? s.label + " · " : "") + `${s.from.toISOString().slice(0, 10)} → ${s.to.toISOString().slice(0, 10)}`
-          }, s.label && width > 8 ? [el("span", { class: "ak-plan__spanlabel", text: s.label })] : []);
-          bar2.style.left = left + "%";
-          bar2.style.width = width + "%";
-          if (!reducedMotion()) {
-            bar2.classList.add("ak-plan__span--enter");
-            bar2.style.animationDelay = `${(ri * 2 + si) * 60}ms`;
-          }
-          track.appendChild(bar2);
-        });
-        lane.appendChild(track);
-        body.appendChild(lane);
-      });
-      const today = data.today ? day(data.today) : /* @__PURE__ */ new Date();
-      if (today && today.getTime() >= min.getTime() && today.getTime() <= max.getTime()) {
-        const line2 = el("span", { class: "ak-plan__today", title: t("today") });
-        line2.style.left = X(today) + "%";
-        body.appendChild(line2);
-      }
-      root.appendChild(body);
-    }
-    render(spec.data || null);
-    return {
-      el: root,
-      set: (patch) => {
-        if (patch && "data" in patch) render(patch.data || null);
-      },
-      destroy: () => root.remove()
-    };
-  }
-  function minutes(value) {
-    const m = /^(\d{1,2}):(\d{2})$/.exec(String(value || ""));
-    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-  }
-  function schedule(spec) {
-    const root = el("div", { class: "ak-root ak-schedule", "data-ak-part": "root" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const days = (data && Array.isArray(data.days) && data.days.length ? data.days : ["Mon", "Tue", "Wed", "Thu", "Fri"]).slice(0, 7);
-      const events = (data && Array.isArray(data.events) ? data.events : []).map((e) => ({ ...e, fromMin: minutes(e.from), toMin: minutes(e.to) })).filter((e) => e && typeof e.day === "number" && e.day >= 0 && e.day < days.length && e.fromMin !== null && e.toMin !== null && e.toMin > e.fromMin);
-      if (!events.length) {
-        emptyCard = emptyInto(root, spec);
-        return;
-      }
-      const open = minutes(data.from) ?? Math.max(Math.floor(Math.min(...events.map((e) => e.fromMin)) / 60) * 60 - 60, 0);
-      const close = minutes(data.to) ?? Math.min(Math.ceil(Math.max(...events.map((e) => e.toMin)) / 60) * 60 + 60, 1440);
-      const span = Math.max(close - open, 60);
-      const Y = (m) => Math.min(Math.max((m - open) / span, 0), 1) * 100;
-      const grid2 = el("div", { class: "ak-schedule__grid" });
-      const hours = el("div", { class: "ak-schedule__hours" });
-      for (let m = Math.ceil(open / 60) * 60; m <= close; m += 60) {
-        const line2 = el("span", { class: "ak-schedule__hour", text: `${String(Math.floor(m / 60)).padStart(2, "0")}:00` });
-        line2.style.top = Y(m) + "%";
-        hours.appendChild(line2);
-      }
-      grid2.appendChild(hours);
-      days.forEach((label, di) => {
-        const inDay = events.filter((e) => e.day === di);
-        const col = el("div", { class: "ak-schedule__day", role: "group", "aria-label": `${label} · ${inDay.length}` }, [
-          el("span", { class: "ak-schedule__dayname", text: label })
-        ]);
-        const well = el("div", { class: "ak-schedule__well" });
-        const places = scheduleLanes(inDay);
-        inDay.forEach((e, i) => {
-          const { lane, lanes } = places[i];
-          const block = el(spec.onPick ? "button" : "span", {
-            class: "ak-schedule__event ak-schedule__event--" + toneOf3(e.tone, "accent") + (lanes > 1 ? " ak-schedule__event--shared" : "") + (lanes > 2 ? " ak-schedule__event--tight" : ""),
-            type: spec.onPick ? "button" : void 0,
-            title: `${e.label} · ${e.from}–${e.to}`,
-            // A third of a narrow day has no room for the name, so the name is also said aloud.
-            "aria-label": lanes > 2 ? `${e.label} · ${e.from}–${e.to}` : void 0
-          }, [
-            el("span", { class: "ak-schedule__eventname", text: e.label }),
-            // A short booking has room for its name only, and so has one that shares its hours
-            // with two others; the title carries the hours anyway.
-            e.toMin - e.fromMin >= 75 && lanes <= 2 ? el("span", { class: "ak-schedule__eventtime", text: `${e.from}–${e.to}` }) : null
-          ]);
-          block.style.top = Y(e.fromMin) + "%";
-          block.style.height = Math.max(Y(e.toMin) - Y(e.fromMin), 4) + "%";
-          if (lanes > 1) {
-            block.style.insetInlineStart = `calc(3px + (100% - 6px) * ${lane} / ${lanes})`;
-            block.style.insetInlineEnd = "auto";
-            block.style.width = `calc((100% - 6px) / ${lanes} - ${lane < lanes - 1 ? 2 : 0}px)`;
-          }
-          if (spec.onPick) block.addEventListener("click", () => spec.onPick(e));
-          if (!reducedMotion()) {
-            block.classList.add("ak-schedule__event--enter");
-            block.style.animationDelay = `${(di * 3 + i) * 50}ms`;
-          }
-          well.appendChild(block);
-        });
-        col.appendChild(well);
-        grid2.appendChild(col);
-      });
-      root.appendChild(grid2);
-    }
-    render(spec.data || null);
-    return {
-      el: root,
-      set: (patch) => {
-        if (patch && "data" in patch) render(patch.data || null);
-      },
-      destroy: () => root.remove()
-    };
-  }
-  function steps(spec) {
-    const root = el("ol", { class: "ak-root ak-steps", "data-ak-part": "root" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    let emptyCard = null;
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(root);
-      const items = (data && Array.isArray(data.steps) ? data.steps : []).filter((s) => s && s.label);
-      if (!items.length) {
-        emptyCard = emptyInto(root, spec);
-        return;
-      }
-      const current2 = Math.min(Math.max(Number(data.current) || 0, 0), items.length - 1);
-      items.forEach((s, i) => {
-        const state = i < current2 ? "done" : i === current2 ? "now" : "ahead";
-        root.appendChild(el("li", {
-          class: "ak-steps__step ak-steps__step--" + state,
-          "aria-current": state === "now" ? "step" : void 0
-        }, [
-          el("span", { class: "ak-steps__dot", "aria-hidden": "true" }, state === "done" ? "✓" : String(i + 1)),
-          el("span", { class: "ak-steps__words" }, [
-            el("span", { class: "ak-steps__label", text: s.label }),
-            s.sub ? el("span", { class: "ak-steps__sub", text: s.sub }) : null
-          ])
-        ]));
-      });
-    }
-    render(spec.data || null);
-    return {
-      el: root,
-      set: (patch) => {
-        if (patch && "data" in patch) render(patch.data || null);
-      },
-      destroy: () => root.remove()
-    };
-  }
-
-  // src/static/sdk-libs/atelier/konsole.js
-  var CAP_DEFAULT = 400;
-  var TONES7 = ["ok", "warn", "err", "plain"];
-  function stamp2(ts) {
-    if (ts == null) return "";
-    const d = ts instanceof Date ? ts : new Date(ts);
-    if (isNaN(d.getTime())) return String(ts);
-    return time(d, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  }
-  function konsole(spec) {
-    const cap = typeof spec.cap === "number" && spec.cap > 0 ? Math.min(spec.cap, 2e3) : CAP_DEFAULT;
-    const root = el("div", { class: "ak-root ak-console" });
-    if (spec.target) resolve(spec.target).appendChild(root);
-    const vane = el("div", { class: "ak-console__vane", role: "log", "aria-live": "polite", tabindex: "0" });
-    root.appendChild(vane);
-    let emptyCard = null;
-    function atTail() {
-      return vane.scrollHeight - vane.scrollTop - vane.clientHeight < 24;
-    }
-    function lineNode(line2, entering) {
-      const tone = TONES7.indexOf(line2.tone) >= 0 ? line2.tone : "plain";
-      const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
-        line2.ts != null ? el("span", { class: "ak-console__ts", text: stamp2(line2.ts) }) : null,
-        el("span", { class: "ak-console__text", text: String(line2.text == null ? "" : line2.text) })
-      ]);
-      if (entering && !reducedMotion()) node.classList.add("ak-console__line--enter");
-      return node;
-    }
-    function trim() {
-      while (vane.children.length > cap) vane.removeChild(vane.firstChild);
-    }
-    function render(data) {
-      if (emptyCard) {
-        emptyCard.destroy();
-        emptyCard = null;
-      }
-      clear(vane);
-      const lines = data && Array.isArray(data.lines) ? data.lines : [];
-      if (!lines.length) {
-        const e = spec.empty || {};
-        emptyCard = emptyState({ target: vane, tone: "quiet", title: e.title || t("consoleEmpty"), hint: e.hint || "" });
-        return;
-      }
-      for (const line2 of lines.slice(-cap)) vane.appendChild(lineNode(line2, false));
-      vane.scrollTop = vane.scrollHeight;
-    }
-    render(spec.data);
-    return {
-      el: root,
-      set(patch) {
-        if (patch && "data" in patch) render(patch.data);
-      },
-      /** @param {Array<{ ts?: any, tone?: string, text: string }>} lines */
-      append(lines) {
-        if (!Array.isArray(lines) || !lines.length) return;
-        if (emptyCard) {
-          emptyCard.destroy();
-          emptyCard = null;
-        }
-        const follow = atTail();
-        for (const line2 of lines) vane.appendChild(lineNode(line2, true));
-        trim();
-        if (follow) vane.scrollTop = vane.scrollHeight;
-      },
-      destroy() {
-        if (emptyCard) emptyCard.destroy();
-        root.remove();
-      }
-    };
-  }
-
   // src/static/sdk-libs/atelier/commercial-i18n.js
-  var STRINGS3 = {
+  var STRINGS2 = {
     en: {
       "legal.title": "The pages this app answers with",
       "legal.intro": "These pages are the app’s own, written by its owner. The app answers for what it does; the node it runs on has its own terms, which cover the node and not this app.",
@@ -17442,12 +13622,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS3[
+      STRINGS2[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS3.en
+      ] || STRINGS2.en
     );
-    const text = table2[key] || STRINGS3.en[key] || key;
+    const text = table2[key] || STRINGS2.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -17918,7 +14098,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/members-i18n.js
-  var STRINGS4 = {
+  var STRINGS3 = {
     en: {
       "members.title": "Members",
       "members.intro": "Who may use this app, and with which role. A role belongs to the person, so their agents have it too.",
@@ -18253,12 +14433,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS4[
+      STRINGS3[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS4.en
+      ] || STRINGS3.en
     );
-    const text = table2[key] || STRINGS4.en[key] || key;
+    const text = table2[key] || STRINGS3.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -19143,7 +15323,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/workspace-i18n.js
-  var STRINGS5 = {
+  var STRINGS4 = {
     en: {
       "sample.note": "A sample. Nothing here is sent or changed.",
       "failed": "That did not go through: {why}",
@@ -19406,12 +15586,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS5[
+      STRINGS4[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS5.en
+      ] || STRINGS4.en
     );
-    const text = table2[key] || STRINGS5.en[key] || key;
+    const text = table2[key] || STRINGS4.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -20621,7 +16801,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/intake-connect-i18n.js
-  var STRINGS6 = {
+  var STRINGS5 = {
     en: {
       "intake.title": "Send us a message",
       "intake.send": "Send",
@@ -20969,9 +17149,9 @@ Known schemas:
     }
   };
   var TI_KEYS = {
-    en: Object.keys(STRINGS6.en),
-    fi: Object.keys(STRINGS6.fi),
-    es: Object.keys(STRINGS6.es)
+    en: Object.keys(STRINGS5.en),
+    fi: Object.keys(STRINGS5.fi),
+    es: Object.keys(STRINGS5.es)
   };
   function ti(key, vars) {
     const hosted = i18n.t(key, vars);
@@ -20979,16 +17159,71 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS6[
+      STRINGS5[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS6.en
+      ] || STRINGS5.en
     );
-    const text = table2[key] || STRINGS6.en[key] || key;
+    const text = table2[key] || STRINGS5.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
     });
+  }
+
+  // src/static/sdk-libs/_core/clipboard.js
+  async function copyText(text) {
+    const value = String(text == null ? "" : text);
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch {
+      }
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = value;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // src/static/sdk-libs/atelier/copy.js
+  function copy(text) {
+    const af = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.agentface;
+    if (af && typeof af.copyText === "function") {
+      return Promise.resolve().then(function() {
+        return af.copyText(text);
+      }).then(function(ok) {
+        return !!ok;
+      }, function() {
+        return false;
+      });
+    }
+    return copyText(text);
+  }
+  function selectForHand(node) {
+    if (!node || typeof document === "undefined" || typeof window === "undefined") return false;
+    try {
+      const sel = window.getSelection && window.getSelection();
+      if (!sel || typeof document.createRange !== "function" || typeof sel.addRange !== "function") return false;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   // src/static/sdk-libs/atelier/intake-form-helpers.js
@@ -22229,7 +18464,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/workflow-i18n.js
-  var STRINGS7 = {
+  var STRINGS6 = {
     en: {
       "wf.title": "Waiting for your answer",
       "wf.intro": "A workflow stops at each of these steps until you answer. When you answer, the run goes on.",
@@ -22351,12 +18586,12 @@ Known schemas:
     const lang2 = i18n.lang();
     const table2 = (
       /** @type {Record<string, string>} */
-      STRINGS7[
+      STRINGS6[
         /** @type {'en'|'fi'|'es'} */
         lang2
-      ] || STRINGS7.en
+      ] || STRINGS6.en
     );
-    const text = table2[key] || STRINGS7.en[key] || key;
+    const text = table2[key] || STRINGS6.en[key] || key;
     if (!vars) return text;
     return text.replace(/\{(\w+)\}/g, function(whole, name) {
       return vars[name] == null ? whole : String(vars[name]);
@@ -22835,6 +19070,996 @@ Known schemas:
         if (root.parentNode) root.parentNode.removeChild(root);
       }
     };
+  }
+
+  // src/static/sdk-libs/atelier/menu.js
+  var GAP = 6;
+  var EDGE = 8;
+  function placeAt(box, at3, o) {
+    const opts = o || {};
+    const w = box.offsetWidth;
+    const h = box.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let top = opts.placement === "above" ? at3.top - GAP - h : at3.bottom + GAP;
+    if (top + h > vh - EDGE && at3.top - GAP - h >= EDGE) top = at3.top - GAP - h;
+    if (top < EDGE && at3.bottom + GAP + h <= vh - EDGE) top = at3.bottom + GAP;
+    let left = opts.align === "end" ? at3.right - w : opts.align === "center" ? (at3.left + at3.right) / 2 - w / 2 : at3.left;
+    left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
+    top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
+    box.style.left = Math.round(left) + "px";
+    box.style.top = Math.round(top) + "px";
+    const ox = Math.max(0, Math.min(w, (at3.left + at3.right) / 2 - left));
+    const oy = top >= at3.bottom ? 0 : top + h <= at3.top ? h : h / 2;
+    return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
+  }
+  function openMotion(box, origin) {
+    box.style.transformOrigin = origin;
+    if (motionOff(box) || typeof box.animate !== "function") return;
+    const sf = springFrames({ el: box });
+    const frames = sf.samples.map(function(at3, i) {
+      const s = 0.9 + 0.1 * at3;
+      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at3 * 1.6) };
+    });
+    box.animate(frames, { duration: sf.duration, easing: "linear" });
+  }
+  function closeMotion(box, done) {
+    if (motionOff(box) || typeof box.animate !== "function") {
+      done();
+      return;
+    }
+    const pace3 = paceOf(box);
+    const anim = box.animate(
+      [{ opacity: 1, transform: "scale(1)" }, { opacity: 0, transform: "scale(0.95)" }],
+      { duration: Math.max(90, pace3.span * 0.6), easing: "ease-in", fill: "forwards" }
+    );
+    anim.onfinish = done;
+    anim.oncancel = done;
+  }
+  function outside(nodes, close) {
+    const hit = function(e) {
+      for (const n of nodes) if (n && n.contains(
+        /** @type {Node} */
+        e.target
+      )) return;
+      close();
+    };
+    document.addEventListener("pointerdown", hit, true);
+    return function() {
+      document.removeEventListener("pointerdown", hit, true);
+    };
+  }
+  function menu(spec) {
+    const s = spec || { items: [] };
+    const anchor = s.anchor ? (
+      /** @type {HTMLElement} */
+      resolve(s.anchor)
+    ) : null;
+    let items = s.items || [];
+    let box = null;
+    let mark = null;
+    let unhook = null;
+    let cursor = -1;
+    let picking = false;
+    if (anchor) {
+      anchor.setAttribute("aria-haspopup", "menu");
+      anchor.setAttribute("aria-expanded", "false");
+    }
+    function rows() {
+      return box ? (
+        /** @type {HTMLElement[]} */
+        Array.prototype.slice.call(box.querySelectorAll('.ak-menu__item:not([aria-disabled="true"])'))
+      ) : [];
+    }
+    function focusRow(i) {
+      const list3 = rows();
+      if (!list3.length) return;
+      cursor = (i + list3.length) % list3.length;
+      list3.forEach(function(r, j) {
+        r.classList.toggle("ak-menu__item--on", j === cursor);
+      });
+      list3[cursor].focus({ preventScroll: true });
+      if (mark) mark.sync();
+    }
+    function choose(item) {
+      if (picking || !item || item.disabled) return;
+      picking = true;
+      const finish = function() {
+        picking = false;
+        close(true);
+        if (item.run) item.run();
+        if (s.onPick) s.onPick(item.id, item);
+      };
+      if (!box || motionOff(box) || !mark || typeof mark.el.animate !== "function") {
+        finish();
+        return;
+      }
+      const blink = mark.el.animate([{ opacity: 1 }, { opacity: 0, offset: 0.45 }, { opacity: 1 }], { duration: 150, easing: "linear" });
+      blink.onfinish = finish;
+      blink.oncancel = finish;
+    }
+    function onKey(e) {
+      const list3 = rows();
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusRow(cursor + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusRow(cursor < 0 ? list3.length - 1 : cursor - 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        focusRow(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        focusRow(list3.length - 1);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        close(true);
+      } else if (e.key === "Tab") {
+        close(false);
+      } else if (e.key.length === 1 && /\S/.test(e.key)) {
+        const ch = e.key.toLowerCase();
+        for (let k = 1; k <= list3.length; k++) {
+          const j = (cursor + k) % list3.length;
+          if ((list3[j].textContent || "").trim().toLowerCase().indexOf(ch) === 0) {
+            focusRow(j);
+            break;
+          }
+        }
+      }
+    }
+    function build() {
+      const root = el("div", { class: "ak-root ak-menu", role: "menu", "data-ak-part": "root", "aria-label": s.label || null, tabindex: "-1", on: { keydown: onKey } });
+      items.forEach(function(it) {
+        if (it === "-") {
+          root.appendChild(el("div", { class: "ak-menu__sep", role: "separator", "data-ak-part": "separator" }));
+          return;
+        }
+        root.appendChild(el("button", {
+          type: "button",
+          role: "menuitem",
+          class: "ak-menu__item" + (it.danger ? " ak-menu__item--danger" : ""),
+          "data-ak-part": "item",
+          "data-ak-id": it.id,
+          tabindex: "-1",
+          "data-ak-noguard": true,
+          "aria-disabled": it.disabled ? "true" : null,
+          on: {
+            click: function() {
+              choose(it);
+            },
+            pointermove: function(e) {
+              if (it.disabled) return;
+              const i = rows().indexOf(
+                /** @type {HTMLElement} */
+                e.currentTarget
+              );
+              if (i >= 0 && i !== cursor) focusRow(i);
+            }
+          }
+        }, [
+          el("span", { class: "ak-menu__label", "data-ak-part": "label", text: it.label }),
+          it.hint ? el("span", { class: "ak-menu__hint", "data-ak-part": "hint", text: it.hint }) : null
+        ]));
+      });
+      return root;
+    }
+    function open(at3, fromKeys) {
+      if (box) return;
+      box = build();
+      document.body.appendChild(wearLook(box, anchor));
+      const r = at3 ? { left: at3.x, right: at3.x, top: at3.y, bottom: at3.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
+      const origin = placeAt(box, r, { align: s.align });
+      mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
+      openMotion(box, origin);
+      if (!motionOff(box)) {
+        const pace3 = paceOf(box);
+        rows().forEach(function(row, i) {
+          if (typeof row.animate === "function") {
+            row.animate(
+              [{ opacity: 0, transform: "translateY(-4px)" }, { opacity: 1, transform: "none" }],
+              { duration: pace3.span, delay: 20 + i * 18, easing: pace3.ease, fill: "backwards" }
+            );
+          }
+        });
+      }
+      if (anchor) anchor.setAttribute("aria-expanded", "true");
+      unhook = outside([box, anchor], function() {
+        close(false);
+      });
+      cursor = -1;
+      box.focus({ preventScroll: true });
+      if (fromKeys) focusRow(0);
+    }
+    function close(focusBack) {
+      if (!box) return;
+      const gone = box;
+      box = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      if (unhook) {
+        unhook();
+        unhook = null;
+      }
+      if (anchor) anchor.setAttribute("aria-expanded", "false");
+      closeMotion(gone, function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+      });
+      if (focusBack && anchor) anchor.focus({ preventScroll: true });
+    }
+    const onAnchor = function(e) {
+      if (box) close(true);
+      else open(void 0, !!e && e.detail === 0);
+    };
+    const onAnchorKey = function(e) {
+      if (e.key === "ArrowDown" && !box) {
+        e.preventDefault();
+        open(void 0, true);
+      }
+    };
+    if (anchor) {
+      anchor.addEventListener("click", onAnchor);
+      anchor.addEventListener("keydown", onAnchorKey);
+    }
+    return {
+      open,
+      close,
+      isOpen() {
+        return !!box;
+      },
+      set(patch) {
+        if (patch && patch.items) {
+          items = patch.items;
+          if (box) {
+            close(false);
+            open();
+          }
+        }
+      },
+      destroy() {
+        close(false);
+        if (anchor) {
+          anchor.removeEventListener("click", onAnchor);
+          anchor.removeEventListener("keydown", onAnchorKey);
+        }
+      }
+    };
+  }
+  function contextMenu(target, spec) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const m = menu({ items: spec.items, onPick: spec.onPick, label: spec.label });
+    const onCtx = function(e) {
+      e.preventDefault();
+      m.close(false);
+      m.open({ x: e.clientX, y: e.clientY });
+    };
+    const onKey = function(e) {
+      if (e.key === "F10" && e.shiftKey) {
+        e.preventDefault();
+        const r = node.getBoundingClientRect();
+        m.close(false);
+        m.open({ x: r.left + 12, y: r.top + 12 }, true);
+      }
+    };
+    node.addEventListener("contextmenu", onCtx);
+    node.addEventListener("keydown", onKey);
+    return {
+      close() {
+        m.close(false);
+      },
+      destroy() {
+        m.destroy();
+        node.removeEventListener("contextmenu", onCtx);
+        node.removeEventListener("keydown", onKey);
+      }
+    };
+  }
+  function popover(spec) {
+    const anchor = (
+      /** @type {HTMLElement} */
+      resolve(spec.anchor)
+    );
+    let box = null;
+    let unhook = null;
+    anchor.setAttribute("aria-expanded", "false");
+    function open() {
+      if (box) return;
+      const body = typeof spec.content === "function" ? spec.content() : spec.content;
+      box = el(
+        "div",
+        {
+          class: "ak-root ak-popover",
+          role: "dialog",
+          "aria-label": spec.label || null,
+          "data-ak-part": "root",
+          tabindex: "-1",
+          on: { keydown: function(e) {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              close();
+              anchor.focus();
+            }
+          } }
+        },
+        [el("div", { class: "ak-popover__body", "data-ak-part": "body" }, body)]
+      );
+      document.body.appendChild(wearLook(box, anchor));
+      openMotion(box, placeAt(box, anchor.getBoundingClientRect(), { align: spec.align || "center" }));
+      anchor.setAttribute("aria-expanded", "true");
+      unhook = outside([box, anchor], close);
+      box.focus({ preventScroll: true });
+      if (spec.onOpen) spec.onOpen();
+    }
+    function close() {
+      if (!box) return;
+      const gone = box;
+      box = null;
+      if (unhook) {
+        unhook();
+        unhook = null;
+      }
+      anchor.setAttribute("aria-expanded", "false");
+      closeMotion(gone, function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+      });
+      if (spec.onClose) spec.onClose();
+    }
+    const onClick = function() {
+      if (box) close();
+      else open();
+    };
+    anchor.addEventListener("click", onClick);
+    return { open, close, isOpen() {
+      return !!box;
+    }, destroy() {
+      close();
+      anchor.removeEventListener("click", onClick);
+    } };
+  }
+  function tooltip(target, text, opts) {
+    const node = (
+      /** @type {HTMLElement} */
+      resolve(target)
+    );
+    const o = opts || {};
+    const tip = el("div", { class: "ak-root ak-tooltip", role: "tooltip", "data-ak-part": "root", id: "ak-tip-" + Math.random().toString(36).slice(2, 8), text });
+    let timer = null;
+    let shown = false;
+    node.setAttribute("aria-describedby", tip.id);
+    function show() {
+      clearTimeout(timer);
+      if (shown) return;
+      shown = true;
+      document.body.appendChild(wearLook(tip, node));
+      openMotion(tip, placeAt(tip, node.getBoundingClientRect(), { align: "center", placement: o.placement || "above" }));
+    }
+    function hide() {
+      clearTimeout(timer);
+      if (!shown) return;
+      shown = false;
+      closeMotion(tip, function() {
+        if (!shown && tip.parentNode) tip.parentNode.removeChild(tip);
+      });
+    }
+    const enter2 = function() {
+      clearTimeout(timer);
+      timer = setTimeout(show, o.delay != null ? o.delay : 450);
+    };
+    const key = function(e) {
+      if (e.key === "Escape") hide();
+    };
+    node.addEventListener("pointerenter", enter2);
+    node.addEventListener("pointerleave", hide);
+    node.addEventListener("focus", show);
+    node.addEventListener("blur", hide);
+    node.addEventListener("keydown", key);
+    return {
+      set(next) {
+        tip.textContent = next;
+      },
+      destroy() {
+        hide();
+        node.removeEventListener("pointerenter", enter2);
+        node.removeEventListener("pointerleave", hide);
+        node.removeEventListener("focus", show);
+        node.removeEventListener("blur", hide);
+        node.removeEventListener("keydown", key);
+        node.removeAttribute("aria-describedby");
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/parts-ui.js
+  var toastHost = null;
+  function toast(spec) {
+    if (!toastHost || !toastHost.isConnected) {
+      toastHost = el("div", { class: "ak-root ak-toasts", role: "status", "aria-live": "polite" });
+      document.body.appendChild(toastHost);
+    }
+    wearLook(toastHost);
+    let timer = null;
+    const node = el("div", { class: "ak-toast" + (spec.tone ? " ak-toast--" + spec.tone : "") }, [
+      el("div", { class: "ak-toast__body" }, [
+        el("div", { class: "ak-toast__title" }, spec.title),
+        spec.sub ? el("div", { class: "ak-toast__sub" }, spec.sub) : null
+      ].filter(Boolean)),
+      spec.action ? el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: {
+        click: function() {
+          spec.action.onPick();
+          close();
+        }
+      } }, spec.action.label) : null
+    ].filter(Boolean));
+    const pace3 = paceOf(node);
+    function close() {
+      if (timer) clearTimeout(timer);
+      const drop = function() {
+        if (node.parentNode) node.parentNode.removeChild(node);
+      };
+      if (motionOff(node) || typeof node.animate !== "function") {
+        drop();
+        return;
+      }
+      const anim = node.animate(
+        [{ opacity: 1, transform: "translateY(0)" }, { opacity: 0, transform: "translateY(" + (pace3.dist || 8) + "px)" }],
+        { duration: pace3.span, easing: "ease-in" }
+      );
+      anim.onfinish = drop;
+      anim.oncancel = drop;
+    }
+    toastHost.appendChild(node);
+    fadeIn(node, pace3, 0);
+    enter(node);
+    const ttl = spec.ttl == null ? 6e3 : spec.ttl;
+    if (ttl > 0) timer = setTimeout(close, ttl);
+    return { el: node, close };
+  }
+  function palette(spec) {
+    const s = spec || { items: [] };
+    let root = null;
+    let box = null;
+    let list3 = null;
+    let mark = null;
+    let cursor = 0;
+    let shown = [];
+    let opener = null;
+    function keyOf3(it, i) {
+      return it.id || it.label || String(i);
+    }
+    function close(after) {
+      if (!root) return;
+      const gone = root;
+      const goneBox = box;
+      root = null;
+      box = null;
+      list3 = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      const drop = function() {
+        if (gone.parentNode) gone.parentNode.removeChild(gone);
+        if (after) after();
+      };
+      if (motionOff(gone) || typeof gone.animate !== "function") {
+        drop();
+        return;
+      }
+      gone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, easing: "ease-in", fill: "forwards" });
+      closeMotion(goneBox, drop);
+    }
+    function runItem(it) {
+      if (!it.done || !box || motionOff(box) || typeof box.animate !== "function") {
+        close();
+        it.run();
+        if (it.done) toast({ title: it.done, tone: "ok", ttl: 3200 });
+        return;
+      }
+      const from = box.getBoundingClientRect();
+      const tw2 = Math.min(360, window.innerWidth - 32);
+      const to = { left: window.innerWidth - tw2 - 16, top: window.innerHeight - 72, width: tw2, height: 56 };
+      const dx = to.left - from.left;
+      const dy = to.top - from.top;
+      const sx = to.width / Math.max(from.width, 1);
+      const sy = to.height / Math.max(from.height, 1);
+      const sf = springFrames({ el: box });
+      const frames = sf.samples.map(function(at3, i) {
+        return {
+          offset: i / (sf.samples.length - 1),
+          transform: "translate(" + (dx * at3).toFixed(1) + "px, " + (dy * at3).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at3).toFixed(4) + ", " + (1 + (sy - 1) * at3).toFixed(4) + ")",
+          opacity: at3 > 0.85 ? 1 - (at3 - 0.85) / 0.15 : 1
+        };
+      });
+      box.style.transformOrigin = "0 0";
+      if (list3) list3.style.opacity = "0";
+      const gone = root;
+      root.animate([{ opacity: 1 }, { opacity: 0 }], { duration: Math.min(sf.duration, 260), easing: "ease-out", fill: "forwards" });
+      const anim = box.animate(frames, { duration: sf.duration, easing: "linear", fill: "forwards" });
+      root = null;
+      box = null;
+      list3 = null;
+      if (mark) {
+        mark.destroy();
+        mark = null;
+      }
+      let handed = false;
+      const hand2 = function() {
+        if (handed) return;
+        handed = true;
+        if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
+        toast({ title: it.done, tone: "ok", ttl: 3200 });
+      };
+      it.run();
+      setTimeout(hand2, Math.min(sf.duration, 420));
+      anim.onfinish = hand2;
+    }
+    function highlight() {
+      if (!list3) return;
+      const rows = Array.prototype.slice.call(list3.querySelectorAll(".ak-palette__item:not(.ak-layout__ghost)"));
+      rows.forEach(function(row, i) {
+        row.setAttribute("aria-selected", i === cursor ? "true" : "false");
+      });
+      if (rows[cursor] && typeof rows[cursor].scrollIntoView === "function") rows[cursor].scrollIntoView({ block: "nearest" });
+      if (mark) mark.sync();
+    }
+    function paintList() {
+      if (!list3) return;
+      const host = list3;
+      settle(host, function() {
+        Array.prototype.slice.call(host.querySelectorAll(".ak-palette__item, .ak-palette__empty")).forEach(function(n) {
+          host.removeChild(n);
+        });
+        if (!shown.length) {
+          host.appendChild(el("li", { class: "ak-palette__empty", "data-ak-id": "__empty" }, s.empty || t("paletteEmpty")));
+          return;
+        }
+        shown.forEach(function(it, i) {
+          host.appendChild(el("li", { class: "ak-palette__item", role: "option", "data-ak-id": keyOf3(it, i), "aria-selected": "false", on: {
+            click: function() {
+              runItem(it);
+            },
+            pointermove: function() {
+              if (cursor !== i) {
+                cursor = i;
+                highlight();
+              }
+            }
+          } }, [el("span", {}, it.label), it.hint ? el("span", { class: "ak-palette__hint" }, it.hint) : null].filter(Boolean)));
+        });
+      }, { rows: ".ak-palette__item, .ak-palette__empty" });
+      highlight();
+    }
+    function open(from) {
+      if (root) return;
+      opener = from || null;
+      cursor = 0;
+      shown = s.items.slice();
+      list3 = el("ul", { class: "ak-palette__list", role: "listbox" });
+      const input = el("input", { class: "ak-palette__input", type: "text", placeholder: s.placeholder || t("palettePlaceholder"), autocomplete: "off", on: {
+        input: function() {
+          const q = (
+            /** @type {HTMLInputElement} */
+            input.value.trim().toLowerCase()
+          );
+          shown = s.items.filter(function(it) {
+            return !q || (it.label + " " + (it.hint || "")).toLowerCase().indexOf(q) >= 0;
+          });
+          cursor = 0;
+          paintList();
+        },
+        keydown: function(e) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            cursor = Math.min(cursor + 1, shown.length - 1);
+            highlight();
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            cursor = Math.max(cursor - 1, 0);
+            highlight();
+          } else if (e.key === "Enter") {
+            e.preventDefault();
+            const it = shown[cursor];
+            if (it) runItem(it);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            close(function() {
+              if (opener && opener.isConnected) opener.focus();
+            });
+          }
+        }
+      } });
+      box = el("div", { class: "ak-palette__box", role: "dialog", "aria-modal": "true", "aria-label": s.placeholder || t("paletteLabel") }, [input, list3]);
+      root = el("div", { class: "ak-root ak-palette", on: { click: function(e) {
+        if (e.target === root) close();
+      } } }, [box]);
+      document.body.appendChild(wearLook(root, opener));
+      mark = ink2(list3, { axis: "y", active: '.ak-palette__item[aria-selected="true"]:not(.ak-layout__ghost)', className: "ak-palette__ink" });
+      paintList();
+      mark.jump();
+      growFrom(box, opener);
+      if (!motionOff(root) && typeof root.animate === "function") root.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: "ease-out" });
+      input.focus();
+    }
+    const key = s.hotkey === void 0 ? "k" : s.hotkey;
+    const onKey = function(e) {
+      if (!key) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === key) {
+        e.preventDefault();
+        if (root) close();
+        else open();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    const anchor = s.anchor ? (
+      /** @type {HTMLElement} */
+      resolve(s.anchor)
+    ) : null;
+    const onAnchor = function() {
+      if (root) close();
+      else open(anchor);
+    };
+    if (anchor) anchor.addEventListener("click", onAnchor);
+    return {
+      open,
+      close() {
+        close();
+      },
+      destroy() {
+        close();
+        window.removeEventListener("keydown", onKey);
+        if (anchor) anchor.removeEventListener("click", onAnchor);
+      }
+    };
+  }
+  function growFrom(box, from) {
+    if (!from || !from.isConnected || motionOff(box) || typeof box.animate !== "function") {
+      openMotion(box, "50% 0");
+      return;
+    }
+    const a = from.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const sx = a.width / Math.max(b.width, 1);
+    const sy = a.height / Math.max(b.height, 1);
+    const dx = a.left - b.left;
+    const dy = a.top - b.top;
+    const sf = springFrames({ el: box });
+    box.style.transformOrigin = "0 0";
+    box.animate(sf.samples.map(function(at3, i) {
+      const k = 1 - at3;
+      return {
+        offset: i / (sf.samples.length - 1),
+        transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
+        opacity: Math.min(1, 0.4 + at3)
+      };
+    }), { duration: sf.duration, easing: "linear" });
+  }
+  function compare(spec) {
+    const s = spec || { before: {}, after: {} };
+    function layer(side, cls) {
+      const body = side.el ? side.el : side.image ? el("img", { src: side.image, alt: side.label || "" }) : el("span", {}, side.label || "");
+      return el("div", { class: "ak-compare__layer " + cls }, [body]);
+    }
+    const handle2 = el("button", { type: "button", class: "ak-compare__handle", "aria-label": t("compareLabel"), role: "slider", "aria-valuemin": "0", "aria-valuemax": "100" }, "⇄");
+    const root = el("div", { class: "ak-root ak-compare" }, [
+      layer(s.before || {}, "ak-compare__before"),
+      layer(s.after || {}, "ak-compare__after"),
+      s.before && s.before.label ? el("span", { class: "ak-compare__label ak-compare__label--before" }, s.before.label) : null,
+      s.after && s.after.label ? el("span", { class: "ak-compare__label ak-compare__label--after" }, s.after.label) : null,
+      el("div", { class: "ak-compare__bar" }),
+      handle2
+    ].filter(Boolean));
+    if (s.target) resolve(s.target).appendChild(root);
+    let pct = typeof s.value === "number" ? s.value : 50;
+    function set(v) {
+      pct = Math.max(0, Math.min(Number(v) || 0, 100));
+      root.style.setProperty("--ak-compare", pct + "%");
+      handle2.setAttribute("aria-valuenow", String(Math.round(pct)));
+      if (s.onChange) s.onChange(pct);
+    }
+    let dragging = false;
+    function at3(e) {
+      const r = root.getBoundingClientRect();
+      set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
+    }
+    root.addEventListener("pointerdown", function(e) {
+      dragging = true;
+      root.setPointerCapture(e.pointerId);
+      at3(e);
+    });
+    root.addEventListener("pointermove", function(e) {
+      if (dragging) at3(e);
+    });
+    root.addEventListener("pointerup", function() {
+      dragging = false;
+    });
+    root.addEventListener("pointercancel", function() {
+      dragging = false;
+    });
+    handle2.addEventListener("keydown", function(e) {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        set(pct - 5);
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        set(pct + 5);
+      }
+    });
+    set(pct);
+    return { el: root, set, destroy() {
+      if (root.parentNode) root.parentNode.removeChild(root);
+    } };
+  }
+  function tour(spec) {
+    const s = spec || { steps: [] };
+    let i = -1;
+    let note = null;
+    let marked = null;
+    let frame2 = 0;
+    let before = null;
+    function follow() {
+      if (frame2) return;
+      frame2 = requestAnimationFrame(function() {
+        frame2 = 0;
+        place2();
+      });
+    }
+    function place2() {
+      if (!note || !marked) return;
+      const r = marked.getBoundingClientRect();
+      const w = note.offsetWidth || 260;
+      const top = r.bottom + 12;
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+      note.style.top = (top + (note.offsetHeight || 0) > window.innerHeight ? Math.max(8, r.top - (note.offsetHeight || 0) - 12) : top) + "px";
+      note.style.left = left + "px";
+    }
+    function show(n) {
+      clearStep();
+      const step = s.steps[n];
+      if (!step) {
+        end();
+        return;
+      }
+      i = n;
+      const target = typeof step.target === "string" ? document.querySelector(step.target) : step.target;
+      if (!target) {
+        show(n + 1);
+        return;
+      }
+      marked = /** @type {HTMLElement} */
+      target;
+      marked.classList.add("ak-tour__mark");
+      if (!reducedMotion()) marked.scrollIntoView({ block: "center", behavior: "smooth" });
+      const last = n === s.steps.length - 1;
+      const L = Object.assign({ next: t("next"), done: t("done"), skip: t("tourSkip") }, s.labels || {});
+      note = el("div", { class: "ak-root ak-tour__note", role: "dialog", "aria-live": "polite" }, [
+        el("div", {}, [el("span", { class: "ak-tour__step" }, n + 1 + "/" + s.steps.length), el("span", {}, step.text)]),
+        el("div", { class: "ak-tour__nav" }, [
+          el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: function() {
+            if (last) end();
+            else show(n + 1);
+          } } }, last ? L.done : L.next),
+          last ? null : el("button", { type: "button", class: "ak-btn ak-btn--ghost", on: { click: end } }, L.skip)
+        ].filter(Boolean))
+      ]);
+      document.body.appendChild(wearLook(note, marked));
+      place2();
+      note.querySelector("button").focus({ preventScroll: true });
+    }
+    function clearStep() {
+      if (marked) marked.classList.remove("ak-tour__mark");
+      if (note && note.parentNode) note.parentNode.removeChild(note);
+      marked = null;
+      note = null;
+    }
+    function onKey(e) {
+      if (e.key === "Escape") end();
+    }
+    function end() {
+      clearStep();
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", place2);
+      window.removeEventListener("scroll", follow, true);
+      if (frame2) {
+        cancelAnimationFrame(frame2);
+        frame2 = 0;
+      }
+      if (before && before.isConnected && typeof before.focus === "function") before.focus({ preventScroll: true });
+      before = null;
+      if (i >= 0 && s.onDone) s.onDone();
+      i = -1;
+    }
+    function start() {
+      before = document.activeElement;
+      window.addEventListener("keydown", onKey);
+      window.addEventListener("resize", place2);
+      window.addEventListener("scroll", follow, { capture: true, passive: true });
+      show(0);
+    }
+    return { start, end };
+  }
+
+  // src/static/sdk-libs/atelier/copy-upload-i18n.js
+  var STRINGS7 = {
+    en: {
+      "drop.label": "Drop the file, or press to pick",
+      "drop.tooBig": "{name} is over {mb} MB.",
+      "drop.wrongKind": "{name} is not a kind this takes.",
+      "upload.waiting": "Waiting",
+      "upload.sending": "Uploading…",
+      "upload.percent": "Uploading… {n}%",
+      "upload.saved": "Saved as {key}",
+      "upload.open": "Open",
+      "upload.failed": "Did not upload: {why}",
+      "copy.promptByHand": "The browser did not allow copying. The whole prompt is selected: press Ctrl+C, or Cmd+C on a Mac."
+    },
+    fi: {
+      "drop.label": "Pudota tiedosto tähän tai valitse se painamalla",
+      "drop.tooBig": "{name} on yli {mb} Mt.",
+      "drop.wrongKind": "Tämä ei ota vastaan tiedostoa {name}: tiedostotyyppi ei käy.",
+      "upload.waiting": "Odottaa vuoroaan",
+      "upload.sending": "Lähetetään…",
+      "upload.percent": "Lähetetään… {n} %",
+      "upload.saved": "Tallennettu nimellä {key}",
+      "upload.open": "Avaa",
+      "upload.failed": "Lähetys ei onnistunut: {why}",
+      "copy.promptByHand": "Selain ei sallinut kopiointia. Koko kehote on valittu: paina Ctrl+C tai Macissa Cmd+C."
+    },
+    es: {
+      "drop.label": "Suelta el archivo o presiona para elegirlo",
+      "drop.tooBig": "{name} pesa más de {mb} MB.",
+      "drop.wrongKind": "{name} no es de un tipo que se acepte aquí.",
+      "upload.waiting": "En espera",
+      "upload.sending": "Subiendo…",
+      "upload.percent": "Subiendo… {n} %",
+      "upload.saved": "Guardado como {key}",
+      "upload.open": "Abrir",
+      "upload.failed": "No se subió: {why}",
+      "copy.promptByHand": "El navegador no permitió copiar. La instrucción completa está seleccionada: pulsa Ctrl+C, o Cmd+C en un Mac."
+    }
+  };
+  function tu(key, vars) {
+    const hosted = i18n.t(key, vars);
+    if (hosted !== key) return hosted;
+    const lang2 = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS7[
+        /** @type {'en'|'fi'|'es'} */
+        lang2
+      ] || STRINGS7.en
+    );
+    const text = table2[key] || STRINGS7.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/workbench-parts.js
+  function parseAnswer(text) {
+    const s = String(text || "").replace(/```(?:json)?/gi, "");
+    const a = s.indexOf("{");
+    const b = s.lastIndexOf("}");
+    if (a < 0 || b <= a) return null;
+    try {
+      return JSON.parse(s.slice(a, b + 1));
+    } catch {
+      return null;
+    }
+  }
+  function button(label, cls, part, onClick) {
+    const b = el("button", { type: "button", class: "ak-btn" + (cls ? " " + cls : ""), "data-ak-part": part, "data-ak-noguard": true }, label);
+    b.addEventListener("click", function() {
+      whileBusy(b, Promise.resolve().then(onClick)).catch(function(err) {
+        toast({ title: String(err && err.message || err), tone: "err" });
+      });
+    });
+    return b;
+  }
+  function promptPanel(spec) {
+    const promptText = function() {
+      return typeof spec.prompt === "function" ? spec.prompt() : String(spec.prompt || "");
+    };
+    const answers = !!(spec.onResult && spec.expect !== null);
+    const root = el("div", { class: "ak-root ak-promptpanel" + (answers ? "" : " ak-promptpanel--one"), "data-ak-part": "root" });
+    const shortText = function() {
+      const lines = promptText().split("\n");
+      return lines[0].slice(0, 120) + "… (" + (lines.length === 1 ? t("promptLine1") : t("promptLines", { n: lines.length })) + ")";
+    };
+    const one = el("div", { class: "ak-promptpanel__col", "data-ak-part": "col" });
+    one.appendChild(el("div", { class: "ak-promptpanel__step", "data-ak-part": "step", text: answers ? t("promptStepCopy") : t("promptStepCopyOnly") }));
+    const preview = el("div", { class: "ak-promptpanel__preview", "data-ak-part": "preview", text: shortText() });
+    one.appendChild(preview);
+    const row = el("div", { class: "ak-promptpanel__row" });
+    let full = false;
+    function showFull(on2) {
+      full = on2;
+      preview.textContent = full ? promptText() : shortText();
+      preview.classList.toggle("ak-promptpanel__preview--full", full);
+      toggle2.textContent = full ? t("promptHide") : t("promptShowAll");
+    }
+    row.appendChild(button(spec.copyLabel || t("promptCopy"), "ak-btn--primary", "copy", function() {
+      return copy(promptText()).then(function(ok) {
+        if (ok) {
+          toast({ title: t("promptCopied"), tone: "ok" });
+          return;
+        }
+        showFull(true);
+        selectForHand(preview);
+        toast({ title: tu("copy.promptByHand"), tone: "warn", ttl: 8e3 });
+      });
+    }));
+    const toggle2 = button(t("promptShowAll"), "", "toggle", function() {
+      showFull(!full);
+    });
+    row.appendChild(toggle2);
+    one.appendChild(row);
+    root.appendChild(one);
+    if (answers) {
+      const two = el("div", { class: "ak-promptpanel__col", "data-ak-part": "col" });
+      const id = uid("ak-pp");
+      two.appendChild(el("label", { class: "ak-promptpanel__step", "data-ak-part": "step", for: id, text: t("promptStepPaste") }));
+      const area = el("textarea", { id, class: "ak-input ak-input--area ak-promptpanel__answer", "data-ak-part": "answer", rows: 4, placeholder: t("promptPastePh") });
+      two.appendChild(area);
+      const row2 = el("div", { class: "ak-promptpanel__row" });
+      row2.appendChild(button(spec.applyLabel || t("promptApply"), "ak-promptpanel__apply", "apply", function() {
+        const raw = (
+          /** @type {HTMLTextAreaElement} */
+          area.value
+        );
+        if (spec.expect === "json") {
+          const value = parseAnswer(raw);
+          if (value == null) throw new Error(t("promptNoJson"));
+          return spec.onResult && spec.onResult(value, raw);
+        }
+        return spec.onResult && spec.onResult(raw, raw);
+      }));
+      two.appendChild(row2);
+      root.appendChild(two);
+    }
+    if (spec.target) resolve(spec.target).appendChild(root);
+    return {
+      el: root,
+      destroy() {
+        clear(root);
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function queueRow(spec) {
+    const s = spec || { title: "" };
+    const root = el("span", { class: "ak-qrow", "data-ak-part": "root" });
+    const top = el("span", { class: "ak-qrow__top", "data-ak-part": "top" });
+    top.appendChild(el("span", { class: "ak-qrow__who", "data-ak-part": "who", text: s.who || "" }));
+    top.appendChild(el("span", { class: "ak-qrow__when", "data-ak-part": "when", text: whenText(s.when) }));
+    root.appendChild(top);
+    root.appendChild(el("span", { class: "ak-qrow__title", "data-ak-part": "title", text: s.title || "—" }));
+    const chips = el("span", { class: "ak-qrow__chips", "data-ak-part": "chips" });
+    (s.chips || []).forEach(function(c) {
+      if (c && c.text) chips.appendChild(el("span", { class: "ak-qrow__chip", "data-ak-part": "chip", text: c.text }));
+    });
+    if (s.note && s.note.text) {
+      const tone = ["warn", "err", "ok", "info"].indexOf(s.note.tone || "") >= 0 ? s.note.tone : "warn";
+      chips.appendChild(el("span", { class: "ak-qrow__note ak-tone-text--" + tone, "data-ak-part": "note", text: s.note.text }));
+    }
+    if (chips.firstChild) root.appendChild(chips);
+    return root;
+  }
+  function whenText(when2) {
+    if (when2 == null || when2 === "") return "";
+    if (typeof when2 === "string" && !/^\d{4}-\d{2}-\d{2}/.test(when2)) return when2;
+    const d = when2 instanceof Date ? when2 : new Date(when2);
+    if (isNaN(d.getTime())) return String(when2);
+    const pad = function(n) {
+      return String(n).padStart(2, "0");
+    };
+    return d.getDate() + "." + (d.getMonth() + 1) + ". " + pad(d.getHours()) + "." + pad(d.getMinutes());
   }
 
   // src/static/sdk-libs/atelier/ai-task.js
@@ -27293,9 +24518,9 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/atlas.js
-  var SVG_NS9 = "http://www.w3.org/2000/svg";
+  var SVG_NS8 = "http://www.w3.org/2000/svg";
   function svg5(name, attrs) {
-    const node = document.createElementNS(SVG_NS9, name);
+    const node = document.createElementNS(SVG_NS8, name);
     for (const key of Object.keys(attrs || {})) node.setAttribute(key, String(attrs[key]));
     return node;
   }
@@ -28364,6 +25589,2836 @@ Known schemas:
   }
   function sheet(spec) {
     return dialog({ ...spec, from: "bottom" });
+  }
+
+  // src/static/sdk-libs/atelier/margins.js
+  var MARGINS = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  var DEFAULT_MARGIN = "a";
+  function margins(choice) {
+    const v = typeof choice === "string" ? choice.toLowerCase() : "";
+    const root = document.documentElement;
+    if (MARGINS.indexOf(v) >= 0) {
+      root.setAttribute("data-ak-margins", v);
+      return v;
+    }
+    root.removeAttribute("data-ak-margins");
+    return "";
+  }
+  function marginsOf(prefs) {
+    const v = prefs && typeof prefs.marginPattern === "string" ? prefs.marginPattern : void 0;
+    return v === void 0 ? DEFAULT_MARGIN : v;
+  }
+
+  // src/static/sdk-libs/atelier/shell-motion.js
+  var SVG_NS9 = "http://www.w3.org/2000/svg";
+  var MOTION_ATTR2 = "data-ak-motion";
+  function motionLabel() {
+    const said = t("lessMotion");
+    return said === "lessMotion" ? "Less motion" : said;
+  }
+  function motionIcon() {
+    const svg6 = document.createElementNS(SVG_NS9, "svg");
+    svg6.setAttribute("viewBox", "0 0 24 24");
+    svg6.setAttribute("width", "18");
+    svg6.setAttribute("height", "18");
+    svg6.setAttribute("fill", "none");
+    svg6.setAttribute("stroke", "currentColor");
+    svg6.setAttribute("stroke-width", "2");
+    svg6.setAttribute("stroke-linecap", "round");
+    svg6.setAttribute("aria-hidden", "true");
+    const lines = document.createElementNS(SVG_NS9, "path");
+    lines.setAttribute("class", "ak-app__motion-lines");
+    lines.setAttribute("d", "M4 7h15M4 12h11M4 17h7");
+    const slash = document.createElementNS(SVG_NS9, "path");
+    slash.setAttribute("class", "ak-app__motion-slash");
+    slash.setAttribute("d", "M20 4 5 20");
+    svg6.appendChild(lines);
+    svg6.appendChild(slash);
+    return svg6;
+  }
+  function motionIsLess() {
+    return document.documentElement.getAttribute(MOTION_ATTR2) === "less";
+  }
+
+  // src/static/sdk-libs/atelier/shell.js
+  var LOGO_INLINE_MAX = 8192;
+  function logoEl(src) {
+    if (typeof src !== "string" || !src.trim()) return null;
+    if (/^\s*data:/i.test(src) && (!/^\s*data:image\//i.test(src) || src.length > LOGO_INLINE_MAX)) {
+      console.warn("[atelier] app({ logo }) refuses this data: URI; an inline logo is a data:image of at most " + LOGO_INLINE_MAX + " characters, anything larger goes to storage as a URL.");
+      return null;
+    }
+    return el("img", { class: "ak-app__logo", src, alt: "", width: "32", height: "32", decoding: "async" });
+  }
+  function bottomEntries(items) {
+    const chosen2 = items.filter(function(it) {
+      return it.bottom === true || it.bottom !== false && !it.group;
+    });
+    return chosen2.length ? chosen2 : items.slice(0, 3);
+  }
+  var MENU_ID = "ak-menu";
+  function phoneBar(items, openMenu) {
+    const bar2 = bottomEntries(items);
+    if (bar2.length === items.length || bar2.some(function(it) {
+      return it.id === "more";
+    })) return bar2;
+    return bar2.concat([{ id: MENU_ID, label: t("menu"), action: true, onPick: openMenu }]);
+  }
+  var BOOT_POLL_MS = 300;
+  var SIGNIN_GRACE_MS = 2500;
+  var MODE_BUTTON = "#aimeat-mode-switch button[data-mode]";
+  function ambientSpec(want) {
+    if (typeof want === "string") return { preset: want };
+    if (want && typeof want === "object") {
+      return {
+        preset: want.preset == null ? null : want.preset,
+        alpha: want.alpha,
+        speed: want.speed,
+        fps: want.fps,
+        gl: want.gl,
+        post: want.post
+      };
+    }
+    return { preset: null };
+  }
+  function app(spec) {
+    injectStyle();
+    if (spec.margins !== void 0) margins(spec.margins);
+    const state = { title: spec.title, look: spec.look || "vivid" };
+    const titleId = uid("ak-app-title");
+    const heading = el("span", { class: "ak-app__title", id: titleId, text: state.title });
+    const pill = el("span", { class: "ak-app__pill", id: "login" });
+    const motionBtn = el("button", {
+      type: "button",
+      class: "ak-app__motion",
+      "data-ak-noguard": true,
+      "aria-pressed": motionIsLess() ? "true" : "false",
+      title: motionLabel(),
+      "aria-label": motionLabel(),
+      on: {
+        click: function() {
+          setMotion(motionIsLess() ? "auto" : "less");
+        }
+      }
+    }, motionIcon());
+    const syncMotion = function() {
+      motionBtn.setAttribute("aria-pressed", motionIsLess() ? "true" : "false");
+    };
+    window.addEventListener("ak-motion", syncMotion);
+    const logo = logoEl(spec.logo);
+    const brand = logo ? el("span", { class: "ak-app__brand" }, [logo, heading]) : heading;
+    const helpBtn = spec.help && typeof spec.help.button === "function" ? spec.help.button() : null;
+    const bar2 = el("header", { class: "ak-app__bar" }, [brand, helpBtn, motionBtn, pill]);
+    let replaying = false;
+    const onBarClick = function(ev) {
+      if (replaying) return;
+      const start = (
+        /** @type {Element|null} */
+        ev.target
+      );
+      if (!start || typeof start.closest !== "function") return;
+      const btn = (
+        /** @type {HTMLElement|null} */
+        start.closest(MODE_BUTTON)
+      );
+      if (!btn || !bar2.contains(btn) || btn.getAttribute("aria-pressed") === "true") return;
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      btn.setAttribute("data-ak-noguard", "");
+      const box = btn.getBoundingClientRect();
+      screenTransition("iris", function() {
+        replaying = true;
+        try {
+          btn.click();
+        } finally {
+          replaying = false;
+        }
+      }, { from: { x: box.left + box.width / 2, y: box.top + box.height / 2 } });
+    };
+    bar2.addEventListener("click", onBarClick, true);
+    const statusHost = el("div", { class: "ak-app__status" });
+    const sideMode = spec.nav === "side" && !!(spec.navItems && spec.navItems.length);
+    const main = el("main", { class: "ak-app__main" + (sideMode ? "" : " ak-scroll") });
+    const sideHost = sideMode ? el("aside", { class: "ak-app__side" }) : null;
+    const frame2 = sideMode ? el("div", { class: "ak-app__frame ak-scroll" }, [sideHost, main]) : null;
+    const footer = spec.footer != null ? el("footer", { class: "ak-app__foot", text: spec.footer }) : null;
+    const root = el("div", {
+      class: "ak-root ak-app" + (sideMode ? " ak-app--sidenav" : ""),
+      "data-ak-look": state.look,
+      "aria-labelledby": titleId
+    }, [bar2, statusHost, frame2 || main, footer]);
+    if (spec.motion === false) setMotionDefaults(root, false);
+    let nav = null;
+    let side = null;
+    let allItems = [];
+    let barItems = [];
+    let current2 = "";
+    let menuSheet = null;
+    function linked(items) {
+      return items.map(function(it) {
+        return Object.assign({}, it, {
+          onPick: function(picked) {
+            current2 = picked.id;
+            if (side) side.set({ value: picked.id });
+            if (nav) nav.set({ value: barValue(picked.id) });
+            if (it.onPick) it.onPick(it);
+          }
+        });
+      });
+    }
+    function barValue(id) {
+      if (!sideMode || barItems.some(function(it) {
+        return it.id === id;
+      })) return id;
+      return barItems.some(function(it) {
+        return it.id === MENU_ID;
+      }) ? MENU_ID : id;
+    }
+    function openMenu() {
+      if (menuSheet) return;
+      menuSheet = sheet({
+        title: spec.navLabel || state.title || t("menu"),
+        body: function(host) {
+          sideNav({
+            target: host,
+            value: current2,
+            label: spec.navLabel,
+            // The sheet closes before the page changes, so the change is seen, not covered.
+            items: allItems.map(function(it) {
+              return Object.assign({}, it, { onPick: function() {
+                if (menuSheet) menuSheet.close("pick");
+                it.onPick(it);
+              } });
+            })
+          });
+        },
+        onClose: function() {
+          menuSheet = null;
+        }
+      });
+    }
+    if (spec.navItems && spec.navItems.length) {
+      const items = linked(spec.navItems);
+      const first = spec.navValue || items[0].id;
+      allItems = items;
+      current2 = first;
+      if (sideMode && sideHost) {
+        side = sideNav({ target: sideHost, items, value: first, label: spec.navLabel });
+      }
+      barItems = sideMode ? phoneBar(items, openMenu) : items;
+      nav = bottomNav({ items: barItems, value: sideMode ? barValue(first) : spec.navValue });
+      root.appendChild(nav.el);
+      root.classList.add("ak-app--bottomnav");
+    }
+    const mount = resolve(spec.target, document.body);
+    mount.appendChild(root);
+    const fullFrame = mount === document.body;
+    if (fullFrame) document.body.classList.add("ak-body");
+    let sky = null;
+    let weatherCtl = null;
+    function syncWeather() {
+      if (weatherCtl) weatherCtl.el.hidden = !sky || sky.preset() === "none";
+    }
+    function ensureSky(want) {
+      if (!sky) {
+        sky = ambient(Object.assign({ target: root }, ambientSpec(want)));
+        weatherCtl = weather({ kind: "cycle" });
+        weatherCtl.el.classList.add("ak-app__weather");
+        bar2.insertBefore(weatherCtl.el, motionBtn);
+      } else {
+        sky.set(Object.assign({ preset: null, alpha: null, speed: null, post: null }, ambientSpec(want)));
+      }
+      syncWeather();
+    }
+    root.addEventListener("ak-ambient-preset", syncWeather);
+    if (spec.ambient !== false) ensureSky(spec.ambient);
+    let statusCard = null;
+    let shownState = null;
+    function status(kind, opts) {
+      const o = opts || {};
+      const leaving = shownState;
+      shownState = kind;
+      if (statusCard) {
+        statusCard.destroy();
+        statusCard = null;
+      }
+      clear(statusHost);
+      if (kind === "none" || kind === "ready") {
+        statusHost.hidden = true;
+        if (leaving && leaving !== "ready" && leaving !== "none" && typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(function() {
+            enter(main);
+          });
+        }
+        return;
+      }
+      statusHost.hidden = false;
+      if (kind === "loading") {
+        statusHost.appendChild(el("div", { class: "ak-loading", role: "status", "aria-live": "polite" }, [
+          el("span", { class: "ak-loading__pulse", "aria-hidden": "true" }),
+          el("span", { text: o.title || t("loading") })
+        ]));
+        return;
+      }
+      const kinds = {
+        empty: { title: o.title || t("empty"), hint: o.hint || t("emptyHint") },
+        error: { title: o.title || t("loadFailed"), hint: o.hint || t("loadFailedHint") },
+        // The sign-in card PRESENTS THE APP: its own name as the title and, when the app gave one,
+        // its tagline before the how-to — a first visitor learns what this is, not only that a
+        // login exists. (The second AEB review met a bare system sentence on an empty page.)
+        signin: {
+          title: o.title || state.title,
+          hint: o.hint != null ? o.hint : (spec.tagline ? spec.tagline + " " : "") + t("signIn") + " " + t("signInHint")
+        }
+      };
+      const chosen2 = kinds[kind] || kinds.error;
+      statusCard = emptyState({
+        target: statusHost,
+        tone: kind === "error" ? "error" : "quiet",
+        title: chosen2.title,
+        hint: chosen2.hint,
+        action: kind === "error" && o.onRetry ? { label: t("retry"), onClick: o.onRetry } : null
+      });
+    }
+    const requireLogin = spec.requireLogin !== false;
+    let booted = false;
+    let pollTimer = null;
+    let graceTimer = null;
+    function auth() {
+      const ns = (
+        /** @type {any} */
+        window.AIMEAT
+      );
+      return ns && ns.auth ? ns.auth : null;
+    }
+    function tryBoot() {
+      if (booted) return;
+      const a = auth();
+      const session = a && typeof a.getSession === "function" ? a.getSession() : null;
+      if (session && session.jwt) {
+        booted = true;
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          graceTimer = null;
+        }
+        root.classList.remove("ak-app--gate");
+        status("none");
+        if (spec.onReady) spec.onReady(session);
+      }
+    }
+    function startBoot() {
+      const a = auth();
+      if (a && typeof a.mountLoginButton === "function") {
+        a.mountLoginButton(pill, {
+          onLogin: function() {
+            tryBoot();
+          },
+          onLogout: function() {
+            if (requireLogin) {
+              booted = false;
+              root.classList.add("ak-app--gate");
+              status("signin");
+            }
+            if (spec.onLogout) spec.onLogout();
+            if (requireLogin) armPoll();
+          }
+        });
+      }
+      if (!requireLogin) {
+        booted = true;
+        status("none");
+        if (spec.onReady) spec.onReady(a && a.getSession ? a.getSession() : null);
+        return;
+      }
+      status("loading");
+      root.classList.add("ak-app--gate");
+      armPoll();
+      tryBoot();
+      graceTimer = setTimeout(function() {
+        graceTimer = null;
+        if (!booted) status("signin");
+      }, SIGNIN_GRACE_MS);
+    }
+    function armPoll() {
+      if (pollTimer) return;
+      pollTimer = setInterval(function() {
+        tryBoot();
+        if (booted && pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      }, BOOT_POLL_MS);
+    }
+    const stopLang = i18n.onChange(function() {
+      heading.textContent = state.title;
+      motionBtn.setAttribute("title", motionLabel());
+      motionBtn.setAttribute("aria-label", motionLabel());
+    });
+    setTimeout(startBoot, 0);
+    return {
+      el: root,
+      main,
+      /** @param {{ title?: string, look?: string, density?: 'comfortable'|'compact',
+       *    quiet?: boolean, ambient?: AmbientWish }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.title != null) {
+          state.title = patch.title;
+          heading.textContent = state.title;
+        }
+        if ("ambient" in patch) {
+          if (patch.ambient === false) {
+            if (sky) {
+              sky.set({ preset: "none" });
+              syncWeather();
+            }
+          } else ensureSky(patch.ambient);
+        }
+        if (patch.look != null && patch.look !== state.look) {
+          state.look = patch.look;
+          const dress = function() {
+            root.setAttribute("data-ak-look", state.look);
+          };
+          if (patch.quiet) {
+            dress();
+          } else {
+            const cover = curtain({ kind: "halves", colour: "accent" });
+            cover.cover().then(dress).then(function() {
+              return cover.uncover();
+            }).then(function() {
+              cover.destroy();
+            }, function(err) {
+              cover.destroy();
+              throw err;
+            });
+          }
+        }
+        if (patch.density != null) root.classList.toggle("ak-app--compact", patch.density === "compact");
+      },
+      status,
+      t,
+      i18n,
+      /** The app's navigation (the side column and the phone's bottom bar together): move the
+       *  mark with `set({ value })`, change the counts with `set({ items })`. Null without navItems. */
+      get nav() {
+        if (!nav) return null;
+        return {
+          /** @param {{ value?: string, items?: any[] }} patch */
+          set(patch) {
+            if (!patch) return;
+            const next = patch.items ? linked(patch.items) : null;
+            if (next) {
+              allItems = next;
+              barItems = sideMode ? phoneBar(next, openMenu) : next;
+            }
+            if (patch.value != null) current2 = patch.value;
+            if (side) side.set({ value: patch.value, items: next || void 0 });
+            if (nav) nav.set({ value: patch.value != null ? barValue(patch.value) : void 0, items: next ? barItems : void 0 });
+          }
+        };
+      },
+      get ambient() {
+        return sky;
+      },
+      get weather() {
+        return weatherCtl;
+      },
+      destroy() {
+        stopLang();
+        window.removeEventListener("ak-motion", syncMotion);
+        root.removeEventListener("ak-ambient-preset", syncWeather);
+        if (sky) sky.destroy();
+        if (weatherCtl) weatherCtl.destroy();
+        bar2.removeEventListener("click", onBarClick, true);
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+        if (graceTimer) {
+          clearTimeout(graceTimer);
+          graceTimer = null;
+        }
+        if (statusCard) statusCard.destroy();
+        if (nav) nav.destroy();
+        if (side) side.destroy();
+        if (fullFrame) document.body.classList.remove("ak-body");
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/ornament-geo.js
+  function R(n) {
+    return Math.round(n * 10) / 10;
+  }
+  function pathOf(pts) {
+    if (!pts.length) return "";
+    let d = "M" + R(pts[0][0]) + " " + R(pts[0][1]);
+    for (let i = 1; i < pts.length; i++) d += "L" + R(pts[i][0]) + " " + R(pts[i][1]);
+    return d;
+  }
+  function lengthOf(pts) {
+    let l = 0;
+    for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return Math.ceil(l) + 2;
+  }
+  function turtle(x, y, h, len, kappa, ds) {
+    const step = ds || 1.5;
+    const n = Math.max(2, Math.ceil(len / step));
+    const pts = [[x, y]];
+    const hs = [h];
+    for (let i = 0; i < n; i++) {
+      h += kappa(i / n) * step;
+      x += Math.cos(h) * step;
+      y += Math.sin(h) * step;
+      pts.push([x, y]);
+      hs.push(h);
+    }
+    return { pts, hs, d: pathOf(pts), len: lengthOf(pts), end: { x, y, h } };
+  }
+  function at2(t2, u) {
+    const i = Math.min(t2.pts.length - 1, Math.max(0, Math.round(u * (t2.pts.length - 1))));
+    return { x: t2.pts[i][0], y: t2.pts[i][1], h: t2.hs[i] };
+  }
+  function leafPath(s, wf) {
+    const w = s * (wf || 0.34);
+    return "M0 0C" + R(s * 0.18) + " " + R(-w) + " " + R(s * 0.62) + " " + R(-w * 0.8) + " " + R(s) + " 0C" + R(s * 0.62) + " " + R(w * 0.8) + " " + R(s * 0.18) + " " + R(w) + " 0 0Z";
+  }
+  function line(x0, y0, x1, y1, flip) {
+    const L = Math.max(1e-6, Math.hypot(x1 - x0, y1 - y0));
+    const tx = (x1 - x0) / L;
+    const ty = (y1 - y0) / L;
+    const nx = flip ? -ty : ty;
+    const ny = flip ? tx : -tx;
+    return { L, at: (s) => ({ x: x0 + tx * s, y: y0 + ty * s, tx, ty, nx, ny }) };
+  }
+  function arc(cx, cy, r, a0, a1) {
+    const dir = a1 > a0 ? 1 : -1;
+    return {
+      L: Math.abs(a1 - a0) * r,
+      at: (s) => {
+        const a = a0 + dir * s / r;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        return { x: cx + r * c, y: cy + r * sn, tx: -sn * dir, ty: c * dir, nx: c, ny: sn };
+      }
+    };
+  }
+  function rrect(x, y, w, h, r) {
+    const rad = Math.max(0, Math.min(r, w / 2, h / 2));
+    const P = Math.PI;
+    const segs = [];
+    const edge = (x0, y0, tx, ty, len) => segs.push({ len, f: (t2) => ({ x: x0 + tx * t2, y: y0 + ty * t2, tx, ty, nx: ty, ny: -tx }) });
+    const bend = (cx, cy, a0) => segs.push({
+      len: P * rad / 2,
+      f: (t2) => {
+        const a = a0 + (rad > 0 ? t2 / rad : 0);
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        return { x: cx + rad * c, y: cy + rad * sn, tx: -sn, ty: c, nx: c, ny: sn };
+      }
+    });
+    edge(x + rad, y, 1, 0, w - 2 * rad);
+    bend(x + w - rad, y + rad, -P / 2);
+    edge(x + w, y + rad, 0, 1, h - 2 * rad);
+    bend(x + w - rad, y + h - rad, 0);
+    edge(x + w - rad, y + h, -1, 0, w - 2 * rad);
+    bend(x + rad, y + h - rad, P / 2);
+    edge(x, y + h - rad, 0, -1, h - 2 * rad);
+    bend(x + rad, y + rad, P);
+    let L = 0;
+    for (const g of segs) L += g.len;
+    return {
+      L,
+      at: (s) => {
+        let rest = Math.max(0, Math.min(L, s));
+        for (let i = 0; i < segs.length - 1; i++) {
+          if (rest <= segs[i].len) return segs[i].f(rest);
+          rest -= segs[i].len;
+        }
+        const last = segs[segs.length - 1];
+        return last.f(Math.min(rest, last.len));
+      }
+    };
+  }
+  function roundedRectPath(x, y, w, h, r) {
+    const q = Math.max(0, Math.min(r, w / 2, h / 2));
+    const a = (ex, ey) => "A" + R(q) + " " + R(q) + " 0 0 1 " + R(ex) + " " + R(ey);
+    return "M" + R(x + q) + " " + R(y) + "H" + R(x + w - q) + a(x + w, y + q) + "V" + R(y + h - q) + a(x + w - q, y + h) + "H" + R(x + q) + a(x, y + h - q) + "V" + R(y + q) + a(x + q, y) + "Z";
+  }
+  function helix(base, L, amp, period, phase, ds) {
+    const step = ds || 2;
+    const k = 2 * Math.PI / period;
+    const n = Math.ceil(L / step);
+    const segs = [];
+    let cur = null;
+    for (let i = 0; i <= n; i++) {
+      const s = Math.min(L, i * step);
+      const b = base(s);
+      const th = k * s + phase;
+      const o = amp * Math.sin(th);
+      const front = Math.cos(th) >= 0;
+      const p = [b.x + b.nx * o, b.y + b.ny * o];
+      if (!cur || cur.front !== front) {
+        const last = cur ? cur.pts[cur.pts.length - 1] : null;
+        cur = { front, s0: last ? Math.max(0, s - step) : s, s1: s, pts: last ? [last] : [] };
+        segs.push(cur);
+      }
+      cur.pts.push(p);
+      cur.s1 = s;
+    }
+    return segs.filter((g) => g.pts.length > 1).map((g) => ({ front: g.front, s0: g.s0, s1: g.s1, d: pathOf(g.pts), len: lengthOf(g.pts) }));
+  }
+  function helixLeaves(base, L, amp, period, phase, opt) {
+    const k = 2 * Math.PI / period;
+    const a = opt.alpha || 0.9;
+    const every = Math.max(1, Math.round(opt.every || 1));
+    const from = opt.from || 0;
+    const endGap = opt.endGap || 0;
+    const cand = [];
+    for (let m = -1; m * period < L + period; m++) {
+      for (const t0 of [Math.PI / 3, 5 * Math.PI / 3]) {
+        const s = (t0 + 2 * Math.PI * m - phase) / k;
+        if (s >= from && s <= L - endGap) cand.push({ s, th: t0 });
+      }
+    }
+    cand.sort((p, q) => p.s - q.s);
+    const out = [];
+    cand.forEach((c, i) => {
+      if (i % every) return;
+      const b = base(c.s);
+      const o = amp * Math.sin(c.th);
+      const sg = o >= 0 ? 1 : -1;
+      const dx = b.tx * Math.cos(a) + b.nx * sg * Math.sin(a);
+      const dy = b.ty * Math.cos(a) + b.ny * sg * Math.sin(a);
+      out.push({ s: c.s, x: b.x + b.nx * o, y: b.y + b.ny * o, ang: Math.atan2(dy, dx), size: opt.size * (0.82 + 0.06 * (i * 5 % 4)) });
+    });
+    return out;
+  }
+
+  // src/static/sdk-libs/atelier/ornament-svg.js
+  var NS = "http://www.w3.org/2000/svg";
+  function svgEl2(tag, attrs, parent) {
+    const el2 = (
+      /** @type {SVGElement} */
+      document.createElementNS(NS, tag)
+    );
+    if (attrs) for (const k of Object.keys(attrs)) el2.setAttribute(k, String(attrs[k]));
+    if (parent) parent.appendChild(el2);
+    return el2;
+  }
+  var ROLE = {
+    ln: "ak-orn-ln",
+    dim: "ak-orn-dim",
+    hi: "ak-orn-hi",
+    vine: "ak-orn-vine",
+    vback: "ak-orn-vback",
+    gap: "ak-orn-gap",
+    gapc: "ak-orn-gapc",
+    band: "ak-orn-band",
+    hatch: "ak-orn-hatch",
+    leaf: "ak-orn-leaf",
+    rib: "ak-orn-rib",
+    petal: "ak-orn-petal",
+    prib: "ak-orn-prib",
+    dot: "ak-orn-dot",
+    vdot: "ak-orn-vdot",
+    card: "ak-orn-card",
+    solid: "ak-orn-solid",
+    tail: "ak-orn-tail",
+    crease: "ak-orn-crease",
+    ring: "ak-orn-ring"
+  };
+  function drawing(parent, w, h, opts) {
+    const o = opts || {};
+    const animate = o.animate !== false;
+    const speed = Math.max(0.25, Math.min(3, Number(o.speed) || 1));
+    const base = Math.max(0, Number(o.delay) || 0);
+    const v = o.view || { x: 0, y: 0, w, h };
+    const svg6 = svgEl2("svg", {
+      viewBox: R(v.x) + " " + R(v.y) + " " + R(v.w) + " " + R(v.h),
+      "aria-hidden": "true",
+      focusable: "false",
+      class: "ak-orn-svg" + (o.cls ? " " + o.cls : "")
+    }, parent);
+    if (o.viewBox !== true) {
+      svg6.setAttribute("width", String(R(v.w)));
+      svg6.setAttribute("height", String(R(v.h)));
+    }
+    const sec = (t2) => ((base + t2) / speed).toFixed(2) + "s";
+    const span = (t2) => (Math.max(0.05, t2) / speed).toFixed(2) + "s";
+    const group = (p, attrs) => svgEl2("g", attrs, p);
+    const stroke = (p, d, role, width, len, del, dur, lin, extra) => {
+      const el2 = svgEl2("path", { d, class: ROLE[role] + (extra && extra.butt ? " ak-orn-butt" : ""), "stroke-width": width }, p);
+      if (animate && len) {
+        el2.classList.add("ak-orn-grow");
+        if (lin) el2.classList.add("ak-orn-lin");
+        const s = (
+          /** @type {SVGElement & { style: CSSStyleDeclaration }} */
+          el2.style
+        );
+        s.strokeDasharray = String(len);
+        s.strokeDashoffset = String(len);
+        s.animationDelay = sec(del || 0);
+        s.animationDuration = span(dur || 1);
+      }
+      return el2;
+    };
+    const sprouting = (p, transform, del) => {
+      const outer = group(p, { transform });
+      const inner = group(outer);
+      if (animate) {
+        inner.classList.add("ak-orn-sprout");
+        inner.style.animationDelay = sec(del || 0);
+      }
+      return inner;
+    };
+    const leaf = (p, x, y, ang, size, del, wf, role) => {
+      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ") rotate(" + R(ang * 180 / Math.PI) + ")", del);
+      svgEl2("path", { d: leafPath(size, wf), class: ROLE[role || "leaf"] }, g);
+      svgEl2("path", { d: "M" + R(size * 0.12) + " 0L" + R(size * 0.8) + " 0", class: ROLE[role === "petal" ? "prib" : "rib"] }, g);
+      return g;
+    };
+    const bead = (p, x, y, r, del, role) => {
+      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ")", del);
+      svgEl2("circle", { r, class: ROLE[role || "dot"] }, g);
+      return g;
+    };
+    const rosette2 = (p, cx, cy, n, r0, size, ringR, del) => {
+      const g = sprouting(p, "translate(" + R(cx) + " " + R(cy) + ")", del);
+      if (ringR) svgEl2("circle", { r: ringR, class: ROLE.ln, "stroke-width": 1.4 }, g);
+      for (let i = 0; i < n; i++) {
+        svgEl2("path", { d: leafPath(size), class: ROLE.ln, "stroke-width": 0.8, transform: "rotate(" + R(360 * i / n) + ") translate(" + r0 + " 0)" }, g);
+      }
+      svgEl2("circle", { r: Math.max(1.6, r0 * 0.75), class: ROLE.dot }, g);
+      return g;
+    };
+    const fade = (el2, del) => {
+      if (animate) {
+        el2.classList.add("ak-orn-fade");
+        el2.style.animationDelay = sec(del || 0);
+      }
+      return el2;
+    };
+    const chain = (back, front, segs, L, t0, T, fronts, backRole, extra) => {
+      for (const g of segs) {
+        const del = t0 + T * g.s0 / L;
+        const dur = T * (g.s1 - g.s0) / L;
+        if (g.front) for (const [role, width] of fronts) stroke(front, g.d, role, width, g.len, del, dur, true, extra);
+        else if (backRole) stroke(back, g.d, backRole[0], backRole[1], g.len, del, dur, true, extra);
+      }
+    };
+    return { svg: svg6, group, stroke, leaf, bead, rosette: rosette2, fade, chain, animate };
+  }
+
+  // src/static/sdk-libs/atelier/ornament-frames.js
+  var PI = Math.PI;
+  function radiusOf(host, fallback) {
+    const r = host ? parseFloat(getComputedStyle(host).borderTopLeftRadius) : NaN;
+    return Number.isFinite(r) && r > 0 ? r : fallback;
+  }
+  function flower(d, parent, x, y, n, r0, size, del) {
+    for (let i = 0; i < n; i++) {
+      const a = 2 * PI * i / n;
+      d.leaf(parent, x + Math.cos(a) * r0, y + Math.sin(a) * r0, a, size, del + 0.04 * i);
+    }
+    d.bead(parent, x, y, Math.max(2, size * 0.32), del + 0.2);
+  }
+  function drawFrame(layers, w, h, _pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const k = Math.max(0.55, Math.min(1, Math.min(w, h) / 420));
+    const rect = (i) => "M" + R(i) + " " + R(i) + "H" + R(w - i) + "V" + R(h - i) + "H" + R(i) + "Z";
+    const rlen = (i) => Math.ceil(2 * (w + h - 4 * i)) + 4;
+    let hatch = "";
+    const hs = 10 * k;
+    for (let x = 3 * k; x <= w - hs - 2; x += 5 * k) hatch += "M" + R(x) + " " + R(hs - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8) + "M" + R(x) + " " + R(h - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8);
+    for (let y = hs + 1; y <= h - 3; y += 5 * k) hatch += "M1 " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8) + "M" + R(w - hs + 1) + " " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8);
+    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 1.2);
+    d.stroke(d.svg, rect(0), "ln", 1, rlen(0), 0, 1.8);
+    d.stroke(d.svg, rect(10 * k), "ln", 1.6, rlen(10 * k), 0.15, 1.8);
+    d.stroke(d.svg, rect(15 * k), "ln", 0.8, rlen(15 * k), 0.3, 1.8);
+    const t0 = 1.2;
+    const T = 2;
+    const Lc = Math.max(50, Math.min(135, Math.min(w, h) / k * 0.27));
+    const m = turtle(46, 34, 0, Lc, (u) => -15e-4 + 0.27 * 135 / Lc * Math.pow(u, 4));
+    const pa = at2(m, 0.42);
+    const b = turtle(pa.x, pa.y, pa.h + 0.8, 62 * Lc / 135, (u) => (0.012 + 0.32 * u * u) * 135 / Lc);
+    const lush = p.leaves;
+    const corner = (g) => {
+      d.stroke(g, "M15 58A43 43 0 0 0 58 15", "ln", 1.2, 72, 0.9, 0.8);
+      d.stroke(g, "M15 64A49 49 0 0 0 64 15", "ln", 0.8, 80, 1, 0.8);
+      for (const view of ["translate(0 0)", "matrix(0 1 1 0 0 0)"]) {
+        const v = d.group(g, { transform: view });
+        d.stroke(v, m.d, "ln", 1.6, m.len, t0, T);
+        d.stroke(v, b.d, "ln", 1.2, b.len, t0 + 0.85, 1.3);
+        if (lush > 0) {
+          const onM = [[0.14, -1, 10], [0.3, 1, 12], [0.56, -1, 9], [0.7, 1, 11]];
+          if (lush > 1.5) onM.push([0.44, -1, 8], [0.82, 1, 8]);
+          for (const [u, side, s] of onM) {
+            const q = at2(m, u);
+            d.leaf(v, q.x, q.y, q.h + side * 0.95, s, t0 + T * u * 0.9 + 0.2);
+          }
+          const qb = at2(b, 0.3);
+          d.leaf(v, qb.x, qb.y, qb.h - 0.95, 9, t0 + 1.05 + 1.3 * 0.3);
+        }
+        d.bead(v, m.end.x, m.end.y, 2.2, t0 + T);
+        d.bead(v, b.end.x, b.end.y, 1.8, t0 + 2.15);
+      }
+      d.rosette(g, 34, 34, 8, 4, 7.5, 12, 0.7);
+    };
+    for (const [x, y, sx, sy] of [[0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1]]) {
+      corner(d.group(d.svg, { transform: "translate(" + R(x) + " " + R(y) + ") scale(" + R(sx * k * 100) / 100 + " " + R(sy * k * 100) / 100 + ")" }));
+    }
+    const mid = (tf, len, gain, s0) => {
+      const g = d.group(d.svg, { transform: tf });
+      for (const sx of [1, -1]) {
+        const s = turtle(sx * 4, 24, sx > 0 ? 0.35 : PI - 0.35, len, (u) => sx * (-0.02 + gain * u * u * u));
+        d.stroke(g, s.d, "ln", 1.4, s.len, s0, 1.6);
+        if (lush > 0) {
+          const p1 = at2(s, 0.25);
+          const p2 = at2(s, 0.5);
+          d.leaf(g, p1.x, p1.y, p1.h + sx * 0.95, 11, s0 + 0.5);
+          d.leaf(g, p2.x, p2.y, p2.h - sx * 0.95, 8, s0 + 0.9);
+        }
+        d.bead(g, s.end.x, s.end.y, 2, s0 + 1.6);
+      }
+      d.leaf(g, 0, 27, PI / 2, 20, s0 + 0.1);
+      d.bead(g, 0, 23, 3.2, s0);
+    };
+    const ks = R(k * 100) / 100;
+    if (w / k >= 2 * (46 + Lc) + 200) {
+      mid("translate(" + R(w / 2) + " 0) scale(" + ks + ")", 95, 0.28, 1.8);
+      mid("translate(" + R(w / 2) + " " + R(h) + ") scale(" + ks + " " + -ks + ")", 95, 0.28, 1.8);
+    }
+    if (h / k >= 2 * (46 + Lc) + 140) {
+      mid("translate(0 " + R(h / 2) + ") rotate(-90) scale(" + ks + ")", 64, 0.42, 1.9);
+      mid("translate(" + R(w) + " " + R(h / 2) + ") rotate(90) scale(" + ks + ")", 64, 0.42, 1.9);
+    }
+  }
+  function drawVineBorder(layers, w, h, pad, p, host) {
+    const d = layers.under;
+    if (!d) return;
+    const r = radiusOf(host, 18);
+    const x = pad.x;
+    const y = pad.y;
+    const base = rrect(x, y, w, h, r);
+    const L = base.L;
+    const per = L / Math.max(4, Math.round(L / 72));
+    const t0 = 1;
+    const T = Math.max(2.5, Math.min(6, L / 400));
+    d.fade(d.stroke(d.svg, roundedRectPath(x + 9, y + 9, w - 18, h - 18, Math.max(0, r - 9)), "dim", 0.8), 0.8);
+    const back = d.group(d.svg);
+    d.stroke(d.svg, roundedRectPath(x, y, w, h, r), "ln", 3, Math.ceil(L) + 4, 0, 1.2);
+    const front = d.group(d.svg);
+    d.chain(back, front, helix(base.at, L, 9, per, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
+    d.chain(back, front, helix(base.at, L, 7, per, PI, 2), L, t0 + 0.25, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
+    if (p.leaves > 0) {
+      const every = p.leaves > 1.5 ? 1 : 2;
+      for (const q of helixLeaves(base.at, L, 9, per, 0, { size: 13, alpha: 0.9, every, from: 6 })) {
+        d.leaf(front, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1);
+      }
+    }
+    const s0 = base.at(0);
+    flower(d, front, s0.x, s0.y, 5, 3, 11, t0 + T + 0.2);
+  }
+  function drawRope(layers, w, h, pad, p, host) {
+    const d = layers.under;
+    if (!d) return;
+    const base = rrect(pad.x, pad.y, w, h, radiusOf(host, 14));
+    const L = base.L;
+    const per = L / Math.max(4, Math.round(L / 34));
+    const n = Math.round(p.strands);
+    const T = Math.max(2, Math.min(5, L / 400));
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    for (let j = 0; j < n; j++) {
+      d.chain(back, front, helix(base.at, L, 6, per, j * 2 * PI / n, 1.5), L, 0.3, T, [["gapc", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
+    }
+  }
+  function drawJugend(layers, w, h, pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const k = Math.max(0.45, Math.min(1.4, h / 520));
+    const x0 = pad.x;
+    const yB = pad.y + h;
+    const ground = yB + 62 * k;
+    d.stroke(d.svg, roundedRectPath(x0, pad.y, w, h, 14 * k), "ln", 1.6, Math.ceil(2 * (w + h)) + 8, 0, 1.6);
+    d.stroke(d.svg, roundedRectPath(x0 + 8 * k, pad.y + 8 * k, w - 16 * k, h - 16 * k, 8 * k), "ln", 0.8, Math.ceil(2 * (w + h)) + 8, 0.15, 1.6);
+    d.fade(d.stroke(d.svg, "M" + R(x0 - 160 * k) + " " + R(ground) + "H" + R(x0 + w + 160 * k), "dim", 1), 0.2);
+    const UP = -PI / 2;
+    const TAU5 = 2 * PI;
+    const sx = x0 - 64 * k;
+    const stems = [
+      { dx: 0, h: UP, L: 540, t0: 0.6, k: (u) => 35e-4 * Math.cos(TAU5 * 1.2 * u) + 0.012 * Math.pow(u, 8), flower: "lily", lv: [[0.2, 1, 36], [0.34, -1, 30], [0.55, 1, 22], [0.7, -1, 16]] },
+      { dx: -14, h: UP - 0.12, L: 430, t0: 0.8, k: (u) => -4e-3 * Math.cos(TAU5 * u + 0.6) - 0.02 * Math.pow(u, 6), flower: "cup", lv: [[0.25, -1, 30], [0.5, 1, 22]] },
+      { dx: 4, h: UP + 0.02, L: 300, t0: 1, k: (u) => 6e-3 * Math.cos(TAU5 * 0.8 * u + 1) + 0.025 * Math.pow(u, 6), flower: "bud", lv: [[0.35, 1, 24]] }
+    ];
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * (x0 + w / 2)) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf });
+      [[-0.38, 110], [-0.16, 88], [0.22, 96]].forEach(([a, s], i) => d.leaf(g, sx - 4 * k, ground, UP + a, s * k, 0.3 + i * 0.12, 0.13));
+      for (const st of stems) {
+        const dur = 2.6;
+        const t2 = turtle(sx + st.dx * k, ground, st.h, st.L * k, (u) => st.k(u) / k, 2);
+        const e = t2.end;
+        const bloom = st.t0 + dur + 0.1;
+        d.stroke(g, t2.d, "vine", 2, t2.len, st.t0, dur);
+        if (p.leaves > 0) {
+          for (const [u, side, s] of st.lv) {
+            const q = at2(t2, u);
+            d.leaf(g, q.x, q.y, q.h + side * 0.45, s * k, st.t0 + dur * u * 0.85 + 0.1, 0.22);
+          }
+        }
+        if (st.flower === "lily") {
+          for (const a of [-1.5, 1.5]) d.leaf(g, e.x, e.y, e.h + a, 10 * k, bloom, 0.3, "petal");
+          for (const a of [-0.6, 0.6, 0]) d.leaf(g, e.x, e.y, e.h + a, 26 * k, bloom + 0.1, 0.42, "petal");
+          [-0.22, 0, 0.22].forEach((a, i) => {
+            const len = (30 + i % 2 * 6) * k;
+            const x2 = e.x + Math.cos(e.h + a) * len;
+            const y2 = e.y + Math.sin(e.h + a) * len;
+            d.stroke(g, "M" + R(e.x) + " " + R(e.y) + "L" + R(x2) + " " + R(y2), "ln", 1, Math.ceil(len) + 2, bloom + 0.5, 0.5);
+            d.bead(g, x2, y2, 2.2 * k, bloom + 0.9);
+          });
+        } else if (st.flower === "cup") {
+          const cx = e.x + Math.cos(e.h) * 9 * k;
+          const cy = e.y + Math.sin(e.h) * 9 * k;
+          for (let i = 0; i < 6; i++) d.leaf(g, cx, cy, e.h + i * TAU5 / 6, 15 * k, bloom + 0.05 * i, 0.5, "petal");
+          d.bead(g, cx, cy, 3.4 * k, bloom + 0.4);
+        } else {
+          for (const a of [-0.5, 0.5]) d.leaf(g, e.x, e.y, e.h + a, 9 * k, bloom, 0.3, "petal");
+          d.leaf(g, e.x, e.y, e.h, 17 * k, bloom + 0.1, 0.5, "petal");
+        }
+      }
+    }
+  }
+  function drawRibbon(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const u = h / 54;
+    const x0 = pad.x;
+    const x1 = pad.x + w;
+    const cx = pad.x + w / 2;
+    const y0 = pad.y;
+    const y1 = pad.y + h;
+    const a = Math.min(12 * u, h * 0.22);
+    const tails = d.group(d.svg);
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * cx) + " 0) scale(-1 1)"]) {
+      const g = d.group(tails, { transform: tf });
+      const top = y0 + a + 20 * u;
+      const bot = y1 + a + 22 * u;
+      const inner = x1 - 14 * u;
+      const outer = x1 + 86 * u;
+      const tail = "M" + R(inner) + " " + R(top) + "H" + R(outer) + "L" + R(outer - 20 * u) + " " + R((top + bot) / 2) + "L" + R(outer) + " " + R(bot) + "H" + R(inner) + "Z";
+      d.stroke(g, tail, "tail", 1.2);
+      d.stroke(g, "M" + R(inner + 6 * u) + " " + R(top + 7 * u) + "H" + R(outer - 7 * u) + "M" + R(inner + 6 * u) + " " + R(bot - 7 * u) + "H" + R(outer - 7 * u), "dim", 0.8);
+      d.stroke(g, "M" + R(x1) + " " + R(y1 + a) + "L" + R(x1) + " " + R(bot) + "L" + R(inner) + " " + R(bot) + "Z", "crease", 1);
+    }
+    d.fade(tails, 0.7);
+    const band = d.group(d.svg);
+    if (d.animate) band.classList.add("ak-orn-unroll");
+    const q = (yc) => "Q" + R(cx) + " " + R(yc) + " ";
+    d.stroke(band, "M" + R(x0) + " " + R(y0 + a) + q(y0 - a) + R(x1) + " " + R(y0 + a) + "L" + R(x1) + " " + R(y1 + a) + q(y1 - a) + R(x0) + " " + R(y1 + a) + "Z", "solid", 1.4);
+    d.stroke(band, "M" + R(x0 + 7 * u) + " " + R(y0 + a + 6 * u) + q(y0 - a + 6 * u) + R(x1 - 7 * u) + " " + R(y0 + a + 6 * u) + "M" + R(x0 + 7 * u) + " " + R(y1 + a - 6 * u) + q(y1 - a - 6 * u) + R(x1 - 7 * u) + " " + R(y1 + a - 6 * u), "dim", 0.8);
+  }
+  var FRAME_FIGURES = {
+    frame: { params: ["leaves"], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawFrame } },
+    "vine-border": { params: ["leaves"], overlay: { pad: () => ({ x: 26, y: 26 }), draw: drawVineBorder } },
+    rope: { params: ["strands"], overlay: { pad: () => ({ x: 12, y: 12 }), draw: drawRope } },
+    jugend: {
+      params: ["leaves"],
+      overlay: {
+        pad: (_w, h) => {
+          const k = Math.max(0.45, Math.min(1.4, h / 520));
+          return { x: Math.ceil(200 * k), y: Math.ceil(76 * k) };
+        },
+        draw: drawJugend
+      }
+    },
+    ribbon: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 1.7 + 4), y: Math.ceil(h * 0.9) }), draw: drawRibbon } }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-rounds.js
+  var PI2 = Math.PI;
+  var TAU3 = 2 * PI2;
+  var D = PI2 / 180;
+  function drawWreath(layers, w, h, pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const r = Math.min(w, h) / 2;
+    const k = r / 84;
+    const cx = pad.x + w / 2;
+    const cy = pad.y + h / 2;
+    const Rw = 118 * k;
+    const t0 = 1.1;
+    const T = 2.6;
+    d.stroke(d.svg, "M" + R(cx + r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx - r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx + r) + " " + R(cy), "ln", 1.6, Math.ceil(TAU3 * r) + 4, 0, 1.4);
+    const r2 = r - 7 * k;
+    d.stroke(d.svg, "M" + R(cx + r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx - r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx + r2) + " " + R(cy), "ln", 0.8, Math.ceil(TAU3 * r2) + 4, 0.15, 1.4);
+    let hatch = "";
+    for (let a = 0; a < 360; a += 4) {
+      const c = Math.cos(a * D);
+      const s = Math.sin(a * D);
+      hatch += "M" + R(cx + (r - 5.4 * k) * c) + " " + R(cy + (r - 5.4 * k) * s) + "L" + R(cx + (r - 1.6 * k) * c) + " " + R(cy + (r - 1.6 * k) * s);
+    }
+    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 0.8);
+    const back = d.group(d.svg);
+    const stems = d.group(d.svg);
+    const front = d.group(d.svg);
+    const leaves = d.group(d.svg);
+    [[95, 250, 1], [85, -70, -1]].forEach(([a0, a1, sx], bi) => {
+      const br = arc(cx, cy, Rw, a0 * D, a1 * D);
+      const pts = [];
+      for (let s = 0; s <= br.L; s += 2) {
+        const q = br.at(s);
+        pts.push([q.x, q.y]);
+      }
+      d.stroke(stems, pathOf(pts), "vine", 2 * Math.max(0.6, k), lengthOf(pts), t0, T, true);
+      d.chain(back, front, helix(br.at, br.L, 3.5 * k, 24 * k, 0, 1.5), br.L, t0 + 0.35, T, [["gap", 3], ["vine", 1]], ["vback", 0.8]);
+      if (p.leaves > 0) {
+        const step = (p.leaves > 1.5 ? 10 : 14) * k;
+        for (let i = 0, s2 = 12 * k; s2 < br.L - 8 * k; i++, s2 += step) {
+          const u = s2 / br.L;
+          const size = 16 * k * (1 - 0.45 * u);
+          const q2 = br.at(s2);
+          const q3 = br.at(Math.min(br.L, s2 + 6 * k));
+          const al = 0.8;
+          const del = t0 + T * u + 0.1;
+          d.leaf(leaves, q2.x, q2.y, Math.atan2(q2.ty * Math.cos(al) + q2.ny * Math.sin(al), q2.tx * Math.cos(al) + q2.nx * Math.sin(al)), size, del);
+          d.leaf(leaves, q3.x, q3.y, Math.atan2(q3.ty * Math.cos(al) - q3.ny * Math.sin(al), q3.tx * Math.cos(al) - q3.nx * Math.sin(al)), size * 0.9, del + 0.08);
+          if (i % 3 === 1) {
+            const qm = br.at(Math.min(br.L, s2 + 9 * k));
+            d.bead(leaves, qm.x + qm.nx * 7 * k, qm.y + qm.ny * 7 * k, 2.3 * k, del + 0.25, "vdot");
+            d.bead(leaves, qm.x + qm.nx * 11 * k + qm.tx * 3 * k, qm.y + qm.ny * 11 * k + qm.ty * 3 * k, 1.8 * k, del + 0.32, "vdot");
+          }
+        }
+      }
+      const e = br.at(br.L);
+      d.leaf(leaves, e.x, e.y, Math.atan2(e.ty, e.tx), 11 * k, t0 + T);
+      const s0 = br.at(0);
+      const tl = turtle(s0.x, s0.y, Math.atan2(-s0.ty, -s0.tx), 46 * k, () => sx * 0.028 / k);
+      const tp = tl.pts.slice().reverse();
+      if (bi === 1) d.stroke(stems, pathOf(tp), "gap", 6, tl.len, 0.6, 0.5);
+      d.stroke(stems, pathOf(tp), "vine", 2 * Math.max(0.6, k), tl.len, 0.6, 0.5);
+      d.bead(stems, tp[0][0], tp[0][1], 2.6 * k, 0.5);
+    });
+  }
+  function drawGuilloche(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const half = Math.min(w, h) / 2;
+    const k = half / 135;
+    const cx = pad.x + w / 2;
+    const cy = pad.y + h / 2;
+    const circle = (rr, width, del) => d.stroke(
+      d.svg,
+      "M" + R(cx + rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx - rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx + rr) + " " + R(cy),
+      "ln",
+      width,
+      Math.ceil(TAU3 * rr) + 4,
+      del,
+      1.5
+    );
+    circle(128 * k, 1.4, 0);
+    circle(133 * k, 0.8, 0.1);
+    circle(84 * k, 1, 0.5);
+    circle(88 * k, 0.6, 0.6);
+    const ring2 = (rb, amp, kk, n, t0, width) => {
+      for (let j = 0; j < n; j++) {
+        const ph = j * TAU3 / (kk * n);
+        const pts = [];
+        for (let i = 0; i <= 360; i++) {
+          const th = i * TAU3 / 360;
+          const rr = (rb + amp * Math.cos(kk * (th + ph))) * k;
+          pts.push([cx + rr * Math.cos(th), cy + rr * Math.sin(th)]);
+        }
+        d.stroke(d.svg, pathOf(pts), "ln", width, lengthOf(pts), t0 + j * 0.12, 2.4);
+      }
+    };
+    ring2(108, 14, 12, 8, 0.2, 0.7);
+    ring2(62, 10, 9, 6, 0.9, 0.7);
+    ring2(24, 12, 8, 5, 1.6, 0.8);
+    d.bead(d.svg, cx, cy, 3 * Math.max(0.6, k), 3.4);
+  }
+  function drawGuillocheBand(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const x0 = pad.x + 4;
+    const x1 = pad.x + w - 4;
+    const cy = pad.y + h / 2;
+    const half = h / 2 - 12;
+    d.stroke(d.svg, "M" + R(x0) + " " + R(pad.y + 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + 8) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 8) + "H" + R(x1), "ln", 0.8, Math.ceil(4 * (x1 - x0)) + 8, 0.3, 1.4);
+    if (half < 6) return;
+    const wl = Math.max(28, Math.min(72, half * 1.1));
+    for (let j = 0; j < 16; j++) {
+      const pts = [];
+      for (let x = x0; x <= x1; x += 2) {
+        const a = half * (0.72 + 0.28 * Math.cos(TAU3 * (x - (x0 + x1) / 2) / Math.max(120, (x1 - x0) / 2)));
+        pts.push([x, cy + a * Math.sin(TAU3 * (x - x0) / wl + j * PI2 / 8)]);
+      }
+      d.stroke(d.svg, pathOf(pts), "hatch", 0.6, lengthOf(pts), 0.6 + j * 0.06, 2.2);
+    }
+  }
+  function drawIvy(layers, w, h, pad, p) {
+    const back = layers.under;
+    const over = layers.over;
+    if (!back || !over) return;
+    const cx = pad.x + w / 2;
+    const amp = w / 2 + 4;
+    const period = Math.max(60, Math.min(160, w * 4));
+    const base = line(cx, pad.y + h - 2, cx, pad.y);
+    const L = base.L;
+    const t0 = 0.8;
+    const T = Math.max(2, Math.min(5, L / 140));
+    const size = Math.max(10, Math.min(20, w * 0.3));
+    const fronts = over.group(over.svg);
+    over.chain(back.svg, fronts, helix(base.at, L, amp, period, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
+    over.chain(back.svg, fronts, helix(base.at, L, amp - 1, period, 2.4, 2), L, t0 + 0.3, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
+    if (p.leaves > 0) {
+      for (const q of helixLeaves(base.at, L, amp, period, 0, { size, alpha: 0.9, from: 12, endGap: 4 })) {
+        over.leaf(fronts, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1, 0.42);
+      }
+      const top = base.at(L);
+      [-2.2, -1.57, -0.9].forEach((a, i) => over.leaf(fronts, top.x, top.y + 2, a, size * 0.75 - i, t0 + T + 0.1 * i, 0.42));
+    }
+  }
+  function drawWrap(layers, w, h, pad) {
+    const back = layers.under;
+    const d = layers.over;
+    if (!back || !d) return;
+    const cy = pad.y + h / 2;
+    const rr = h / 2;
+    let hatch = "";
+    for (const deg of [48, 60, 70, 80]) {
+      for (const sg of [-1, 1]) hatch += "M" + R(pad.x + 4) + " " + R(cy + sg * rr * Math.sin(deg * D)) + "H" + R(pad.x + w - 4);
+    }
+    back.stroke(back.svg, hatch, "hatch", 0.6);
+    const x0 = pad.x + Math.min(w * 0.12, h * 1.5);
+    const x1 = pad.x + w - Math.min(w * 0.12, h * 1.5);
+    const base = line(x0, cy, x1, cy);
+    const bw = h * 0.46;
+    const front = d.group(d.svg);
+    d.chain(front, front, helix(base.at, base.L, rr, h * 1.07, 0, 1), base.L, 0.6, Math.max(1, base.L / 200), [["ln", bw + 3], ["band", bw]], null, { butt: true });
+    for (const x of [x0 - h * 0.36, x1]) {
+      d.fade(d.stroke(d.svg, "M" + R(x) + " " + R(cy - rr - 3) + "h" + R(h * 0.36) + "v" + R(h + 6) + "h" + R(-h * 0.36) + "Z", "solid", 1.4), 0.4);
+    }
+  }
+  function drawBrackets(layers, w, h, pad, p) {
+    const d = layers.over;
+    if (!d) return;
+    const k = h / 44;
+    const cxc = pad.x + w / 2;
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * cxc) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf });
+      const bx = pad.x - 12 * k;
+      const top = pad.y + 2;
+      const bot = pad.y + h - 2;
+      d.stroke(g, "M" + R(bx) + " " + R(top) + "Q" + R(bx - 16 * k) + " " + R((top + bot) / 2) + " " + R(bx) + " " + R(bot), "ln", 1.4, Math.ceil((bot - top) * 1.15) + 4, 0.2, 0.6);
+      const tc2 = turtle(bx, top, -0.6, 20 * k, (u) => (0.3 + 0.2 * u) / k);
+      const bc = turtle(bx, bot, 0.6, 20 * k, (u) => -(0.3 + 0.2 * u) / k);
+      d.stroke(g, tc2.d, "ln", 1.2, tc2.len, 0.7, 0.5);
+      d.stroke(g, bc.d, "ln", 1.2, bc.len, 0.7, 0.5);
+      if (p.leaves > 0) d.leaf(g, bx - 9 * k, (top + bot) / 2, PI2, 11 * k, 0.8);
+    }
+  }
+  var ROUND_FIGURES = {
+    wreath: { params: ["leaves"], overlay: { pad: (w, h) => {
+      const k = Math.min(w, h) / 168;
+      return { x: Math.ceil(72 * k), y: Math.ceil(84 * k) };
+    }, draw: drawWreath } },
+    guilloche: { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuilloche } },
+    "guilloche-band": { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuillocheBand } },
+    ivy: { params: ["leaves"], overlay: { pad: (w) => ({ x: Math.ceil(30 + Math.max(10, Math.min(20, w * 0.3))), y: 16 }), under: true, over: true, draw: drawIvy } },
+    wrap: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 0.5), y: 6 }), under: true, over: true, draw: drawWrap } },
+    brackets: { params: ["leaves"], overlay: { pad: (_w, h) => ({ x: Math.ceil(30 * h / 44), y: 4 }), under: false, over: true, draw: drawBrackets } }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-lines.js
+  var PI3 = Math.PI;
+  var TAU4 = 2 * PI3;
+  function fillMount(host, height, cls, opts, draw) {
+    const box = document.createElement("span");
+    box.className = "ak-orn-strip " + cls;
+    box.setAttribute("aria-hidden", "true");
+    box.style.height = height + "px";
+    host.appendChild(box);
+    let lastW = -1;
+    let frame2 = 0;
+    const render = (animate) => {
+      const W7 = Math.round(box.getBoundingClientRect().width) || host.clientWidth || 0;
+      lastW = W7;
+      box.textContent = "";
+      if (W7 < 40) return;
+      draw(drawing(box, W7, height, { animate, speed: opts.speed, delay: opts.delay }), W7, height);
+    };
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+      if (Math.abs(Math.round(box.getBoundingClientRect().width) - lastW) < 2) return;
+      cancelAnimationFrame(frame2);
+      frame2 = requestAnimationFrame(() => render(false));
+    }) : null;
+    if (ro) ro.observe(box);
+    return {
+      render,
+      teardown: () => {
+        if (ro) ro.disconnect();
+        cancelAnimationFrame(frame2);
+        box.remove();
+      }
+    };
+  }
+  function mountVineBar(host, p, opts) {
+    let value = p.value;
+    let apply2 = null;
+    const strip = fillMount(host, 96, "ak-orn-strip--bar", opts, (d, W7) => {
+      const y = 48;
+      const base = line(0, y, W7, y);
+      const L = base.L;
+      const period = Math.max(70, Math.min(110, W7 / 6));
+      const amp = 21;
+      const k = TAU4 / period;
+      const x0 = 20;
+      const bw = W7 - 40;
+      const segs = [];
+      const back = d.group(d.svg);
+      const budBack = d.group(d.svg);
+      svgEl2("rect", { x: x0, y: y - 11, width: R(bw), height: 22, rx: 11, class: "ak-orn-track" }, d.svg);
+      let hatch = "";
+      for (let x = x0 + 12; x <= x0 + bw - 14; x += 6) hatch += "M" + R(x) + " " + (y + 7) + "l6 -14";
+      svgEl2("path", { d: hatch, class: "ak-orn-hatch", "stroke-width": 0.8 }, d.svg);
+      const fill2 = svgEl2("rect", { x: x0 + 3, y: y - 8, width: 0, height: 16, rx: 8, class: "ak-orn-fill" }, d.svg);
+      const front = d.group(d.svg);
+      const add = (parent, gs, role, width) => {
+        for (const g of gs) {
+          const el2 = svgEl2("path", { d: g.d, class: "ak-orn-" + role + " ak-orn-dash", "stroke-width": width }, parent);
+          el2.style.strokeDasharray = String(g.len);
+          el2.style.strokeDashoffset = String(g.len);
+          segs.push({ el: el2, s0: g.s0, s1: g.s1, len: g.len });
+        }
+      };
+      for (const [a, ph, wf, wb, wg] of [[amp, 0, 2.4, 1.6, 6], [16, PI3, 1.2, 1, 4]]) {
+        const gs = helix(base.at, L, a, period, ph, 2);
+        add(back, gs.filter((g) => !g.front), "vback", wb);
+        const fr = gs.filter((g) => g.front);
+        add(front, fr, "gap", wg);
+        add(front, fr, "vine", wf);
+      }
+      const leaves = [];
+      if (p.leaves > 0) {
+        for (const q of helixLeaves(base.at, L, amp, period, 0, { size: 13, alpha: 0.95, from: 10, endGap: 6 })) {
+          const outer = svgEl2("g", { transform: "translate(" + R(q.x) + " " + R(q.y) + ") rotate(" + R(q.ang * 180 / PI3) + ")" }, front);
+          const inner = svgEl2("g", { class: "ak-orn-pop" }, outer);
+          svgEl2("path", { d: leafPath(q.size), class: "ak-orn-leaf" }, inner);
+          svgEl2("path", { d: "M" + R(q.size * 0.12) + " 0L" + R(q.size * 0.8) + " 0", class: "ak-orn-rib" }, inner);
+          leaves.push({ el: inner, s: q.s });
+        }
+      }
+      const budFront = d.group(d.svg);
+      const buds = [budBack, budFront].map((g) => {
+        const bloom = svgEl2("g", { class: "ak-orn-bloom" }, g);
+        for (let i = 0; i < 5; i++) svgEl2("path", { d: leafPath(9), class: "ak-orn-leaf", transform: "rotate(" + 72 * i + ") translate(2.5 0)" }, bloom);
+        svgEl2("circle", { r: 3.2, class: "ak-orn-vdot" }, g);
+        return { g, bloom };
+      });
+      apply2 = (v) => {
+        const rv = 14 + v * (L - 14);
+        for (const s of segs) {
+          const f2 = Math.max(0, Math.min(1, (rv - s.s0) / Math.max(1, s.s1 - s.s0)));
+          s.el.style.strokeDashoffset = String(Math.round(s.len * (1 - f2)));
+        }
+        for (const lf of leaves) lf.el.classList.toggle("ak-orn-open", lf.s <= rv - 4);
+        fill2.setAttribute("width", String(R(Math.max(0, (bw - 6) * v))));
+        const b = base.at(rv);
+        const th = k * rv;
+        const o = amp * Math.sin(th);
+        const inFront = Math.cos(th) >= 0;
+        buds.forEach((bd, i) => {
+          bd.g.setAttribute("transform", "translate(" + R(b.x + b.nx * o) + " " + R(b.y + b.ny * o) + ")");
+          bd.g.style.display = i === 1 === inFront ? "" : "none";
+          bd.bloom.classList.toggle("ak-orn-open", v >= 0.995);
+        });
+      };
+      apply2(value);
+    });
+    const clamp3 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
+    return {
+      render: (animate) => {
+        strip.render(animate);
+        if (!apply2) return;
+        if (animate) {
+          apply2(0);
+          requestAnimationFrame(() => requestAnimationFrame(() => apply2 && apply2(value)));
+        } else apply2(value);
+      },
+      set: (v) => {
+        value = clamp3(v);
+        if (apply2) apply2(value);
+      },
+      teardown: strip.teardown
+    };
+  }
+  function drawRail(d, W7) {
+    const y = 14;
+    const base = line(8, y, W7 - 8, y);
+    const T = Math.max(1.2, Math.min(3, W7 / 300));
+    const back = d.group(d.svg);
+    d.stroke(d.svg, "M8 " + y + "H" + R(W7 - 8), "ln", 1, Math.ceil(W7), 0, 0.8);
+    const front = d.group(d.svg);
+    d.chain(back, front, helix(base.at, base.L, 7, 44, 0, 1.5), base.L, 0.3, T, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
+    d.chain(back, front, helix(base.at, base.L, 6, 44, PI3, 1.5), base.L, 0.45, T, [["gap", 4], ["vine", 1]], ["vback", 0.8]);
+    for (const q of helixLeaves(base.at, base.L, 7, 44, 0, { size: 7.5, alpha: 0.95, every: 2, from: 6, endGap: 6 })) d.leaf(front, q.x, q.y, q.ang, q.size, 0.3 + T * q.s / base.L);
+    d.bead(d.svg, 5, y, 3, 0.1);
+    d.bead(d.svg, W7 - 5, y, 3, 0.3 + T);
+  }
+  function drawDivider(d, W7, H4, leaves) {
+    const y = H4 / 2;
+    const c = W7 / 2;
+    const reach = Math.min(W7 / 2 - 40, 420);
+    const d0 = 0.4;
+    const T = Math.max(1.2, Math.min(2.4, reach / 180));
+    const ends = [c + reach, c - reach];
+    const back = d.group(d.svg);
+    d.stroke(d.svg, "M" + R(c + 14) + " " + R(y) + "H" + R(ends[0]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
+    d.stroke(d.svg, "M" + R(c - 14) + " " + R(y) + "H" + R(ends[1]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
+    const front = d.group(d.svg);
+    for (const bs of [line(c + 14, y, ends[0], y), line(c - 14, y, ends[1], y, true)]) {
+      d.chain(back, front, helix(bs.at, bs.L, 6, 42, 0, 1.5), bs.L, d0, T, [["gap", 4], ["vine", 1.6]], ["vback", 1]);
+      if (leaves > 0) {
+        for (const q of helixLeaves(bs.at, bs.L, 6, 42, 0, { size: 7.5, alpha: 0.95, every: leaves > 1.5 ? 1 : 2, from: 8, endGap: 10 })) {
+          d.leaf(front, q.x, q.y, q.ang, q.size, d0 + T * q.s / bs.L + 0.1);
+        }
+      }
+    }
+    const cr = turtle(ends[0], y, 0, 40, (u) => -(0.02 + 0.42 * u * u));
+    const cl = turtle(ends[1], y, PI3, 40, (u) => 0.02 + 0.42 * u * u);
+    d.stroke(d.svg, cr.d, "ln", 1.2, cr.len, d0 + T - 0.2, 0.7);
+    d.stroke(d.svg, cl.d, "ln", 1.2, cl.len, d0 + T - 0.2, 0.7);
+    d.rosette(d.svg, c, y, 6, 3, 5, 9, 0.1);
+  }
+  function rope(d, back, front, base, n, amp, period, t0, T, fronts, backRole) {
+    for (let j = 0; j < n; j++) d.chain(back, front, helix(base.at, base.L, amp, period, j * TAU4 / n, 1.5), base.L, t0, T, fronts, backRole);
+  }
+  function drawBraid(d, W7, H4, strands) {
+    const y = H4 / 2;
+    const base = line(14, y, W7 - 14, y);
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    rope(d, back, front, base, Math.round(strands), 6, 34, 0.4, Math.max(1.2, Math.min(3, W7 / 300)), [["gap", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
+    for (const x of [8, W7 - 8]) {
+      const g = d.bead(d.svg, x, y, 2.6, x < W7 / 2 ? 0.3 : 2.4);
+      g.insertBefore(svgEl2("circle", { r: 7, class: "ak-orn-ring" }), g.firstChild);
+    }
+  }
+  function drawCord(d, W7) {
+    const y = 16;
+    const base = line(18, y, W7 - 18, y);
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    const T = Math.max(1, Math.min(2.4, W7 / 300));
+    rope(d, back, front, base, 2, 3.5, 20, 0.3, T, [["gap", 5], ["ln", 2.4], ["hi", 0.8]], ["dim", 1.6]);
+    let tassel = "";
+    for (let i = -3; i <= 3; i++) tassel += "M" + R(i * 1.6) + " 11L" + R(i * 2.6) + " 44";
+    for (const [x, del] of [[12, 0.3], [W7 - 12, 0.3 + T]]) {
+      const g = d.bead(d.svg, x, y, 4.5, del);
+      svgEl2("path", { d: tassel, class: "ak-orn-ln", "stroke-width": 1 }, g);
+      svgEl2("path", { d: "M-5 9H5", class: "ak-orn-ln", "stroke-width": 3 }, g);
+    }
+  }
+  function drawStrip(d, W7, H4) {
+    const y = H4 / 2;
+    d.stroke(d.svg, "M4 3H" + R(W7 - 4) + "M4 " + R(H4 - 3) + "H" + R(W7 - 4), "ln", 0.8, Math.ceil(2 * W7), 0, 1.2);
+    for (let m = 0; m < 8; m++) {
+      const pts = [];
+      for (let x = 4; x <= W7 - 4; x += 2) pts.push([x, y + 7 * Math.sin(TAU4 * (x - 4) / 28 + m * PI3 / 4)]);
+      d.stroke(d.svg, pathOf(pts), "ln", 0.6, lengthOf(pts), 0.3 + m * 0.08, 2.4);
+    }
+  }
+  var LINE_FIGURES = {
+    "vine-bar": { params: ["leaves", "value"], mount: mountVineBar },
+    "vine-rail": { params: [], mount: (host, _p, opts) => fillMount(host, 28, "ak-orn-strip--rail", opts, drawRail) },
+    divider: { params: ["leaves"], mount: (host, p, opts) => fillMount(host, 48, "ak-orn-strip--divider", opts, (d, W7, H4) => drawDivider(d, W7, H4, p.leaves)) },
+    braid: { params: ["strands"], mount: (host, p, opts) => fillMount(host, 32, "ak-orn-strip--braid", opts, (d, W7, H4) => drawBraid(d, W7, H4, p.strands)) },
+    cord: { params: [], mount: (host, _p, opts) => fillMount(host, 64, "ak-orn-strip--cord", opts, drawCord) },
+    "guilloche-strip": { params: [], mount: (host, _p, opts) => fillMount(host, 30, "ak-orn-strip--guilloche", opts, drawStrip) }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-text.js
+  var PI4 = Math.PI;
+  function owned(render, teardown) {
+    return { render, teardown };
+  }
+  function slot(cls) {
+    const s = document.createElement("span");
+    s.className = cls;
+    s.setAttribute("aria-hidden", "true");
+    return s;
+  }
+  function flourishInto(d, leaves) {
+    const t0 = 0.3;
+    const m = turtle(8, 58, 0, 200, (u) => -4e-3 + 0.3 * Math.pow(u, 5));
+    const pa = at2(m, 0.38);
+    const b1 = turtle(pa.x, pa.y, pa.h + 0.9, 80, (u) => 0.012 + 0.3 * u * u * u);
+    const pb = at2(m, 0.15);
+    const b2 = turtle(pb.x, pb.y, pb.h - 0.9, 55, (u) => -(0.012 + 0.34 * u * u * u));
+    d.stroke(d.svg, m.d, "ln", 1.8, m.len, t0, 1.8);
+    d.stroke(d.svg, b2.d, "ln", 1.2, b2.len, t0 + 0.3, 1);
+    d.stroke(d.svg, b1.d, "ln", 1.2, b1.len, t0 + 0.7, 1.3);
+    if (leaves > 0) {
+      const marks = [
+        { t: m, u: 0.26, side: 1, s: 12, start: t0, dur: 1.8 },
+        { t: m, u: 0.5, side: -1, s: 11, start: t0, dur: 1.8 },
+        { t: m, u: 0.64, side: 1, s: 10, start: t0, dur: 1.8 },
+        { t: b1, u: 0.3, side: -1, s: 9, start: t0 + 0.7, dur: 1.3 },
+        { t: b2, u: 0.35, side: 1, s: 8, start: t0 + 0.3, dur: 1 }
+      ];
+      for (const mk of marks) {
+        const q = at2(mk.t, mk.u);
+        d.leaf(d.svg, q.x, q.y, q.h + mk.side * 0.95, mk.s, mk.start + mk.dur * mk.u + 0.15);
+      }
+    }
+    d.bead(d.svg, 8, 58, 3.4, 0.1);
+    d.bead(d.svg, m.end.x, m.end.y, 2.6, t0 + 1.8);
+    d.bead(d.svg, b1.end.x, b1.end.y, 2, t0 + 2);
+    d.bead(d.svg, b2.end.x, b2.end.y, 2, t0 + 1.3);
+  }
+  function mountFlourish(host, p, opts) {
+    const left = slot("ak-orn-flourish ak-orn-flourish--left");
+    const right = slot("ak-orn-flourish ak-orn-flourish--right");
+    host.classList.add("ak-orn-flourished");
+    host.insertBefore(left, host.firstChild);
+    host.appendChild(right);
+    return owned((animate) => {
+      for (const s of [left, right]) {
+        s.textContent = "";
+        flourishInto(drawing(s, 200, 110, { animate, speed: opts.speed, delay: opts.delay, viewBox: true }), p.leaves);
+      }
+    }, () => {
+      left.remove();
+      right.remove();
+      host.classList.remove("ak-orn-flourished");
+    });
+  }
+  function mountSwash(host, p, opts) {
+    const s = slot("ak-orn-swash");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 300, 72, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      const sc = turtle(20, 26, PI4 + 0.1, 40, (u) => 0.3 * u * u);
+      const sm = turtle(20, 26, -0.1, 270, (u) => 7e-4 + 0.25 * Math.pow(u, 9));
+      d.stroke(d.svg, sc.d, "ln", 1.2, sc.len, 0.5, 0.5);
+      d.stroke(d.svg, sm.d, "ln", 1.6, sm.len, 0.6, 1.6);
+      if (p.leaves > 0) {
+        const q = at2(sm, 0.55);
+        d.leaf(d.svg, q.x, q.y, q.h - 0.9, 9, 1.4);
+      }
+      d.bead(d.svg, sm.end.x, sm.end.y, 2, 2.2);
+    }, () => s.remove());
+  }
+  function firstLetter(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.nodeValue || "";
+      const i = text.search(/\S/);
+      if (i >= 0) return { node: (
+        /** @type {Text} */
+        n
+      ), index: i };
+    }
+    return null;
+  }
+  function mountDropcap(host, p, opts) {
+    const found = firstLetter(host);
+    if (!found) return owned(() => {
+    }, () => {
+    });
+    const { node, index } = found;
+    const text = node.nodeValue || "";
+    const letter = Array.from(text.slice(index))[0] || "";
+    const cap = document.createElement("span");
+    cap.className = "ak-orn-cap";
+    const art = slot("ak-orn-cap__art");
+    const glyph = document.createElement("span");
+    glyph.className = "ak-orn-cap__letter";
+    glyph.textContent = letter;
+    cap.appendChild(art);
+    cap.appendChild(glyph);
+    node.nodeValue = text.slice(index + letter.length);
+    const pre = text.slice(0, index);
+    node.parentNode.insertBefore(cap, node);
+    const preNode = pre ? node.parentNode.insertBefore(document.createTextNode(pre), cap) : null;
+    return owned((animate) => {
+      art.textContent = "";
+      const d = drawing(art, 124, 124, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      const box = rrect(8, 8, 108, 108, 10);
+      const per = box.L / Math.round(box.L / 34);
+      d.fade(d.stroke(d.svg, roundedRectPath(14, 14, 96, 96, 5), "dim", 0.8), 1.4);
+      const back = d.group(d.svg);
+      d.stroke(d.svg, roundedRectPath(8, 8, 108, 108, 10), "ln", 2, 420, 0.4, 1.2);
+      const front = d.group(d.svg);
+      d.chain(back, front, helix(box.at, box.L, 5, per, 0, 1.5), box.L, 1, 3, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
+      if (p.leaves > 0) {
+        for (const q of helixLeaves(box.at, box.L, 5, per, 0, { size: 6.5, alpha: 0.9, every: p.leaves > 1.5 ? 1 : 2 })) {
+          d.leaf(front, q.x, q.y, q.ang, q.size, 1 + 3 * q.s / box.L + 0.1);
+        }
+      }
+      if (animate) d.fade(glyph, 0.6);
+    }, () => {
+      node.nodeValue = text;
+      cap.remove();
+      if (preNode) preNode.remove();
+    });
+  }
+  function mountFleuron(host, p, opts) {
+    const s = slot("ak-orn-fleuron");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 160, 64, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      for (const sx of [1, -1]) {
+        const c = turtle(80 + sx * 4, 38, sx > 0 ? 0.3 : PI4 - 0.3, 70, (u) => -sx * (0.01 + 0.34 * u * u * u));
+        d.stroke(d.svg, c.d, "ln", 1.4, c.len, 0.3, 1.3);
+        if (p.leaves > 0) {
+          const q = at2(c, 0.35);
+          d.leaf(d.svg, q.x, q.y, q.h + sx * 0.95, 10, 0.8);
+        }
+        d.bead(d.svg, c.end.x, c.end.y, 1.8, 1.6);
+        d.bead(d.svg, 80 + sx * 14, 52, 1.6, 0.5);
+      }
+      d.leaf(d.svg, 80, 34, -PI4 / 2, 22, 0.2);
+      d.bead(d.svg, 80, 44, 2.4, 0.1);
+    }, () => s.remove());
+  }
+  function mountDinkus(host, _p, opts) {
+    const s = slot("ak-orn-dinkus");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 200, 24, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      d.stroke(d.svg, "M20 12H64M136 12H180", "dim", 0.8, 120, 0.2, 0.8);
+      d.leaf(d.svg, 108, 12, 0, 14, 0.3);
+      d.leaf(d.svg, 92, 12, PI4, 14, 0.3);
+      d.bead(d.svg, 100, 12, 3.2, 0.2);
+      d.bead(d.svg, 128, 12, 1.6, 0.5);
+      d.bead(d.svg, 72, 12, 1.6, 0.5);
+    }, () => s.remove());
+  }
+  function mountBullets(host, _p, opts) {
+    host.classList.add("ak-orn-bullets");
+    const marks = [];
+    return owned((animate) => {
+      for (const m of marks) m.remove();
+      marks.length = 0;
+      Array.from(host.children).forEach((li, i) => {
+        if (li.tagName !== "LI") return;
+        const m = slot("ak-orn-bullet");
+        li.insertBefore(m, li.firstChild);
+        marks.push(m);
+        const d = drawing(m, 18, 18, { animate, speed: opts.speed, delay: opts.delay + i * 0.12, viewBox: true });
+        d.leaf(d.svg, 3, 15, -PI4 / 4, 16, 0, 0.36);
+      });
+    }, () => {
+      for (const m of marks) m.remove();
+      host.classList.remove("ak-orn-bullets");
+    });
+  }
+  var TEXT_FIGURES = {
+    flourish: { params: ["leaves"], mount: mountFlourish },
+    swash: { params: ["leaves"], mount: mountSwash },
+    dropcap: { params: ["leaves"], mount: mountDropcap },
+    fleuron: { params: ["leaves"], mount: mountFleuron },
+    dinkus: { params: [], mount: mountDinkus },
+    bullets: { params: [], mount: mountBullets }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-set-pen.js
+  var f = (n) => Math.round(n * 10) / 10;
+  var dOf = (pts) => "M" + pts.map((p) => f(p[0]) + " " + f(p[1])).join(" L");
+  var lenOf = (pts) => {
+    let L = 0;
+    for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return Math.ceil(L) + 2;
+  };
+  var poly = (pts) => dOf(pts) + " Z";
+  var circ = (x, y, r) => "M" + f(x - r) + " " + f(y) + " a" + f(r) + " " + f(r) + " 0 1 0 " + f(2 * r) + " 0 a" + f(r) + " " + f(r) + " 0 1 0 " + f(-2 * r) + " 0 Z";
+  var arc2 = (cx, cy, r, a0, a1, n) => {
+    const o = [];
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * i / n;
+      o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return o;
+  };
+  var bz = (a, b, c, d, n) => {
+    const o = [];
+    for (let i = 0; i <= n; i++) {
+      const u = i / n;
+      const v = 1 - u;
+      o.push([
+        v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0],
+        v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]
+      ]);
+    }
+    return o;
+  };
+  var hex = (cx, cy, r, a0) => {
+    const o = [];
+    for (let i = 0; i <= 6; i++) {
+      const a = (a0 || 0) + i * Math.PI / 3;
+      o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return o;
+  };
+  var HOW = { pop: "ak-orn-spop", turn: "ak-orn-sturn", shoot: "ak-orn-sshoot", spin: "ak-orn-sspin", fade: "ak-orn-sfade", drift: "ak-orn-sdrift", wipe: "ak-orn-swipe" };
+  function pen(svg6, o) {
+    const speed = Math.max(0.25, Math.min(3, Number(o.speed) || 1));
+    const base = Math.max(0, Number(o.delay) || 0);
+    const shift = o.shift || 0;
+    const sec = (t2) => ((base + Math.max(0, t2 - shift)) / speed).toFixed(2) + "s";
+    const span = (t2) => (Math.max(0.05, t2) / speed).toFixed(2) + "s";
+    let seed = o.seed || 1;
+    const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+    const timed = (el2, cls, dl, du, ease) => {
+      el2.classList.add(cls);
+      const s = (
+        /** @type {any} */
+        el2.style
+      );
+      s.animationDelay = sec(dl);
+      s.animationDuration = span(du);
+      if (ease) s.animationTimingFunction = ease;
+    };
+    const line2 = (pts, role, width, dl, du) => {
+      if (pts.length < 2) return null;
+      const el2 = svgEl2("path", { d: dOf(pts), class: "ak-orn-k ak-orn-r-" + role, "stroke-width": width }, svg6);
+      if (o.animate) {
+        const len = lenOf(pts);
+        const s = (
+          /** @type {any} */
+          el2.style
+        );
+        s.strokeDasharray = String(len);
+        s.strokeDashoffset = String(len);
+        timed(el2, "ak-orn-grow", dl, du, o.ease);
+      }
+      return el2;
+    };
+    const shape = (d, role, dl, du, how) => {
+      const el2 = svgEl2("path", { d, class: "ak-orn-f ak-orn-r-" + role }, svg6);
+      if (o.animate) timed(el2, HOW[how || "pop"], dl, du || 0.5, !how || how === "pop" || how === "turn" || how === "spin" ? o.popEase : null);
+      return el2;
+    };
+    const stroke = (d, role, width, dl, du, how) => {
+      const el2 = svgEl2("path", { d, class: "ak-orn-k ak-orn-r-" + role, "stroke-width": width }, svg6);
+      if (o.animate) timed(el2, HOW[how || "fade"], dl, du, null);
+      return el2;
+    };
+    const rect = (x, y, w, h, role, opts) => {
+      const r = opts || {};
+      if (w <= 0 || h <= 0) return null;
+      const el2 = svgEl2("rect", {
+        x: f(x),
+        y: f(y),
+        width: f(w),
+        height: f(h),
+        rx: r.rx || 0,
+        class: (r.stroke ? "ak-orn-k" : "ak-orn-f") + " ak-orn-r-" + role,
+        "stroke-width": r.sw || 1
+      }, svg6);
+      if (o.animate && r.wipe) timed(el2, HOW.wipe, r.wipe[0], r.wipe[1], r.wipe[2] || o.ease);
+      return el2;
+    };
+    return { line: line2, shape, stroke, rect, rnd, poly, circ, arc: arc2, bz, hex, f };
+  }
+
+  // src/static/sdk-libs/atelier/ornament-sets-a.js
+  var PI5 = Math.PI;
+  var modern = {
+    id: "modern",
+    // A hairline drawn all round, two corner brackets growing out of their corners, one accent square.
+    frame(P, C) {
+      const x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
+      const arm2 = Math.min(64, C.w / 4, C.h / 3);
+      P.line([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]], "mute", 0.75, 0.1, 1.8);
+      P.line([[x0 - 10, y0 + arm2], [x0 - 10, y0 - 10], [x0 + arm2, y0 - 10]], "ink", 2, 0.35, 0.6);
+      P.line([[x1 + 10, y1 - arm2], [x1 + 10, y1 + 10], [x1 - arm2, y1 + 10]], "ink", 2, 0.55, 0.6);
+      P.shape(poly([[x1 + 4, y0 - 16], [x1 + 16, y0 - 16], [x1 + 16, y0 - 4], [x1 + 4, y0 - 4]]), "s1", 1.2);
+      for (let i = 0; i < 5; i++) P.line([[x0 + 24 + i * 10, y1 + 4], [x0 + 24 + i * 10, y1 + 12]], "mute", 1, 1.3 + i * 0.06, 0.2);
+    },
+    // An accent lead, a hairline, ticks every 44 px.
+    rule(P, D2) {
+      const span = D2.x1 - D2.x0;
+      P.line([[D2.x0, D2.y], [D2.x1, D2.y]], "mute", 0.75, 0.3, 1.1);
+      P.line([[D2.x0, D2.y], [D2.x0 + Math.min(48, span / 4), D2.y]], "s1", 3, 0.2, 0.45);
+      for (let x = D2.x0 + 88; x <= D2.x1 + 0.1; x += 44) P.line([[x, D2.y - 4], [x, D2.y + 4]], "ink", 1, 0.5 + (x - D2.x0) / span * 0.8, 0.15);
+    },
+    // An outlined track, a ruler under it and a marker at the value.
+    bar(P, B) {
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "ink", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4] });
+      for (let i = 0; i <= 10; i++) {
+        const x = B.x + B.w * i / 10, h = i % 5 === 0 ? 10 : 5;
+        P.line([[x, B.y + B.h + 5], [x, B.y + B.h + 5 + h]], i % 5 === 0 ? "ink" : "mute", 1, 0.5 + i * 0.05, 0.15);
+      }
+      const vx = B.x + B.w * B.v;
+      P.line([[vx, B.y - 10], [vx, B.y + B.h + 2]], "ink", 1.5, 1.8, 0.3);
+      P.shape(poly([[vx - 5, B.y - 18], [vx + 5, B.y - 18], [vx, B.y - 10]]), "s1", 1.9);
+    },
+    // Open squares, the first one filled with the accent.
+    bullet(P, p, i) {
+      P.line([[p[0] - 5, p[1] - 5], [p[0] + 5, p[1] - 5], [p[0] + 5, p[1] + 5], [p[0] - 5, p[1] + 5], [p[0] - 5, p[1] - 5]], "ink", 1.5, 0.9 + i * 0.15, 0.4);
+      if (i === 0) P.shape(poly([[p[0] - 2.5, p[1] - 2.5], [p[0] + 2.5, p[1] - 2.5], [p[0] + 2.5, p[1] + 2.5], [p[0] - 2.5, p[1] + 2.5]]), "s1", 1.4);
+    },
+    // A ruler along the foot.
+    strip(P, S) {
+      const span = S.x1 - S.x0;
+      P.line([[S.x0, S.y], [S.x1, S.y]], "mute", 0.75, 0.6, 1.4);
+      for (let x = S.x0; x <= S.x1 + 0.1; x += 16) {
+        const big = Math.round((x - S.x0) / 16) % 5 === 0;
+        P.line([[x, S.y], [x, S.y - (big ? 10 : 5)]], big ? "ink" : "mute", 1, 0.7 + (x - S.x0) / span, 0.12);
+      }
+    }
+  };
+  var futuristic = {
+    id: "futuristic",
+    // A chamfered outline drawn from the top-left cut both ways at once, readout ticks, a segmented arc, a crosshair.
+    frame(P, C) {
+      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12, k = 18;
+      P.line([[x0 + k, y0], [x1 - k, y0], [x1, y0 + k], [x1, y1 - k], [x1 - k, y1]], "s1", 1.5, 0.1, 1.2);
+      P.line([[x0 + k, y0], [x0, y0 + k], [x0, y1 - k], [x0 + k, y1], [x1 - k, y1]], "s1", 1.5, 0.1, 1.2);
+      P.line([[x0 - 6, y0 + k + 6], [x0 + k + 6, y0 - 6]], "s2", 3, 1.1, 0.25);
+      P.line([[x1 - k - 6, y1 + 6], [x1 + 6, y1 - k - 6]], "s2", 3, 1.25, 0.25);
+      const ticks = Math.max(4, Math.min(12, Math.floor((C.w - 2 * k) / 16)));
+      for (let i = 0; i < ticks; i++) {
+        const x = x1 - k - 10 - i * 8;
+        P.line([[x, y0 - 4], [x, y0 - (i % 3 === 0 ? 11 : 7)]], i % 3 === 0 ? "s1" : "pale", 1.2, 1 + i * 0.04, 0.15);
+      }
+      for (let s = 0; s < 4; s++) {
+        const a0 = PI5 / 2 + s * PI5 / 8 + 0.05;
+        P.line(arc2(x0, y1, 26, a0, a0 + PI5 / 8 - 0.1, 6), s === 3 ? "s2" : "s1", 2, 1.2 + s * 0.1, 0.2);
+      }
+      const hx = x1 - 34, hy = y1 + 22;
+      P.line(arc2(hx, hy, 7, 0, PI5 * 2, 28), "s1", 1.2, 1.5, 0.4);
+      P.line([[hx - 14, hy], [hx - 4, hy]], "pale", 1, 1.7, 0.15);
+      P.line([[hx + 4, hy], [hx + 14, hy]], "pale", 1, 1.7, 0.15);
+      P.line([[hx, hy - 14], [hx, hy - 4]], "pale", 1, 1.75, 0.15);
+      P.line([[hx, hy + 4], [hx, hy + 14]], "pale", 1, 1.75, 0.15);
+    },
+    // Two lines run to a centre diamond, brackets close the ends.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      P.line([[D2.x0 + 10, D2.y], [mid - 16, D2.y]], "s1", 1.2, 0.3, 0.6);
+      P.line([[D2.x1 - 10, D2.y], [mid + 16, D2.y]], "s1", 1.2, 0.3, 0.6);
+      P.line([[mid, D2.y - 8], [mid + 8, D2.y], [mid, D2.y + 8], [mid - 8, D2.y], [mid, D2.y - 8]], "s2", 1.5, 0.8, 0.4);
+      P.shape(poly([[mid, D2.y - 3.5], [mid + 3.5, D2.y], [mid, D2.y + 3.5], [mid - 3.5, D2.y]]), "s2", 1.1);
+      P.line([[D2.x0 + 6, D2.y - 6], [D2.x0, D2.y - 6], [D2.x0, D2.y + 6], [D2.x0 + 6, D2.y + 6]], "mute", 1.2, 0.2, 0.3);
+      P.line([[D2.x1 - 6, D2.y - 6], [D2.x1, D2.y - 6], [D2.x1, D2.y + 6], [D2.x1 - 6, D2.y + 6]], "mute", 1.2, 0.2, 0.3);
+    },
+    // Blocks; the filled ones light up in turn, the last lit block in the second colour.
+    bar(P, B) {
+      const n = Math.max(8, Math.round(24 * B.w / 356)), g = 3, bw = (B.w - (n - 1) * g) / n, lit = Math.round(n * B.v);
+      for (let i = 0; i < n; i++) {
+        const x = B.x + i * (bw + g), r = [[x, B.y], [x + bw, B.y], [x + bw, B.y + B.h], [x, B.y + B.h]];
+        if (i < lit) P.shape(poly(r), i === lit - 1 ? "s2" : "s1", 0.5 + i * 0.06 * 24 / n, 0.25);
+        else P.line(r.concat([r[0]]), "pale", 1, 0.5 + i * 0.03 * 24 / n, 0.2);
+      }
+      P.line([[B.x - 6, B.y - 4], [B.x - 10, B.y - 4], [B.x - 10, B.y + B.h + 4], [B.x - 6, B.y + B.h + 4]], "mute", 1.2, 0.4, 0.3);
+      P.line([[B.x + B.w + 6, B.y - 4], [B.x + B.w + 10, B.y - 4], [B.x + B.w + 10, B.y + B.h + 4], [B.x + B.w + 6, B.y + B.h + 4]], "mute", 1.2, 0.4, 0.3);
+    },
+    // Hexagons, the first one with a lit core.
+    bullet(P, p, i) {
+      P.line(hex(p[0], p[1], 7, PI5 / 6), "s1", 1.4, 0.9 + i * 0.15, 0.45);
+      if (i === 0) P.shape(poly(hex(p[0], p[1], 3, PI5 / 6).slice(0, 6)), "s2", 1.4);
+    },
+    // A dim rail with nodes; lit runs between them in turn.
+    strip(P, S) {
+      const nodes = [0, 112, 248, 416, 552, 696, 832].map((u) => S.x0 + u / 832 * (S.x1 - S.x0));
+      P.line([[S.x0, S.y], [S.x1, S.y]], "pale", 1, 0.5, 1.2);
+      for (let i = 0; i < nodes.length - 1; i++) P.line([[nodes[i] + 6, S.y], [nodes[i + 1] - 6, S.y]], i % 2 ? "s2" : "s1", 2, 0.9 + i * 0.22, 0.3);
+      nodes.forEach((x, i) => P.line(arc2(x, S.y, 4, 0, PI5 * 2, 16), "s1", 1.4, 0.8 + i * 0.22, 0.2));
+    }
+  };
+  function via(P, x, y, r, role, dl) {
+    P.line(arc2(x, y, r, 0, PI5 * 2, 18), role, 1.4, dl, 0.2);
+    if (P.rnd() > 0.5) P.shape(circ(x, y, r * 0.45), "s3", dl + 0.2, 0.3);
+  }
+  var cyberpunk = {
+    id: "cyberpunk",
+    seed: 31,
+    // A neon outline with a shifted ghost of three of its runs; traces leave every side, turn at 45 degrees and end in a via.
+    frame(P, C) {
+      const x0 = C.x - 10, y0 = C.y - 10, x1 = C.x + C.w + 10, y1 = C.y + C.h + 10;
+      const kx = (x1 - x0) / 420, ky = (y1 - y0) / 268;
+      P.line([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]], "s1", 1.6, 0.1, 1.1);
+      P.line([[x0 + 40 * kx, y0 - 3], [x0 + 170 * kx, y0 - 3]], "s2", 1.2, 1, 0.12);
+      P.line([[x1 + 3, y0 + 60 * ky], [x1 + 3, y0 + 130 * ky]], "s2", 1.2, 1.1, 0.12);
+      P.line([[x1 - 210 * kx, y1 + 3], [x1 - 120 * kx, y1 + 3]], "s2", 1.2, 1.2, 0.12);
+      [40, 84, 150, 204].forEach((u, i) => {
+        const y = y0 + u * ky, s = i % 2 ? 1 : -1;
+        P.line([[x0, y], [x0 - 8, y], [x0 - 18, y + 10 * s], [x0 - 26, y + 10 * s]], i % 2 ? "s2" : "s1", 1.3, 0.6 + i * 0.1, 0.35);
+        via(P, x0 - 30, y + 10 * s, 3.5, "s2", 0.95 + i * 0.1);
+      });
+      [60, 110, 290, 340].forEach((u, i) => {
+        const x = x0 + u * kx;
+        P.line([[x, y1], [x, y1 + 8], [x + 12, y1 + 20], [x + 12, y1 + 34]], i % 2 ? "s1" : "s2", 1.3, 0.7 + i * 0.1, 0.35);
+        via(P, x + 12, y1 + 38, 3.5, "s1", 1.05 + i * 0.1);
+      });
+      [30, 72].forEach((u, i) => {
+        const y = y0 + u * ky;
+        P.line([[x1, y], [x1 + 10, y], [x1 + 20, y + 10], [x1 + 30, y + 10]], "s2", 1.3, 0.8 + i * 0.1, 0.3);
+        via(P, x1 + 34, y + 10, 3.5, "s2", 1.1 + i * 0.1);
+      });
+      [250, 290].forEach((u, i) => {
+        const x = x0 + u * kx;
+        P.line([[x, y0], [x, y0 - 4], [x + 6, y0 - 10]], "s1", 1.3, 0.9 + i * 0.1, 0.25);
+        via(P, x + 9, y0 - 13, 3, "s1", 1.15 + i * 0.1);
+      });
+    },
+    // A three-line bus with one 45-degree jog, a via at each end of each line.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      ["s1", "s2", "s1"].forEach((role, j) => {
+        const y = D2.y - 7 + j * 5;
+        P.line([[D2.x0 + 6, y], [mid - 8, y], [mid, y + 8], [D2.x1 - 6, y + 8]], role, 1.3, 0.3 + j * 0.08, 0.9);
+        P.line(arc2(D2.x0 + 3, y, 2.5, 0, PI5 * 2, 12), role, 1, 0.25, 0.15);
+        P.line(arc2(D2.x1 - 3, y + 8, 2.5, 0, PI5 * 2, 12), role, 1, 1.2, 0.15);
+      });
+    },
+    // A neon track, a ghost of its edges, data packets in the filled run, a cursor at the value.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v;
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4, "steps(12, end)"] });
+      P.line([[B.x, B.y - 3], [vx, B.y - 3]], "s2", 1, 1.3, 0.2);
+      if (vx - 60 > B.x + 40) P.line([[B.x + 40, B.y + B.h + 3], [vx - 60, B.y + B.h + 3]], "s2", 1, 1.4, 0.2);
+      for (let i = 0, x = B.x + 14; x + 6 < vx - 10; i++, x += 36) P.shape(poly([[x, B.y + 3], [x + 6, B.y + 3], [x + 6, B.y + B.h - 3], [x, B.y + B.h - 3]]), "s3", 1.5 + i * 0.07, 0.2);
+      P.line([[vx + 2, B.y - 7], [vx + 2, B.y + B.h + 7]], "s2", 2, 1.9, 0.15);
+    },
+    // A via with a short stub, the first one lit.
+    bullet(P, p, i) {
+      P.line(arc2(p[0], p[1], 5, 0, PI5 * 2, 20), "s1", 1.5, 0.9 + i * 0.15, 0.3);
+      P.line([[p[0] + 5, p[1]], [p[0] + 9, p[1] - 4], [p[0] + 14, p[1] - 4]], "s2", 1.3, 1.1 + i * 0.15, 0.2);
+      if (i === 0) P.shape(circ(p[0], p[1], 2.2), "s3", 1.3);
+    },
+    // Three traces along the foot, each jogging twice at its own places.
+    strip(P, S) {
+      const k = (S.x1 - S.x0) / 832;
+      [[S.y - 10, "s2"], [S.y, "s1"], [S.y + 10, "pale"]].forEach((row, j) => {
+        const y = (
+          /** @type {number} */
+          row[0]
+        ), role = (
+          /** @type {string} */
+          row[1]
+        );
+        const a = S.x0 + (80 + P.rnd() * 260) * k, b = Math.min(S.x1 - 12, a + (180 + P.rnd() * 260) * k), s = j === 1 ? 1 : -1;
+        P.line([[S.x0, y], [a, y], [a + 6, y + 6 * s], [b, y + 6 * s], [b + 6, y], [S.x1, y]], role, 1.4, 0.5 + j * 0.12, 1.4);
+        via(P, S.x1 + 4, y, 3, role, 1.9 + j * 0.1);
+      });
+    }
+  };
+  function wave(a, b, amp, per, ph) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, o = [];
+    for (let s = 0; s <= len; s += 3) {
+      const w = amp * Math.sin(2 * PI5 * s / per + ph);
+      o.push([a[0] + dx * s / len + nx * w, a[1] + dy * s / len + ny * w]);
+    }
+    return o;
+  }
+  function star(x, y, r) {
+    const o = [];
+    for (let i = 0; i < 10; i++) {
+      const a = -PI5 / 2 + i * PI5 / 5, q = i % 2 ? r * 0.45 : r;
+      o.push([x + q * Math.cos(a), y + q * Math.sin(a)]);
+    }
+    return poly(o);
+  }
+  var vibrant = {
+    id: "vibrant",
+    seed: 5,
+    barH: 16,
+    popEase: "cubic-bezier(.3,1.7,.5,1)",
+    // One thick wavy ribbon per side, each in its own colour, then confetti round the card.
+    frame(P, C) {
+      const x0 = C.x - 16, y0 = C.y - 16, x1 = C.x + C.w + 16, y1 = C.y + C.h + 16;
+      P.line(wave([x0 + 18, y0], [x1 - 18, y0], 4, 40, 0), "s1", 6, 0.1, 0.7);
+      P.line(wave([x1, y0 + 18], [x1, y1 - 18], 4, 40, 0), "s3", 6, 0.45, 0.55);
+      P.line(wave([x1 - 18, y1], [x0 + 18, y1], 4, 40, 0), "s2", 6, 0.75, 0.7);
+      P.line(wave([x0, y1 - 18], [x0, y0 + 18], 4, 40, 0), "s4", 6, 1.1, 0.55);
+      const map2 = (v, lo, len, size, at3) => v < lo ? at3 + (v - lo) : v > lo + len ? at3 + size + (v - lo - len) : at3 + (v - lo) / len * size;
+      const roles = ["s1", "s3", "s2", "s4"];
+      [[34, 250], [26, 330], [40, 420], [30, 470], [110, 516], [190, 526], [290, 512], [380, 528], [440, 516], [500, 250], [508, 330], [496, 410], [512, 470]].forEach((q, i) => {
+        const x = map2(q[0], 64, 400, C.w, C.x), y = map2(q[1], 232, 248, C.h, C.y), role = roles[i % 4], kind = i % 3, dl = 1.3 + i * 0.05;
+        if (kind === 0) P.shape(circ(x, y, 3 + P.rnd() * 2.5), role, dl);
+        else if (kind === 1) P.shape(poly([[x, y - 5], [x + 5, y + 4], [x - 5, y + 4]]), role, dl);
+        else P.line([[x - 6, y], [x - 2, y - 4], [x + 2, y], [x + 6, y - 4]], role, 2.5, dl, 0.25);
+      });
+    },
+    // Two waves half a period apart, a dot at each end.
+    rule(P, D2) {
+      P.line(wave([D2.x0 + 10, D2.y], [D2.x1 - 10, D2.y], 5, 36, 0), "s1", 4, 0.3, 1);
+      P.line(wave([D2.x0 + 10, D2.y], [D2.x1 - 10, D2.y], 5, 36, PI5), "s4", 4, 0.45, 1);
+      P.shape(circ(D2.x0 + 2, D2.y, 4.5), "s3", 0.25);
+      P.shape(circ(D2.x1 - 2, D2.y, 4.5), "s3", 1.4);
+    },
+    // A rounded track, a wave riding the filled run, a star where it ends.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2;
+      P.rect(B.x, B.y, B.w, B.h, "t3", { rx: B.h / 2 });
+      P.rect(B.x, B.y, B.w * B.v, B.h, "s3", { rx: B.h / 2, wipe: [0.5, 1.4, "cubic-bezier(.3,1.3,.5,1)"] });
+      if (vx - 14 > B.x + 10) P.line(wave([B.x + 10, my], [vx - 14, my], 2.5, 18, 0), "s4", 2.5, 1.2, 0.7);
+      P.shape(star(vx + 2, B.y - 8, 9), "s1", 1.9, 0.6);
+    },
+    // Dots in three colours, each with a small bounce beside it.
+    bullet(P, p, i) {
+      P.shape(circ(p[0], p[1], 7), ["s1", "s2", "s4"][i % 3], 0.9 + i * 0.15, 0.6);
+      P.shape(circ(p[0] + 6, p[1] - 6, 2.5), "s3", 1.1 + i * 0.15, 0.4);
+    },
+    // A zigzag in four colour runs.
+    strip(P, S) {
+      const run = (S.x1 - S.x0) / 4, roles = ["s1", "s3", "s2", "s4"];
+      for (let k = 0; k < 4; k++) {
+        const o = [];
+        for (let x = S.x0 + k * run; x <= S.x0 + (k + 1) * run + 0.1; x += 12) o.push([x, S.y + (Math.round((x - S.x0) / 12) % 2 ? -7 : 7)]);
+        P.line(o, roles[k], 5, 0.6 + k * 0.3, 0.35);
+      }
+    }
+  };
+  var SETS_A = [modern, futuristic, cyberpunk, vibrant];
+
+  // src/static/sdk-libs/atelier/ornament-sets-b.js
+  var PI6 = Math.PI;
+  function hand(P, pts, amp) {
+    const p1 = P.rnd() * 6, p2 = P.rnd() * 6, o = [];
+    let s = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+      for (let u = 0; u < len; u += 4) {
+        const w = amp * (0.6 * Math.sin((s + u) / 23 + p1) + 0.4 * Math.sin((s + u) / 9 + p2));
+        o.push([a[0] + dx * u / len + nx * w, a[1] + dy * u / len + ny * w]);
+      }
+      s += len;
+    }
+    o.push(pts[pts.length - 1]);
+    return o;
+  }
+  function petal(x, y, s, a) {
+    const raw = bz([0, -s], [s * 0.6, -s * 0.3], [s * 0.5, s * 0.5], [0, s * 0.5], 10).concat(bz([0, s * 0.5], [-s * 0.5, s * 0.5], [-s * 0.6, -s * 0.3], [0, -s], 10));
+    const c = Math.cos(a), sn = Math.sin(a);
+    return poly(raw.map((p) => [x + p[0] * c - p[1] * sn, y + p[0] * sn + p[1] * c]));
+  }
+  var emotional = {
+    id: "emotional",
+    seed: 13,
+    ease: "cubic-bezier(.35,0,.25,1)",
+    popEase: "cubic-bezier(.3,1.4,.55,1)",
+    // The outline twice by hand, each pass a little off the other; a curl at the top left, petals falling at the lower right.
+    frame(P, C) {
+      const x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
+      P.line(hand(P, [[x0 + 30, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0], [x0 + 60, y0 + 1]], 1.8), "s1", 1.6, 0.1, 2.2);
+      P.line(hand(P, [[x0 + 4, y0 + 3], [x1 - 3, y0 - 2], [x1 + 3, y1 - 4], [x0 - 2, y1 + 3], [x0 + 3, y0 - 3], [x0 + 30, y0 - 2]], 2.4), "s2", 1, 0.5, 2.2);
+      P.line(bz([x0 + 30, y0], [x0 - 4, y0 - 2], [x0 - 26, y0 - 4], [x0 - 22, y0 + 14], 16).concat(bz([x0 - 22, y0 + 14], [x0 - 18, y0 + 30], [x0 + 4, y0 + 22], [x0 - 4, y0 + 10], 14)), "s1", 1.6, 2.1, 0.6);
+      [[x1 - 8, y1 + 20, 9, 2.4, "s1"], [x1 + 18, y1 + 6, 7, 3.1, "s3"], [x1 - 40, y1 + 34, 6, 1.9, "s2"], [x1 + 12, y1 + 38, 8, 2.7, "s3"]].forEach((q, i) => P.shape(
+        petal(
+          /** @type {number} */
+          q[0],
+          /** @type {number} */
+          q[1],
+          /** @type {number} */
+          q[2],
+          /** @type {number} */
+          q[3]
+        ),
+        /** @type {string} */
+        q[4],
+        2 + i * 0.25,
+        0.9,
+        "drift"
+      ));
+    },
+    // A handwritten line that ties one loop in the middle.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      const loop = bz([mid - 34, D2.y], [mid + 12, D2.y + 2], [mid + 14, D2.y - 24], [mid, D2.y - 24], 16).concat(bz([mid, D2.y - 24], [mid - 14, D2.y - 24], [mid - 10, D2.y + 2], [mid + 34, D2.y], 16));
+      P.line(hand(P, [[D2.x0, D2.y + 2], [mid - 34, D2.y]], 1.2).concat(loop).concat(hand(P, [[mid + 34, D2.y], [D2.x1, D2.y - 2]], 1.2)), "s1", 1.8, 0.3, 1.6);
+    },
+    // A soft pencil track, a thicker stroke over the value, a petal where it stops.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2;
+      P.line(hand(P, [[B.x, my], [B.x + B.w, my]], 1), "pale", 2, 0.3, 1);
+      if (vx > B.x + 6) P.line(hand(P, [[B.x + 2, my], [vx, my]], 1.4), "s1", 6, 0.7, 1.2);
+      P.shape(petal(vx + 10, my - 8, 7, 2.2), "s3", 1.9, 0.9, "drift");
+    },
+    // Petals in the three soft colours.
+    bullet(P, p, i) {
+      P.shape(petal(p[0], p[1], 8, -0.5 + i % 3 * 0.3), ["s1", "s2", "s3"][i % 3], 0.9 + i * 0.2, 0.7, "drift");
+    },
+    // A quiet line that beats once in the middle.
+    strip(P, S) {
+      const sm = (S.x0 + S.x1) / 2, y = S.y;
+      const beat = [[S.x0, y], [sm - 60, y]].concat(bz([sm - 60, y], [sm - 44, y], [sm - 40, y + 8], [sm - 30, y + 6], 6)).concat(bz([sm - 30, y + 6], [sm - 18, y + 4], [sm - 16, y - 26], [sm - 4, y - 24], 8)).concat(bz([sm - 4, y - 24], [sm + 8, y - 22], [sm + 8, y + 14], [sm + 22, y + 12], 8)).concat(bz([sm + 22, y + 12], [sm + 34, y + 10], [sm + 40, y], [sm + 60, y], 6)).concat([[S.x1, y]]);
+      P.line(hand(P, beat, 0.6), "s1", 2, 0.6, 2.4);
+    }
+  };
+  var diamond = (x, y, r) => poly([[x, y - r], [x + r * 0.7, y], [x, y + r], [x - r * 0.7, y]]);
+  function taper(pts, wf) {
+    let tot = 0;
+    for (let i = 1; i < pts.length; i++) tot += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    const left = [], right = [];
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) {
+      if (i > 0) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, w = wf(s / (tot || 1)) / 2;
+      left.push([pts[i][0] - dy / len * w, pts[i][1] + dx / len * w]);
+      right.push([pts[i][0] + dy / len * w, pts[i][1] - dx / len * w]);
+    }
+    return poly(left.concat(right.reverse()));
+  }
+  var seg = (a, b, n) => {
+    const o = [];
+    for (let i = 0; i <= n; i++) o.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]);
+    return o;
+  };
+  var dramatic = {
+    id: "dramatic",
+    ease: "cubic-bezier(.7,0,.2,1)",
+    // A heavy rule opened from the top centre both ways, a fine inner rule, swashes and a diamond on top, rays under the card.
+    frame(P, C) {
+      const cx = C.x + C.w / 2, x0 = C.x - 18, y0 = C.y - 18, x1 = C.x + C.w + 18, y1 = C.y + C.h + 18;
+      const reach = Math.min(150, C.w / 2 - 10);
+      P.line([[cx, y0], [x1, y0], [x1, y1], [cx, y1]], "s2", 3, 0.1, 1.1);
+      P.line([[cx, y0], [x0, y0], [x0, y1], [cx, y1]], "s2", 3, 0.1, 1.1);
+      P.line([[C.x - 8, C.y - 8], [C.x + C.w + 8, C.y - 8], [C.x + C.w + 8, C.y + C.h + 8], [C.x - 8, C.y + C.h + 8], [C.x - 8, C.y - 8]], "s2", 0.8, 0.9, 1.3);
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q, i) => P.shape(diamond(q[0], q[1], 7), "s1", 1.1 + i * 0.05));
+      for (const sx of [-1, 1]) {
+        P.line(seg([cx + sx * 12, y0 - 6], [cx + sx * reach, y0 - 6], 20), "s2", 0.8, 1.2, 0.5);
+        P.shape(taper(seg([cx + sx * 12, y0 - 6], [cx + sx * reach, y0 - 6], 30), (u) => 6 * (1 - u)), "s2", 1.5, 0.7, "fade");
+      }
+      P.shape(diamond(cx, y0 - 6, 14), "s1", 1, 0.6);
+      for (let i = 0; i < 11; i++) {
+        const a = PI6 * (0.18 + 0.64 * i / 10), r1 = i % 2 ? 16 : 30;
+        P.line([[cx + 6 * Math.cos(a), y1 + 6 * Math.sin(a)], [cx + r1 * Math.cos(a), y1 + r1 * Math.sin(a)]], "s2", 1, 1.4 + Math.abs(i - 5) * 0.05, 0.3);
+      }
+    },
+    // A blade, thickest in the middle, a hairline under it and a diamond at its heart.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2, inset = Math.min(50, (D2.x1 - D2.x0) / 6);
+      P.line(seg([D2.x0, D2.y], [D2.x1, D2.y], 2), "s2", 0.8, 0.3, 0.8);
+      P.shape(taper(seg([D2.x0, D2.y], [D2.x1, D2.y], 60), (u) => 7 * Math.sin(PI6 * u)), "s1", 0.9, 0.8, "fade");
+      P.line(seg([D2.x0 + inset, D2.y + 9], [D2.x1 - inset, D2.y + 9], 2), "s2", 0.8, 1.1, 0.6);
+      P.line([[mid, D2.y - 10], [mid + 7, D2.y], [mid, D2.y + 10], [mid - 7, D2.y], [mid, D2.y - 10]], "s2", 1.5, 1.4, 0.4);
+    },
+    // A dark track in a fine rule, a mark at the value with a diamond, a hairline under the track.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v;
+      P.rect(B.x, B.y, B.w, B.h, "deep");
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s2", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.6] });
+      P.line([[vx, B.y - 12], [vx, B.y + B.h + 12]], "s2", 1.5, 2, 0.25);
+      P.shape(diamond(vx, B.y - 16, 6), "s2", 2.1);
+      P.line(seg([B.x, B.y + B.h + 6], [B.x + B.w, B.y + B.h + 6], 2), "s2", 0.6, 0.6, 1);
+    },
+    // Diamonds inside fine outlines.
+    bullet(P, p, i) {
+      P.line([[p[0], p[1] - 9], [p[0] + 6, p[1]], [p[0], p[1] + 9], [p[0] - 6, p[1]], [p[0], p[1] - 9]], "s2", 1.2, 0.9 + i * 0.15, 0.35);
+      P.shape(diamond(p[0], p[1], 4.5), "s1", 1.15 + i * 0.15);
+    },
+    // Two swords drawn out from a centre diamond.
+    strip(P, S) {
+      const sm = (S.x0 + S.x1) / 2;
+      P.line(seg([sm - 16, S.y], [S.x0, S.y], 2), "s2", 0.8, 0.5, 0.9);
+      P.line(seg([sm + 16, S.y], [S.x1, S.y], 2), "s2", 0.8, 0.5, 0.9);
+      P.shape(taper(seg([sm - 16, S.y], [S.x0 + 20, S.y], 50), (u) => 5 * (1 - u)), "s2", 1.2, 0.7, "fade");
+      P.shape(taper(seg([sm + 16, S.y], [S.x1 - 20, S.y], 50), (u) => 5 * (1 - u)), "s2", 1.2, 0.7, "fade");
+      P.shape(diamond(sm, S.y, 12), "s1", 0.4, 0.6);
+      P.shape(diamond(S.x0, S.y, 5), "s1", 1.4);
+      P.shape(diamond(S.x1, S.y, 5), "s1", 1.4);
+    }
+  };
+  var mirX = (pts, mx) => pts.map((p) => [2 * mx - p[0], p[1]]);
+  var mirY = (pts, my) => pts.map((p) => [p[0], 2 * my - p[1]]);
+  function rosette(P, x, y, r, n, role, dl) {
+    for (let i = 0; i < n; i++) {
+      const a = i * 2 * PI6 / n, c = Math.cos(a), s = Math.sin(a);
+      const lens = bz([0, 0], [r * 0.3, -r * 0.36], [r * 0.75, -r * 0.3], [r, 0], 8).concat(bz([r, 0], [r * 0.75, r * 0.3], [r * 0.3, r * 0.36], [0, 0], 8));
+      P.shape(poly(lens.map((p) => [x + p[0] * c - p[1] * s, y + p[0] * s + p[1] * c])), role, dl, 0.6, "turn");
+    }
+    P.shape(circ(x, y, r * 0.22), "ground", dl + 0.15, 0.4);
+  }
+  var symmetrical = {
+    id: "symmetrical",
+    popEase: "cubic-bezier(.3,1.4,.55,1)",
+    // Both halves drawn from the top centre and meeting at the bottom centre, an inner rule the same way, rosettes on the corners, mirrored scrolls.
+    frame(P, C) {
+      const cx = C.x + C.w / 2, cy = C.y + C.h / 2, x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
+      const half = [[cx, y0], [x1, y0], [x1, y1], [cx, y1]];
+      P.line(half, "s1", 1.5, 0.1, 1.4);
+      P.line(mirX(half, cx), "s1", 1.5, 0.1, 1.4);
+      const inner = [[cx, y0 + 7], [x1 - 7, y0 + 7], [x1 - 7, y1 - 7], [cx, y1 - 7]];
+      P.line(inner, "s2", 0.8, 0.5, 1.4);
+      P.line(mirX(inner, cx), "s2", 0.8, 0.5, 1.4);
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q) => rosette(P, q[0], q[1], 11, 8, "s1", 1.4));
+      const curl = bz([cx, y0], [cx - 14, y0 - 16], [cx - 40, y0 - 14], [cx - 40, y0 - 4], 16).concat(bz([cx - 40, y0 - 4], [cx - 40, y0 + 1], [cx - 32, y0 + 1], [cx - 32, y0 - 5], 8));
+      for (const c of [curl, mirX(curl, cx), mirY(curl, cy), mirX(mirY(curl, cy), cx)]) P.line(c, "s2", 1.4, 1, 0.6);
+      const side = bz([x0, cy], [x0 - 14, cy - 10], [x0 - 14, cy - 30], [x0 - 5, cy - 34], 14);
+      for (const c of [side, mirY(side, cy), mirX(side, cx), mirX(mirY(side, cy), cx)]) P.line(c, "s2", 1.4, 1.1, 0.5);
+      P.shape(circ(cx, y0, 3), "s2", 1.5);
+      P.shape(circ(cx, y1, 3), "s2", 1.5);
+    },
+    // A rosette in the middle, lines growing out to both ends, a scroll at each end.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      rosette(P, mid, D2.y, 10, 8, "s2", 0.2);
+      P.line([[mid + 14, D2.y], [D2.x1 - 20, D2.y]], "s1", 1.4, 0.5, 0.9);
+      P.line([[mid - 14, D2.y], [D2.x0 + 20, D2.y]], "s1", 1.4, 0.5, 0.9);
+      const end = bz([D2.x1 - 20, D2.y], [D2.x1 - 6, D2.y], [D2.x1, D2.y - 12], [D2.x1 - 10, D2.y - 12], 10);
+      P.line(end, "s1", 1.4, 1.35, 0.35);
+      P.line(mirX(end, mid), "s1", 1.4, 1.35, 0.35);
+      [0.33, 0.66].forEach((k) => {
+        P.shape(circ(mid + (D2.x1 - 20 - mid) * k, D2.y, 2.5), "s2", 0.8 + k);
+        P.shape(circ(mid - (mid - D2.x0 - 20) * k, D2.y, 2.5), "s2", 0.8 + k);
+      });
+    },
+    // A rounded track, mirrored end brackets and a mark at the middle.
+    bar(P, B) {
+      const bm = B.x + B.w / 2, by = B.y + B.h / 2;
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true, rx: B.h / 2 });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { rx: (B.h - 2) / 2, wipe: [0.5, 1.4] });
+      const cap = [[B.x + B.w + 6, B.y - 5], [B.x + B.w + 11, by], [B.x + B.w + 6, B.y + B.h + 5]];
+      P.line(cap, "s2", 1.4, 0.4, 0.3);
+      P.line(mirX(cap, bm), "s2", 1.4, 0.4, 0.3);
+      P.line([[bm, B.y - 8], [bm, B.y - 2]], "s2", 1.4, 0.3, 0.2);
+      P.line([[bm, B.y + B.h + 2], [bm, B.y + B.h + 8]], "s2", 1.4, 0.3, 0.2);
+    },
+    // Four-petal rosettes.
+    bullet(P, p, i) {
+      rosette(P, p[0], p[1], 8, 4, i === 0 ? "s1" : "s2", 0.9 + i * 0.15);
+    },
+    // From the middle outward: rosettes at the centre and the quarters, diamonds between, all in pairs.
+    strip(P, S) {
+      const sm = (S.x0 + S.x1) / 2, q = (S.x1 - S.x0) / 4;
+      P.line([[sm + 14, S.y], [S.x1, S.y]], "s1", 1, 0.5, 1.2);
+      P.line([[sm - 14, S.y], [S.x0, S.y]], "s1", 1, 0.5, 1.2);
+      rosette(P, sm, S.y, 12, 8, "s1", 0.3);
+      [1, 2].forEach((k) => {
+        rosette(P, sm + q * k, S.y, k === 1 ? 8 : 6, 6, "s2", 0.6 + k * 0.5);
+        rosette(P, sm - q * k, S.y, k === 1 ? 8 : 6, 6, "s2", 0.6 + k * 0.5);
+      });
+      [0.5, 1.5].forEach((k) => {
+        const dl = 0.6 + k * 0.5;
+        [sm + q * k, sm - q * k].forEach((x) => P.shape(poly([[x, S.y - 5], [x + 4, S.y], [x, S.y + 5], [x - 4, S.y]]), "s1", dl));
+      });
+    }
+  };
+  function loopRound(P, x0, y0, x1, y1, amp, over, mess) {
+    const per = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0], [x0 + over, y0]], o = [];
+    let v = 0;
+    for (let i = 1; i < per.length; i++) {
+      const a = per[i - 1], b = per[i], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+      for (let u = 0; u < len; u += 7) {
+        v = v * 0.8 + (P.rnd() - 0.5) * amp * mess;
+        o.push([a[0] + dx * u / len + nx * v, a[1] + dy * u / len + ny * v]);
+      }
+    }
+    return o;
+  }
+  function knot(P, x, y, r, steps2, mess) {
+    const o = [];
+    let a = P.rnd() * 6;
+    for (let i = 0; i < steps2; i++) {
+      a += 0.6 + P.rnd() * 0.7;
+      const q = r * (0.4 + P.rnd() * 0.6 * mess);
+      o.push([x + q * Math.cos(a), y + q * Math.sin(a)]);
+    }
+    return o;
+  }
+  function walk(P, xa, xb, y, amp, loops, mess) {
+    const o = [];
+    let v = 0, x = xa;
+    while (x < xb) {
+      v = v * 0.85 + (P.rnd() - 0.5) * amp * mess;
+      o.push([x, y + v]);
+      if (loops && P.rnd() < 0.06) {
+        const r = 4 + P.rnd() * 5;
+        for (let k = 1; k <= 10; k++) {
+          const a = PI6 / 2 + k * 2 * PI6 / 10;
+          o.push([x + r * Math.cos(a), y + v - r + r * Math.sin(a)]);
+        }
+      }
+      x += 5 + P.rnd() * 6;
+    }
+    o.push([xb, y]);
+    return o;
+  }
+  var chaotic = {
+    id: "chaotic",
+    seed: 2026,
+    ease: "cubic-bezier(.5,.1,.5,.9)",
+    popEase: "cubic-bezier(.2,2,.5,1)",
+    // Three scribbled loops in three inks, a knot on the top-right corner, a splatter at the lower left.
+    frame(P, C, p) {
+      const x0 = C.x - 10, y0 = C.y - 10, x1 = C.x + C.w + 10, y1 = C.y + C.h + 10, m = p.mess;
+      P.line(loopRound(P, x0, y0, x1, y1, 6, 40, m), "ink", 1.4, 0.1, 1.6);
+      P.line(loopRound(P, x0 - 4, y0 + 3, x1 + 5, y1 - 2, 9, 70, m), "s1", 2.2, 0.5, 1.4);
+      P.line(loopRound(P, x0 + 3, y0 - 5, x1 - 2, y1 + 6, 7, 20, m), "s2", 1.1, 0.9, 1.3);
+      P.line(knot(P, x1 + 2, y0 + 2, 16, 26, m), "ink", 1.3, 1.6, 0.7);
+      for (let i = 0; i < 14; i++) {
+        const a = P.rnd() * PI6 * 2, q = 6 + P.rnd() * 34;
+        P.shape(circ(x0 + 10 + q * Math.cos(a) * 0.9, y1 + 8 + q * Math.sin(a) * 0.5, 0.8 + P.rnd() * 3.2), ["ink", "s1", "s2"][i % 3], 1.5 + P.rnd() * 0.6);
+      }
+    },
+    // A wandering line that ties a few small loops on its way, an echo under it.
+    rule(P, D2, p) {
+      P.line(walk(P, D2.x0, D2.x1, D2.y, 6, true, p.mess), "ink", 1.6, 0.3, 1.5);
+      P.line(walk(P, D2.x0 + 20, D2.x1 - 30, D2.y + 5, 5, false, p.mess), "s2", 1, 0.7, 1.2);
+    },
+    // A scribbled outline and a zigzag hatched over the value.
+    bar(P, B, p) {
+      const vx = B.x + B.w * B.v, hz = [];
+      P.line(loopRound(P, B.x - 2, B.y - 2, B.x + B.w + 2, B.y + B.h + 2, 2.5, 30, p.mess), "ink", 1.2, 0.3, 1.1);
+      for (let x = B.x + 2, k = 0; x < vx; x += 3 + P.rnd() * 3, k++) hz.push([x, k % 2 ? B.y + B.h - P.rnd() * 2 : B.y + P.rnd() * 2]);
+      P.line(hz, "s1", 1.6, 0.8, 1.2);
+    },
+    // Small knots in the three inks.
+    bullet(P, pt, i, p) {
+      P.line(knot(P, pt[0], pt[1], 6, 12, p.mess), ["ink", "s1", "s2"][i % 3], 1.5, 0.9 + i * 0.15, 0.5);
+    },
+    // Three walks that cross one another along the foot.
+    strip(P, S, p) {
+      [["ink", 1.4], ["s1", 2], ["s2", 1.2]].forEach((q, i) => P.line(
+        walk(P, S.x0, S.x1, S.y + (i - 1) * 4, 9, i === 0, p.mess),
+        /** @type {string} */
+        q[0],
+        /** @type {number} */
+        q[1],
+        0.5 + i * 0.2,
+        1.8
+      ));
+    }
+  };
+  var SETS_B = [emotional, dramatic, symmetrical, chaotic];
+
+  // src/static/sdk-libs/atelier/ornament-sets-c.js
+  var PI7 = Math.PI;
+  var DEG = PI7 / 180;
+  var chev = (x, y, h) => [[x, y - h / 2], [x + h * 0.45, y], [x, y + h / 2]];
+  var velocity = {
+    id: "velocity",
+    seed: 99,
+    ease: "cubic-bezier(.7,0,.25,1)",
+    // Speed lines trail off the left edge, the top edge shoots across into a chevron, two lines run under the card, chevrons point on.
+    frame(P, C) {
+      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12;
+      const n = Math.max(4, Math.min(12, Math.round(C.h / 27)));
+      for (let i = 0; i < n; i++) {
+        const y = C.y + 16 + i * (C.h - 32) / Math.max(1, n - 1), len = 12 + P.rnd() * 34;
+        P.line([[x0 - 4 - len, y], [x0 - 4, y]], i % 3 === 1 ? "s2" : "pale", i % 3 === 1 ? 2 : 1.4, 0.05 + i * 0.04, 0.25);
+      }
+      P.line([[x0, y0], [x1 - 6, y0]], "s2", 2.5, 0.2, 0.45);
+      P.line(chev(x1 - 6, y0, 14), "s1", 2.5, 0.62, 0.15);
+      P.line([[x0 + 20, y1], [x1, y1]], "pale", 1.4, 0.35, 0.45);
+      P.line([[x0 + Math.min(120, C.w / 3), y1 + 7], [x1 - 30, y1 + 7]], "s1", 1.6, 0.5, 0.4);
+      ["s1", "s2", "pale"].forEach((role, i) => P.line(chev(x1 + 10 + i * 13, C.y + C.h / 2, 18), role, 2.6, 0.8 + i * 0.08, 0.15));
+    },
+    // A streak that thickens toward its point, with two thinner lines riding beside it.
+    rule(P, D2) {
+      const tail = D2.x0, head = D2.x1 - 14, wmax = 7, top = [], bot = [], span = D2.x1 - D2.x0;
+      for (let x = tail; x <= head; x += 6) {
+        const u = (x - tail) / (head - tail), w = wmax * Math.pow(u, 1.6) / 2;
+        top.push([x, D2.y - w]);
+        bot.push([x, D2.y + w]);
+      }
+      P.shape(poly(top.concat([[D2.x1, D2.y]]).concat(bot.reverse())), "s1", 0.3, 0.55, "shoot");
+      P.line([[D2.x0 + span * 0.34, D2.y - 9], [D2.x1 - span * 0.17, D2.y - 9]], "s2", 1.3, 0.45, 0.35);
+      P.line([[D2.x0 + span * 0.17, D2.y + 9], [D2.x1 - span * 0.34, D2.y + 9]], "pale", 1.3, 0.5, 0.35);
+    },
+    // A pale track, a striped fill, a chevron at the value with speed lines trailing it.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2, fw = B.w * B.v;
+      P.rect(B.x, B.y, B.w, B.h, "pale");
+      P.rect(B.x, B.y, fw, B.h, "s1", { wipe: [0.5, 1] });
+      const slant = B.h * Math.tan(25 * DEG);
+      let d = "";
+      for (let x = B.x + 4; x + slant < B.x + fw - 1; x += 14) d += "M" + P.f(x) + " " + P.f(B.y + B.h) + " L" + P.f(x + slant) + " " + P.f(B.y);
+      if (d) P.stroke(d, "d1", 3, 1.5, 0.35, "fade");
+      P.shape(poly([[vx - 4, B.y - 6], [vx + 8, my], [vx - 4, B.y + B.h + 6], [vx + 1, my]]), "s2", 1.4, 0.3, "shoot");
+      if (vx - 14 > B.x) P.line([[Math.max(B.x, vx - 70), B.y - 7], [vx - 14, B.y - 7]], "s2", 1.4, 1.3, 0.25);
+      if (vx - 30 > B.x) P.line([[Math.max(B.x, vx - 110), B.y + B.h + 7], [vx - 30, B.y + B.h + 7]], "pale", 1.4, 1.35, 0.25);
+    },
+    // Chevrons.
+    bullet(P, p, i) {
+      P.line(chev(p[0] - 3, p[1], 14), i === 0 ? "s1" : "s2", 2.6, 0.9 + i * 0.1, 0.18);
+    },
+    // A burst of speed lines along the foot, quicker at the far end.
+    strip(P, S) {
+      const k = (S.x1 - S.x0) / 832;
+      for (let i = 0; i < 16; i++) {
+        const y = S.y - 14 + P.rnd() * 28, a = S.x0 + P.rnd() * 600 * k, len = (60 + P.rnd() * 200) * k, b = Math.min(S.x1, a + len);
+        P.line([[a, y], [b, y]], i % 5 === 0 ? "s1" : i % 2 ? "s2" : "pale", i % 5 === 0 ? 2.2 : 1.4, 0.5 + i * 0.06, 0.3 - i * 8e-3);
+      }
+    }
+  };
+  function stepped(x0, y0, x1, y1, s) {
+    const cx = (x0 + x1) / 2;
+    return [
+      [cx, y0],
+      [x1 - 2 * s, y0],
+      [x1 - 2 * s, y0 + s],
+      [x1 - s, y0 + s],
+      [x1 - s, y0 + 2 * s],
+      [x1, y0 + 2 * s],
+      [x1, y1 - 2 * s],
+      [x1 - s, y1 - 2 * s],
+      [x1 - s, y1 - s],
+      [x1 - 2 * s, y1 - s],
+      [x1 - 2 * s, y1],
+      [x0 + 2 * s, y1],
+      [x0 + 2 * s, y1 - s],
+      [x0 + s, y1 - s],
+      [x0 + s, y1 - 2 * s],
+      [x0, y1 - 2 * s],
+      [x0, y0 + 2 * s],
+      [x0 + s, y0 + 2 * s],
+      [x0 + s, y0 + s],
+      [x0 + 2 * s, y0 + s],
+      [x0 + 2 * s, y0],
+      [cx, y0]
+    ];
+  }
+  function fan(P, x, y, r, n, dir, role, dl) {
+    P.line(arc2(x, y, r, 0, dir * PI7, 24), role, 1.2, dl, 0.5);
+    P.line(arc2(x, y, r * 0.55, 0, dir * PI7, 16), role, 1, dl + 0.1, 0.4);
+    for (let i = 1; i < n; i++) {
+      const a = dir * PI7 * i / n;
+      P.line([[x + r * 0.2 * Math.cos(a), y + r * 0.2 * Math.sin(a)], [x + r * Math.cos(a), y + r * Math.sin(a)]], role, 1, dl + 0.2 + Math.abs(i - n / 2) * 0.04, 0.3);
+    }
+  }
+  var artDeco = {
+    id: "art-deco",
+    barH: 16,
+    popEase: "cubic-bezier(.3,1.4,.55,1)",
+    // Three stepped rules, the outer one heaviest, a rising sun on top and a setting one below.
+    frame(P, C) {
+      const cx = C.x + C.w / 2;
+      P.line(stepped(C.x - 20, C.y - 20, C.x + C.w + 20, C.y + C.h + 20, 7), "s1", 1.6, 0.1, 1.8);
+      P.line(stepped(C.x - 14, C.y - 14, C.x + C.w + 14, C.y + C.h + 14, 6), "s1", 0.8, 0.3, 1.8);
+      P.line(stepped(C.x - 8, C.y - 8, C.x + C.w + 8, C.y + C.h + 8, 5), "h1", 0.6, 0.5, 1.8);
+      fan(P, cx, C.y - 20, 28, 9, -1, "s1", 1.4);
+      fan(P, cx, C.y + C.h + 20, 18, 7, 1, "s1", 1.6);
+    },
+    // Three lines from each end close in on a small sun and a diamond.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2, inset = Math.min(36, (D2.x1 - D2.x0) / 10);
+      [-5, 0, 5].forEach((o, j) => {
+        const ins = j === 1 ? 0 : inset;
+        P.line([[D2.x0 + ins, D2.y + o], [mid - 26, D2.y + o]], "s1", j === 1 ? 1.2 : 0.7, 0.3 + j * 0.06, 0.8);
+        P.line([[D2.x1 - ins, D2.y + o], [mid + 26, D2.y + o]], "s1", j === 1 ? 1.2 : 0.7, 0.3 + j * 0.06, 0.8);
+      });
+      fan(P, mid, D2.y - 2, 16, 7, -1, "s1", 1);
+      P.shape(poly([[mid, D2.y + 2], [mid + 6, D2.y + 9], [mid, D2.y + 16], [mid - 6, D2.y + 9]]), "s1", 1.4);
+    },
+    // A double rule round the track, the fill inside it, stepped marks under the quarters.
+    bar(P, B) {
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true });
+      P.rect(B.x + 2.5, B.y + 2.5, B.w - 5, B.h - 5, "s1", { stroke: true });
+      P.rect(B.x + 5, B.y + 5, (B.w - 10) * B.v, B.h - 10, "s1", { wipe: [0.5, 1.4] });
+      for (let i = 0; i <= 4; i++) {
+        const x = B.x + B.w * i / 4, y = B.y + B.h + 6;
+        P.line([[x - 6, y + 8], [x - 6, y + 4], [x - 3, y + 4], [x - 3, y], [x + 3, y], [x + 3, y + 4], [x + 6, y + 4], [x + 6, y + 8]], "s1", 1, 0.6 + i * 0.12, 0.3);
+      }
+    },
+    // Quarter suns.
+    bullet(P, p, i) {
+      const x = p[0] - 6, y = p[1] + 6;
+      P.line(arc2(x, y, 12, -PI7 / 2, 0, 10), "s1", 1.2, 0.9 + i * 0.15, 0.3);
+      for (let k = 1; k < 4; k++) {
+        const a = -PI7 / 2 * k / 4;
+        P.line([[x + 3 * Math.cos(a), y + 3 * Math.sin(a)], [x + 12 * Math.cos(a), y + 12 * Math.sin(a)]], "s1", 1, 1.05 + i * 0.15 + k * 0.03, 0.2);
+      }
+    },
+    // A row of scallops over a straight rule, every other one holding a sun.
+    strip(P, S) {
+      const y = S.y + 10, n = Math.max(6, Math.round(16 * (S.x1 - S.x0) / 832)), w = (S.x1 - S.x0) / n;
+      P.line([[S.x0, y], [S.x1, y]], "s1", 1, 0.4, 1.4);
+      for (let i = 0; i < n; i++) {
+        const x = S.x0 + w * (i + 0.5), dl = 0.6 + i * 0.06 * 16 / n;
+        P.line(arc2(x, y, w / 2, PI7, 2 * PI7, 14), i % 2 ? "h1" : "s1", 1, dl, 0.3);
+        if (i % 2 === 0) for (let k = 1; k < 5; k++) {
+          const a = PI7 + PI7 * k / 5;
+          P.line([[x + 4 * Math.cos(a), y + 4 * Math.sin(a)], [x + (w / 2 - 4) * Math.cos(a), y + (w / 2 - 4) * Math.sin(a)]], "s1", 0.8, dl + 0.2, 0.2);
+        }
+      }
+    }
+  };
+  var ARM_SPEED = 260;
+  function arm(P, x, y, dir, len, s, br, role, dl) {
+    const c = Math.cos(dir * DEG), sn = Math.sin(dir * DEG);
+    P.line([[x, y], [x + c * len, y + sn * len]], role, 1.4, dl, len / ARM_SPEED);
+    for (let d = 12; d < len - 4; d += 13) {
+      const bl = br * Math.pow(1 - d / len, 0.8) + 3, px = x + c * d, py = y + sn * d, when2 = dl + d / ARM_SPEED;
+      (s === 0 ? [1, -1] : [s]).forEach((side) => {
+        const a = (dir + side * 60) * DEG;
+        P.line([[px, py], [px + Math.cos(a) * bl, py + Math.sin(a) * bl]], role, 1, when2, 0.2);
+        if (bl > 10) {
+          const tx = px + Math.cos(a) * bl * 0.55, ty = py + Math.sin(a) * bl * 0.55, a2 = dir * DEG;
+          P.line([[tx, ty], [tx + Math.cos(a2) * bl * 0.35, ty + Math.sin(a2) * bl * 0.35]], role, 0.8, when2 + 0.15, 0.15);
+        }
+      });
+    }
+  }
+  function flake(P, x, y, r, role, dl) {
+    for (let i = 0; i < 6; i++) {
+      const a = (i * 60 + 30) * DEG;
+      P.line([[x, y], [x + r * Math.cos(a), y + r * Math.sin(a)]], role, 1.1, dl, 0.25);
+      const mx = x + r * 0.6 * Math.cos(a), my = y + r * 0.6 * Math.sin(a);
+      [-1, 1].forEach((sd) => {
+        const b = a + sd * 60 * DEG;
+        P.line([[mx, my], [mx + r * 0.3 * Math.cos(b), my + r * 0.3 * Math.sin(b)]], role, 0.9, dl + 0.2, 0.15);
+      });
+    }
+    P.line(hex(x, y, r * 0.3), role, 1, dl + 0.1, 0.25);
+  }
+  var crystal = {
+    id: "crystal",
+    popEase: "cubic-bezier(.3,1.3,.55,1)",
+    // From every corner an arm grows along each edge, branching outward; a crystal sits in each corner.
+    frame(P, C) {
+      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12;
+      const lx = Math.min(150, (x1 - x0) * 0.36), ly = Math.min(110, (y1 - y0) * 0.41);
+      arm(P, x0, y0, 0, lx, -1, 16, "s1", 0.2);
+      arm(P, x0, y0, 90, ly, 1, 14, "s2", 0.2);
+      arm(P, x1, y0, 180, lx, 1, 16, "s1", 0.35);
+      arm(P, x1, y0, 90, ly, -1, 14, "s2", 0.35);
+      arm(P, x1, y1, 180, lx, -1, 16, "s1", 0.5);
+      arm(P, x1, y1, 270, ly, 1, 14, "s2", 0.5);
+      arm(P, x0, y1, 0, lx, 1, 16, "s1", 0.65);
+      arm(P, x0, y1, 270, ly, -1, 14, "s2", 0.65);
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q, i) => {
+        P.shape(poly(hex(q[0], q[1], 7).slice(0, 6)), "s3", 0.1 + i * 0.15, 0.6, "spin");
+        P.line(hex(q[0], q[1], 11), "s1", 1, 0.3 + i * 0.15, 0.4);
+      });
+    },
+    // A flake in the middle with branching arms growing out both ways.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      flake(P, mid, D2.y, 13, "s3", 0.2);
+      arm(P, mid + 16, D2.y, 0, D2.x1 - mid - 16, 0, 11, "s1", 0.5);
+      arm(P, mid - 16, D2.y, 180, mid - 16 - D2.x0, 0, 11, "s1", 0.5);
+    },
+    // A light track, twigs frosting the filled run, a faceted point at the value.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2, a = -60 * DEG;
+      P.rect(B.x, B.y, B.w, B.h, "paper");
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "t1", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4] });
+      for (let x = B.x + 14; x < vx - 10; x += 18) {
+        P.line([[x, B.y - 1], [x + Math.cos(a) * 9, B.y - 1 + Math.sin(a) * 9]], "s2", 1, 1 + (x - B.x) / 400, 0.15);
+        P.line([[x + 9, B.y + B.h + 1], [x + 9 + Math.cos(-a) * 7, B.y + B.h + 1 + Math.sin(-a) * 7]], "s2", 1, 1.05 + (x - B.x) / 400, 0.15);
+      }
+      P.shape(poly([[vx - 4, B.y - 7], [vx + 8, B.y - 2], [vx + 14, my], [vx + 8, B.y + B.h + 2], [vx - 4, B.y + B.h + 7]]), "s3", 1.9, 0.5, "spin");
+      P.line([[vx - 4, B.y - 7], [vx + 4, my], [vx - 4, B.y + B.h + 7]], "paper", 1, 2.2, 0.2);
+    },
+    // Small flakes.
+    bullet(P, p, i) {
+      flake(P, p[0], p[1], 8, i === 0 ? "s3" : "s1", 0.9 + i * 0.15);
+    },
+    // A band of facets between two rules, every third one filled.
+    strip(P, S) {
+      const step = 16, top = S.y - 8, bot = S.y + 8, zz = [];
+      P.line([[S.x0, top], [S.x1, top]], "s1", 0.8, 0.5, 1.2);
+      P.line([[S.x0, bot], [S.x1, bot]], "s1", 0.8, 0.5, 1.2);
+      for (let x = S.x0, k = 0; x <= S.x1 + 0.1; x += step, k++) zz.push([x, k % 2 ? top : bot]);
+      P.line(zz, "s2", 1, 0.7, 1.6);
+      for (let k = 0; k + 2 < zz.length; k += 3) P.shape(poly([zz[k], zz[k + 1], zz[k + 2]]), k % 2 ? "t3" : "t2", 0.8 + k * 0.03, 0.4, "spin");
+    }
+  };
+  var SETS_C = [velocity, artDeco, crystal];
+
+  // src/static/sdk-libs/atelier/ornament-sets.js
+  var SETS = [...SETS_A, ...SETS_B, ...SETS_C];
+  var SET_IDS = SETS.map((s) => s.id);
+  var SET_ROLES_LIST = ["frame", "rule", "bar", "bullets", "strip"];
+  var knobs = (style, role) => {
+    const out = role === "bar" ? ["value"] : [];
+    if (style.id === "chaotic") out.push("mess");
+    return out;
+  };
+  var penFor = (svg6, style, animate, p, shift) => {
+    svg6.classList.add("ak-orn-pal-" + style.id);
+    return pen(svg6, {
+      animate,
+      speed: p.speed,
+      delay: p.delay,
+      shift: shift || 0,
+      ease: style.ease || null,
+      popEase: style.popEase || null,
+      seed: style.seed || 1
+    });
+  };
+  function figuresOf(style) {
+    const out = {};
+    out[style.id + "-frame"] = {
+      params: knobs(style, "frame"),
+      overlay: {
+        pad: () => ({ x: 64, y: 64 }),
+        draw: (layers, w, h, pad, p) => {
+          const d = layers.under;
+          if (d) style.frame(penFor(d.svg, style, d.animate, p, 0), { x: pad.x, y: pad.y, w, h }, p);
+        }
+      }
+    };
+    const run = (role, height, y, shift) => ({
+      params: knobs(style, role),
+      mount: (host, p, opts) => fillMount(host, height, "ak-orn-strip--set", opts, (d, W7) => {
+        style[role](penFor(d.svg, style, d.animate, p, shift), { x0: 12, x1: W7 - 12, y }, p);
+      })
+    });
+    out[style.id + "-rule"] = run("rule", 44, 24, 0.2);
+    out[style.id + "-bar"] = {
+      params: knobs(style, "bar"),
+      mount: (host, p, opts) => {
+        let value = p.value;
+        const bh = style.barH || 12;
+        const strip = fillMount(host, 56, "ak-orn-strip--set ak-orn-strip--setbar", opts, (d, W7) => {
+          style.bar(penFor(d.svg, style, d.animate, p, 0.3), { x: 18, y: (56 - bh) / 2, w: W7 - 36, h: bh, v: value }, p);
+        });
+        return {
+          render: strip.render,
+          set: (v) => {
+            value = Math.max(0, Math.min(1, Number(v) || 0));
+            strip.render(false);
+          },
+          teardown: strip.teardown
+        };
+      }
+    };
+    out[style.id + "-bullets"] = {
+      params: knobs(style, "bullets"),
+      mount: (host, p, opts) => {
+        host.classList.add("ak-orn-bullets");
+        const marks = [];
+        const clear2 = () => {
+          for (const m of marks) m.remove();
+          marks.length = 0;
+        };
+        return {
+          render: (animate) => {
+            clear2();
+            let i = 0;
+            for (const li of Array.from(host.children)) {
+              if (li.tagName !== "LI") continue;
+              const m = document.createElement("span");
+              m.className = "ak-orn-sbullet";
+              m.setAttribute("aria-hidden", "true");
+              li.insertBefore(m, li.firstChild);
+              marks.push(m);
+              const d = drawing(m, 30, 24, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+              style.bullet(penFor(d.svg, style, animate, p, 0.85), [11, 12], i, p);
+              i++;
+            }
+          },
+          teardown: () => {
+            clear2();
+            host.classList.remove("ak-orn-bullets");
+          }
+        };
+      }
+    };
+    out[style.id + "-strip"] = run("strip", 64, 32, 0.4);
+    return out;
+  }
+  var SET_FIGURES = Object.assign({}, ...SETS.map(figuresOf));
+
+  // src/static/sdk-libs/atelier/ornament.js
+  var ORN_PARAMS = {
+    speed: { min: 0.25, max: 3, default: 1 },
+    delay: { min: 0, max: 5, default: 0 },
+    leaves: { min: 0, max: 2, default: 1 },
+    value: { min: 0, max: 1, default: 0.64 },
+    strands: { min: 2, max: 4, default: 3 },
+    mess: { min: 0.5, max: 2, default: 1 }
+  };
+  var ORNAMENT_SET_IDS = SET_IDS;
+  var FIGURES = { ...FRAME_FIGURES, ...ROUND_FIGURES, ...LINE_FIGURES, ...TEXT_FIGURES, ...SET_FIGURES };
+  var ORNAMENT_IDS = Object.keys(FIGURES);
+  function ornamentParams(id, given) {
+    const fig = FIGURES[id];
+    const g = given || {};
+    const out = {};
+    for (const name of Object.keys(ORN_PARAMS)) {
+      const b = ORN_PARAMS[
+        /** @type {keyof typeof ORN_PARAMS} */
+        name
+      ];
+      const takes = name === "speed" || name === "delay" || fig && fig.params.indexOf(name) >= 0;
+      const n = Number(g[name]);
+      out[name] = takes && Number.isFinite(n) ? Math.max(b.min, Math.min(b.max, n)) : b.default;
+    }
+    return (
+      /** @type {OrnParams} */
+      /** @type {unknown} */
+      out
+    );
+  }
+  function hostFor(el2) {
+    if (getComputedStyle(el2).position === "static") el2.classList.add("ak-orn-host");
+    else el2.classList.add("ak-orn-host--placed");
+  }
+  function mountOverlay(host, fig, p, animate) {
+    hostFor(host);
+    const spec = fig.overlay;
+    const make = (cls) => {
+      const box = document.createElement("span");
+      box.className = "ak-orn-layer " + cls;
+      box.setAttribute("aria-hidden", "true");
+      host.appendChild(box);
+      return box;
+    };
+    const under = spec.under !== false ? make("ak-orn-layer--under") : null;
+    const over = spec.over ? make("ak-orn-layer--over") : null;
+    let lastW = -1;
+    let lastH = -1;
+    const render = (grow) => {
+      const w = host.offsetWidth;
+      const h = host.offsetHeight;
+      lastW = w;
+      lastH = h;
+      if (w < 8 || h < 8) return;
+      const pad = spec.pad(w, h);
+      const W7 = w + 2 * pad.x;
+      const H4 = h + 2 * pad.y;
+      const opts = { animate: grow, speed: p.speed, delay: p.delay, view: { x: pad.x, y: pad.y, w, h } };
+      const layers = { under: null, over: null };
+      for (
+        const [key, box] of
+        /** @type {Array<['under' | 'over', HTMLElement | null]>} */
+        [["under", under], ["over", over]]
+      ) {
+        if (!box) continue;
+        box.textContent = "";
+        box.style.left = "0px";
+        box.style.top = "0px";
+        box.style.width = w + "px";
+        box.style.height = h + "px";
+        layers[key] = drawing(box, W7, H4, opts);
+      }
+      spec.draw(layers, w, h, pad, p, host);
+    };
+    render(animate);
+    let frame2 = 0;
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+      if (Math.abs(host.offsetWidth - lastW) < 2 && Math.abs(host.offsetHeight - lastH) < 2) return;
+      cancelAnimationFrame(frame2);
+      frame2 = requestAnimationFrame(() => render(false));
+    }) : null;
+    if (ro) ro.observe(host);
+    return {
+      render,
+      teardown: () => {
+        if (ro) ro.disconnect();
+        cancelAnimationFrame(frame2);
+        if (under) under.remove();
+        if (over) over.remove();
+        host.classList.remove("ak-orn-host", "ak-orn-host--placed");
+      }
+    };
+  }
+  function ornament(target, id, opts) {
+    const host = (
+      /** @type {HTMLElement | null} */
+      typeof target === "string" ? document.querySelector(target) : target
+    );
+    const fig = FIGURES[id];
+    if (!host || !fig) return null;
+    const prev = (
+      /** @type {any} */
+      host.__akOrnament
+    );
+    if (prev && typeof prev.destroy === "function") prev.destroy();
+    const p = ornamentParams(id, opts);
+    const animate = !(opts && opts.animate === false) && !reducedMotion();
+    const mounted = "overlay" in fig ? mountOverlay(host, fig, p, animate) : (
+      /** @type {InlineFigure} */
+      fig.mount(host, p, { speed: p.speed, delay: p.delay })
+    );
+    if (!("overlay" in fig)) mounted.render(animate);
+    host.setAttribute("data-ak-ornament", id);
+    if (opts && opts.palette === "look") host.classList.add("ak-orn-lookpal");
+    const handle2 = {
+      id,
+      el: host,
+      replay: () => mounted.render(!reducedMotion()),
+      set: (v) => {
+        if (typeof /** @type {any} */
+        mounted.set === "function") mounted.set(v);
+      },
+      destroy: () => {
+        mounted.teardown();
+        host.removeAttribute("data-ak-ornament");
+        host.classList.remove("ak-orn-lookpal");
+        if (
+          /** @type {any} */
+          host.__akOrnament === handle2
+        ) delete /** @type {any} */
+        host.__akOrnament;
+      }
+    };
+    host.__akOrnament = handle2;
+    return handle2;
+  }
+  function ornamentSet(set, targets, opts) {
+    if (SET_IDS.indexOf(set) < 0) return null;
+    const handles = {};
+    for (const role of SET_ROLES_LIST) {
+      const el2 = targets && /** @type {any} */
+      targets[role];
+      if (!el2) continue;
+      const h = ornament(el2, set + "-" + role, opts);
+      if (h) handles[role] = h;
+    }
+    const all = () => Object.values(handles).filter(Boolean);
+    return {
+      set,
+      handles,
+      replay: () => {
+        for (const h of all()) h.replay();
+      },
+      update: (v) => {
+        if (handles.bar) handles.bar.set(v);
+      },
+      destroy: () => {
+        for (const h of all()) h.destroy();
+      }
+    };
+  }
+
+  // src/static/sdk-libs/atelier/agentic.js
+  function agentsNs() {
+    const ns = (
+      /** @type {any} */
+      window.AIMEAT
+    );
+    return ns && ns.agents && typeof ns.agents.createTask === "function" ? ns.agents : null;
+  }
+  function delegate(spec) {
+    const status = el("span", { class: "ak-delegate__status", "aria-live": "polite" });
+    const btn = (
+      /** @type {HTMLButtonElement} */
+      el("button", {
+        type: "button",
+        class: "ak-btn ak-btn--ghost",
+        on: { click: run }
+      }, "✦ " + (spec.label || t("delegateGo")))
+    );
+    const root = el("div", { class: "ak-root ak-delegate" }, [btn, status]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    enter(root);
+    let stopWatch = null;
+    async function run() {
+      const agents = agentsNs();
+      if (!agents) {
+        status.textContent = t("delegateNoAgents");
+        return;
+      }
+      btn.disabled = true;
+      status.textContent = "…";
+      try {
+        const created = await agents.createTask(spec.agent, {
+          title: spec.task.title,
+          description: spec.task.description
+        }, { confirm: true });
+        const id = created && (created.id || created.task_id);
+        status.textContent = t("delegateHanded") + " (" + spec.agent + ")";
+        if (id && typeof agents.watch === "function") {
+          stopWatch = agents.watch(spec.agent, id, function(task) {
+            if (task.status === "done") {
+              status.textContent = t("ready");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+              if (spec.onDone) spec.onDone({ task, deliverable: null });
+            } else if (task.status === "failed" || task.status === "stalled") {
+              status.textContent = t("delegateFailed");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+            } else if (task.status === "declined") {
+              status.textContent = t("delegateDeclined");
+              btn.disabled = false;
+              if (stopWatch) {
+                stopWatch();
+                stopWatch = null;
+              }
+            }
+          });
+        } else {
+          btn.disabled = false;
+        }
+      } catch (err) {
+        const code = err && /** @type {any} */
+        err.code;
+        status.textContent = code === "SPEND_CANCELLED" ? t("cancel") + "." : t("delegateFailed");
+        btn.disabled = false;
+      }
+    }
+    return {
+      el: root,
+      destroy() {
+        if (stopWatch) stopWatch();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
+  function agentActivity(spec) {
+    const root = el("div", { class: "ak-root ak-agentactivity" });
+    if (spec.target) resolve(spec.target).appendChild(root);
+    let inner = null;
+    async function refresh() {
+      const agents = agentsNs();
+      if (inner && inner.destroy) inner.destroy();
+      clear(root);
+      if (!agents) {
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone"), hint: t("delegateNoAgents") });
+        return;
+      }
+      let tasks;
+      try {
+        tasks = await agents.tasks(spec.agent, {});
+      } catch (err) {
+        console.warn("aimeat-atelier: agent activity could not be read", err);
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
+        return;
+      }
+      const rows = (tasks || []).slice(0, spec.limit || 8).map(function(task) {
+        return {
+          id: String(task.id || task.title),
+          ts: task.updated_at || task.created_at || (/* @__PURE__ */ new Date()).toISOString(),
+          title: task.title || task.description || "",
+          sub: task.status,
+          tone: task.status === "failed" ? "err" : task.status === "done" ? "ok" : "warn"
+        };
+      });
+      if (!rows.length) {
+        inner = emptyState({ target: root, tone: "quiet", title: t("agentActivityNone") });
+        return;
+      }
+      inner = timeline({ target: root, items: rows });
+    }
+    refresh();
+    return {
+      el: root,
+      refresh,
+      destroy() {
+        if (inner && inner.destroy) inner.destroy();
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
   }
 
   // src/static/sdk-libs/atelier/board-i18n.js
@@ -33305,7 +33360,7 @@ Known schemas:
       variants: ["dense"],
       tokens: ["--ak-chrome-bottom"],
       fork: "Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.",
-      file: "shell.js"
+      file: "shell-parts.js"
     },
     "callout": {
       parts: ["root", "icon", "words", "title", "text", "after"],
@@ -33569,7 +33624,7 @@ Known schemas:
       variants: ["dense", "plain", "quiet"],
       tokens: ["--ak-section-pad", "--ak-section-gap"],
       fork: "It IS the escape hatch: put your own markup in its body and keep the frame.",
-      file: "shell.js"
+      file: "shell-parts.js"
     },
     "segmented": {
       parts: ["root", "option", "ink"],
@@ -33649,7 +33704,7 @@ Known schemas:
       variants: ["dense", "pill"],
       tokens: ["--ak-tabs-gap"],
       fork: "A row of buttons; copy .ak-tabs* out of shell.css and you give up the view transition.",
-      file: "shell.js"
+      file: "shell-parts.js"
     },
     "timeline": {
       parts: ["root", "item", "dot", "body", "when", "title", "sub", "extra", "aside"],
@@ -33716,7 +33771,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.68.0",
+    version: "0.68.1",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots

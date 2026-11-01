@@ -18,7 +18,7 @@
  */
 import { el, enter, reducedMotion } from './dom.js';
 import { t } from './i18n.js';
-import { tabs, bottomNav } from './shell.js';
+import { tabs, bottomNav } from './shell-parts.js';
 import { transition } from './mosaic-motion.js';
 import { panelTransition } from './transitions.js';
 
