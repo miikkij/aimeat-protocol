@@ -9,6 +9,7 @@
  * @version-history
  *   v1.55.0 -- 2026-11-01 -- Discover names aimeat_party "share": a package shared by name with an outside party (plan doc-mvwxcas3dom3, D3.4).
  *   v1.54.0 -- 2026-11-01 -- Discover names aimeat_dataproduct: a table built from material, previewed, then run (plan doc-mvwxcas3dom3, D9).
+ *   v1.54.0 -- 2026-11-01 -- Build it with you: aimeat_build_request_status, _submit, and aimeat_trail_list.
  *   v1.53.0 -- 2026-11-01 -- Discover lists datasets: a data package with its rows, freshness and read addresses (plan doc-mvwxcas3dom3, D1.1).
  *   v1.52.0 -- 2026-10-31 -- Rules for pictures and videos: aimeat_ai_gen_rules, the directive for a model elsewhere, rules_followed.
  *   v1.51.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
@@ -241,6 +242,14 @@ As an agent: \`aimeat_goal_work\` action \`available\` lists open work your tags
 takes one and gives you a task (complete it as usual), \`leave\` hands the next work to another agent
 (never to yourself). A goal's coordinator is woken by a task when something happens; read the goal,
 decide, and say why in \`reason\`. Ask before a change that \`preview\` says ends running work.
+
+**Build it with you, and what was done.** \`aimeat_build_request_status\` · \`aimeat_build_request_submit\`
+· \`aimeat_trail_list\`. A place may send ONE build request to the operator's builders: the first agent or
+small app the person wants built with them. Read the status first; when the offer is open, fill the four
+fields in with the person in their words (what, for whom, what for, when it is ready) and send it. Its
+status then says the queue's state and place in line; there is no time estimate, so give none.
+\`aimeat_trail_list\` answers "what did you do" and "who changed this": every action on the account, newest
+first, with who did it (the person, their AI, an agent, an app, the operator).
 
 **Messages — the owner conversation.** \`aimeat_message_inbox\` (pending inbound) ·
 \`aimeat_message_send\` (markdown; can carry a proposed_task or a single-select prompt for the owner)

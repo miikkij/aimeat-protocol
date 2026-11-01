@@ -8,6 +8,7 @@
  * @structure parseSiteContacts() · siteLinksFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.9.0 — 2026-11-01 — AIMEAT_SITE_BUILD_QUEUE_URL: the operator's build queue for "build it with you".
  *   v1.8.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE removed the same night: no message counts
  *     are shown to a customer (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
  *   v1.7.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE, kept only when it is a positive decimal up to 1.
@@ -98,6 +99,7 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     storeNoteEs: (process.env.AIMEAT_SITE_STORE_NOTE_ES ?? '').trim(),
     storeSoonCode: (process.env.AIMEAT_SITE_STORE_SOON_CODE ?? '').trim(),
     storeTopup: (process.env.AIMEAT_SITE_STORE_TOPUP_URL ?? '').trim(),
+    buildQueue: (process.env.AIMEAT_SITE_BUILD_QUEUE_URL ?? '').trim(),
     // A rate that does not read as a positive decimal is no rate: the pages count a dollar as a euro.
     aiCreditEurPerUsd: isEurPerUsd((process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim())
         ? (process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim() : '',

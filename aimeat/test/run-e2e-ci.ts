@@ -1116,6 +1116,9 @@ const ALL_SUITES = [
     // Agent goals: open work two agents race for, the chain and its limit, a reaction, a person's step,
     // asking a result again, pause, and the refusals (session cc-jouni-goals).
     'test/e2e-goals.ts',
+    // "Build it with you": the place's one build request, the operator's relay with the admin password,
+    // the queue's public status, the place's trail, and the once-per-code notice (Jouni, 1.11 16.22).
+    'test/e2e-build-with-you.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',

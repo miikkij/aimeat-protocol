@@ -15,6 +15,10 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.12.0 — 2026-11-01 — On a place bought from the store that runs on the store's AI key, a turn opens
+ *     the place's one "build it with you" offer (services/build-with-you.ts). GET /v1/chat/threads/:id
+ *     answers `running` while a turn of it is answered, and a turn's end sends the `chat` live domain,
+ *     so a page opened mid-turn shows the answer when it lands (commercial's crew51 walk, 2026-11-01).
  *   v1.11.1 -- 2026-10-29 -- DELETE /v1/chat/threads/:id answers chat_tool_copy (kept or none) and, when
  *     kept, a note that the chat tool's own store keeps the conversation text (secaudit2026oct26 round 8c).
  *   v1.11.0 — 2026-10-29 — GET /v1/chat/status: allowance_remaining_usd is the node's key's own limit
@@ -64,7 +68,13 @@ import { readAllowance, remainingOf } from '../services/ai-allowance.js';
 import { allowanceShown } from '../services/ai/node-key-balance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
 import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
+import { openBuildOffer } from '../services/build-with-you.js';
+import { nodeOpenRouterKey } from '../services/ai/node-openrouter-key.js';
+import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
+
+/** The conversations with a turn being answered now, as `<owner identity>:<thread id>`. One process holds a turn. */
+const running = new Set<string>();
 import { LOCALES, detectLocale, toLocale, type Locale } from '../i18n.js';
 
 export function chatRouter(config: AimeatConfig, storage: Storage): Router {
@@ -159,7 +169,9 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such conversation.'));
             return;
         }
-        res.json(success(config.nodeId, { thread }));
+        // `running`: a turn of this conversation is still being answered, so a page opened while it
+        // runs shows the work going on and reads the conversation again when the turn ends.
+        res.json(success(config.nodeId, { thread: { ...thread, running: running.has(`${identity(req)}:${thread.id}`) } }));
     });
 
     // DELETE /v1/chat/threads/:id
@@ -233,6 +245,11 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         // did). Fire-and-forget and write-once — the marker can never delay or fail a turn.
         const starterId = typeof starter === 'string' && /^[a-z-]{1,32}$/.test(starter) ? starter : undefined;
         void recordFirstChatTurn(storage, config, owner(req), starterId);
+        // On a place bought from the store that runs on the store's AI key, the first chat turn opens
+        // the place's one "build it with you" offer (services/build-with-you.ts).
+        if ((config.siteLinks?.purchasePlan ?? '').trim() && nodeOpenRouterKey(config)) {
+            void openBuildOffer({ storage, config }, 'chat', identity(req)).catch((e: Error) => logger.warn(`[chat] the build offer was not opened: ${e.message}`));
+        }
 
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',
@@ -273,6 +290,8 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             abort.abort();
         });
 
+        const turnKey = `${identity(req)}:${threadId}`;
+        running.add(turnKey);
         try {
             for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, attachmentKeys, { locale })) {
                 if (finished) break;
@@ -284,6 +303,10 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         } finally {
             clearInterval(keepalive);
             if (!finished) res.end();
+            running.delete(turnKey);
+            // The turn is over and saved: a chat page opened while it ran, in another tab or after
+            // the person went to another page and came back, reads the conversation again.
+            emitChange('chat', identity(req));
         }
     });
 

@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-01 — trailRecorder() after optionalAuth: every authenticated REST change is a line in the
+ *     place's trail ("Rakennamme kanssasi", part C).
  *   2026-10-27 — inputJunkGuard() before idempotency(): a NUL or a lone surrogate in the body, the query
  *     or the path is refused with a 400 that names the field (middleware/input-junk.ts).
  *   2026-10-25 — secaudit2026oct22: POST /v1/mcp/register is parsed at 64 kB, not at the large /v1/mcp limit.
@@ -68,6 +70,7 @@ import { idempotency } from './middleware/idempotency.js';
 import { inputJunkGuard } from './middleware/input-junk.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
+import { trailRecorder } from './middleware/trail-recorder.js';
 import { refusalRecorder } from './middleware/refusal-recorder.js';
 import { subdomainMiddleware } from './middleware/subdomain.js';
 import { pageHostOnly } from './middleware/page-host-only.js';
@@ -282,6 +285,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   app.use(optionalAuth({
     refusedLimiter: rateLimit(() => ({ ...config.rateLimits.global, keyBy: 'ip' }), config.rateLimits.roleMultipliers),
   }));
+
+  // Every authenticated REST change is a line in the place's trail (middleware/trail-recorder.ts).
+  // After optionalAuth, so the line names the caller; it is written when the response finishes.
+  app.use(trailRecorder(config, () => storageForCors));
 
   // Rewrite /v1/agents/me/... to /v1/agents/{agentName}/... when the caller is an
   // agent. The handbook tells agents to use "/me/" everywhere; this middleware
