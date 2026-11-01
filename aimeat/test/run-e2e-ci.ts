@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-dataproduct-canvas.ts and e2e-data-share-visitor.ts join the list (not the guard tier): the canvas capabilities WP9c built (plan doc-mvwxcas3dom3, D9, D3).
  *   2026-11-01 -- e2e-company-page-key.ts joins the list (not the guard tier): the bytes a company's address serves change only for a caller that may change the company page, on every upload route (secaudit2026oct31w2 round 11).
  *   2026-11-01 -- e2e-package-compose-holder.ts joins the list (not the guard tier): compose packages only a cortex the composer holds (secaudit2026oct31w2 round 11).
  *   2026-11-01 -- e2e-dsp.ts joins the list (not the guard tier): the Dataspace Protocol provider (plan doc-mvwxcas3dom3, D8).
@@ -1265,10 +1266,14 @@ const ALL_SUITES = [
     'test/e2e-datapackage-discovery.ts',
     // Data products: a definition builds a package version from six kinds of material (plan doc-mvwxcas3dom3, D9).
     'test/e2e-dataproduct.ts',
+    // The canvas capabilities WP9a lacked: a run when a source changes, the AI description draft, the column descriptions from the source (WP9c).
+    'test/e2e-dataproduct-canvas.ts',
     // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
     'test/e2e-party.ts',
     // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
     'test/e2e-data-share.ts',
+    // A named share to a person on another AIMEAT node: exactly that visitor reads, a namesake never (WP9c).
+    'test/e2e-data-share-visitor.ts',
     // The lifecycle: freshness against the promise, one stale notice per spell, versions in use, retention spares a pin, live events (plan doc-mvwxcas3dom3, D6).
     'test/e2e-data-lifecycle.ts',
     // Data intermediation: the setting's four modes, the notification record, section 12's findings and Article 12 rows (plan doc-mvwxcas3dom3, D7).

@@ -17,9 +17,10 @@
  *              owner's own records through the owner-scope view (an agent reads a private record of its
  *              owner only with memory:read-as-owner); another account's record through authorizeRead,
  *              the guard GET /v1/pub uses.
- * @structure readRecordsSource · readAppSource · readMemorySource · familyMatches
+ * @structure readRecordsSource · readAppSource · readMemorySource · familyMatches · descriptionsOfJson
  * @usage const src = await readMemorySource(call);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A records space's locked schema describes its columns (descriptionsOfJson; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.1).
  */
 import type { MemoryRecord } from '../../storage/interface.js';
@@ -40,7 +41,7 @@ import {
 const now = () => new Date().toISOString();
 
 /** A JSON Schema property's type as a Table Schema field type. */
-function fieldTypeOfJson(p: unknown): FieldType | undefined {
+export function fieldTypeOfJson(p: unknown): FieldType | undefined {
     const prop = (p ?? {}) as { type?: unknown; format?: unknown };
     const t = Array.isArray(prop.type) ? prop.type.find(x => x !== 'null') : prop.type;
     if (t === 'integer') return 'integer';
@@ -49,6 +50,18 @@ function fieldTypeOfJson(p: unknown): FieldType | undefined {
     if (t === 'string') return prop.format === 'date' ? 'date' : prop.format === 'date-time' ? 'datetime' : 'string';
     if (t === 'array' || t === 'object') return 'string';
     return undefined;
+}
+
+/** What a JSON Schema's properties say each column is: `description`, else `title`, one line each. */
+export function descriptionsOfJson(properties: Record<string, unknown> | undefined): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [name, p] of Object.entries(properties ?? {})) {
+        const prop = (p ?? {}) as { description?: unknown; title?: unknown };
+        const words = typeof prop.description === 'string' && prop.description.trim() ? prop.description
+            : typeof prop.title === 'string' && prop.title.trim() ? prop.title : '';
+        if (words) out[name] = words.replace(/\s+/g, ' ').trim().slice(0, 500);
+    }
+    return out;
 }
 
 /** A workspace records space: each published record is a row. */
@@ -84,7 +97,7 @@ export async function readRecordsSource(call: SourceCall): Promise<ResolvedSourc
     for (const [name, p] of Object.entries(schema?.properties ?? {})) { types[name] = fieldTypeOfJson(p); order.push(name); }
     const table = tableOf(spec.id, shapeRows(rows, spec.columns), types, new Set(), spec.columns ? [] : order);
     return {
-        ...table, audience: `organism:${organismId}`, fetchedAt: now(),
+        ...table, descriptions: descriptionsOfJson(schema?.properties), audience: `organism:${organismId}`, fetchedAt: now(),
         provenance: { kind: 'records', address: `organism:${organismId}/${ws}/${ot.name}`, title: `${ot.name} records` },
     };
 }

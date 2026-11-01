@@ -15,12 +15,13 @@
  * @structure ProductListFacts · productListFacts
  * @usage const facts = await productListFacts(deps, ownerGhii, defs.map(d => d.name));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A share to a person on another AIMEAT node counts as a share (isNamedShare; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, WP9a: the Offers page's data products list).
  */
 import type { StoreDeps } from '../datapackage/store.js';
 import { readPointer } from '../datapackage/version-audience.js';
 import { packageFreshness } from '../datapackage/freshness-read.js';
-import { isLiveShare, packageOfPattern } from '../parties/shares.js';
+import { isLiveShare, isNamedShare, packageOfPattern } from '../parties/shares.js';
 import { shareReadStats } from '../parties/read-stats.js';
 
 export interface ProductListFacts {
@@ -40,7 +41,7 @@ export async function productListFacts(deps: StoreDeps, ownerGhii: string, names
     if (!names.length) return out;
     const now = Date.now();
     const active = await deps.storage.listConsents(ownerGhii, { status: 'active' });
-    const live = active.filter(c => c.recipient.startsWith('party:') && isLiveShare(c, now));
+    const live = active.filter(c => isNamedShare(c) && isLiveShare(c, now));
     const stats = await shareReadStats(deps.storage, ownerGhii);
     for (const name of names) {
         const pointer = await readPointer(deps, ownerGhii, name);

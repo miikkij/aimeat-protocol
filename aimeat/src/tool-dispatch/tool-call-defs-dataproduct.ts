@@ -6,6 +6,7 @@
  *   MCP: a thin proxy over /v1/dataproducts, one REST call per action, so the words, the source checks
  *   and the publish are the node's answer here too. Nothing in this file decides anything.
  * @version-history
+ *   v1.2.0 — 2026-11-01 — action "describe" → POST /v1/dataproducts/{name}/describe, with `lang` (WP9c).
  *   v1.1.0 — 2026-11-01 — `retention` passes through to define and a draft preview (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
@@ -17,7 +18,7 @@ const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'sourc
 
 export const dataProductCliTools: ConnectCliToolDefinition[] = [
     {
-        // → GET/PUT/DELETE /v1/dataproducts/{name}, GET /v1/dataproducts, POST .../preview and .../run
+        // → GET/PUT/DELETE /v1/dataproducts/{name}, GET /v1/dataproducts, POST .../preview, .../run and .../describe
         name: 'aimeat_dataproduct',
         handler: ({ client }, input) => {
             const action = requiredString(input, 'action');
@@ -30,7 +31,8 @@ export const dataProductCliTools: ConnectCliToolDefinition[] = [
                 case 'preview': return client.post(`${path}/preview`, body);
                 case 'run': return client.post(`${path}/run`, {});
                 case 'delete': return client.delete(path);
-                default: throw new Error('action is one of define, get, list, preview, run, delete');
+                case 'describe': return client.post(`${path}/describe`, { ...body, ...(typeof input.lang === 'string' ? { lang: input.lang } : {}) });
+                default: throw new Error('action is one of define, get, list, preview, run, delete, describe');
             }
         },
     },
