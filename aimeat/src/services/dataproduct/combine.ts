@@ -22,6 +22,9 @@
  * @structure SourceTable · CombinedResource · Combined · combineSources · applyFilter · coerceTo · flatRow
  * @usage const combined = combineSources(definition, tables);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A source's own column descriptions (`descriptions`: a records space's schema,
+ *     an extension action's output schema, another package's Table Schema) describe the output column
+ *     unless the mapping gives one (WP9c, the wizard's step 2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.9).
  */
 import type { FieldType, SchemaField, TableSchema } from '../datapackage/contract.js';
@@ -38,6 +41,8 @@ export interface SourceTable {
     columns: string[];
     types: Record<string, FieldType | undefined>;
     personal: ReadonlySet<string>;
+    /** What the source's own schema says each column is, where it says it. */
+    descriptions?: Record<string, string>;
 }
 
 export interface CombinedResource {
@@ -107,7 +112,8 @@ function outColumnsOf(def: DataProductDefinition, t: SourceTable, transformation
             if (personal) personalIncluded.push(`${t.id}.${m.from}`);
             const name = m.name ?? m.from;
             if (name !== m.from) transformations.push({ by: BY, what: `renamed ${t.id}.${m.from} to ${name}` });
-            cols.push({ from: m.from, name, type: m.type ?? t.types[m.from], ...(m.description ? { description: m.description } : {}) });
+            const description = m.description ?? t.descriptions?.[m.from];
+            cols.push({ from: m.from, name, type: m.type ?? t.types[m.from], ...(description ? { description } : {}) });
         }
         return cols;
     }
@@ -116,7 +122,8 @@ function outColumnsOf(def: DataProductDefinition, t: SourceTable, transformation
             transformations.push({ by: BY, what: `left out ${t.id}.${c}, which the data map marks personal` });
             continue;
         }
-        cols.push({ from: c, name: c, type: t.types[c] });
+        const description = t.descriptions?.[c];
+        cols.push({ from: c, name: c, type: t.types[c], ...(description ? { description } : {}) });
     }
     return cols;
 }

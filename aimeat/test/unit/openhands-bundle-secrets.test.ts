@@ -17,18 +17,24 @@
  *   the OpenHands UI would. Enrolment must still write the token and the key, and post-up must
  *   still send the same request bodies.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openhands-bundle-secrets.test.ts
+ *   - The connect script's kept key signs a return proof only toward the node that gave it, over
+ *     that node's stored id (secaudit2026oct31w2 round 11).
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- The connect script signs a return proof only toward the node that gave
+ *     the key: a key recorded for one node, or kept before the record with an env file naming one,
+ *     sends another address no proof; a reconnect to that node signs over the stored id
+ *     (secaudit2026oct31w2 round 11).
  *   v1.0.1 -- 2026-10-27 -- The curl stub answers GET /.well-known/aimeat with a node id, which the
  *     enrolment script now reads to sign the v2 return proof (secaudit2026oct26, merged with the
  *     return-proof fix).
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, delimiter } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createPrivateKey, createPublicKey, verify as cryptoVerify } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 // Each case runs a whole script under bash; its JSON helper may start node once per field.
@@ -126,20 +132,23 @@ function runScript(script: string, stubDir: string, env: Record<string, string>)
 const argvLog = () => existsSync(join(logs, 'argv.log')) ? readFileSync(join(logs, 'argv.log'), 'utf8') : '';
 const stdinLog = () => existsSync(join(logs, 'stdin.log')) ? readFileSync(join(logs, 'stdin.log'), 'utf8') : '';
 
+/** A temp copy of the bundle's scripts and the stub programs. */
+function setUpBundle(): void {
+  work = mkdtempSync(join(tmpdir(), 'aimeat-openhands-'));
+  bundle = join(work, 'bundle');
+  stubs = join(work, 'stubs');
+  logs = join(work, 'logs');
+  mkdirSync(join(bundle, 'scripts'), { recursive: true });
+  mkdirSync(join(stubs, 'connect'), { recursive: true }); mkdirSync(join(stubs, 'postup'), { recursive: true }); mkdirSync(logs);
+  for (const f of readdirSync(join(BUNDLE, 'scripts'))) copyFileSync(join(BUNDLE, 'scripts', f), join(bundle, 'scripts', f));
+  writeFileSync(join(stubs, 'connect', 'curl'), CURL_STUB, { mode: 0o755 });
+  writeFileSync(join(stubs, 'postup', 'curl'), CURL_STUB, { mode: 0o755 });
+  writeFileSync(join(stubs, 'postup', 'python3'), PYTHON_STUB, { mode: 0o755 });
+  writeFileSync(join(stubs, 'postup', 'docker'), DOCKER_STUB, { mode: 0o755 });
+}
+
 describe.runIf(bash !== null)('the bundle scripts give curl their secrets on stdin', () => {
-  beforeAll(() => {
-    work = mkdtempSync(join(tmpdir(), 'aimeat-openhands-'));
-    bundle = join(work, 'bundle');
-    stubs = join(work, 'stubs');
-    logs = join(work, 'logs');
-    mkdirSync(join(bundle, 'scripts'), { recursive: true });
-    mkdirSync(join(stubs, 'connect'), { recursive: true }); mkdirSync(join(stubs, 'postup'), { recursive: true }); mkdirSync(logs);
-    for (const f of readdirSync(join(BUNDLE, 'scripts'))) copyFileSync(join(BUNDLE, 'scripts', f), join(bundle, 'scripts', f));
-    writeFileSync(join(stubs, 'connect', 'curl'), CURL_STUB, { mode: 0o755 });
-    writeFileSync(join(stubs, 'postup', 'curl'), CURL_STUB, { mode: 0o755 });
-    writeFileSync(join(stubs, 'postup', 'python3'), PYTHON_STUB, { mode: 0o755 });
-    writeFileSync(join(stubs, 'postup', 'docker'), DOCKER_STUB, { mode: 0o755 });
-  });
+  beforeAll(setUpBundle);
   afterAll(() => { rmSync(work, { recursive: true, force: true }); });
 
   it('enrolment: no device_code, return proof or token on curl\'s command line, and the token and key are still written', () => {
@@ -185,5 +194,75 @@ describe.runIf(bash !== null)('the bundle scripts give curl their secrets on std
     expect(stdin).toContain(`"api_key": "${OPENROUTER_KEY}"`);
     expect(stdin).toContain(`"auth": "${AGENT_TOKEN}"`);
     expect(stdin).toContain('"url": "http://node.invalid/v2/mcp/appdev"');
+  });
+});
+
+const hasOpenssl3 = /^OpenSSL 3/.test(spawnSync('openssl', ['version'], { encoding: 'utf8' }).stdout ?? '');
+
+/** The device-authorize body the connect script sent, from the stub's stdin log. */
+const authorizeBody = (): any => {
+  const line = stdinLog().split('\n').find((l) => l.includes('"agent_name"'));
+  return line ? JSON.parse(line) : null;
+};
+
+/** Whether `sig` is the key's Ed25519 signature over the v2 return text naming `nodeId`. */
+function signsFor(seedB64: string, nodeId: string, proof: { signed_at: string; signature: string }): boolean {
+  const der = Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), Buffer.from(seedB64, 'base64')]);
+  const pub = createPublicKey(createPrivateKey({ key: der, format: 'der', type: 'pkcs8' }));
+  const text = `aimeat-device-return:v2\n${nodeId}\nalice\nopenhands\n${proof.signed_at}`;
+  return cryptoVerify(null, Buffer.from(text), pub, Buffer.from(proof.signature, 'base64'));
+}
+
+// secaudit2026oct31w2 round 11: the key kept from an approval signs a return proof only toward the
+// node that gave it, over that node's stored id, not over whatever id the contacted server reports.
+describe.runIf(bash !== null && hasOpenssl3)('the connect script signs a return proof only toward the node that gave the key', () => {
+  let key = '';
+  const secretsDir = () => join(bundle, 'secrets');
+  const connect = (baseUrl: string) => runScript('aimeat-connect.sh', join(stubs, 'connect'), {
+    AIMEAT_BASE_URL: baseUrl, AIMEAT_OWNER: 'alice', AIMEAT_AGENT_NAME: 'openhands', AIMEAT_SCOPES: '*', STUB_KEY: key,
+  });
+  beforeAll(setUpBundle);
+  afterAll(() => { rmSync(work, { recursive: true, force: true }); });
+  beforeEach(() => {
+    rmSync(secretsDir(), { recursive: true, force: true });
+    rmSync(join(logs, 'argv.log'), { force: true });
+    rmSync(join(logs, 'stdin.log'), { force: true });
+    mkdirSync(secretsDir(), { recursive: true });
+    key = randomBytes(32).toString('base64');
+    writeFileSync(join(secretsDir(), 'openhands@alice.key'), `${key}\n`);
+  });
+
+  it('a key recorded for one node sends another address no proof, and says which node holds it', () => {
+    writeFileSync(join(secretsDir(), 'openhands@alice.node'), 'origin=http://node-a.invalid\nnode_id=node-one\n');
+    const r = connect('http://node-b.invalid');
+    expect(r.status, r.stderr + r.stdout).toBe(0);
+    expect(authorizeBody()).not.toBeNull();
+    expect(authorizeBody().proof).toBeUndefined();
+    expect(r.stderr).toContain('for http://node-a.invalid');
+  });
+
+  it('a key kept before the record existed is bound to the address in the env file written with it', () => {
+    writeFileSync(join(secretsDir(), 'aimeat.env'), 'AIMEAT_BASE_URL=http://node-a.invalid\nAIMEAT_AGENT_TOKEN=old\n');
+    const r = connect('http://node-b.invalid');
+    expect(r.status, r.stderr + r.stdout).toBe(0);
+    expect(authorizeBody().proof).toBeUndefined();
+  });
+
+  it('a reconnect to the node that gave the key signs over the stored id, and the approval records the node', () => {
+    writeFileSync(join(secretsDir(), 'openhands@alice.node'), 'origin=http://node.invalid\nnode_id=node-stored\n');
+    // Another spelling of the same origin still reaches it.
+    const r = connect('HTTP://Node.invalid:80/');
+    expect(r.status, r.stderr + r.stdout).toBe(0);
+    const proof = authorizeBody().proof;
+    expect(proof?.signature).toBeTruthy();
+    expect(signsFor(key, 'node-stored', proof)).toBe(true);
+    // The approval wrote the new key and the node that gave it (the stub reports node-one).
+    expect(readFileSync(join(secretsDir(), 'openhands@alice.node'), 'utf8')).toBe('origin=http://node.invalid\nnode_id=node-one\n');
+  });
+
+  it('a key with neither a record nor an env file signs toward the address it is run with, as before', () => {
+    const r = connect('http://node.invalid');
+    expect(r.status, r.stderr + r.stdout).toBe(0);
+    expect(signsFor(key, 'node-one', authorizeBody().proof)).toBe(true);
   });
 });

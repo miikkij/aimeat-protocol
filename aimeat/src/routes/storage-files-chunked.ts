@@ -17,6 +17,9 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-11-01 -- Init refuses a company's page key to a caller the company page route would refuse,
+ *     before any chunk, and complete asks again at the shared write (services/storage-page-keys.ts;
+ *     secaudit2026oct31w2 round 11).
  *   2026-10-30 -- Init takes `store`, the store the bytes are kept in, checked with the caller's rights
  *     before any chunk; complete writes there (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-18 -- Init without a visibility stores visibility.file_default with the session; `visibility:
@@ -55,6 +58,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitRecordChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { appOwnedKeyRefusal, writeStorageFile } from '../services/storage-file-write.js';
+import { pageKeyWriteRefusal, pageWriterOf } from '../services/storage-page-keys.js';
 import { organismVisibilityRefusal } from '../services/organism-visibility.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
@@ -124,7 +128,10 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         }
         // An app's icon and screenshot keys belong to the app's own doors (A7-2). Refused here, at
         // the start of the session, rather than at complete, when the chunks are already in.
-        const owned = appOwnedKeyRefusal(String(key));
+        const owned = appOwnedKeyRefusal(String(key))
+            // A key a page origin serves asks what that page's own route asks; complete asks again at the shared write.
+            ?? await pageKeyWriteRefusal({ storage, config }, gaii, String(key),
+                pageWriterOf({ storage, config }, { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) }));
         if (owned) {
             res.status(owned.status).json(error(config.nodeId, owned.code, owned.message));
             return;

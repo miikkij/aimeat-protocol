@@ -32,7 +32,14 @@
  * @usage
  *   const out = await defineProduct(ctx, name, body);
  *   if (!out.ok) return render(out.status, out.code, out.message);
+ *
+ *   A PRODUCT THAT RUNS WHEN ITS SOURCE CHANGES has no schedule record: define stores who it runs as
+ *   (`runAs`, the fields a schedule record keeps of its maker) and tells ./on-change.ts, which runs it
+ *   after a change as that maker, asked again at each run (services/schedule-actor.ts).
  * @version-history
+ *   v1.2.0 — 2026-11-01 — `schedule: { on: 'change' }` (WP9c): define keeps `runAs` and registers the
+ *     product with the change runner; delete unregisters it. A clock schedule is removed for it. get
+ *     answers `next_change_run_at` and `visitor_shares`, the live shares to people on other AIMEAT nodes.
  *   v1.1.0 — 2026-11-01 — The list carries each product's package, freshness, live shares, reads in the
  *     last seven days, next run and a short label of each source (./list-facts.ts; WP9a, the Offers page),
  *     and the node's data intermediation mode, which a sale on EXCHANGE is subject to (plan D7.1).
@@ -49,8 +56,11 @@ import { readPointer } from '../datapackage/version-audience.js';
 import { logger } from '../../utils/logger.js';
 import {
     DataProductError, normaliseDefinition, dataProductKey, asDefinition, sourceLabel, DATAPRODUCT_KEY_PREFIX,
-    type DataProductDefinition, type LastRun,
+    runsOnChange, type DataProductDefinition, type LastRun, type RunAs,
 } from './definition.js';
+import { noteChangeWatch, nextChangeRunAt } from './on-change.js';
+import { isLiveShare, isNamedShare, packageOfPattern, shareMetaOf, shareView } from '../parties/shares.js';
+import { shareReadStats } from '../parties/read-stats.js';
 import { productListFacts } from './list-facts.js';
 import { intermediationMode } from '../data-intermediation/gate.js';
 import { prepareBuild, previewProduct, runProduct, type BuildContext, type RunOutcome } from './build.js';
@@ -68,7 +78,7 @@ export interface DataProductCtx {
     schedule?: string;
 }
 
-export type DataProductAnswer<T> = { ok: true; data: T } | { ok: false; status: number; code: string; message: string; source?: string };
+export type DataProductAnswer<T> = { ok: true; data: T } | { ok: false; status: number; code: string; message: string; source?: string; details?: Record<string, unknown> };
 
 const READ_WORDS = ['storage:read'] as const;
 const WRITE_WORDS = ['storage:write', 'memory:write'] as const;
@@ -124,7 +134,8 @@ function scheduleCallerOf(ctx: DataProductCtx): ScheduleWriteCaller {
 /** Make the stored schedules match the definition: keep a matching one of this maker, replace the rest. */
 async function syncSchedule(ctx: DataProductCtx, def: DataProductDefinition): Promise<{ schedule: ScheduledJobRecord | null } | { ok: false; status: number; code: string; message: string }> {
     const existing = await schedulesOf(ctx, def.name);
-    const want = def.schedule ?? null;
+    // A product that runs on a source change has no clock: every schedule record of it goes.
+    const want = def.schedule?.cron ? def.schedule as { cron: string; timezone?: string } : null;
     const keep = want ? existing.find(j => j.cron === want.cron && (j.timezone ?? undefined) === want.timezone && j.createdBy === ctx.caller.principal) : undefined;
     for (const j of existing) if (j !== keep) await removeSchedule(ctx, j);
     if (!want || keep) return { schedule: keep ?? null };
@@ -150,6 +161,7 @@ export async function defineProduct(ctx: DataProductCtx, name: string, body: Rec
     const draft: DataProductDefinition = {
         ...norm.definition, definedBy: ctx.caller.principal, createdAt: previous?.createdAt ?? now, updatedAt: now,
         ...(previous?.lastRun ? { lastRun: previous.lastRun } : {}),
+        ...(runsOnChange(norm.definition) ? { runAs: runAsOf(ctx) } : {}),
     };
     // Every source read as the caller, before anything is stored. A refusal of the audience or of a
     // personal column is the definition's own error, so it is refused here too.
@@ -160,9 +172,16 @@ export async function defineProduct(ctx: DataProductCtx, name: string, body: Rec
     const stored = await updateRecord<DataProductDefinition>(ctx.deps.storage, ctx.caller.ownerGhii, dataProductKey(name),
         v => asDefinition(v) as DataProductDefinition, () => draft, { tag: 'dataproduct' });
     emitChange('memory', ctx.caller.ownerGhii);
+    noteChangeWatch(ctx.caller.ownerGhii, name, stored);
     const synced = await syncSchedule(ctx, stored);
     if ('ok' in synced) return synced;
     return { ok: true, data: { definition: stored, created: !previous, schedule: scheduleView(synced.schedule) } };
+}
+
+/** Whom a change run of this caller's definition acts as: what a schedule record would keep of it. */
+function runAsOf(ctx: DataProductCtx): RunAs {
+    const s = scheduleCallerOf(ctx);
+    return { createdBy: s.identity, createdByAgent: !s.isOwnerSession, ...(s.appGrant ? { createdByApp: s.appGrant } : {}) };
 }
 
 function buildCtx(ctx: DataProductCtx): BuildContext {
@@ -177,7 +196,15 @@ export async function getProduct(ctx: DataProductCtx, name: string): Promise<Dat
     if (!def) return notFound(name);
     const [job] = await schedulesOf(ctx, name);
     const pointer = await readPointer(ctx.deps, ctx.caller.ownerGhii, name);
-    return { ok: true, data: { definition: def, schedule: scheduleView(job ?? null), package: pointer ? { package_id: pointer.packageId, content_hash: pointer.contentHash || null, updated_at: pointer.updatedAt, visibility: pointer.visibility ?? 'public', ...(pointer.lastError ? { last_error: pointer.lastError } : {}) } : null } };
+    // The live shares to people on other AIMEAT nodes: no party holds them, so the parties list does not.
+    const stats = await shareReadStats(ctx.deps.storage, ctx.caller.ownerGhii);
+    const visitorShares = (await ctx.deps.storage.listConsents(ctx.caller.ownerGhii, { status: 'active' }))
+        .filter(c => isNamedShare(c) && shareMetaOf(c).visitor === true && packageOfPattern(c.dataPattern) === name && isLiveShare(c))
+        .map(c => shareView(c, {
+            recipient_kind: 'visitor', display_name: typeof c.metadata?.displayName === 'string' ? c.metadata.displayName : c.recipient,
+            last_read_at: stats.get(c.id)?.last_read_at ?? null, reads_7d: stats.get(c.id)?.reads_7d ?? 0,
+        }));
+    return { ok: true, data: { definition: def, schedule: scheduleView(job ?? null), next_change_run_at: nextChangeRunAt(ctx.caller.ownerGhii, name), visitor_shares: visitorShares, package: pointer ? { package_id: pointer.packageId, content_hash: pointer.contentHash || null, updated_at: pointer.updatedAt, visibility: pointer.visibility ?? 'public', ...(pointer.lastError ? { last_error: pointer.lastError } : {}) } : null } };
 }
 
 /** The caller's own definitions, newest first. */
@@ -191,7 +218,9 @@ export async function listProducts(ctx: DataProductCtx): Promise<DataProductAnsw
     // is any of it stale, who reads it" without a second call per product.
     const facts = await productListFacts(ctx.deps, ctx.caller.ownerGhii, defs.map(d => d.name));
     const jobs = await ctx.deps.storage.listScheduledJobs({ ownerScope: ctx.caller.ownerGhii, type: DATAPRODUCT_SCHEDULE_KIND });
-    const nextRunOf = (name: string) => jobs.find(j => (j.input as { name?: unknown } | undefined)?.name === name)?.nextRunAt ?? null;
+    // A product that runs on a source change has its next run only while a seen change waits.
+    const nextRunOf = (name: string) => jobs.find(j => (j.input as { name?: unknown } | undefined)?.name === name)?.nextRunAt
+        ?? nextChangeRunAt(ctx.caller.ownerGhii, name);
     return { ok: true, data: { products: defs.map(d => ({
         name: d.name, title: d.title ?? null, visibility: d.visibility, sources: d.sources.map(s => ({ id: s.id, kind: s.kind, ...sourceLabel(s) })),
         combine: d.combine.mode, schedule: d.schedule ?? null, next_run_at: nextRunOf(d.name), last_run: d.lastRun ?? null, updated_at: d.updatedAt,
@@ -208,6 +237,7 @@ export async function deleteProduct(ctx: DataProductCtx, name: string): Promise<
     const jobs = await schedulesOf(ctx, name);
     for (const j of jobs) await removeSchedule(ctx, j);
     await ctx.deps.storage.deleteMemory(ctx.caller.ownerGhii, dataProductKey(name), ctx.caller.principal);
+    noteChangeWatch(ctx.caller.ownerGhii, name, null);
     emitChange('memory', ctx.caller.ownerGhii);
     return { ok: true, data: { name, deleted: true, schedules_removed: jobs.map(j => j.id), package_kept: !!(await readPointer(ctx.deps, ctx.caller.ownerGhii, name)) } };
 }

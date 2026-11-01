@@ -6724,9 +6724,16 @@ components:
             value: {}
         schedule:
           type: [object, 'null']
+          description: >
+            A clock (`cron`, `timezone`), or `on: change` to run when a source changes: a records space,
+            an app's data, a memory key, a stored file or another data package. A change run follows
+            the change after ten quiet seconds and at most once every five minutes per product; it
+            publishes a version only when the rows changed. A product with an extension source has no
+            change the node can see, so `on: change` is 400 NO_CHANGE_SIGNAL. null builds on demand only.
           properties:
             cron: { type: string, example: '0 6 * * 1' }
             timezone: { type: string, example: Europe/Helsinki }
+            'on': { type: string, enum: [change] }
         retention:
           type: [object, 'null']
           description: How many earlier versions a run keeps; null or absent keeps every version.
@@ -13191,6 +13198,11 @@ paths:
                     approval records an account event, and the owner may sign the agent's other
                     sessions out. Nothing is refused either way. `aimeat connect add` sends it from
                     the key it keeps beside the token.
+                    A client keeps the node id (the device-token answer's
+                    `next_steps.keep_your_key.node_id`) and this node's address with the key, and
+                    signs a proof only when it connects to that same address: a server at another
+                    address can report this node's id. `aimeat connect add`, the OpenHands bundle
+                    and the Dify bridge do so.
                   properties:
                     signed_at: { type: string, format: date-time }
                     signature: { type: string }
@@ -27405,8 +27417,11 @@ paths:
           description: >
             The key is under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and
             screenshot doors write, because they check that the bytes are a picture; an anonymous
-            principal wrote outside `anonymous/*`; or SCOPE_DENIED, a declaration without
-            `provenance:write`.
+            principal wrote outside `anonymous/*`; the key is `company/{id}/index.html`, the page a
+            company of the account serves, and the caller is not the owner in person, does not hold
+            `company:write` and was not allowed by the owner (FORBIDDEN, the message names the request
+            that asks the owner, kind `company-page-write`, and `PUT /v1/companies/{id}/portfolio`); or
+            SCOPE_DENIED, a declaration without `provenance:write`.
         '404':
           description: NOT_FOUND — `ai_provenance_id` names no provenance record of the caller's own.
         '413':
@@ -27543,6 +27558,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: >
+            Anonymous agent outside the `anonymous/` key prefix, or a company's page key that the
+            caller may not change (as on `DELETE /v1/storage/{key}`).
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -28337,7 +28356,7 @@ paths:
       security: [{ BearerAuth: [] }]
       responses:
         '200':
-          description: '`{ definition, schedule: { id, cron, timezone, enabled, next_run_at } | null, package | null }`'
+          description: '`{ definition, schedule: { id, cron, timezone, enabled, next_run_at } | null, next_change_run_at, package | null }`. `next_change_run_at`: for a product that runs on a source change, when the run after a seen change is due (null when none waits). `visitor_shares`: the live shares of the package to people on other AIMEAT nodes (each a share view with `recipient_kind: visitor`, `display_name`, `last_read_at`, `reads_7d`); shares to parties are in GET /v1/parties.'
         '403':
           description: SCOPE_DENIED without storage:read
         '404':
@@ -28371,7 +28390,9 @@ paths:
         mismatch after the mapping is 400 UNION_COLUMNS_MISMATCH), `join` with `key { left, right }`
         (a left join of the first source; unmatched rows kept with nulls; a right key matching
         several rows is 400 JOIN_DUPLICATE_KEY). `columns` maps the output, `filter` keeps rows,
-        `schedule { cron, timezone? }` makes one schedule of kind `dataproduct` (null removes it).
+        `schedule { cron, timezone? }` makes one schedule of kind `dataproduct` (null removes it);
+        `schedule { on: change }` makes none and runs the product when a source changes, as the maker
+        of the definition (400 NO_CHANGE_SIGNAL for a product with an extension source).
         `retention { keep, unit? }` keeps that many earlier versions (unit `versions`, the default) or
         that many months of them on each run; null or absent keeps every version. A version a live
         share pins or a contract reads is kept regardless.
@@ -28396,7 +28417,7 @@ paths:
         '201':
           description: 'Defined. `{ definition, created: true, schedule }`'
         '400':
-          description: INVALID_INPUT, UNKNOWN_COLUMN, NOT_ROWS, NOT_PUBLISHABLE, UNION_COLUMNS_MISMATCH or JOIN_DUPLICATE_KEY; `details.source` names the source
+          description: INVALID_INPUT, NO_CHANGE_SIGNAL, UNKNOWN_COLUMN, NOT_ROWS, NOT_PUBLISHABLE, UNION_COLUMNS_MISMATCH or JOIN_DUPLICATE_KEY; `details.source` names the source
         '401':
           description: AUTH_REQUIRED
         '403':
@@ -28452,6 +28473,47 @@ paths:
           description: SCOPE_DENIED or FORBIDDEN
         '404':
           description: NOT_FOUND
+  /v1/dataproducts/{name}/describe:
+    post:
+      operationId: describeDataProduct
+      summary: A draft of a data product's description, by the owner's own AI
+      description: |
+        Asks the owner's AI (their AI settings and budget, as POST /v1/ai/complete spends them) for a
+        two- or three-sentence description of the product in `lang` (en, fi or es; default en), from
+        its name and title, a label of each source and each output column's name, type and
+        description. No row of data is sent. Nothing is stored: the answer is a draft for the owner to
+        change. A body carrying `sources` describes that draft; an empty body the stored definition.
+        The answer carries the provenance record of the call (`provenance { id, record, record_url }`),
+        decided against the audience the product would have, so a page can show the AI label when one
+        is owed. With no AI to ask, the AI call's refusal (for example 424 NO_API_KEY, 402
+        QUOTA_EXHAUSTED) with `details.reason` (NO_KEY, NO_MODEL, BUDGET_EXHAUSTED ...) and
+        `details.settings_url`, the AI settings page. Needs `storage:read` and `ai:use` from a
+        principal other than the owner in person. MCP: aimeat_dataproduct action "describe".
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              allOf:
+                - { $ref: '#/components/schemas/DataProductDefinitionInput' }
+                - type: object
+                  properties:
+                    lang: { type: string, enum: [en, fi, es] }
+      responses:
+        '200':
+          description: '`{ description, lang, model, ai_written: true, truncated, provenance? }`'
+        '400':
+          description: INVALID_INPUT or NO_CHANGE_SIGNAL (a draft body that is not a definition)
+        '403':
+          description: SCOPE_DENIED (storage:read or ai:use) or FORBIDDEN (a session of another node)
+        '404':
+          description: NOT_FOUND. The caller's account has no such product
+        '424':
+          description: 'NO_API_KEY and the other AI refusals: no AI to ask; `details.reason`, `details.settings_url`'
   /v1/dataproducts/{name}/run:
     post:
       operationId: runDataProduct
@@ -28704,7 +28766,20 @@ paths:
         `expirationTime`, `package`, `resources: [{ name, csvUrl, odataEntitySet }]`) and `say`, the
         one sentence to tell the owner: what the party gets, until when, that ending the share stops
         the next read and that copies already taken cannot be called back. A party made for a share
-        that is then refused is removed again.
+        that is then refused is removed again. The answer carries `key_shown` (a key is in the
+        connection file) and `package_title`, the facts the sentences are made of, so a page says them
+        in its own language.
+
+        `recipient` in place of `name` shares with a person on another AIMEAT node, by their home
+        account (`bob@their-node`; an account of this node is 400 INVALID_RECIPIENT). No party and no
+        key: they sign in on this node as a visitor from their home node, and the package reads
+        (descriptor, rows, CSV, OData) admit exactly the visitor whose home account is the recipient;
+        a visitor of the same name from a third node and the local account of the same name are not.
+        The answer is `{ recipient, recipient_kind: visitor, display_name, share, package_title,
+        key_shown: false, sign_in, read: { sign_in_url, account, descriptor_url, odata_url, resources },
+        say }`; `sign_in` is `ready`, or why this node does not take a sign-in from their node now
+        (`not-a-peer`, `sign-ins-off`, `not-allowed`). The same share is a consent with
+        `data_pattern datapkg:<name>` and the recipient's GHII (POST /v1/consent).
       tags: [Parties]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -28713,9 +28788,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, package, purpose]
+              required: [package, purpose]
               properties:
-                name: { type: string }
+                name: { type: string, description: 'The party. One of name and recipient.' }
+                recipient: { type: string, description: 'A person on another AIMEAT node, name@their-node. One of name and recipient.' }
                 package: { type: string }
                 purpose: { type: string }
                 days: { type: number }
@@ -28728,8 +28804,8 @@ paths:
                 terms_required: { type: boolean }
                 new_key: { type: boolean }
       responses:
-        '201': { description: '`{ party, party_created, share, connection, key_note, say }`' }
-        '400': { description: INVALID_INPUT or SHARE_TOO_LONG }
+        '201': { description: '`{ party, party_created, share, connection, key_note, key_shown, package_title, say }`, or for a recipient on another node the answer above' }
+        '400': { description: INVALID_INPUT, INVALID_RECIPIENT or SHARE_TOO_LONG }
         '403': { description: 'SCOPE_DENIED (party:manage, consent:manage) or FORBIDDEN' }
         '404': { description: NOT_FOUND (the package) or VERSION_NOT_FOUND }
         '409': { description: PARTY_STOPPED or PACKAGE_WITHDRAWN }
@@ -29474,8 +29550,12 @@ paths:
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or any caller targeted a key
             under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot
-            doors write, because they check that the bytes are a picture. Applies to both the inline
-            and the presigned form: the namespace fence is on the write, not on the representation.
+            doors write, because they check that the bytes are a picture. The key
+            `company/{id}/index.html`, the page a company of the account serves, needs the owner in
+            person, `company:write`, or the owner's one-press allowance for this caller (FORBIDDEN, the
+            message names the request that asks the owner, kind `company-page-write`, and
+            `PUT /v1/companies/{id}/portfolio`). Applies to both the inline and the presigned form: the
+            namespace fence is on the write, not on the representation.
             SCOPE_DENIED: an agent or app declared ai_provenance without `provenance:write`.
         '404':
           description: NOT_FOUND — `ai_provenance_id` names no provenance record of the caller's own.
@@ -29661,7 +29741,12 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '403':
-          description: Anonymous agent outside the `anonymous/` key prefix
+          description: >
+            Anonymous agent outside the `anonymous/` key prefix, or the key is
+            `company/{id}/index.html`, the page a company of the account serves, and the caller is not
+            the owner in person, does not hold `company:write` and was not allowed by the owner
+            (FORBIDDEN, the message names the request that asks the owner, kind `company-page-write`,
+            and `DELETE /v1/companies/{id}/portfolio`).
         '404':
           description: No such file in the caller's own namespace
 
@@ -35197,7 +35282,9 @@ paths:
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or the key is under
             `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot doors
-            write.
+            write, or the key is `company/{id}/index.html`, the page a company of the account serves,
+            and the caller is not the owner in person, does not hold `company:write` and was not
+            allowed by the owner (the message names the request that asks the owner).
         '413':
           description: QUOTA_EXCEEDED — the declared chunks make a file larger than one file on this node may be.
         '429':
@@ -81532,16 +81619,28 @@ paths:
                                 level: { type: string, enum: [public, link, signed-in, organism, named], description: 'named is one outside party the owner chose by name (a named share, a party holding a key).' }
                                 organism_id: { type: string, description: Present when level is organism. }
                                 url: { type: string, description: The address it is read at, when a stranger can open one. }
-                                how_to_close: { type: string }
+                                how_to_close: { type: string, description: 'The English sentence, for an AI. A page says the same from `close`.' }
+                                close:
+                                  type: object
+                                  description: 'How to close it as a stable `code` (package, market-listed, market-record, need-open, agent, named-share, party, app-public, app-narrow, app-internet, workspace-page, organism, organism-members, board, portfolio-public, portfolio-narrow, company, memory, file, knowledge-package, knowledge-entry, knowledge-record, skill, datapackage) and the identifiers the instruction names (`values`: tools, routes, ids, a date), so a page says it in its own language.'
+                                  properties:
+                                    code: { type: string }
+                                    values: { type: object, additionalProperties: { type: string } }
+                                title_parts:
+                                  type: object
+                                  description: 'For a title the node words itself (offering, offering-off, need, need-closed, members, portfolio, stored-by): its `code` and the names in it (`values`).'
+                                  properties:
+                                    code: { type: string }
+                                    values: { type: object, additionalProperties: { type: string } }
                                 freshness: { type: string, enum: [fresh, late, stale, unscheduled], description: A data package's or a named share's package freshness against its producer's schedule. }
                                 share:
                                   type: object
                                   description: A named share's facts (kind named_share).
                                   properties:
                                     package: { type: string }
-                                    party: { type: string, description: The party's name. }
+                                    party: { type: string, description: 'The party''s name, or for a share to a person on another AIMEAT node their home account (name@their-node).' }
                                     party_name: { type: string, description: The party's display name. }
-                                    party_kind: { type: string, enum: [program, person, dataspace] }
+                                    party_kind: { type: string, enum: [program, person, dataspace, visitor], description: 'visitor: a person on another AIMEAT node, who reads signed in from there.' }
                                     purpose: { type: string }
                                     expires: { type: [string, 'null'], format: date-time }
                                     last_read_at: { type: [string, 'null'], format: date-time }
@@ -81570,6 +81669,14 @@ paths:
                           notes:
                             type: array
                             items: { type: string }
+                            description: The English sentences, for an AI.
+                          note_codes:
+                            type: array
+                            items: { type: string, enum: [signed-in-node, presigned, access-code, named-readers, workspace-page, market-record, item-cap, store-limit] }
+                            description: The code of each note, in the same order, so a page says them in its own language.
+                          item_cap:
+                            type: integer
+                            description: How many items a kind lists at most (the note item-cap names it).
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '503':

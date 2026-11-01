@@ -14,8 +14,11 @@
  *   - POST   /v1/dataproducts/:name/preview   build without publishing (storage:read); a body with
  *                                             `sources` previews a draft that is not stored
  *   - POST   /v1/dataproducts/:name/run       build and publish one version (storage:write and memory:write)
+ *   - POST   /v1/dataproducts/:name/describe  a description draft by the owner's own AI (storage:read, ai:use)
  * @usage app.use(dataProductsRouter(config, storage))
  * @version-history
+ *   v1.1.0 — 2026-11-01 — POST /v1/dataproducts/:name/describe: a description draft by the owner's own
+ *     AI (storage:read and ai:use); a refusal carries its `details` (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import { Router } from 'express';
@@ -28,7 +31,8 @@ import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { deny403 } from '../auth/deny.js';
 import { validateBody } from '../models/schemas.js';
-import { DataProductBodySchema, DataProductRunBodySchema } from '../models/dataproduct-schemas.js';
+import { DataProductBodySchema, DataProductRunBodySchema, DataProductDescribeBodySchema } from '../models/dataproduct-schemas.js';
+import { describeProduct } from '../services/dataproduct/describe.js';
 import {
     defineProduct, getProduct, listProducts, deleteProduct, previewProductAnswer, runStored,
     type DataProductAnswer, type DataProductCtx,
@@ -47,7 +51,8 @@ export function dataProductsRouter(config: AimeatConfig, storage: Storage): Rout
     const render = <T>(req: Request, res: Response, out: DataProductAnswer<T>, okStatus = 200, links: Array<{ description: string; method: string; url: string }> = []) => {
         if (out.ok) { res.status(okStatus).json(success(config.nodeId, out.data as Record<string, unknown>, links)); return; }
         if (out.status === 403 && (out.code === 'SCOPE_DENIED' || out.code === 'FORBIDDEN')) { deny403(req, res, out.code, out.message); return; }
-        res.status(out.status).json(error(config.nodeId, out.code, out.message, undefined, out.source ? { source: out.source } : undefined));
+        const details = { ...(out.details ?? {}), ...(out.source ? { source: out.source } : {}) };
+        res.status(out.status).json(error(config.nodeId, out.code, out.message, undefined, Object.keys(details).length ? details : undefined));
     };
     const name = (req: Request) => String(req.params.name ?? '');
     const self = (req: Request) => `/v1/dataproducts/${encodeURIComponent(name(req))}`;
@@ -79,6 +84,11 @@ export function dataProductsRouter(config: AimeatConfig, storage: Storage): Rout
     router.post('/v1/dataproducts/:name/preview', requireAuth(), refuseAnonymousPrincipal(), requireScope('storage:read'), validateBody(DataProductBodySchema, config.nodeId), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
         render(req, res, await previewProductAnswer(ctxOf(req), name(req), Array.isArray(body.sources) ? body : undefined));
+    });
+
+    // A draft of the description by the owner's own AI. ai:use is the word POST /v1/ai/complete asks.
+    router.post('/v1/dataproducts/:name/describe', requireAuth(), refuseAnonymousPrincipal(), requireScope('storage:read', 'ai:use'), validateBody(DataProductDescribeBodySchema, config.nodeId), async (req, res) => {
+        render(req, res, await describeProduct(ctxOf(req), name(req), (req.body ?? {}) as Record<string, unknown>));
     });
 
     router.post('/v1/dataproducts/:name/run', requireAuth(), refuseAnonymousPrincipal(), requireScope('storage:write', 'memory:write'), validateBody(DataProductRunBodySchema, config.nodeId), async (req, res) => {

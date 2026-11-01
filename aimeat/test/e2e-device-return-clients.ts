@@ -20,12 +20,18 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=device-return-clients
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- Each script, run with the same folder and names against another server
+ *     that reports this node's id, sends that server no return proof (secaudit2026oct31w2 round 11,
+ *     connect-onboard.ts:returnProof-signs-held-key-for-contacted-server-node-id and the OpenHands
+ *     script's same root cause).
  *   v1.0.0 — 2026-10-26 — Initial (secaudit2026oct22, unbound-reapproval-of-existing-agent, follow-up
  *     to a9e7b15a9).
  */
 
 import { registerOwner } from './helpers/owner-login.js';
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
@@ -152,6 +158,56 @@ async function enrolThenReturn(label: string, agent: string, start: () => Promis
     });
 }
 
+/**
+ * A server the script is pointed at by mistake that reports this node's id (the relay of
+ * secaudit2026oct31w2 round 11): it answers GET /.well-known/aimeat with `nodeId` and keeps the
+ * device-authorize body it receives, then refuses it so the script stops.
+ */
+async function startLookalike(nodeId: string): Promise<{ url: string; bodies: any[]; close: () => Promise<void> }> {
+    const bodies: any[] = [];
+    const server = createServer((req, res) => {
+        let raw = '';
+        req.on('data', (c: Buffer) => { raw += c.toString(); });
+        req.on('end', () => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.method === 'GET' && req.url?.startsWith('/.well-known/aimeat')) {
+                res.end(JSON.stringify({ data: { node_id: nodeId } }));
+                return;
+            }
+            if (req.method === 'POST' && req.url?.startsWith('/v1/agents/device-authorize')) {
+                try { bodies.push(JSON.parse(raw)); } catch { bodies.push({ _raw: raw }); }
+            }
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'lookalike' }));
+        });
+    });
+    await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok));
+    const port = (server.address() as AddressInfo).port;
+    return { url: `http://127.0.0.1:${port}`, bodies, close: () => new Promise<void>((ok) => server.close(() => ok())) };
+}
+
+/**
+ * The key kept from an approval at this node signs a return proof only toward this node: run
+ * against another address with the same names and folder, the script sends that server no proof,
+ * says which node holds the names, and leaves the kept key alone.
+ */
+async function noProofElsewhere(label: string, start: (baseUrl: string) => Promise<Run>, keyFile: string) {
+    await test(`${label}: pointed at another server that reports this node's id, the script sends it no return proof`, async () => {
+        const nodeId = (await json('/.well-known/aimeat')).body.data.node_id as string;
+        const keyBefore = readFileSync(keyFile, 'utf-8').trim();
+        const lookalike = await startLookalike(nodeId);
+        try {
+            const r = await start(lookalike.url);
+            assert(lookalike.bodies.length === 1, `one device request reached the other server: ${lookalike.bodies.length}; the script said: ${r.out.slice(-800)}`);
+            assert(lookalike.bodies[0].proof === undefined, `no proof went to the other server: ${JSON.stringify(lookalike.bodies[0].proof)}`);
+            assert(r.out.includes(new URL(BASE).origin), `the script names the node that holds the key: ${r.out.slice(-800)}`);
+            assert(readFileSync(keyFile, 'utf-8').trim() === keyBefore, 'the kept key is unchanged');
+        } finally {
+            await lookalike.close();
+        }
+    });
+}
+
 console.log('\n=== Device-authorization returns from the OpenHands and Dify scripts ===\n');
 
 let strangerToken = '';
@@ -176,6 +232,9 @@ console.log('\nOpenHands: tools/aimeat-openhands/scripts/aimeat-connect.sh');
             () => writeFileSync(secrets, readFileSync(secrets, 'utf-8').replace(/^AIMEAT_AGENT_TOKEN=.*$/m, 'AIMEAT_AGENT_TOKEN=aaa.bbb.ccc'), 'utf-8'),
             // The default scope "*" is asked for as itself, not glob-expanded into file names.
             (row) => assert(JSON.stringify(row.requested_scopes) === '["*"]', `requested scopes: ${JSON.stringify(row.requested_scopes)}`));
+        await noProofElsewhere('openhands', (url) => run(bash, [OPENHANDS_SCRIPT], {
+            AIMEAT_BASE_URL: url, AIMEAT_OWNER: owner, AIMEAT_AGENT_NAME: agent, AIMEAT_SECRETS_FILE: secrets,
+        }), keyFile);
     }
 }
 
@@ -192,6 +251,9 @@ console.log('\nDify: aimeat/tools/dify-bridge/src/connect-onboard.ts');
         }),
         keyFile,
         () => writeFileSync(tokenFile, 'aaa.bbb.ccc', 'utf-8'));
+    await noProofElsewhere('dify', (url) => run(process.execPath, ['--import', 'tsx', DIFY_SCRIPT], {
+        AIMEAT_BASE_URL: url, OWNER: owner, AGENT_NAME: agent, AIMEAT_DIFY_HOME: home, POLL_TIMEOUT_SEC: '10',
+    }), keyFile);
 }
 
 try { rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* a handle may still be closing */ }

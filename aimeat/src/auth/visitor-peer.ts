@@ -27,9 +27,11 @@
  *   FAILS CLOSED. A node that registered no registry knows of no peer, so a visitor has no live peer
  *   and is refused. Only a visitor is asked: every other principal returns before any read.
  * @structure VisitorPeerView · registerVisitorPeers(peers, nodeId) · visitorPeerRefuses(verified) ·
- *   visitorPeerScopes(verified)
+ *   visitorPeerScopes(verified) · homeNodeSignIn(homeNode)
  * @usage if (visitorPeerRefuses(verified)) return true;   // auth/credential-revoked.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — homeNodeSignIn: whether a sign-in from a node would be taken now, for a share
+ *     to a person on another AIMEAT node (WP9c).
  *   v1.0.1 — 2026-10-21 — A peer the heartbeat marks degraded, offline or unreachable keeps its
  *     visitors; only a removed peer or an operator-set status ends their sessions (it signed every
  *     visitor out after about fifteen minutes of network trouble).
@@ -93,6 +95,22 @@ export function visitorPeerRefuses(verified: VerifiedToken): boolean {
   if (policy === 'disabled') return true;
   if (policy === 'specific_peers' && !peer.allowFederatedAuth) return true;
   return !tierCeiling(coerceTier(peer.tier)).allowFederatedAuth;
+}
+
+/**
+ * Would this node take a sign-in from `homeNode` now? `ready`, or why not: no active peer of that id
+ * (`not-a-peer`), this node's federated sign-in policy is off (`sign-ins-off`), or the policy or the
+ * peer's tier does not carry a sign-in from it (`not-allowed`). The same questions as
+ * visitorPeerRefuses, asked before anyone signs in: a share to a person on another node says it
+ * (services/parties/service.ts shareWithVisitor).
+ */
+export function homeNodeSignIn(homeNode: string): 'ready' | 'not-a-peer' | 'sign-ins-off' | 'not-allowed' {
+  const peer = peerRegistry.get()?.get(homeNode) ?? null;
+  if (!peer || peer.status !== 'active') return 'not-a-peer';
+  const policy = sessionConfig()?.federationAuthPolicy ?? 'disabled';
+  if (policy === 'disabled') return 'sign-ins-off';
+  if (policy === 'specific_peers' && !peer.allowFederatedAuth) return 'not-allowed';
+  return tierCeiling(coerceTier(peer.tier)).allowFederatedAuth ? 'ready' : 'not-allowed';
 }
 
 /**

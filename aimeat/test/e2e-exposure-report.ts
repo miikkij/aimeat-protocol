@@ -15,6 +15,8 @@
  *     - the refusals: anonymous 401, B's agent without memory:read 403 (REST) and refused (MCP),
  *       GET /v1/admin/exposure 403 for a non-operator and numbers only for the operator.
  * @version-history
+ *   v1.2.0 — 2026-11-01 — Each item carries `close` (a code and its identifiers) and the report
+ *     `note_codes` and `item_cap`, the facts a page says them with in its language (WP9c).
  *   v1.1.0 — 2026-11-01 — Data packages are listed at their own audience, a private one not at all, and a
  *     withdrawn one leaves the report; how_to_close names DELETE /v1/datapackages (plan doc-mvwxcas3dom3, D0.2).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.3).
@@ -157,6 +159,18 @@ await test('A\'s report lists every exposed thing at its level', async () => {
     assert(rep.counts.by_level.public >= 6 && rep.counts.by_level.link >= 2 && rep.counts.by_level['signed-in'] >= 1, `counts ${JSON.stringify(rep.counts.by_level)}`);
     assert(Array.isArray(rep.notes) && rep.notes.length > 0, 'the report says what it does not count');
     assert(Array.isArray(rep.failed) && rep.failed.length === 0, `failed kinds: ${JSON.stringify(rep.failed)}`);
+});
+
+await test('Each item says how to close it as a code with its identifiers, and each note has a code, so a page says them in its language', async () => {
+    const rep = await report(A.token);
+    const missing = (rep.items as Body[]).filter(i => typeof i.close?.code !== 'string' || typeof i.close.values !== 'object');
+    assert(missing.length === 0, `items without a close code: ${JSON.stringify(missing.map(i => `${i.kind}:${i.id}`))}`);
+    const share = find(rep, 'workspace_share', `${privateOrg}/${ws}/pages/${docId}`)!;
+    assert(share.close.code === 'workspace-page' && share.close.values.tool === 'aimeat_workspace_share' && share.close.values.route.includes(`/v1/organisms/${privateOrg}/workspace/share`), `the share's close: ${JSON.stringify(share.close)}`);
+    const mem = find(rep, 'memory', K.pubMem)!;
+    assert(mem.close.code === 'memory' && mem.close.values.removeRoute.includes('/v1/memory/'), `the record's close: ${JSON.stringify(mem.close)}`);
+    assert(Array.isArray(rep.note_codes) && rep.note_codes.length === rep.notes.length && rep.note_codes.includes('item-cap') && typeof rep.item_cap === 'number',
+        `note codes: ${JSON.stringify(rep.note_codes)} for ${rep.notes?.length} notes, cap ${rep.item_cap}`);
 });
 
 await test('A\'s report lists none of the private things', async () => {

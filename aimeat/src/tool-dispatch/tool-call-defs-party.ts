@@ -7,12 +7,13 @@
  *   are the node's answer here too. `stop` and `resume` with an `owner` call the operator's routes
  *   /v1/admin/parties/{owner}/{name}/stop and /resume. Nothing in this file decides anything.
  * @version-history
+ *   v1.1.0 — 2026-11-01 — "share" passes `recipient` (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3.4).
  */
 import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.js';
 import { requiredString, optionalString } from './tool-call-helpers.js';
 
-const SHARE_FIELDS = ['name', 'package', 'purpose', 'days', 'expires', 'kind', 'display_name', 'contact', 'pinned_version', 'allow_url_key', 'terms_required', 'new_key'] as const;
+const SHARE_FIELDS = ['name', 'recipient', 'package', 'purpose', 'days', 'expires', 'kind', 'display_name', 'contact', 'pinned_version', 'allow_url_key', 'terms_required', 'new_key'] as const;
 const PARTY_FIELDS = ['name', 'kind', 'display_name', 'contact'] as const;
 
 export const partyCliTools: ConnectCliToolDefinition[] = [

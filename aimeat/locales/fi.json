@@ -5528,6 +5528,7 @@
     },
     "audience": { "private": "Vain minä", "members": "Kirjautuneet", "public": "Julkinen", "organismOf": "Organismin {name} jäsenet" },
     "schedule": {
+      "onChange": "päivittyy, kun lähde muuttuu",
       "none": "päivittyy vain, kun ajat sen", "cron": "ajastus {cron}", "daily": "päivittyy joka päivä klo {at}", "monthly": "päivittyy kuun {day}. päivä klo {at}",
       "weekly": { "0": "päivittyy sunnuntaisin klo {at}", "1": "päivittyy maanantaisin klo {at}", "2": "päivittyy tiistaisin klo {at}", "3": "päivittyy keskiviikkoisin klo {at}", "4": "päivittyy torstaisin klo {at}", "5": "päivittyy perjantaisin klo {at}", "6": "päivittyy lauantaisin klo {at}" }
     },
@@ -5556,6 +5557,7 @@
     },
     "product": {
       "label": "Datatuote", "loadFailed": "Datatuotetta ei voitu lukea. Yritä hetken päästä uudelleen.",
+      "nextChangeRun": "seuraava ajo {when}, koska lähde muuttui",
       "versionN": "Versio {n}", "current": "käytössä", "notPublished": "Ei vielä julkaistu", "nextRun": "seuraava ajo {when}",
       "share": "Jaa", "sell": "Myy EXCHANGEssa", "sellEdit": "Muuta myyntiä", "withdraw": "Vedä pois", "runNow": "Päivitä nyt", "publishAgain": "Julkaise uudelleen", "onSale": "EXCHANGEssa",
       "figRows": "Rivejä", "figVersions": "Versioita", "figShares": "Jakoja", "figReads": "Lukuja 7 pv", "lastRun": "päivitetty {when}",
@@ -5603,6 +5605,21 @@
       "howProgram": "Ohjelmalla", "howProgramHint": "Power BI, Excel, DuckDB. Saa avaimen yhteystiedostossa.",
       "howBrowser": "Selaimella", "howBrowserHint": "Avaa sähköpostiin tulevan linkin ja näkee rivit.",
       "howDataspace": "Dataavaruudesta", "howDataspaceHint": "Organisaation liitin Dataspace Protocolilla.",
+      "howAimeat": "Toiselta AIMEATilta", "howAimeatHint": "Käyttää omaa tiliään vierailijana.",
+      "account": "Hänen AIMEAT-tilinsä", "accountPlaceholder": "matti@hanen-palvelimensa.fi", "accountHint": "Tili ja hänen oma palvelimensa muodossa nimi@palvelin. Hän kirjautuu tälle palvelimelle sillä.",
+      "sentencesAimeat": "{who} lukee omalla AIMEAT-tilillään eikä tarvitse avainta. Voit perua jaon milloin tahansa, ja se päättyy heti. Jo ladattuja kopioita ei saa takaisin. Jokainen luku näkyy sinulle.",
+      "say": "{who} voi nyt lukea datatuotetta ”{title}” {until}. Voit perua jaon milloin tahansa, ja seuraava luku estetään. Jo ladattuja kopioita ei saa takaisin.",
+      "sayVisitor": "{who} voi nyt lukea datatuotetta ”{title}” {until}. Hän kirjautuu tälle palvelimelle omalla tilillään {account}. Voit perua jaon milloin tahansa, ja seuraava luku estetään. Jo ladattuja kopioita ei saa takaisin.",
+      "untilDate": "{date} asti", "untilYouEnd": "kunnes perut jaon",
+      "keyShown": "Avain on yhteystiedostossa, ja se näytetään vain kerran. Anna tiedosto nyt vastaanottajalle: {who}.",
+      "keyKept": "Vastaanottajalla on jo avain ({who}). Yhteystiedosto kertoo, miten sitä käytetään.",
+      "signInAt": "Kirjautuu osoitteessa",
+      "signIn": {
+        "ready": "Tämä palvelin hyväksyy kirjautumiset palvelimelta {node}, joten {who} voi lukea datatuotetta heti.",
+        "not-a-peer": "Tätä palvelinta ei ole vielä yhdistetty palvelimeen {node}, joten {who} ei voi kirjautua tänne. Pyydä tämän palvelimen ylläpitäjää yhdistämään palvelimet.",
+        "sign-ins-off": "Tämä palvelin ei hyväksy kirjautumisia muilta palvelimilta, joten {who} ei voi kirjautua tänne. Pyydä ylläpitäjää sallimaan ne.",
+        "not-allowed": "Tämä palvelin ei hyväksy kirjautumisia palvelimelta {node}, joten {who} ei voi kirjautua tänne. Pyydä ylläpitäjää sallimaan ne."
+      },
       "email": "Sähköposti linkkiä varten", "emailPlaceholder": "nimi@esimerkki.fi", "emailHint": "Vapaaehtoinen. Linkki lähtee tähän osoitteeseen.", "emailNeeded": "Selaimella lukeva saa linkin tähän osoitteeseen.",
       "purpose": "Käyttötarkoitus", "purposePlaceholder": "raportointi", "until": "Päättyy", "untilHint": "Tällä palvelimella enintään {n} päivää eli viimeistään {date}.",
       "version": "Mikä versio", "versionLatest": "Aina uusin", "versionOnly": "Vain versio {n} ({hash})",
@@ -5634,8 +5651,8 @@
       "intro": "Ihmiset ja ohjelmat, joilla ei ole tiliä tällä palvelimella mutta joille olet antanut pääsyn. Kukin lukee vain sen, minkä jaoit sille.",
       "colName": "Osapuoli", "colShares": "Jaot", "colKey": "Avain käytetty",
       "none": "Sinulla ei ole ulkopuolisia osapuolia. Osapuoli syntyy, kun jaat datatuotteen nimetylle.",
-      "kind": { "program": "ohjelma", "person": "ihminen", "dataspace": "dataavaruus" },
-      "keyOf": { "program": "ohjelman avain", "person": "selainlinkki", "dataspace": "dataavaruuden liitin" },
+      "kind": { "program": "ohjelma", "person": "ihminen", "dataspace": "dataavaruus", "aimeat": "toinen AIMEAT", "visitor": "toinen AIMEAT" },
+      "keyOf": { "program": "ohjelman avain", "person": "selainlinkki", "dataspace": "dataavaruuden liitin", "visitor": "oma tili toisessa AIMEATissa" },
       "status": { "active": "voimassa", "stopped": "pysäytetty" },
       "dataProduct": "datatuote",
       "sharesN": "{n} jakoa", "sharesN_one": "{n} jako", "keyUsed": "avain käytetty {when}", "keyNotUsed": "avainta ei ole vielä käytetty",
@@ -5678,6 +5695,7 @@
       "provenance": "Jokaisen lähteen alkuperä, tuoreus ja henkilötiedot tarkistetaan erikseen, ja ne kirjataan paketin tietoihin. Datatuote on yhtä tuore kuin sen vanhin lähde."
     },
     "cols": {
+      "sourceField": "Lähteen kenttä", "note": "Huomio", "includeOne": "{col} mukana",
       "title": "Sarakkeet", "count": "{n}/{of} lähtee ulos", "include": "Mukana", "personal": "henkilötieto · datakartta", "descPlaceholder": "Mitä sarakkeessa on",
       "personalLeftOut": "Jätin pois sarakkeet {cols}, koska datakartta merkitsee ne henkilötiedoksi. Jos otat ne mukaan, et voi tehdä datatuotteesta julkista. Nimetty jako ja sopimus ovat mahdollisia, ja ne näkyvät Compliance-sivulla.",
       "personalIncluded": "Henkilötietoa lähtee ulos: {cols}. Datatuotetta ei voi tehdä julkiseksi.",
@@ -5686,6 +5704,10 @@
       "filterNote": "Suodatus kirjataan paketin muunnoksiin, joten lukija näkee, mitä rajattiin."
     },
     "preview": {
+      "aiWorking": "Tekoälysi kirjoittaa kuvauksen luonnosta…", "aiAsk": "Pyydä tekoälyltä luonnos",
+      "aiNoKey": "Kuvauksen luonnos tarvitsee oman tekoälysi. Ota se käyttöön Tekoäly-sivulla tai kirjoita kuvaus itse.", "aiSettings": "Avaa Tekoäly-sivu",
+      "aiWrote": "Tekoäly kirjoitti kuvauksen luonnoksen sarakkeista ja lähteestä; muuta se omaksesi.",
+      "aiFailed": "Tekoälysi ei saanut luonnosta valmiiksi. Kirjoita kuvaus itse.",
       "rowsTitle": "Ensimmäiset rivit kokeiluajosta", "counts": "{rows} riviä · {cols} saraketta", "sizeLine": "{rows} riviä · {cols} saraketta · noin {size}",
       "validOk": "Frictionless-tarkistus meni läpi.", "validBad": "Frictionless-tarkistus löysi {n} ongelmaa. Muuta sarakkeiden tyyppejä vaiheessa 2.", "validBad_one": "Frictionless-tarkistus löysi yhden ongelman. Muuta sarakkeen tyyppiä vaiheessa 2.",
       "describedOk": "Jokaisella sarakkeella on tyyppi ja kuvaus.", "describedBad": "Jostain sarakkeesta puuttuu kuvaus. Lisää se vaiheessa 2.",
@@ -5695,6 +5717,11 @@
       "odpsTitle": "Kuvaus, jonka koneet lukevat (ODPS 4.1, ote)", "noOdps": "Kuvaus näkyy, kun esikatselu läpäisee tarkistukset."
     },
     "sched": {
+      "change": "Kun lähde muuttuu",
+      "changeNote": "Palvelin ajaa datatuotteen, kun sen lähde muuttuu: aikaisintaan kymmenen sekuntia muutoksen jälkeen ja enintään kerran viidessä minuutissa. Uusi versio syntyy vain, kun rivit muuttuivat.",
+      "changeBlocked": "Vaihtoehtoa Kun lähde muuttuu ei voi valita, koska palvelin ei näe laajennuksen tuloksen muuttuvan. Anna tälle datatuotteelle ajastus.",
+      "changeNodeNote": "Palvelin näkee, kun työtilan tietueet, sovelluksen data, muistitietue, tiedosto tai toinen datatuote muuttuu. Versio, jota joku vielä lukee, ei poistu ilman, että näet sen ensin.",
+      "freshChange": { "fresh": "uusin ajo muutoksen jälkeen onnistui", "late": "lähde muuttui, ja sen jälkeinen ajo epäonnistui", "stale": "datatuote, josta tämä on tehty, on vanhentunut" },
       "title": "Tahti", "pace": "Tahti", "once": "Kerran", "daily": "Päivittäin", "weekly": "Viikoittain", "monthly": "Kuukausittain",
       "weekday": "Päivä", "monthday": "Kuukauden päivä", "time": "Kello", "keep": "Säilytä vanhoja versioita", "keep12": "12 viimeisintä", "keepAll": "Kaikki", "keep6m": "6 kuukautta",
       "onceNote": "Datatuote rakennetaan, kun julkaiset sen ja kun painat Päivitä nyt. Lukija näkee sen tilassa Ei ajastusta.",
@@ -5716,6 +5743,21 @@
       "sharesTitle": "Nimetyt jaot", "newShare": "Lisää jako", "addShare": "Lisää", "noShares": "Nimettyjä jakoja ei vielä ole.",
       "noAccount": "Vastaanottaja ei tarvitse AIMEAT-tiliä. Jokainen jako tehdään, kun julkaiset, ja sen avain näytetään kerran seuraavalla sivulla.",
       "sellTitle": "EXCHANGE", "sell": "Myy EXCHANGEssa"
+    },
+    "err": {
+      "SHARE_TOO_LONG": "Päättymispäivä on myöhemmin kuin tämä palvelin sallii. Valitse aiempi päivä.",
+      "INVALID_RECIPIENT": "Kirjoita tili muodossa nimi@palvelin. Tämän palvelimen tili lukee datatuotetta sen mukaan, kuka saa käyttää sitä.",
+      "PACKAGE_WITHDRAWN": "Datatuote on vedetty pois. Julkaise se uudelleen ennen kuin jaat sen.",
+      "PARTY_STOPPED": "Osapuoli on pysäytetty. Jatka sitä ensin Tietolompakossa.",
+      "VERSION_NOT_FOUND": "Tätä versiota ei enää säilytetä. Valitse toinen.",
+      "NO_CHANGE_SIGNAL": "Palvelin ei näe laajennuslähteen muuttuvan. Valitse ajastus vaiheessa 4.",
+      "AUDIENCE_WIDER_THAN_SOURCE": "Valitsit laajemman käyttäjäjoukon kuin lähde sallii. Valitse suppeampi vaiheessa 5.",
+      "PERSONAL_DATA_PUBLIC": "Julkisessa datatuotteessa ei voi olla henkilötietoa. Jätä henkilötietosarakkeet pois vaiheessa 2 tai valitse toinen käyttäjäjoukko.",
+      "SOURCE_FAILED": "Lähdettä {source} ei voitu lukea. Kokeile lähteitä uudelleen.",
+      "SCOPE_DENIED": "Sinulla ei ole tähän tarvittavaa oikeutta.",
+      "UNKNOWN_COLUMN": "Lähteessä ei enää ole valitsemaasi saraketta. Kokeile lähteitä uudelleen vaiheessa 1.",
+      "UNION_COLUMNS_MISMATCH": "Lähteillä ei ole samoja sarakkeita, joten niistä ei voi tehdä yhtä taulukkoa. Valitse omat taulukot tai avain.",
+      "JOIN_DUPLICATE_KEY": "Avain ei ole yksilöllinen jossakin lähteessä. Valitse toinen avainsarake."
     },
     "licence": { "ccBy": "CC BY 4.0", "cc0": "CC0", "contract": "Vain sopimuksen ehdoilla" },
     "done": {
@@ -5742,6 +5784,47 @@
       "namedSharesSub": "kukin yhdelle ihmiselle tai ohjelmalle",
       "parties": "Osapuolet",
       "partiesSub": "ei tiliä täällä"
+    },
+    "close": {
+      "package": "Muuta se yksityiseksi: {route}, tai vedä versio pois työkalulla {tool}.",
+      "market-listed": "Poista se markkinoilta: {route}. Poista sitten tietue työkalulla {tool} (avain {key}).",
+      "market-record": "Poista tietue työkalulla {tool} (avain {key}; {route}).",
+      "need-open": "Sulje se: {route}. Poista sitten tietue työkalulla {tool} (avain {key}).",
+      "agent": "Poista se julkisesta agenttilistasta työkalulla {tool}: lisää sen tunnisteisiin \"{tag}\" ({route}).",
+      "named-share": "Päätä jako työkalulla {tool} (consent_id {id}; {route}). Seuraava luku estetään. Jo ladatut kopiot jäävät osapuolelle.",
+      "party": "Pysäytä osapuoli työkalulla {tool}, toiminto \"stop\" ({stop}), tai poista se toiminnolla \"delete\" ({remove}). Poisto päättää heti sen avaimet, tunnukset ja jaot.",
+      "app-public": "Poista sovellus kaikista listoista työkalulla {tool} (toiminto \"settings\", listing \"unlisted\") ja valitse siellä, kuka saa avata sen: open_to \"signed-in\" tai \"organism:<id>\", tai pääsykoodi access_code ({route}). {remove} poistaa sovelluksen.",
+      "app-narrow": "Valitse työkalulla {tool} (toiminto \"settings\"), kuka saa avata sovelluksen: open_to \"organism:<id>\" yhdelle yhteiselle paikalle, tai pääsykoodi access_code, jolloin vain koodin tietävät avaavat sen ({route}). {remove} poistaa sovelluksen.",
+      "app-internet": "Sovellus on avoinna kaikille internetissä {date} asti avauksella, jolla on oma syy ja historia. Sulje avaus työkalulla {tool} ({route}). Sen jälkeen sovellus näkyy taas vain kirjautuneille.",
+      "workspace-page": "Lopeta sivun jakaminen työkalulla {tool} ({args}) tai pyynnöllä {route}.",
+      "organism": "Muuta yhteinen paikka yksityiseksi työkalulla {tool} ja näkyvyydellä \"private\" ({route}).",
+      "organism-members": "Näytä jäsenlista vain kirjautuneille: {route}.",
+      "board": "Sulje taulu: {route}, tai poista se työkalulla {remove}.",
+      "portfolio-public": "Valitse työkalulla {tool}, kuka saa avata sivun (access \"signed-in\" tai \"organism:<id>\"), tai sulje sivu: {route}.",
+      "portfolio-narrow": "Sulje sivu: {route}, tai rajaa työkalulla {tool}, kuka saa avata sen (access \"organism:<id>\").",
+      "company": "Valitse työkalulla {tool}, kuka saa avata sivun (access \"signed-in\" tai \"organism:<id>\"), tai lopeta yrityksen osoitteen palvelu valinnalla kind \"none\" ({route}).",
+      "memory": "Muuta tietue yksityiseksi työkalulla {tool} ja näkyvyydellä \"private\" ({route}), tai poista se työkalulla {remove} ({removeRoute}).",
+      "file": "Muuta tiedosto yksityiseksi: {route}, tai poista se työkalulla {remove} ({removeRoute}).",
+      "knowledge-package": "Poista paketti luettelosta: {route}. {remove} avaimelle {key} poistaa sen.",
+      "knowledge-entry": "Muuta merkintä yksityiseksi: {route}, tai työkalulla {tool} ja näkyvyydellä \"private\".",
+      "knowledge-record": "Muuta merkintä yksityiseksi työkalulla {tool} ja näkyvyydellä \"private\", tai poista se työkalulla {remove}.",
+      "skill": "Muuta taito vain omaksesi työkalulla {tool} ja näkyvyydellä \"owner\" ({route}).",
+      "datapackage": "Vedä datapaketti pois työkalulla {tool} ja viitteellä \"{ref}\" ({route}): jokainen luku saa vastauksen 410, ja paketti poistuu luettelosta. Lisää ?purge=true, jos haluat poistaa myös sen tiedostot. Jos haluat vain rajata lukijoita, julkaise paketti uudelleen näkyvyydellä \"private\"."
+    },
+    "titles": {
+      "offering": "Tarjous: {name}", "offering-off": "Tarjous: {name} (pois markkinoilta, tietue on yhä luettavissa)",
+      "need": "Tarve: {name}", "need-closed": "Tarve: {name} (suljettu, tietue on yhä luettavissa)",
+      "members": "Paikan {name} jäsenet", "portfolio": "Tervetulosivusi", "stored-by": "{name} (tallentaja {holder})"
+    },
+    "notes": {
+      "signed-in-node": "Tämä palvelin näyttää sisältönsä vain omille kirjautuneille tileilleen (ylläpitäjän asetus). Siksi mikään tässä ei ole auki tuntemattomille eikä pelkän linkin haltijalle: se, mikä muuten olisi julkista, näkyy listassa kirjautuneille avoimena, ja mitä nyt muutat julkiseksi, tallentuu kirjautuneille. Ainoa poikkeus on internetiin avattu sovellus lomakkeineen: se näkyy julkisena, kunnes avaus päättyy.",
+      "presigned": "Listassa ei ole latausosoitetta, joka on tehty yhden tiedoston jakamista varten (esiallekirjoitettu linkki). Se vanhenee itsestään, ja annoit sen jollekulle tarkoituksella.",
+      "access-code": "Listassa ei ole sovellusta, jolla on pääsykoodi, ylläpitäjän piilottamaa sovellusta eikä salasanan takana olevaa työtilan jakoa: tuntematon tarvitsee myös koodin tai salasanan.",
+      "named-readers": "Listassa eivät ole jakoryhmät, työtilojen jäsenluettelot eivätkä työtilaan jaetut tietueet: jokainen niistä nimeää lukijansa.",
+      "workspace-page": "Jaettu työtilan sivu lasketaan sellaisena kuin nimetön kävijä sen saa. Se näkyy työtilan luojalle sekä yhteisen paikan luojalle, omistajille ja ylläpitäjille, koska jokainen heistä voi sulkea sen.",
+      "market-record": "Vaihdannan tarjous tai tarve jää julkiseksi tietueeksi, kun se poistuu markkinoilta. Se lasketaan, kunnes tietue poistetaan.",
+      "item-cap": "Jokaisesta lajista listataan enintään {n} kohdetta. Luvuissa on mukana kaikki löydetty.",
+      "store-limit": "Osa listoista luetaan tallennuksen rajaan asti: vaihdannan tarjoukset ja tarpeet (kumpiakin 5000 tällä palvelimella) ja yhden jaetun työtilan tilan tietueet (5000)."
     },
     "named": {
       "sharesTitle": "Nimetyt jaot", "sharesSub": "datatuote yhdelle ihmiselle tai ohjelmalle tiettyyn päivään asti",
@@ -11351,6 +11434,8 @@
   "notiftext.approval_goal_model_spend.body": "{agent} lisäsi tavoitteeseesi ”{goal}” tehtävän ”{work}” AIMEATin tekoälylle. {agent} ei itse saa käyttää tekoälyäsi, joten tehtävän kulu odottaa sinun päätöstäsi. Jos sallit, tekoäly tekee tämän tehtävän ja ne tekoälytehtävät, jotka {agent} lisää tähän tavoitteeseen myöhemmin. Jos et salli, tätä tehtävää ei tehdä.",
   "notiftext.approval_living_ai_spend.title": "{who} loi elävän dokumentin, joka käyttäisi tekoälyäsi",
   "notiftext.approval_living_ai_spend.body": "{writer} loi elävän dokumentin ”{document}”. Dokumentti päivittyy tekoälysi avulla, ja sinä maksat sen omalla avaimellasi tai tekoälysaldostasi. {writer} ei itse saa käyttää tekoälyäsi, joten päivitys odottaa sinun päätöstäsi. Jos sallit, dokumentti päivittyy aikataulunsa mukaan. Jos et salli, tekoäly ei päivitä sitä, eikä rahaa kulu.",
+  "notiftext.approval_company_page_write.title": "{who} pyytää lupaa muuttaa yrityksesi {company} verkkosivua",
+  "notiftext.approval_company_page_write.body": "{writer} yritti tallentaa yrityksellesi {company} uuden verkkosivun. Kaikki näkevät tämän sivun yrityksen osoitteessa. {writer} saa tallentaa tiedostojasi, mutta se ei saa muuttaa yritystesi verkkosivuja. Jos sallit, {writer} voi tästä eteenpäin muuttaa ja poistaa tämän yrityksen verkkosivun. Jos et salli, sivu pysyy ennallaan.",
   "notiftext.approval_refinery_definition.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
   "notiftext.approval_refinery_definition.body": "Postinjalostamo hakee sähköpostisi ja tallentaa viestit työtilaan. Muutoksen jälkeen se lukee postilaatikkoa {mailbox} ja tallentaa jokaisen viestin työtilaan {workspace}. {who} ei saa tehdä tätä muutosta yksin, joten muutos odottaa hyväksyntääsi. Jos et salli, mikään ei muutu.",
   "notiftext.approval_refinery_definition_text.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
@@ -27871,6 +27956,17 @@
         "high": "Tekoäly ei päivitä dokumenttia, eikä rahaa kulu.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos haluat dokumentin pysyvän ajan tasalla. Jos agentti tai sovellus saa aina käyttää tekoälyäsi, anna sille tämä lupa. Silloin se ei enää kysy."
+      },
+      "approval_company_page_write": {
+        "title": "Sovellus pyytää lupaa muuttaa yrityksesi verkkosivua",
+        "short": "Sovellus tai agentti, joka saa tallentaa tiedostojasi, yritti muuttaa verkkosivua, jonka yrityksesi näyttää osoitteessaan.",
+        "what": "Yrityksesi verkkosivu on se, minkä kaikki näkevät yrityksen osoitteessa. Sovellus tai agentti saa tallentaa tiedostojasi, mutta sillä ei ole lupaa muuttaa yritystesi verkkosivuja. Siksi se ei voi muuttaa tätä sivua yksin, ja sinulta kysytään.",
+        "lowLabel": "Jos sallit",
+        "low": "Sovellus tai agentti voi tästä eteenpäin muuttaa ja poistaa tämän yrityksen verkkosivun.",
+        "highLabel": "Jos et salli",
+        "high": "Sivu pysyy ennallaan, eikä sovellukselta tai agentilta kysytä tästä uudelleen.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos teet yrityksesi verkkosivun tällä sovelluksella. Jos et tiedä, miksi sovellus haluaa muuttaa sivua, älä salli."
       },
       "approval_schedule_instruction": {
         "title": "Joku muutti ajastusta",

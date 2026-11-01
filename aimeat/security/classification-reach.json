@@ -2178,6 +2178,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/services/company/company-page-key.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-01 (secaudit2026oct31w2 round 11), the node's own read: the service-owned record company-page-writers.<company id> that holds which writers the owner allowed to change a company's page through the file routes. Nothing of it is shown to anyone or sent to a model."
+    },
     "src/services/living-pulse-spend.ts": {
       "reads": {
         "getMemory": 2
@@ -2533,10 +2539,10 @@
     },
     "src/services/portfolio-read-hold.ts": {
       "reads": {
-        "getMemory": 1,
+        "getMemory": 4,
         "getStorageFile": 1
       },
-      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. Nothing of the page is shown to anyone or sent to a model."
+      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. 2026-11-01 (secaudit2026oct31w2 round 11): the same record read again by the generic write's note and the once-only step, and the finished record of that step under system@<node>. Nothing of the page or the records is shown to anyone or sent to a model."
     },
     "src/services/portfolio-members.ts": {
       "reads": {
@@ -3114,11 +3120,24 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest namespace policy and the latest version for write guards."
     },
+    "src/services/dataproduct/on-change.ts": {
+      "reads": {
+        "listMemoryKeysByPrefix": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: at start, the addresses of every data product definition (dataproducts.*, a reserved, service-owned prefix) and each definition, to know which products run when a source changes and which sources they read. Nothing is shown to anyone; the run itself reads the sources through the source readers, which pass the classification reader."
+    },
     "src/services/dataproduct/schedule-input.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9.5), the node's own read: whether the data product definition a dataproduct schedule names exists. No content is shown."
+    },
+    "src/services/dataproduct/scheduled-job.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: the data product definition (dataproducts.<name>, service-owned) a run after a source change is for, to find its maker (runAs). Nothing is shown; the run reads the sources through the source readers."
     },
     "src/services/dataproduct/service.ts": {
       "reads": {

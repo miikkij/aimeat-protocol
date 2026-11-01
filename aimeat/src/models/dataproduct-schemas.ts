@@ -11,6 +11,7 @@
  *   DataProductBodySchema · DataProductRunBodySchema
  * @usage router.put('/v1/dataproducts/:name', ..., validateBody(DataProductBodySchema, config.nodeId), handler)
  * @version-history
+ *   v1.2.0 — 2026-11-01 — `schedule.on: "change"` (WP9c); the describe body (DataProductDescribeBodySchema).
  *   v1.1.0 — 2026-11-01 — `retention` { keep, unit } (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
@@ -47,7 +48,8 @@ export const DataProductFilterSchema = z.object({
     column: name, op: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'in']), value: z.unknown(),
 }).nullable();
 
-export const DataProductScheduleSchema = z.object({ cron: name, timezone: name.optional() }).nullable();
+/** A clock { cron, timezone? }, or { on: "change" } to run when a source changes (definition.ts checks which). */
+export const DataProductScheduleSchema = z.object({ cron: name.optional(), timezone: name.optional(), on: z.literal('change').optional() }).nullable();
 
 export const DataProductRetentionSchema = z.object({ keep: z.number().int().min(1).max(1000), unit: z.enum(['versions', 'months']).optional() }).nullable();
 
@@ -67,6 +69,9 @@ export const DataProductBodySchema = z.object({
     visibility: DataProductVisibilitySchema.optional(),
     confirm_personal_public: z.boolean().optional(),
 }).strict();
+
+/** POST /v1/dataproducts/{name}/describe: a draft body (or none, for the stored definition) and the language. */
+export const DataProductDescribeBodySchema = DataProductBodySchema.extend({ lang: z.enum(['en', 'fi', 'es']).optional() }).strict();
 
 /** POST /v1/dataproducts/{name}/run takes no fields. */
 export const DataProductRunBodySchema = z.object({}).strict().optional();
