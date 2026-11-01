@@ -12,6 +12,10 @@
  * @structure registerPartyTool(mcp, config, storage, caller)
  * @usage registerPartyTool(mcp, config, storage, caller);   // from registerCoreDataPackageTools
  * @version-history
+ *   v1.2.0 — 2026-11-01 — "share" takes `email` (the one-time link is sent with the share) and
+ *     "send_link" sends it again; aimeat_admin_app_party_registrations, the operator's list and decision
+ *     of the apps that ask to let people register (plan D4.3; WP9b).
+ *   v1.1.0 — 2026-11-01 — "share" takes `recipient`: a person on another AIMEAT node (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3.4).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -25,12 +29,16 @@ import { toolError } from './tool-error.js';
 import { scopeDeniedText } from './scope-denied-answer.js';
 import {
     createParty, listParties, getParty, updateParty, stopParty, resumeParty, deleteParty, createKey, deleteKey,
-    readsOfParty, shareWithParty, type PartyAnswer, type PartyServiceCtx,
+    readsOfParty, type PartyAnswer, type PartyServiceCtx,
 } from '../services/parties/service.js';
+import { sendShareLink, shareAndSend } from '../services/parties/invite.js';
+import { decideRegistration, listRegistrationRequests } from '../services/app-parties/owner.js';
+import type { AppOpOutcome } from '../services/app-op-outcome.js';
 import { operatorSetStop } from '../services/parties/admin.js';
 import { PARTY_MANAGE_SCOPE } from '../services/parties/contract.js';
 
-const SHARE_FIELDS = ['name', 'package', 'purpose', 'days', 'expires', 'kind', 'display_name', 'contact', 'pinned_version', 'allow_url_key', 'terms_required', 'new_key'] as const;
+const SHARE_FIELDS = ['name', 'recipient', 'package', 'purpose', 'days', 'expires', 'kind', 'display_name', 'contact', 'pinned_version', 'allow_url_key', 'terms_required', 'new_key', 'email', 'locale'] as const;
+const LINK_FIELDS = ['share', 'email', 'locale'] as const;
 const PARTY_FIELDS = ['name', 'kind', 'display_name', 'contact'] as const;
 
 export function registerPartyTool(
@@ -64,7 +72,8 @@ export function registerPartyTool(
             return answer(await operatorSetStop({ storage, config }, owner, name, action === 'stop', typeof a.reason === 'string' ? a.reason : undefined));
         }
         switch (action) {
-            case 'share': return answer(await shareWithParty(ctx, pick(a, SHARE_FIELDS)));
+            case 'share': return answer(await shareAndSend(ctx, pick(a, SHARE_FIELDS)));
+            case 'send_link': return answer(await sendShareLink(ctx, name, pick(a, LINK_FIELDS)));
             case 'create': return answer(await createParty(ctx, pick(a, PARTY_FIELDS)));
             case 'list': return answer(await listParties(ctx));
             case 'get': return answer(await getParty(ctx, name));
@@ -79,7 +88,28 @@ export function registerPartyTool(
                 return answer(await deleteKey(ctx, name, keyId));
             }
             case 'reads': return answer(await readsOfParty(ctx, name));
-            default: return toolError('INVALID_INPUT', 'action is one of share, create, list, get, update, stop, resume, delete, key_create, key_delete, reads.');
+            default: return toolError('INVALID_INPUT', 'action is one of share, send_link, create, list, get, update, stop, resume, delete, key_create, key_delete, reads.');
         }
+    });
+
+    // The operator decides the apps' requests to let people register without an account (D4.3,
+    // AIMEAT_PARTY_SELF_REGISTRATION=apps-ask): the functions GET and POST /v1/admin/app-party-registrations call.
+    mcp.registerTool('aimeat_admin_app_party_registrations', {
+        description: descriptionFor('aimeat_admin_app_party_registrations'), inputSchema: zodShapeFor('aimeat_admin_app_party_registrations'),
+        annotations: annotationsFor('aimeat_admin_app_party_registrations'),
+    }, async (args) => {
+        const c = caller();
+        if (!(await c.operator('operator:admin'))) return toolError('FORBIDDEN', 'Deciding which apps may let people register is for the operator of this node, with operator:admin.');
+        const a = args as Record<string, unknown>;
+        const appAnswer = (out: AppOpOutcome) => (out.ok
+            ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] }
+            : toolError(out.code, out.message));
+        if (a.action === 'decide') {
+            const owner = typeof a.owner === 'string' ? a.owner.trim() : '';
+            const app = typeof a.app === 'string' ? a.app.trim() : '';
+            if (!owner || !app) return toolError('INVALID_INPUT', 'action "decide" needs owner and app.');
+            return appAnswer(await decideRegistration({ storage, config }, c.principal, { owner, filename: app }, { decision: a.decision, ...(typeof a.reason === 'string' ? { reason: a.reason } : {}) }));
+        }
+        return appAnswer(await listRegistrationRequests({ storage, config }));
     });
 }

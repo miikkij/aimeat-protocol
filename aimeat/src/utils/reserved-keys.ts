@@ -20,6 +20,20 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-11-01 -- `datapkg-exchange.` is service-owned: the EXCHANGE sale terms of a data package, written
+ *     only by the data package service (services/datapackage/sale-terms-record.ts; WP9e). A new prefix.
+ *   2026-11-01 -- `company-page-writers.` is service-owned: which writers without company:write the owner
+ *     allowed to change a company's page through the file routes (services/company/company-page-key.ts;
+ *     secaudit2026oct31w2 round 11). A new prefix, so nothing wrote it through the memory API before.
+ *   2026-11-01 -- `dsp.` is service-owned: the Dataspace Protocol negotiations, transfers, archive and
+ *     package settings of an owner (services/dataspace/; plan doc-mvwxcas3dom3, D8). An agreement there
+ *     names the share it made, so a principal that could write it could forge an agreement. A new prefix.
+ *   2026-11-01 -- `app-parties.` and `app-party-data.` are service-owned: the people who registered to an
+ *     app, and what each keeps in it (services/app-parties/; plan doc-mvwxcas3dom3, D4).
+ *   2026-11-01 -- `party-purchases.` is service-owned: the EXCHANGE purchases of outside parties, one
+ *     record per provider per month (services/exchange-party-buy.ts; plan doc-mvwxcas3dom3, D5.4).
+ *   2026-11-01 -- `datapkg-freshness-notices` is a service-owned key: the stale notices the owner was
+ *     sent (plan doc-mvwxcas3dom3, D6.2).
  *   2026-11-01 -- SERVICE_OWNED_KEYS, exact service-owned keys: `parties`, the owner's outside parties and
  *     their key hashes, and the prefix `party-reads.`, their read log; only services/parties/ writes
  *     either (plan doc-mvwxcas3dom3, D2, D3.5). Both are new, so nothing wrote them through the memory API.
@@ -432,8 +446,14 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * of the `latest.json` pointer and the descriptor tag, which the generic storage routes write. The
  * service's writeLatest is its one writer, straight to storage. A new prefix: nothing wrote it through
  * the memory API before this.
+ *
+ * `datapkg-exchange.` (2026-11-01, WP9e) is the EXCHANGE sale terms of a data package
+ * (services/datapackage/sale-terms-record.ts): the price, the model and the usage terms a buyer signs
+ * under. They lived on the `latest.json` pointer, which an app with storage:write rewrites. The
+ * service's setPackageExchange is its one writer, straight to storage; a new prefix, so nothing wrote it
+ * through the memory API before this.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'dataproducts.', 'party-reads.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'datapkg-exchange.', 'living-spend-hold.', 'company-page-writers.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.', 'dsp.'];
 
 /**
  * Exact keys one named service owns, under the same rule as SERVICE_OWNED_KEY_PREFIXES: no memory route
@@ -446,8 +466,12 @@ export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.po
  * Its sibling `party-reads.<yyyy-mm>`, the read log, is a prefix above: a principal that could write it
  * could erase the record of who read the owner's data. An exact key rather than a prefix because the
  * collection is one record (lead decision L3), and `parties.x` is an ordinary key.
+ *
+ * `datapkg-freshness-notices` (2026-11-01, plan doc-mvwxcas3dom3 D6.2) is which stale data packages the
+ * owner was told about (services/datapackage/freshness-sweep.ts). A principal that could write it could
+ * keep the owner from hearing that a package went stale. A new key: nothing wrote it before.
  */
-export const SERVICE_OWNED_KEYS: readonly string[] = ['parties'];
+export const SERVICE_OWNED_KEYS: readonly string[] = ['parties', 'datapkg-freshness-notices'];
 
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
@@ -466,11 +490,18 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['mcp.tasks.', 'an MCP task, and only the MCP server writes it. Read it with tasks/get over MCP 2026-07-28.'],
   ['commerce.platform-fee.', 'the operator\'s fee on a money sale, and only the checkout writes it. The operator reads the totals on GET /v1/admin/dashboard.'],
   ['dataproducts.', 'a data product definition, and only the data product service writes it. Read and change it with /v1/dataproducts/{name} or the aimeat_dataproduct MCP tool.'],
+  ['app-parties.', 'the people who registered to one of your apps and its signup setting, and only the app party service writes it. Read them with GET /v1/apps/{owner}/{app}/parties.'],
+  ['app-party-data.', 'what a person registered to one of your apps keeps in it, and only the app party service writes it. The app reads and writes it with /v1/apps/{owner}/{app}/party-data/{key}.'],
+  ['dsp.', 'a Dataspace Protocol negotiation, transfer or setting of your data packages, and only the dataspace service writes it. Read them with GET /v1/dataspace/negotiations or the aimeat_dataspace MCP tool.'],
+  ['party-purchases.','the EXCHANGE purchases outside parties made of your data packages, and only the purchase service writes it. Read them with GET /v1/exchange/offerings/{id}/consumers.'],
   ['party-reads.', 'the read log of your outside parties, and only the party service writes it. Read it with GET /v1/parties/{name}/reads or the aimeat_party MCP tool (action reads).'],
   ['parties', 'your outside parties and their keys, and only the party service writes it. Read and change them with /v1/parties or the aimeat_party MCP tool.'],
+  ['datapkg-freshness-notices', 'which of your data packages you were told are out of date, and only the node writes it. Read a package\'s freshness with GET /v1/datapackages/{owner}/{name}.'],
   ['portfolio-read-hold.', 'whether your welcome page may read your memory, and only the node writes it. You allow a page with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
   ['datapkg-audience.', 'who reads a data package, and only the data package service writes it. Publish with POST /v1/datapackages or the aimeat_datapackage_publish MCP tool, which takes the visibility.'],
+  ['datapkg-exchange.', 'the EXCHANGE sale terms of a data package, and only the data package service writes it. Set them with PUT /v1/datapackages/{owner}/{name}/exchange or the aimeat_datapackage_sell MCP tool.'],
   ['living-spend-hold.', 'whether a living document may refresh itself with your AI, and only the node writes it. You allow it with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
+  ['company-page-writers.', 'which apps and agents may change your company\'s page through the file routes, and only the node writes it. You allow one with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
 ];
 
 /**

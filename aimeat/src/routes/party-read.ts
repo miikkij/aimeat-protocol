@@ -21,6 +21,11 @@
  * @structure PartyReadOpts · PartyAdmitted · partyReaderFor
  * @usage const p = await partyReaderFor(req, res, deps, { owner, name, version, what: 'rows' }); if (p === null) return;
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A data read takes the token of a DSP transfer (plan D8.4): the data address
+ *     a DSP agreement hands out is this party token, bound to the agreement's share.
+ *   v1.1.0 — 2026-11-01 — An admitted party carries `charge()`: a share an EXCHANGE purchase made meters
+ *     each data read against the purchase (402 PREPAID_ENDED when it is used up). sendReadRefusal and
+ *     renderMeteredRead are shared with routes/package-reader.ts (plan doc-mvwxcas3dom3, D5.3, D5.4).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.1, D3.2; lead decision L2).
  */
 import type { Request, Response } from 'express';
@@ -31,6 +36,10 @@ import { partyCredentialOf, verifyParty } from '../services/parties/verify.js';
 import { partyReadVerdict } from '../services/parties/read-gate.js';
 import { logPartyRead } from '../services/parties/activity.js';
 import type { DatapackageReader } from '../services/datapackage/audience.js';
+import { meterPackageRead } from '../services/datapackage/contract-read.js';
+import type { MeteredOutcome } from '../services/metered-access.js';
+import { meteredRefusalText } from './extensions/metered-response.js';
+import { logger } from '../utils/logger.js';
 
 export interface PartyReadOpts {
     /** The owner and the package the path names. */
@@ -51,6 +60,47 @@ export interface PartyAdmitted {
     version?: string;
     /** Write the served read to the owner's read log. */
     served: (rows?: number) => void;
+    /**
+     * Meter one DATA read before it is sent (plan D5.3): a share a purchase made charges its prepaid
+     * contract, any other share charges nothing. False when the read was refused and the answer is sent.
+     */
+    charge: () => Promise<boolean>;
+}
+
+/** Send a read refusal: the OData error shape on the feed (with the Basic challenge on a 401), else the envelope. */
+export function sendReadRefusal(
+    res: Response, nodeId: string, odata: boolean | undefined, status: number, code: string, message: string, details?: Record<string, unknown>,
+): void {
+    if (status === 401 && odata) res.setHeader('WWW-Authenticate', 'Basic realm="aimeat", charset="UTF-8"');
+    if (odata) {
+        res.status(status).setHeader('Content-Type', 'application/json;odata.metadata=minimal');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.send(JSON.stringify({ error: { code, message, ...(details ? { details } : {}) } }));
+        return;
+    }
+    res.status(status).json(error(nodeId, code, message, undefined, details));
+}
+
+/**
+ * Render a metered data read's outcome: true when the read goes on (settled, or the provider's own),
+ * else the refusal is sent (402 for a spent budget, an inactive contract or a used-up purchase).
+ */
+export function renderMeteredRead(
+    res: Response, config: AimeatConfig, odata: boolean | undefined, outcome: MeteredOutcome, label: string,
+): boolean {
+    if (outcome.kind === 'settled') {
+        // The beneficiary book (services/metered-settlement.ts) never throws; a failure here is logged and the read goes on.
+        void outcome.accrue().catch(err => logger.warn('party-read: the beneficiary accrual of a metered read failed', { label, error: String(err) }));
+        return true;
+    }
+    if (outcome.kind === 'free_owner') return true;
+    if (outcome.kind === 'no_right') {
+        sendReadRefusal(res, config.nodeId, odata, 402, 'CONTRACT_REQUIRED', `Reading ${label} needs an EXCHANGE contract. Accept its offering first.`);
+        return false;
+    }
+    const r = meteredRefusalText(outcome, label, config);
+    sendReadRefusal(res, config.nodeId, odata, r.status, r.code, r.message);
+    return false;
 }
 
 /** Decide the party half of one read. See the file header for the three answers. */
@@ -59,17 +109,10 @@ export async function partyReaderFor(
 ): Promise<PartyAdmitted | 'none' | null> {
     const cred = partyCredentialOf(req, opts.urlKey ? { urlKeyOwner: opts.owner } : {});
     if (!cred) return 'none';
-    const send = (status: number, code: string, message: string, details?: Record<string, unknown>) => {
-        if (status === 401 && opts.odata) res.setHeader('WWW-Authenticate', 'Basic realm="aimeat", charset="UTF-8"');
-        if (opts.odata) {
-            res.status(status).setHeader('Content-Type', 'application/json;odata.metadata=minimal');
-            res.setHeader('X-Content-Type-Options', 'nosniff');
-            res.send(JSON.stringify({ error: { code, message, ...(details ? { details } : {}) } }));
-            return;
-        }
-        res.status(status).json(error(deps.config.nodeId, code, message, undefined, details));
-    };
-    const verdict = await verifyParty(deps, cred);
+    const send = (status: number, code: string, message: string, details?: Record<string, unknown>) =>
+        sendReadRefusal(res, deps.config.nodeId, opts.odata, status, code, message, details);
+    // A data read takes the token of a DSP transfer too; the read gate holds it to its one share (plan D8.4).
+    const verdict = await verifyParty(deps, cred, { transferKeys: true });
     if (!verdict.ok) { send(verdict.status, verdict.code, verdict.message); return null; }
     const ctx = verdict.ctx;
     if (ctx.owner !== opts.owner) {
@@ -89,5 +132,10 @@ export async function partyReaderFor(
     // A response decided for this caller is never a shared cache's to keep.
     res.setHeader('Cache-Control', 'private, no-store');
     res.vary('Authorization');
-    return { reader: gate.reader, ...(gate.version ? { version: gate.version } : {}), served: gate.served };
+    const charge = async (): Promise<boolean> => {
+        if (!gate.contract) return true;
+        const outcome = await meterPackageRead(deps, { caller: ctx.partyRef, owner: opts.owner, name: opts.name });
+        return renderMeteredRead(res, deps.config, opts.odata, outcome, `pkg:${opts.owner}/${opts.name}`);
+    };
+    return { reader: gate.reader, ...(gate.version ? { version: gate.version } : {}), served: gate.served, charge };
 }

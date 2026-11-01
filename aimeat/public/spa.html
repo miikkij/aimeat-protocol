@@ -590,6 +590,7 @@
       "/js/services/catalogue.js": "/js/services/catalogue.js",
       "/js/services/chat.js": "/js/services/chat.js",
       "/js/services/consent.js": "/js/services/consent.js",
+      "/js/services/dataproducts.js": "/js/services/dataproducts.js",
       "/js/services/cortex.js": "/js/services/cortex.js",
       "/js/services/extensions.js": "/js/services/extensions.js",
       "/js/services/federation.js": "/js/services/federation.js",
@@ -1204,6 +1205,9 @@
       // The owner allows another account's capability to have their outside app run one action
       // (services/eco-capability-approvals.ts). A spaRoute in routes/portal.ts too, or F5 is a 404.
       '/v1/eco-capability-allow': () => import('/views/eco-capability-allow.js' + B),
+      // A share link a person with no account opens (services/parties/invite.ts, WP9b). In
+      // data/spa-page-paths.ts too, or F5 is a 404.
+      '/v1/shared-data': () => import('/views/shared-data.js' + B),
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),
@@ -1246,6 +1250,10 @@
       // The whole account record, and the archive behind it: /v1/home?history=1
       if (pathname === '/v1/home' && /[?&]history=/.test(search)) {
         return () => import('/views/home/history.js' + B);
+      }
+      // The place's activity log, every action done in it (/v1/home?trail=1, "Rakennamme kanssasi").
+      if (pathname === '/v1/home' && /[?&]trail=/.test(search)) {
+        return () => import('/views/home/trail.js' + B);
       }
       // The home's agent pages: a new agent before it exists (/v1/home?new-agent=1), one agent at
       // work (/v1/home?agent=<name>), and the computers agents run on (/v1/home?computers=1; the
@@ -1291,6 +1299,10 @@
       // Portfolio public view: /v1/portfolio/<username>
       if (pathname.startsWith('/v1/portfolio/') && pathname !== '/v1/portfolio/') {
         return () => import('/views/portfolio.js' + B);
+      }
+      // The public dataset page of one data package: /v1/dataset/<owner>/<name> (routes/portal.ts, WP9b)
+      if (/^\/v1\/dataset\/[^/]+\/[^/]+\/?$/.test(pathname)) {
+        return () => import('/views/dataset.js' + B);
       }
       // One app's "Use with your AI" guide: /v1/use-with-ai/<owner>/<file>
       if (/^\/v1\/use-with-ai\/[^/]+\/[^/]+\/?$/.test(pathname)) {
@@ -2102,7 +2114,13 @@
               // A node the store sold has its owner already, so its sign-in offers no registration
               // (Jouni v27 P3): the pill says "Sign in" instead of "Sign in / Register".
               // Its dialog has no "Create account" tab either: others come in by invitation (v31 K24).
-              ...(customerNode() ? { buttonText: t('siteStart.signInPill'), signInOnly: true } : {}),
+              // The button carries a short form for a phone, which top-bar.css shows under 420px
+              // ("Kirjaudu", Jouni 1.11 13.50). Both are locale strings, inserted as the button's HTML.
+              ...(customerNode() ? {
+                buttonText: '<span class="topnav-sign-full">' + t('siteStart.signInPill') + '</span>'
+                  + '<span class="topnav-sign-short">' + t('siteStart.signInPillShort') + '</span>',
+                signInOnly: true,
+              } : {}),
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               i18n: authI18n(),

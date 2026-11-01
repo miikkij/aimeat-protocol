@@ -9,6 +9,8 @@
  * @structure catalogueRouter(config, storage, directoryService?) — GET /v1/catalogue,
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
+ *   2026-11-01 — GET /v1/catalogue/knowledge: a data package's `datapackage` block carries `freshness`
+ *     against its producer's promise, read for the page's packages only (plan doc-mvwxcas3dom3, D6.1).
  *   2026-11-01 — GET /v1/catalogue/dcat, the DCAT-AP feed of the public data packages, is mounted here
  *     (routes/catalogue-dcat.ts) before GET /v1/catalogue/:actionId (plan doc-mvwxcas3dom3, D1.3).
  *   2026-11-01 — GET /v1/catalogue/knowledge: a data package's item carries `datapackage`, its descriptor,
@@ -57,6 +59,8 @@ import { readerFor } from '../services/classification/reader.js';
 import { presentMemories, classificationWarningOf } from '../services/classification/present-memory.js';
 import { logger } from '../utils/logger.js';
 import { datasetFactsOf, datapackageListing } from '../services/datapackage/catalogue-facts.js';
+import { packageFreshness } from '../services/datapackage/freshness-read.js';
+import { freshnessBrief } from '../services/datapackage/freshness.js';
 import { mountCatalogueDcat } from './catalogue-dcat.js';
 
 /** Shape of a stored knowledge-package manifest value (memory record `value`). */
@@ -377,6 +381,17 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const total = manifests.length;
     const paged = manifests.slice((page - 1) * perPage, page * perPage);
 
+    // The freshness of each data package on this page, against its producer's promise (D6.1): the
+    // pointer and the product definition of the page's packages only.
+    const freshnessByKey = new Map<string, ReturnType<typeof freshnessBrief>>();
+    await Promise.all(paged.map(async m => {
+      const f = m.value?.content_type === 'dataset' ? datasetFactsOf(m) : null;
+      if (!f) return;
+      const fr = await packageFreshness({ storage, config }, f.ownerGhii, f.name,
+        f.producerKind ? { schedule: f.schedule ?? '', producerKind: f.producerKind } : {});
+      if (fr) freshnessByKey.set(`${m.ownerGaii}|${m.key}`, freshnessBrief(fr));
+    }));
+
     const items = paged.map(m => {
       const v = m.value;
       const packageId = m.key.replace('packages/', '').replace('/manifest', '');
@@ -401,7 +416,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         sharing: v.sharing,
         created: v.created || m.createdAt,
         updated: v.updated || m.updatedAt,
-        ...(dataset ? { datapackage: datapackageListing(config.baseUrl, dataset) } : {}),
+        ...(dataset ? { datapackage: { ...datapackageListing(config.baseUrl, dataset), ...(freshnessByKey.get(`${m.ownerGaii}|${m.key}`) ? { freshness: freshnessByKey.get(`${m.ownerGaii}|${m.key}`) } : {}) } } : {}),
       };
     });
 

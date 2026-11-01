@@ -29,6 +29,11 @@
  *   const ctx = createExposureContext(storage, config);
  *   const items = await source.list(ctx, 'alice', 'alice@node');
  * @version-history
+ *   v1.4.0 — 2026-11-01 — ExposureItem.close (ExposureClose, closeAs): the instruction to close it as a
+ *     code and the identifiers it names, so a page says it in its language (WP9c).
+ *   v1.3.0 — 2026-11-01 — ExposureItem.share and .party: a named share's and an outside party's facts as
+ *     fields, so the owner's page draws them as rows (WP9a).
+ *   v1.2.0 — 2026-11-01 — ExposureItem.freshness: a data package's or a named share's package state (D6.1).
  *   v1.1.0 — 2026-11-01 — The level `named` and the kinds `named_share` and `outside_party`: what the
  *     person shares with outside parties (./sources-parties.ts; plan doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
@@ -60,6 +65,12 @@ export const KINDS = [
 
 export type ExposureKind = typeof KINDS[number];
 
+/** How to close one thing, as a code and the identifiers the instruction names (no words in them). */
+export interface ExposureClose { code: string; values: Record<string, string> }
+
+/** An ExposureClose: `close('record', { key, route })`. */
+export const closeAs = (code: string, values: Record<string, string> = {}): ExposureClose => ({ code, values });
+
 /** One thing someone outside can read. */
 export interface ExposureItem {
   kind: ExposureKind;
@@ -67,6 +78,8 @@ export interface ExposureItem {
   id: string;
   /** What a person recognises it by. */
   title: string;
+  /** For a title the node words itself (an offering, a member list, a welcome page): its code and the names in it. */
+  title_parts?: ExposureClose;
   level: ExposureLevel;
   /** Present exactly when `level` is 'organism': the organism whose members read it. */
   organism_id?: string;
@@ -74,6 +87,22 @@ export interface ExposureItem {
   url?: string;
   /** One plain sentence, naming the MCP tool and the REST route that close it. */
   how_to_close: string;
+  /**
+   * The same instruction as a stable code and the identifiers it names (routes, tools, ids), so a page
+   * says it in its own language; `how_to_close` stays the English sentence for an AI.
+   */
+  close?: ExposureClose;
+  /** A data package's freshness against its producer's promise: fresh, late, stale or unscheduled. */
+  freshness?: string;
+  /** A named share's facts, for a page that lists the shares as rows (kind named_share). */
+  share?: {
+    package: string; party: string; party_name: string; party_kind: string; purpose: string;
+    expires: string | null; last_read_at: string | null; reads_7d: number;
+  };
+  /** An outside party's facts (kind outside_party). */
+  party?: {
+    name: string; display_name: string; party_kind: string; shares: number; keys: number; key_last_used_at: string | null;
+  };
 }
 
 /**

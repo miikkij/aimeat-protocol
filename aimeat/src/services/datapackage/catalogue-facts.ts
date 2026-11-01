@@ -24,6 +24,8 @@
  * @usage
  *   const facts = (await allDatasetFacts(storage)).filter(f => f.audience === 'public');
  * @version-history
+ *   v1.1.0 — 2026-11-01 — datasetLandingUrl names the public dataset page /v1/dataset/{owner}/{name}
+ *     (board Julkinen-sivu); it named the public knowledge viewer, which shows no data package (WP9b).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.1, D1.3, D1.4).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -224,9 +226,13 @@ export interface DatasetLinks {
   landing?: string;
 }
 
-/** The public dataset page of one catalogue entry: the public knowledge viewer opened on it. */
-export function datasetLandingUrl(baseUrl: string, catalogueId: string): string {
-  return `${baseUrl.replace(/\/+$/, '')}/v1/publicknowledgeviewer?id=${encodeURIComponent(catalogueId)}`;
+/**
+ * The public dataset page of one data package (board Julkinen-sivu; public/views/dataset.js, its head
+ * from ./landing-page.ts): what DCAT's landingPage, schema.org's url, the dataset sitemap and the
+ * IndexNow notice name.
+ */
+export function datasetLandingUrl(baseUrl: string, owner: string, name: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/v1/dataset/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 }
 
 /**
@@ -270,7 +276,7 @@ export async function publicDatasetFacts(config: AimeatConfig, storage: Storage)
 export async function publicDatasetPages(config: AimeatConfig, storage: Storage): Promise<Array<{ loc: string; lastmod: string }>> {
   if (config.seoIndexing === 'off') return [];
   return (await publicDatasetFacts(config, storage))
-    .map(f => ({ loc: datasetLandingUrl(config.baseUrl, f.catalogueId), lastmod: f.modified.slice(0, 10) }));
+    .map(f => ({ loc: datasetLandingUrl(config.baseUrl, f.owner, f.name), lastmod: f.modified.slice(0, 10) }));
 }
 
 /** The addresses of one package. `landing` only when the package is public. */
@@ -283,6 +289,6 @@ export function datasetLinks(baseUrl: string, f: Pick<DatasetFacts, 'owner' | 'n
     odata: `${b}/v1/odata/${path}`,
     odps: `${b}/v1/datapackages/${path}/odps`,
     schemaOrg: `${b}/v1/datapackages/${path}?format=schemaorg`,
-    ...(f.audience === 'public' ? { landing: datasetLandingUrl(b, f.catalogueId) } : {}),
+    ...(f.audience === 'public' ? { landing: datasetLandingUrl(b, f.owner, f.name) } : {}),
   };
 }

@@ -17,6 +17,7 @@
  *   const doc = AppToolsDocSchema.parse(rec.value);
  *   const pacing = toolTollMorsels(tool);   // tollMorsels + a deprecated price.morsels
  * @version-history
+ *   v1.8.0 — 2026-11-01 — A tool takes `deliversData`, the provider's statement for its EXCHANGE listing (plan D5.5).
  *   v1.7.0 — 2026-10-11 — A morsel is pacing, never a price. isToolPriced is money only; a tool's
  *     `price.morsels` is deprecated and read as pacing (toolTollMorsels, isToolOffered,
  *     normalizeToolPacing, presentToolPacing), refused from 4.0.0 (legacyToolPriceRefusal). A `price`
@@ -148,6 +149,8 @@ export const AppToolSchema = z.object({
    * product. Text past an ODPS cap on a flagged tool is refused at the write when it changed.
    */
   exchange: z.boolean().optional(),
+  /** Whether the listing delivers data (plan D5.5). Absent: the node proposes it from outputSchema. */
+  deliversData: z.boolean().optional(),
   /** Usage licence surfaced on the projected offering (mandatory to list — the legibility gate). */
   usageTerms: z.object({
     derivatives: z.boolean().optional(),

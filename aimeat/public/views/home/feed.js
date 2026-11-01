@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-11-01: dataspace_request, filed under access: a data space participant asks for a package and
+ *     the agreement waits for the owner (plan doc-mvwxcas3dom3, D8.3).
  *   2026-10-29: agent_permissions_added, filed under access: one of your agents gave another new
  *     permissions, and where to take them away.
  *   2026-10-27: operator_acted for a restored backup names how many of your entries and agents it
@@ -232,6 +234,9 @@ export function line(item) {
       return tr('home.feed.contractStarted', 'A contract started: {name}.').replace('{name}', d.name || '');
     case 'contract_ended':
       return tr('home.feed.contractEnded', 'A contract ended: {name}.').replace('{name}', d.name || '');
+    case 'dataspace_request':
+      return tr('home.feed.dataspaceRequest', '{who} asks to use {name} through a data space. Approve or decline it.')
+        .replace('{who}', d.who || '').replace('{name}', d.name || '');
     case 'app_granted':
       return tr('home.feed.appGranted', 'You gave {name} access.').replace('{name}', d.name || '');
     case 'app_revoked':
@@ -311,7 +316,7 @@ export function kindCategory(kind) {
     'agent_removed', 'two_factor_reset_by_operator', 'session_token_reused', 'agent_device_takeover'].includes(k)) return 'trouble';
   if (['payment_received', 'payment_sent', 'checkout_completed', 'app_tool_paid', 'ai_spend_daily',
     'contract_started', 'contract_ended'].includes(k)) return 'money';
-  if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
+  if (['consent_granted', 'consent_revoked', 'dataspace_request', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
     'passkey_added', 'passkey_removed', 'password_changed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept', 'agent_permissions_added'].includes(k)) return 'access';
   return 'system';

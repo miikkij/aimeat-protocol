@@ -26,6 +26,9 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-11-01 — aimeat_admin_app_party_registrations is probed on its decide branch (WP9b).
+ *   2026-11-01 — aimeat_dataspace is probed on its decline branch; list and settings in dataspace-dispatch.test.ts (plan D8.3).
+ *   2026-11-01 — aimeat_datapackage_sell is probed with a pkg:owner/name ref (plan doc-mvwxcas3dom3, D5.1).
  *   2026-11-01 — aimeat_datapackage_withdraw is probed with a pkg:owner/name ref (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-25 — aimeat_publish_requests is probed with a request_id, which `account` rides on (secaudit2026oct22).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
@@ -112,6 +115,13 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     aimeat_datapackage_export: { shaped: { ref: 'pkg:zqxrefzqx/zqxrefzqx' }, always: { format: 'json' } },
     // ref is matched against the same pattern; owner and name go into the DELETE path.
     aimeat_datapackage_withdraw: { shaped: { ref: 'pkg:zqxrefzqx/zqxrefzqx' } },
+    aimeat_datapackage_sell: { shaped: { ref: 'pkg:zqxrefzqx/zqxrefzqx' } },
+    // action='settings' (the enum sentinel) carries only package and auto_agree; 'decline' carries the
+    // negotiation and the reason. The list and settings branches are measured in dataspace-dispatch.test.ts.
+    aimeat_dataspace: { always: { action: 'decline' } },
+    // action='list' (the default) reads nothing; 'decide' carries owner and app in the path and the
+    // decision and reason in the body, so the probe holds the decision's companions (WP9b).
+    aimeat_admin_app_party_registrations: { always: { action: 'decide', owner: 'zqxownerzqx', app: 'zqxappzqx', decision: 'approve' } },
     // `account` names whose request an operator reads or answers, so it rides on one request (request_id);
     // the list is always the caller's own account.
     aimeat_publish_requests: { always: { request_id: 'zqxrequest_idzqx' } },
@@ -240,6 +250,12 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
         state: 'Same condition and the same test.',
         request_id: "Conditional, not dropped: it rides only on action='decide'; measured in test/unit/package-sale-dispatch.test.ts.",
         decision: 'Same condition and the same test.',
+    },
+    aimeat_dataspace: {
+        state: "Conditional, not dropped: it rides only on action='list', and the probe holds `action` at 'decline'. "
+            + 'The list branch is measured in test/unit/dataspace-dispatch.test.ts.',
+        waiting: 'Same condition and the same test.',
+        auto_agree: "Conditional, not dropped: it rides only on action='settings' with a package; measured in test/unit/dataspace-dispatch.test.ts.",
     },
     aimeat_knowledge_contribute: {
         package_id: 'This tool is deliberately unreachable from the connector — see knowledgeContributeUnreachable().',

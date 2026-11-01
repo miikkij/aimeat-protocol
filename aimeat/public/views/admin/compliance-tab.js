@@ -31,6 +31,8 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.7.0 — 2026-11-01 — Section 12, data intermediation (compliance-tab.intermediation.js; board
+ *     Admin-Compliance, plan doc-mvwxcas3dom3 D7, WP9b), after the agreements.
  *   v3.6.0 — 2026-10-28 — "Fill these in for me" also brings the app makers' answers into entries
  *     already saved, for the questions they leave open; the CSV carries each answer's reason; the
  *     line under the verdict counts the makers' answers.
@@ -84,6 +86,7 @@ import { groupGaps, answerStats, classCounts } from './compliance-tab.gaps.js';
 import { RegisterSection, QuestionnaireSection, classWord } from './compliance-tab.register.js';
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
 import AgreementsSection from './compliance-agreements-section.js';
+import IntermediationSection from './compliance-tab.intermediation.js';
 import PrintableReport, { answerText } from './compliance-tab.print.js';
 import SavedReports, { readableId } from './compliance-tab.saved.js';
 import { RecordsSection, RecordsGapsSection, RecordsPromptSection } from './compliance-tab.records.js';
@@ -516,6 +519,7 @@ export default function ComplianceTab(props) {
           onPrint=${(regs, title) => setPrintOnly({ registers: regs, title })}
           onChanged=${() => load(days)} />` : null}
         <${AgreementsSection} num="11" onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
+        <${IntermediationSection} di=${report.data_intermediation} switchPage=${switchPage} onChanged=${() => load(days)} onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
       <//>
       <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} found=${found} only=${printOnly} />
     <//>

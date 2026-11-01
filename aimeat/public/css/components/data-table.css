@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.3.0 — 2026-11-01 — .data-table--form (cells that hold controls) and .data-table--stack (one block
+ *     per row at 560px and narrower, each cell labelled with its head); additive (WP9c).
  *   v1.2.0 — 2026-09-28 — .data-table-wrap: a table wider than the page scrolls sideways instead of
  *     being cut off (the admin sharing-groups table at 390 px); additive.
  *   v1.1.0 — 2026-09-27 — .data-table--compact (DataTable compact): the old app catalogue's backup import
@@ -62,3 +64,27 @@
 .data-table--compact .poster-status { padding: 2px 6px; font-family: inherit; font-size: .62rem; font-weight: var(--weight-semibold); line-height: normal; }
 .data-table--compact .select-field { width: auto; min-width: 0; margin-top: 2px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--shape-corner-control); background: var(--surface); font-family: inherit; font-size: .78rem; font-weight: var(--weight-regular); line-height: normal; color: var(--text); }
 
+
+/* The form table (DataTable form, the data product wizard): cells that hold a check, a text field or
+   a select. Each control fills its cell, the cells sit on one middle line so a row of fields and its
+   words line up, and a row keeps its colour under the pointer (a hover tint behind a field reads as a
+   selection). */
+.data-table--form td { vertical-align: middle; color: var(--text); }
+.data-table--form tr:hover td { background: none; }
+.data-table--form td > .og-input, .data-table--form td > .select-field { box-sizing: border-box; width: 100%; min-width: 6rem; }
+.data-table--form td > .check { margin: 0; }
+
+/* The stacking table (DataTable stack): on a phone each row is one block and each cell carries its
+   column head as a label (data-label), in the listing's label face (listing.css list--labels). */
+@media (max-width: 560px) {
+  .data-table--stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .data-table--stack, .data-table--stack tbody, .data-table--stack tr, .data-table--stack td { display: block; width: 100%; }
+  .data-table--stack tr { padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .data-table--stack td { padding: 4px 10px; border-bottom: 0; }
+  .data-table--stack td:empty { display: none; }
+  .data-table--stack td[data-label]::before {
+    content: attr(data-label); display: block; margin-bottom: 2px;
+    font-family: var(--font-mono); font-size: .68rem; font-weight: var(--weight-regular); color: var(--text-dim);
+    text-transform: var(--shape-case-label); letter-spacing: var(--shape-tracking-label);
+  }
+}

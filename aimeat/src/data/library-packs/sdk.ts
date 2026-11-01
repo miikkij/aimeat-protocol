@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.36.0 — 2026-11-01 — aimeat-parties (sdk-parties.ts): an app's users without an account (plan D4.2).
  *   v1.35.1 — 2026-10-30 — aimeat-commerce's aiDoc adds that a buyer who paid a seller who does not run
  *     the node confirms the card once before the adult check is recorded (secaudit2026oct26 round 8c,
  *     commerce-07; Jouni, 2026-10-30).
@@ -165,6 +166,7 @@ import { AI_PACKS } from './sdk-ai.js';
 import { LABELS_PACKS } from './sdk-labels.js';
 import { VALIDATE_PACKS } from './sdk-validate.js';
 import { DATAPACKAGE_PACKS } from './sdk-datapackage.js';
+import { PARTIES_PACKS } from './sdk-parties.js';
 
 export const SDK_PACKS: LibraryPack[] = [
   ...CALENDAR_PRINT_PACKS,
@@ -347,6 +349,7 @@ export const SDK_PACKS: LibraryPack[] = [
   ...DECIDE_PACKS,
   ...REFINERY_PACKS,
   ...DATAPACKAGE_PACKS,
+  ...PARTIES_PACKS,
   {
     id: 'aimeat-iam',
     kind: 'sdk',

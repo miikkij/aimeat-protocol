@@ -22,6 +22,9 @@
  *     PERSONAL_DATA_PUBLIC, nothing written) until the request confirms; the confirmation stays on the
  *     package; a map row naming the package's own family decides alone.
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The public page is /v1/dataset/{owner}/{name} in every listing, the feed, the
+ *     sitemap and schema.org; D1.4d its head carries the Dataset JSON-LD for a public package only (WP9b;
+ *     the address was the knowledge viewer, so these assertions fail on the previous code).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.1 to D1.7).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=datapackage-discovery
@@ -139,7 +142,7 @@ await test('D1.1a A\'s own scope lists A\'s packages as type dataset, with audie
     assert(d.audience === 'public' && d.rowCount === 2 && d.resources[0].name === 'items' && d.resources[0].fields === 2, `dataset ${JSON.stringify(d)}`);
     assert(typeof d.lastPublishedAt === 'string' && !d.lastError, `freshness ${JSON.stringify(d)}`);
     assert(d.links.descriptor.includes('/datapackage.json') && d.links.odata.endsWith(`/v1/odata/${A.name}/${P.pub}`)
-        && d.links.odps.endsWith(`/${P.pub}/odps`) && d.links.landing.includes('/v1/publicknowledgeviewer?id='), `links ${JSON.stringify(d.links)}`);
+        && d.links.odps.endsWith(`/${P.pub}/odps`) && d.links.landing.endsWith(`/v1/dataset/${A.name}/${P.pub}`), `links ${JSON.stringify(d.links)}`);
     const priv = own.find(e => e.id === pkgOf(P.priv))!;
     assert(priv.dataset.audience === 'private' && priv.visibility === 'owner' && !priv.dataset.links.landing, `private entry ${JSON.stringify(priv)}`);
     const orgE = own.find(e => e.id === pkgOf(P.org))!;
@@ -203,7 +206,7 @@ await test('D1.1g GET /v1/catalogue/knowledge names a dataset\'s descriptor, ODa
     assert(item, `no item for ${P.pub}: ${JSON.stringify(items.map(i => i.datapackage?.package_id))}`);
     const dp = item.datapackage;
     assert(dp.descriptor_url.endsWith('/datapackage.json') && dp.odata_url.includes('/v1/odata/') && dp.odps_url.includes('/odps')
-        && dp.landing_url.includes('publicknowledgeviewer') && dp.resources[0].csv_url.endsWith('/data/items.csv'), `datapackage ${JSON.stringify(dp)}`);
+        && dp.landing_url.endsWith(`/v1/dataset/${A.name}/${P.pub}`) && dp.resources[0].csv_url.endsWith('/data/items.csv'), `datapackage ${JSON.stringify(dp)}`);
     const csv = await call(pathOf(dp.resources[0].csv_url));
     assert(csv.status === 200 && csv.text.includes('id'), `csv: ${show(csv)}`);
     const listed = items.map(i => i.datapackage?.package_id);
@@ -254,7 +257,7 @@ await test('D1.3a JSON-LD: a dcat:Catalog with the public datasets, their distri
     const ds = sets.find((s: Body) => s['dct:identifier'] === pkgOf(P.pub));
     assert(ds['@type'] === 'dcat:Dataset' && ds['dct:title'] === 'Shortage list' && ds['dct:description'], `dataset ${JSON.stringify(ds).slice(0, 400)}`);
     assert(ds['dct:publisher']['foaf:name'] === A.name && ds['dct:license']?.['rdfs:label'] === 'CC-BY-4.0', `publisher/license ${JSON.stringify([ds['dct:publisher'], ds['dct:license']])}`);
-    assert(ds['dct:issued']['@type'] === 'xsd:dateTime' && ds['dcat:landingPage']['@id'].includes('publicknowledgeviewer'), 'issued/landingPage');
+    assert(ds['dct:issued']['@type'] === 'xsd:dateTime' && ds['dcat:landingPage']['@id'].endsWith(`/v1/dataset/${A.name}/${P.pub}`), 'issued/landingPage');
     const dists = [].concat(ds['dcat:distribution']) as Body[];
     const csv = dists.find(d => d['dcat:mediaType']?.['@id']?.endsWith('text/csv'));
     assert(csv && csv['dcat:downloadURL']['@id'].endsWith('/data/items.csv') && csv['dcat:accessURL'] && Number(csv['dcat:byteSize']['@value']) > 0, `csv dist ${JSON.stringify(csv)}`);
@@ -326,7 +329,7 @@ await test('D1.4c ?format=schemaorg answers a schema.org Dataset; the public one
     assert(r.status === 200 && r.type.includes('application/ld+json'), show(r));
     const doc = JSON.parse(r.text);
     assert(doc['@context'] === 'https://schema.org' && doc['@type'] === 'Dataset' && doc.name === 'Shortage list', `doc ${r.text.slice(0, 300)}`);
-    assert(doc.license === 'CC-BY-4.0' && doc.url.includes('publicknowledgeviewer') && doc.isAccessibleForFree === true, `license/url ${JSON.stringify([doc.license, doc.url])}`);
+    assert(doc.license === 'CC-BY-4.0' && doc.url.endsWith(`/v1/dataset/${A.name}/${P.pub}`) && doc.isAccessibleForFree === true, `license/url ${JSON.stringify([doc.license, doc.url])}`);
     assert(doc.distribution[0]['@type'] === 'DataDownload' && doc.distribution[0].contentUrl.endsWith('/data/items.csv'), 'distribution');
     assert(doc.variableMeasured.map((v: Body) => v.name).join(',') === 'id,label', `variables ${JSON.stringify(doc.variableMeasured)}`);
     const d = await call(`/v1/datapackages/${A.name}/${P.pub}`);
@@ -335,6 +338,20 @@ await test('D1.4c ?format=schemaorg answers a schema.org Dataset; the public one
     assert(mem.status === 200 && !JSON.parse(mem.text).url, `members: ${show(mem)}`);
     const anon = await call(`/v1/datapackages/${A.name}/${P.priv}?format=schemaorg`);
     assert(anon.status === 404, `private to anyone: ${anon.status}`);
+});
+
+await test('D1.4d The public dataset page carries its title and the schema.org Dataset in the head; a private one none, and noindex', async () => {
+    const page = await fetch(`${BASE}/v1/dataset/${A.name}/${P.pub}`, { signal: AbortSignal.timeout(60_000) });
+    const text = await page.text();
+    assert(page.status === 200 && (page.headers.get('content-type') ?? '').includes('text/html'), `page ${page.status}`);
+    assert(text.includes('<title>Shortage list') && text.includes('"@type":"Dataset"') && text.includes(`/v1/dataset/${A.name}/${P.pub}"`), `head: ${text.slice(0, 600)}`);
+    assert(!(page.headers.get('x-robots-tag') ?? '').includes('noindex'), `a public dataset page is indexable: ${page.headers.get('x-robots-tag')}`);
+    for (const n of [P.priv, P.mem, P.gone]) {
+        const other = await fetch(`${BASE}/v1/dataset/${A.name}/${n}`, { signal: AbortSignal.timeout(60_000) });
+        const body = await other.text();
+        assert(other.status === 200 && !body.includes('"@type":"Dataset"') && !body.includes(n) && (other.headers.get('x-robots-tag') ?? '').includes('noindex'),
+            `${n}: no head of its own and noindex (${other.headers.get('x-robots-tag')})`);
+    }
 });
 
 // ── D1.5 Discovery documents ─────────────────────────────────────────────────────────────────────

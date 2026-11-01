@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Core-settings wizard step (identity, storage, admin, network role, push/SMTP/metrics/site) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A new node is written with AIMEAT_DATA_INTERMEDIATION=none (plan doc-mvwxcas3dom3, D7.1).
  *   v1.1.0 — 2026-10-18 — A new node is written with the recommended content starting levels (NEW_NODE_CONTENT_DEFAULTS, plan doc-mvcn6c7e4e5q V5), and AIMEAT_PUBLISH_GATE=agents-and-apps (V4).
  *   v1.0.1 — 2026-10-16 — A "No" to push notifications writes AIMEAT_PUSH_ENABLED=false: the loader's default is on (QA audit D8-03).
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
@@ -198,6 +199,9 @@ export async function askCoreSettings(
   // A new node starts with agents and apps asking the owner before they make something public
   // (plan doc-mvcn6c7e4e5q, V4). The code default stays off, so a running node does not change.
   if (!env.AIMEAT_PUBLISH_GATE) settings.AIMEAT_PUBLISH_GATE = 'agents-and-apps';
+  // A new node intermediates no data until its operator decides to (plan doc-mvwxcas3dom3, D7.1). The
+  // code default stays report, so a running node does not change.
+  if (!env.AIMEAT_DATA_INTERMEDIATION) settings.AIMEAT_DATA_INTERMEDIATION = 'none';
   // A new node starts with the recommended levels for content nobody named a level for (plan V5).
   // The code defaults keep what a node did before these settings, so a running node does not change.
   for (const [k, v] of Object.entries(NEW_NODE_CONTENT_DEFAULTS)) if (!env[k]) settings[k] = v;

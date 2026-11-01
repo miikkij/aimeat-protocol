@@ -12,6 +12,8 @@
  * @structure registerScheduleKinds(scheduler, storage, config)
  * @usage registerScheduleKinds(scheduler, storage, config);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The change runner of the data products that run when a source changes is
+ *     installed here, with its run injected (WP9c).
  *   v1.0.0 — 2026-11-01 — The refinery and ai registrations moved here unchanged from service-init.ts;
  *     the dataproduct kind added (plan doc-mvwxcas3dom3, D9.5).
  */
@@ -20,9 +22,13 @@ import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { runRefineryJob } from '../services/refinery/scheduled-job.js';
 import { runAiJob } from '../services/scheduler-ai-job.js';
-import { runDataproductJob } from '../services/dataproduct/scheduled-job.js';
+import { runDataproductJob, runDataproductOnChange } from '../services/dataproduct/scheduled-job.js';
+import { installDataproductChangeRuns } from '../services/dataproduct/on-change.js';
 
 export function registerScheduleKinds(scheduler: Scheduler, storage: Storage, config: AimeatConfig): void {
+  // The data products that run when a source changes: the same build and the same actor rule as the
+  // dataproduct kind, started by a change instead of a clock (services/dataproduct/on-change.ts).
+  installDataproductChangeRuns({ storage, config }, (ownerGhii, name) => runDataproductOnChange(storage, config, ownerGhii, name));
   scheduler.registerKindExecutor('refinery', (job) => runRefineryJob(storage, config, job));
   // The `ai` kind for the same reason: it writes its answer through the shared memory write
   // service, which reaches the Scheduler, so the Scheduler cannot import it (secaudit 2026-10).

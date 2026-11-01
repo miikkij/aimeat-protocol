@@ -85,7 +85,7 @@
 
     <h2>1. Rekisterinpitäjä</h2>
     <p><strong>Rekisterinpitäjä:</strong> {{operatorName}}, {{operatorTypeLabel}}{{operatorBusinessIdClause}}, joka ylläpitää {{nodeName}}-AIMEAT-solmua.</p>
-    <p><strong>Postiosoite:</strong> {{operatorAddress}}</p>
+    {{operatorAddressBlock}}
     <p><strong>Yhteystiedot:</strong> <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a></p>
     <p><strong>Tietosuojavastaava:</strong> Ylläpitäjä ei ole velvollinen nimittämään tietosuojavastaavaa GDPR 37 art. mukaan (pienimuotoinen, ei-arkaluonteinen käsittely). Tietosuojakysymykset voi osoittaa yllä olevaan yhteystietoon.</p>
 
@@ -189,7 +189,7 @@
     <p>Lähdekoodi on avoin osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>, joten voit tarkistaa mitä palvelin oikeasti tekee sen sijaan että uskoisit tämän listan sanaan.</p>
 
     <h2>6. Kansainväliset tiedonsiirrot</h2>
-    <p>{{nodeName}}-solmua ylläpidetään {{operatorCountry}}sta ja sitä hostataan {{hostingName}}-infrastruktuurilla ({{hostingLocation}}). Jos molemmat lainkäyttöalueet ovat Euroopan talousalueella, tietojesi säilyttäminen ja tarjoilu ei sisällä siirtoa ETA:n ulkopuolelle.</p>
+    <p>{{nodeName}}-solmua ylläpidetään {{operatorCountryFrom}} ja sitä hostataan {{hostingName}}-infrastruktuurilla ({{hostingLocation}}). Jos molemmat lainkäyttöalueet ovat Euroopan talousalueella, tietojesi säilyttäminen ja tarjoilu ei sisällä siirtoa ETA:n ulkopuolelle.</p>
     <p>Kaksi asiaa voi sisältää siirron, ja ero on olennainen koska se ratkaisee kenen sopimus sitä koskee. <em>Oman</em> avaimesi tai liittämäsi ulkoisen tilin käyttö lähettää pyynnön <em>sinun</em> sopimuksesi nojalla sen tarjoajan kanssa. <em>Tämän solmun</em> tekoälyavaimen käyttö lähettää sen ylläpitäjän sopimuksen nojalla, ja jos tarjoaja on ETA:n ulkopuolella, ylläpitäjä tukeutuu siinä sopimuksessa sovittuun siirtomekanismiin. Kummassakin tapauksessa siirto tapahtuu koska pyysit jotain, ei taustalla.</p>
 
     <h2>7. Tietojen säilytysajat</h2>
@@ -214,7 +214,7 @@
     </table>
     <p><strong>Kaksi asiaa joita poisto ei voi viedä mukanaan, ja jotka on hyvä tietää ennen kuin painat nappia.</strong></p>
     <ul>
-      <li><strong>Kirjanpitoaineisto.</strong> Jos tilisi kautta on liikkunut rahaa, sen taustalla olevat tositteet säilytetään niin kauan kuin {{operatorCountry}}n kirjanpitolainsäädäntö vaatii, ja se on pidempään kuin tilisi elää. Niitä säilytetään vain siihen tarkoitukseen eikä käsitellä muuhun. GDPR 17(3)(b) sallii tämän, ja ehtona on että siitä kerrotaan sinulle.</li>
+      <li><strong>Kirjanpitoaineisto.</strong> Jos tilisi kautta on liikkunut rahaa, sen taustalla olevat tositteet säilytetään niin kauan kuin {{operatorCountryOf}} kirjanpitolainsäädäntö vaatii, ja se on pidempään kuin tilisi elää. Niitä säilytetään vain siihen tarkoitukseen eikä käsitellä muuhun. GDPR 17(3)(b) sallii tämän, ja ehtona on että siitä kerrotaan sinulle.</li>
       <li><strong>Provenance-tietueet sisällöstä joka on yhä julkista.</strong> Jos solmu tuotti jotain tekoälyllä ja sinä julkaisit sen, tieto siitä mikä malli sen teki säilyy niin kauan kuin sisältökin. Se on se mikä tekee kysymyksestä "kuka tämän teki" vastattavan, ja merkinnän riisuminen yhä luettavissa olevasta sisällöstä kumoaisi koko merkinnän tarkoituksen. Jos haluat tietueen pois, ota sisältö alas niin molemmat lähtevät.</li>
     </ul>
 
@@ -273,8 +273,7 @@
 
     <h2>16. Yhteystiedot</h2>
     <p>Tietosuojakysymykset: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a><br>
-    Tietoturva-asiat: <a href="mailto:{{operatorSecurityEmail}}">{{operatorSecurityEmail}}</a><br>
-    Postiosoite: {{operatorAddress}}</p>
+    Tietoturva-asiat: <a href="mailto:{{operatorSecurityEmail}}">{{operatorSecurityEmail}}</a>{{operatorAddressContact}}</p>
 </main>
 
 </div>

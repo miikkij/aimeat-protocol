@@ -12,15 +12,26 @@
  *     - buildAgentDataSection(): the section "Reading data your AGENTS produced".
  *   The provenance paragraph and the agents section moved here verbatim from
  *   services/build-app-prompt.ts when that file reached the 800-line limit; the text is unchanged.
- * @structure buildRenderedContentParagraphs() · buildAgentDataSection()
+ *     - buildOutsideUsersParagraph(): users without an account register as outside parties (2026-11-01).
+ * @structure buildRenderedContentParagraphs() · buildAgentDataSection() · buildOutsideUsersParagraph()
  * @usage
  *   body += buildRenderedContentParagraphs();   // last in the Data Storage section
  *   body += buildAgentDataSection();            // after the row-spaces section
  * @version-history
+ *   v1.1.0 — 2026-11-01 — ADDITIVE: buildOutsideUsersParagraph (plan doc-mvwxcas3dom3, D4.4).
  *   v1.0.1 — 2026-09-30 — The classification paragraph's action list names explorer and exception_list.
  *   v1.0.0 — 2026-09-29 — Initial: the provenance paragraph and the agents section moved verbatim,
  *     and the classification paragraph added (TARGET-082 V5).
  */
+
+/**
+ * ADDITIVE (plan doc-mvwxcas3dom3, D4.4): an app whose users have no AIMEAT account (a market place, a
+ * club, a shop) registers them as outside parties with aimeat-parties.js, and its map says so.
+ */
+export function buildOutsideUsersParagraph(): string {
+  return '### Users who have no AIMEAT account\n'
+    + 'When the app is for people who have no account on this node (the buyers and sellers of a market place, the members of a club, the customers of a shop), do not build your own sign-up or password store. Load `aimeat-parties.js`: `AIMEAT.parties.signUp(email)` mails the person a link, `await AIMEAT.parties.ready()` opens it when they come back, `AIMEAT.parties.me()` says who is signed in and their role, and `AIMEAT.parties.data.get/set/remove(key)` keeps one record per collection for that person only. The node lets them register only when its operator allows it and the owner opens the signup (`PUT /v1/apps/{owner}/{app}/parties/registration { "open": true }`); otherwise show that registration is closed. These people are personal data the owner holds, so the data map says so: `"registers-parties"` in `machinery`, or `"registers": { "who": "the buyers and sellers", "keeps": ["e-mail address", "listings"] }`.\n\n';
+}
 
 export function buildRenderedContentParagraphs(): string {
   let body = '';

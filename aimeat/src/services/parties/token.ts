@@ -18,6 +18,8 @@
  * @structure initPartyTokenKeys · mintPartyToken · verifyPartyToken · PartyTokenClaims
  * @usage const token = await mintPartyToken({ owner, uid, kid });  const claims = await verifyPartyToken(token);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The token of a party registered to an app names the app (`app`) and its
+ *     sign-in epoch (`ep`); ./verify.ts refuses it on every endpoint but that app's (plan D4.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.1; lead decision L2).
  */
 import { SignJWT, jwtVerify } from 'jose';
@@ -38,12 +40,22 @@ export interface PartyTokenClaims {
     owner: string;
     uid: string;
     kid: string;
+    /**
+     * Set on the token of a party registered to an app (services/app-parties/): `owner/filename`. Such
+     * a token is read only by that app's party endpoints; ./verify.ts refuses it everywhere else.
+     */
+    app?: string;
+    /** The app party's sign-in epoch: a sign-out raises it and ends every token minted before. */
+    ep?: number;
 }
 
 /** Sign a party token. The answer carries the prefix and is what the party sends as its Bearer value. */
 export async function mintPartyToken(claims: PartyTokenClaims, ttlSeconds: number = PARTY_TOKEN_TTL_SECONDS): Promise<string> {
     if (!_privateKey) throw new Error('Party token keys not initialized');
-    const jwt = await new SignJWT({ typ: 'party', owner: claims.owner, uid: claims.uid, kid: claims.kid })
+    const jwt = await new SignJWT({
+        typ: 'party', owner: claims.owner, uid: claims.uid, kid: claims.kid,
+        ...(claims.app ? { app: claims.app, ep: claims.ep ?? 0 } : {}),
+    })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setIssuedAt()
         .setExpirationTime(`${ttlSeconds}s`)
@@ -63,7 +75,8 @@ export async function verifyPartyToken(token: string): Promise<PartyTokenClaims 
         logger.debug('party token refused', { reason: (err as Error).message });
         return null;
     }
-    const { typ, owner, uid, kid } = payload;
+    const { typ, owner, uid, kid, app, ep } = payload;
     if (typ !== 'party' || typeof owner !== 'string' || typeof uid !== 'string' || typeof kid !== 'string' || !owner || !uid || !kid) return null;
-    return { owner, uid, kid };
+    if (app !== undefined && (typeof app !== 'string' || !app)) return null;
+    return { owner, uid, kid, ...(typeof app === 'string' ? { app, ep: typeof ep === 'number' ? ep : -1 } : {}) };
 }

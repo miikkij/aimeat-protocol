@@ -12,6 +12,16 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
+ *   2026-11-01 -- e2e-dataproduct-canvas.ts and e2e-data-share-visitor.ts join the list (not the guard tier): the canvas capabilities WP9c built (plan doc-mvwxcas3dom3, D9, D3).
+ *   2026-11-01 -- e2e-company-page-key.ts joins the list (not the guard tier): the bytes a company's address serves change only for a caller that may change the company page, on every upload route (secaudit2026oct31w2 round 11).
+ *   2026-11-01 -- e2e-package-compose-holder.ts joins the list (not the guard tier): compose packages only a cortex the composer holds (secaudit2026oct31w2 round 11).
+ *   2026-11-01 -- e2e-dsp.ts joins the list (not the guard tier): the Dataspace Protocol provider (plan doc-mvwxcas3dom3, D8).
+ *   2026-11-01 -- e2e-party-invite.ts joins the list (not the guard tier): the one-time share link and the engine reads as a party (WP9b).
+ *   2026-11-01 -- e2e-app-parties.ts joins the list (not the guard tier): an app's users as outside parties (plan doc-mvwxcas3dom3, D4).
+ *   2026-11-01 -- e2e-exchange-datapackage.ts joins the list (not the guard tier): a data package on EXCHANGE (plan doc-mvwxcas3dom3, D5).
+ *   2026-11-01 -- e2e-data-lifecycle.ts and e2e-data-intermediation.ts join the list (not the guard tier):
+ *     the data package lifecycle and the data intermediation setting (plan doc-mvwxcas3dom3, D6, D7).
  *   2026-11-01 -- e2e-party.ts and e2e-data-share.ts join the list (not the guard tier): outside parties and the named shares to them (plan doc-mvwxcas3dom3, D2, D3).
  *   2026-11-01 -- e2e-dataproduct.ts joins the list (not the guard tier): data products, six source kinds, three combine modes, audience, preview, schedule (plan doc-mvwxcas3dom3, D9).
  *   2026-11-01 -- e2e-datapackage-discovery.ts joins the list (not the guard tier): data packages in discovery, the DCAT feed, the dataset sitemap, schema.org, the MCP resource and the personal-data guard (plan doc-mvwxcas3dom3, D1).
@@ -1239,6 +1249,9 @@ const ALL_SUITES = [
     'test/e2e-app-visitors.ts',
     'test/e2e-outbound-organism-sender.ts',
     'test/e2e-companies.ts',
+    // The bytes a company's address serves change only for a caller that may change the company page,
+    // on every upload route, with the owner's one-press answer for an app (secaudit2026oct31w2 round 11).
+    'test/e2e-company-page-key.ts',
     'test/e2e-money-audit.ts',
     'test/e2e-x402.ts',
     'test/e2e-x402-testnet.ts',
@@ -1258,10 +1271,26 @@ const ALL_SUITES = [
     'test/e2e-datapackage-discovery.ts',
     // Data products: a definition builds a package version from six kinds of material (plan doc-mvwxcas3dom3, D9).
     'test/e2e-dataproduct.ts',
+    // The canvas capabilities WP9a lacked: a run when a source changes, the AI description draft, the column descriptions from the source (WP9c).
+    'test/e2e-dataproduct-canvas.ts',
     // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
     'test/e2e-party.ts',
     // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
     'test/e2e-data-share.ts',
+    // A named share to a person on another AIMEAT node: exactly that visitor reads, a namesake never (WP9c).
+    'test/e2e-data-share-visitor.ts',
+    // The lifecycle: freshness against the promise, one stale notice per spell, versions in use, retention spares a pin, live events (plan doc-mvwxcas3dom3, D6).
+    'test/e2e-data-lifecycle.ts',
+    // Data intermediation: the setting's four modes, the notification record, section 12's findings and Article 12 rows (plan doc-mvwxcas3dom3, D7).
+    'test/e2e-data-intermediation.ts',
+    // A data package sold on EXCHANGE: the projection, the metered feed, the outside buyer, deliversData, ODPS, the intermediation gate (plan doc-mvwxcas3dom3, D5).
+    'test/e2e-exchange-datapackage.ts',
+    // An app's own users as outside parties: the setting, signup by mail, data isolation, the roster (plan doc-mvwxcas3dom3, D4). Runs its own node with mail on.
+    'test/e2e-app-parties.ts',
+    // The one-time share link: the mail, preview, redeem once with a new key, the refusals, and DuckDB and pandas reading as a party (WP9b). Runs its own node with mail on (28566).
+    'test/e2e-party-invite.ts',
+    // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
+    'test/e2e-dsp.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
     // The conflicts in that report: each item's effective classification and cap, conflicts first,
@@ -1276,6 +1305,9 @@ const ALL_SUITES = [
     // What a data package read trusts: the audience the service wrote, the classification reader, and
     // the OData cache header by the package's audience (secaudit2026oct31w2 round 10).
     'test/e2e-datapackage-trusted-reads.ts',
+    // The rest of the package reads decide on the service's record too: the withdrawal, a share, a data
+    // product source, the EXCHANGE sale terms and the Dataspace catalogue (WP9e).
+    'test/e2e-datapackage-pointer-forgery.ts',
     'test/e2e-publish-gate-shared.ts',
     // The same gate on apps (listing, open_to, access code, first publish, fork), the welcome page and a company's front page (V4).
     'test/e2e-publish-gate-apps.ts',
@@ -1450,6 +1482,8 @@ const ALL_SUITES = [
     'test/e2e-mcp-install.ts',
     'test/e2e-packages.ts',
     'test/e2e-package-compose.ts',
+    // Compose packages only the composer's own cortexes; another account's is named in expects.
+    'test/e2e-package-compose-holder.ts',
     // A managed install: the package owns the code and layout, the owner keeps the settings, an
     // update replaces everything, and a fork gives the code back and ends the updates.
     'test/e2e-package-managed.ts',

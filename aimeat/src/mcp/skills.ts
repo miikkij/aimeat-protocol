@@ -14,6 +14,10 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-01 — aimeat_skill_list and aimeat_skill_get read the shared anonymous principal as a reader
+ *     with no account, as GET /v1/skills and GET /v1/skills/:name do: no skill at 'members' is listed
+ *     or returned to it, and an unscoped name is looked up in the node library only
+ *     (secaudit2026oct31w2 round 11).
  *   2026-10-26 — Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss):
  *     aimeat_skill_publish takes a file as { content, encoding: "base64" } and `keep_files`, as POST
  *     /v1/skills does; aimeat_skill_get takes `body_only` and `path` and answers FILE_NOT_FOUND for a
@@ -68,7 +72,7 @@ import { readSkillFileInput } from '../services/skill-files.js';
 import { SkillValidationError } from '../services/skill-md.js';
 import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent } from '../services/skill-agent-links.js';
 import type { SkillVisibility } from '../services/skill-audience.js';
-import { readerForAgent } from '../services/classification/reader.js';
+import { readerForAgent, readerFor } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { toolError } from './tool-error.js';
@@ -106,7 +110,12 @@ export function registerSkillsTools(
 
     // Node scope is the operator's, asked of THIS AGENT: an operator account's agent holding
     // operator:admin (services/operator-principal.ts), never the owner record alone.
-    const accessor = async (): Promise<SkillAccessor> => ({
+    // The shared anonymous principal reads as a reader with no account, as routes/skills.ts accessorOf
+    // reads it on REST: 'members' means this node's accounts, and that principal is not one of them.
+    const accessor = async (): Promise<SkillAccessor> => refusesAnonymous ? {
+        ownerName: null,
+        reader: readerFor({ storage, config }, null),
+    } : ({
         ownerName,
         isOperator: (await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null,
         sub: agentGaii,
@@ -264,7 +273,8 @@ export function registerSkillsTools(
             const candidates: string[] = [];
             if (ref) candidates.push(ref);
             else if (name) {
-                if (ownerName) candidates.push(`user:${ownerName}/${name}`);
+                // The caller's own registry first, which the shared anonymous principal does not have.
+                if (acc.ownerName) candidates.push(`user:${acc.ownerName}/${name}`);
                 candidates.push(`node:${name}`);
             } else {
                 return err('Provide ref or name');

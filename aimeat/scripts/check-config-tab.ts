@@ -18,6 +18,9 @@
  * @structure main() · groups vs DOMAINS · names · dead locale keys · unread settings · list and number rows
  * @usage pnpm check:config-tab
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The page's PAGE_GROUPS (a group that collects settings of several sections, the
+ *     "Data out" group of WP9b): a path one names counts in that group for the DOMAINS check, the group
+ *     needs its name, an entry that names no setting fails, and a section's name stays alive.
  *   v1.0.2 — 2026-10-25 — security.allow_private_egress is read from the environment the loader normalises.
  *   v1.0.1 — 2026-10-12 — security.owner_key_login and ai.legacy_settings_routes are read through the
  *     version gate beside their config key (ownerKeyLoginAllowed, aiLegacySettingsRoutesAllowed).
@@ -49,7 +52,19 @@ const fail = (title: string, items: string[], fix: string): void => {
 const tab = readFileSync(join(ROOT, 'public', 'views', 'admin', 'config-tab.js'), 'utf8');
 const listed = new Set<string>();
 for (const m of tab.matchAll(/\{ id: '\w+', groups: \[([^\]]+)\] \}/g)) for (const g of m[1].split(',')) listed.add(g.trim().replace(/'/g, ''));
-const groups = new Set(paths.map(p => p.split('.')[0]));
+// The page groups that collect settings of several sections (PAGE_GROUPS in config-tab.js): an entry is
+// a dot-path or `<section>.*`. A path one names is shown in that group, not in its section.
+const pageGroups: Array<[string, string[]]> = [];
+const pageBlock = /const PAGE_GROUPS = \{([\s\S]*?)\n\};/.exec(tab)?.[1] ?? '';
+for (const m of pageBlock.matchAll(/(\w+): \[([^\]]*)\]/g)) pageGroups.push([m[1], m[2].split(',').map(s => s.trim().replace(/'/g, '')).filter(Boolean)]);
+const groupOfPath = (p: string): string => pageGroups.find(([, list]) => list.some(e => (e.endsWith('.*') ? p.startsWith(e.slice(0, -1)) : e === p)))?.[0] ?? p.split('.')[0];
+const deadEntries = pageGroups.flatMap(([g, list]) => list.filter(e => !paths.some(p => (e.endsWith('.*') ? p.startsWith(e.slice(0, -1)) : e === p))).map(e => `${g}: ${e}`));
+fail('PAGE_GROUPS entries that name no setting', deadEntries, 'correct the dot-path in PAGE_GROUPS (public/views/admin/config-tab.js), or delete the entry');
+/** The groups the page shows: a page group, or a section none of them takes whole. */
+const groups = new Set(paths.map(groupOfPath));
+/** The sections themselves: their names still name the settings elsewhere (the admin menu find). */
+const sections = new Set(paths.map(p => p.split('.')[0]));
+const named = new Set([...groups, ...sections]);
 if (listed.size === 0) fail('DOMAINS not found in public/views/admin/config-tab.js', ['the list changed shape, so this gate is checking nothing'], 'fix the pattern in scripts/check-config-tab.ts');
 fail('Sections of the schema the index puts under "Other"', [...groups].filter(g => !listed.has(g)), 'name the section in DOMAINS (public/views/admin/config-tab.js)');
 fail('Names in DOMAINS that are no section of the schema', [...listed].filter(g => !groups.has(g)), 'delete the name from DOMAINS, or correct it to the first segment of the settings\' dot-path');
@@ -65,7 +80,7 @@ const locale = (tag: string): Record<string, string> => flat(JSON.parse(readFile
 const en = locale('en');
 fail('Settings with no name: the page prints the raw key twice', paths.filter(p => !(`dashboard.cfg_${under(p)}` in en)),
   'add dashboard.cfg_<path with dots as underscores> to locales/en.json, then fi and es');
-fail('Sections with no name', [...groups].filter(g => !(`dashboard.cfgGroup_${g}` in en)), 'add dashboard.cfgGroup_<section> to locales/en.json, then fi and es');
+fail('Sections with no name', [...named].filter(g => !(`dashboard.cfgGroup_${g}` in en)), 'add dashboard.cfgGroup_<section> to locales/en.json, then fi and es');
 const rawChoices: string[] = [];
 for (const f of fields) if (f.choices && !f.immutable && f.adminDisplay !== 'hidden') for (const c of f.choices) if (!(`dashboard.cfgOpt_${under(f.dotPath)}_${c}` in en)) rawChoices.push(`${f.dotPath} = ${c}`);
 fail('Fixed values the page shows as the raw value', rawChoices, 'add dashboard.cfgOpt_<path>_<value> to locales/en.json, then fi and es');
@@ -78,8 +93,8 @@ for (const tag of ['en', 'fi', 'es']) {
   const dead = keys.filter(k =>
     (/^dashboard\.cfg_/.test(k) && !validNames.has(k.slice('dashboard.cfg_'.length)))
     || (/^dashboard\.cfgDesc_/.test(k) && !validNames.has(k.slice('dashboard.cfgDesc_'.length)))
-    || (/^dashboard\.cfgGroup_/.test(k) && !groups.has(k.slice('dashboard.cfgGroup_'.length)))
-    || (/^dashboard\.cfgHelp_/.test(k) && !groups.has(k.slice('dashboard.cfgHelp_'.length)))
+    || (/^dashboard\.cfgGroup_/.test(k) && !named.has(k.slice('dashboard.cfgGroup_'.length)))
+    || (/^dashboard\.cfgHelp_/.test(k) && !named.has(k.slice('dashboard.cfgHelp_'.length)))
     || (/^dashboard\.cfgOpt_/.test(k) && !choicePrefixes.some(p => k.startsWith(p))));
   fail(`Config-tab keys in locales/${tag}.json that name no setting or section`, dead, 'delete the key: the setting it named is gone or was renamed');
 }

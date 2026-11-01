@@ -16,6 +16,8 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-11-01 — optionalAuth leaves the Dataspace Protocol paths (/dsp/2025-1) to their own verifier:
+ *     no session, no anonymous identity (services/dataspace/verifier.ts; plan doc-mvwxcas3dom3, D8.5).
  *   2026-11-01 — optionalAuth recognises an outside party's token by its prefix (aimeat_party_,
  *     services/parties/token.ts) and never turns it into req.auth: on an endpoint that takes a party
  *     (PARTY_TOKEN_ROUTES) it is left to that endpoint's verifier with no anonymous identity, and on any
@@ -153,6 +155,7 @@ import { withCurrentScopes } from './effective-scopes.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 import { PARTY_TOKEN_PREFIX, takesPartyToken } from '../services/parties/contract.js';
+import { takesDataspaceCredential } from '../services/dataspace/contract.js';
 
 export { enableAnonymousAuth, isAnonymousMode, getAnonymousCredentials } from './node-auth.js';
 
@@ -312,6 +315,11 @@ export function optionalAuth(opts: OptionalAuthOptions = {}) {
     else denyInvalidToken(req, res, message);
   };
   return async (req: Request, res: Response, next: NextFunction) => {
+    // A DATASPACE PROTOCOL ENDPOINT TAKES A PARTICIPANT'S CREDENTIAL, NEVER A SESSION (plan D8.5). A DCP
+    // self-issued token is a JWT this node did not sign, which the session check below would answer 401;
+    // those paths verify the header themselves (services/dataspace/verifier.ts) and never read req.auth,
+    // so nothing is set here, not even the anonymous identity.
+    if (takesDataspaceCredential(req.path)) { next(); return; }
     const token = extractToken(req);
     // AN OUTSIDE PARTY'S TOKEN IS NEVER A SESSION (plan doc-mvwxcas3dom3, lead decision L2). It is a
     // purpose token with its own prefix (services/parties/token.ts), so it is recognised here without a

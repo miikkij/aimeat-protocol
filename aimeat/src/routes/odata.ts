@@ -17,18 +17,22 @@
  *   at a permanent address, so a feed over the same rows is world-readable too. Putting a token in
  *   front of the feed while the CSV stays public would be theatre, not a control.
  *
- *   NOT METERED, AND SAYING SO. The design note for this target wants each feed request to be a
- *   billable event, and that is genuinely attractive — a downloaded file escapes measurement the
- *   moment it lands, and a feed does not. But metering needs an authenticated caller and an
- *   entitlement coordinate, which is a different door from this one, and a half-built meter that
- *   counted anonymous reads as free would misreport rather than under-report. So: no meter here, and
- *   the paid feed is a separate authenticated surface when it is built.
+ *   THE PAID FEED (plan doc-mvwxcas3dom3, D5.3). A package's own audience reads it unmetered, as
+ *   before. A package sold on EXCHANGE is read beyond its audience by an account holding a contract
+ *   on it, or by an outside party whose share a purchase made (routes/package-reader.ts); for those
+ *   two each entity set read is metered and charged against the contract after the rows were read
+ *   and before they are sent, so a failed or refused read is never charged. The service document and
+ *   $metadata are admitted by the contract and not charged. An anonymous read is never metered: it
+ *   holds no contract, so it reads only what the audience gives everyone.
  * @structure
  *   - GET /v1/odata/:owner/:name            the service document
  *   - GET /v1/odata/:owner/:name/$metadata  CSDL XML
  *   - GET /v1/odata/:owner/:name/:resource  the entity set
  * @usage app.use(odataRouter(config, storage))
  * @version-history
+ *   2026-11-01 -- The paid feed: an account's EXCHANGE contract admits it beyond the package's audience,
+ *     at the versions of the contract's interface, and each entity set read through a contract or a
+ *     purchased share is metered (routes/package-reader.ts; plan doc-mvwxcas3dom3, D5.3).
  *   2026-11-01 -- The feed takes an outside party (routes/party-read.ts): HTTP Basic (user
  *     `<owner>/<party>`, password the party key), which Excel, Power BI and Tableau send, or a party
  *     token. A wrong key is 401 with `WWW-Authenticate: Basic realm="aimeat"` so the client asks for it;
@@ -60,8 +64,7 @@ import { lacksPackageReadScope, ownerAuthOf } from '../services/datapackage/audi
 import { withdrawalOfRef, withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { toCsdl, parseQuery, applyQueryPaged, nextLinkFor, edmName, ODATA_SUPPORTED } from '../services/datapackage/odata.js';
 import type { Descriptor } from '../services/datapackage/contract.js';
-import type { DatapackageReader } from '../services/datapackage/audience.js';
-import { partyReaderFor } from './party-read.js';
+import { packageReaderFor } from './package-reader.js';
 
 /**
  * OData errors have their own shape, and a client renders it. The node envelope would be a body this
@@ -133,12 +136,12 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
      */
     const whoReads = async (req: Request, res: Response, what: string) => {
         const asked = typeof req.query.version === 'string' && req.query.version.trim() ? req.query.version.trim() : undefined;
-        const p = await partyReaderFor(req, res, store, {
+        // An outside party's share, an account's EXCHANGE contract, or req.auth (routes/package-reader.ts).
+        const who = await packageReaderFor(req, res, store, {
             owner: req.params.owner as string, name: req.params.name as string, what, odata: true, ...(asked ? { version: asked } : {}),
         });
-        if (p === null) return null;
-        if (p === 'none') return { reader: req.auth as DatapackageReader | undefined, ref: refOf(req), party: false, served: (_rows?: number) => {} };
-        return { reader: p.reader, ref: `pkg:${req.params.owner}/${req.params.name}${p.version ? `@${p.version}` : ''}`, party: true, served: p.served };
+        if (!who) return null;
+        return { reader: who.reader, ref: who.admitted ? who.ref : refOf(req), party: who.admitted, served: who.served, charge: who.charge };
     };
     /** Not opened: a party gets 404 (its share admitted it, so the package or version is not there); anyone else notOpened. */
     const refuseOpen = async (req: Request, res: Response, who: { party: boolean; ref: string }): Promise<void> => {
@@ -220,6 +223,8 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
         if (!all) { odataError(res, 404, 'NotFound', `Could not read ${resource.name} of ${ref}`); return; }
 
         const page = applyQueryPaged(all.rows, parsed.value, resource.schema);
+        // The paid feed: a read through a contract or a purchased share is metered before it is sent.
+        if (!(await who.charge())) return;
         who.served(page.rows.length);
         odataHeaders(res, !!req.query.version, opened.openToAnyone && !who.party);
         const entitySetUrl = `${serviceRoot(req)}/${encodeURIComponent(edmName(resource.name))}`;

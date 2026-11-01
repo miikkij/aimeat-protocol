@@ -25,6 +25,7 @@
  * @usage
  *   const key = await canonicalAppToolsKey(storage, ownerGhii, 'apps.nuotta.tools'); // 'apps.nuotta.html.tools'
  * @version-history
+ *   2026-11-01 — A datapackage listing's surface names no app, so it is not read for one (plan D5.1).
  *   v1.1.0 — 2026-10-18 — The record is claimed before the work (services/once-only-step.ts), and a
  *     manifest is created under the filename key only if that key is still empty (createMemoryIfAbsent),
  *     so a publish there while the step runs stays (check:atomic-writes).
@@ -129,7 +130,7 @@ async function carryManifests(
             const toKey = appToolsKey(canonical);
             if (await storage.getMemory(ownerGhii, toKey)) { taken(label); continue; }
             listed ??= (await listAllOfferings(storage)).filter(o => o.state === 'listed');
-            if (listed.some(o => o.providerOwner === owner.name && o.surface?.appId === appId)) {
+            if (listed.some(o => o.providerOwner === owner.name && o.surface?.kind !== 'datapackage' && o.surface?.appId === appId)) {
                 left.push(`${label} (it has a live EXCHANGE listing)`);
                 continue;
             }
