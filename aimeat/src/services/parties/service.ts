@@ -19,6 +19,8 @@
  *   stopParty · resumeParty · deleteParty · createKey · deleteKey · readsOfParty · shareWithParty
  * @usage const out = await createParty({ deps, caller }, body); if (!out.ok) render(out);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The list answers `share_max_days`, the longest share this node grants, so a
+ *     share form caps its end date before it asks, and `dataspace`, whether the Dataspace Protocol is on (WP9a).
  *   v1.1.0 — 2026-11-01 — Each share in a party's view carries `package_freshness` (plan D6.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3.4).
  */
@@ -131,7 +133,10 @@ export async function listParties(ctx: PartyServiceCtx): Promise<PartyAnswer<Rec
     const { parties } = await readParties(ctx.deps.storage, ctx.caller.ownerGhii);
     const out = [];
     for (const p of parties) out.push(await partyWithShares(ctx, p));
-    return { ok: true, data: { parties: out, total: out.length } };
+    // dataspace: whether this node speaks the Dataspace Protocol (AIMEAT_DATASPACE_ENABLED, plan D8), so a
+    // share form offers a dataspace party only where one can connect.
+    const dataspace = (ctx.deps.config as unknown as { dataspaceEnabled?: unknown }).dataspaceEnabled === true;
+    return { ok: true, data: { parties: out, total: out.length, share_max_days: Math.max(1, ctx.deps.config.shareMaxDays ?? 365), dataspace } };
 }
 
 export async function getParty(ctx: PartyServiceCtx, name: string): Promise<PartyAnswer<Record<string, unknown>>> {

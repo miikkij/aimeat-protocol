@@ -15,6 +15,8 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.6.0 — 2026-11-01 — The Dataspace Protocol provider's settings (config-dataspace.ts) are spread in
+ *     here, beside the other settings of data leaving the node (plan doc-mvwxcas3dom3, D8).
  *   v1.5.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION: off, the default |
  *     apps-ask | on; plan doc-mvwxcas3dom3, D4.3).
  *   v1.4.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION: report, the code default |
@@ -29,6 +31,8 @@
  *     executionLogRetentionDays and consentMaxPerUser moved from config.ts unchanged;
  *     classificationMode added (AIMEAT_CLASSIFICATION, TARGET-082).
  */
+
+import { dataspaceDefaults } from './config-dataspace.js';
 
 /** The node's classification switch. */
 export type ClassificationMode = 'off' | 'owner' | 'all';
@@ -82,6 +86,8 @@ export function dataAccessDefaults() {
     // Whether an app's own users may register as outside parties of its owner (services/app-parties/).
     // off, the default, refuses every signup; a node that shows its content to signed-in accounts only forces off.
     partySelfRegistration: parsePartySelfRegistration(process.env.AIMEAT_PARTY_SELF_REGISTRATION),
+    // The Eclipse Dataspace Protocol provider (services/dataspace/): off, and every list empty, by default.
+    ...dataspaceDefaults(),
   };
 }
 

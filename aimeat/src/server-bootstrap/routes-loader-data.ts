@@ -8,6 +8,7 @@
  *   stood, so what matches first is unchanged.
  * @structure mountDataRouters(app, config, storage)
  * @version-history
+ *   v1.3.0 — 2026-11-01 — dspRouter and dataspaceRouter: the Dataspace Protocol provider (plan D8).
  *   v1.2.0 — 2026-11-01 — exchangePartyBuyRouter: a buyer with no account buys a data package (plan D5.4).
  *   v1.1.0 — 2026-11-01 — partiesRouter: outside parties and named shares (plan doc-mvwxcas3dom3, D2, D3).
  *   v1.0.0 — 2026-11-01 — The data package and OData mounts moved from routes-loader.ts with their
@@ -21,6 +22,8 @@ import { dataProductsRouter } from '../routes/dataproducts.js';
 import { odataRouter } from '../routes/odata.js';
 import { partiesRouter } from '../routes/parties.js';
 import { exchangePartyBuyRouter } from '../routes/exchange-party-buy.js';
+import { dspRouter } from '../routes/dsp/index.js';
+import { dataspaceRouter } from '../routes/dataspace.js';
 
 export function mountDataRouters(app: express.Express, config: AimeatConfig, storage: Storage): void {
   // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
@@ -39,4 +42,8 @@ export function mountDataRouters(app: express.Express, config: AimeatConfig, sto
   app.use(partiesRouter(config, storage));
   // A buyer with no account buys a data package on EXCHANGE and becomes an outside party (D5.4).
   app.use(exchangePartyBuyRouter(config, storage));
+  // The Eclipse Dataspace Protocol provider (plan D8): the DSP endpoints a connector calls, which
+  // answer 404 while AIMEAT_DATASPACE_ENABLED is off, and the owner's and the operator's reads.
+  app.use(dspRouter(config, storage));
+  app.use(dataspaceRouter(config, storage));
 }

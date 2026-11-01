@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "DidServiceSchema",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/definitions/DidService"
+    }
+  ],
+  "$id": "https://w3id.org/dspace/2025/1/common/did-service-schema.json",
+  "definitions": {
+    "DidService": {
+      "type": "object",
+      "properties": {
+        "@context": {
+          "allOf": [
+            {
+              "$ref": "https://w3id.org/dspace/2025/1/common/context-schema.json"
+            },
+            {
+              "type": "array",
+              "contains": {
+                "type": "string",
+                "const": "https://www.w3.org/ns/did/v1"
+              }
+            }
+          ]
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "DataService",
+            "CatalogService"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "serviceEndpoint": {
+          "type": "string",
+          "pattern": "https?://.*?/catalog$"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "serviceEndpoint"
+      ]
+    }
+  }
+}

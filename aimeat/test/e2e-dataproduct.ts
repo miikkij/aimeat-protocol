@@ -20,6 +20,9 @@
  *   file, and cannot read, run or delete A's definition; an agent without memory:write is refused; an
  *   agent with the words defines and previews over MCP.
  * @version-history
+ *   v1.1.0 — 2026-11-01 — D9.6: the list's package, freshness, shares, reads, next run, source label and
+ *     intermediation mode; retention keeps the newest versions; the parties list's share cap and
+ *     dataspace flag (WP9a; the assertions fail on the code before it: retention was an unknown field).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dataproduct
@@ -333,6 +336,36 @@ await test('D9.5 a schedule is made with the definition, builds on a trigger, an
     const del = await call(`/v1/dataproducts/${N('sch')}`, { token: A.token, method: 'DELETE' });
     assert(del.status === 200 && del.body.data.schedules_removed.includes(id2) && del.body.data.package_kept === true, `delete: ${show(del)}`);
     assert((await call(`/v1/schedules/${id2}`, { token: A.token })).status === 404, 'deleting the definition left its schedule');
+});
+
+await test('D9.6 the list says each product\'s package, freshness, live shares, reads and next run; retention keeps the newest versions', async () => {
+    const name = N('lst');
+    const rowsFor = (k: number) => ({ rows: Array.from({ length: 3 }, (_, i) => ({ kunta: `K${i}`, n: i * k })) });
+    assert((await putMemory(A.token, 'dpr.lst', rowsFor(1))).status < 300, 'memory');
+    const bad = await define(A.token, name, { sources: [{ kind: 'memory', key: 'dpr.lst', rows_at: 'rows' }], retention: { keep: 0 } });
+    assert(bad.status === 400, `retention keep 0 must be refused: ${show(bad)}`);
+    const d = await define(A.token, name, { sources: [{ kind: 'memory', key: 'dpr.lst', rows_at: 'rows' }], retention: { keep: 1, unit: 'versions' }, schedule: { cron: '0 6 * * 1' } });
+    assert(d.status === 201 && d.body.data.definition.retention?.keep === 1, `define: ${show(d)}`);
+    const before = (await call('/v1/dataproducts', { token: A.token })).body.data.products.find((p: Body) => p.name === name);
+    assert(before && before.package === null && before.freshness === null && before.shares === 0 && before.reads_7d === 0, `before the first run: ${JSON.stringify(before)}`);
+    assert(before.sources[0].label === 'dpr.lst › rows' && before.next_run_at, `label and next run: ${JSON.stringify(before)}`);
+    for (const k of [1, 2, 3]) {
+        assert((await putMemory(A.token, 'dpr.lst', rowsFor(k))).status < 300, 'memory');
+        const r = await run(A.token, name);
+        assert(r.status === 201, `run ${k}: ${show(r)}`);
+    }
+    const versions = await call(`/v1/datapackages/${A.name}/${name}/versions`, { token: A.token });
+    assert(versions.status === 200 && versions.body.data.versions.length <= 2 && versions.body.data.retention_policy?.keep === 1, `retention: ${show(versions)}`);
+    const share = await call('/v1/parties/share', { token: A.token, body: { name: `lp${stamp % 100000}`, package: name, purpose: 'reporting', days: 7 } });
+    assert(share.status === 201, `share: ${show(share)}`);
+    const after = (await call('/v1/dataproducts', { token: A.token })).body.data.products.find((p: Body) => p.name === name);
+    assert(after.package?.visibility === 'private' && after.package.withdrawn === false && after.package.content_hash, `package: ${JSON.stringify(after)}`);
+    assert(after.freshness?.state === 'fresh' && after.shares === 1 && after.reads_7d === 0, `facts: ${JSON.stringify(after)}`);
+    const list = await call('/v1/dataproducts', { token: A.token });
+    assert(['report', 'none', 'node', 'owners'].includes(list.body.data.data_intermediation), `data_intermediation: ${show(list)}`);
+    const parties = await call('/v1/parties', { token: A.token });
+    assert(parties.status === 200 && typeof parties.body.data.share_max_days === 'number' && parties.body.data.share_max_days >= 1
+        && typeof parties.body.data.dataspace === 'boolean', `share_max_days, dataspace: ${show(parties)}`);
 });
 
 console.log('\nCross-owner and cross-scope');

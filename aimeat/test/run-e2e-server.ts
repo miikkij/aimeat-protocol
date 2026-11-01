@@ -13,6 +13,7 @@
  *            the shipped default agent scopes, the admin setup route closed after the first operator
  *            and the production rate limits, except the groups a listed suite keeps (QA audit P1-01,
  *            P1-08, P7-03, P7-05, F03a-02, S1-08, F7d). AIMEAT_E2E_SERVER_READY_MS sets the start budget.
+ *   v1.9.6 -- 2026-11-01 -- e2e-dsp joins ANONYMOUS_OFF_SUITES (plan doc-mvwxcas3dom3, D8).
  *   v1.9.5 -- 2026-11-01 -- e2e-app-parties joins ANONYMOUS_OFF_SUITES (plan doc-mvwxcas3dom3, D4).
  *   v1.9.4 -- 2026-11-01 -- e2e-exchange-datapackage joins ANONYMOUS_OFF_SUITES (plan doc-mvwxcas3dom3, D5.4).
  *   v1.9.3 -- 2026-11-01 -- e2e-party and e2e-data-share join ANONYMOUS_OFF_SUITES (outside parties; plan
@@ -232,6 +233,9 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     'e2e-exchange-datapackage',
     // Runs its own node with anonymous mode off; listed so the runner's node matches (plan D4).
     'e2e-app-parties',
+    // A DSP credential refused on a path the anonymous reader would otherwise reach, and the transfer
+    // token on a session route, are provable only with the setting off (plan D8). Not yet measured three times.
+    'e2e-dsp',
 ];
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */
