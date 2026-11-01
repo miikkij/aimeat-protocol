@@ -15,6 +15,8 @@
  * @structure summariseMap · checkMap · statesInvites · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.7.0 — 2026-11-01 — DATAMAP_ROW_BAD_PUBLISHABLE: a row's optional `publishable` that is not a
+ *     boolean is a finding, after the agent one, and never a refusal (plan doc-mvwxcas3dom3, D9.1).
  *   v1.6.0 — 2026-10-28 — DATAMAP_AI_ACT_UNANSWERED: the map says the app uses AI and its `aiAct`
  *     answers none of the EU AI Act questions. Last in the order and never a refusal.
  *   v1.5.0 — 2026-10-28 — DATAMAP_ROW_BAD_DOMAIN (a row names a data domain the node does not know)
@@ -56,6 +58,7 @@ export const FINDING_CODES = [
   'DATAMAP_NO_ROWS',
   'DATAMAP_INVITES_UNSTATED',
   'DATAMAP_ROW_BAD_AGENT',
+  'DATAMAP_ROW_BAD_PUBLISHABLE',
   'DATAMAP_ROW_BAD_CLASSIFICATION',
   'DATAMAP_ROW_BAD_DOMAIN',
   'DATAMAP_PERSONAL_NO_DOMAIN',
@@ -96,6 +99,9 @@ const badClassification = (r: DataMapRow): boolean =>
  * the map is written, and the pages that read the tie say so then.
  */
 const badAgent = (r: DataMapRow): boolean => r.agent !== undefined && !isValidAgentName(r.agent);
+
+/** True when a row's optional `publishable` is present and is not true or false. */
+const badPublishable = (r: DataMapRow): boolean => r.publishable !== undefined && typeof r.publishable !== 'boolean';
 
 /** The scope that lets an app invite people into organisms, where an invitation can create an account. */
 export const INVITE_SCOPE = 'organism:invite';
@@ -282,6 +288,15 @@ export function checkMap(map: DataMap | null, at: string, declaredScopes: readon
       message: `${badName.length} of ${map.held.length} rows name an agent with something that cannot `
         + 'be an agent\'s name: use the local name of one of your own agents, such as "morning-news", '
         + `or leave the field out. Rows: ${badName.map(r => r.what).join(', ')}.`,
+    });
+  }
+  const badMark = map.held.filter(badPublishable);
+  if (badMark.length > 0) {
+    findings.push({
+      code: 'DATAMAP_ROW_BAD_PUBLISHABLE',
+      message: `${badMark.length} of ${map.held.length} rows carry a "publishable" that is not true or false. `
+        + 'true offers the family to a data product as material; leave the field out otherwise. '
+        + `Rows: ${badMark.map(r => r.what).join(', ')}.`,
     });
   }
   const unknownDomain = map.held.filter(r => badDomains(r).length > 0);

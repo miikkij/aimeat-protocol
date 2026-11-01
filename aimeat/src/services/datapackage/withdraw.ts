@@ -26,6 +26,9 @@
  * @usage
  *   const out = await withdrawPackage({ storage, config }, callerOf(req, nodeId, storage), owner, name, { purge });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A withdrawal ends the package's named shares (status revoked, endedReason
+ *     package-withdrawn) and answers how many (`sharesEnded`); the withdrawal a reader learns of names
+ *     the package to datapackageReadable (plan doc-mvwxcas3dom3, D3).
  *   v1.0.1 — 2026-11-01 — Removing the catalogue entry drops the cached package listing
  *     (./catalogue-facts.ts), so discovery and the DCAT feed stop naming it at once (plan D1.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D0.3).
@@ -40,6 +43,7 @@ import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { invalidateDatasetFacts } from './catalogue-facts.js';
+import { endShares, packageOfPattern } from '../parties/shares.js';
 
 /** The caller facts a withdrawal is decided on (services/caller-context.ts CallerContext). */
 export interface WithdrawCaller {
@@ -51,7 +55,7 @@ export interface WithdrawCaller {
 
 export type WithdrawResult =
     | { ok: true; packageId: string; name: string; withdrawnAt: string; purged: boolean; alreadyWithdrawn: boolean;
-        filesDeleted: number; catalogueRemoved: boolean }
+        filesDeleted: number; catalogueRemoved: boolean; sharesEnded: number }
     | { ok: false; status: 400 | 403 | 404; code: 'INVALID_INPUT' | 'FORBIDDEN' | 'SCOPE_DENIED' | 'NOT_FOUND'; message: string };
 
 /** The permission word a principal of the owner withdraws with. */
@@ -73,7 +77,7 @@ export async function withdrawalFor(
     const pointer = await readPointer(deps, ownerGhii, name);
     const withdrawn = withdrawalOf(pointer);
     if (!withdrawn) return null;
-    return (await datapackageReadable(deps.storage, ownerGhii, pointer!.visibility, reader)) ? withdrawn : null;
+    return (await datapackageReadable(deps.storage, ownerGhii, pointer!.visibility, reader, name)) ? withdrawn : null;
 }
 
 /** withdrawalFor for a `pkg:{owner}/{name}[@version]` reference. */
@@ -140,9 +144,13 @@ export async function withdrawPackage(
         });
         if (!written.ok) throw new Error(`withdrawing ${packageId}: the pointer could not be written: ${written.message}`);
     }
+    // Its named shares end with it (plan D0.3, D3): status revoked with endedReason package-withdrawn, so
+    // the party reads SHARE_ENDED and a version published again later is not shared again by itself.
+    const sharesEnded = await endShares(storage, ownerGhii, c => packageOfPattern(c.dataPattern) === name, 'package-withdrawn');
+    if (sharesEnded) emitChange('consent');
     emitChange('files');
     if (catalogueRemoved) emitChange('memory');
-    return { ok: true, packageId, name, withdrawnAt, purged: opts.purge, alreadyWithdrawn: !!earlier && !opts.purge, filesDeleted, catalogueRemoved };
+    return { ok: true, packageId, name, withdrawnAt, purged: opts.purge, alreadyWithdrawn: !!earlier && !opts.purge, filesDeleted, catalogueRemoved, sharesEnded };
 }
 
 /** Remove the package's catalogue manifest and its per-resource entries. True when anything was removed. */

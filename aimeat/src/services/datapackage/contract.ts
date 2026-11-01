@@ -34,6 +34,9 @@
  * @usage
  *   import { buildDescriptor, contentHashOf, descriptorKey } from './contract.js';
  * @version-history
+ *   v1.4.0 -- 2026-11-01 -- A producer of kind 'dataproduct'; a source names its kind, address and
+ *     licence; AimeatBlock.sourcesFetchedAt (outside the content hash) says when each source of a data
+ *     product build was read (plan doc-mvwxcas3dom3, D9).
  *   v1.3.0 -- 2026-11-01 -- PublishInput.confirmPersonalPublic and LatestPointer.personalPublicConfirmed:
  *     a public package from personal data waits for the owner's confirmation (./personal-guard.ts; plan
  *     doc-mvwxcas3dom3, D1.7).
@@ -82,13 +85,18 @@ export interface AimeatBlock {
     /** REQUIRED. What changed against the previous version and why. A version nobody explained is a
      *  version a consumer cannot decide about. */
     changes: string;
-    producer: { kind: 'workflow' | 'extension' | 'agent' | 'app' | 'manual'; ref?: string; schedule?: string };
+    producer: { kind: 'workflow' | 'extension' | 'agent' | 'app' | 'manual' | 'dataproduct'; ref?: string; schedule?: string };
     producedBy: { gaii: string; run?: string; at: string };
     /** Whether the Table Schemas were declared by the producer or proposed by inference. A consumer
      *  reading `inferred` knows the types are a guess nobody has confirmed yet. */
     schemaSource: 'declared' | 'inferred' | 'mixed';
     parameters?: Record<string, unknown>;
-    sources?: Array<{ url?: string; title?: string; retrievedAt?: string; role?: string }>;
+    /** Where the data came from. A data product build names each source's `kind` (records, app,
+     *  memory, extension, file, datapackage), its `address` and `license` when known; the fetch times
+     *  are in `sourcesFetchedAt`, outside the hash, so the same rows keep one address. */
+    sources?: Array<{ url?: string; title?: string; retrievedAt?: string; role?: string; kind?: string; address?: string; license?: string; id?: string }>;
+    /** When each source of a data product build was read, by source id. Outside the content hash. */
+    sourcesFetchedAt?: Record<string, string>;
     lineage?: string[];
     transformations?: Array<{ by: string; what: string }>;
     legalBasis?: string;
@@ -131,6 +139,8 @@ export interface Descriptor {
     resources: DescriptorResource[];
     title?: string;
     description?: string;
+    /** Frictionless `keywords`. Inside the content hash; absent on every version before 2026-11-01. */
+    keywords?: string[];
     licenses?: Array<{ name: string; path?: string }>;
     created: string;
     aimeat: AimeatBlock;
@@ -143,9 +153,10 @@ export interface PublishInput {
     resources: ResourceInput[];
     title?: string;
     description?: string;
+    keywords?: string[];
     producer?: Partial<AimeatBlock['producer']>;
     parameters?: Record<string, unknown>;
-    provenance?: Pick<AimeatBlock, 'sources' | 'lineage' | 'transformations' | 'legalBasis' | 'consentStatus' | 'retention' | 'license' | 'supersedes'>;
+    provenance?: Pick<AimeatBlock, 'sources' | 'lineage' | 'transformations' | 'legalBasis' | 'consentStatus' | 'retention' | 'license' | 'supersedes' | 'sourcesFetchedAt'>;
     retentionPolicy?: AimeatBlock['retentionPolicy'];
     /** What the caller said about how this was made (TARGET-058). Threaded to provenanceForWrite. */
     declaredProvenance?: unknown;
@@ -245,6 +256,8 @@ export function contentHashOf(descriptor: Omit<Descriptor, 'aimeat'> & { aimeat:
         resources: descriptor.resources,
         title: descriptor.title,
         description: descriptor.description,
+        // Absent before 2026-11-01, and an absent key is not serialised, so no earlier hash moves.
+        keywords: descriptor.keywords,
         licenses: descriptor.licenses,
         aimeat: {
             packageId: a.packageId,

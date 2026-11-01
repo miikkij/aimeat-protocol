@@ -15,6 +15,9 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.3.0 — 2026-11-01 — shareMaxDays (AIMEAT_SHARE_MAX_DAYS, 365) and partyReadsPerMinute
+ *     (AIMEAT_PARTY_READS_PER_MINUTE, 60): the longest named share and an outside party's read rate
+ *     (plan doc-mvwxcas3dom3, D2.9, D3.1).
  *   v1.2.0 — 2026-10-18 — agentClearanceDefault (AIMEAT_AGENT_CLEARANCE_DEFAULT): the clearance a new
  *     agent gets, '' = no limit (plan doc-mvdipuyqraas, L2.1).
  *   v1.1.0 — 2026-10-11 — consentMaxPerUser (AIMEAT_CONSENT_MAX_PER_USER) removed: no code read it.
@@ -65,5 +68,15 @@ export function dataAccessDefaults() {
     executionLogRetentionDays: parseInt(process.env.AIMEAT_EXECUTION_LOG_RETENTION_DAYS ?? '30', 10),
     classificationMode: parseClassificationMode(process.env.AIMEAT_CLASSIFICATION),
     agentClearanceDefault: parseAgentClearanceDefault(process.env.AIMEAT_AGENT_CLEARANCE_DEFAULT),
+    // The longest a named share to an outside party may last, in days (services/parties/shares.ts).
+    shareMaxDays: positiveInt(process.env.AIMEAT_SHARE_MAX_DAYS, 365, 3650),
+    // How many reads one outside party may make a minute; past it 429 (services/parties/read-gate.ts).
+    partyReadsPerMinute: positiveInt(process.env.AIMEAT_PARTY_READS_PER_MINUTE, 60, 100_000),
   };
+}
+
+/** A whole number from 1 to `max`; anything else is `fallback`. */
+function positiveInt(raw: string | undefined, fallback: number, max: number): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  return Number.isInteger(n) && n >= 1 && n <= max ? n : fallback;
 }

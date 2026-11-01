@@ -29,6 +29,8 @@
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-11-01 — Registers aimeat_party (mcp/party.ts; plan doc-mvwxcas3dom3, D2, D3.4).
+ *   2026-11-01 — Registers aimeat_dataproduct (mcp/dataproduct.ts; plan doc-mvwxcas3dom3, D9).
  *   2026-11-01 — Registers the resource template aimeat://datapackage/{owner}/{name} (mcp/datapackage-resource.ts;
  *     plan doc-mvwxcas3dom3, D1.6).
  *   2026-11-01 — aimeat_datapackage_withdraw withdraws a package (purge deletes its files), through the
@@ -76,6 +78,8 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 import { toolError } from './tool-error.js';
 import { registerDatapackageResource } from './datapackage-resource.js';
+import { registerDataProductTool } from './dataproduct.js';
+import { registerPartyTool } from './party.js';
 
 /** What one tool call may carry as rows. Same number as the sandbox bridge, for one reason a person
  *  can remember: "8 MB is what crosses in one call, wherever you are standing". */
@@ -114,6 +118,10 @@ export function registerCoreDataPackageTools(
 
     // aimeat://datapackage/{owner}/{name}: the descriptor and a first-rows sample, read as this session.
     registerDatapackageResource(mcp, storage, config, caller);
+    // aimeat_dataproduct: a definition that builds a package version from material (mcp/dataproduct.ts).
+    registerDataProductTool(mcp, config, storage, caller);
+    // aimeat_party: outside parties and the named shares of packages to them (mcp/party.ts).
+    registerPartyTool(mcp, config, storage, caller);
 
     /**
      * The refusal REST gives (GET /v1/datapackages/..., 403 SCOPE_DENIED naming storage:read) when this

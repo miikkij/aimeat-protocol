@@ -8,6 +8,8 @@
  * @structure EXPOSURE_SOURCES · sourceFor(kind)
  * @usage for (const source of EXPOSURE_SOURCES) items.push(...await source.list(ctx, name, ghii));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — namedShareSource and outsidePartySource (./sources-parties.ts; plan
+ *     doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
 import type { ExposureKind, ExposureSource } from './exposure-types.js';
@@ -16,6 +18,7 @@ import {
   appSource, workspaceShareSource, organismSource, boardSource, portfolioSource, companySource,
 } from './sources-places.js';
 import { packageSource, exchangeSource, agentSource } from './sources-market.js';
+import { namedShareSource, outsidePartySource } from './sources-parties.js';
 
 export const EXPOSURE_SOURCES: readonly ExposureSource[] = [
   memorySource,
@@ -32,6 +35,8 @@ export const EXPOSURE_SOURCES: readonly ExposureSource[] = [
   companySource,
   exchangeSource,
   agentSource,
+  namedShareSource,
+  outsidePartySource,
 ];
 
 /** The source of one kind, or undefined when the registry has none. */

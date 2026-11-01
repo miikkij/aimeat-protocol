@@ -23,6 +23,7 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.5.2 — 2026-11-01 — The note also names the model that reads pictures, when it is another one.
  *   v1.5.1 — 2026-11-01 — A region row's note names the node's default model (Jouni, 2026-11-01 02.54).
  *   v1.5.0 — 2026-11-01 — Each OpenRouter region row carries its transfer basis (eu: adequacy for the
  *     UK and Switzerland; us and any: SCC) with a note, and the own-key choice (ai.region_mode own)
@@ -46,7 +47,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { nodeAiProviders, NODE_OPENROUTER_ID } from './ai/providers.js';
-import { nodeTextModel, regionModeOf, regionsInUse, REGION_COUNTRY, REGION_HOSTS, type OpenRouterRegion } from './ai/openrouter-region.js';
+import { nodePictureModel, nodeTextModel, regionModeOf, regionsInUse, REGION_COUNTRY, REGION_HOSTS, type OpenRouterRegion } from './ai/openrouter-region.js';
 
 /** What each region's transfer basis rests on, as the records of processing state it. */
 const REGION_TRANSFER_NOTE: Readonly<Record<OpenRouterRegion, string>> = {
@@ -221,6 +222,7 @@ export function derivedProcessors(config: AimeatConfig): ComplianceProcessor[] {
     // about it stays attached.
     if (p.id === NODE_OPENROUTER_ID) {
       const model = nodeTextModel(config);
+      const picture = nodePictureModel(config);
       for (const r of regionsInUse(config)) {
         // The transfer basis each region stands on (Jouni, 2026-11-01): the EU region is the EU/EEA,
         // with the United Kingdom and Switzerland under adequacy decisions; the United States and any
@@ -232,7 +234,7 @@ export function derivedProcessors(config: AimeatConfig): ComplianceProcessor[] {
           ...(r === 'any' ? {} : { country: REGION_COUNTRY[r] }),
           transferBasis: r === 'eu' ? 'adequacy' : 'scc',
           // The model is not a processor; the note names it so the record says what runs there.
-          notes: `${REGION_TRANSFER_NOTE[r]}${model ? ` The node's default model for the chat and the agents is ${model}.` : ''}`,
+          notes: `${REGION_TRANSFER_NOTE[r]}${model ? ` The node's default model for the chat and the agents is ${model}.` : ''}${picture ? ` Pictures are read by ${picture}.` : ''}`,
           answerSources: src(r === 'any' ? ['name', 'service', 'host', 'transferBasis'] : ['name', 'service', 'host', 'country', 'transferBasis']),
         });
       }

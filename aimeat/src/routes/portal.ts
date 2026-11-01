@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-01 — /v1/privacy, /v1/terms and /v1/connect with `?lang=<a language the node ships>` go to
+ *     that language's own path (302); the English page was served (crew45 check).
  *   2026-10-31 — The privacy page's {{aiRegionNotice}}: where the node's OpenRouter key has a request
  *     processed (services/privacy-ai-region.ts).
  *   2026-10-22 — /v1/eco-capability-allow joins the SPA routes: the owner allows another account's
@@ -94,7 +96,7 @@
  *     access gate reads too: three addresses here had never reached the gate, so on a signed-in-only
  *     node a link to them showed SIGN_IN_REQUIRED.
  */
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { readFileSync } from 'node:fs';
 import type { AimeatConfig } from '../config.js';
 import { missingOperatorConfig, operatorTypeLabel } from '../config.js';
@@ -716,12 +718,19 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // The English page at the bare path, and one localized path per other language the node ships.
   // A language without its own file falls through to the English one inside serveStaticPage.
   const nonEnglish = LOCALES.filter(l => l !== 'en');
-  router.get('/v1/privacy', serveStaticPage('privacy.html', '/v1/privacy'));
-  router.get('/v1/terms', serveStaticPage('terms.html', '/v1/terms'));
+  // `?lang=fi` on the bare path goes to the language's own path, as `?lang` works on the other pages:
+  // a Finnish link written that way served the English policy (crew45 check, 2026-11-01).
+  const toLanguagePath = (base: string): RequestHandler => (req, res, next) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : '';
+    if ((nonEnglish as string[]).includes(lang)) { res.redirect(302, `${base}/${lang}`); return; }
+    next();
+  };
+  router.get('/v1/privacy', toLanguagePath('/v1/privacy'), serveStaticPage('privacy.html', '/v1/privacy'));
+  router.get('/v1/terms', toLanguagePath('/v1/terms'), serveStaticPage('terms.html', '/v1/terms'));
   // Connect / MCP attach page — standalone static HTML. Public-facing docs
   // required by the Anthropic Connectors Directory (3+ example prompts +
   // attach instructions for major MCP-aware clients).
-  router.get('/v1/connect', serveStaticPage('connect.html', '/v1/connect'));
+  router.get('/v1/connect', toLanguagePath('/v1/connect'), serveStaticPage('connect.html', '/v1/connect'));
   for (const l of nonEnglish) {
     router.get(`/v1/privacy/${l}`, serveStaticPage(`privacy.${l}.html`));
     router.get(`/v1/terms/${l}`, serveStaticPage(`terms.${l}.html`));

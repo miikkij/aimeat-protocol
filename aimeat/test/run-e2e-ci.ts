@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-party.ts and e2e-data-share.ts join the list (not the guard tier): outside parties and the named shares to them (plan doc-mvwxcas3dom3, D2, D3).
+ *   2026-11-01 -- e2e-dataproduct.ts joins the list (not the guard tier): data products, six source kinds, three combine modes, audience, preview, schedule (plan doc-mvwxcas3dom3, D9).
  *   2026-11-01 -- e2e-datapackage-discovery.ts joins the list (not the guard tier): data packages in discovery, the DCAT feed, the dataset sitemap, schema.org, the MCP resource and the personal-data guard (plan doc-mvwxcas3dom3, D1).
  *   2026-11-01 -- e2e-datapackage-audience-fixes.ts joins the list (not the guard tier): the ODPS sheet tells the real access, a package is withdrawn, an organism package opens through /v1/pub (plan doc-mvwxcas3dom3, D0.1, D0.3, D0.4).
  *   2026-10-31 -- e2e-ai-gen-rules.ts joins the list (not the guard tier): the generation rules for AI pictures.
@@ -1251,6 +1253,12 @@ const ALL_SUITES = [
     'test/e2e-datapackage-audience-fixes.ts',
     // Data packages are findable: discover type dataset, DCAT feed, sitemap, schema.org, MCP resource, personal-data guard (plan doc-mvwxcas3dom3, D1).
     'test/e2e-datapackage-discovery.ts',
+    // Data products: a definition builds a package version from six kinds of material (plan doc-mvwxcas3dom3, D9).
+    'test/e2e-dataproduct.ts',
+    // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
+    'test/e2e-party.ts',
+    // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
+    'test/e2e-data-share.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
     // The conflicts in that report: each item's effective classification and cap, conflicts first,
