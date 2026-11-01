@@ -14492,7 +14492,8 @@
     "away": {
       "title": "Mientras no estabas",
       "nothing": "No ha pasado nada nuevo mientras no estabas.",
-      "more": "Ver todo lo que ha pasado"
+      "more": "Ver todo lo que ha pasado",
+      "agentNew": "Un agente nuevo está trabajando: {name}"
     },
     "trail": {
       "title": "Registro de actividad",
