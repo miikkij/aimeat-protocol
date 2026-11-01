@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.27.0 — 2026-11-01 — DataspaceConfig mixed in (config-dataspace.ts; plan doc-mvwxcas3dom3, D8).
  *   v1.26.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION; plan doc-mvwxcas3dom3, D4.3).
  *   v1.25.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION; plan doc-mvwxcas3dom3, D7.1).
  *   v1.24.0 — 2026-11-01 — shareMaxDays and partyReadsPerMinute: the named share's longest life and an
@@ -142,8 +143,9 @@ import type { RuntimeConfig } from './config-runtime.js';
 import type { ExtensionLoadConfig } from './config-extension-load.js';
 import type { NodeLimitsConfig } from './config-node-limits.js';
 import type { FileStoreConfig } from './config-file-store.js';
+import type { DataspaceConfig } from './config-dataspace.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig, DataspaceConfig {
   port: number;
   baseUrl: string;
   /**

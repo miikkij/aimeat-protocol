@@ -1481,6 +1481,33 @@
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D7.3, D4.5), the node's own read: the owners' `parties` records and the apps' `app-parties.` records (both service-owned), counted for the compliance report's data intermediation findings (how many person parties hold a contact, per account; which apps have an open signup), and an app's tool manifest read only for whether a tool has a money price. The operator's report gets counts, account and app names; an owner's slice only their own. No party contact or other content leaves."
     },
+    "src/services/dataspace/participant.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D8.2, D8.5), the node's own read: the owners' `parties` records (service-owned), scanned by key only and read to find which owners have this data space participant as a party, so the DSP catalog lists the packages shared with it by name. Only the matching party (its uid, name and status) is used; no other party or content leaves."
+    },
+    "src/services/dataspace/settings.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D8.3), the node's own read: the owner's `dsp.settings` record (service-owned), which packages agree on their own. No content."
+    },
+    "src/services/dataspace/status.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D8.6), the node's own read: the operator's recorded TCK run (`dsp.tck-result` under the TCK service owner, no account), for the operator's status read. No content."
+    },
+    "src/services/dataspace/store.ts": {
+      "reads": {
+        "getMemory": 3,
+        "listMemory": 3,
+        "listMemoryMeta": 2
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D8.3), the node's own read: the owner's DSP negotiation, transfer and archive records (`dsp.` prefix, service-owned), the protocol state this node keeps for each process, read to answer the participant and the owner and to fold finished ones into the monthly archive. No package content: the rows are read through the party read gate."
+    },
     "src/services/datapackage/images.ts": {
       "reads": {
         "getStorageFileMeta": 1
