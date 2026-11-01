@@ -24,6 +24,9 @@
  *   MAX_PARTIES · MAX_KEYS_PER_PARTY · isPartyRef · PARTY_TOKEN_ROUTES · takesPartyToken
  * @usage const ref = partyRefOf('alice', 'matti', config.nodeId);   // party:alice/matti@node
  * @version-history
+ *   v1.5.0 — 2026-11-01 — PARTY_TOKEN_ROUTES takes GET /v1/apps/{owner}/{filename}/members/me and
+ *     POST /v1/ext/{extension}/{action}: an app party reads its roster standing and calls the member
+ *     check of its own app's IAM extension (WP9d).
  *   v1.4.0 — 2026-11-01 — A party holds the one-time links its owner sent (`shareLinks`, PartyInvite;
  *     ./invite.ts), and the owner's view lists them without their hashes; "invites" is a reserved name
  *     (WP9b).
@@ -157,6 +160,13 @@ export const PARTY_TOKEN_ROUTES: ReadonlyArray<{ methods: readonly string[]; pat
     // An app's registered party: its own standing, its sign-out and its data in the app (D4.2).
     { methods: ['GET', 'POST'], path: /^\/v1\/apps\/[^/]+\/[^/]+\/parties\/(?:me|signout)\/?$/ },
     { methods: ['GET', 'PUT', 'DELETE'], path: /^\/v1\/apps\/[^/]+\/[^/]+\/party-data\/[^/]+\/?$/ },
+    // The same party's standing on the app's member roster, the read AIMEAT.iam makes (WP9d).
+    { methods: ['GET'], path: /^\/v1\/apps\/[^/]+\/[^/]+\/members\/me\/?$/ },
+    // An action of an extension, two segments only (WP9d). The path cannot say which app the token is
+    // for, so the handler refuses every extension but the one that gates the token's own app
+    // (services/app-parties/iam-gate.ts); the instance form and the literal <owner>/<name>/<action>
+    // form are not listed and stay 401.
+    { methods: ['POST'], path: /^\/v1\/ext\/[^/]+\/[^/]+\/?$/ },
 ];
 
 /** Does this endpoint take a party token? */

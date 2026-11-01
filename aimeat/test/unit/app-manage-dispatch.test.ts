@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-01 — party_stop and party_resume (WP9d).
  *   2026-11-01 — parties, party_remove and party_registration_set, and member_set's party field (plan D4).
  *   2026-10-31 — settings' screenshot_public field (secaudit2026oct31w2 round 10, W2-12).
  *   v1.11.0 — 2026-10-30 — structure_set's proposals field.
@@ -138,6 +139,8 @@ const EXPECT: Record<string, [string, string]> = {
     parties: ['GET', '/v1/apps/me-owner/shop.html/parties'],
     party_remove: ['DELETE', '/v1/apps/me-owner/shop.html/parties/ap-zqxname'],
     party_registration_set: ['PUT', '/v1/apps/me-owner/shop.html/parties/registration'],
+    party_stop: ['POST', '/v1/apps/me-owner/shop.html/parties/ap-zqxname/stop'],
+    party_resume: ['POST', '/v1/apps/me-owner/shop.html/parties/ap-zqxname/resume'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */

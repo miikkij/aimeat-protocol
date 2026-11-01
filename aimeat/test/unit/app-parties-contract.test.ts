@@ -8,6 +8,7 @@
  *   party's token routes, and the data map's DATAMAP_REGISTERS_UNSTATED.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-parties-contract.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The app party token on members/me and a two-segment extension action (WP9d).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4).
  */
 import { describe, it, expect } from 'vitest';
@@ -62,6 +63,15 @@ describe('the record and the keys', () => {
         expect(takesPartyToken('PUT', '/v1/apps/alice/m.html/party-data/cart')).toBe(true);
         expect(takesPartyToken('GET', '/v1/apps/alice/m.html/parties')).toBe(false);
         expect(takesPartyToken('PUT', '/v1/apps/alice/m.html/parties/registration')).toBe(false);
+    });
+    it('an app party token reaches its roster standing and a two-segment extension action only (WP9d)', () => {
+        expect(takesPartyToken('GET', '/v1/apps/alice/m.html/members/me')).toBe(true);
+        expect(takesPartyToken('GET', '/v1/apps/alice/m.html/members')).toBe(false);
+        expect(takesPartyToken('POST', '/v1/apps/alice/m.html/members')).toBe(false);
+        expect(takesPartyToken('POST', '/v1/ext/market-iam/check')).toBe(true);
+        expect(takesPartyToken('GET', '/v1/ext/market-iam/check')).toBe(false);
+        expect(takesPartyToken('POST', '/v1/ext/market-iam/inst-1/check')).toBe(false);
+        expect(takesPartyToken('POST', '/v1/apps/alice/m.html/parties/ap-x/stop')).toBe(false);
     });
 });
 
