@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-11-01: New opens an empty screen and the conversation is created with its first message;
+ *     the list shows only conversations with a message (Grok's first-timer review, K32).
  *   2026-11-01: The empty chat says "Voit myös pyytää sovellusta: saat linkin valmiiseen sovellukseen."
  *     without the name Atelier, and "Aloita keskustelu alusta" shows only once the conversation has
  *     a message (Jouni's review of v33, K32).
@@ -186,6 +188,12 @@ function sessionTokenCap() {
 const sessionTokensOf = (turns) =>
     Math.ceil((turns ?? []).reduce((n, turn) => n + (turn.text || '').length, 0) / 4);
 
+/**
+ * The conversations worth a row: the ones with a message. An empty one says nothing a person can
+ * go back to, and the ones stored before New stopped creating them stay on the node, out of the list.
+ */
+const spokenThreads = (threads) => (threads ?? []).filter((th) => (th.turns ?? 0) > 0);
+
 /** Close enough to the bottom to count as "following the conversation". */
 const BOTTOM_SLACK_PX = 48;
 /** How long a scroll up suspends auto-follow. Long enough to read a paragraph and look back up. */
@@ -240,7 +248,7 @@ export default function ChatView() {
 
     const loadThreads = useCallback(async () => {
         const res = await chat.listThreads();
-        setThreads(res?.data?.threads ?? []);
+        setThreads(spokenThreads(res?.data?.threads));
     }, []);
 
     const openThread = useCallback(async (id) => {
@@ -270,7 +278,7 @@ export default function ChatView() {
         (async () => {
             try {
                 const list = await chat.listThreads();
-                const found = list?.data?.threads ?? [];
+                const found = spokenThreads(list?.data?.threads);
                 setThreads(found);
                 if (found.length > 0) await openThread(found[0].id);
             } catch (err) {
@@ -339,16 +347,25 @@ export default function ChatView() {
         return () => window.removeEventListener('aimeat-live-update', handler);
     }, []);
 
+    // New opens an empty screen and stores nothing: the conversation is created on the node when
+    // the first message is sent (send below), so pressing New three times leaves no three empty
+    // rows in the list (Grok's first-timer review, 2026-11-01, K32). The bump drops a late answer
+    // of the conversation that was open, the same as opening another one.
+    const newConversation = useCallback(() => {
+        ++openSeqRef.current;
+        setThread(null);
+        setFailure('');
+        setLive({ text: '', thought: '', progress: '', tools: [], cards: [] });
+        setListOpen(false);
+    }, []);
+
     const startThread = useCallback(async () => {
         const res = await chat.createThread();
         const created = res?.data?.thread;
         if (!created) return null;
         setThread(created);
-        setFailure('');
-        setListOpen(false);
-        await loadThreads();
         return created;
-    }, [loadThreads]);
+    }, []);
 
     /**
      * Send one message and read the answer as it is written.
@@ -648,7 +665,7 @@ export default function ChatView() {
                 threads=${threads}
                 activeId=${thread?.id}
                 onOpen=${openThread}
-                onNew=${startThread}
+                onNew=${newConversation}
                 onDelete=${removeThread}
                 onClose=${() => setListOpen(false)}>
                 <${Alert} type="info" message=${deleteNote} onDismiss=${() => setDeleteNote('')} />
