@@ -75,7 +75,8 @@ export function aiCredit(status) {
 export function messagesFor(eur) {
   const per = Number(siteLink('aiEurPerMessage'));
   if (!Number.isFinite(per) || !(per > 0)) return null;
-  const n = Math.floor(Math.max(0, Number(eur) || 0) / per);
+  // The small epsilon keeps 0,70 / 0,02 at 35: in floats it is 34.999…, and the store's count is 35.
+  const n = Math.floor(Math.max(0, Number(eur) || 0) / per + 1e-9);
   return n >= 1 ? n : null;
 }
 

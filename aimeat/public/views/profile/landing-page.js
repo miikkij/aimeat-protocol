@@ -18,7 +18,7 @@
  *   - LandingPage — main orchestrator (default export)
  * @version-history
  *   v3.22.0 — 2026-11-01 — On a customer's node a menu item reads its `Place` words when they exist:
- *     "Tekoälysaldo" and "Yhdistä ChatGPT, Claude tai Grok" (Jouni's review of v33).
+ *     "Tekoälysaldo" (Jouni's review of v33). "Yhdistä ChatGPT, Claude tai Grok" did not fit the menu's width, so that item keeps "Yhdistä tekoälysi".
  *   v3.21.0 — 2026-10-29 — On a customer's node (site.js customerNode()) the menu before "Show all
  *     tools" is the eight Jouni chose, with no default pins; a "Your purchase" group links the
  *     store's orders and invoices and support; the node's maintenance is a link in the operator's

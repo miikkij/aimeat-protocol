@@ -12,10 +12,11 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.41.0 -- 2026-11-01 -- The simple view says what the credit still buys as a sentence in the head ("Saldosi riittää vielä noin N tavalliseen viestiin."), not in the strip's monospace line, and its crumb names the page Tekoälysaldo (commercial's check of 2c31d1d22).
+ *   v1.40.0 -- 2026-11-01 -- The simple view (Jouni's review of v33): the title and menu say "Tekoälysaldo"; no 30-day figure in the strip and no monospace line on the meter; in Lisäasetukset the first and chosen radio is "Tekoälysaldo (oletus, ei avainta)", with "Ilman omaa avainta…" above the choice and the key field only after a service of one's own is picked (K60); "about N messages" by the store's price of one message when it set one (A3).
+ *   v1.39.0 -- 2026-11-01 -- The simple view's daily limit is never more than today's use plus the credit left (todayLimit), and the head explains the credit in the help page's words (Jouni, K58).
  *   v1.38.0 -- 2026-11-01 -- Section 06, the rules for AI pictures and videos (gen-rules-section.js), in the full page and under the simple view's fold; budget and consumers move to 07 and 08.
  *   v1.37.0 -- 2026-10-31 -- Jouni's review of v31 (K58, K60): the credit shows once, on its own card, with "riittää noin N tavalliseen viestiin" when this place's 30-day average cost per call can tell (messagesLeft), and no tag; sums under a cent read "alle 1 snt" (creditWords); the daily limit says it protects the credit; under "Buy more credit" it says the same card pays and no new subscription is made; the decision model, transparency and compliance cards sit inside "Lisäasetukset" (ctx.extras); there the key section is "Oma tekoälytili (valinnainen)" and says that no own key is the usual way.
- *   v1.38.0 -- 2026-11-01 -- The simple view (Jouni's review of v33): the title and menu say "Tekoälysaldo"; no 30-day figure in the strip and no monospace line on the meter; in Lisäasetukset the first and chosen radio is "Tekoälysaldo (oletus, ei avainta)", with "Ilman omaa avainta…" above the choice and the key field only after a service of one's own is picked (K60); "about N messages" by the store's price of one message when it set one (A3).
- *   v1.37.0 -- 2026-11-01 -- The simple view's daily limit is never more than today's use plus the credit left (todayLimit), and the head explains the credit in the help page's words (Jouni, K58).
  *   v1.36.0 -- 2026-10-31 -- The simple view (renderSimple) on a node the store sold, for a person with no key of their own: the head says how much AI credit is left and offers only "Buy more credit"; the strip is the credit, today's use against the daily limit and the month, all in euros; section 01 is today's use (secToday); everything else, the key and the budget's edit included, is under one fold, "Lisäasetukset" (v31 K58, K60).
  *   v1.35.0 -- 2026-10-31 -- On a node the store sold, with no key of the person's own, the head's loud action is "Buy more credit" in the store (the top-up address in the page's language), "Get a key" a small link, and OpenRouter's balance page is not offered (v28 #19).
  *   v1.34.0 -- 2026-10-31 -- On a node the store sold, the allowance left is euros of AI credit (js/ai-credit.js creditEur), the number the Home and the chat show (v28 finding 9).
@@ -258,7 +259,7 @@ function mast(ctx) {
     const topup = topupHref(getLocale());
     return {
       title: t('profile.generator.openrouter.titlePlace'), sub: x('simple.titleSub'), help: 'concept.provider', marks,
-      desc: !s ? '' : x('simple.desc'),
+      desc: !s ? '' : (messagesLeft(ctx) ? `${x('simple.desc')} ${x('simple.lastsLine', { n: messagesLeft(ctx) })}` : x('simple.desc')),
       actions: topup ? html`<${Loud} href=${topup} newTab>${t('home.credit.topup')}<//><${Note} kind="meta">${x('simple.topupNote')}<//>` : null,
     };
   }
@@ -280,11 +281,10 @@ function strip(ctx) {
   const r = ctx.roll;
   if (!s) return html`<${FigureStrip} loading=${simpleView(ctx) ? 2 : 4} />`;
   if (simpleView(ctx)) {
-    // The credit once, on its own card, with what it buys when this place's history can tell (K58).
-    const lasts = messagesLeft(ctx);
+    // The credit once, on its own card; what it still buys is a sentence in the head, in the page's
+    // own type, not the strip's small monospace line (review of v33, K58).
     return html`<${FigureStrip} items=${[
-      { key: 'credit', n: ctx.chat ? creditWords(ctx.chat.allowance_remaining_usd || 0) : '…', tone: 'coral', label: x('simple.stripCredit'),
-        sub: lasts ? x('simple.lasts', { n: lasts }) : '' },
+      { key: 'credit', n: ctx.chat ? creditWords(ctx.chat.allowance_remaining_usd || 0) : '…', tone: 'coral', label: x('simple.stripCredit') },
       { key: 'today', n: u ? creditWords(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('simple.stripLimit', { n: creditWords(todayLimit(ctx)) }) : '' },
     ]} />`;
   }
