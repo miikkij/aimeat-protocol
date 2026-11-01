@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.16.0 - 2026-11-01 - Register aimeat-parties (an app's users without an account; plan D4.2).
  *   v1.15.0 - 2026-10-05 - Register aimeat-validate (input checked against a JSON Schema).
  *   v1.14.0 — 2026-09-29 — Register aimeat-labels (content classification, TARGET-082 V5).
  *   v1.13.0 — 2026-09-29 — Register aimeat-refinery (an app's side of the mail refinery the node runs).
@@ -99,6 +100,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'tunnel', entry: 'tunnel/index.js' },
   { name: 'connect', entry: 'connect/index.js' },
   { name: 'datapackage', entry: 'datapackage/index.js' },
+  { name: 'parties', entry: 'parties/index.js' },
   { name: 'events', entry: 'events/index.js' },
   { name: 'auth', entry: 'auth/index.js' },
   { name: 'atelier', entry: 'atelier/index.js' },

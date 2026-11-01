@@ -31,6 +31,8 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.8.0 — 2026-11-01 — Mounts routes/app-parties.ts (an app's users as outside parties), and POST
+ *     members takes `party` (plan doc-mvwxcas3dom3, D4.1, D4.2).
  *   v1.7.0 — 2026-10-05 — The handlers' logic (owner and manager tests, validation, refusals, grant
  *     sync, notifications, audit rows) moved to services/app-roster-ops.ts, app-roster-write.ts and
  *     app-dev-grant-ops.ts; the routes answer the same statuses, codes and data. aimeat_app_manage
@@ -100,6 +102,7 @@ import {
 import { notify } from '../services/notify.js';
 import { logger } from '../utils/logger.js';
 import { appMembersExtraRouter } from './app-members-extra.js';
+import { appPartiesRouter } from './app-parties.js';
 import { memberAddress } from '../services/app-member-approve.js';
 import {
   listRoster, rosterMe, readCarryPlan, dismissGuest, sweepRoster, requestMembership, declineRequest, type AppRef,
@@ -117,6 +120,8 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   // The audit read and the invitation cancel live in their own module and are mounted here, so
   // the roster stays one mount in routes-loader, ahead of the parameterized app routes.
   router.use(appMembersExtraRouter(config, storage));
+  // The app's own users as outside parties (routes/app-parties.ts; plan doc-mvwxcas3dom3, D4).
+  router.use(appPartiesRouter(config, storage));
   const addressOf = (account: string) => memberAddress(account, config.nodeId);
   const answer = (res: import('express').Response, out: Parameters<typeof sendAppOp>[2]) => sendAppOp(res, config.nodeId, out);
 

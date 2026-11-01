@@ -16,6 +16,8 @@
  * @structure appManageMemberAction(storage, config, caller, action, args) → ToolAnswer | null
  * @usage const out = await appManageMemberAction(storage, config, caller, action, args); if (out) return out;
  * @version-history
+ *   v1.4.0 — 2026-11-01 — member_set passes `party`; parties, party_remove and party_registration_set call
+ *     services/app-parties/owner.ts (plan doc-mvwxcas3dom3, D4.1 to D4.3).
  *   v1.3.0 — 2026-10-30 — structure_set passes `proposals` on.
  *   v1.2.0 — 2026-10-29 — structure, structure_set and plans call services/app-structure.ts.
  *   v1.1.0 — 2026-10-13 — scope_allowance and scope_allowance_remove call services/app-scope-allowance.ts.
@@ -36,6 +38,7 @@ import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../services/app-
 import { readStructureFor, writePlanFor, listPlansFor } from '../services/app-structure.js';
 import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../services/app-audit-keep.js';
 import { opAnswer, type ToolAnswer } from './app-manage-answers.js';
+import { listAppParties, removeAppParty, setRegistration } from '../services/app-parties/owner.js';
 
 type Args = Record<string, unknown>;
 
@@ -65,10 +68,17 @@ export async function appManageMemberAction(
     case 'members':
       return opAnswer(await listRoster(storage, config, caller, ref, pick(args, ['q', 'limit', 'offset'])));
     case 'member_set': {
-      const body = pick(args, ['account', 'email', 'locale', 'role', 'level', 'note', 'offerings', 'days']);
+      const body = pick(args, ['account', 'email', 'party', 'locale', 'role', 'level', 'note', 'offerings', 'days']);
       if (present(args.expires_at)) body.expiresAt = args.expires_at === '' ? null : args.expires_at;
       return opAnswer(await setMember(storage, config, caller, ref, body));
     }
+    // The app's users without an account (services/app-parties/owner.ts), as their routes do.
+    case 'parties':
+      return opAnswer(await listAppParties({ storage, config }, caller, ownRef));
+    case 'party_remove':
+      return opAnswer(await removeAppParty({ storage, config }, caller, ownRef, String(args.party_name ?? '')));
+    case 'party_registration_set':
+      return opAnswer(await setRegistration({ storage, config }, caller, ownRef, pick(args, ['open', 'role'])));
     case 'member_remove':
       return opAnswer(await removeRosterMember(storage, config, caller, ref, account));
     case 'member_decline':

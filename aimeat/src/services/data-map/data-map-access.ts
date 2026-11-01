@@ -12,6 +12,8 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-11-01 — The map carries the optional `registers` statement, and an app whose party signup is open
+ *     gets DATAMAP_REGISTERS_UNSTATED until its map says whom it registers (plan doc-mvwxcas3dom3, D4.4).
  *   2026-10-29 — The AI Act questions answer `asked` too: the ones the maker's answers so far make the
  *     node ask (askedWhen), and `unanswered` is of those.
  *   2026-10-28 — The map carries the maker's optional `aiAct` answers through a write (readAiAct), and
@@ -41,7 +43,8 @@ import { operatorOverride, type OperatorAuth } from '../operator-override.js';
 import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
 import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor, type MapCheck } from './data-map-check.js';
-import { DATA_MAP_SPEC, type AiActStatement, type DataMap, type DataMapStamp, type InvitesStatement } from './data-map-types.js';
+import { DATA_MAP_SPEC, type AiActStatement, type DataMap, type DataMapStamp, type InvitesStatement, type RegistersStatement } from './data-map-types.js';
+import { readAppParties, signupOpen } from '../app-parties/store.js';
 import { appAiSignals } from '../compliance-app-signals.js';
 import { askedQuestions, effectiveQuestionnaire, type ComplianceQuestion } from '../compliance-register.js';
 import { builtInQuestionIds } from '../../data/compliance-questionnaire.js';
@@ -150,7 +153,7 @@ export async function readProgramMap(
   const appId = appIdOf(ref.filename);
   const map = await readAppDataMap(storage, record.ownerGaii, appId);
   const scopes = declaredScopesOf(record);
-  const check = checkMap(map, at, scopes);
+  const check = checkMap(map, at, scopes, { registersParties: await registersParties(storage, config, record.ownerGaii, record.ownerName, ref.filename) });
 
   // The stamp carries the worst finding as `gap`, and that is the same unfinished business as
   // `findings`, so it is stripped for everyone but the owner here, where every door reads the map.
@@ -232,6 +235,21 @@ function readInvites(v: unknown): InvitesStatement | null {
   return { does, into };
 }
 
+/** The optional `registers` statement as stored, cut to sane lengths; anything else is no statement. */
+function readRegisters(v: unknown): RegistersStatement | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const raw = v as { who?: unknown; keeps?: unknown };
+  const who = typeof raw.who === 'string' ? raw.who.trim().slice(0, 500) : '';
+  const keeps = Array.isArray(raw.keeps)
+    ? raw.keeps.filter((k): k is string => typeof k === 'string' && k.trim().length > 0).map(k => k.trim().slice(0, 120)).slice(0, 20) : [];
+  return who || keeps.length ? { who, keeps } : null;
+}
+
+/** Is this app's party signup open now (services/app-parties/)? Then its map says whom it registers. */
+async function registersParties(storage: Storage, config: AimeatConfig, ownerGhii: string, owner: string, filename: string): Promise<boolean> {
+  return signupOpen(config, (await readAppParties(storage, ownerGhii, `${owner}/${filename}`)).registration);
+}
+
 const QUESTION_ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
 
 /**
@@ -273,6 +291,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
   }
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   const invites = readInvites(body.invites);
+  const registers = readRegisters(body.registers);
   const aiAct = readAiAct(body.aiAct);
   return {
     spec: DATA_MAP_SPEC,
@@ -283,6 +302,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
     machinery: Array.isArray(body.machinery) ? body.machinery : [],
     leaves: Array.isArray(body.leaves) ? body.leaves : [],
     ...(invites ? { invites } : {}),
+    ...(registers ? { registers } : {}),
     ...(aiAct ? { aiAct } : {}),
     held: Array.isArray(body.held) ? body.held : [],
     elsewhere: Array.isArray(body.elsewhere) ? body.elsewhere : [],
@@ -373,7 +393,7 @@ export async function putProgramMap(
   const scopes = declaredScopesOf(await storage.getApp(ownerGhii, filename));
   const stamp = stampFor(parsed, appId, at, scopes);
   await storage.updateAppMeta(ownerGhii, filename, { dataMap: stamp });
-  return { map: parsed, stamp, findings: checkMap(parsed, at, scopes).findings };
+  return { map: parsed, stamp, findings: checkMap(parsed, at, scopes, { registersParties: await registersParties(storage, config, ownerGhii, caller.ownerName, filename) }).findings };
 }
 
 export interface HandsAnswer {

@@ -65,7 +65,8 @@ The node never guesses a map: an app that states nothing has a map that says the
 invents.
 
 **`machinery`**: `iam-and-roles`, `workflows`, `extensions`, `cortex`, `ai-generation`,
-`scheduling`, `connections-and-publish`, `payments`, `federation`, `invites-people`.
+`scheduling`, `connections-and-publish`, `payments`, `federation`, `invites-people`,
+`registers-parties`.
 
 **An app that invites people says so.** An app whose `<meta name="aimeat-scopes">` asks for
 `organism:invite` can invite people into the organisms its user belongs to, and an invitation can
@@ -75,6 +76,14 @@ word `invites-people`, the `invites` statement, or both. **`invites.does`**:
 `sends-email-invitations`, `mints-access-codes`, `creates-accounts`, `grants-workspace-access`,
 `manages-members`. An app that asks for the scope and states neither has the finding
 `DATAMAP_INVITES_UNSTATED`.
+
+**An app that registers people says so.** When the node lets people without an account register to
+apps (`AIMEAT_PARTY_SELF_REGISTRATION`) and an app opens its signup, the people who register become
+outside parties of the app's owner, and the owner holds their e-mail addresses and what they keep in
+the app. The map states it with the machinery word `registers-parties`, the app-level `registers`
+statement `{ "who": "buyers and sellers of the market", "keeps": ["e-mail address", "listings"] }`,
+or both. An app whose signup is open and that states neither has the finding
+`DATAMAP_REGISTERS_UNSTATED`, and the records of processing list the registrations either way.
 
 ### A row: one key family
 
@@ -158,5 +167,6 @@ and its declared hosts there; the declaration on the extension is the source for
 
 `/2` replaced `/1` on 2026-08-25: `/1` described key families and their compliance columns and never
 said what the app was for. Optional fields added since (`organism-rows`, `classification`, `agent`,
-`madeFor`, `invites`, the machinery word `invites-people` and the row's `domains`) are additive and keep the format at `/2`; a map carries its own `spec` so a newer node can
+`madeFor`, `invites`, the machinery word `invites-people`, the row's `domains`, `registers` and the
+machinery word `registers-parties`) are additive and keep the format at `/2`; a map carries its own `spec` so a newer node can
 read an older map.

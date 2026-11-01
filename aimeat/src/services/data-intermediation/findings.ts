@@ -8,8 +8,10 @@
  *     (b) contract_outside_buyer        contracts on such offerings with a buyer of another account or a party;
  *     (c) open_organism_with_data       organisms anyone may join that carry data packages shared to them,
  *                                       one finding each, with the proposal to require approval (D7.6);
- *     (d) app_open_registration_commerce apps that let outside parties register and sell (the setting is
- *                                       not on this node yet, so the count is 0 and the evidence says why);
+ *     (d) app_open_registration_commerce apps whose signup lets outside parties register now (the node's
+ *                                       AIMEAT_PARTY_SELF_REGISTRATION and the app's own setting,
+ *                                       services/app-parties/) and that sell: a listed EXCHANGE offering of
+ *                                       the app's tools, or a tool with a money price (D4.5);
  *     (e) priced_named_share            named shares to parties that carry a price (none can yet);
  *     person_party_contact              outside parties that are persons with a contact: the owner holds
  *                                       personal data about them and is its controller (D2.10);
@@ -25,6 +27,7 @@
  * @structure IntermediationFacts · gatherFacts · buildFindings · ITEM_CAP
  * @usage const facts = await gatherFacts(deps, { owner }); const findings = buildFindings(facts);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Finding (d) counts the apps whose party signup is open and that sell (plan D4.5).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D7.3, D7.5, D7.6, D2.10).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -40,6 +43,9 @@ import type { IntermediationNotification, IntermediationReview } from '../compli
 import { listDocs } from '../compliance-docs.js';
 import { DGA_REFS, offeringDeliversData, type IntermediationFinding } from './contract.js';
 import { nodeNotification, providerOrganisms, readIntermediationDocs } from './gate.js';
+import { APP_PARTIES_PREFIX, parseAppPartiesValue } from '../app-parties/contract.js';
+import { registrationMode, signupOpen } from '../app-parties/store.js';
+import { AppToolsDocSchema, appToolsKey, isToolPriced } from '../../models/app-tool-schemas.js';
 
 /** Items a finding lists; the count is the whole. */
 export const ITEM_CAP = 50;
@@ -137,17 +143,40 @@ export async function gatherFacts(deps: { storage: Storage; config: AimeatConfig
         for (const f of await storage.consentFacets({ since: new Date(0).toISOString() })) if (f.status === 'active') consents += f.count;
     }
 
-    // The app setting that lets outside parties register (plan D4.3) is not on this node yet.
-    const appRegistrationSettingPresent = 'partySelfRegistration' in (config as unknown as Record<string, unknown>);
+    // Apps whose signup lets outside parties register (plan D4.3) and that sell: a listed EXCHANGE
+    // offering of the app's tools, or a money price on the app (D4.5). Read only while the node's
+    // setting lets anyone register at all.
+    const appRegistrationSettingPresent = true;
+    const appsOpenRegistration: IntermediationFacts['appsOpenRegistration'] = [];
+    if (registrationMode(config) !== 'off') {
+        const { items } = await storage.listAllMemory({ prefix: APP_PARTIES_PREFIX, limit: 2000 });
+        for (const r of items) {
+            if (!r.ownerGaii.endsWith(`@${config.nodeId}`) || r.ownerGaii.includes('#')) continue;
+            const account = localAccountName(r.ownerGaii);
+            if (!mine(account)) continue;
+            const v = parseAppPartiesValue(r.value);
+            if (!signupOpen(config, v.registration) || !v.appId) continue;
+            const filename = v.appId.slice(v.appId.indexOf('/') + 1);
+            const sells = listed.some(o => o.providerOwner === account && o.surface?.kind !== 'datapackage' && o.surface?.appId === filename)
+                || await appSellsTools(storage, r.ownerGaii, filename);
+            if (sells) appsOpenRegistration.push({ app: `${account}/${filename}`, owner: account });
+        }
+    }
 
     const packages = (await allDatasetFacts(storage)).filter(f => mine(f.owner)).length;
     return {
         mode: config.dataIntermediation, owner, nodeNotification: nodeNotification(docs), providers,
-        dataOfferings, outsideContracts, openOrganisms, appsOpenRegistration: [], appRegistrationSettingPresent,
+        dataOfferings, outsideContracts, openOrganisms, appsOpenRegistration, appRegistrationSettingPresent,
         pricedShares, personParties, exchangedPackages,
         nodeAiReadsFiles: config.classificationMode !== 'off' || (config as { contentClassMode?: string }).contentClassMode !== 'off',
         reviews, counts: { packages, liveShares, parties, consents },
     };
+}
+
+/** Does the app sell a tool for money (its tool manifest, sold through the checkout or EXCHANGE)? */
+async function appSellsTools(storage: Storage, ownerGhii: string, filename: string): Promise<boolean> {
+    const parsed = AppToolsDocSchema.safeParse((await storage.getMemory(ownerGhii, appToolsKey(filename)))?.value);
+    return parsed.success && parsed.data.tools.some(t => isToolPriced(t));
 }
 
 const cap = <T>(xs: T[]): T[] => xs.slice(0, ITEM_CAP);
@@ -198,7 +227,7 @@ export function buildFindings(f: IntermediationFacts): IntermediationFinding[] {
         count: f.appsOpenRegistration.length, items: cap(f.appsOpenRegistration.map(a => ({ app: a.app, owner: a.owner }))),
         reason: f.appRegistrationSettingPresent
             ? (f.appsOpenRegistration.length ? `${f.appsOpenRegistration.length} app(s) let outside parties register and sell to them: the app's owner may be the provider of a marketplace.` : 'No app lets outside parties register and sell to them.')
-            : 'No app can let outside parties register on this node yet, so none runs an open marketplace of its own.',
+            : 'No app can let outside parties register on this node, so none runs an open marketplace of its own.',
         regulation: [DGA_REFS.marketplace],
     });
     add({

@@ -11,9 +11,11 @@
  *
  *   Drafted on every read from the data maps, so a draft follows the map and goes when the app or
  *   its personal data goes; once a register is stored, its place shows the stored one instead.
- * @structure APP_SCAN · registerDrafts()
+ * @structure APP_SCAN · registerDrafts() · appPartiesRegister()
  * @usage const drafts = await registerDrafts({ storage, config }, await listDocs(storage, nodeId, 'registers'));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — An app with people registered to it as outside parties, or with its signup
+ *     open, drafts a register of them (appPartiesRegister; plan doc-mvwxcas3dom3, D4.4).
  *   v1.0.0 — 2026-10-26 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -22,6 +24,7 @@ import { appSlug, localAccountName } from '../utils/gaii.js';
 import type { ComplianceScope } from './compliance-docs.js';
 import { appRegisterDraft, nodeRegistersDraft } from './compliance-derived.js';
 import type { ComplianceRegister } from './compliance-docs-schemas.js';
+import { readAppParties, signupOpen } from './app-parties/store.js';
 
 /** How many apps are read, as the gap scan reads them (compliance-scope-gaps.ts). */
 const APP_SCAN = 1000;
@@ -50,7 +53,28 @@ export async function registerDrafts(
     const owner = localAccountName(a.ownerName ?? a.ownerGaii);
     if (!owner || keeps.has(`app:${owner}/${appSlug(a.filename)}`)) continue;
     const { register } = await appRegisterDraft(storage, `${owner}@${config.nodeId}`, a.filename);
-    if (register) out.push({ scope: { kind: 'app', ownerName: owner, app: a.filename }, items: [register] });
+    const parties = await appPartiesRegister(deps, owner, a.filename);
+    const items = [register, parties].filter((r): r is ComplianceRegister => !!r);
+    if (items.length) out.push({ scope: { kind: 'app', ownerName: owner, app: a.filename }, items });
   }
   return out;
+}
+
+/**
+ * The people who registered to an app as its outside parties (services/app-parties/; plan
+ * doc-mvwxcas3dom3, D4.4): personal data the app's owner holds as controller, a register of its own.
+ * Null when nobody registered and the signup is not open.
+ */
+export async function appPartiesRegister(deps: { storage: Storage; config: AimeatConfig }, owner: string, filename: string): Promise<ComplianceRegister | null> {
+    const rec = await readAppParties(deps.storage, `${owner}@${deps.config.nodeId}`, `${owner}/${filename}`);
+    if (!rec.parties.length && !signupOpen(deps.config, rec.registration)) return null;
+    const stem = filename.replace(/\.html?$/i, '').replace(/[^A-Za-z0-9_-]+/g, '-');
+    return {
+        id: `app-${stem}-parties`, title: `People who registered to ${filename}`.slice(0, 300), type: 'personal', purpose: 'member', role: 'controller',
+        subjects: ['people registered to the app without an account'],
+        dataCategories: ['e-mail address', 'display name', 'role in the app', 'what each person keeps in the app'],
+        retentionText: 'Until the person or the app\'s owner removes the registration.',
+        containers: [{ kind: 'app', app: filename }], reviewEveryMonths: 12,
+        answerSources: { type: 'evidence', purpose: 'evidence', role: 'evidence', subjects: 'evidence', dataCategories: 'evidence', retentionText: 'evidence', containers: 'evidence' },
+    } as ComplianceRegister;
 }

@@ -1030,6 +1030,26 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: one bounded page of an app's member rows in the system namespace app-member, read for their role names only, to choose the role a request notification's one-click approval offers. Nothing it reads is shown to the caller."
     },
+    "src/services/app-parties/data.ts": {
+      "reads": {
+        "getMemory": 3,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4.2), the node's own read: the service-owned `app-party-data.` records under the app owner, read back only to the party whose uid the node put in the key (or the app's shared collection), and counted for the per-party limit. The party wrote the content itself; no owner content is read."
+    },
+    "src/services/app-parties/owner.ts": {
+      "reads": {
+        "listMemory": 1,
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4.1, D4.3), the node's own read: the keys of one removed party's service-owned data records, to delete them, and the apps' service-owned `app-parties.` records for the operator's list of signup requests. No record content is answered."
+    },
+    "src/services/app-parties/store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4), the node's own read: an app's service-owned `app-parties.` record (its signup setting and the people who registered), which only the app party service writes."
+    },
     "src/services/app-members.ts": {
       "reads": {
         "listAllMemory": 1,
@@ -1455,9 +1475,11 @@
     },
     "src/services/data-intermediation/findings.ts": {
       "reads": {
-        "getMemoryByKeysAnyOwner": 1
+        "getMemoryByKeysAnyOwner": 1,
+        "listAllMemory": 1,
+        "getMemory": 1
       },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D7.3), the node's own read: the owners' `parties` records (service-owned), counted for the compliance report's data intermediation findings (how many person parties hold a contact, per account). The operator's report gets counts and account names; an owner's slice only their own. No party contact or other content leaves."
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D7.3, D4.5), the node's own read: the owners' `parties` records and the apps' `app-parties.` records (both service-owned), counted for the compliance report's data intermediation findings (how many person parties hold a contact, per account; which apps have an open signup), and an app's tool manifest read only for whether a tool has a money price. The operator's report gets counts, account and app names; an owner's slice only their own. No party contact or other content leaves."
     },
     "src/services/datapackage/images.ts": {
       "reads": {
