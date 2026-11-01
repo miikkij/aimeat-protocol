@@ -39,6 +39,8 @@
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.7.0 — 2026-11-01 — An item carries its freshness, a named share's facts (`share`) and an outside
+ *     party's (`party`) out of the report; outward() dropped the freshness the sources attached (WP9a).
  *   v1.6.0 — 2026-11-01 — The counts carry the level `named` (outside parties, plan doc-mvwxcas3dom3, D3).
  *   v1.5.0 — 2026-10-25 — On a closed node an app opened to the internet stays public in the report,
  *     with how to close its opening (services/internet-opening/); the node note names the exception.
@@ -180,6 +182,9 @@ function outward(f: ExposureFound, cls?: ItemClassification): ReportedItem {
     ...(f.organism_id ? { organism_id: f.organism_id } : {}),
     ...(f.url ? { url: f.url } : {}),
     how_to_close: f.how_to_close,
+    ...(f.freshness ? { freshness: f.freshness } : {}),
+    ...(f.share ? { share: f.share } : {}),
+    ...(f.party ? { party: f.party } : {}),
     ...(cls ? { classification: cls } : {}),
   };
 }

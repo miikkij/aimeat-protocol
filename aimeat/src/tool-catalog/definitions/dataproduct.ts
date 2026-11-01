@@ -9,6 +9,7 @@
  * @structure dataProductTools · DATAPRODUCT_ACTIONS
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.1.0 — 2026-11-01 — `retention`; "list" says what each row carries (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import { z } from 'zod';
@@ -16,7 +17,7 @@ import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 import {
     DataProductSourceSchema, DataProductCombineSchema, DataProductColumnsSchema, DataProductFilterSchema,
-    DataProductScheduleSchema, DataProductVisibilitySchema,
+    DataProductScheduleSchema, DataProductRetentionSchema, DataProductVisibilitySchema,
 } from '../../models/dataproduct-schemas.js';
 
 export const DATAPRODUCT_ACTIONS = ['define', 'get', 'list', 'preview', 'run', 'delete'] as const;
@@ -28,7 +29,7 @@ export const dataProductTools = [
             + 'When the person asks for one ("make a data product of the municipal budget signals, update it on Mondays"), find the material first (aimeat_discover, aimeat_workspace_read), then call action "define" with the sources and the schedule, then action "preview" and tell the person what the rows look like and who will read them. Run it when they agree. '
             + 'action "define" { name, sources, combine?, columns?, filter?, schedule?, visibility?, title?, description?, keywords?, license? } stores the definition (REPLACES one of the same name) after reading every source as you; '
             + '"preview" { name } builds it without publishing: the first 20 rows of each resource, the row counts, the Table Schema, the validation result and the ODPS sheet the version would get (pass the definition fields too to preview a draft without storing it); '
-            + '"run" { name } builds and publishes one version (the same rows give no new version: unchanged true); "get", "list", "delete" (removes the definition and its schedule; the package stays). '
+            + '"run" { name } builds and publishes one version (the same rows give no new version: unchanged true); "get"; "list" (each product with its freshness: fresh, late, stale or unscheduled; its audience, live named shares and reads in the last seven days, which answers "what data do I offer", "is any of it stale" and "who reads my data"); "delete" (removes the definition and its schedule; the package stays). '
             + 'SOURCES, each { id (A, B...), kind, ... }: records { organism_id, ws, space } (each published record of a workspace records space is a row); app { app, key_prefix, rows_at? } (an app\'s data, only the families its data map marks publishable); memory { key, rows_at?, owner? } (the array at rows_at of one record); extension { ext, action, input?, rows_at? } (an extension action the node runs); file { key, sheet? } (a stored CSV or XLSX); datapackage { name, owner?, resource? } (another data package; it goes into the lineage). '
             + 'A source may name `columns`: a list to keep, or { column: "dotted.path" } to flatten nested values. '
             + 'COMBINE: "tables" (each source its own resource; the default with one source), "union" (rows appended; the columns must match), "join" with key { left: "A.kunta", right: "B.kunta" } (a left join of the first source; unmatched rows kept with nulls; a right key on several rows is refused). '
@@ -54,6 +55,7 @@ export const dataProductTools = [
             columns: { type: 'array', description: 'For define: the output columns [{ source, from, name?, type?, description?, include? }]. Omit to keep every column of every source.', zod: DataProductColumnsSchema },
             filter: { type: 'object', description: 'For define: { column, op, value } keeps the rows that pass; null removes the filter.', zod: DataProductFilterSchema },
             schedule: { type: 'object', description: 'For define: { cron, timezone? } rebuilds the product on a clock; null builds on demand only.', zod: DataProductScheduleSchema },
+            retention: { type: 'object', description: 'For define: { keep, unit? } keeps that many earlier versions (unit "versions", the default) or that many months of them; null or absent keeps every version. A version a share pins stays regardless.', zod: DataProductRetentionSchema },
             visibility: { type: 'string', description: 'For define: private (the default), members, organism:<id> or public.', zod: DataProductVisibilitySchema },
             confirm_personal_public: { type: 'boolean', description: 'For define: the person agreed that a public product carries the columns the data map marks personal.' },
         },

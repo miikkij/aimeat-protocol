@@ -13,6 +13,7 @@
  * @structure registerDataProductTool(mcp, config, storage, caller)
  * @usage registerDataProductTool(mcp, config, storage, caller);   // from registerCoreDataPackageTools
  * @version-history
+ *   v1.1.0 — 2026-11-01 — define and a draft preview take `retention` (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -29,7 +30,7 @@ import {
     type DataProductAnswer, type DataProductCtx,
 } from '../services/dataproduct/service.js';
 
-const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'sources', 'combine', 'columns', 'filter', 'schedule', 'visibility', 'confirm_personal_public'] as const;
+const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'sources', 'combine', 'columns', 'filter', 'schedule', 'retention', 'visibility', 'confirm_personal_public'] as const;
 
 export function registerDataProductTool(
     mcp: McpServer, config: AimeatConfig, storage: Storage,
