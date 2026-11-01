@@ -16,6 +16,9 @@
  *   entrance are the kit's one-shot JavaScript, and they stand down under reduced motion.
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.3.2 — 2026-11-02 — The side column scrolls on its own when it is taller than the window (a
+ *     phone on its side: the column stood pinned and its last pages could not be reached), and the
+ *     side navigation in the phone's Menu sheet.
  *   v0.3.1 — 2026-09-29 — The side column keeps the node's row of marks free at its foot.
  *   v0.3.0 — 2026-09-29 — promptPanel and queueRow (workbench-parts.js).
  *   v0.2.0 — 2026-09-28 — `.ak-setgroups` (the settings groups in one card, divided by hairlines)
@@ -87,6 +90,12 @@
   position: sticky;
   top: 0;
   padding-bottom: var(--ak-chrome-bottom);
+  /* A pinned column taller than the window never shows its foot, however far the page scrolls
+     (a phone on its side, 400px high): it scrolls on its own, and only then. */
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 .ak-app--sidenav .ak-app__main {
   flex: 1 1 auto;
@@ -112,6 +121,10 @@
   .ak-app__frame { padding: var(--ak-pad) var(--ak-pad) 0; }
   .ak-app--sidenav .ak-app__main { padding-bottom: calc(var(--ak-chrome-bottom) + var(--ak-touch) + var(--ak-pad) * 2); }
 }
+
+/* The phone's Menu sheet carries the whole side navigation: the entries at full touch width. */
+.ak-dialog .ak-sidenav { gap: 12px; }
+.ak-dialog .ak-sidenav__item { min-height: var(--ak-touch); }
 
 /* ── sideNav ──────────────────────────────────────────────────────────────────────────────── */
 .ak-sidenav { display: flex; flex-direction: column; gap: 16px; }
