@@ -402,8 +402,8 @@
       on: "Activado",
       off: "Desactivado",
       loading: "Cargando…",
-      partiesTitle: "Registrados sin cuenta: {n}",
-      partiesLead: "Estas personas se registraron con un correo electrónico y entran con un enlace que el servidor les envía. No tienen cuenta aquí, y su acceso funciona solo en esta app.",
+      partiesTitle: "Personas registradas sin cuenta: {n}",
+      partiesLead: "Estas personas se registraron con un correo electrónico y entran con un enlace que el servidor les envía. No tienen cuenta aquí, y su acceso funciona solo en esta aplicación.",
       partiesNone: "Todavía no se ha registrado nadie.",
       partiesRegOff: "Este servidor no permite registrarse sin cuenta. Eso lo decide su operador.",
       partiesRegOpen: 'El registro está abierto. Una persona nueva recibe el rol "{role}".',
@@ -417,10 +417,10 @@
       partiesJoined: "se unió el {d}",
       partiesSeen: "última visita el {d}",
       partiesPending: "todavía no abrió el enlace",
-      partiesStopped: "detenido",
+      partiesStopped: "detenida",
       partiesStop: "Detener",
       partiesResume: "Dejar entrar de nuevo",
-      partiesRemoveConfirm: "¿Quitar a {name}? Su acceso termina y se borra todo lo que guardó en la app."
+      partiesRemoveConfirm: "¿Quitar a {name}? Su acceso termina y se borra todo lo que guardó en la aplicación."
     }
   };
   function pickLang(explicit) {
