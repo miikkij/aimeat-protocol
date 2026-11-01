@@ -186,10 +186,11 @@ Defaults as shipped in `.env.example`.
 
 **The security posture is environment-only.** `AIMEAT_SECURITY_PROFILE` takes `local` or `public`.
 When unset, `config.ts` selects `local` for a private base URL or a personal node, and `public`
-otherwise. It is read from the environment rather than through the field schema,
-so it has no dot path and cannot be changed from the dashboard. It decides the settings whose safe
-value differs between localhost and the open internet: private-network egress, the AI provider
-allowlist, and whether app origin isolation is on when nothing has said. `aimeat validate` reports
+otherwise. Its schema row (`security.profile`) is immutable, so the dashboard shows it and cannot
+change it. It decides the settings whose safe value differs between localhost and the open internet:
+private-network egress and whether app origin isolation is on when nothing has said. On a public node
+it also makes the start log warn about an empty AI provider allowlist; the allowlist itself is empty
+by default under both profiles. `aimeat validate` reports
 what the current posture leaves open. → `docs/coding-guidelines/security-development-dna.md`
 
 Operator identity (`operator.*`) has no default on purpose. A node that has not said who runs it

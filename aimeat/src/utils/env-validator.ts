@@ -5,7 +5,10 @@
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
- * @version-history v1.4.0 — 2026-10-16 — Names every value the start sets aside and runs the default
+ * @version-history v1.4.1 -- 2026-11-01 -- The two-step sign-in key is an error only when neither it nor
+ *   AIMEAT_ENCRYPTION_KEY is set, as the runtime reads them since 2026-10-09; the message no longer says
+ *   the secrets are stored unencrypted, which stopped being true that day (IT adoption review).
+ *   v1.4.0 — 2026-10-16 — Names every value the start sets aside and runs the default
  *   for (config-start-check.ts), as an error, and a fixed-set word in another case as a warning; says
  *   which ones still stop the start (Jouni, decision 2026-10-16).
  *   v1.3.1 — 2026-10-16 — AIMEAT_NODE_TYPE takes personal, as the loader does (QA audit D8-02).
@@ -301,11 +304,12 @@ export function validateEnv(): ValidationResult[] {
   // ── TOTP / 2FA ──────────────────────────────────────────────────
   const totpEnabled = env.AIMEAT_TOTP_ENABLED;
   if (totpEnabled !== 'false') {
-    // TOTP is enabled by default — encryption key should be set
+    // The secrets are encrypted with AIMEAT_ENCRYPTION_KEY, or with this key when only this one is set
+    // (services/encryption.ts getEncryptionKey); with neither, setting up two-step sign-in answers 503.
     const totpKey = env.AIMEAT_TOTP_ENCRYPTION_KEY;
-    if (!totpKey) {
-      results.push({ level: 'error', variable: 'AIMEAT_TOTP_ENCRYPTION_KEY', message: 'Required when TOTP is enabled. TOTP secrets are stored unencrypted without this key. Set a 32-byte hex key or disable TOTP with AIMEAT_TOTP_ENABLED=false.' });
-    } else if (totpKey.length < 64) {
+    if (!totpKey && !env.AIMEAT_ENCRYPTION_KEY) {
+      results.push({ level: 'error', variable: 'AIMEAT_TOTP_ENCRYPTION_KEY', message: 'Neither AIMEAT_ENCRYPTION_KEY nor AIMEAT_TOTP_ENCRYPTION_KEY is set, so nobody can set up two-step sign-in (503). Set AIMEAT_ENCRYPTION_KEY (64 hex characters, openssl rand -hex 32), which encrypts every stored secret, or disable TOTP with AIMEAT_TOTP_ENABLED=false.' });
+    } else if (totpKey && totpKey.length < 64) {
       results.push({ level: 'warning', variable: 'AIMEAT_TOTP_ENCRYPTION_KEY', message: `Key length ${totpKey.length} hex chars is short. Expected 64 hex chars (32 bytes) for AES-256-GCM.` });
     }
   }
