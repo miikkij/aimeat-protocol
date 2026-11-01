@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-11-01 — Seed core:datapackage-freshness (hourly at :47): owners of stale data packages are told once (plan D6.2).
  *   2026-10-28 — Seed core:compliance-ask-makers (daily 08:15): the makers of AI apps with EU AI Act questions open are asked.
  *   2026-10-25 — Seed core:held-label-release (daily 05:41; secaudit2026oct22, app-label-recycled-after-delete).
  *   2026-10-29 — Seed core:file-store-sweep (daily 03:37).
@@ -97,6 +98,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     // The makers of apps that use AI with EU AI Act questions open get one message with a ready prompt.
     // Daily at 08:15, in working hours; the same app is asked again only after a fortnight.
     { id: 'core:compliance-ask-makers', name: 'Ask App Makers for AI Act Answers', coreHandler: 'compliance-ask-makers', cron: '15 8 * * *' },
+    // Data packages whose producer missed three promised runs; each owner is told once per stale spell
+    // (datapackage/freshness-sweep.ts). Hourly at :47; a node with no scheduled package reads one scan.
+    { id: 'core:datapackage-freshness', name: 'Data Package Freshness', coreHandler: 'datapackage-freshness', cron: '47 * * * *' },
   ];
 
   if (config.consentEnabled) {

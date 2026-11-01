@@ -27,6 +27,7 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   2026-11-01 — Section 5: a package sold on EXCHANGE, the feed metered against the buyer's contract (plan D5; routes/odata.ts).
  *   2026-11-01 — Section 5: a package shared by name with an outside reader through aimeat_party, who
  *     signs in to the feed with HTTP Basic (plan doc-mvwxcas3dom3, D3; routes/odata.ts).
  *   2026-11-01 — Section 5: the ODPS sheet's address (odps_url) and aimeat_datapackage_withdraw, after
@@ -171,6 +172,11 @@ programs read it:
   package, the purpose and \`days\`. The reader gets a key and a connection file, and signs in to the
   feed with HTTP Basic (user \`<owner>/<name>\`, password the key). Tell the person until when, that
   ending the share stops the next read, and that copies already taken stay with the reader.
+- **To sell the package** (by the month, or by the read), \`aimeat_datapackage_sell\` with the money
+  price and the usage terms lists it on EXCHANGE. A buyer with an account reads the feed with their own
+  token and pays each read or month through their contract; a buyer with no account buys on the
+  provider's card page and gets a key for HTTP Basic, as an outside reader does. A reader the package's
+  own audience already admits reads free, so a package for sale is one that is not public.
 
 ## How it goes stale
 

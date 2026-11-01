@@ -14,6 +14,7 @@
  * @usage import { OffersDocSchema } from '../models/offer-schemas.js';
  *   const parsed = OffersDocSchema.safeParse(req.body);
  * @version-history
+ *   2026-11-01 — An offer takes `deliversData`, the provider's statement for its EXCHANGE listing (plan D5.5).
  *   Pacing — 2026-10-11 — A morsel is pacing, never a price: `price.morsels` is deprecated (accepted
  *     and mirrored until 4.0.0, config-pacing.ts) and is read as part of `tollMorsels`
  *     (normalizeOfferPacing, presentOfferPacing). An offer's price is `priceMoney`; none means free.
@@ -193,6 +194,8 @@ export const OfferSchema = z.object({
    * on delivery". Requires visibility 'public' + a price + the I/O schemas below (the legibility gate).
    */
   exchange: z.boolean().optional(),
+  /** Whether the work delivers data (plan D5.5). Absent: false, agent work is a service unless stated. */
+  deliversData: z.boolean().optional(),
   /** What the buyer SENDS to start the task — required to list on EXCHANGE. */
   inputSchema: z.record(z.string(), z.unknown()).optional(),
   /** What the agent DELIVERS — required to list on EXCHANGE. */

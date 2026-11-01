@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.9.0 — 2026-11-01 — `datapackages` passes for a principal holding storage:read: a data package of
+ *     the owner was published or withdrawn (plan doc-mvwxcas3dom3, D6).
  *   v1.8.0 — 2026-10-29 — `app-plans` passes for a principal holding app:write: an app's plan changed,
  *     so its structure page re-reads (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  *   v1.7.0 — 2026-10-22 — `realtime-rooms` passes for a principal holding social:read: a realtime
@@ -59,6 +61,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   memory: 'memory:read',
   personal: 'memory:read',
   files: 'storage:read',
+  // A data package of the owner was published, ran again or was withdrawn (services/datapackage/
+  // contract.ts DATAPACKAGES_DOMAIN): its versions and freshness changed. The word its reads ask.
+  datapackages: 'storage:read',
   // The content class pipeline's facts about the owner's files and records (services/content/).
   contentclass: 'storage:read',
 

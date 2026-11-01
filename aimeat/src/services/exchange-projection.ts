@@ -39,6 +39,12 @@
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.9.0 — 2026-11-01 — A fourth source, data packages (services/exchange-projection-datapackage.ts),
+ *     scoped by `packageName` and reconciled after each new pointer of a package on sale. Every listing
+ *     carries `deliversData` (the source's own statement, else proposeDeliversData), and the data
+ *     intermediation gate reads it. migrateLegacyOfferings moved unchanged to
+ *     services/exchange-projection-migrate.ts (plan doc-mvwxcas3dom3, D5.1, D5.5).
+ *   v1.8.0 — 2026-11-01 — A new listing that delivers data is skipped with DATA_INTERMEDIATION_NOT_OFFERED under the node's data intermediation setting; an existing one is updated as before (plan D7.1).
  *   v1.7.2 — 2026-10-25 — A tool bound to the owner's own namespaced extension by its short name counts
  *     as selling that action (ownBindingExt; owner namespaces wish, secaudit2026oct22).
  *   v1.7.1 — 2026-10-19 — migrateLegacyOfferings sets the exchange flag on the source record's version
@@ -70,7 +76,7 @@
  *   v1.0.0 — 2026-07-25 — Initial projection + reconcile + legacy adoption (TARGET-050 slices 1 & 3).
  */
 import type { Storage } from '../storage/interface.js';
-import { AppToolsDocSchema, appToolsKey, type AppTool } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { OffersDocSchema, normalizeOfferPacing, type Offer } from '../models/offer-schemas.js';
 import { ensureInterfaceVersion, getLatestInterface } from './app-tool-interfaces.js';
 import {
@@ -81,20 +87,17 @@ import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOver
 import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './exchange-source-terms.js';
 import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchange-projection-types.js';
 import { logger } from '../utils/logger.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
 import { findExtension } from './component-address.js';
+import { dataListingRefusal } from './data-intermediation/gate.js';
+import { desiredFromDataPackages } from './exchange-projection-datapackage.js';
+import { proposeDeliversData } from './exchange-datapackage.js';
+import { onLatestWritten } from './datapackage/version-audience.js';
 
 /** A tool binding's extension as stored: an owner's bare name for their own namespaced extension is that one. */
 async function ownBindingExt(storage: Storage, name: string, ownerName: string): Promise<string> {
   if (name.includes('/')) return name;
   return (await findExtension(storage, name, ownerName, 'manage'))?.name ?? name;
 }
-
-/** A stored source document as its schema reads it, or null when it is absent or does not validate. */
-const parsedOrNull = <T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, v: unknown): T | null => {
-  const p = schema.safeParse(v);
-  return p.success ? p.data : null;
-};
 import { ownerGhiiOf as ownerGhiiOfPrincipal, localAccountName } from '../utils/gaii.js';
 
 export type { ReconcileChange, ReconcileReport } from './exchange-projection-types.js';
@@ -182,6 +185,7 @@ export async function desiredFromAppTools(
           aiProvenance: inheritAiProvenance(parsed.data.aiProvenance, tool.aiProvenance),
           tollMorsels: sold.tollMorsels,
           taskSpec: { inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {} },
+          deliversData: tool.deliversData ?? proposeDeliversData('agent-work'),
         };
         for (const p of sold.rows) {
           out.push({
@@ -218,6 +222,7 @@ export async function desiredFromAppTools(
         aiProvenance: inheritAiProvenance(parsed.data.aiProvenance, tool.aiProvenance),
         tollMorsels: sold.tollMorsels,
         binding: tool.action_id, lockedInput: hasSchema(tool.lockedInput),
+        deliversData: tool.deliversData ?? proposeDeliversData('app-tool', tool.outputSchema),
       };
       for (const p of sold.rows) {
         out.push({
@@ -258,6 +263,7 @@ async function desiredFromExtActions(
         plans: (comm.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(comm.usageTerms), tags: [] as string[],
         provenance: provenanceOf(comm.provenance), odps: comm.odps ?? null,
         tollMorsels: sold.tollMorsels,
+        deliversData: comm.deliversData ?? proposeDeliversData('ext-action', act.outputSchema),
       };
       for (const p of sold.rows) {
         out.push({
@@ -306,6 +312,7 @@ async function desiredFromAgentOffers(
         provenance: provenanceOf(offer.provenance), odps: offer.odps ?? null,
         tollMorsels: sold.tollMorsels,
         taskSpec: { inputSchema: offer.inputSchema ?? {}, outputSchema: offer.outputSchema ?? {} },
+        deliversData: offer.deliversData ?? proposeDeliversData('agent-work'),
       };
       for (const p of sold.rows) {
         out.push({
@@ -328,7 +335,7 @@ async function desiredFromAgentOffers(
  */
 export async function reconcileOwnerOfferings(
   storage: Storage, principal: string,
-  opts?: { dryRun?: boolean; appId?: string; extName?: string; agentName?: string },
+  opts?: { dryRun?: boolean; appId?: string; extName?: string; agentName?: string; packageName?: string },
 ): Promise<ReconcileReport> {
   const dryRun = opts?.dryRun === true;
   /* Normalise HERE, not at the call sites. Sources live in the OWNER's namespace, so a GAII reaching
@@ -337,13 +344,14 @@ export async function reconcileOwnerOfferings(
      normalised; the browse path did not, and one asymmetry was enough. */
   const ownerGhii = ownerGhiiOf(principal);
   const ownerName = localAccountName(ownerGhii);
-  const scoped = !!(opts?.appId || opts?.extName || opts?.agentName);
+  const scoped = !!(opts?.appId || opts?.extName || opts?.agentName || opts?.packageName);
   const changes: ReconcileChange[] = [];
 
   const sourced: DesiredListing[] = [
     ...(!scoped || opts?.appId ? await desiredFromAppTools(storage, ownerGhii, ownerName, opts?.appId, changes, dryRun) : []),
     ...(!scoped || opts?.extName ? await desiredFromExtActions(storage, ownerName, opts?.extName, changes) : []),
     ...(!scoped || opts?.agentName ? await desiredFromAgentOffers(storage, ownerName, opts?.agentName, changes) : []),
+    ...(!scoped || opts?.packageName ? await desiredFromDataPackages(storage, ownerGhii, ownerName, opts?.packageName, changes, dryRun) : []),
   ];
 
   /* Two sources can now want the SAME listing: an unbound app-tool projects onto (agent, toolName),
@@ -383,9 +391,13 @@ export async function reconcileOwnerOfferings(
     wanted.add(d.key);
     const existing = byKey.get(d.key);
     if (!existing) {
+      // A NEW listing that delivers data waits for the node's data intermediation setting (plan D7.1);
+      // a listing that exists is updated below as before and reported by the compliance page instead.
+      const refused = await dataListingRefusal({ storage }, { providerOwner: ownerName, kind: d.kind, deliversData: d.deliversData });
+      if (refused) { skipped(changes, d, `${refused.code} ${refused.message}`); continue; }
       const offering: Offering = {
         offeringId: newOfferingId(), providerGhii: ownerGhii, providerOwner: ownerName,
-        kind: d.kind, ext: d.ext, action: d.action, surface: d.surface,
+        kind: d.kind, ext: d.ext, action: d.action, surface: d.surface, deliversData: d.deliversData,
         title: d.title, description: d.description,
         unit: d.unit, basePrice: d.basePrice, currency: d.currency, plans: d.plans,
         ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
@@ -400,7 +412,7 @@ export async function reconcileOwnerOfferings(
     }
     const adopting = !existing.auto;
     const unchanged = !adopting && existing.state === 'listed' && existing.sourceHash === d.sourceHash
-      && existing.basePrice === d.basePrice;
+      && existing.basePrice === d.basePrice && existing.deliversData === d.deliversData;
     if (unchanged) {
       changes.push({ action: 'unchanged', offeringId: existing.offeringId, kind: d.kind, label: labelOf(d), unit: d.unit, currency: d.currency });
       resolved.push({ d, offering: existing });
@@ -409,7 +421,7 @@ export async function reconcileOwnerOfferings(
     // Keep offeringId: existing entitlements carry `contractRef: offering:{id}`.
     const updated: Offering = {
       ...existing,
-      kind: d.kind, ext: d.ext, action: d.action, surface: d.surface,
+      kind: d.kind, ext: d.ext, action: d.action, surface: d.surface, deliversData: d.deliversData,
       title: d.title, description: d.description,
       unit: d.unit, basePrice: d.basePrice, currency: d.currency, plans: d.plans,
       ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
@@ -590,10 +602,11 @@ const skipped = (changes: ReconcileChange[], d: DesiredListing, reason: string):
 const labelOf = (d: Pick<DesiredListing, 'surface' | 'ext' | 'action'>): string =>
   d.surface?.kind === 'app-tool' ? `${d.surface.appId}/${d.surface.tool}`
     : d.surface?.kind === 'agent-work' ? `${d.surface.agentName}:${d.surface.taskType}`
-      : `${d.ext}/${d.action}`;
+      : d.surface?.kind === 'datapackage' ? `datapkg/${d.surface.packageName}`
+        : `${d.ext}/${d.action}`;
 
 /** Does a projected offering belong to the source this scoped reconcile is about? */
-function inScope(o: Offering, opts?: { appId?: string; extName?: string; agentName?: string }): boolean {
+function inScope(o: Offering, opts?: { appId?: string; extName?: string; agentName?: string; packageName?: string }): boolean {
   // An app manifest sources BOTH kinds: a bound tool lists as app-tool, an unbound one as agent-work.
   // Matching only the first left a task-shape listing that its own manifest could never retire.
   if (opts?.appId) {
@@ -603,6 +616,7 @@ function inScope(o: Offering, opts?: { appId?: string; extName?: string; agentNa
   }
   if (opts?.extName) return o.kind === 'ext-action' && o.ext === opts.extName;
   if (opts?.agentName) return o.kind === 'agent-work' && o.surface?.kind === 'agent-work' && o.surface.agentName === opts.agentName;
+  if (opts?.packageName) return o.kind === 'datapackage' && o.surface?.kind === 'datapackage' && o.surface.packageName === opts.packageName;
   return true;
 }
 
@@ -702,77 +716,19 @@ export async function reconcileAfterExtensionWrite(storage: Storage, ownerName: 
   catch (err) { logger.warn('reconcileAfterExtensionWrite: projection is best-effort', { error: String(err) }); return null; }
 }
 
-// ── MIGRATION (TARGET-050 slice 3) ───────────────────────────────────────────
-
 /**
- * Bring hand-authored listings into the projection model: for each of the owner's listed offerings that is
- * not yet a projection, flip the `exchange` flag ON in its SOURCE (so the source now explains why the
- * listing exists) and let reconcile adopt the existing record — keeping its `offeringId`, so entitlements
- * referencing `offering:{id}` keep resolving. A listing whose source is gone is reported as an orphan and
- * left exactly as it is. Idempotent; `dryRun` writes nothing.
+ * Same, for a data package whose pointer carries sale terms (plan D5.1): its listing follows the
+ * terms, and a new version with changed schemas mints the next interface version. Null on failure.
  */
-export async function migrateLegacyOfferings(
-  storage: Storage, ownerGhii: string, opts?: { dryRun?: boolean },
-): Promise<ReconcileReport & { orphans: string[]; flagged: string[] }> {
-  const dryRun = opts?.dryRun === true;
-  const ownerName = localAccountName(ownerGhii);
-  const legacy = (await listAllOfferings(storage)).filter(o => o.providerOwner === ownerName && o.state === 'listed' && !o.auto);
-  const orphans: string[] = []; const flagged: string[] = [];
-
-  for (const o of legacy) {
-    if (o.kind === 'app-tool' && o.surface?.kind === 'app-tool') {
-      const { appId, tool: toolName } = o.surface;
-      // The flag is set on the manifest's version (updateRecord), so a tool list published meanwhile
-      // is read again and flagged rather than replaced; a dry run decides on the same read.
-      let seen: 'orphan' | 'listed' | 'flag' = 'orphan';
-      await updateRecord(storage, ownerGhii, appToolsKey(appId), (v) => parsedOrNull(AppToolsDocSchema, v), (doc) => {
-        const tool = doc?.tools.find((t: AppTool) => t.name === toolName);
-        seen = !doc || !tool ? 'orphan' : tool.exchange === true ? 'listed' : 'flag';
-        if (seen !== 'flag' || dryRun || !doc || !tool) return UNCHANGED;
-        tool.exchange = true;
-        if (!tool.usageTerms && o.usageTerms) tool.usageTerms = { ...o.usageTerms };
-        return { ...doc, updatedAt: new Date().toISOString() };
-      }, { tag: 'app-tools', visibility: 'public' });
-      if (seen === 'orphan') orphans.push(`${o.offeringId} (${o.ext}/${o.action})`);
-      else if (seen === 'flag') flagged.push(`${appId}/${toolName}`);
-      continue;
-    }
-    if (o.kind === 'ext-action') {
-      const ext = await storage.getExtension(o.ext);
-      const act = ext?.actions.find(a => a.id === o.action);
-      if (!ext || !act || ext.installedBy !== ownerName) { orphans.push(`${o.offeringId} (${o.ext}/${o.action})`); continue; }
-      if (act.commercial?.exchange === true) continue;
-      flagged.push(`${ext.name}/${act.id}`);
-      if (!dryRun && act.commercial) {
-        act.commercial.exchange = true;
-        if (!act.commercial.usageTerms && o.usageTerms) act.commercial.usageTerms = { ...o.usageTerms };
-        await storage.updateExtension(ext.name, { actions: ext.actions });
-      }
-      continue;
-    }
-    if (o.kind === 'agent-work' && o.surface?.kind === 'agent-work') {
-      const agentName = o.surface.agentName;
-      const agent = (await storage.listAgents()).find(a => a.owner === ownerName && a.name === agentName);
-      // As for an app tool list: the flag is set on the offers record's version.
-      let seen: 'orphan' | 'listed' | 'flag' = 'orphan';
-      if (agent) await updateRecord(storage, agent.gaii, `agents.${agentName}.offers`, (v) => parsedOrNull(OffersDocSchema, v), (doc) => {
-        const offer = doc?.offers.find((f: Offer) => f.id === o.action);
-        seen = !doc || !offer ? 'orphan' : offer.exchange === true ? 'listed' : 'flag';
-        if (seen !== 'flag' || dryRun || !doc || !offer) return UNCHANGED;
-        offer.exchange = true;
-        offer.visibility = 'public';
-        if (!offer.inputSchema && o.taskSpec?.inputSchema) offer.inputSchema = o.taskSpec.inputSchema;
-        if (!offer.outputSchema && o.taskSpec?.outputSchema) offer.outputSchema = o.taskSpec.outputSchema;
-        if (!offer.usageTerms && o.usageTerms) offer.usageTerms = { ...o.usageTerms };
-        return { ...doc, updatedAt: new Date().toISOString() };
-      }, { tag: 'offers', visibility: (stored) => stored?.visibility ?? 'owner' });
-      if (seen === 'orphan') orphans.push(`${o.offeringId} (${o.ext}/${o.action})`);
-      else if (seen === 'flag') flagged.push(`${agentName}:${o.action}`);
-      continue;
-    }
-    orphans.push(`${o.offeringId} (${o.ext}/${o.action})`);
-  }
-
-  const report = await reconcileOwnerOfferings(storage, ownerGhii, { dryRun });
-  return { ...report, orphans, flagged };
+export async function reconcileAfterPackageWrite(storage: Storage, ownerGhii: string, packageName: string): Promise<ReconcileReport | null> {
+  lastReconcile.delete(ownerGhii);
+  try { return await reconcileOwnerOfferings(storage, ownerGhii, { packageName }); }
+  catch (err) { logger.warn('reconcileAfterPackageWrite: projection is best-effort', { error: String(err) }); return null; }
 }
+
+// Every new pointer of a package on sale (a new version, a changed audience) reconciles its listing.
+onLatestWritten(async (storage, ownerGhii, name, pointer) => {
+  if (pointer.exchange) await reconcileAfterPackageWrite(storage, ownerGhii, name);
+});
+
+// The migration of hand-authored listings (TARGET-050 slice 3) is services/exchange-projection-migrate.ts.

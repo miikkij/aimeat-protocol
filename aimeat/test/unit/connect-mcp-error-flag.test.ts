@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-11-01 — PROBE_SETUP for aimeat_datapackage_sell (a package ref; plan D5.1).
  *   2026-11-01 — PROBE_SETUP for aimeat_dataproduct (an action and a product name).
  *   2026-11-01 — PROBE_SETUP for aimeat_datapackage_withdraw (a package ref, as for the export tool).
  *   2026-10-31 — PROBE_SETUP for aimeat_admin_federation_settlement_ceiling_set (a ceiling, or "node";
@@ -79,6 +80,7 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_datapackage_export: { ref: 'pkg:someone/thing' },
   // The ref is parsed before the call (owner/name, or pkg:owner/name), as for the export tool.
   aimeat_datapackage_withdraw: { ref: 'pkg:someone/thing' },
+  aimeat_datapackage_sell: { ref: 'pkg:someone/thing' },
   // The ceiling is a whole number, "none" or "node" on the catalog's pattern; 'probe' is none of them.
   aimeat_admin_federation_settlement_ceiling_set: { settlement_ceiling: 'node' },
   aimeat_dataproduct: { action: 'get', name: 'thing' },

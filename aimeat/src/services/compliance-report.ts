@@ -35,6 +35,9 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.5.0 — 2026-11-01 — `data_intermediation`, section 12 (Data Governance Act 2022/868): the setting,
+ *     the notification record, the findings and the Article 12 checklist, in both rings
+ *     (services/data-intermediation/report.ts; plan doc-mvwxcas3dom3, D7).
  *   v1.4.0 — 2026-10-28 — Gap kind app-uses-ai-not-in-register: an app whose own statements say it
  *     uses AI and that no use case names, with the Annex III area its data map points to. The model
  *     gap had named only model ids on a node whose apps all call through their owners' accounts.
@@ -63,6 +66,7 @@ import {
 import { buildProcessingSummary, type ProcessingSummary } from './compliance-processing.js';
 import { appAiGaps } from './compliance-app-ai-gaps.js';
 import type { ScopeGap } from './compliance-scope-gaps.js';
+import { buildDataIntermediationSection, type DataIntermediationSection } from './data-intermediation/report.js';
 
 /** How far back the rollup's hot window reaches before rows move to the archive. */
 const USAGE_HOT_WINDOW_DAYS = 90;
@@ -156,6 +160,12 @@ export interface ComplianceReport {
    */
   processing?: ProcessingSummary & { gaps: ScopeGap[] };
   gaps: ComplianceGap[];
+  /**
+   * Section 12, data intermediation (Data Governance Act 2022/868): the setting, the provider's
+   * notification record, the findings and the Article 12 checklist. Both rings; an owner's slice holds
+   * only the owner's own (services/data-intermediation/report.ts).
+   */
+  data_intermediation: DataIntermediationSection;
 }
 
 export interface ComplianceReportOptions {
@@ -481,6 +491,9 @@ export async function buildComplianceReport(
   // without an owner still covers the app.
   const appGaps: ComplianceGap[] = await appAiGaps(storage, config, rawUseCases, owner);
 
+  // Section 12, data intermediation (plan doc-mvwxcas3dom3, D7): both rings, the owner's own in a slice.
+  const dataIntermediation = await buildDataIntermediationSection({ storage, config }, owner ? { ownerGhii: owner } : {});
+
   return {
     scope: {
       node_id: config.nodeId,
@@ -497,6 +510,7 @@ export async function buildComplianceReport(
     register: { usecases, questionnaire },
     ...(processing ? { processing: { ...processing.summary, gaps: processing.gaps } } : {}),
     gaps: [...findGaps(usecases, usage, transparency), ...appGaps, ...fontGaps],
+    data_intermediation: dataIntermediation,
   };
 }
 

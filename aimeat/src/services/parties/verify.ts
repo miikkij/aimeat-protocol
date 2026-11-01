@@ -27,6 +27,8 @@
  * @structure PartyCredential · PartyContext · PartyVerdict · partyCredentialOf · verifyParty · RequestLike
  * @usage const cred = partyCredentialOf(req, { urlKeyOwner }); if (cred) { const v = await verifyParty(deps, cred); }
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The token of a party registered to an app is refused here: it opens that app's
+ *     party endpoints only (services/app-parties/verify.ts; plan D4.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.1, D2.5; lead decision L2).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -116,6 +118,8 @@ export async function verifyParty(deps: { storage: Storage; config: AimeatConfig
     if (cred.form === 'token') {
         const claims = await verifyPartyToken(cred.token);
         if (!claims) return { ok: false, status: 401, code: 'INVALID_PARTY_CREDENTIAL', message: 'The party token has expired or is not valid. Ask for a new one at POST /v1/parties/token.' };
+        // The token of a party registered to an app opens that app's party endpoints only (services/app-parties/).
+        if (claims.app) return { ok: false, status: 401, code: 'INVALID_PARTY_CREDENTIAL', message: 'This token signs you in to one app, and it reads nothing here. Ask the owner who shared the data for a key.' };
         owner = claims.owner;
         party = (await readParties(storage, `${owner}@${config.nodeId}`)).parties.find(p => p.uid === claims.uid);
         key = party?.keys.find(k => k.id === claims.kid && (!k.expiresAt || Date.parse(k.expiresAt) > now));

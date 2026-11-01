@@ -12,6 +12,7 @@
  * @structure partyPubReader
  * @usage const p = await partyPubReader(req, res, deps, gaii, key); if (p === null) return;
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A resource CSV read through a share a purchase made is metered (`charge`; plan D5.3).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3.2).
  */
 import type { Request, Response } from 'express';
@@ -41,5 +42,7 @@ export async function partyPubReader(
         return null;
     }
     const p = await partyReaderFor(req, res, deps, { owner, name: m[1]!, what: 'file', ...(m[2] ? { version: `sha256:${m[2]}` } : {}) });
+    // A resource CSV is a data read, metered for a share a purchase made; the descriptor and the pointer are not (plan D5.3).
+    if (p && p !== 'none' && !key.endsWith('.csv')) return { ...p, charge: async () => true };
     return p;
 }

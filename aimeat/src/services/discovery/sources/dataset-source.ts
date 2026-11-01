@@ -27,6 +27,8 @@
  * @structure createDatasetSource(storage, config) → DiscoverySource · DATASET_SOURCE_ID
  * @usage registry.register(createDatasetSource(storage, config));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — An entry carries `freshness` against its producer's promise, for the kept
+ *     entries only (services/datapackage/freshness.ts; plan doc-mvwxcas3dom3, D6.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.1).
  */
 import type { AimeatConfig } from '../../../config.js';
@@ -37,11 +39,13 @@ import { datapackageReadable } from '../../datapackage/audience.js';
 import { readPointer } from '../../datapackage/version-audience.js';
 import { memoryTarget } from '../../classification/labels.js';
 import type { LatestPointer } from '../../datapackage/contract.js';
+import { packageFreshness } from '../../datapackage/freshness-read.js';
+import { freshnessBrief, type Freshness } from '../../datapackage/freshness.js';
 
 export const DATASET_SOURCE_ID = 'datasets';
 const MAX_LIMIT = 100;
 
-interface DatasetHit { facts: DatasetFacts; pointer: LatestPointer | null }
+interface DatasetHit { facts: DatasetFacts; pointer: LatestPointer | null; freshness: Freshness | null }
 
 /** The audience as the directory's visibility ladder. */
 function visibilityOf(audience: string): CanonicalVisibility {
@@ -88,16 +92,22 @@ export function createDatasetSource(storage: Storage, config: AimeatConfig): Dis
       }
       const shown = await ctx.reader.show(readable, f => memoryTarget(f.ownerGhii, f.manifestKey));
       const page = shown.slice(0, limit);
-      const hits = await Promise.all(page.map(async (facts): Promise<DatasetHit> => ({
-        facts, pointer: await readPointer(deps, facts.ownerGhii, facts.name),
-      })));
+      const hits = await Promise.all(page.map(async (facts): Promise<DatasetHit> => {
+        const pointer = await readPointer(deps, facts.ownerGhii, facts.name);
+        // Against the producer's promise, from the pointer read here and the manifest's schedule (D6.1).
+        const freshness = pointer?.status === 'withdrawn' ? null : await packageFreshness(deps, facts.ownerGhii, facts.name, {
+          // A manifest that names its producer kind states its schedule too, so none means none.
+          pointer, ...(facts.producerKind ? { schedule: facts.schedule ?? '', producerKind: facts.producerKind } : {}),
+        });
+        return { facts, pointer, freshness };
+      }));
       return hits
         .filter(h => h.pointer?.status !== 'withdrawn')
         .map(record => ({ sourceId: DATASET_SOURCE_ID, record, score: 0 }));
     },
 
     toEntry(raw: RawHit): DiscoveryEntry {
-      const { facts: f, pointer } = raw.record as DatasetHit;
+      const { facts: f, pointer, freshness } = raw.record as DatasetHit;
       const rowCount = f.resources.reduce((n, r) => n + r.rowCount, 0);
       const lastPublishedAt = pointer?.contentHash ? pointer.updatedAt : f.modified;
       const columns = f.resources.reduce((n, r) => n + r.fields, 0);
@@ -122,6 +132,7 @@ export function createDatasetSource(storage: Storage, config: AimeatConfig): Dis
           resources: f.resources.map(r => ({ name: r.name, rowCount: r.rowCount, fields: r.fields })),
           lastPublishedAt,
           ...(pointer?.lastError ? { lastError: pointer.lastError } : {}),
+          ...(freshness ? { freshness: freshnessBrief(freshness) } : {}),
           links: datasetLinks(config.baseUrl, f),
         },
       };

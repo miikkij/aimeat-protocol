@@ -132,13 +132,13 @@
       "digest": "sha256:0616f65dadb980487d16a50a"
     },
     "node:aimeat-app-builder": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/services/node-templates.ts",
         "aimeat/src/services/app-spec-gate.ts"
       ],
-      "digest": "sha256:1ceef6c22f4bc674f2887fa2",
+      "digest": "sha256:ffa29db256af3de8766ea339",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
@@ -322,7 +322,7 @@
       "digest": "sha256:2d418558132de8fbc92e13f6"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
@@ -332,7 +332,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:fb5fad6ba0f302d7861ce227"
+      "digest": "sha256:deb7db8c3a8a2499810bd13a"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-01",
@@ -369,7 +369,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:6c3aa9ed12cdfab84aec79a1"
+      "digest": "sha256:c2feeb9b33c95eed3a52f64a"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-01",
@@ -415,7 +415,7 @@
         "aimeat/src/services/finance/invoice-service.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:e7ee00dac870f3601ace7704",
+      "digest": "sha256:1994a7afd52d120eea44f19d",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -462,12 +462,12 @@
       "digest": "sha256:28c44ab5d5b30609821c175c"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/routes/app-templates.ts"
       ],
-      "digest": "sha256:e4aaa83addb7f75e5b29bd76"
+      "digest": "sha256:ef9048a899a684528b70c5cf"
     },
     "project:aimeat-design-language": {
       "reviewedOn": "2026-10-24",
@@ -494,13 +494,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-10-26",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:b88887de471323fccde113ed"
+      "digest": "sha256:e5c57c903228bb4bb158f4c0"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -562,7 +562,7 @@
       "aimeat/src/services/app-publish-next-steps.ts": "9754eccc2c25fb6f"
     },
     "node:aimeat-app-builder": {
-      "aimeat/src/services/build-app-layers.ts": "dab09d22f4255723",
+      "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
       "aimeat/src/services/node-templates.ts": "bcf0b92f35579c1e",
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
@@ -678,7 +678,7 @@
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
-      "aimeat/src/services/build-app-layers.ts": "dab09d22f4255723",
+      "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85"
     },
     "project:aimeat-design-language": {
@@ -693,7 +693,7 @@
       "scripts/gen_image.py": "e2435908849b31d3"
     },
     "project:aimeat-library-authoring": {
-      "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
+      "aimeat/scripts/build-sdk-libs.ts": "9f7c9e6018b803da",
       ".githooks/pre-commit": "ba558088830eb13c",
       "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1"
     },
@@ -758,7 +758,7 @@
     "node:aimeat-extension-builder": {
       "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1",
       "aimeat/src/services/extension-ctx-contract.ts": "ba2b8499c8ca5652",
-      "aimeat/src/services/extension-manifest.ts": "09e04a048b7c541f",
+      "aimeat/src/services/extension-manifest.ts": "fd3d70de8b81e457",
       "aimeat/src/routes/extensions/paywall.ts": "e464e27b4cbca9aa",
       "aimeat/src/routes/extensions/crud.ts": "723ee89afa7b5c7f",
       "aimeat/src/routes/extensions/instances.ts": "d7ace6eb026fee79",
@@ -791,10 +791,10 @@
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
-      "aimeat/src/routes/odata.ts": "e15eee911332aa63"
+      "aimeat/src/routes/odata.ts": "adb0ec05fc647d8f"
     },
     "node:aimeat-agent-capability": {
-      "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
+      "aimeat/src/models/app-tool-schemas.ts": "f3ec18941ecc650d",
       "aimeat/src/commerce/app-tool-catalog.ts": "9f754fa8073a0adf",
       "aimeat/src/services/extension-ctx-contract.ts": "ba2b8499c8ca5652",
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",

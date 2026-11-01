@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Indexing, personal-node, site, consent, push, email, TOTP, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-11-01 — AIMEAT_DATA_INTERMEDIATION in the consent section (plan doc-mvwxcas3dom3, D7.1).
  *   v1.4.0 — 2026-10-31 — AIMEAT_SMTP_REPLY_TO in the email section.
  *   v1.3.1 — 2026-10-11 — The cookie categories are read through consentCategories(): the value could
  *     be text typed in Config, which has no join().
@@ -104,6 +105,12 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'How long to keep audit logs (days)',
           value: String(config.consentAuditRetentionDays),
           defaultVal: '365',
+        },
+        {
+          envVar: 'AIMEAT_DATA_INTERMEDIATION',
+          description: 'Data intermediation service (EU 2022/868): report | none | node | owners',
+          value: config.dataIntermediation,
+          defaultVal: 'report',
         },
       ],
     },
