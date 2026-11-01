@@ -28,10 +28,12 @@
  * @usage
  *   import type { McpServerRepository } from './repositories/mcp-server.repository.js';
  * @version-history
+ *   v1.1.0 — 2026-11-01 — updateMcpServerCredential takes the auth mode, so a sign-in hangs an OAuth
+ *     credential on a row that was attached as `none` and the token is then sent.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import type {
-  McpServerRecord, McpServerStatus, McpOwnership, RemoteToolSnapshot,
+  McpServerRecord, McpServerStatus, McpOwnership, RemoteToolSnapshot, McpAuthMode,
 } from '../../models/mcp-server-schemas.js';
 
 /** Narrowing for a listing. All fields optional; omitted means "any". */
@@ -82,10 +84,11 @@ export interface McpServerRepository {
   /**
    * Replace the stored credential after a refresh or a re-authorisation. Takes ciphertext.
    * Clears `lastError` and sets status back to `active`, because a token exchange that worked is
-   * exactly the evidence that whatever was wrong no longer is.
+   * exactly the evidence that whatever was wrong no longer is. `auth`, when given, is written with
+   * it: a row attached to sign in afterwards holds the mode the credential now belongs to.
    */
   updateMcpServerCredential(
-    id: string, credential: string | null, expiresAt: string | null,
+    id: string, credential: string | null, expiresAt: string | null, auth?: McpAuthMode,
   ): Promise<void>;
 
   /** Move to `needs_reauth`, `unreachable` or `disabled`, with a reason the owner can act on. */

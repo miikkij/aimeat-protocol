@@ -43,11 +43,11 @@
       "digest": "sha256:87a171600d3e771db3254383"
     },
     "node:aimeat-open-items": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:e7d6e96dedba4f85193d1706"
+      "digest": "sha256:4730794dc7914fef305e5e55"
     },
     "node:aimeat-recurring-work": {
       "reviewedOn": "2026-11-01",
@@ -332,7 +332,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:747f54889450d68000194bdc"
+      "digest": "sha256:1540298cdf0a2e41b5d51471"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-01",
@@ -387,7 +387,7 @@
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/services/mcp-client/grants.ts",
@@ -395,7 +395,7 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:945b6e6f6a658a1fc0cdf4df"
+      "digest": "sha256:fdaa6bd5ac02571584d225d0"
     },
     "node:aimeat-workflow-decisions": {
       "reviewedOn": "2026-10-27",
@@ -500,7 +500,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:e5c57c903228bb4bb158f4c0"
+      "digest": "sha256:b4ee55fc665ffaa6d59a9c87"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -538,7 +538,7 @@
   },
   "fileDigests": {
     "node:aimeat-open-items": {
-      "aimeat/src/services/open-items.ts": "6882e2583df9b088"
+      "aimeat/src/services/open-items.ts": "cef5aded3c599ed5"
     },
     "node:aimeat-first-conversation": {
       "aimeat/src/services/model-recommendation.ts": "35430253a9486362"
@@ -695,7 +695,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "9f7c9e6018b803da",
       ".githooks/pre-commit": "ba558088830eb13c",
-      "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1"
+      "aimeat/src/services/build-extension-prompt.ts": "fdcfd38cd4fc64f5"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
@@ -756,7 +756,7 @@
       "aimeat/src/services/agent-task-rules.ts": "9e08919bb240837a"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1",
+      "aimeat/src/services/build-extension-prompt.ts": "fdcfd38cd4fc64f5",
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/extension-manifest.ts": "fd3d70de8b81e457",
       "aimeat/src/routes/extensions/paywall.ts": "e464e27b4cbca9aa",
@@ -777,7 +777,7 @@
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "095fdb4fbeb06409",
       "aimeat/src/services/mcp-client/grants.ts": "1652c22f0c53e827",
-      "aimeat/src/services/mcp-client/registry.ts": "804ea44a9115d001",
+      "aimeat/src/services/mcp-client/registry.ts": "518aaf36f74a6637",
       "aimeat/src/services/mcp-client/invoke.ts": "2c19276ca1c8fdd1",
       "aimeat/src/mcp/mcp-proxy.ts": "9b3ef4f1de84a597"
     },

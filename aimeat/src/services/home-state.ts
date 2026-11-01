@@ -19,6 +19,7 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.4.5 — 2026-11-01 — helloMcp leaves out a proof key the node's own chat or basic agents wrote.
  *   v1.4.4 — 2026-10-19 — The card's agent carries `avatar` (services/agent-avatar.ts), null when it has none.
  *   v1.4.3 — 2026-10-18 — The portfolio keys come from services/portfolio-config.ts.
  *   v1.4.2 — 2026-10-11 — needsBetterApp passes the person's answer to the conditions question
@@ -40,8 +41,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { getOwnerScopeMemory } from './owner-memory.js';
-import { HELLO_MCP_KEY } from './hello-mcp.js';
+import { hasHelloMcpProof } from './node-resident-agent.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingTrack, type OnboardingBranch,
     type OnboardingRoom,
@@ -171,8 +171,9 @@ async function readHomeStateInScope(
         if (await storage.getStorageFile(gaii, PORTFOLIO_HTML_KEY)) { matHtmlExists = true; break; }
     }
 
-    // The proof key is written by the AGENT under its own GAII, so this must read owner-scope.
-    const helloMcp = !!(await getOwnerScopeMemory(storage, config.nodeId, owner, HELLO_MCP_KEY));
+    // The proof key is written by the AGENT under its own GAII, so this must read owner-scope, and
+    // a copy the node's own chat or basic agents wrote is not a connection the person made.
+    const helloMcp = await hasHelloMcpProof(storage, config.nodeId, owner);
 
     // Which agent the card shows. The list is ordered by both providers now (createdAt, gaii), so
     // agents[0] is the FIRST agent rather than whatever the storage engine happened to return —
