@@ -210,6 +210,26 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   'src/services/discovery/sources/dataset-source.ts': {
     'readPointer(deps, facts.ownerGhii, facts.name)': 'Read after the audience filter for freshness (updatedAt, lastError) and the withdrawn mark; it opens nothing the filter refused.',
   },
+  'src/services/dataproduct/service.ts': {
+    'readPointer(ctx.deps, ctx.caller.ownerGhii, name)': 'Tells whether a data product\'s package exists (delete answer, failure note) and shows its pointer to the product\'s own caller; it opens nothing.',
+    'pointer.visibility': 'Shown to the data product\'s own caller beside its definition; display only, no read decides on it.',
+  },
+  'src/services/dataproduct/scheduled-job.ts': {
+    '`datapkg/${name}/latest.json`': 'Names the key a scheduled data product run writes, for the scheduler\'s reads and writes list; it decides nothing.',
+  },
+  'src/services/dataproduct/sources-io.ts': {
+    'readPointer(deps, ownerGhii, spec.name!)': 'DEBT: a source package\'s audience label; Lifecycle Central incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
+    'pointer?.visibility': 'DEBT: same incident, incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
+  },
+  'src/services/parties/shares.ts': {
+    'latestKey(packageName)': 'DEBT: share creation reads the version and withdrawn mark off the pointer; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
+    'latestKey(name)': 'DEBT: descriptorFor serves a party the pointer\'s version; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
+  },
+  'src/services/exchange-datapackage.ts': {
+    'readPointer({ storage, config }, ownerGhii, name)': 'DEBT: sale terms set on the pointer\'s version; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
+    'latestKey(name)': 'DEBT: the terms are written back to the pointer and the listing projection reads it; same incident.',
+    'pointer.visibility': 'DEBT: the pointer file\'s tier on the terms write; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
+  },
   'src/services/anonymous-principal-records.ts': {
     "'/latest.json'": 'Finds the anonymous account\'s packages by their pointer key for the operator\'s list of what that account holds; it shows the file\'s tier and decides no access.',
   },
