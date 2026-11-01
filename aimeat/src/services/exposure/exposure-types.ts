@@ -29,6 +29,7 @@
  *   const ctx = createExposureContext(storage, config);
  *   const items = await source.list(ctx, 'alice', 'alice@node');
  * @version-history
+ *   v1.2.0 — 2026-11-01 — ExposureItem.freshness: a data package's or a named share's package state (D6.1).
  *   v1.1.0 — 2026-11-01 — The level `named` and the kinds `named_share` and `outside_party`: what the
  *     person shares with outside parties (./sources-parties.ts; plan doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
@@ -74,6 +75,8 @@ export interface ExposureItem {
   url?: string;
   /** One plain sentence, naming the MCP tool and the REST route that close it. */
   how_to_close: string;
+  /** A data package's freshness against its producer's promise: fresh, late, stale or unscheduled. */
+  freshness?: string;
 }
 
 /**

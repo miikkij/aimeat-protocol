@@ -27,6 +27,7 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-01 — Section 8: `commercial.deliversData`, and the node's proposal from the output schema (plan D5.5).
  *   2026-10-30 — Section 9: a file linked from a workspace record opens to the members; ctx.files.read
  *     answers visibility and workspaceRef.
  *   2026-10-29 — Section 10: with install role operator a package's extensions wait switched off for an
@@ -275,6 +276,11 @@ Every action can carry two values, and they do different jobs:
   4.0.0, refused from 4.0.0 with \`MORSEL_PRICE_REMOVED\`. Write \`tollMorsels\`.
 - Ask why a flagged action is not on the market with \`POST /v1/exchange/reconcile\`
   \`{ "dry_run": true, "ext": "<name>" }\`.
+- Every listing says whether it delivers data. \`commercial.deliversData: true | false\` states it;
+  left out, the node proposes true when the action's \`output\` returns rows or records (an array of
+  objects, or \`rows\`, \`records\`, \`items\`, \`data\` or \`results\` holding one). A node that runs no
+  data intermediation service refuses a new listing that delivers data with
+  \`DATA_INTERMEDIATION_NOT_OFFERED\`.
 
 ## 9. Secrets and files
 

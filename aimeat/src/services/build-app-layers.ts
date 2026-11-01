@@ -34,7 +34,9 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
- *   2026-10-19 — The section "Calling the node" is served in part `data`, not `start`. Part `start`
+ *   2026-11-01 — The section "Users who have no AIMEAT account" (aimeat-parties.js) is on demand,
+ *     id `outside-users` (plan D4).
+ *   2026-10-19 —The section "Calling the node" is served in part `data`, not `start`. Part `start`
  *     had grown to 24 008 characters on the E2E node's address and failed MAX_PART_CHARS in the
  *     nightly sweep; on a node address longer than 27 characters it failed in production too.
  *   2026-10-17 — The section "How the data map answers steer the build" (build-data-map-step.ts) is
@@ -132,6 +134,10 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
   'Reading data your AGENTS produced (not your own keys)': {
     id: 'agent-data', layer: 'on-demand',
     when: "The app shows data that the person's AI agents wrote. A plain list returns nothing for it.",
+  },
+  'Users who have no AIMEAT account': {
+    id: 'outside-users', layer: 'on-demand',
+    when: 'The app is for people who have no account on this node: the buyers of a shop, the members of a club, a market place.',
   },
   'Collecting input from anonymous visitors (Public Intake)': {
     id: 'public-intake', layer: 'on-demand',

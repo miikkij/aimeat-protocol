@@ -29,10 +29,14 @@
  *   party declining it, by the party's deletion, and by the package's withdrawal; each of the last
  *   three sets status `revoked` with `endedReason` (`declined`, `party-deleted`, `package-withdrawn`).
  * @structure SHARE_PATTERN_PREFIX · sharePatternOf · packageOfPattern · ShareMeta · shareMetaOf ·
- *   isLiveShare · partySharesOf · normalizePartyShare · endShares · setShareMeta · connectionFileOf ·
+ *   isLiveShare · partySharesOf · normalizePartyShare · endShares · endSharesListed · setShareMeta · connectionFileOf ·
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A share may be bound to an EXCHANGE purchase (`contract`, node-written only):
+ *     its reads are metered against the purchase and cover the versions of its interface (plan D5.3, D5.4).
+ *   v1.1.0 — 2026-11-01 — endSharesListed answers the shares it ended, so a withdrawal mails their
+ *     parties (services/datapackage/share-notices.ts; plan D6.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3; lead decision L3).
  */
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
@@ -67,10 +71,15 @@ export interface ShareMeta {
     termsAcceptedAt?: string;
     declinedAt?: string;
     endedReason?: string;
+    /** The EXCHANGE purchase this share delivers (services/exchange-party-buy.ts): its reads are metered. */
+    contract?: ShareContract;
 }
 
+/** What binds a share to a contract: the offering bought and the interface version its reads cover. */
+export interface ShareContract { offeringId: string; entitlementId: string; ifaceVersion: number }
+
 /** The metadata keys the node writes on a share; a request's own values under them are dropped. */
-const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason'] as const;
+const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason', 'contract'] as const;
 
 export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
     const m = (c.metadata ?? {}) as Record<string, unknown>;
@@ -82,7 +91,14 @@ export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
         ...(typeof m.termsAcceptedAt === 'string' ? { termsAcceptedAt: m.termsAcceptedAt } : {}),
         ...(typeof m.declinedAt === 'string' ? { declinedAt: m.declinedAt } : {}),
         ...(typeof m.endedReason === 'string' ? { endedReason: m.endedReason } : {}),
+        ...(contractOf(m.contract) ? { contract: contractOf(m.contract)! } : {}),
     };
+}
+
+function contractOf(v: unknown): ShareContract | null {
+    const c = v as Partial<ShareContract> | null | undefined;
+    return c && typeof c.offeringId === 'string' && typeof c.entitlementId === 'string' && typeof c.ifaceVersion === 'number'
+        ? { offeringId: c.offeringId, entitlementId: c.entitlementId, ifaceVersion: c.ifaceVersion } : null;
 }
 
 /** Active and not past its expiry. */
@@ -197,13 +213,18 @@ export async function setShareMeta(storage: Storage, share: ConsentRecord, chang
  * audit entry each. Answers how many ended. The next read through any of them is refused.
  */
 export async function endShares(storage: Storage, ownerGhii: string, match: (c: ConsentRecord) => boolean, reason: string): Promise<number> {
+    return (await endSharesListed(storage, ownerGhii, match, reason)).length;
+}
+
+/** endShares, answering the shares it ended as they were before, so a caller can tell their parties. */
+export async function endSharesListed(storage: Storage, ownerGhii: string, match: (c: ConsentRecord) => boolean, reason: string): Promise<ConsentRecord[]> {
     const active = await storage.listConsents(ownerGhii, { status: 'active' });
-    let ended = 0;
+    const ended: ConsentRecord[] = [];
     for (const c of active) {
         if (!c.recipient.startsWith('party:') || !match(c)) continue;
         await setShareMeta(storage, c, { endedReason: reason }, 'revoked');
         await auditDataAccess(storage, c.id, c.ownerGaii, c.recipient, c.dataPattern, 'revoke', true);
-        ended++;
+        ended.push(c);
     }
     return ended;
 }
@@ -276,6 +297,7 @@ export function shareView(c: ConsentRecord, extra: Record<string, unknown> = {})
         terms_required: m.termsRequired, terms_accepted_at: m.termsAcceptedAt ?? null,
         ...(m.declinedAt ? { declined_at: m.declinedAt } : {}),
         ...(m.endedReason ? { ended_reason: m.endedReason } : {}),
+        ...(m.contract ? { contract: { offering_id: m.contract.offeringId, entitlement_id: m.contract.entitlementId, interface_version: m.contract.ifaceVersion } } : {}),
         ...extra,
     };
 }

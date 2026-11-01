@@ -10,6 +10,8 @@
  * @structure setCarryPlan · setMember · removeRosterMember
  * @usage const out = await setMember(storage, config, caller, { owner, filename }, req.body);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — POST .../members takes `party`: an outside party of the app's owner joins the
+ *     roster with a role and no grant (services/app-parties/owner.ts); removing one sends no notice (plan D4.1).
  *   v1.0.0 — 2026-10-05 — Moved out of the handlers of routes/app-members.ts by extraction;
  *     aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
  */
@@ -31,6 +33,7 @@ import { resolveAppUrls } from './app-urls.js';
 import { rosterContext, rosterBucketOf, rosterAudit, type MembersCtx, type RosterCaller } from './app-roster-context.js';
 import { MANAGER_ROLE_MSG, type AppRef } from './app-roster-ops.js';
 import { done, refuse, type AppOpOutcome } from './app-op-outcome.js';
+import { setPartyMember } from './app-parties/owner.js';
 
 const forbidden = (message: string) => refuse(403, 'FORBIDDEN', message);
 const bad = (message: string, code = 'INVALID_INPUT') => refuse(400, code, message);
@@ -174,6 +177,14 @@ export async function setMember(
   if (!c.ok) return c;
   if (!c.canManage) return forbidden('Only the app owner, or a member who manages its roster, approves its members');
   const b = (body ?? {}) as Record<string, unknown>;
+  // An outside party of the app's owner, by its identity (services/app-parties/owner.ts; plan D4.1).
+  if (typeof b.party === 'string' && b.party) {
+    if (b.account !== undefined || b.email !== undefined) return bad('Give party, account or email, one of them.');
+    if (typeof b.role !== 'string' || !b.role.trim()) return bad('party and role are required');
+    const out = await setPartyMember({ storage, config }, c, b.party, b.role.trim(), typeof b.note === 'string' ? b.note.slice(0, 400) : undefined);
+    if (out.ok) await rosterAudit(storage, config, c, 'member.approved', { account: b.party, to: b.role.trim() });
+    return out;
+  }
   const email = typeof b.email === 'string' ? b.email.trim() : '';
   let account = typeof b.account === 'string' ? accountOf(b.account) : '';
   const role = typeof b.role === 'string' && b.role.trim() ? b.role.trim() : '';
@@ -278,7 +289,8 @@ export async function removeRosterMember(
     });
   }
   if (!gone) return refuse(404, 'NOT_FOUND', 'No such member');
-  await sendMemberNotice(storage, memberAddress(account, config.nodeId), 'revoked', { app: appStem(c.filename), by: c.callerAccount }, { link: appDeepLink(c.appId) });
+  // An outside party has no account to notify (services/app-parties/).
+  if (!account.startsWith('party:')) await sendMemberNotice(storage, memberAddress(account, config.nodeId), 'revoked', { app: appStem(c.filename), by: c.callerAccount }, { link: appDeepLink(c.appId) });
   await rosterAudit(storage, config, c, 'member.removed', { account, from: gone.role || null, to: null });
   return done({ removed: true, member: gone });
 }

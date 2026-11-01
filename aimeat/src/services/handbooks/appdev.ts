@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-01 — Users with no AIMEAT account: aimeat-parties.js and the party actions of aimeat_app_manage (plan D4).
  *   2026-10-17 — A package install renames its apps: link a sibling from your own name and the app
  *     host's path form, which keeps the query (pitfall-list round).
  *   2026-10-30 — structure_set carries two or three layouts drawn for the app (proposals).
@@ -326,6 +327,15 @@ action needs the permission its route needs: app:write to read, app:manage to de
 cancel an invitation, exchange:grant to approve, remove or sweep, commerce:sell to set the plan. Anybody can call two of them on somebody
 else's app: \`member_me\` answers your own role and request there, and \`member_request\` (with
 \`owner\`, and an optional \`note\`) asks its owner to let you in, which needs social:write.
+
+**Users with no AIMEAT account.** When the app's users are not accounts here (a market place, a club,
+a shop), they register with an e-mail address through \`/v1/libs/aimeat-parties.js\`
+(\`AIMEAT.parties.signUp(email)\`, \`ready()\`, \`me()\`, \`signOut()\`, \`data.get/set/remove(key)\`) and
+become outside parties of the owner, signed in to that one app only. \`party_registration_set\`
+(\`open\`, optional \`role\`) opens or closes the signup when the server allows registration; under
+apps-ask the operator approves it first. \`parties\` lists who registered, \`party_remove\` removes a
+person and everything they kept in the app, and \`member_set\` with \`party\` gives a party a role. Say
+it in the data map: \`registers-parties\` in machinery, or \`registers: { who, keeps }\`.
 
 **Somebody else builds it too.** When the owner says "let Bob develop this app too", that is a
 development right, not a membership: \`aimeat_app_manage\` \`builder_set\` with \`filename\`, \`account\`

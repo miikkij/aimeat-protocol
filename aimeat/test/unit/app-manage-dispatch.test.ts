@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-01 — parties, party_remove and party_registration_set, and member_set's party field (plan D4).
  *   2026-10-31 — settings' screenshot_public field (secaudit2026oct31w2 round 10, W2-12).
  *   v1.11.0 — 2026-10-30 — structure_set's proposals field.
  *   v1.10.0 — 2026-10-29 — structure, structure_set and plans, and the purpose, data, choices and now fields.
@@ -71,6 +72,7 @@ const VALUE: Record<string, unknown> = {
     markdown: '# zqxspec', expected_revision: 4, words: ['zqxword'],
     purpose: 'zqxpurpose', data: { summary: 'zqxdata', personalData: 'no' }, choices: { look: { value: 'zqxlook' } }, now: 'zqxnow',
     proposals: { layout: [{ id: 'zqxproposal', name: 'n', note: 'n', sketch: [{ height: 'l', cells: [{ w: 'full' }] }] }] },
+    party: 'party:alice/ap-zqxparty@node', party_name: 'ap-zqxname', open: true,
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -132,11 +134,15 @@ const EXPECT: Record<string, [string, string]> = {
     structure: ['GET', '/v1/apps/alice/shop.html/structure'],
     structure_set: ['PUT', '/v1/apps/alice/shop.html/structure'],
     plans: ['GET', '/v1/app-plans'],
+    // The people registered to the app without an account, and its signup setting: the owner's own app only.
+    parties: ['GET', '/v1/apps/me-owner/shop.html/parties'],
+    party_remove: ['DELETE', '/v1/apps/me-owner/shop.html/parties/ap-zqxname'],
+    party_registration_set: ['PUT', '/v1/apps/me-owner/shop.html/parties/registration'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */
 const IN_PATH = new Set(['filename', 'owner', 'bundled_agent', 'subdomain', 'limit', 'playtest', 'days', 'detail', 'runner_agent',
-    'q', 'offset', 'before', 'invite_id', 'year', 'words']);
+    'q', 'offset', 'before', 'invite_id', 'year', 'words', 'party_name']);
 
 function fullInput(action: string): Record<string, unknown> {
     const input: Record<string, unknown> = { action };
@@ -191,7 +197,7 @@ describe('aimeat_app_manage: every action reaches its endpoint with its fields',
         const a = recorder();
         await appManageCall(a.client, 'me', fullInput('member_set'));
         expect(a.sent[0]!.body).toEqual({
-            account: 'zqxacct', email: 'zqx@example.com', locale: 'fi', role: 'zqxrole', level: 4, note: 'zqxnote', offerings: ['zqxoff'], days: 9,
+            account: 'zqxacct', email: 'zqx@example.com', party: 'party:alice/ap-zqxparty@node', locale: 'fi', role: 'zqxrole', level: 4, note: 'zqxnote', offerings: ['zqxoff'], days: 9,
             expiresAt: '2027-01-02T03:04:05Z',
         });
         const b = recorder();
