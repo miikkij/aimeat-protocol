@@ -32,6 +32,8 @@
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
+ *   v1.2.7 — 2026-11-01 — One added sentence: a build request goes through the attached server the
+ *     build status's `send` names, with the place's build code (commercial, after Jouni 1.11 18.18).
  *   v1.2.6 — 2026-10-31 — The sentences between steps are in the person's language too. On crew36 the
  *     Finnish answer began "Fetching template for a list app. Publishing the shopping-list app."
  *   v1.2.5 — 2026-10-31 — The app path says the publish ends the turn and their data is not read
@@ -120,6 +122,7 @@ export function turnNote(): string {
         'When the person asks for an app: finish it in this turn, with their sentence as the whole brief and no interview. Read the build specification once, aimeat_handbook_get with tier "build-app-atelier", and no other part unless the app cannot work without it. Then take a genre with aimeat_app_template_get, one that comes whole in one answer: id "genre-receipt" for a list, "genre-almanac" for a calendar or a log, "genre-departures" for a board of items. Every AIMEAT ships these, so one is always there. When an answer says it has more parts, do not fetch them: build on the first part. Build the page from its `content` and keep every script tag it has, and publish with aimeat_app_publish. A template you did not find is never a reason to stop: write the page yourself from the specification and publish it. Give them `url` from the answer.',
         'When aimeat_app_publish has answered, the app is done: give them its `url` in your next words and end the turn. Their own data is not part of building it, so do not read it after the publish.',
         'The person is signed in here, and an app of their own signs them in by itself when they open it, so never ask them to sign in.',
+        'When the person wants to send their build request to the builders ("Rakennamme kanssasi"): read aimeat_build_request_status, fill the four fields in with them, and send it through the attached server its `send.mcp` names, with aimeat_mcp_call calling `send.tool` with `send.arguments` and the code from the status; when aimeat_mcp_list shows no such server, tell them to connect it on the Access page first.',
     ].join('\n');
 }
 

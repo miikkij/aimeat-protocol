@@ -2,10 +2,10 @@
   "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
   "skills": {
     "aimeat-writing": {
-      "digest": "sha256:360b2c584a9c25d1179885b0",
+      "digest": "sha256:e5a28b9bf8b91a712b8542ec",
       "decision": "skipped",
       "on": "2026-11-01",
-      "note": "language-context rows only: settlement, daily ceiling and settlements a day (federation peer, Jouni 2026-11-01), kuvasääntö and syväväärennös, and the OpenRouter region row, merged; no instruction changed; Jouni skipped each, 2026-10-31 and 2026-11-01"
+      "note": "three language-context rows only (AI region choice, Build it with you, build code), no rule or prompt text changed; Grok as Chief of Staff under Jouni's rule of 31.10, relayed by aimeat-commercial-1c, 2026-11-01"
     },
     "aimeat-ai-capabilities": {
       "digest": "sha256:cd5753fef8b4cb9592d229b8",
