@@ -16,6 +16,8 @@
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.6.1 — 2026-11-01 — writeLatest copies the sale terms from the service's record
+ *     (./sale-terms-record.ts saleTermsOf), not from the earlier pointer (WP9e).
  *   v1.6.0 — 2026-11-01 — writeLatest keeps the package's EXCHANGE sale terms (`exchange`) on the new
  *     pointer, so a new version stays on sale, and runs the hooks onLatestWritten registered (plan
  *     doc-mvwxcas3dom3, D5.1).
@@ -48,6 +50,7 @@ import {
 import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
 import { fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, withAudienceTag } from './audience.js';
 import { recordPackageAudience, trustedAudienceOf } from './audience-record.js';
+import { saleTermsOf } from './sale-terms-record.js';
 import { invalidateDatasetFacts, catalogueKeyRoot } from './catalogue-facts.js';
 import { announcePublicDataset } from './announce.js';
 
@@ -90,14 +93,17 @@ export async function writeLatest(
 ): Promise<void> {
     // The owner's confirmation of a public package from personal data stays with the package
     // (./personal-guard.ts); every other field of the earlier pointer is the old version's.
-    // The EXCHANGE sale terms stay with the package too (services/exchange-datapackage.ts, D5.1).
+    // The EXCHANGE sale terms stay with the package too (services/exchange-datapackage.ts, D5.1): the
+    // pointer carries a copy of the service's record of them (./sale-terms-record.ts), not the earlier
+    // pointer's word.
     const before = await readPointer(deps, ownerGhii, name);
     const confirmed = opts.personalPublicConfirmed ?? before?.personalPublicConfirmed;
+    const sold = await saleTermsOf(deps.storage, deps.config.nodeId, ownerGhii, name, before);
     const pointer: LatestPointer = {
         packageId: packageId(localAccountName(ownerGhii), name),
         name, contentHash, descriptorUrl, updatedAt: at, visibility,
         ...(confirmed ? { personalPublicConfirmed: confirmed } : {}),
-        ...(before?.exchange ? { exchange: before.exchange } : {}),
+        ...(sold ? { exchange: sold } : {}),
     };
     // The audience the reads decide on, written before the pointer moves, so the pointer never names
     // a version the record does not (./audience-record.ts).

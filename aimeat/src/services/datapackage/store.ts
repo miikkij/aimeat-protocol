@@ -28,6 +28,9 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — openPackage, and a publish of the same bytes after a withdrawal, take the withdrawal
+ *     from the service's record (./audience-record.ts trustedAudienceOf withdrawnAt), not the pointer's
+ *     mark alone (WP9e).
  *   2026-11-01 — pruneOldVersions moved to ./retention.ts, where a version a live named share pins is
  *     kept; a successful publish emits the `datapackages` change to the owner's streams, and a new
  *     version tells the parties whose share pins the superseded one (./share-notices.ts; plan D6.2, D6.4).
@@ -376,7 +379,7 @@ export async function publishPackage(
         // A withdrawn package lost its catalogue entry, so publishing it again writes the entry back.
         const moved = await setVersionAudience({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, visibility, {
             catalogue: ((await readTrustedVisibility(deps, ownerGhii, input.name)) ?? 'public') !== visibility
-                || previous?.status === 'withdrawn',
+                || !!(await trustedAudienceOf(storage, config.nodeId, ownerGhii, input.name, previous)).withdrawnAt,
             ...(personalPublicConfirmed ? { personalPublicConfirmed } : {}),
         });
         if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
@@ -529,7 +532,8 @@ export async function openPackage(
     const trusted = await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer);
     if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, reader, name))) return null;
     // A withdrawn package opens for nobody, its owner included (./withdraw.ts); a route answers 410.
-    if (pointer?.status === 'withdrawn') return null;
+    // The record's mark counts too, so a pointer with its mark cleared brings no package back.
+    if (trusted.withdrawnAt) return null;
 
     let hash = contentHash;
     let latest: LatestPointer | undefined;

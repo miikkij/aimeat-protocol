@@ -41,6 +41,8 @@
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.4.1 — 2026-11-01 — Share creation and descriptorFor take the package's version and withdrawal
+ *     from the service's record (trustedPackageOf), not the latest.json pointer (WP9e, incident ...-mvxozs2r).
  *   v1.4.0 — 2026-11-01 — A share to a person on another AIMEAT node (`visitor`, normalizeVisitorShare,
  *     isVisitorRecipient); isNamedShare, the one test every list of shares asks (WP9c).
  *   v1.3.0 — 2026-11-01 — A share may deliver a Dataspace Protocol agreement (`dspAgreement`,
@@ -53,11 +55,12 @@
  */
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
+import { localAccountName, ownerGhiiOf, currentNodeId } from '../../utils/gaii.js';
 import { callerFromAuth } from '../caller-context.js';
 import { logger } from '../../utils/logger.js';
 import { auditDataAccess } from '../consent.js';
-import { latestKey, descriptorKey, PACKAGE_NAME_RE, bare, type LatestPointer, type Descriptor } from '../datapackage/contract.js';
+import { descriptorKey, PACKAGE_NAME_RE, bare, type Descriptor } from '../datapackage/contract.js';
+import { trustedPackageOf } from '../datapackage/audience-record.js';
 import { edmName } from '../datapackage/odata.js';
 import { PARTY_MANAGE_SCOPE, parsePartyRef, partyRefOf, type PartyRecord } from './contract.js';
 import { findParty } from './store.js';
@@ -244,10 +247,10 @@ async function packageShareTerms(
     const { storage, config } = deps;
     const packageName = packageOfPattern(input.dataPattern);
     if (!packageName) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'A named share names one data package: data_pattern "datapkg:<package name>".' };
-    const pointerFile = await storage.getStorageFile(ownerGhii, latestKey(packageName));
-    const pointer = storedJson<LatestPointer>(pointerFile?.data, latestKey(packageName));
-    if (!pointer?.contentHash) return { ok: false, status: 404, code: 'NOT_FOUND', message: `You have no data package called "${packageName}".` };
-    if (pointer.status === 'withdrawn') return { ok: false, status: 409, code: 'PACKAGE_WITHDRAWN', message: `The data package "${packageName}" is withdrawn. Publish a version again before you share it.` };
+    // The version and the withdrawal are the service's record, never the pointer file an app can rewrite.
+    const pkg = await trustedPackageOf(storage, config.nodeId, ownerGhii, packageName);
+    if (!pkg?.trusted.current) return { ok: false, status: 404, code: 'NOT_FOUND', message: `You have no data package called "${packageName}".` };
+    if (pkg.trusted.withdrawnAt) return { ok: false, status: 409, code: 'PACKAGE_WITHDRAWN', message: `The data package "${packageName}" is withdrawn. Publish a version again before you share it.` };
 
     const asked = input.metadata ?? {};
     const pinRaw = asked.pinned_version ?? asked.pinnedVersion;
@@ -308,9 +311,13 @@ export async function endSharesListed(storage: Storage, ownerGhii: string, match
     return ended;
 }
 
-/** The descriptor a share reads now: its pinned version, or the package's newest. Null when neither is there. */
+/**
+ * The descriptor a share reads now: its pinned version, or the package's newest as the service
+ * recorded it (./audience-record.ts trustedPackageOf), which is the version a read through the share
+ * opens. Null when neither is there.
+ */
 export async function descriptorFor(storage: Storage, ownerGhii: string, name: string, pinned?: string): Promise<Descriptor | null> {
-    const hash = pinned ?? storedJson<LatestPointer>((await storage.getStorageFile(ownerGhii, latestKey(name)))?.data, latestKey(name))?.contentHash;
+    const hash = pinned ?? (await trustedPackageOf(storage, currentNodeId() ?? '', ownerGhii, name))?.trusted.current;
     if (!hash) return null;
     return storedJson<Descriptor>((await storage.getStorageFile(ownerGhii, descriptorKey(name, hash)))?.data, descriptorKey(name, hash));
 }
