@@ -19,6 +19,8 @@
  * @structure RetentionPolicy · VersionAge · doomedVersions · pinnedVersionsOf · pruneOldVersions
  * @usage const removed = await pruneOldVersions(deps, ownerGhii, name, policy, contentHash);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The newest version of each interface a live EXCHANGE contract pins is kept too,
+ *     named `contract:<entitlement id>` (plan D5.1).
  *   v1.0.0 — 2026-11-01 — pruneOldVersions moved from ./store.ts unchanged; doomedVersions extracted as
  *     the pure half, shared with the versions list; a version a live named share pins is kept (D6.4).
  */
@@ -26,6 +28,9 @@ import type { Storage } from '../../storage/interface.js';
 import { bare, packageKeyRoot, type PublishInput } from './contract.js';
 import { isLiveShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { listEntitlementsByProvider } from '../metered-entitlements.js';
+import { contractVersionHashes, datapackageCoordinate } from '../exchange-datapackage.js';
 
 export type RetentionPolicy = NonNullable<PublishInput['retentionPolicy']>;
 
@@ -62,6 +67,17 @@ export async function pinnedVersionsOf(deps: StoreDeps, ownerGhii: string, name:
         if (!pin) continue;
         const h = bare(pin);
         out.set(h, [...(out.get(h) ?? []), c.id]);
+    }
+    // A live EXCHANGE contract reads the versions of the interface it pins (plan D5.1): the newest of
+    // them stays, so the contract always has a version to read after the schemas changed.
+    const coord = datapackageCoordinate(localAccountName(ownerGhii), name);
+    const contracts = (await listEntitlementsByProvider(deps.storage, ownerGhii))
+        .filter(e => e.ext === coord.ext && e.state !== 'revoked' && e.surface?.kind === 'datapackage');
+    const byIface = new Map<number, string[]>();
+    for (const e of contracts) if (e.surface?.kind === 'datapackage') byIface.set(e.surface.ifaceVersion, [...(byIface.get(e.surface.ifaceVersion) ?? []), `contract:${e.entitlementId}`]);
+    for (const [iface, ids] of byIface) {
+        const newest = (await contractVersionHashes(deps.storage, ownerGhii, name, iface))[0];
+        if (newest) out.set(bare(newest), [...(out.get(bare(newest)) ?? []), ...ids]);
     }
     return out;
 }

@@ -19,6 +19,8 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   2026-11-01 — A fourth kind, `datapackage` (a data package sold as a metered feed, priced from its
+ *     listing by resolveDatapackagePricing), and `deliversData` on every offering (plan D5.1, D5.5).
  *   2026-10-27 — Offerings, needs and bids are read only from the namespace of the party they name
  *     (writtenFor), and an ext-action offering whose provider does not own the extension is refused
  *     (OFFERING_PROVIDER_MISMATCH) (secaudit2026oct26, exchange:cross-namespace-prefix-scan-trusts-value).
@@ -70,6 +72,7 @@ import { resolvePacingToll } from './metered-settlement.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { resolveDatapackagePricing } from './exchange-datapackage.js';
 
 export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
@@ -119,10 +122,16 @@ export interface Offering {
   offeringId: string;
   providerGhii: string;
   providerOwner: string;
-  kind: 'ext-action' | 'app-tool' | 'agent-work';
+  kind: 'ext-action' | 'app-tool' | 'agent-work' | 'datapackage';
   ext: string;
   action: string;
-  surface: SellableSurface | null;   // app-tool (pinned interface) or agent-work (task type); null for ext-action
+  surface: SellableSurface | null;   // app-tool (pinned interface), agent-work (task type) or datapackage (pinned schemas); null for ext-action
+  /**
+   * Whether this offering delivers data (plan doc-mvwxcas3dom3, D5.5): the provider states it, and the
+   * node proposes it when the source says nothing (services/exchange-datapackage.ts proposeDeliversData).
+   * The data intermediation setting and its findings read it. Absent on a listing made before it existed.
+   */
+  deliversData?: boolean;
   title: string;
   description: string;
   unit: EntitlementUnit;
@@ -293,13 +302,23 @@ export async function resolveOfferingPricing(
       tollMorsels: number | null }
   | { ok: false; status: number; code: string; message: string }
 > {
+  // A data package prices from its listing too; `per_month` mints its subscription plan (plan D5.2).
+  if (o.kind === 'datapackage' && o.surface?.kind === 'datapackage') {
+    const priced = resolveDatapackagePricing(o, planId);
+    if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
+    return {
+      ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
+      providerGhii: o.providerGhii, ext: o.ext, action: o.action,
+      capabilityLabel: `${o.surface.packageName} v${o.surface.ifaceVersion}`, surface: o.surface, tollMorsels: o.tollMorsels ?? null,
+    };
+  }
   // app-tool + agent-work both price from the offering's own listing (the provider authored it).
   if ((o.kind === 'app-tool' || o.kind === 'agent-work') && o.surface) {
     const priced = resolveActionPricing(offeringToCommercial(o), planId);
     if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
     const label = o.surface.kind === 'app-tool'
       ? `${o.surface.appId}/${o.surface.tool} v${o.surface.ifaceVersion}`
-      : `${o.surface.agentName}:${o.surface.taskType}`;
+      : o.surface.kind === 'agent-work' ? `${o.surface.agentName}:${o.surface.taskType}` : `${o.ext}/${o.action}`;
     return {
       ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
       providerGhii: o.providerGhii, ext: o.ext, action: o.action, capabilityLabel: label, surface: o.surface,

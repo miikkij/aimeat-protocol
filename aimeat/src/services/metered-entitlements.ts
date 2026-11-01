@@ -18,6 +18,9 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   2026-11-01 — SellableSurface gains DatapackageSurface: a data package sold as a metered feed, its
+ *     Table Schemas pinned as an interface version (plan doc-mvwxcas3dom3, D5.1). A contract of an
+ *     outside party (consumer `party:...`) records no account event for the party, which has no account.
  *   2026-11-01 — listAllEntitlements is exported: the data intermediation findings count the contracts
  *     with outside buyers (services/data-intermediation/findings.ts; plan doc-mvwxcas3dom3, D7.3).
  *   2026-10-27 — The lists read only the service's own namespaces (serviceRows): NS for contracts,
@@ -148,8 +151,24 @@ export interface AgentWorkSurface {
   appId?: string;
 }
 
+/**
+ * The sellable surface for a DATA PACKAGE (plan doc-mvwxcas3dom3, D5.1): one owner's package sold as a
+ * metered feed. The coordinate is `datapkg:{owner}/{name}` + `read`, and a metered call is one data
+ * read (an OData entity set, a row window, the CSV of a resource). `ifaceVersion` pins the package's
+ * Table Schemas at accept time (services/exchange-datapackage.ts): the contract reads the versions whose
+ * schemas are that interface, so a schema change leaves the contract on the versions it was signed for.
+ */
+export interface DatapackageSurface {
+  kind: 'datapackage';
+  ownerName: string;
+  packageName: string;
+  ifaceVersion: number;
+  /** How the source sells it: a month of reads, or each read. */
+  model: 'per_month' | 'per_read';
+}
+
 /** The sellable surface a contract binds to when it is not a raw ext-action. */
-export type SellableSurface = AppToolSurface | AgentWorkSurface;
+export type SellableSurface = AppToolSurface | AgentWorkSurface | DatapackageSurface;
 
 /**
  * What makes an entitlement a GRANT rather than a purchase: the provider decided this consumer may
@@ -434,6 +453,8 @@ export async function createEntitlement(
   // something by watching their balance.
   const contractLabel = value.capabilityLabel || `${value.ext}/${value.action}`;
   for (const side of new Set([ownerGhiiOf(value.consumerGaii), value.providerGhii])) {
+    // An outside party (a buyer with no account, services/exchange-party-buy.ts) has no account events.
+    if (side.startsWith('party:')) continue;
     void recordAccountEvent(storage, {
       ownerGhii: side, kind: 'contract_started', actorGaii: value.createdBy,
       subject: value.entitlementId, link: '/v1/profile?tab=usage',

@@ -8,6 +8,7 @@
  *   stood, so what matches first is unchanged.
  * @structure mountDataRouters(app, config, storage)
  * @version-history
+ *   v1.2.0 — 2026-11-01 — exchangePartyBuyRouter: a buyer with no account buys a data package (plan D5.4).
  *   v1.1.0 — 2026-11-01 — partiesRouter: outside parties and named shares (plan doc-mvwxcas3dom3, D2, D3).
  *   v1.0.0 — 2026-11-01 — The data package and OData mounts moved from routes-loader.ts with their
  *     comments; dataProductsRouter mounted beside them (plan doc-mvwxcas3dom3, D9).
@@ -19,6 +20,7 @@ import { dataPackagesRouter } from '../routes/datapackages.js';
 import { dataProductsRouter } from '../routes/dataproducts.js';
 import { odataRouter } from '../routes/odata.js';
 import { partiesRouter } from '../routes/parties.js';
+import { exchangePartyBuyRouter } from '../routes/exchange-party-buy.js';
 
 export function mountDataRouters(app: express.Express, config: AimeatConfig, storage: Storage): void {
   // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
@@ -35,4 +37,6 @@ export function mountDataRouters(app: express.Express, config: AimeatConfig, sto
   // Outside parties and named shares: the owner's management, the party's own endpoints and token,
   // and the operator's stop (services/parties/).
   app.use(partiesRouter(config, storage));
+  // A buyer with no account buys a data package on EXCHANGE and becomes an outside party (D5.4).
+  app.use(exchangePartyBuyRouter(config, storage));
 }

@@ -31,6 +31,10 @@
  *   res.type('text/yaml').send(odpsToYaml(doc));
  *   const tooLong = odpsLengthOverruns(doc);   // listing warnings; the write refusal is exchange-odps-write.ts
  * @version-history
+ *   v1.5.0 — 2026-11-01 — A datapackage offering projects as a dataset: its plans (a month, or per read),
+ *     its OData and CSV ports, the purchase address of an outside buyer as a second payment gateway, and
+ *     x-aimeat.package with the package's own read-time sheet. x-aimeat.delivers_data on every offering.
+ *     pricingPlans and paymentGateways are exported for the package's sheet (plan D5.1, D5.4, D5.5, D1.2).
  *   v1.4.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): a morsel-rail offering is free at price "0" with its pacing in the note,
  *     the payment gateway says no money moves, and `x-aimeat.economics` carries `toll_morsels` (the
@@ -150,6 +154,7 @@ function isNonEmptyObject(v: unknown): v is Record<string, unknown> {
 /** ODPS `details.type` for an offering that did not declare one: what the surface actually is. */
 function defaultProductType(o: Offering): string {
   if (o.kind === 'agent-work') return 'automated decision-making';
+  if (o.kind === 'datapackage') return 'dataset';
   return 'data-driven service';
 }
 
@@ -183,8 +188,13 @@ function billingDuration(periodSeconds: number): 'day' | 'week' | 'month' | 'yea
   return 'year';
 }
 
-/** The pricing plans block: the per-call base price plus every volume/subscription plan on the listing. */
-function pricingPlans(o: Offering, extras: OdpsExtras | null, lang: string): Json {
+/**
+ * The pricing plans block: the per-call base price plus every volume/subscription plan on the listing.
+ * A data package sold by the month states the month only: its per-call figure is the month's price,
+ * which no read is charged (plan D5.2). Exported for the package's own read-time sheet (D1.2).
+ */
+export function pricingPlans(o: Offering, extras: OdpsExtras | null, lang: string): Json {
+  const monthly = o.kind === 'datapackage' && o.surface?.kind === 'datapackage' && o.surface.model === 'per_month' && o.plans.length > 0;
   const base = priceFields(o, o.basePrice);
   // The listed price is the one in force since the listing last changed — ODPS states that as a validity window.
   const validity: Json = {
@@ -192,9 +202,9 @@ function pricingPlans(o: Offering, extras: OdpsExtras | null, lang: string): Jso
     ...(extras?.valueAddedTaxIncluded !== undefined ? { valueAddedTaxIncluded: extras.valueAddedTaxIncluded } : {}),
     ...(extras?.valueAddedTaxPercentage !== undefined ? { valueAddedTaxPercentage: extras.valueAddedTaxPercentage } : {}),
   };
-  const declarative: Json[] = [{
+  const declarative: Json[] = monthly ? [] : [{
     ...validity,
-    name: o.kind === 'agent-work' ? 'Per delivered task' : 'Per call',
+    name: o.kind === 'agent-work' ? 'Per delivered task' : o.kind === 'datapackage' ? 'Per read' : 'Per call',
     unit: 'Pay-per-use',
     billingDuration: 'instant',
     price: base.price,
@@ -295,6 +305,23 @@ function licence(o: Offering, extras: OdpsExtras | null): Json {
 function dataAccess(input: OdpsProjectionInput, lang: string): Json {
   const { offering: o, callRecipe, baseUrl } = input;
   const ports: Json = {};
+  if (o.surface?.kind === 'datapackage') {
+    // A data package is read, not called: the OData feed and the CSV of each resource (plan D5.1).
+    const path = `${encodeURIComponent(o.surface.ownerName)}/${encodeURIComponent(o.surface.packageName)}`;
+    ports.default = {
+      name: localized(lang, 'OData feed'),
+      description: localized(lang, 'The contract is the access: an account reads with its own AIMEAT token, an outside party with the key its purchase gave (HTTP Basic). Each entity set read is metered.'),
+      outputPortType: 'API', format: 'JSON', authenticationMethod: 'Token', specification: 'OData v4',
+      accessURL: `${baseUrl}/v1/odata/${path}`, documentationURL: `${baseUrl}/v1/exchange/offerings/${o.offeringId}`,
+    };
+    ports.csv = {
+      name: localized(lang, 'CSV'),
+      description: localized(lang, 'The whole resource as CSV, one metered read per request.'),
+      outputPortType: 'file', format: 'CSV', authenticationMethod: 'Token',
+      accessURL: `${baseUrl}/v1/datapackages/${path}/rows/{resource}?format=csv`, documentationURL: `${baseUrl}/v1/datapackages/${path}/odps`,
+    };
+    return ports;
+  }
   ports.default = {
     name: localized(lang, 'Metered AIMEAT call'),
     description: localized(lang, 'The accepted contract IS the access — the consumer calls with their own AIMEAT token and no separate API key is issued; each call is metered, charged and rake-split by the node.'),
@@ -325,7 +352,7 @@ function dataAccess(input: OdpsProjectionInput, lang: string): Json {
 
 /** Which rail settles this offering. Money goes out over the platform's connected-account rail; morsels never
  *  leave. Same named-mapping shape (and the same published-schema caveat) as `dataAccess`. */
-function paymentGateways(o: Offering, rakePercent: number, baseUrl: string, lang: string): Json {
+export function paymentGateways(o: Offering, rakePercent: number, baseUrl: string, lang: string): Json {
   if (o.unit === 'money') {
     return {
       default: {
@@ -333,6 +360,14 @@ function paymentGateways(o: Offering, rakePercent: number, baseUrl: string, lang
         description: localized(lang, `Settled to the provider’s connected account through the AIMEAT platform rail (${o.currency ?? 'EUR'}); the platform retains ${rakePercent}% of each metered call.`),
         reference: `${baseUrl}/v1/exchange/info`,
       },
+      // A buyer with no AIMEAT account buys a data package as an outside party (plan D5.4).
+      ...(o.kind === 'datapackage' ? {
+        outsideBuyer: {
+          type: 'Stripe',
+          description: localized(lang, `A buyer without an AIMEAT account pays on the provider’s card page and gets a key and a connection file. The platform retains ${rakePercent}%.`),
+          reference: `${baseUrl}/v1/exchange/offerings/${o.offeringId}/buy`,
+        },
+      } : {}),
     };
   }
   return {
@@ -400,6 +435,15 @@ function aimeatExtension(input: OdpsProjectionInput): Json {
     language: (o.odps as OdpsExtras | null)?.language ?? DEFAULT_LANGUAGE,
     offering_id: o.offeringId,
     kind: o.kind,
+    // Whether this offering delivers data (plan D5.5): the provider's statement, else the node's proposal.
+    delivers_data: o.deliversData ?? (o.kind === 'ext-action' || o.kind === 'datapackage'),
+    ...(o.surface?.kind === 'datapackage' ? {
+      package: {
+        id: `pkg:${o.surface.ownerName}/${o.surface.packageName}`,
+        odps_url: `${input.baseUrl}/v1/datapackages/${encodeURIComponent(o.surface.ownerName)}/${encodeURIComponent(o.surface.packageName)}/odps`,
+        interface_version: o.surface.ifaceVersion, model: o.surface.model,
+      },
+    } : {}),
     provider: { ghii: o.providerGhii, owner: o.providerOwner },
     capability: { ext: o.ext, action: o.action },
     ...(o.surface ? { surface: o.surface as unknown as Json } : {}),
@@ -455,7 +499,7 @@ export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
   const o = input.offering;
   const extras = (o.odps ?? null) as OdpsExtras | null;
   const lang = extras?.language ?? DEFAULT_LANGUAGE;
-  const ifaceVersion = o.surface && o.surface.kind === 'app-tool' ? o.surface.ifaceVersion : null;
+  const ifaceVersion = o.surface && (o.surface.kind === 'app-tool' || o.surface.kind === 'datapackage') ? o.surface.ifaceVersion : null;
 
   const details: Json = {
     name: o.title || `${o.ext}/${o.action}`,
@@ -481,7 +525,7 @@ export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
         },
       })),
     } : {}),
-    outputFileFormats: extras?.outputFileFormats ?? ['JSON'],
+    outputFileFormats: extras?.outputFileFormats ?? (o.kind === 'datapackage' ? ['CSV', 'JSON'] : ['JSON']),
     ...(extras?.contentSample ? { contentSample: extras.contentSample } : {}),
     ...(extras?.logoURL ? { logoURL: extras.logoURL } : {}),
     ...(extras?.brandSlogan ? { brandSlogan: extras.brandSlogan } : {}),

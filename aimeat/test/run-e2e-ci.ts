@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-exchange-datapackage.ts joins the list (not the guard tier): a data package on EXCHANGE (plan doc-mvwxcas3dom3, D5).
  *   2026-11-01 -- e2e-data-lifecycle.ts and e2e-data-intermediation.ts join the list (not the guard tier):
  *     the data package lifecycle and the data intermediation setting (plan doc-mvwxcas3dom3, D6, D7).
  *   2026-11-01 -- e2e-party.ts and e2e-data-share.ts join the list (not the guard tier): outside parties and the named shares to them (plan doc-mvwxcas3dom3, D2, D3).
@@ -1265,6 +1266,8 @@ const ALL_SUITES = [
     'test/e2e-data-lifecycle.ts',
     // Data intermediation: the setting's four modes, the notification record, section 12's findings and Article 12 rows (plan doc-mvwxcas3dom3, D7).
     'test/e2e-data-intermediation.ts',
+    // A data package sold on EXCHANGE: the projection, the metered feed, the outside buyer, deliversData, ODPS, the intermediation gate (plan doc-mvwxcas3dom3, D5).
+    'test/e2e-exchange-datapackage.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
     // The conflicts in that report: each item's effective classification and cap, conflicts first,

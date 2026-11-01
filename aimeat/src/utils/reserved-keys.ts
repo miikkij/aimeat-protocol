@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-11-01 -- `party-purchases.` is service-owned: the EXCHANGE purchases of outside parties, one
+ *     record per provider per month (services/exchange-party-buy.ts; plan doc-mvwxcas3dom3, D5.4).
  *   2026-11-01 -- `datapkg-freshness-notices` is a service-owned key: the stale notices the owner was
  *     sent (plan doc-mvwxcas3dom3, D6.2).
  *   2026-11-01 -- SERVICE_OWNED_KEYS, exact service-owned keys: `parties`, the owner's outside parties and
@@ -435,7 +437,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * service's writeLatest is its one writer, straight to storage. A new prefix: nothing wrote it through
  * the memory API before this.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'dataproducts.', 'party-reads.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'dataproducts.', 'party-reads.', 'party-purchases.'];
 
 /**
  * Exact keys one named service owns, under the same rule as SERVICE_OWNED_KEY_PREFIXES: no memory route
@@ -472,6 +474,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['mcp.tasks.', 'an MCP task, and only the MCP server writes it. Read it with tasks/get over MCP 2026-07-28.'],
   ['commerce.platform-fee.', 'the operator\'s fee on a money sale, and only the checkout writes it. The operator reads the totals on GET /v1/admin/dashboard.'],
   ['dataproducts.', 'a data product definition, and only the data product service writes it. Read and change it with /v1/dataproducts/{name} or the aimeat_dataproduct MCP tool.'],
+  ['party-purchases.', 'the EXCHANGE purchases outside parties made of your data packages, and only the purchase service writes it. Read them with GET /v1/exchange/offerings/{id}/consumers.'],
   ['party-reads.', 'the read log of your outside parties, and only the party service writes it. Read it with GET /v1/parties/{name}/reads or the aimeat_party MCP tool (action reads).'],
   ['parties', 'your outside parties and their keys, and only the party service writes it. Read and change them with /v1/parties or the aimeat_party MCP tool.'],
   ['datapkg-freshness-notices', 'which of your data packages you were told are out of date, and only the node writes it. Read a package\'s freshness with GET /v1/datapackages/{owner}/{name}.'],

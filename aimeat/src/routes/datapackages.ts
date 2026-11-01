@@ -24,9 +24,14 @@
  *   - GET  /v1/datapackages/:owner/:name         the descriptor (public packages: no auth), with odps_url
  *   - GET  /v1/datapackages/:owner/:name/odps    the ODPS sheet, projected from the version's audience
  *   - DELETE /v1/datapackages/:owner/:name       withdraw (?purge=true deletes the files too)
+ *   - PUT  /v1/datapackages/:owner/:name/exchange   the EXCHANGE sale terms (exchange: false delists)
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window, or ?format=csv the whole resource
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.10.0 -- 2026-11-01 -- PUT /v1/datapackages/:owner/:name/exchange sells a package on EXCHANGE (or
+ *     takes it off). The reads decide who reads in routes/package-reader.ts: an outside party's share, an
+ *     account's EXCHANGE contract (the paid feed), or req.auth; a row window and the CSV are metered for
+ *     the first two before they are sent (plan doc-mvwxcas3dom3, D5.1, D5.3).
  *   v1.9.0 -- 2026-11-01 -- The descriptor read answers `freshness` (services/datapackage/freshness.ts:
  *     fresh, late, stale or unscheduled against the producer's promise). The versions list tells the
  *     owner, per version, `in_use` (the live named shares that pin it, the outside parties' reads of the
@@ -84,8 +89,11 @@ import { inferSchema, validateRows, type ValidationIssue } from '../services/dat
 import type { PublishInput, TableSchema } from '../services/datapackage/contract.js';
 import { publishPackage, openPackage, readRows, readAllRows, listPackages, listVersions, parseRef } from '../services/datapackage/store.js';
 import { toCsv } from '../services/datapackage/table.js';
-import { partyReaderFor } from './party-read.js';
-import type { DatapackageReader } from '../services/datapackage/audience.js';
+import { packageReaderFor } from './package-reader.js';
+import { setPackageExchange } from '../services/exchange-datapackage.js';
+import { validateBody } from '../models/schemas.js';
+import { DatapackageExchangeSchema } from '../models/exchange-datapackage-schemas.js';
+import { exchangeOutcome, reconcileAfterPackageWrite } from '../services/exchange-projection.js';
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
@@ -142,10 +150,10 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
     const readerOf = async (req: Request, res: Response, what: string, opts: { urlKey?: boolean } = {}) => {
         const owner = req.params.owner as string, name = req.params.name as string;
         const asked = typeof req.query.version === 'string' && req.query.version.trim() ? req.query.version.trim() : undefined;
-        const p = await partyReaderFor(req, res, store, { owner, name, what, ...(asked ? { version: asked } : {}), ...(opts.urlKey ? { urlKey: true } : {}) });
-        if (p === null) return null;
-        if (p === 'none') return { reader: req.auth as DatapackageReader | undefined, ref: buildRef(owner, name, req.query.version), party: false, served: (_rows?: number) => {} };
-        return { reader: p.reader, ref: buildRef(owner, name, p.version), party: true, served: p.served };
+        // An outside party's share, an account's EXCHANGE contract, or req.auth (routes/package-reader.ts).
+        const who = await packageReaderFor(req, res, store, { owner, name, what, ...(asked ? { version: asked } : {}), ...(opts.urlKey ? { urlKey: true } : {}) });
+        if (!who) return null;
+        return { reader: who.reader, ref: who.ref, party: who.admitted, served: who.served, charge: who.charge };
     };
 
     /** The schema.org Dataset JSON-LD of an opened version: the public page address for a public package only. */
@@ -377,6 +385,28 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     /**
+     * Sell a package on EXCHANGE, change its terms, or with `exchange: false` take it off the market
+     * (services/exchange-datapackage.ts; plan doc-mvwxcas3dom3, D5.1, D5.2). The terms are stored on the
+     * package pointer and the listing is projected from them before the answer, which carries what the
+     * projection did. A contract already signed keeps its price and its interface. The owner in person,
+     * or the owner's principal with exchange:write; a new listing of data asks the node's data
+     * intermediation setting first (403 DATA_INTERMEDIATION_NOT_OFFERED).
+     */
+    router.put('/v1/datapackages/:owner/:name/exchange', requireAuth(), refuseAnonymousPrincipal(), requireScope('exchange:write'), validateBody(DatapackageExchangeSchema, config.nodeId), async (req, res) => {
+        const out = await setPackageExchange(store, callerOf(req, config.nodeId, storage), req.params.owner as string, req.params.name as string,
+            (req.body ?? {}) as Record<string, unknown>,
+            async (ownerGhii, name) => exchangeOutcome(await reconcileAfterPackageWrite(storage, ownerGhii, name), 'POST /v1/exchange/reconcile'));
+        if (!out.ok) {
+            if (out.status === 403) { deny403(req, res, out.code, out.message); return; }
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
+            return;
+        }
+        res.json(success(config.nodeId, { exchange: out.terms, listing: out.listing }, [
+            { description: 'The listings on EXCHANGE', method: 'GET', url: '/v1/exchange/offerings' },
+        ]));
+    });
+
+    /**
      * The ODPS v4.1 product sheet of one version, projected now from the descriptor and the version's
      * audience (services/datapackage/odps-read.ts): YAML, or the envelope with `?format=json`. Readable
      * by whoever may read the package, refused as the descriptor read refuses.
@@ -456,6 +486,8 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such resource in ${ref}`));
                 return;
             }
+            // A data read through a share a purchase made, or a contract, is metered now (plan D5.3).
+            if (!(await who.charge())) return;
             who.served(all.total);
             res.setHeader('Cache-Control', 'private, no-store');
             res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -473,6 +505,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such resource in ${ref}`));
             return;
         }
+        if (!(await who.charge())) return;
         who.served(out.rows.length);
         res.json(success(config.nodeId, {
             rows: out.rows, total: out.total, schema: out.schema,

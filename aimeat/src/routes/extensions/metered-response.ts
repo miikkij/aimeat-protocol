@@ -24,6 +24,8 @@
  *                         as every other INSUFFICIENT_MORSELS answer says.
  *   v1.4.0 — 2026-10-31 — `refused_product` is sent with the status, code and sentence the door's
  *                         productRefusal wrote (secaudit 2026-10-31 inv-05).
+ *   v1.5.0 — 2026-11-01 — `prepaid_ended`: an outside party's prepaid contract is used up, 402
+ *                         PREPAID_ENDED (plan doc-mvwxcas3dom3, D5.4).
  */
 import type { AimeatConfig } from '../../config.js';
 import { error } from '../../middleware/envelope.js';
@@ -91,6 +93,10 @@ export function meteredRefusalText(outcome: Refusal, label: string, config?: Aim
     case 'settlement_failed':
       return { status: 500, code: 'SETTLEMENT_FAILED',
         message: `Payment for ${label} could not be settled (${outcome.reason}); you were not charged.` };
+    case 'prepaid_ended':
+      return { status: 402, code: 'PREPAID_ENDED',
+        message: `What you bought of ${label} is used up (contract ${outcome.entitlement.contractRef}). Buy again on the offering `
+          + 'to go on reading; the same key keeps working.' };
     case 'refused_product':
       // The door wrote this refusal itself (MeteredCallArgs.productRefusal); it is sent as written.
       return { status: outcome.refusal.statusCode, code: outcome.refusal.code, message: outcome.refusal.message };

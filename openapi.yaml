@@ -25941,6 +25941,92 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
 
+  /v1/exchange/offerings/{id}/buy:
+    post:
+      operationId: exchangePartyBuy
+      summary: A buyer with no AIMEAT account buys a data package (outside party)
+      description: |
+        Opens a purchase of a `datapackage` offering for a buyer that has no account here (plan
+        doc-mvwxcas3dom3, D5.4). The price comes from the listing: `months` (1 to 12) of a `per_month`
+        offering, or `reads` (1 to 1000000) of a `per_read` one, paid in advance. `handler` is
+        `com.stripe.checkout` (the answer's `pay.card_page_url` is the provider's Stripe card page) or,
+        on a node that runs it, the test double `test.money`. The purchase waits an hour; complete it at
+        `pay.complete_url`. A party buying again sends its own credential (HTTP Basic `<owner>/<party>`
+        and its key, or a party token) and no `party` block: the purchase tops up its contract and the
+        same key keeps working. A signed-in account is told to accept the offering instead (409
+        USE_YOUR_ACCOUNT).
+      tags: [Commerce]
+      security: [{}, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                party:
+                  type: object
+                  properties:
+                    display_name: { type: string }
+                    kind: { type: string, enum: [person, program], default: person }
+                    contact: { type: string, description: 'An e-mail address; required for a person.' }
+                    name: { type: string, description: 'The party name; default a slug of display_name with a random tail.' }
+                months: { type: integer, minimum: 1, maximum: 12 }
+                reads: { type: integer, minimum: 1, maximum: 1000000 }
+                handler: { type: string, enum: [com.stripe.checkout, test.money] }
+                return_url: { type: string, description: 'https address the card page returns the buyer to.' }
+      responses:
+        '201': { description: '`{ purchase, pay }`: the open purchase and how to pay it (`complete_url`, and `card_page_url` for the card page).' }
+        '400': { description: INVALID_INPUT }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+        '403': { description: FORBIDDEN. The party credential belongs to another provider }
+        '404': { description: No such listed offering }
+        '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price) or USE_YOUR_ACCOUNT' }
+        '422': { description: UNKNOWN_PAYMENT_HANDLER }
+        '429': { description: TOO_MANY_PURCHASES }
+  /v1/exchange/purchases/{id}/complete:
+    post:
+      operationId: exchangePartyPurchaseComplete
+      summary: Pay a purchase and receive the key, the contract and the connection file
+      description: |
+        Collects the payment (`instrument`: the Stripe session id the card page returned, or any text
+        with test.money) and only then delivers: the outside party of the provider with its key (new
+        buyers), the prepaid contract, the named share bound to it, and the connection file (OData
+        endpoint, CSV addresses, HTTP Basic user and the key, the token endpoint). The key is in this
+        answer only. Each data read is metered against the contract (402 PREPAID_ENDED when it is
+        used up); the read log and the per-party rate limit are the named share's. A delivery that
+        fails after the payment refunds it and reopens the purchase.
+      tags: [Commerce]
+      security: [{}]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handler: { type: string }
+                instrument: { type: string }
+      responses:
+        '200': { description: '`{ purchase, party, share, contract, connection, key_note?, say }`' }
+        '402': { description: The payment did not go through }
+        '404': { description: No such purchase }
+        '409': { description: 'ALREADY_COMPLETED or PURCHASE_BUSY' }
+        '410': { description: PURCHASE_EXPIRED }
+        '422': { description: 'HANDLER_MISMATCH or UNKNOWN_PAYMENT_HANDLER' }
+  /v1/exchange/purchases/{id}:
+    get:
+      operationId: exchangePartyPurchase
+      summary: The state of one purchase by an outside party
+      tags: [Commerce]
+      security: [{}]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ purchase }`: status open, completing or completed, the amount and the model.' }
+        '404': { description: No such purchase }
   /v1/exchange/offerings/{id}:
     get:
       operationId: exchangeOfferingDetail
@@ -28000,6 +28086,73 @@ paths:
           description: FORBIDDEN for another account; SCOPE_DENIED for a principal of the owner without storage:write
         '404':
           description: No such package
+
+  /v1/datapackages/{owner}/{name}/exchange:
+    put:
+      operationId: setDataPackageExchange
+      summary: Sell a data package on EXCHANGE, change its terms, or take it off
+      description: |
+        Stores the package's sale terms on its pointer and projects its EXCHANGE listing from them
+        before it answers (kind `datapackage`, coordinate `datapkg:{owner}/{name}` + `read`, plan
+        doc-mvwxcas3dom3, D5.1, D5.2). `model` is `per_month` (a 30-day subscription of reads, the
+        default) or `per_read` (each OData entity set, row window or CSV request is charged).
+        `prices_money` are the prices in 6-decimal micro-units; `toll_morsels` is pacing per read for a
+        buyer with an account, never a price. `usage_terms` are required. `exchange: false` delists the
+        package; contracts already signed keep their price and the versions they cover.
+
+        The package's Table Schemas are its interface: each distinct set of schemas is an interface
+        version, the listing names the current one, and a contract reads the stored versions whose
+        schemas are the interface it was signed on (its pinned version range). A new version with
+        changed schemas updates the same listing to the next interface; an earlier contract stays on
+        the versions of its own.
+
+        A reader the package's audience already admits reads it free; the contract admits a buyer the
+        audience does not. The owner in person, or the owner's principal with `exchange:write`. A new
+        listing of data asks the node's data intermediation setting first: under `none`, or `owners`
+        without a declared provider, it is 403 DATA_INTERMEDIATION_NOT_OFFERED before anything is
+        written. MCP: aimeat_datapackage_sell.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name.' }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exchange: { type: boolean, default: true }
+                model: { type: string, enum: [per_month, per_read], default: per_month }
+                prices_money:
+                  type: array
+                  maxItems: 2
+                  items: { type: object, properties: { amount: { type: integer, minimum: 1 }, currency: { type: string, enum: [EUR, USD] } }, required: [amount, currency] }
+                toll_morsels: { type: integer, minimum: 0, maximum: 100 }
+                usage_terms:
+                  type: object
+                  properties: { derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } }
+                reads_per_minute: { type: integer, minimum: 1, maximum: 6000 }
+                delivers_data: { type: boolean, description: 'Default true: a package delivers data.' }
+                title: { type: string }
+                description: { type: string }
+                tags: { type: array, items: { type: string } }
+                odps: { type: object, additionalProperties: true }
+                provenance: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: '`{ exchange, listing }`: the stored terms and what the projection did (`listing.listed`, `skipped` with the reason, `delisted`, `warnings`).'
+        '400':
+          description: INVALID_INPUT, USAGE_TERMS_REQUIRED, NOT_PRICED, INVALID_ODPS or INVALID_PROVENANCE
+        '401':
+          description: AUTH_REQUIRED
+        '403':
+          description: FORBIDDEN (another account's package), SCOPE_DENIED (no exchange:write) or DATA_INTERMEDIATION_NOT_OFFERED
+        '404':
+          description: No such package
+        '409':
+          description: PACKAGE_WITHDRAWN
 
   /v1/datapackages/{owner}/{name}/odps:
     get:
