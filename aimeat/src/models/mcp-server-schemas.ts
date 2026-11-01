@@ -40,6 +40,7 @@
  *   - McpPrice / normalizeMcpPrice — what a call costs, in money only, and the one check every door uses
  * @usage import type { McpServerRecord } from '../models/mcp-server-schemas.js';
  * @version-history
+ *   v1.3.0 — 2026-11-01 — mcpAuthModeOf: a deferred-credential attach is stored as 'oauth'.
  *   v1.2.0 — 2026-10-20 — McpServerCredential carries the issuing authorization server (oauthIssuer,
  *     oauthClient.issuer), the stamp the MCP SDK v2 puts on tokens and client registrations.
  *   v1.1.0 — 2026-09-16 — McpPrice is money only. Morsels are a pacer and buy nothing; a morsel price
@@ -204,6 +205,16 @@ export interface McpServerCredential {
    * another authorization server would be asked to honour.
    */
   oauthIssuer?: string;
+}
+
+/**
+ * The row's auth mode at attach. A server attached to sign in afterwards is 'oauth' from the start:
+ * as `none`, the token the round later stored was never sent (mcp-client/invoke.ts resolveCredential
+ * reads `none` as "no credential") and every call answered 401.
+ */
+export function mcpAuthModeOf(input: { credential?: McpServerCredential; deferCredential?: boolean }): McpAuthMode {
+  if (input.credential) return input.credential.shape === 'oauth2' ? 'oauth' : 'static';
+  return input.deferCredential ? 'oauth' : 'none';
 }
 
 /**

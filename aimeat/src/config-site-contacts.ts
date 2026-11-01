@@ -5,9 +5,11 @@
  * @description parseSiteContacts(): the people printed on the public pages, read from
  *   AIMEAT_SITE_CONTACTS. Moved out of config.ts by pure extraction when that file reached the
  *   800-line limit; the code is unchanged and config.ts calls it exactly where it used to.
- * @structure parseSiteContacts() · siteLinksFromEnv()
+ * @structure parseSiteContacts() · siteLinksFromEnv() · buildCodeFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.10.0 — 2026-11-01 — buildCodeFromEnv(): the store's build code for a place (format in utils/build-code.ts).
+ *   v1.9.0 — 2026-11-01 — AIMEAT_SITE_BUILD_QUEUE_URL: the operator's build queue for "build it with you".
  *   v1.8.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE removed the same night: no message counts
  *     are shown to a customer (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
  *   v1.7.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE, kept only when it is a positive decimal up to 1.
@@ -27,6 +29,16 @@
 import type { SiteContact, SiteLinksConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
 import { isEurPerUsd } from './utils/eur-per-usd.js';
+import { BUILD_CODE } from './utils/build-code.js';
+
+/**
+ * AIMEAT_SITE_BUILD_CODE, kept only in the code's format; anything else is no code. Not in siteLinks,
+ * which every anonymous visitor's page carries: the owner and their AI read it (services/build-with-you.ts).
+ */
+export function buildCodeFromEnv(): string {
+  const code = (process.env.AIMEAT_SITE_BUILD_CODE ?? '').trim().toUpperCase();
+  return BUILD_CODE.test(code) ? code : '';
+}
 
 /**
  * The people printed on the public pages, from `AIMEAT_SITE_CONTACTS` (a JSON array of
@@ -98,6 +110,7 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     storeNoteEs: (process.env.AIMEAT_SITE_STORE_NOTE_ES ?? '').trim(),
     storeSoonCode: (process.env.AIMEAT_SITE_STORE_SOON_CODE ?? '').trim(),
     storeTopup: (process.env.AIMEAT_SITE_STORE_TOPUP_URL ?? '').trim(),
+    buildQueue: (process.env.AIMEAT_SITE_BUILD_QUEUE_URL ?? '').trim(),
     // A rate that does not read as a positive decimal is no rate: the pages count a dollar as a euro.
     aiCreditEurPerUsd: isEurPerUsd((process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim())
         ? (process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim() : '',

@@ -24,6 +24,8 @@
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-11-01 — Section 1: a server attached with OAuth before 2026-11-01 whose calls are refused
+ *     after a finished sign-in is repaired by signing in once more (services/mcp-client/oauth.ts).
  *   2026-10-16 — Section 3: a grant on a server the operator offers narrows the person's own agents and apps, and another person's grant there never touches them (QA audit F01b-02).
  *   2026-10-15 — Section 3: an app with mcp:use calls tools, a grant for app:{owner}/{file} narrows it, an
  *     agent's grantee is its full name, and a grant on an operator's server answers GRANT_NOT_APPLICABLE
@@ -94,7 +96,9 @@ token) is attached through \`POST /v1/mcp-servers\` with \`auth: "oauth"\`, or f
 
 The node refreshes the sign-in by itself before calls. When that renewal fails, the server is marked
 as needing a new sign-in at once and the call is refused (\`UPSTREAM_UNAUTHORIZED\`): run
-\`aimeat_mcp_authorize\` again and hand the address over.
+\`aimeat_mcp_authorize\` again and hand the address over. The same answer cures a server attached this
+way before 2026-11-01 whose every call is refused although the sign-in finished: until then the node
+kept the token and did not send it, and one more sign-in repairs the server.
 
 ## 2. Look and call
 

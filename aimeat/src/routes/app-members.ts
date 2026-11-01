@@ -31,6 +31,8 @@
  *   (across all of them). The audit read and the invitation cancel are in routes/app-members-extra.ts.
  * @usage app.use(appMembersRouter(config, storage))
  * @version-history
+ *   v1.9.0 — 2026-11-01 — GET members/me takes a person registered to the app (an app party token) and
+ *     answers its standing with kind 'party' (services/app-parties/iam-gate.ts; WP9d).
  *   v1.8.0 — 2026-11-01 — Mounts routes/app-parties.ts (an app's users as outside parties), and POST
  *     members takes `party` (plan doc-mvwxcas3dom3, D4.1, D4.2).
  *   v1.7.0 — 2026-10-05 — The handlers' logic (owner and manager tests, validation, refusals, grant
@@ -110,6 +112,8 @@ import {
 import { setCarryPlan, setMember, removeRosterMember } from '../services/app-roster-write.js';
 import { DEV_RUNGS, listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app-dev-grant-ops.js';
 import { sendAppOp } from './app-op-answer.js';
+import { appPartyFromRequest } from '../services/app-parties/service.js';
+import { partyBearer, partyRosterMe } from '../services/app-parties/iam-gate.js';
 
 /** The app a per-app route addresses. */
 const refOf = (req: Request): AppRef => ({ owner: String(req.params.owner ?? ''), filename: String(req.params.filename ?? '') });
@@ -131,7 +135,16 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
 
   // ── GET .../members/me — the caller's own standing. Any authenticated caller. ──
   // An agent asks this and gets its HUMAN's answer, which is the whole point of keying on the person.
-  router.get('/v1/apps/:owner/:filename/members/me', requireAuth(), async (req, res) =>
+  // A person registered to this app (an app party token, services/app-parties/iam-gate.ts) gets its
+  // own standing in the same shape, with kind 'party'; any other request goes on to requireAuth.
+  const partyMeOrNext = async (req: Request, res: import('express').Response, next: import('express').NextFunction): Promise<void> => {
+    if (!partyBearer(req)) { next(); return; }
+    const v = await appPartyFromRequest({ storage, config }, refOf(req), req);
+    if (!v.ok) { res.status(v.status).json(error(config.nodeId, v.code, v.message)); return; }
+    res.setHeader('Cache-Control', 'private, no-store');
+    answer(res, await partyRosterMe({ storage, config }, v.ctx));
+  };
+  router.get('/v1/apps/:owner/:filename/members/me', partyMeOrNext, requireAuth(), async (req, res) =>
     answer(res, await rosterMe(storage, config, req.auth!, refOf(req))));
 
   // ── GET/PUT .../members/plan — what each role is CARRIED on. Owner only. ──

@@ -33,6 +33,11 @@
  * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   2026-11-01 — The authorization address carries ui_locales, the node's own language
+ *     (site.default_locale), so the far side's sign-in page can speak the buyer's language.
+ *   2026-11-01 — A finished round writes the row's auth mode as 'oauth' with the token. A row attached
+ *     to sign in afterwards was stored as `none`, so the token was kept and never sent, and every
+ *     call to aimeat.io answered 401 (aimeat-commercial-1c, test lane).
  *   2026-10-31 — The round stores which cookie carries its binding (`bindCookie`), and finishMcpOAuth
  *     reads the `__Host-` cookie for a round bound over https (roundBindingHeld) (secaudit2026oct31w2
  *     round 10, W2-19).
@@ -64,6 +69,7 @@ import { mcpClientPool } from './pool.js';
 import { logger } from '../../utils/logger.js';
 import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie } from '../oauth-round-secrets.js';
 import { describeUpstreamError } from './upstream-error.js';
+import { LOCALES } from '../../i18n.js';
 
 /** How long a person has to finish the round in their browser before the state is dead. */
 const STATE_TTL_MS = 15 * 60_000;
@@ -261,6 +267,15 @@ export async function startMcpOAuth(input: {
           + 'attach it with a token instead.',
       };
     }
+    // The node's own language (site.default_locale: a node bought from the store speaks its buyer's
+    // language) as OAuth's ui_locales, so the far side's sign-in page can speak it too. A hint: a
+    // server that does not know the parameter ignores it.
+    const uiLocale = (config.siteLinks?.defaultLocale ?? '').trim();
+    if ((LOCALES as readonly string[]).includes(uiLocale)) {
+      const withLocale = new URL(provider.captured.authorizationUrl);
+      if (!withLocale.searchParams.has('ui_locales')) withLocale.searchParams.set('ui_locales', uiLocale);
+      provider.captured.authorizationUrl = withLocale.toString();
+    }
   } catch (err) {
     // The reason is logged rather than returned: a discovery error can carry the endpoint, and the
     // endpoint is the one thing this design keeps away from callers.
@@ -453,7 +468,9 @@ async function sealAndStore(
     ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
     : null;
 
-  await storage.updateMcpServerCredential(server.id, sealMcpCredential(credential, key), expiresAt);
+  // 'oauth' with it: a row attached to sign in afterwards, or one stored before 2026-11-01 as
+  // `none`, would otherwise hold the token and never send it (invoke.ts resolveCredential).
+  await storage.updateMcpServerCredential(server.id, sealMcpCredential(credential, key), expiresAt, 'oauth');
   // The pooled client is holding the OLD credential in its headers. Without this the next call
   // still presents the token the far side just replaced.
   await mcpClientPool.invalidate(server.id);

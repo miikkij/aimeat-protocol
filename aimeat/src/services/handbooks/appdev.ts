@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-01 — AIMEAT.iam for every member, aimeat-parties for the signup and sign-in only; party_stop and party_resume (WP9d).
  *   2026-11-01 — Users with no AIMEAT account: aimeat-parties.js and the party actions of aimeat_app_manage (plan D4).
  *   2026-10-17 — A package install renames its apps: link a sibling from your own name and the app
  *     host's path form, which keeps the query (pitfall-list round).
@@ -331,9 +332,15 @@ else's app: \`member_me\` answers your own role and request there, and \`member_
 **Users with no AIMEAT account.** When the app's users are not accounts here (a market place, a club,
 a shop), they register with an e-mail address through \`/v1/libs/aimeat-parties.js\`
 (\`AIMEAT.parties.signUp(email)\`, \`ready()\`, \`me()\`, \`signOut()\`, \`data.get/set/remove(key)\`) and
-become outside parties of the owner, signed in to that one app only. \`party_registration_set\`
+become outside parties of the owner, signed in to that one app only. Use \`AIMEAT.iam\` for every
+member, account holder or registered person alike: load \`aimeat-parties.js\` before \`aimeat-iam.js\`,
+and \`me()\`, \`can()\`, \`gate()\` and \`guard()\` answer for whoever is signed in (\`me().kind\` is
+\`party\` for a registered person), the app's IAM extension sees the person in \`ctx.caller\`, and
+\`MemberAdmin\` lists the registered people for the owner. \`AIMEAT.parties\` is for the signup and the
+sign-in only, plus the person's own records. \`party_registration_set\`
 (\`open\`, optional \`role\`) opens or closes the signup when the server allows registration; under
-apps-ask the operator approves it first. \`parties\` lists who registered, \`party_remove\` removes a
+apps-ask the operator approves it first. \`parties\` lists who registered, \`party_stop\` and
+\`party_resume\` stop a person's sign-in and let them in again, \`party_remove\` removes a
 person and everything they kept in the app, and \`member_set\` with \`party\` gives a party a role. Say
 it in the data map: \`registers-parties\` in machinery, or \`registers: { who, keeps }\`.
 

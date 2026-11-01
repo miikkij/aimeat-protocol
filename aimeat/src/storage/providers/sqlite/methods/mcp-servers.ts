@@ -12,6 +12,7 @@
  * @structure mcpServerMethods — attach · read · patch · credential · tool cache · refresh claim
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — updateMcpServerCredential writes the auth mode when given.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import type { McpServerQuery, McpServerPatch } from '../../../repositories/mcp-server.repository.js';
@@ -153,15 +154,15 @@ export const mcpServerMethods = {
   },
 
   async updateMcpServerCredential(
-    this: HasDb, id: string, credential: string | null, expiresAt: string | null,
+    this: HasDb, id: string, credential: string | null, expiresAt: string | null, auth?: McpAuthMode,
   ): Promise<void> {
     // status back to active and lastError cleared: a token exchange that worked is exactly the
     // evidence that whatever was wrong no longer is.
     this.db.prepare(`
       UPDATE mcp_servers
-      SET credential = ?, expiresAt = ?, status = 'active', lastError = NULL, updatedAt = ?
+      SET credential = ?, expiresAt = ?, auth = COALESCE(?, auth), status = 'active', lastError = NULL, updatedAt = ?
       WHERE id = ?
-    `).run(credential, expiresAt, new Date().toISOString(), id);
+    `).run(credential, expiresAt, auth ?? null, new Date().toISOString(), id);
   },
 
   async setMcpServerStatus(

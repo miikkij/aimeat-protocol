@@ -7,6 +7,9 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-01 — POST /v1/ext/:extName/:actionId takes a person registered to an app (an app party
+ *     token) before the visitor path, for the extension that gates that app only
+ *     (services/app-parties/iam-gate.ts; WP9d).
  *   2026-10-27 — A visitor's run share is keyed by visitorRunShareKey: IPv6 by its /64 network, as the
  *     visitor rate limiter keys it (secaudit2026oct26, extension-run-slots:visitor-share-keyed-on-raw-ip).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): `:extName` may be
@@ -86,6 +89,8 @@ import { resolveExtensionForCall } from '../../services/component-versions.js';
 import { extensionCallTarget, addressSegment } from '../../services/component-address.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { visitorRunShareKey } from '../../services/extension-run-slots.js';
+import { appPartyForExtensionCall, partyBearer } from '../../services/app-parties/iam-gate.js';
+import type { AppPartyCtx } from '../../services/app-parties/service.js';
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
   // ── GET /v1/ext-hash — the node's published ctx.hash, as source ──
@@ -200,6 +205,41 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     res.json(success(config.nodeId, out.result));
   };
 
+  /**
+   * A person registered to an app, calling with the app's sign-in (an app party token; the security
+   * reasoning is in services/app-parties/iam-gate.ts). Every party token on this path is answered
+   * here and never goes on: not to the visitor path, which would read it as nobody, and not to
+   * requireAuth. The app is the token's own; extension-invoke.ts runs only the extension that gates it.
+   */
+  const partyOrNext = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!partyBearer(req)) { next(); return; }
+    const v = await appPartyForExtensionCall({ storage, config }, req);
+    if (!v.ok) { res.status(v.status).json(error(config.nodeId, v.code, v.message)); return; }
+    visitorLimit(req, res, () => { void runParty(req, res, v.ctx); });
+  };
+  const runParty = async (req: Request, res: Response, p: AppPartyCtx): Promise<void> => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    const out = await invokeExtensionAction({
+      config, storage, enforcePaywall,
+      extRef: req.params.extName as string, actionId: req.params.actionId as string,
+      method: req.method, input: (req.body ?? {}) as Record<string, unknown>,
+      caller: { gaii: p.partyRef, metered: p.partyRef, owner: p.partyRef, kind: 'party', roles: [], scopes: [], appGrantId: null },
+      party: { appId: p.appId, appOwner: p.owner, ref: p.partyRef, name: p.party.name, displayName: p.party.displayName },
+      paywall: { res },
+      correlationId: req.header('x-aimeat-correlation') ?? null,
+      // A party has no account: its share of the run slots is its own.
+      admission: { account: p.partyRef },
+    });
+    if (out.kind === 'paywall') return;
+    if (out.kind === 'refused') {
+      if (out.retryAfterSec) res.setHeader('Retry-After', String(out.retryAfterSec));
+      const body = error(config.nodeId, out.code, out.message);
+      res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
+      return;
+    }
+    res.json(success(config.nodeId, out.result));
+  };
+
   // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
   // Runs against one instance: its own config, and the namespace `ext:{name}.{instanceId}`. The same
   // path is the literal form of `<owner>/<name>/<action>` (callTarget decides).
@@ -208,7 +248,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
   });
 
   // ── POST /v1/ext/:extName/:actionId — Dynamic action execution ──
-  router.post('/v1/ext/:extName/:actionId', visitorOrSignIn('two'), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
+  // A person registered to the app this extension gates calls it here too (partyOrNext).
+  router.post('/v1/ext/:extName/:actionId', partyOrNext, visitorOrSignIn('two'), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
     await runAction(req, res, 'two');
   });
 }

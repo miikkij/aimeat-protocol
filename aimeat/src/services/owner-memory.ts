@@ -10,11 +10,14 @@
  *   signal evaluator both go through here so they can't diverge.
  * @structure
  *   - listOwnerScopeMemory(storage, nodeId, ownerName, opts) — aggregated list (deduped, GHII-first)
- *   - getOwnerScopeMemory(storage, nodeId, ownerName, key) — one key across owner+agents (GHII-first)
+ *   - getOwnerScopeMemory(storage, nodeId, ownerName, key, opts?) — one key across owner+agents
+ *       (GHII-first); `skipAgent` leaves chosen agents' copies out
  *   - getOwnerScopePublicMemory(storage, nodeId, ownerName, key) — first PUBLIC record for a key across
  *       owner+agents (GHII-first); a non-public record never shadows a public one (anonymous serve paths)
  * @usage import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
  * @version-history
+ *   v1.5.0 — 2026-11-01 — getOwnerScopeMemory takes `skipAgent`, so the connect-your-AI proof key can
+ *     leave out a copy the node's own chat or basic agents wrote (mcp-agent-admission.ts).
  *   v1.0.0 — 2026-06-13 — Extracted from routes/memory.ts owner-scope branch; reused by the workflow
  *     signal evaluator (fix: signals must read owner-scope, not the owner GHII keyspace alone).
  *   v1.1.0 — 2026-06-14 — Fold the owner's ecosystem apps (GEAIs) into the owner-scope union
@@ -29,7 +32,7 @@
  *     resolve a record an owner's AGENT published under its own GAII — a non-public record never shadows
  *     a public one on the same key.
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage, MemoryRecord, AgentRecord } from '../storage/interface.js';
 import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
 import { MemoryRepository } from '../storage/repositories-impl/memory-repository.js';
 
@@ -101,6 +104,7 @@ export async function listOwnerScopeMemoryMeta(
 /** Read ONE key across the owner's GHII + all the owner's agents (GHII first). null if found nowhere. */
 export async function getOwnerScopeMemory(
   storage: Storage, nodeId: string, ownerName: string, key: string,
+  opts?: { skipAgent?: (agent: AgentRecord) => boolean },
 ): Promise<MemoryRecord | null> {
   const ownerGhii = `${ownerName}@${nodeId}`;
   const ghii = await storage.getMemory(ownerGhii, key);
@@ -109,7 +113,7 @@ export async function getOwnerScopeMemory(
   // was one getMemory PER identity (an owner with ~60 agents = ~60 serial round-trips just to read one
   // key that isn't there). `prefix: key` + an exact-key filter finds the key wherever it lives; GHII was
   // already checked, so agents/eco keep their listing-order precedence.
-  const agents = await storage.getAgentsByOwner(ownerName);
+  const agents = (await storage.getAgentsByOwner(ownerName)).filter(a => !opts?.skipAgent?.(a));
   const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
   const others = [...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
   if (!others.length) return null;

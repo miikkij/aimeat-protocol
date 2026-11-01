@@ -15,16 +15,20 @@
  *
  *   A package nobody promised anything about, made by a person, an agent or an app, is not read: it is
  *   unscheduled for ever and there is nothing to tell. Withdrawn packages have no catalogue entry.
- * @structure FRESHNESS_NOTICES_KEY · sweepStalePackages · parseNotices
+ *
+ *   AFTER EACH CHECK the hooks registered with onFreshnessSwept get every package read and its
+ *   freshness; the EXCHANGE projection updates a listing whose state changed.
+ * @structure FRESHNESS_NOTICES_KEY · onFreshnessSwept · SweptPackage · sweepStalePackages · parseNotices
  * @usage const out = await sweepStalePackages(storage, config);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — onFreshnessSwept: hooks get the packages each check read (plan D6).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.2).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { allDatasetFacts, type DatasetFacts } from './catalogue-facts.js';
 import { packageFreshness } from './freshness-read.js';
-import { SCHEDULED_BY_NATURE } from './freshness.js';
+import { SCHEDULED_BY_NATURE, type Freshness } from './freshness.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
@@ -40,6 +44,21 @@ export function parseNotices(v: unknown): Notices {
     return { packages: p && typeof p === 'object' ? { ...p } : {} };
 }
 
+/** One package the check read, with the freshness it computed. */
+export interface SweptPackage { ownerGhii: string; name: string; freshness: Freshness }
+
+type SweptHook = (storage: Storage, swept: SweptPackage[]) => Promise<void>;
+const sweptHooks: SweptHook[] = [];
+
+/**
+ * Run `hook` after every check with the packages it read. The EXCHANGE projection registers here
+ * (services/exchange-projection.ts), so a listing follows its package's freshness without this file
+ * importing the projection. A hook's failure is logged and the check goes on.
+ */
+export function onFreshnessSwept(hook: SweptHook): void {
+    sweptHooks.push(hook);
+}
+
 /** Is there anything to promise or break for this package? */
 function watched(f: DatasetFacts): boolean {
     return !!f.schedule || f.producerKind === 'dataproduct' || SCHEDULED_BY_NATURE.includes(f.producerKind ?? '');
@@ -50,6 +69,7 @@ export async function sweepStalePackages(storage: Storage, config: AimeatConfig,
     const deps = { storage, config };
     const out = { checked: 0, stale: 0, notified: 0 };
     const byOwner = new Map<string, Array<{ name: string; title: string; lastSuccessAt: string | null; stale: boolean }>>();
+    const swept: SweptPackage[] = [];
     for (const f of (await allDatasetFacts(storage)).filter(watched)) {
         let fr;
         try {
@@ -65,6 +85,12 @@ export async function sweepStalePackages(storage: Storage, config: AimeatConfig,
         const list = byOwner.get(f.ownerGhii) ?? [];
         list.push({ name: f.name, title: f.title, lastSuccessAt: fr.last_success_at, stale });
         byOwner.set(f.ownerGhii, list);
+        swept.push({ ownerGhii: f.ownerGhii, name: f.name, freshness: fr });
+    }
+
+    for (const hook of sweptHooks) {
+        try { await hook(storage, swept); }
+        catch (err) { logger.warn('datapackage freshness sweep: a hook on the checked packages failed', { error: String(err) }); }
     }
 
     for (const [ownerGhii, list] of byOwner) {

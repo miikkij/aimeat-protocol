@@ -43,6 +43,7 @@
  *   2026-10-31 — registerOverviewTools: aimeat_overview (the account's overview).
  *   2026-10-18 — registerAccountRightsTools: aimeat_adult_status, aimeat_subscription_list,
  *     aimeat_subscription_cancel, aimeat_provenance_embed (Comicland v3 A-3, A-5, A-8).
+ *   2026-11-01 — registerBuildWithYouTools: aimeat_build_request_submit, _status and aimeat_trail_list ("Rakennamme kanssasi").
  *   2026-10-25 — registerGoalTools: aimeat_goal_get, _set, _work and _answer (agent goals, session cc-jouni-goals).
  *   2026-10-24 — registerComplianceAgreementTools: aimeat_compliance_agreement (plan doc-mvmr4i2wdk0p).
  *   2026-10-26 — registerDmReactionTools: aimeat_dm_react (a mark on one message).
@@ -190,6 +191,7 @@ import { registerContentTools } from './content.js';
 import { registerDocsignTools } from './docsign.js';
 import { registerComplianceAgreementTools } from './compliance-agreements.js';
 import { registerGoalTools } from './goals.js';
+import { registerBuildWithYouTools } from './build-with-you.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
@@ -247,6 +249,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDocsignTools(mcp, storage, config, caller);
     registerComplianceAgreementTools(mcp, storage, config, caller);
     registerGoalTools(mcp, storage, config, caller);
+    registerBuildWithYouTools(mcp, storage, config, caller);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes, caller);

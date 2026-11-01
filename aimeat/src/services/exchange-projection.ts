@@ -39,6 +39,8 @@
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.10.0 — 2026-11-01 — A datapackage listing carries its freshness, and the hourly freshness check
+ *     reconciles a listing whose freshness state changed (onFreshnessSwept) (plan D6).
  *   v1.9.0 — 2026-11-01 — A fourth source, data packages (services/exchange-projection-datapackage.ts),
  *     scoped by `packageName` and reconciled after each new pointer of a package on sale. Every listing
  *     carries `deliversData` (the source's own statement, else proposeDeliversData), and the data
@@ -92,6 +94,8 @@ import { dataListingRefusal } from './data-intermediation/gate.js';
 import { desiredFromDataPackages } from './exchange-projection-datapackage.js';
 import { proposeDeliversData } from './exchange-datapackage.js';
 import { onLatestWritten } from './datapackage/version-audience.js';
+import { onFreshnessSwept } from './datapackage/freshness-sweep.js';
+import { freshnessBrief } from './datapackage/freshness.js';
 
 /** A tool binding's extension as stored: an owner's bare name for their own namespaced extension is that one. */
 async function ownBindingExt(storage: Storage, name: string, ownerName: string): Promise<string> {
@@ -403,6 +407,7 @@ export async function reconcileOwnerOfferings(
         ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
         provenance: d.provenance, odps: d.odps, aiProvenance: d.aiProvenance ?? null,
         tollMorsels: d.tollMorsels, usageTerms: d.usageTerms, tags: d.tags,
+        ...(d.freshness !== undefined ? { freshness: d.freshness } : {}),
         state: 'listed', auto: true, sourceHash: d.sourceHash, createdAt: now, updatedAt: now,
       };
       if (!dryRun) await putOffering(storage, offering);
@@ -435,6 +440,7 @@ export async function reconcileOwnerOfferings(
       // Pacing IS overwritten from the source even when cleared: unlike an attestation, a stale brake
       // the provider has since removed keeps charging consumers for a limit nobody asked for.
       tollMorsels: d.tollMorsels,
+      ...(d.freshness !== undefined ? { freshness: d.freshness } : {}),
       state: 'listed', auto: true, sourceHash: d.sourceHash, updatedAt: now,
     };
     if (!dryRun) await putOffering(storage, updated);
@@ -729,6 +735,29 @@ export async function reconcileAfterPackageWrite(storage: Storage, ownerGhii: st
 // Every new pointer of a package on sale (a new version, a changed audience) reconciles its listing.
 onLatestWritten(async (storage, ownerGhii, name, pointer) => {
   if (pointer.exchange) await reconcileAfterPackageWrite(storage, ownerGhii, name);
+});
+
+/** What a datapackage listing states of its freshness, for comparing with a fresh read. */
+function freshnessSignature(f: Offering['freshness']): string {
+  return f ? `${f.state}|${f.due_at ?? ''}|${f.stale_at ?? ''}` : '';
+}
+
+// The hourly freshness check (services/datapackage/freshness-sweep.ts, D6.2) reads every scheduled
+// package. A listing whose stated freshness differs from that read is reconciled, so the market shows a
+// package going late or stale with no read of its own: one scan of the listings per check, and a pass
+// only for a listing whose state changed.
+onFreshnessSwept(async (storage, swept) => {
+  const stated = new Map<string, string>();
+  for (const o of await listAllOfferings(storage)) {
+    if (o.kind !== 'datapackage' || !o.auto || o.state !== 'listed' || o.surface?.kind !== 'datapackage') continue;
+    stated.set(`${o.providerGhii}|${o.surface.packageName}`, freshnessSignature(o.freshness));
+  }
+  for (const p of swept) {
+    const held = stated.get(`${p.ownerGhii}|${p.name}`);
+    if (held === undefined || held === freshnessSignature(freshnessBrief(p.freshness))) continue;
+    stated.delete(`${p.ownerGhii}|${p.name}`);
+    await reconcileAfterPackageWrite(storage, p.ownerGhii, p.name);
+  }
 });
 
 // The migration of hand-authored listings (TARGET-050 slice 3) is services/exchange-projection-migrate.ts.

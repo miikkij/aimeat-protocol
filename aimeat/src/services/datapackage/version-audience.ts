@@ -16,6 +16,7 @@
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.6.3 — 2026-11-01 — readPointer takes the storage alone, as the freshness read without the config needs (plan D6).
  *   v1.6.2 — 2026-11-01 — writeLatest records the confirmation of a public package from personal data on
  *     the audience record, and carries the recorded one forward, not the earlier pointer's (WP9e, D1.7).
  *   v1.6.1 — 2026-11-01 — writeLatest copies the sale terms from the service's record
@@ -64,7 +65,7 @@ import { announcePublicDataset } from './announce.js';
 type StoreDeps = StorageWriteDeps;
 
 /** The pointer as stored, or null when there is none or it does not parse. A failure-only pointer is returned too. */
-export async function readPointer(deps: StoreDeps, ownerGhii: string, name: string): Promise<LatestPointer | null> {
+export async function readPointer(deps: Pick<StoreDeps, 'storage'>, ownerGhii: string, name: string): Promise<LatestPointer | null> {
     const file = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
     if (!file) return null;
     try {

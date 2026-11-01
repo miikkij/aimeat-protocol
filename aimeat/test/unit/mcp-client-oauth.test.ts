@@ -15,6 +15,7 @@
  *   round that "works" against a server which never checks the verifier proves nothing about the
  *   half that never travels.
  * @version-history
+ *   2026-11-01 — The authorization address carries ui_locales from site.default_locale.
  *   2026-10-20 — On the SDK v2 client: the issuer stamp is sealed with the token and the client, the
  *     callback's iss is taken when it matches and refuses the exchange when it does not.
  *   2026-10-18 — The authorization server listens on a port the system picks, not the fixed 40688.
@@ -193,6 +194,20 @@ describe('the OAuth round, against a real authorization server', () => {
     // plain text (secrets audit 2026-10-09, chapter 2).
     expect(round?.nonce).toMatch(/^v2:/);
     expect(JSON.stringify(round)).not.toContain('secret-xyz');
+  });
+
+  it('asks the far side for the node\'s own language with ui_locales, and for nothing it does not ship', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow();
+    await storage.createMcpServer(row);
+    const start = (defaultLocale: string) => startMcpOAuth({
+      storage, config: { ...config, siteLinks: { defaultLocale } } as unknown as AimeatConfig,
+      server: row, ownerGhii: 'alice@test-node-001', returnUrl: '/v1/profile?tab=access',
+    });
+    const fi = await start('fi');
+    expect(fi.ok && new URL(fi.authorizeUrl).searchParams.get('ui_locales')).toBe('fi');
+    const unknown = await start('de');
+    expect(unknown.ok && new URL(unknown.authorizeUrl).searchParams.has('ui_locales')).toBe(false);
   });
 
   it('finishes the round, proves the verifier and seals the token', async () => {
