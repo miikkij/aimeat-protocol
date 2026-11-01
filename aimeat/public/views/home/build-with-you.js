@@ -25,6 +25,7 @@
  *   SpecRows
  * @usage html`<${BuildWithYou} />` (views/home/index.js, under the buyer's welcome)
  * @version-history
+ *   v1.1.1 — 2026-11-01 — "Connect the chat" opens the Access page at its MCP servers section.
  *   v1.1.0 — 2026-11-01 — BuildCodeCard: the build code and three steps, shown when the node has a
  *     code and no request (commercial-1c and aimeat-protocol-4e, the new model); aimeat.io is the
  *     node's queueOrigin, and the place's chat is the second way in when the node has it. Step 1
@@ -141,7 +142,7 @@ function BuildCodeCard({ code, aimeatOrigin, chatPath }) {
           ${chatPath && html`
             <${Note} kind="hint">${fill(tr('home.buildWithYou.codeChatPath', 'You can also use this place\'s chat: connect it to {host} under Access and security.'), { host })}<//>
             <${Actions}>
-              <${Action} small soft href="/v1/profile?tab=access">${fill(tr('home.buildWithYou.codeChatButton', 'Connect the chat to {host}'), { host })} →<//>
+              <${Action} small soft href="/v1/profile?tab=access&section=ac-mcp">${fill(tr('home.buildWithYou.codeChatButton', 'Connect the chat to {host}'), { host })} →<//>
             <//>`}
         <//>
         <${IndexStep}>
