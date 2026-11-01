@@ -25,6 +25,9 @@
  *   SpecRows
  * @usage html`<${BuildWithYou} />` (views/home/index.js, under the buyer's welcome)
  * @version-history
+ *   v1.1.2 — 2026-11-01 — The invitation step says the aimeat.io account and links its Shared places
+ *     page, unless the queue says the invitation went only to an email address (inviteEmail without
+ *     inviteAccount).
  *   v1.1.1 — 2026-11-01 — "Connect the chat" opens the Access page at its MCP servers section.
  *   v1.1.0 — 2026-11-01 — BuildCodeCard: the build code and three steps, shown when the node has a
  *     code and no request (commercial-1c and aimeat-protocol-4e, the new model); aimeat.io is the
@@ -238,6 +241,10 @@ function InvitedGuide({ request, queueOrigin }) {
     ? `${queueOrigin}/v1/profile?tab=organisms&org=${encodeURIComponent(org.id)}` : '');
   const host = hostOf(queueOrigin || org?.url || '') || 'aimeat.io';
   const connectHref = queueOrigin ? `${queueOrigin}/v1/profile?tab=mcp` : '';
+  // The invitation goes to the person's account on the queue's node; the email words only when the
+  // queue says it went to an address (commercial's crew56 chain test: it went to the account).
+  const byEmail = !!request.inviteEmail && !request.inviteAccount;
+  const invitesHref = queueOrigin ? `${queueOrigin}/v1/profile?tab=organisms` : '';
   return html`
     <${Band} title=${title()}>
       <${Note} kind="lead">${org?.name
@@ -245,9 +252,10 @@ function InvitedGuide({ request, queueOrigin }) {
         : fill(tr('home.buildWithYou.invited', 'An organism was made on {host} for your request. It is one shared place for you, your AI and the builders.'), { host })}<//>
       <${IndexList} steps>
         <${IndexStep}>
-          ${request.inviteEmail
+          ${byEmail
             ? fill(tr('home.buildWithYou.acceptTo', 'Accept the invitation in your email. It went to {email}.'), { email: request.inviteEmail })
-            : tr('home.buildWithYou.accept', 'Accept the invitation in your email.')}
+            : html`${fill(tr('home.buildWithYou.acceptAccount', 'Accept the invitation in your {host} account. It waits on the Shared places page.'), { host })}
+              ${invitesHref && html`<${Actions}><${Action} small href=${invitesHref} newTab>${tr('home.buildWithYou.acceptAccountButton', 'Open the invitation')} →<//><//>`}`}
         <//>
         <${IndexStep}>
           ${fill(tr('home.buildWithYou.follow', 'Follow the work on {host}.'), { host })}
