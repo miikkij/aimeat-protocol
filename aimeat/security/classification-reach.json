@@ -1813,9 +1813,15 @@
     },
     "src/services/ecosystem-events.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The subscription index and inbound log, read to append."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The subscription index and inbound log, read to append. 2026-11-01 (secaudit2026oct31w2 round 12): the one read left is the owner's own subscription list under the node's system identity; the writes go through record-cas."
+    },
+    "src/services/ecosystem-subscriptions-by-owner.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (secaudit2026oct31w2 round 12), the node's own read: the node-wide ecosystem subscription record under the node's system identity, read once at boot to move each entry to its owner's list. No content is shown to anyone."
     },
     "src/services/entitlement-erasure.ts": {
       "reads": {
