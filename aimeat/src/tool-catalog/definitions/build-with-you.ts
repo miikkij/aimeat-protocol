@@ -9,6 +9,8 @@
  * @structure buildWithYouTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.2.1 — 2026-11-01 — aimeat_build_request_submit takes the four fields flat or under `spec`, the
+ *     shape the status's `send` shows; the test lane's chat sent them nested and was refused before the call.
  *   v1.2.0 — 2026-11-01 — With a build code aimeat_build_request_submit sends the request itself, with the
  *     person's own account through the server they attached (BUILD_CONNECT_FIRST, BUILD_SEND_FAILED).
  *   v1.1.0 — 2026-11-01 — buildCode and `send` on the status: the request goes with the person's own
@@ -27,10 +29,11 @@ export const buildWithYouTools = [
     scope: 'memory:write',
     surfaces: ['agent'],
     input: {
-      what: { type: 'string', required: true, description: 'What to build, in the person\'s words.' },
-      forWhom: { type: 'string', required: true, description: 'Who it is for.' },
-      use: { type: 'string', required: true, description: 'What it is used for: the work it does for them.' },
-      readyWhen: { type: 'string', required: true, description: 'When it is ready, as a sentence the person can check.' },
+      what: { type: 'string', description: 'What to build, in the person\'s words. Needed, here or in `spec`.' },
+      forWhom: { type: 'string', description: 'Who it is for. Needed, here or in `spec`.' },
+      use: { type: 'string', description: 'What it is used for: the work it does for them. Needed, here or in `spec`.' },
+      readyWhen: { type: 'string', description: 'When it is ready, as a sentence the person can check. Needed, here or in `spec`.' },
+      spec: { type: 'object', description: 'The same four fields as one object { what, forWhom, use, readyWhen }, the shape the status answer\'s `send` shows; a field given at the top level wins.' },
       lang: { type: 'string', enum: ['en', 'fi', 'es'], description: 'The language the builders answer in; omit it for the person\'s own.' },
       email: { type: 'string', description: 'Where the builders write, when the person gave an address for it; omit it for the one in their notification settings.' },
     },

@@ -12,6 +12,7 @@
 //      to take.
 // Written after the test lane's chat could not send it by itself (aimeat-commercial-1c, crew54).
 //
+// v1.1.0 -- 2026-11-01 -- The fields under `spec` too, on REST and over MCP (crew55: the chat sent them nested).
 // v1.0.0 -- 2026-11-01 -- Initial.
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -185,15 +186,20 @@ try {
     });
 
     await test('the builders\' node saying no is 502 BUILD_SEND_FAILED with its reason, and nothing is stored', async () => {
-        const post = await send(customerToken, { ...spec, what: 'FAIL' });
+        // REST with the fields under `spec`: the shape passes the route's validation and reaches the call.
+        const post = await send(customerToken, { spec: { ...spec, what: 'FAIL' } });
         assert(post.status === 502 && post.body.error?.code === 'BUILD_SEND_FAILED' && post.text.includes('INVALID_CODE'), `post ${post.status} ${post.text}`);
         assert(toolCalls.length === 1, `calls ${toolCalls.length}`);
         assert(await stored() === null, 'a refused request is not stored, so it can be sent again');
     });
 
-    await test('sent: the queue\'s tool got the code and the four fields with the person\'s own token, and the place keeps the answer', async () => {
-        const post = await send(customerToken, { ...spec, lang: 'fi' });
-        assert(post.status === 201, `post ${post.status} ${post.text}`);
+    await test('sent over MCP with the four fields under `spec`, as the status\'s `send` shows them: the queue\'s tool got them with the person\'s own token, and the place keeps the answer', async () => {
+        // The place's chat holds every word, mcp:use with it; the fields go nested, as the test lane's chat sent them.
+        const ai = await makeAgent(BASE, { name: customerName, token: customerToken }, ['memory:read', 'memory:write', 'mcp:use'], `bwschat${stamp}`);
+        const s = await openSession(BASE, ai.token, 'bws-chat');
+        const sent = await callTool(s, 'aimeat_build_request_submit', { spec, lang: 'fi' });
+        assert(!sent.isError, `submit: ${sent.text.slice(0, 300)}`);
+        const post = { text: sent.text, body: { data: sent.data } };
         const call = toolCalls[1];
         assert(call?.authorization === `Bearer ${BUILDERS_TOKEN}`, 'the attached server\'s own token was sent');
         assert(call.args.owner === 'builder' && call.args.app === 'rakennamme.html' && call.args.tool === 'submitRequest', `args ${JSON.stringify(call.args)}`);
