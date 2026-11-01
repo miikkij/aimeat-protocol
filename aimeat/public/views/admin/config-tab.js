@@ -32,6 +32,8 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-01 -- The `dataspace` section (the Dataspace Protocol provider) sits under identity, after
+ *     consent (plan doc-mvwxcas3dom3, D8); the "Data ulos" group of WP9b may move it.
  *   2026-10-31 -- The `schedules` section (how many schedules one owner keeps, and the shortest time
  *     between two runs) sits under limits (secaudit2026oct31w2 round 10).
  *   v3.9.0 -- 2026-10-29 -- The `file_store` section (where stored files keep their bytes, and whether a
@@ -140,7 +142,7 @@ const SOURCE_BADGE = {
 const DOMAINS = [
   { id: 'ai', groups: ['ai', 'decide', 'content_class', 'agent','agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
-  { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
+  { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'dataspace', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
   { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'usage', 'features', 'packages'] },
   { id: 'limits', groups: ['quota', 'file_store', 'rate_limits', 'boards', 'extensions', 'realtime', 'schedules'] },
   { id: 'federation', groups: ['federation', 'federation_sync', 'cross_federation', 'personal_nodes', 'connect_tunnel', 'msm'] },

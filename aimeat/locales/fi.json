@@ -5518,6 +5518,211 @@
       "created": "Luonnos tehtiin."
     }
   },
+  "dataout": {
+    "fresh": {
+      "fresh": "Ajan tasalla", "late": "Myöhässä", "stale": "Vanhentunut", "unscheduled": "Ei ajastusta", "unpublished": "Ei vielä julkaistu",
+      "why": {
+        "late": "Viimeisin päivitys tuli myöhemmin kuin ajastus lupasi. Lukijat saavat yhä edellisen version. Päivitä nyt tai katso, miksi edellinen ajo epäonnistui.",
+        "stale": "Kolme päivitystä peräkkäin puuttuu. Katalogi merkitsee datatuotteen vanhentuneeksi, ja sait siitä ilmoituksen. Päivitä nyt tai muuta ajastusta."
+      }
+    },
+    "audience": { "private": "Vain minä", "members": "Kirjautuneet", "public": "Julkinen", "organismOf": "Organismin {name} jäsenet" },
+    "schedule": {
+      "none": "päivittyy vain, kun ajat sen", "cron": "ajastus {cron}", "daily": "päivittyy joka päivä klo {at}", "monthly": "päivittyy kuun {day}. päivä klo {at}",
+      "weekly": { "0": "päivittyy sunnuntaisin klo {at}", "1": "päivittyy maanantaisin klo {at}", "2": "päivittyy tiistaisin klo {at}", "3": "päivittyy keskiviikkoisin klo {at}", "4": "päivittyy torstaisin klo {at}", "5": "päivittyy perjantaisin klo {at}", "6": "päivittyy lauantaisin klo {at}" }
+    },
+    "day": { "0": "sunnuntai", "1": "maanantai", "2": "tiistai", "3": "keskiviikko", "4": "torstai", "5": "perjantai", "6": "lauantai" },
+    "kind": { "records": "Työtilan tietuetila", "app": "Sovelluksen data", "memory": "Agentin tai työnkulun tulos", "extension": "Laajennuksen toiminto", "file": "Tiedosto", "datapackage": "Toinen datatuote" },
+    "combine": {
+      "title": "Miten {ids} yhdistetään",
+      "tables": "Omina tauluina", "tablesHint": "Paketissa on oma taulu kullekin lähteelle. Power BI näkee jokaisen, ja voit liittää ne siellä itse.",
+      "union": "Yhdeksi tauluksi", "unionHint": "Rivit peräkkäin, kun lähteillä on samat sarakkeet.",
+      "join": "Rikasta avaimella", "joinHint": "Muiden lähteiden sarakkeet lisätään ensimmäisen lähteen riveille, kun avain täsmää.",
+      "keyLeft": "Avain lähteessä {id}", "keyRight": "Avain lähteessä {id}", "tryFirst": "Kokeile lähteitä ensin", "tryNow": "Kokeile lähteitä"
+    },
+    "list": {
+      "title": "Datatuotteet", "sub": "{n} datatuotetta", "sub_one": "{n} datatuote",
+      "desc": "Taulut, jotka rakentuvat omasta aineistostasi. Jokaisella on ajastus ja lista siitä, kuka saa lukea. Rivi kertoo, onko data ajan tasalla ja kuka sitä lukee.",
+      "new": "Uusi datatuote", "allN": "Kaikki {n}", "oldN": "Vanhentuneet: {n}",
+      "filterLabel": "Näytä", "filterAll": "Datatuotteet", "filterOld": "Vanhentuneet",
+      "chipProducts": "{n} datatuotetta", "chipProducts_one": "{n} datatuote", "chipOld": "{n} vanhentunutta", "chipOld_one": "{n} vanhentunut",
+      "colName": "Nimi", "colFresh": "Tuoreus", "colWho": "Kuka saa käyttää", "colReads": "Lukijat",
+      "rows": "{n} riviä", "rows_one": "{n} rivi", "sharesN": "{n} jakoa", "sharesN_one": "{n} jako", "readsWeek": "{n} lukua / vko", "readsWeek_one": "{n} luku / vko",
+      "open": "Avaa", "withdrawn": "Vedetty pois",
+      "empty": "Sinulla ei ole vielä datatuotteita. Tee ensimmäinen tietueistasi, sovelluksen datasta, tiedostosta tai laajennuksen tuloksista.",
+      "noneOld": "Kaikki datatuotteet ovat ajan tasalla, tai niillä ei ole ajastusta.",
+      "hint": "Datatuote on taulu pysyvässä osoitteessa. Power BI, Excel ja muut ohjelmat lukevat sitä, ja sinä päätät, kuka saa lukea.",
+      "askAi": "Tekoälysi lukee saman listan. Kysy siltä: \"Mitä dataa minulla on tarjolla?\" tai \"Onko jokin datani vanhentunut?\"."
+    },
+    "product": {
+      "label": "Datatuote", "loadFailed": "Datatuotetta ei voitu lukea. Yritä hetken päästä uudelleen.",
+      "versionN": "Versio {n}", "current": "käytössä", "notPublished": "Ei vielä julkaistu", "nextRun": "seuraava ajo {when}",
+      "share": "Jaa", "sell": "Myy EXCHANGEssa", "sellEdit": "Muuta myyntiä", "withdraw": "Vedä pois", "runNow": "Päivitä nyt", "publishAgain": "Julkaise uudelleen", "onSale": "EXCHANGEssa",
+      "figRows": "Rivejä", "figVersions": "Versioita", "figShares": "Jakoja", "figReads": "Lukuja 7 pv", "lastRun": "päivitetty {when}",
+      "tabsLabel": "Datatuotteen tiedot",
+      "tab": { "shares": "Jaot ja lukijat", "versions": "Versiot", "columns": "Sarakkeet", "connect": "Yhteysohjeet", "origin": "Alkuperä" },
+      "colWho": "Kuka", "colUntil": "Mihin asti", "until": "{date} asti", "lastRead": "luettu viimeksi {when}", "notRead": "ei vielä luettu",
+      "revoke": "Peru", "revokeConfirm": "Peruutetaanko jako osapuolelle {who}? Seuraava luku hylätään heti. Jo ladattuja kopioita ei saa takaisin.",
+      "revoked": "Jako osapuolelle {who} päättyi.", "revokeFailed": "Jakoa ei peruttu. Yritä uudelleen.",
+      "youAndAgents": "Sinä ja agenttisi", "owner": "omistaja",
+      "noShares": "Kukaan ulkopuolinen ei lue tätä datatuotetta. Jaa se nimetylle ihmiselle tai ohjelmalle.",
+      "colVersion": "Versio", "colChanges": "Mikä muuttui", "colRows": "Rivejä", "colWhen": "Milloin", "descriptor": "Kuvaus",
+      "pinnedN": "{n} jakoa lukitsee tähän versioon", "pinnedN_one": "{n} jako lukitsee tähän versioon", "reads30": "{n} lukua 30 päivässä", "reads30_one": "{n} luku 30 päivässä", "removedNext": "poistuu seuraavassa päivityksessä",
+      "noVersions": "Yhtään versiota ei ole vielä julkaistu.", "retentionAll": "Kaikki versiot säilytetään.",
+      "retention": { "versions": "Uusimmat {n} versiota säilytetään. Versio, jota joku vielä lukee, ei poistu ilman, että näet sen ensin.", "months": "Viimeisen {n} kuukauden versiot säilytetään. Versio, jota joku vielä lukee, ei poistu ilman, että näet sen ensin." },
+      "noColumns": "Sarakkeet näkyvät, kun ensimmäinen versio on julkaistu.", "notPublishedYet": "Osoitteet toimivat, kun ensimmäinen versio on julkaistu. Päivitä nyt.",
+      "ran": "Uusi versio on julkaistu.", "unchanged": "Rivit eivät muuttuneet, joten uutta versiota ei tehty.", "runFailed": "Päivitys epäonnistui. Edellinen versio jää voimaan.",
+      "lastRunFailed": "Viimeisin päivitys epäonnistui {when}: {error}. Lukijat saavat yhä edellisen version.",
+      "withdrawConfirm": "Vedetäänkö \"{title}\" pois? Jokainen luku hylätään tästä eteenpäin, se poistuu katalogista ja sen {n} jakoa päättyvät. Jo ladattuja kopioita ei saa takaisin.",
+      "withdrawConfirm_one": "Vedetäänkö \"{title}\" pois? Jokainen luku hylätään tästä eteenpäin, se poistuu katalogista ja sen jako päättyy. Jo ladattuja kopioita ei saa takaisin.",
+      "withdrawn": "\"{title}\" on vedetty pois.", "withdrawFailed": "Sitä ei vedetty pois. Yritä uudelleen."
+    },
+    "connect": {
+      "copy": "Kopioi", "odata": "OData-syöte", "csv": "CSV: {table}", "descriptor": "Kuvaus", "descriptorSub": "datapackage.json, Frictionless; tämän version pysyvä osoite", "odps": "ODPS", "odpsSub": "odps.yaml, lasketaan lukuhetkellä",
+      "openPrivate": "Osoitteet vaativat kirjautumisen. Sinä luet ne omalla tunnuksellasi. Se, jolle jaat, lukee ne oman jakonsa avaimella.",
+      "openPublic": "Kuka tahansa voi lukea osoitteet kirjautumatta.",
+      "toolLabel": "Ohjelma",
+      "tool": { "excel": "Excel", "powerbi": "Power BI", "duckdb": "DuckDB", "pandas": "pandas", "ai": "Oma tekoäly" },
+      "excel1": "Tiedot › Nouda tiedot › Muista lähteistä › OData-syötteestä", "excel2": "Liitä OData-syötteen osoite: {url}", "excel3": "Valitse Perus: käyttäjä on jaon nimi (omistaja/osapuoli), salasana on avain", "excel4": "Valitse taulu {table} › Lataa",
+      "powerbi1": "Nouda tiedot › OData-syöte", "powerbi2": "Liitä OData-syötteen osoite: {url}", "powerbi3": "Valitse Perus: käyttäjä on jaon nimi (omistaja/osapuoli), salasana on avain", "powerbi4": "Valitse taulu {table} › Lataa",
+      "duckdb1": "Hae token jaon nimellä ja avaimella osoitteesta {url}", "duckdb2": "Laita token alla olevaan salaisuuteen ja lue CSV",
+      "pandas1": "Token haetaan jaon nimellä ja avaimella osoitteesta {url}", "pandas2": "pandas lukee CSV:n, ja token kulkee otsakkeessa",
+      "ai1": "Yhdistä tekoälysi AIMEATiin MCP:llä", "ai2": "Sano: \"Lue datatuote {name}\"",
+      "after": {
+        "excel": "Päivitä-painike hakee uusimman version.", "powerbi": "Päivitä-painike hakee uusimman version. Power BI -palvelun ajastettu päivitys tarvitsee julkisen osoitteen.",
+        "duckdb": "Token on voimassa vähän aikaa. Hae uusi, kun se päättyy.", "pandas": "Token on voimassa vähän aikaa. Hae uusi, kun se päättyy.",
+        "ai": "Tekoälysi lukee rivit työkalulla aimeat_datapackage_export."
+      }
+    },
+    "origin": {
+      "sources": "Lähteet", "combine": "Yhdistetty", "transformations": "Mitä muutettiin", "lineage": "Rakennettu näistä", "license": "Lisenssi", "noLicense": "Lisenssiä ei ole annettu", "producedBy": "Tekijä", "hash": "Sisällön tiiviste"
+    },
+    "share": {
+      "title": "Jaa nimetylle", "doneTitle": "Jaettu", "who": "Kenelle", "whoPlaceholder": "Matti", "whoHint": "Nimi listassasi: {name}",
+      "how": "Miten hän lukee",
+      "howProgram": "Ohjelmalla", "howProgramHint": "Power BI, Excel, DuckDB. Saa avaimen yhteystiedostossa.",
+      "howBrowser": "Selaimella", "howBrowserHint": "Avaa sähköpostiin tulevan linkin ja näkee rivit.",
+      "howDataspace": "Dataavaruudesta", "howDataspaceHint": "Organisaation liitin Dataspace Protocolilla.",
+      "email": "Sähköposti linkkiä varten", "emailPlaceholder": "nimi@esimerkki.fi", "emailHint": "Vapaaehtoinen. Linkki lähtee tähän osoitteeseen.", "emailNeeded": "Selaimella lukeva saa linkin tähän osoitteeseen.",
+      "purpose": "Käyttötarkoitus", "purposePlaceholder": "raportointi", "until": "Päättyy", "untilHint": "Tällä palvelimella enintään {n} päivää eli viimeistään {date}.",
+      "version": "Mikä versio", "versionLatest": "Aina uusin", "versionOnly": "Vain versio {n} ({hash})",
+      "sentences": "{who} ei tarvitse AIMEAT-tiliä. Voit perua jaon milloin tahansa, ja se päättyy heti. Jo ladattuja kopioita ei saa takaisin. Jokainen luku näkyy sinulle.",
+      "theRecipient": "Vastaanottaja",
+      "cancel": "Peruuta", "submit": "Jaa", "submitSend": "Jaa ja lähetä linkki", "close": "Valmis",
+      "done": "Jaettu.", "failed": "Jakoa ei tehty. Yritä uudelleen.",
+      "notSent": "Linkkiä ei lähetetty osoitteeseen {email}, koska tämä palvelin ei vielä lähetä jakolinkkejä. Anna yhteystiedosto hänelle itse.",
+      "copyFile": "Kopioi yhteystiedosto", "downloadFile": "Lataa yhteystiedosto"
+    },
+    "sell": {
+      "title": "Myy EXCHANGEssa", "lead": "Ostajat löytävät datatuotteen EXCHANGEsta ja lukevat sitä omalla avaimellaan. Sinä päätät hinnan ja sen, miten dataa saa käyttää.",
+      "model": "Hinta", "perMonth": "Kuukausittain", "perRead": "Lukukerroittain",
+      "priceMonth": "Hinta euroina kuukaudessa", "priceRead": "Hinta euroina lukukerralta", "priceHint": "Jätä tyhjäksi, jos se on maksuton.",
+      "pacing": "Tahdistus murusina lukukerralta", "pacingHint": "Kuinka nopeasti tilillinen ostaja saa lukea. Muru ei ole rahaa.",
+      "terms": "Ostaja saa", "attribution": "käyttää dataa, kun hän mainitsee sinut lähteenä", "derivatives": "tehdä siitä uutta dataa", "resale": "myydä sitä eteenpäin",
+      "note": "Muut ehdot", "notePlaceholder": "esimerkiksi: ei markkinointiin",
+      "mode": {
+        "report": "Tällä palvelimella datanvälitys on tilassa seuranta. Myynti näkyy ylläpitäjän Compliance-sivulla havaintona.",
+        "none": "Tämä palvelin ei toimi datanvälityspalveluna. Datan myynti voidaan hylätä, ja vastaus kertoo syyn.",
+        "node": "Tämän palvelimen ylläpitäjä tarjoaa datanvälityspalvelun ja on tehnyt siitä ilmoituksen viranomaiselle. Myyntisi kulkee sen kautta.",
+        "owners": "Tällä palvelimella jokainen dataa myyvä omistaja tarjoaa oman datanvälityspalvelunsa ja ilmoittaa siitä viranomaiselle. Ilman ilmoitusta myynti hylätään."
+      },
+      "submit": "Listaa EXCHANGEen", "update": "Tallenna myynti", "off": "Poista EXCHANGEsta",
+      "done": "Datatuote on listattu EXCHANGEen.", "offDone": "Datatuote ei ole enää EXCHANGEssa.", "failed": "Myyntiä ei tallennettu."
+    },
+    "party": {
+      "title": "Osapuolet", "count": "{n} osapuolta", "count_one": "{n} osapuoli",
+      "intro": "Ihmiset ja ohjelmat, joilla ei ole tiliä tällä palvelimella mutta joille olet antanut pääsyn. Kukin lukee vain sen, minkä jaoit sille.",
+      "colName": "Osapuoli", "colShares": "Jaot", "colKey": "Avain käytetty",
+      "none": "Sinulla ei ole ulkopuolisia osapuolia. Osapuoli syntyy, kun jaat datatuotteen nimetylle.",
+      "kind": { "program": "ohjelma", "person": "ihminen", "dataspace": "dataavaruus" },
+      "keyOf": { "program": "ohjelman avain", "person": "selainlinkki", "dataspace": "dataavaruuden liitin" },
+      "status": { "active": "voimassa", "stopped": "pysäytetty" },
+      "dataProduct": "datatuote",
+      "sharesN": "{n} jakoa", "sharesN_one": "{n} jako", "keyUsed": "avain käytetty {when}", "keyNotUsed": "avainta ei ole vielä käytetty",
+      "open": "Avaa", "close": "Sulje", "add": "Lisää osapuoli",
+      "display": "Nimi", "name": "Nimi osoitteessa", "nameHint": "Pienet kirjaimet, numerot ja väliviivat", "kindLabel": "Laji", "contact": "Yhteystieto", "contactHint": "Sähköpostiosoite tai puhelinnumero. Ihmisen yhteystieto on henkilötieto, jota sinä säilytät.",
+      "created": "Osapuoli tehtiin. Sen avain näytetään alla kerran.",
+      "label": "Ulkopuolinen osapuoli", "newKey": "Uusi avain", "keyOnce": "Avain näytetään vain kerran. Anna se osapuolelle nyt, sillä tämä palvelin säilyttää siitä vain tunnisteen.",
+      "keys": "Avaimet", "noKeys": "Ei avainta. Tee uusi, kun osapuolen pitää lukea.", "keyId": "avain …{id}", "keyMade": "luotu {date}",
+      "replace": "Vaihda", "replaceConfirm": "Vaihdetaanko osapuolen {who} avain? Uusi avain tehdään, ja vanha lakkaa toimimasta heti.", "replaced": "Avain vaihdettiin.",
+      "deleteKey": "Poista", "deleteKeyConfirm": "Poistetaanko tämä osapuolen {who} avain? Se lakkaa toimimasta heti.", "keyDeleted": "Avain poistettiin.",
+      "gets": "Mitä hän saa", "read": "luku", "noShares": "Tälle osapuolelle ei ole nyt jaettu mitään.",
+      "reads": "Viimeiset luvut", "noReads": "Ei vielä lukuja.", "served": "sallittu", "refused": "hylätty",
+      "refusedMeans": "Hylätty luku tarkoittaa, että avainta yritettiin käyttää johonkin, mitä et jakanut.",
+      "stop": "Pysäytä", "resume": "Jatka", "stopped": "{who} on pysäytetty. Osapuolen avaimet ja jaot eivät enää toimi.", "resumed": "{who} voi taas lukea.",
+      "delete": "Poista osapuoli", "deleteConfirm": "Poistetaanko osapuoli {who}? Sen avaimet lakkaavat toimimasta, ja sen jaot ({n}) päättyvät heti. Jo ladattuja kopioita ei saa takaisin.", "deleted": "{who} poistettiin.",
+      "operatorStopped": "Tämän palvelimen ylläpitäjä pysäytti osapuolen. Pyydä ylläpitäjää jatkamaan sitä.",
+      "failed": "Se ei onnistunut. Yritä uudelleen."
+    },
+    "wizard": {
+      "label": "Uusi datatuote", "stepsLabel": "Vaiheet", "back": "Takaisin", "cancel": "Peru", "working": "Hetki…", "failed": "Se ei onnistunut. Lue viesti ja yritä uudelleen.",
+      "needName": "Anna datatuotteelle osoitteen nimi vaiheessa 3.", "publish": "Julkaise",
+      "next": { "columns": "Seuraava: sarakkeet", "preview": "Seuraava: esikatselu", "schedule": "Seuraava: päivitys", "who": "Seuraava: kuka saa käyttää" },
+      "colOut": "Nimi ulos", "colType": "Tyyppi", "colDesc": "Kuvaus",
+      "sources": { "tab": "Lähteet", "title": "Mistä data tulee?", "lead": "Datatuotteella voi olla monta lähdettä. Jokainen lähde voi olla oma taulunsa samassa paketissa, tai lähteet yhdistetään yhdeksi tauluksi. Näet vain lähteet, joita sinä, agenttisi ja sovelluksesi voitte lukea." },
+      "columns": { "tab": "Sarakkeet", "title": "Mitkä sarakkeet lähtevät ulos?", "lead": "Valitse sarakkeet ja anna niille nimet, jotka toinen järjestelmä ymmärtää. Kuvaus menee skeemaan, ja Power BI ja Excel näyttävät sen." },
+      "preview": { "tab": "Esikatselu", "title": "Näin se näkyy toiselle järjestelmälle", "lead": "Tarkista rivit, nimi ja kuvaus. Kirjoita kuvaus sille, joka päättää, käyttääkö hän dataa." },
+      "schedule": { "tab": "Päivitys", "title": "Kuinka usein se päivittyy?", "lead": "Tämä on lupaus lukijalle. Palvelin ajaa lähteet ajastuksen mukaan ja tekee uuden version vain, kun rivit muuttuivat. Jos ajo epäonnistuu, edellinen versio jää voimaan ja sinä saat ilmoituksen." },
+      "who": { "tab": "Kuka saa käyttää", "title": "Kuka saa käyttää?", "lead": "Tapoja on kolme, ja voit käyttää niitä yhtä aikaa: yleisö, nimetyt jaot ja myynti EXCHANGEssa. Palvelin tarkistaa pääsyn joka luvulla, joten muutos vaikuttaa heti." },
+      "done": { "tab": "Valmis", "title": "Valmis. Ensimmäinen versio on ulkona.", "lead": "Datatuote on julkaistu, ja sen ajastus on päällä. Alla ovat osoitteet ja ohjeet, joilla ohjelmat lukevat sitä." }
+    },
+    "src": {
+      "title": "Lähteet", "count": "{n} lähdettä", "count_one": "{n} lähde", "none": "Lisää ensimmäinen lähde alta.", "add": "Lisää lähde", "kindLabel": "Lähteen laji", "remove": "Poista", "pick": "Valitse…",
+      "notTried": "Ei vielä kokeiltu. Seuraava-painike lukee sen.", "tried": "Viimeisin kokeilu luki {rows} riviä ja {cols} saraketta.",
+      "organism": "Organismi", "ws": "Työtila", "space": "Tietuetila", "spaceHint": "Tietuetilan nimi",
+      "app": "Sovellus", "keyPrefix": "Avaimen alku", "keyPrefixHint": "Vain tietueet, jotka sovelluksen datakartta merkitsee julkaistaviksi",
+      "key": "Muistiavain", "keyHint": "Tietue, johon agentti tai työnkulku kirjoittaa tuloksensa", "rowsAt": "Rivit kentässä", "rowsAtHint": "Kenttä, jossa rivien lista on, esimerkiksi rows",
+      "ext": "Laajennus", "action": "Toiminto", "input": "Syöte", "inputHint": "JSON, tai pelkät sanat toiminnon hakuun",
+      "file": "Tiedosto", "fileHint": "CSV- tai Excel-tiedosto tallennustilassasi", "sheet": "Taulukko", "sheetHint": "Excel-tiedostossa; tyhjänä ensimmäinen",
+      "package": "Datatuote", "resource": "Taulu", "resourceHint": "Tyhjänä ensimmäinen taulu",
+      "provenance": "Jokaisen lähteen alkuperä, tuoreus ja henkilötiedot tarkistetaan erikseen, ja ne kirjataan paketin tietoihin. Datatuote on yhtä tuore kuin sen vanhin lähde."
+    },
+    "cols": {
+      "title": "Sarakkeet", "count": "{n}/{of} lähtee ulos", "include": "Mukana", "personal": "henkilötieto · datakartta", "descPlaceholder": "Mitä sarakkeessa on",
+      "personalLeftOut": "Jätin pois sarakkeet {cols}, koska datakartta merkitsee ne henkilötiedoksi. Jos otat ne mukaan, et voi tehdä datatuotteesta julkista. Nimetty jako ja sopimus ovat mahdollisia, ja ne näkyvät Compliance-sivulla.",
+      "personalIncluded": "Henkilötietoa lähtee ulos: {cols}. Datatuotetta ei voi tehdä julkiseksi.",
+      "filterTitle": "Rivien suodatus", "optional": "valinnainen", "filterColumn": "Sarake", "noFilter": "Ei suodatusta", "filterOp": "Ehto", "filterValue": "Arvo",
+      "op": { "eq": "on", "ne": "ei ole", "gt": "suurempi kuin", "gte": "vähintään", "lt": "pienempi kuin", "lte": "enintään", "contains": "sisältää" },
+      "filterNote": "Suodatus kirjataan paketin muunnoksiin, joten lukija näkee, mitä rajattiin."
+    },
+    "preview": {
+      "rowsTitle": "Ensimmäiset rivit kokeiluajosta", "counts": "{rows} riviä · {cols} saraketta", "sizeLine": "{rows} riviä · {cols} saraketta · noin {size}",
+      "validOk": "Frictionless-tarkistus meni läpi.", "validBad": "Frictionless-tarkistus löysi {n} ongelmaa. Muuta sarakkeiden tyyppejä vaiheessa 2.", "validBad_one": "Frictionless-tarkistus löysi yhden ongelman. Muuta sarakkeen tyyppiä vaiheessa 2.",
+      "describedOk": "Jokaisella sarakkeella on tyyppi ja kuvaus.", "describedBad": "Jostain sarakkeesta puuttuu kuvaus. Lisää se vaiheessa 2.",
+      "personalNone": "Henkilötietoa ei ole mukana.", "personalIn": "Henkilötietoa on mukana.",
+      "aboutTitle": "Nimi ja kuvaus", "name": "Nimi", "slug": "Osoitteen nimi", "slugHint": "Pienet kirjaimet, numerot ja väliviivat. Nimi tulee jokaiseen osoitteeseen.",
+      "desc": "Kuvaus", "keywords": "Avainsanat", "keywordsHint": "Pilkuilla erotettuna", "rebuild": "Tee esikatselu uudelleen",
+      "odpsTitle": "Kuvaus, jonka koneet lukevat (ODPS 4.1, ote)", "noOdps": "Kuvaus näkyy, kun esikatselu läpäisee tarkistukset."
+    },
+    "sched": {
+      "title": "Tahti", "pace": "Tahti", "once": "Kerran", "daily": "Päivittäin", "weekly": "Viikoittain", "monthly": "Kuukausittain",
+      "weekday": "Päivä", "monthday": "Kuukauden päivä", "time": "Kello", "keep": "Säilytä vanhoja versioita", "keep12": "12 viimeisintä", "keepAll": "Kaikki", "keep6m": "6 kuukautta",
+      "onceNote": "Datatuote rakennetaan, kun julkaiset sen ja kun painat Päivitä nyt. Lukija näkee sen tilassa Ei ajastusta.",
+      "freshTitle": "Miten lukija näkee tuoreuden",
+      "freshFresh": "päivitetty luvatussa ajassa",
+      "freshLate": { "day": "yli päivä viimeisestä päivityksestä", "week": "yli viikko viimeisestä päivityksestä", "month": "yli kuukausi viimeisestä päivityksestä" },
+      "freshStale": { "day": "yli kolme päivää; katalogi merkitsee sen, ja sinä saat ilmoituksen", "week": "yli kolme viikkoa; katalogi merkitsee sen, ja sinä saat ilmoituksen", "month": "yli kolme kuukautta; katalogi merkitsee sen, ja sinä saat ilmoituksen" },
+      "freshNone": "Ajastusta ei luvata, joten lukija näkee, milloin datatuote julkaistiin viimeksi.",
+      "nodeNote": "Ajo on palvelimen oma ajastus: sama, jonka näet Ajastukset-sivulla ja jonka agentti voi käynnistää. Versio, jota joku vielä lukee, ei poistu ilman, että näet sen ensin."
+    },
+    "who": {
+      "audience": "Yleisö",
+      "privateHint": "Sinä, agenttisi ja sovelluksesi. Muut vain nimetyllä jaolla tai sopimuksella.",
+      "organism": "Yhden organismin jäsenet", "organismHint": "Yhden yhteisen paikan aktiiviset jäsenet.", "organismPick": "Organismi",
+      "membersHint": "Jokainen tämän palvelimen käyttäjä. Ei osapuolia eikä toisen palvelimen kävijöitä.",
+      "publicHint": "Kuka tahansa, myös hakukoneet ja EU:n dataportaalit. Jo ladattuja kopioita ei saa takaisin.",
+      "publicNote": "Julkista datatuotetta ei saa enää yksityiseksi niiltä osin kuin siitä on jo ladattu kopioita.",
+      "licence": "Lisenssi", "licencePick": "Valitse lisenssi",
+      "sharesTitle": "Nimetyt jaot", "newShare": "Lisää jako", "addShare": "Lisää", "noShares": "Nimettyjä jakoja ei vielä ole.",
+      "noAccount": "Vastaanottaja ei tarvitse AIMEAT-tiliä. Jokainen jako tehdään, kun julkaiset, ja sen avain näytetään kerran seuraavalla sivulla.",
+      "sellTitle": "EXCHANGE", "sell": "Myy EXCHANGEssa"
+    },
+    "licence": { "ccBy": "CC BY 4.0", "cc0": "CC0", "contract": "Vain sopimuksen ehdoilla" },
+    "done": {
+      "addresses": "Osoitteet", "noPackage": "Pakettia ei voitu lukea juuri nyt. Avaa datatuote, niin näet sen osoitteet.",
+      "shares": "Tehdyt jaot", "showInOffers": "Avaa datatuote", "tryTool": "Kokeile ulkoisella työkalulla", "shareMore": "Jaa toiselle"
+    }
+  },
   "exposure": {
     "title": "Mitä muut näkevät sinun sisällöstäsi",
     "intro": "Tässä on kaikki sisältösi, jonka joku ulkopuolinen voi lukea: kuka tahansa, kuka tahansa linkillä, jokainen täällä kirjautunut tili tai yhden yhteisen paikan jäsenet. Sulje se, minkä ei kuulu olla auki.",
@@ -5531,7 +5736,32 @@
       "signedIn": "Kirjautuneet tilit",
       "signedInSub": "mikä tahansa tili täällä",
       "organism": "Vain jäsenet",
-      "organismSub": "yhdessä yhteisessä paikassa"
+      "organismSub": "yhdessä yhteisessä paikassa",
+      "named": "Sinun nimeämäsi",
+      "namedShares": "Nimetyt jaot",
+      "namedSharesSub": "kukin yhdelle ihmiselle tai ohjelmalle",
+      "parties": "Osapuolet",
+      "partiesSub": "ei tiliä täällä"
+    },
+    "named": {
+      "sharesTitle": "Nimetyt jaot", "sharesSub": "datatuote yhdelle ihmiselle tai ohjelmalle tiettyyn päivään asti",
+      "sharesEmpty": "Et ole jakanut mitään nimetylle.",
+      "colWho": "Kuka · datatuote", "colUntil": "Mihin asti", "colLastRead": "Viimeisin luku",
+      "revoke": "Peru jako", "revokeConfirm": "Peruutetaanko osapuolen {who} jako datatuotteeseen {what}? Seuraava luku hylätään heti. Jo ladattuja kopioita ei saa takaisin.",
+      "revoked": "Osapuolen {who} jako päättyi.",
+      "partiesTitle": "Ulkopuoliset osapuolet", "partiesSub": "ihmiset ja ohjelmat, joilla on avain mutta ei tiliä täällä",
+      "partiesEmpty": "Millään ulkopuolisella osapuolella ei ole avainta.",
+      "colParty": "Osapuoli", "colGets": "Jaot ja avaimet", "colKeyUsed": "Avain käytetty",
+      "noAccount": "ei AIMEAT-tiliä", "sharesKeys": "jakoja {shares} · avaimia {keys}",
+      "keyUsed": "avain käytetty {when}", "keyNotUsed": "avainta ei ole vielä käytetty", "manage": "Hallitse",
+      "productsTitle": "Datatuotteet", "productsEmpty": "Sinulla ei ole julkaistuja datapaketteja.",
+      "colLevel": "Taso", "change": "Muuta",
+      "level": { "public": "julkinen", "members": "kirjautuneet", "organism": "jäsenet", "private": "vain minä" },
+      "plusShares": "+ {n} jakoa", "plusShares_one": "+ {n} jako",
+      "who": { "public": "kuka tahansa, myös hakukoneet", "members": "jokainen tili täällä", "organism": "yhden yhteisen paikan jäsenet" },
+      "privateAlone": "ei näy ulos",
+      "privateShared": "ei näy ulos ilman jakoa",
+      "productsNote": "Jokainen datatuote näkyy omalla tasollaan. Yksityisen datatuotteen näkevät vain ne, joille jaoit sen nimellä."
     },
     "levelSubPartial": "osaa paikoista ei voitu lukea",
     "failed": "Näitä ei voitu lukea juuri nyt, joten niiden määrät puuttuvat eivätkä ole nolla: {kinds}. Yritä hetken päästä uudelleen.",
@@ -5551,7 +5781,9 @@
       "portfolio": "Tervetulosivu",
       "company": "Yrityksen sivu",
       "exchange": "Vaihdannan ilmoitus",
-      "agent": "Agentti julkisessa listassa"
+      "agent": "Agentti julkisessa listassa",
+      "named_share": "Nimetty jako",
+      "outside_party": "Ulkopuolinen osapuoli"
     },
     "noAddress": "ei osoitetta ulkopuolisille",
     "closeIt": "Sulje",
@@ -13899,6 +14131,7 @@
     "cfgGroup_rate_limits": "Nopeusrajoitukset",
     "cfgGroup_email": "Sähköposti",
     "cfgGroup_consent": "Suostumus",
+    "cfgGroup_dataspace": "Data-avaruudet",
     "cfgGroup_classification": "Luokittelu",
     "cfgGroup_content_class": "Sisältöluokat",
     "cfg_content_class_mode": "Sisältöluokat",
@@ -14097,6 +14330,13 @@
     "cfg_consent_party_reads_per_minute": "Ulkopuolisen osapuolen lukukerrat minuutissa",
     "cfg_consent_data_intermediation": "Datanvälityspalvelu (EU 2022/868)",
     "cfg_consent_party_self_registration": "Sovelluksiin rekisteröidytään ilman tiliä",
+    "cfg_dataspace_enabled": "Datapaketit tarjolla data-avaruuksiin",
+    "cfg_dataspace_auth": "Miten osallistuja todistaa, kuka se on",
+    "cfg_dataspace_trusted_issuers": "Data-avaruuksien luotetut todisteiden myöntäjät",
+    "cfg_dataspace_static_tokens_configured": "Testiympäristön yhteiset avaimet",
+    "cfg_dataspace_callback_origins": "Yksityiset osoitteet, joissa osallistuja voi olla",
+    "cfg_dataspace_participant_id": "Tämän palvelimen osallistujatunniste",
+    "cfg_dataspace_tck_mode": "Yhteensopivuustestien tila",
     "cfg_totp_enabled": "TOTP käytössä",
     "cfg_totp_period": "Koodijakso (sekuntia)",
     "cfg_totp_window": "Validointi-ikkuna",
@@ -16400,6 +16640,7 @@
       "paymentSent": "Maksoit {amount}.",
       "contractStarted": "Sopimus alkoi: {name}.",
       "contractEnded": "Sopimus päättyi: {name}.",
+      "dataspaceRequest": "{who} pyytää data-avaruuden kautta lupaa käyttää pakettia {name}. Hyväksy tai hylkää pyyntö.",
       "appGranted": "Annoit applikaatiolle {name} pääsyn.",
       "appRevoked": "Otit applikaatiolta {name} pääsyn pois.",
       "aiBudgetReached": "Päivän AI-budjettisi on käytetty.",

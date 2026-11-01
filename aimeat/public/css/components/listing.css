@@ -12,6 +12,8 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.34.0 — 2026-11-01 — The cut name-state-who-n-doors (the Offers page's data products, WP9a): the
+ *     product, its freshness, who may use it, its reads this week, a door; the rows stack on a phone.
  *   v1.33.0 — 2026-10-25 — when-who-name-doors stacks from 861 to 1320px too, where the page's rail
  *     leaves its column too narrow for four columns (the developer's review of the Notifications page).
  *   v1.32.0 — 2026-10-19 — The Agents list's cut is name-kind-runs-access-last-doors: an agent's mode
@@ -420,6 +422,14 @@
    pacing; the deliveries and the catalogue keep their heading row on a phone, and the register's rows
    stack there with each cell's column name before it (List labels). What the AI found: a hit's name
    with its words under it, and a door, at every width. */
+/* Offers, the data products (the product with its source line, its freshness, who may use it, its
+   reads this week, a door). Without keepCols the rows stack on a phone with their column names
+   (List labels); between 861 and 1100px who may use it gives way. */
+.listing--name-state-who-n-doors { grid-template-columns: minmax(0, 2.2fr) minmax(0, 8rem) minmax(0, 1.2fr) minmax(0, 8rem) 5rem; }
+@media (max-width: 1100px) and (min-width: 861px) {
+  .listing--name-state-who-n-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 8rem) minmax(0, 7rem) 5rem; }
+  .listing--name-state-who-n-doors > .listing-row > :nth-child(3) { display: none; }
+}
 .listing--when-name-who-state-doors { grid-template-columns: 6rem minmax(0, 1fr) minmax(0, 10rem) minmax(0, 7rem) 3.5rem; }
 .listing--name-get-cost-trust-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 11rem) minmax(0, 9rem) minmax(0, 8rem) 3.5rem; }
 .listing--name-state-price-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 11rem) minmax(0, 11rem) 6rem; }

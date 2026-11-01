@@ -33,6 +33,8 @@
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.3.0 — 2026-11-01 — A share may deliver a Dataspace Protocol agreement (`dspAgreement`,
+ *     node-written only; plan D8.3).
  *   v1.2.0 — 2026-11-01 — A share may be bound to an EXCHANGE purchase (`contract`, node-written only):
  *     its reads are metered against the purchase and cover the versions of its interface (plan D5.3, D5.4).
  *   v1.1.0 — 2026-11-01 — endSharesListed answers the shares it ended, so a withdrawal mails their
@@ -73,13 +75,15 @@ export interface ShareMeta {
     endedReason?: string;
     /** The EXCHANGE purchase this share delivers (services/exchange-party-buy.ts): its reads are metered. */
     contract?: ShareContract;
+    /** The Dataspace Protocol agreement this share delivers (services/dataspace/agreement.ts). */
+    dspAgreement?: string;
 }
 
 /** What binds a share to a contract: the offering bought and the interface version its reads cover. */
 export interface ShareContract { offeringId: string; entitlementId: string; ifaceVersion: number }
 
 /** The metadata keys the node writes on a share; a request's own values under them are dropped. */
-const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason', 'contract'] as const;
+const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason', 'contract', 'dspAgreement'] as const;
 
 export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
     const m = (c.metadata ?? {}) as Record<string, unknown>;
@@ -92,6 +96,7 @@ export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
         ...(typeof m.declinedAt === 'string' ? { declinedAt: m.declinedAt } : {}),
         ...(typeof m.endedReason === 'string' ? { endedReason: m.endedReason } : {}),
         ...(contractOf(m.contract) ? { contract: contractOf(m.contract)! } : {}),
+        ...(typeof m.dspAgreement === 'string' && m.dspAgreement ? { dspAgreement: m.dspAgreement } : {}),
     };
 }
 
@@ -298,6 +303,7 @@ export function shareView(c: ConsentRecord, extra: Record<string, unknown> = {})
         ...(m.declinedAt ? { declined_at: m.declinedAt } : {}),
         ...(m.endedReason ? { ended_reason: m.endedReason } : {}),
         ...(m.contract ? { contract: { offering_id: m.contract.offeringId, entitlement_id: m.contract.entitlementId, interface_version: m.contract.ifaceVersion } } : {}),
+        ...(m.dspAgreement ? { dsp_agreement: m.dspAgreement } : {}),
         ...extra,
     };
 }

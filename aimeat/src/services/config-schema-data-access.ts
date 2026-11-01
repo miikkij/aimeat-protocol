@@ -10,6 +10,7 @@
  * @structure DATA_ACCESS_CONFIG_FIELDS
  * @usage import { DATA_ACCESS_CONFIG_FIELDS } from './config-schema-data-access.js';
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The `dataspace` rows (config-schema-dataspace.ts; plan doc-mvwxcas3dom3, D8).
  *   v1.3.0 — 2026-11-01 — consent.party_self_registration (plan doc-mvwxcas3dom3, D4.3).
  *   v1.2.0 — 2026-11-01 — consent.data_intermediation (plan doc-mvwxcas3dom3, D7.1).
  *   v1.1.0 — 2026-11-01 — consent.share_max_days and consent.party_reads_per_minute (plan
@@ -21,6 +22,7 @@
 import { CLEARANCE_ID_PATTERN, type dataAccessDefaults } from '../config-data-access.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
+import { DATASPACE_CONFIG_FIELDS } from './config-schema-dataspace.js';
 
 type DataAccessKey = keyof ReturnType<typeof dataAccessDefaults>;
 
@@ -33,5 +35,7 @@ export const DATA_ACCESS_CONFIG_FIELDS: ConfigFieldShape<DataAccessKey>[] = [
   { key: 'partySelfRegistration', dotPath: 'consent.party_self_registration', envVar: 'AIMEAT_PARTY_SELF_REGISTRATION', type: 'string', ...oneOf('off', 'apps-ask', 'on'), immutable: false, description: 'Whether people may register to an app as its outside parties: an app\'s own users with no account on this server, who sign in with an e-mail link and see only what the app gives them. off: nobody registers. apps-ask: an app\'s owner asks, and the operator approves each app. on: an app\'s owner opens its signup. A server that shows its content to signed-in accounts only is always off' },
   { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
   { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', ...oneOf('off', 'owner', 'all'), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
+  // ── The Eclipse Dataspace Protocol provider, section `dataspace` ── config-schema-dataspace.ts
+  ...DATASPACE_CONFIG_FIELDS,
   { key: 'agentClearanceDefault', dotPath: 'classification.agent_clearance_default', envVar: 'AIMEAT_AGENT_CLEARANCE_DEFAULT', type: 'string', validate: v => v === '' || (typeof v === 'string' && CLEARANCE_ID_PATTERN.test(v)), refusal: 'Write the id of a classification in this server\'s policy, such as sisainen, or leave it empty for no limit.', immutable: false, description: 'The highest classification a NEW agent may read, written as the classification\'s id (for example sisainen for Internal). Content classified higher is hidden from the agent and counted. Empty: no limit. Agents that already exist keep what they have, and the owner can change it on the agent\'s page. Matters only while classification is on' },
 ];

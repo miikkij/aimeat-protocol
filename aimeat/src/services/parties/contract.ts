@@ -24,6 +24,9 @@
  *   MAX_PARTIES · MAX_KEYS_PER_PARTY · isPartyRef · PARTY_TOKEN_ROUTES · takesPartyToken
  * @usage const ref = partyRefOf('alice', 'matti', config.nodeId);   // party:alice/matti@node
  * @version-history
+ *   v1.3.0 — 2026-11-01 — A data space participant (kind `dataspace`) carries its `did` and credential
+ *     type `did`; a key a DSP transfer minted names its `share` and `transfer` (plan D8.4, D8.5). The DSP
+ *     data address token is this party token, read on the OData and CSV routes already listed here.
  *   v1.2.0 — 2026-11-01 — PARTY_TOKEN_ROUTES takes an app party's own endpoints (me, signout, party-data;
  *     plan D4.2), and a name starting with "ap-" is kept for the parties of an app.
  *   v1.1.0 — 2026-11-01 — PARTY_TOKEN_ROUTES takes POST /v1/exchange/offerings/{id}/buy: a party buying a
@@ -55,6 +58,12 @@ export interface PartyKey {
     createdAt: string;
     lastUsedAt: string | null;
     expiresAt?: string | null;
+    /**
+     * Set on the key a DSP transfer minted (services/dataspace/transfer-token.ts): the one share its
+     * token reads, and the transfer it belongs to. No secret of it ever leaves the node; its token does.
+     */
+    share?: string;
+    transfer?: string;
 }
 
 /** One party, as the `parties` record holds it. */
@@ -75,6 +84,13 @@ export interface PartyRecord {
     /** The principal that made it (the owner's GHII, or the agent's GAII). */
     createdBy: string;
     keys: PartyKey[];
+    /**
+     * A data space participant's id (kind `dataspace`, plan D8.5): its DID under DCP, or the id the
+     * operator gave it under the static method. Set with `credential: 'did'`; such a party holds no key
+     * the owner hands out, only the keys its DSP transfers mint.
+     */
+    did?: string;
+    credential?: 'key' | 'did';
     /** Wrong keys presented for this party, counted for the owner and the operator (D2.9). */
     failedAttempts: number;
     lastSeenAt: string | null;
@@ -197,11 +213,12 @@ export function partyView(p: PartyRecord, ref: string): Record<string, unknown> 
     return {
         uid: p.uid, name: p.name, party_ref: ref, display_name: p.displayName, kind: p.kind,
         ...(p.contact ? { contact: p.contact } : {}),
+        ...(p.did ? { did: p.did, credential: p.credential ?? 'did' } : {}),
         status: p.status,
         ...(p.stoppedBy ? { stopped_by: p.stoppedBy, stopped_at: p.stoppedAt ?? null } : {}),
         ...(p.stopReason ? { stop_reason: p.stopReason } : {}),
         created_at: p.createdAt, created_by: p.createdBy,
-        keys: p.keys.map(k => ({ id: k.id, created_at: k.createdAt, last_used_at: k.lastUsedAt, expires_at: k.expiresAt ?? null })),
+        keys: p.keys.map(k => ({ id: k.id, created_at: k.createdAt, last_used_at: k.lastUsedAt, expires_at: k.expiresAt ?? null, ...(k.transfer ? { dsp_transfer: k.transfer } : {}) })),
         failed_attempts: p.failedAttempts ?? 0,
         last_seen_at: p.lastSeenAt ?? null,
     };

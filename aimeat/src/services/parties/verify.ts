@@ -27,6 +27,8 @@
  * @structure PartyCredential · PartyContext · PartyVerdict · partyCredentialOf · verifyParty · RequestLike
  * @usage const cred = partyCredentialOf(req, { urlKeyOwner }); if (cred) { const v = await verifyParty(deps, cred); }
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A key a DSP transfer minted (`share` set) is admitted only where the caller
+ *     takes it (`transferKeys`, the data reads), and its context names the one share it reads (plan D8.4).
  *   v1.1.0 — 2026-11-01 — The token of a party registered to an app is refused here: it opens that app's
  *     party endpoints only (services/app-parties/verify.ts; plan D4.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.1, D2.5; lead decision L2).
@@ -60,6 +62,8 @@ export interface PartyContext {
     partyRef: string;
     keyId: string;
     form: 'basic' | 'token' | 'url-key';
+    /** The one share the key reads, for a key a DSP transfer minted (plan D8.4); ./read-gate.ts holds it there. */
+    keyShare?: string;
 }
 
 export type PartyVerdict =
@@ -106,8 +110,15 @@ function matchingKey(party: PartyRecord, given: string, nowMs: number): PartyKey
     return found;
 }
 
-/** Verify a party credential. 401 for anything that names no live party and key; 403 for a stopped party. */
-export async function verifyParty(deps: { storage: Storage; config: AimeatConfig }, cred: PartyCredential): Promise<PartyVerdict> {
+/**
+ * Verify a party credential. 401 for anything that names no live party and key; 403 for a stopped party.
+ * A key a DSP transfer minted reads its one share and nothing else, so it is refused (401) unless the
+ * caller is a data read that takes it (`transferKeys`): /v1/parties/me, the token endpoint and the
+ * EXCHANGE buy never do.
+ */
+export async function verifyParty(
+    deps: { storage: Storage; config: AimeatConfig }, cred: PartyCredential, opts: { transferKeys?: boolean } = {},
+): Promise<PartyVerdict> {
     const { storage, config } = deps;
     const now = Date.now();
     if (cred.form === 'malformed') return { ok: false, status: 401, code: 'INVALID_PARTY_CREDENTIAL', message: cred.reason };
@@ -151,6 +162,9 @@ export async function verifyParty(deps: { storage: Storage; config: AimeatConfig
                 : 'The owner has stopped this party. Contact the owner who shared the data.',
         };
     }
+    if (key.share && !opts.transferKeys) {
+        return { ok: false, status: 401, code: 'INVALID_PARTY_CREDENTIAL', message: 'This token reads the data of one Dataspace Protocol transfer, at the address its data address names, and nothing else.' };
+    }
     noteKeyUse(storage, ownerGhii, party.uid, key.id);
-    return { ok: true, ctx: { owner, ownerGhii, party, partyRef: partyRefOf(owner, party.name, config.nodeId), keyId: key.id, form: cred.form } };
+    return { ok: true, ctx: { owner, ownerGhii, party, partyRef: partyRefOf(owner, party.name, config.nodeId), keyId: key.id, form: cred.form, ...(key.share ? { keyShare: key.share } : {}) } };
 }

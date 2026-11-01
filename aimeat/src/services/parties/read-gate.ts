@@ -22,6 +22,7 @@
  * @structure PartyReadTarget · PartyReadVerdict · partyReadVerdict
  * @usage const v = await partyReadVerdict(deps, ctx, { name, version, what: 'rows' }); if (!v.ok) refuse(v);
  * @version-history
+ *   v1.3.0 — 2026-11-01 — A key a DSP transfer minted reads only the share it names (plan D8.4).
  *   v1.2.0 — 2026-11-01 — A share a purchase made reads the purchased interface's versions only, and the
  *     verdict names its `contract` for the metering (plan D5.3, D5.4).
  *   v1.1.0 — 2026-11-01 — A served read names its version in the read log when it is known (plan D6.4).
@@ -76,8 +77,9 @@ export async function partyReadVerdict(
         return refuse(429, 'RATE_LIMITED', `This party may make ${config.partyReadsPerMinute ?? 60} reads a minute on this server. Wait a minute and read again.`, null);
     }
 
+    // A key a DSP transfer minted reads the one share its agreement made (plan D8.4).
     const shares = (await partySharesOf(storage, ctx.ownerGhii, ctx.party, config.nodeId))
-        .filter(c => packageOfPattern(c.dataPattern) === target.name);
+        .filter(c => packageOfPattern(c.dataPattern) === target.name && (!ctx.keyShare || c.id === ctx.keyShare));
     const live = shares.filter(c => isLiveShare(c));
     if (!live.length) {
         if (!shares.length) return refuse(403, 'NOT_SHARED', 'The owner has not shared this data package with you.', null);

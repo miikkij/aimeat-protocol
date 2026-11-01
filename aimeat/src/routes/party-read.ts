@@ -21,6 +21,8 @@
  * @structure PartyReadOpts · PartyAdmitted · partyReaderFor
  * @usage const p = await partyReaderFor(req, res, deps, { owner, name, version, what: 'rows' }); if (p === null) return;
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A data read takes the token of a DSP transfer (plan D8.4): the data address
+ *     a DSP agreement hands out is this party token, bound to the agreement's share.
  *   v1.1.0 — 2026-11-01 — An admitted party carries `charge()`: a share an EXCHANGE purchase made meters
  *     each data read against the purchase (402 PREPAID_ENDED when it is used up). sendReadRefusal and
  *     renderMeteredRead are shared with routes/package-reader.ts (plan doc-mvwxcas3dom3, D5.3, D5.4).
@@ -109,7 +111,8 @@ export async function partyReaderFor(
     if (!cred) return 'none';
     const send = (status: number, code: string, message: string, details?: Record<string, unknown>) =>
         sendReadRefusal(res, deps.config.nodeId, opts.odata, status, code, message, details);
-    const verdict = await verifyParty(deps, cred);
+    // A data read takes the token of a DSP transfer too; the read gate holds it to its one share (plan D8.4).
+    const verdict = await verifyParty(deps, cred, { transferKeys: true });
     if (!verdict.ok) { send(verdict.status, verdict.code, verdict.message); return null; }
     const ctx = verdict.ctx;
     if (ctx.owner !== opts.owner) {

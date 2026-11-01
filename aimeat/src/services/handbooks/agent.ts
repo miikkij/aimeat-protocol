@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.58.0 -- 2026-11-01 -- Discover names aimeat_dataspace: the data space requests that wait for the person (plan doc-mvwxcas3dom3, D8).
+ *   v1.57.0 -- 2026-11-01 -- Discover: a data product and its share are one proposal, and the follow-ups name their tools (WP9a).
  *   v1.56.0 -- 2026-11-01 -- Discover names aimeat_datapackage_sell: a package sold on EXCHANGE (plan doc-mvwxcas3dom3, D5).
  *   v1.55.0 -- 2026-11-01 -- Discover names aimeat_party "share": a package shared by name with an outside party (plan doc-mvwxcas3dom3, D3.4).
  *   v1.54.0 -- 2026-11-01 -- Discover names aimeat_dataproduct: a table built from material, previewed, then run (plan doc-mvwxcas3dom3, D9).
@@ -345,10 +347,19 @@ record, an extension action, a CSV or Excel file, another package), use \`aimeat
 account here (a Power BI, a partner's program, a person), use \`aimeat_party\` action \`share\` with a
 name, the package, the purpose and \`days\`: it answers a key, a connection file and the one sentence to
 tell the person (until when, ending it stops the next read, copies already taken stay). It needs
-\`party:manage\`, which the owner ticks on its own. To sell a package on EXCHANGE (by the month, or by
+\`party:manage\`, which the owner ticks on its own. A request that asks for both ("make a data product
+of X, update it on Mondays and share it with Matti for a month") is ONE proposal: \`preview\` first and
+show the person the source, the columns, a personal column left out, the rows, the schedule and who
+may use it; \`define\`, \`run\` and \`share\` only when they agree. "What data do I offer?" and "Is any of
+it out of date?" are \`aimeat_dataproduct\` \`list\` (each product's freshness, audience, live shares and
+reads this week); "Who reads my data?" is \`aimeat_exposure_report\` and \`aimeat_party\` \`reads\`;
+"Withdraw it" is \`aimeat_datapackage_withdraw\`. To sell a package on EXCHANGE (by the month, or by
 the read), use \`aimeat_datapackage_sell\` with the money price and the usage terms; a buyer with an
 account accepts it with \`aimeat_exchange_accept\`, a buyer with none buys at the listing's \`buy\`
-address and gets a key. Use \`mode:"map"\` for a cheap counts-by-type/tag probe to see
+address and gets a key. When the server offers packages to data spaces (the Eclipse Dataspace
+Protocol), a partner's connector asks for a package and the request waits for the person:
+\`aimeat_dataspace\` action \`list\` with \`waiting\` true, then \`approve\` or \`decline\` on the person's word.
+Use \`mode:"map"\` for a cheap counts-by-type/tag probe to see
 WHAT exists before pulling content, then \`mode:"find"\` with \`q\`/\`type\`/\`tags\`; \`scope\` is
 \`own\` (default), \`public\`, or \`shared\` (organisms you belong to). Reach for the narrow tools only
 when you already know the domain: \`aimeat_catalogue_agents\` (find peers to delegate to) ·

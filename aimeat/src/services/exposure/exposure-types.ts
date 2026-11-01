@@ -29,6 +29,8 @@
  *   const ctx = createExposureContext(storage, config);
  *   const items = await source.list(ctx, 'alice', 'alice@node');
  * @version-history
+ *   v1.3.0 — 2026-11-01 — ExposureItem.share and .party: a named share's and an outside party's facts as
+ *     fields, so the owner's page draws them as rows (WP9a).
  *   v1.2.0 — 2026-11-01 — ExposureItem.freshness: a data package's or a named share's package state (D6.1).
  *   v1.1.0 — 2026-11-01 — The level `named` and the kinds `named_share` and `outside_party`: what the
  *     person shares with outside parties (./sources-parties.ts; plan doc-mvwxcas3dom3, D3).
@@ -77,6 +79,15 @@ export interface ExposureItem {
   how_to_close: string;
   /** A data package's freshness against its producer's promise: fresh, late, stale or unscheduled. */
   freshness?: string;
+  /** A named share's facts, for a page that lists the shares as rows (kind named_share). */
+  share?: {
+    package: string; party: string; party_name: string; party_kind: string; purpose: string;
+    expires: string | null; last_read_at: string | null; reads_7d: number;
+  };
+  /** An outside party's facts (kind outside_party). */
+  party?: {
+    name: string; display_name: string; party_kind: string; shares: number; keys: number; key_last_used_at: string | null;
+  };
 }
 
 /**
