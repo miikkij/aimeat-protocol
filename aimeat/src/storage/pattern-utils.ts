@@ -10,6 +10,9 @@
  * @usage
  *   import { consentMatchPattern } from '../storage/pattern-utils.js';
  * @version-history
+ *   v1.3.0 -- 2026-10-31 -- consentMatchPattern evaluates the same pattern meaning as a set of
+ *     reachable key positions instead of a compiled RegExp, so a pattern with many '**' segments ends
+ *     in bounded time (secaudit2026oct31w2 round 10). Every pattern matches the same keys as before.
  *   v1.2.0 -- 2026-08-10 -- matchWildcardPattern understands a trailing '*' glued to a prefix
  *     ('chart:*'), which is how every cortex manifest writes a schema key_pattern. It split on '.'
  *     only, so those patterns matched nothing and every schema a cortex pack declared validated
@@ -90,15 +93,46 @@ export function globMatchSimple(pattern: string, value: string): boolean {
  * (`[^./]+` ⊂ the old `[^.]+`), so no pattern matches a key it did not match before.
  */
 export function consentMatchPattern(pattern: string, key: string): boolean {
-  const regex = pattern
-    .split(/([./])/) // keep '.' and '/' as their own tokens
-    .map(tok => {
-      if (tok === '**') return '.*';
-      if (tok === '*') return '[^./]+';
-      if (tok === '.') return '\\.';
-      if (tok === '/') return '/';
-      return tok.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    })
-    .join('');
-  return new RegExp(`^${regex}$`).test(key);
+  // The meaning is the anchored RegExp the tokens used to compile to ('**' -> '.*', '*' -> '[^./]+',
+  // anything else literal). It is evaluated as a set of reachable key positions, one token at a
+  // time, so a pattern with many '**' segments costs O(pattern length * key length) instead of
+  // backtracking through every placement of the separators (secaudit2026oct31w2 round 10).
+  const n = key.length;
+  let cur = new Uint8Array(n + 1);
+  cur[0] = 1;
+  for (const tok of pattern.split(/([./])/)) { // keep '.' and '/' as their own tokens
+    const next = new Uint8Array(n + 1);
+    let any = false;
+    if (tok === '**') {
+      // '.*' without the s flag: any run of code units that holds no line terminator, empty included.
+      let run = false;
+      for (let q = 0; q <= n; q++) {
+        if (cur[q]) run = true;
+        if (run) { next[q] = 1; any = true; }
+        if (q < n && isLineTerminator(key.charCodeAt(q))) run = false;
+      }
+    } else if (tok === '*') {
+      // '[^./]+': one or more code units, none of them '.' or '/'.
+      let run = false;
+      for (let q = 0; q < n; q++) {
+        const c = key.charCodeAt(q);
+        if (c === 0x2e || c === 0x2f) { run = false; continue; }
+        if (cur[q]) run = true;
+        if (run) { next[q + 1] = 1; any = true; }
+      }
+    } else {
+      const len = tok.length;
+      for (let p = 0; p + len <= n; p++) {
+        if (cur[p] && key.startsWith(tok, p)) { next[p + len] = 1; any = true; }
+      }
+    }
+    if (!any) return false;
+    cur = next;
+  }
+  return cur[n] === 1;
+}
+
+/** The code units JavaScript's '.' does not match without the s flag. */
+function isLineTerminator(c: number): boolean {
+  return c === 0x0a || c === 0x0d || c === 0x2028 || c === 0x2029;
 }

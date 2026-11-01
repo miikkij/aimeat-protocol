@@ -22,6 +22,9 @@
  *   const out = await publishPackage(deps, ownerGhii, { ...input, visibility: gate.visibility }, producedBy);
  *   const asked = gate.requester && out.ok ? await fileDatapackageAsk(deps, owner, gate.requester, ownerGhii, name, out.contentHash, gate.from) : {};
  * @version-history
+ *   v1.4.0 -- 2026-10-31 -- The package's current audience is the one the service recorded
+ *     (readTrustedVisibility), so a pointer rewritten through the generic storage routes does not make
+ *     a later public publish read as no raise (secaudit2026oct31w2 round 10).
  *   v1.3.0 — 2026-10-22 — datapackageGateOf: the decision with the gate's answer supplied by the
  *     caller, for the extension capability and the workflow step (secaudit 2026-10, v68).
  *     datapackagePublishGate calls it with the request's caller object, unchanged.
@@ -36,7 +39,7 @@ import type { CallerContext } from '../caller-context.js';
 import { isRaiseToPublic } from '../publish-gate.js';
 import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from '../publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
-import { readPointer } from './version-audience.js';
+import { readTrustedVisibility } from './version-audience.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
 import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
 
@@ -61,9 +64,9 @@ export async function datapackagePublishGate(
 export async function datapackageGateOf(
   ctx: PublishStoreCtx, askOf: () => PublishAsk, ownerGhii: string, name: string, requested: string | undefined,
 ): Promise<DatapackageGate> {
-  const pointer = typeof name === 'string' && name ? await readPointer(ctx, ownerGhii, name) : null;
-  // A pointer with a version and no visibility is a public package's (./audience.ts).
-  const from = pointer?.contentHash ? (pointer.visibility ?? 'public') : undefined;
+  // The audience the service recorded, never the pointer's own word, which the generic storage routes
+  // can write (./audience-record.ts). A legacy package with no visibility is a public package's.
+  const from = typeof name === 'string' && name ? await readTrustedVisibility(ctx, ownerGhii, name) : undefined;
   const kept = from ?? 'private';
   // No visibility named: the node's starting level (plan V5.6), decided before the gate is asked.
   const level = requested ?? datapackageVisibilityDefault(ctx.config);

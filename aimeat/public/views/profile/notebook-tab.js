@@ -11,6 +11,10 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.18.1 -- 2026-11-01 -- Open on a workspace hit hands the workspace the hit's whole key, which it
+ *     resolves through its manifest: the hit's `space` is only the first part of the namespace
+ *     (`shared` of `shared.notes`), so the page never opened, and an id with a dot lost its tail
+ *     (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.18.0 -- 2026-10-16 -- A failed inbox load shows the could-not-load note with Retry instead of
  *     "no notes"; a trust switch is not saved until the stored settings have loaded, because the save
  *     replaces all three switches (QA audit F6-04, F6-05).
@@ -245,7 +249,10 @@ export default function NotebookTab({ session, showToast, onStats }) {
       try {
         sessionStorage.setItem('aimeat.ws.openId', hit.organismId);
         sessionStorage.setItem('aimeat.ws.openWs', hit.workspaceId);
-        if (docId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.openDoc`, JSON.stringify({ namespace: hit.space, id: docId }));
+        // The whole key: the workspace resolves its space and id from the manifest, so a shared
+        // namespace (shared.notes) and an id with a dot in it open the right page
+        // (organisms/workspace-open-doc.js; secaudit2026oct31w2 round 10b).
+        sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.openDoc`, JSON.stringify({ key: hit.key }));
       // eslint-disable-next-line aimeat/no-silent-catch -- noop
       } catch { /* noop */ }
       window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));

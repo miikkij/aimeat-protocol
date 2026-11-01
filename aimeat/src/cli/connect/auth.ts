@@ -30,12 +30,13 @@
  * @version-history v2.3.2 -- 2026-10-27 -- The return proof is the v2 text, which names the node's id (read from GET /.well-known/aimeat), so a proof made for one node verifies on no other one; without the id the request goes without proof (secaudit2026oct26, device-return-proof:return-proof-unbound-to-node-and-request).
  * @version-history v2.2.0 -- 2026-10-25 -- The per-agent config is written with saveConnectedAgentConfig: connecting records the runner and wake command it keeps as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
  * @version-history v2.3.2 -- 2026-10-27 -- ownerHandleFrom accepts only one plain path segment as the owner handle and runAuth stops before writing anything otherwise: the handle names the token, key and config files and is read back into generated scripts (secaudit2026oct26, node-owner-handle-in-local-paths).
+ * @version-history v2.3.3 -- 2026-10-31 -- The token and key held under <agent>@<owner> are sent and used only toward the node their settings name (heldNodeUrl, the address the serve daemon sends them to). A connect to another address with the same names starts a fresh device request there without the bearer and without a return proof, and says which node holds those names and how to keep both; the proof's node id came from the contacted server, so it did not bind against a second node (secaudit2026oct31w2 round 10, W2-2).
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken, listAllTokens, storeAgentKey, getAgentKey } from './keychain.js';
 import { sign } from '../../auth/keypair.js';
 import { returnProofMessageV2 } from '../../services/device-return-proof.js';
-import { saveConfig, saveConnectedAgentConfig, loadPerAgentConfig } from './config.js';
+import { saveConfig, saveConnectedAgentConfig, loadPerAgentConfig, peekPerAgentConfig, fallbackConfigFor } from './config.js';
 import { downloadSkillBundle, readSkillBundleGuide } from './skill-bundle.js';
 import { buildAgentOnboardingInstruction } from './onboarding-prompt.js';
 
@@ -126,6 +127,22 @@ async function nodeIdAt(client: AimeatClient, warn: (msg: string) => void): Prom
     warn(`The node's discovery document could not be read (${(e as Error).message}).`);
     return null;
   }
+}
+
+/**
+ * The node address the token and key held under (agent, owner) belong to: the per-agent settings,
+ * else what the serve daemon sends such a bearer with (the old single-agent settings when they name
+ * this agent, else the public node; config.ts fallbackConfigFor). Reads only. The node id a server
+ * reports cannot say this, because any server can report any id.
+ */
+function heldNodeUrl(agent: string, owner: string): string {
+  return peekPerAgentConfig(agent, owner)?.node_url || fallbackConfigFor(agent, owner).node_url;
+}
+
+/** Whether two node addresses are one origin (scheme, host and port). */
+function sameOrigin(a: string, b: string): boolean {
+  if (!URL.canParse(a) || !URL.canParse(b)) return false;
+  return new URL(a).origin === new URL(b).origin;
 }
 
 const DEFAULT_NODE_URL = 'https://aimeat.io';
@@ -280,7 +297,21 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     mode = args.mode as AgentMode;
   }
 
-  const existingToken = await getToken(agentName, owner);
+  // What this connector holds under these names goes only to the node it was connected to. The
+  // store has no node in its key, so a connect to another address with the same names would send
+  // that node the bearer and a return proof (secaudit2026oct31w2, W2-2). It starts a fresh request
+  // there instead, and says what an approval replaces.
+  const heldToken = await getToken(agentName, owner);
+  const heldKeyAny = await getAgentKey(agentName, owner);
+  const heldAt = heldToken || heldKeyAny ? heldNodeUrl(agentName, owner) : null;
+  const heldHere = heldAt === null || sameOrigin(heldAt, nodeUrl);
+  if (!heldHere) {
+    warn(`This connector holds the agent "${agentName}" of ${owner} for ${heldAt}. Its token and key go only to that node, `
+      + `so this request to ${nodeUrl} starts a new connection without them. Approving it replaces what this connector holds for ${heldAt}. `
+      + 'To keep both, run this command in another folder (or with AIMEAT_HOME set to another folder), or give another --agent name.');
+  }
+
+  const existingToken = heldHere ? heldToken : null;
   if (existingToken) {
     client.setToken(existingToken);
     try {
@@ -327,7 +358,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   // (services/device-return-proof.ts). No key here: the request goes without proof, as before.
   // The proof names the node it goes to (v2), so a proof made for this node verifies on no other one
   // (secaudit2026oct26).
-  const heldKey = await getAgentKey(agentName, owner);
+  const heldKey = heldHere ? heldKeyAny : null;
   let proof: { signed_at: string; signature: string } | undefined;
   const nodeId = heldKey ? await nodeIdAt(client, warn) : null;
   if (heldKey && !nodeId) warn('The node did not say its id; connecting without proof that it is the same agent.');

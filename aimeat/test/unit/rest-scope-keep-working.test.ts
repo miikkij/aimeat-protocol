@@ -21,6 +21,9 @@
  *   - The owner gets one line on the activity feed, the operator one incident on the Security page.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-keep-working.test.ts
  * @version-history
+ *   v1.1.3 — 2026-11-01 — INLINE_CONSTANTS names DATAPACKAGE_WITHDRAW_SCOPE (storage:write), which the
+ *     data package withdrawal route refuses inline with, and INLINE_NOT_KEPT says why the keep-working
+ *     step does not give it: the route asked it from its first day.
  *   v1.1.2 — 2026-10-27 — INLINE_CONSTANTS names READ_AS_OWNER_SCOPE, and INLINE_NOT_KEPT says why the
  *     keep step never gives memory:read-as-owner (secaudit2026oct26, routes/memory key.ts and patch.ts).
  *   v1.1.1 — 2026-10-20 — INLINE_CONSTANTS names DATAPACKAGE_READ_SCOPE (storage:read), which the data
@@ -107,6 +110,9 @@ const INLINE_NOT_KEPT: Record<string, string> = {
     // of a record the caller reads as absent. The word is outside every wildcard and only the owner's
     // own tick gives it (decision 2026-10-15); giving it wholesale would give every agent the read.
     'memory:read-as-owner': 'outside every wildcard: the owner gives it per agent, never a keep step',
+    // routes/datapackages.ts DELETE /v1/datapackages/:owner/:name, DATAPACKAGE_WITHDRAW_SCOPE (plan
+    // doc-mvwxcas3dom3, D0.3): a route made on 2026-11-01 with the check in place.
+    'storage:write': 'the data package withdrawal route asked it from its first day',
 };
 const INLINE_CONSTANTS: Record<string, string> = {
     READ_THROUGH_SCOPE: 'connections:read-through',
@@ -114,6 +120,8 @@ const INLINE_CONSTANTS: Record<string, string> = {
     READ_AS_OWNER_SCOPE: 'memory:read-as-owner',
     // services/datapackage/audience.ts: the word a same-owner principal needs for a non-public package (ruling 2026-10-20).
     DATAPACKAGE_READ_SCOPE: 'storage:read',
+    // services/datapackage/withdraw.ts: the word a withdrawal asks (plan doc-mvwxcas3dom3, D0.3).
+    DATAPACKAGE_WITHDRAW_SCOPE: 'storage:write',
 };
 
 /**

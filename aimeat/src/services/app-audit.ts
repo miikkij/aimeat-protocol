@@ -38,6 +38,7 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   2026-10-31 — `screenshot_public`: the owner's "show the screenshot to everyone" (secaudit2026oct31w2 round 10, W2-12).
  *   v1.11.1 — 2026-10-31 — A move between the active record and the archive (the roll on append, the
  *     owner's archive-before and limit actions) writes the active record's compare-and-swap first and
  *     the archive after it, in one transaction. A move that lost the swap had already written the
@@ -98,6 +99,8 @@ export type AppAuditAction =
   | 'access_code.set' | 'access_code.cleared'
   // Who may open the app (services/app-access.ts): anyone, signed-in, or one organism's members.
   | 'access'
+  // The owner showed the screenshot of an app that opens for fewer people to everyone, or stopped.
+  | 'screenshot_public'
   | 'protection'
   | 'name' | 'description'
   | 'dev.granted' | 'dev.revoked'

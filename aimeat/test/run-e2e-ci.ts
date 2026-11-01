@@ -15,6 +15,13 @@
  *   2026-11-01 -- e2e-datapackage-discovery.ts joins the list (not the guard tier): data packages in discovery, the DCAT feed, the dataset sitemap, schema.org, the MCP resource and the personal-data guard (plan doc-mvwxcas3dom3, D1).
  *   2026-11-01 -- e2e-datapackage-audience-fixes.ts joins the list (not the guard tier): the ODPS sheet tells the real access, a package is withdrawn, an organism package opens through /v1/pub (plan doc-mvwxcas3dom3, D0.1, D0.3, D0.4).
  *   2026-10-31 -- e2e-ai-gen-rules.ts joins the list (not the guard tier): the generation rules for AI pictures.
+ *   2026-10-31 -- e2e-owner-load-limits.ts and e2e-workspace-dotted-id.ts join the list (not the guard
+ *     tier): one owner's share of the scheduler and the realtime rooms, and a dotted record id that made
+ *     a workspace index unreadable (secaudit2026oct31w2 round 10).
+ *   2026-10-31 -- e2e-datapackage-trusted-reads.ts joins the list (not the guard tier): what a data package
+ *     read trusts (secaudit2026oct31w2 round 10, W2-14, W2-15, W2-20).
+ *   2026-10-31 -- e2e-app-screenshot-access.ts joins the list (not the guard tier): an access-limited app's screenshot follows who may open it, and the owner's screenshot_public (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-10-31 -- e2e-flag-counting.ts joins the list (not the guard tier): a board hide counts one person once, a memory flag hides only on review or the threshold (secaudit2026oct31w2 round 10, W2-8 and W2-9).
  *   2026-10-31 -- e2e-ai-openrouter-region.ts joins the list (not the guard tier): its own node on 28494,
  *     where an OpenRouter call on the node's key is processed (eu, us, any).
  *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
@@ -1255,6 +1262,9 @@ const ALL_SUITES = [
     'test/e2e-publish-gate-files.ts',
     // The same gate on packages, knowledge packages and data packages (plan doc-mvcn6c7e4e5q, V4).
     'test/e2e-publish-gate-packages.ts',
+    // What a data package read trusts: the audience the service wrote, the classification reader, and
+    // the OData cache header by the package's audience (secaudit2026oct31w2 round 10).
+    'test/e2e-datapackage-trusted-reads.ts',
     'test/e2e-publish-gate-shared.ts',
     // The same gate on apps (listing, open_to, access code, first publish, fork), the welcome page and a company's front page (V4).
     'test/e2e-publish-gate-apps.ts',
@@ -1379,6 +1389,8 @@ const ALL_SUITES = [
     // A record space that names extensions takes an agent's write only through one of them: every
     // direct write, publish, reopen, delete and archive of an agent refused, the named extension let in.
     'test/e2e-workspace-fenced-space.ts',
+    // A record id with a dot lists under its whole id and no longer makes the index unreadable (secaudit2026oct31w2).
+    'test/e2e-workspace-dotted-id.ts',
     'test/e2e-workspace-rows.ts',
     // A row replaced by another writer family is kept as a revision the delete authority restores (secaudit 2026-10, v80).
     'test/e2e-workspace-row-revisions.ts',
@@ -1588,6 +1600,8 @@ const ALL_SUITES = [
     'test/e2e-agent-tasks.ts',
     'test/e2e-agent-file-handoff.ts',
     'test/e2e-agent-schedules.ts',
+    // One owner's share of the scheduler and the realtime rooms, each limit an operator setting (secaudit2026oct31w2).
+    'test/e2e-owner-load-limits.ts',
     'test/e2e-agent-quality.ts',
     'test/e2e-agent-directives.ts',
     'test/e2e-agent-messages.ts',
@@ -1698,6 +1712,12 @@ const ALL_SUITES = [
     'test/e2e-session-forgery.ts',
     'test/e2e-scope-ceiling.ts',
     'test/e2e-flag-review.ts',
+    // What a flag changes for readers: one person and their agents count once toward a board hide, and
+    // a memory record leaves discovery only on review or the threshold (secaudit2026oct31w2 round 10).
+    'test/e2e-flag-counting.ts',
+    // The screenshot of an app that opens for fewer people follows who may open it, unless its owner
+    // shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
+    'test/e2e-app-screenshot-access.ts',
     'test/e2e-maintenance-access.ts',
     'test/e2e-package-update-widening.ts',
     'test/e2e-memory-bin-purge.ts',

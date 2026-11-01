@@ -7,6 +7,8 @@
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).
  *   Translated 1:1 from the SQLite/Prisma implementations.
  * @version-history
+ *   2026-10-31 — sumTransactionsSince takes an optional counterparty, for the per-peer settlement ceiling
+ *     (services/settlement-ceiling.ts; secaudit2026oct31w2 round 10).
  *   2026-10-16 — getTransactions breaks a timestamp tie by id, the order SQLite uses (QA audit D4-04).
  *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
@@ -89,13 +91,14 @@ export const walletMethods = {
     return rows.map(r => ({ type: r.type, count: Number(r.count), total: Number(r.total), absTotal: Number(r.absTotal) }));
   },
 
-  async sumTransactionsSince(this: PostgresKyselyStorage, types: readonly string[], since: string): Promise<number> {
+  async sumTransactionsSince(this: PostgresKyselyStorage, types: readonly string[], since: string, counterparty?: string): Promise<number> {
     if (types.length === 0) return 0;
-    const row = await this.db.selectFrom('Transaction')
+    let q = this.db.selectFrom('Transaction')
       .select(sql<string>`coalesce(sum(case when "amount" > 0 then "amount" else 0 end), 0)`.as('total'))
       .where('type', 'in', [...types])
-      .where('timestamp', '>=', new Date(since))
-      .executeTakeFirst();
+      .where('timestamp', '>=', new Date(since));
+    if (counterparty !== undefined) q = q.where('counterpartyGaii', '=', counterparty);
+    const row = await q.executeTakeFirst();
     return Number(row?.total ?? 0);
   },
   // ── Atomic morsel-balance mutations (on GHIIRecord.morselBalance) ──

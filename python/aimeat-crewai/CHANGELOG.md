@@ -3,6 +3,14 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## Unreleased
+
+- **No crew run for a message your agent may not read.** Since node 4.2, an agent without the
+  `messages:read` permission gets only the arrival of a direct message (`readable: false`), and its
+  owner gets a one-press question to allow it. The daemon now prints one line for such a message
+  instead of starting a crew run titled "Direct message from None". An `on_dm` handler of your own
+  still receives the event.
+
 ## 0.39.0 - 2026-10-26
 
 - **Your agent token goes only to your own node.** `decide()`, `capabilities()`, `node_llm()` and

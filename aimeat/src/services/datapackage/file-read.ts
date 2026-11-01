@@ -25,6 +25,9 @@
  *   const verdict = await packageFileVerdict(storage, gaii, key, req.auth);
  *   if (verdict.kind === 'open' && file.visibility !== 'public') { ...serve... }
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The package's and the version's audience come from the service's own record
+ *     (./audience-record.ts trustedAudienceOf), as openPackage reads them, not from the pointer or the
+ *     descriptor's tags (secaudit2026oct31w2 round 10, W2-14, met again at the merge with D0.4).
  *   v1.1.0 — 2026-11-01 — 'withdrawn': a withdrawn package's own file (plan doc-mvwxcas3dom3, D0.3).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D0.4).
  */
@@ -33,6 +36,8 @@ import { logger } from '../../utils/logger.js';
 import { descriptorKey, latestKey, resourceKey, type Descriptor, type LatestPointer } from './contract.js';
 import { datapackageReadable, versionOpenTo, type DatapackageReader } from './audience.js';
 import { withdrawalOf } from './withdraw.js';
+import { trustedAudienceOf } from './audience-record.js';
+import { currentNodeId } from '../../utils/gaii.js';
 
 /** What a /v1/pub read of a key under `datapkg/` is, for one reader. */
 export type PackageFileVerdict =
@@ -61,6 +66,7 @@ function parseJson<T>(data: Buffer, what: string): T | null {
  */
 export async function packageFileVerdict(
     storage: Storage, ownerGhii: string, key: string, reader: DatapackageReader | null | undefined,
+    nodeId: string | null = currentNodeId(),
 ): Promise<PackageFileVerdict> {
     const m = PACKAGE_FILE_RE.exec(key);
     if (!m) return { kind: 'not-package' };
@@ -80,11 +86,15 @@ export async function packageFileVerdict(
         versionFile = dFile;
     }
 
-    if (!(await datapackageReadable(storage, ownerGhii, pointer.visibility, reader))) return { kind: 'closed' };
+    // The audience is the one the service recorded (./audience-record.ts), as openPackage reads it: the
+    // pointer and the descriptor's tags are files the generic storage routes write.
+    const trusted = await trustedAudienceOf(storage, nodeId ?? '', ownerGhii, name, pointer);
+    if (!(await datapackageReadable(storage, ownerGhii, trusted.visibility, reader))) return { kind: 'closed' };
     // A withdrawn package's files are served to nobody (./withdraw.ts); a reader the audience admits
     // learns it was withdrawn, anyone else gets the ordinary refusal.
     const withdrawn = withdrawalOf(pointer);
     if (withdrawn) return { kind: 'withdrawn', withdrawnAt: withdrawn.withdrawnAt };
-    if (hash && versionFile && !(await versionOpenTo(storage, ownerGhii, reader, pointer, hash, versionFile))) return { kind: 'closed' };
+    if (hash && versionFile
+        && !(await versionOpenTo(storage, ownerGhii, reader, trusted.pointer, hash, trusted.versionFile(hash, versionFile)))) return { kind: 'closed' };
     return { kind: 'open' };
 }

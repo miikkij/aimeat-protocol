@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 — `screenshot_url` comes from listedScreenshotUrl: where an app's screenshot follows who
+ *     may open it, a caller who may open it gets the address with a screenshot grant and anybody else
+ *     null; an owner's row carries `screenshot_public` (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-25 — GET /v1/admin/apps carries open_to and open_to_internet, and GET /v1/apps open_to_internet (services/internet-opening/).
  *   2026-10-23 — The operator's app delete deletes the app's compliance documents (plan doc-mvlftkh9zmc9).
  *   2026-10-21 — GET /v1/apps asks isAnonymousPrincipal for own=true, building=true, the member listing
@@ -84,6 +87,7 @@ import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
 import { removeComplianceDocs } from '../../services/compliance-docs.js';
+import { listedScreenshotUrl } from './open.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -191,6 +195,15 @@ export function registerCatalogueAdminRoutes(
         }
         // What each app needs (cortexes it loads, extensions it calls), from the dependency map.
         const deps = await dependencyIndex(storage);
+        // The screenshot address per app: public as before, or, where the screenshot follows who may
+        // open the app, with a screenshot grant for a caller who may open it and none for anybody
+        // else (routes/apps/open.ts, W2-12).
+        const shotUrls = new Map<string, string | null>();
+        for (const app of apps) {
+            if (!screenshotKeys.has(`${app.ownerGaii} apps/screenshots/${app.filename}`)) continue;
+            shotUrls.set(`${app.ownerGaii} ${app.filename}`, await listedScreenshotUrl(config, storage, app, req.auth,
+                { isOwn: !!viewerGhii && app.ownerGaii === viewerGhii, isOperator }));
+        }
 
         const result = apps.map((app) => {
             const metricKey = `${app.ownerGaii} ${app.filename}`;
@@ -243,6 +256,8 @@ export function registerCatalogueAdminRoutes(
                 // Who may open it (PATCH /v1/apps/:filename `open_to`): the owner reads the value they
                 // set, everyone else the level, without the organism's id.
                 open_to: isOwn ? appAccessOf(app) : appAccessLevelOf(app),
+                // The owner's "show the screenshot to everyone" (PATCH `screenshot_public`), the owner's to read.
+                ...(isOwn ? { screenshot_public: app.manifest?.screenshotPublic === true } : {}),
                 // Opened to everyone on a closed node (services/internet-opening/).
                 open_to_internet: isAppOpenToInternet(app.ownerName, app.filename),
                 parked: !!app.parked,
@@ -268,7 +283,7 @@ export function registerCatalogueAdminRoutes(
                 downloads,
                 forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
-                screenshot_url: hasScreenshot ? `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot` : null,
+                screenshot_url: hasScreenshot ? shotUrls.get(metricKey) ?? null : null,
                 requires: deps.byApp.get(depAppRef(app.ownerName, app.filename)) ?? { cortex: [], extensions: [] },
                 created_at: app.createdAt,
             };
@@ -337,6 +352,13 @@ export function registerCatalogueAdminRoutes(
             for (const f of files) if (f.key.startsWith('apps/screenshots/')) screenshotKeys.add(`${gaii} ${f.key}`);
         }
 
+        // The operator may open every app, so an access-limited app's screenshot carries a grant (W2-12).
+        const shotUrls = new Map<string, string | null>();
+        for (const app of apps) {
+            if (!screenshotKeys.has(`${app.ownerGaii} apps/screenshots/${app.filename}`)) continue;
+            shotUrls.set(`${app.ownerGaii} ${app.filename}`, await listedScreenshotUrl(config, storage, app, req.auth, { isOwn: false, isOperator: true }));
+        }
+
         const result = apps.map((app) => {
             const metricKey = `${app.ownerGaii} ${app.filename}`;
             const downloads = downloadsByApp[metricKey] ?? 0;
@@ -372,9 +394,7 @@ export function registerCatalogueAdminRoutes(
                 downloads,
                 forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
-                screenshot_url: screenshotKeys.has(`${app.ownerGaii} apps/screenshots/${app.filename}`)
-                    ? `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot`
-                    : null,
+                screenshot_url: shotUrls.get(metricKey) ?? null,
                 created_at: app.createdAt,
             };
         });

@@ -15,6 +15,8 @@
  * @structure buyerSteps(journey) · BuyerSteps({ journey })
  * @usage html`<${BuyerSteps} journey=${journey} />`
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A step after the next one is plain quiet text with "Aukeaa, kun edellinen on
+ *     tehty", not a link (Jouni's review of v34).
  *   v1.0.0 — 2026-10-31 — Initial (v31 K27).
  */
 import { h } from 'preact';
@@ -23,6 +25,7 @@ import { t } from '/js/i18n.js';
 import { Chooser } from '/components/Chooser.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { Action, Actions, Loud } from '/components/Action.js';
+import { Note } from '/components/Note.js';
 
 const html = htm.bind(h);
 
@@ -45,15 +48,23 @@ export function BuyerSteps({ journey }) {
   const steps = buyerSteps(journey);
   const count = steps.filter((s) => s.done).length;
   const next = steps.find((s) => !s.done);
+  const nextAt = next ? steps.indexOf(next) : steps.length;
   return html`
     <${Chooser} titleId="home-journey-title"
       title=${t('buyerSteps.title', { done: count, total: steps.length })}
       lead=${next ? t('buyerSteps.lead') : t('buyerSteps.allDone')}>
       <${IndexList} steps>
-        ${steps.map((s) => html`
-          <${IndexStep} key=${s.id} line=${t('buyerSteps.' + s.id + 'Line')} endWord=${s.done ? t('buyerSteps.done') : null}>
-            <${Action} href=${s.href}>${t('buyerSteps.' + s.id)}<//>
-          <//>`)}
+        ${steps.map((s, i) => (!s.done && i > nextAt)
+          // A step after the next one is not pressed yet: no link and no arrow, and it says when it
+          // opens (Jouni's review of v34: steps 3 and 4 looked like links).
+          ? html`
+            <${IndexStep} key=${s.id} locked line=${t('buyerSteps.locked')}>
+              <${Note} kind="quiet" inline>${t('buyerSteps.' + s.id)}<//>
+            <//>`
+          : html`
+            <${IndexStep} key=${s.id} line=${t('buyerSteps.' + s.id + 'Line')} endWord=${s.done ? t('buyerSteps.done') : null}>
+              <${Action} href=${s.href}>${t('buyerSteps.' + s.id)}<//>
+            <//>`)}
       <//>
       ${next && html`<${Actions}><${Loud} href=${next.href}>${t('buyerSteps.next', { step: t('buyerSteps.' + next.id + 'Short') })}<//><//>`}
     <//>`;

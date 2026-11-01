@@ -36,6 +36,8 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   2026-10-31 — shotUrl takes the listing's screenshot address when it carries a screenshot grant: the
+ *     screenshot of an app that opens for fewer people follows who may open it (secaudit2026oct31w2 round 10, W2-12).
  *   v1.8.0 — 2026-10-29 — The section "Structure" after About (sections/structure.js): how many of the
  *     app's steps are done and the way to its structure page.
  *   v1.7.0 — 2026-10-28 — The section "EU AI Act questions" after the AI labels (sections/aiact.js),
@@ -245,7 +247,10 @@ function DetailView({ given, onClose }) {
     editAbout: (on) => setAboutEditing(on),
     launch: () => openPublished(appUrl(row.owner, row.filename) + '?mode=inline', row),
     openDraft: () => openStagingPreview(owner, row.filename),
-    shotUrl: opened && owner && row.filename ? appUrl(owner, row.filename, 'screenshot') + '?t=' + work.shotAt : '',
+    // An app that opens for fewer people: the listing's address carries the screenshot grant (?shot=).
+    shotUrl: opened && owner && row.filename
+      ? (String(row.screenshot_url || '').includes('?shot=') ? row.screenshot_url + '&t=' : appUrl(owner, row.filename, 'screenshot') + '?t=') + work.shotAt
+      : '',
     legal,
     legalLoaded: (data) => setLegal(data || null),
     isFavourite: (r) => !!(cat.favourites && cat.favourites.has && cat.favourites.has(r)),

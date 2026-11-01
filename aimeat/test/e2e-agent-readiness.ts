@@ -225,6 +225,43 @@ function locs(xml: string): string[] {
         assert(html.includes("getElementById('api-index')"), 'nothing removes the index once Swagger has drawn');
     });
 
+    // secaudit2026oct31w2 round 10b (W2-5): Swagger UI came from unpkg by the major range @5 with no
+    // integrity, so whatever unpkg served ran on the apex origin. The page now loads the two files
+    // the node vendors, and its CSP names no outside host.
+    await test('/v1/docs loads Swagger UI from the node itself, and its CSP names no outside host', async () => {
+        const res = await fetch(`${BASE}/v1/docs`);
+        const html = await res.text();
+        const csp = res.headers.get('content-security-policy') ?? '';
+        assert(!/https?:\/\//.test(csp), `the CSP names an outside host: ${csp}`);
+        assert(!html.includes('unpkg.com'), 'the page still loads from unpkg.com');
+        const script = html.match(/<script src="(\/lib\/swagger-ui-dist@\d+\.\d+\.\d+\/swagger-ui-bundle\.js)"/)?.[1];
+        const style = html.match(/<link rel="stylesheet" href="(\/lib\/swagger-ui-dist@\d+\.\d+\.\d+\/swagger-ui\.css)"/)?.[1];
+        assert(!!script, 'no vendored swagger-ui-bundle.js script tag');
+        assert(!!style, 'no vendored swagger-ui.css link');
+    });
+
+    // The usage side of the same change: the page still has what it needs to draw the reference.
+    // Each file the node serves itself is fetched and checked; a file on another host is not fetched.
+    await test('/v1/docs links the Swagger UI bundle and stylesheet, each answers with its type, and the page starts Swagger UI on /v1/spec', async () => {
+        const html = (await text('/v1/docs')).body;
+        const script = html.match(/<script src="([^"]*\/swagger-ui-bundle\.js)"/)?.[1] ?? '';
+        const style = html.match(/<link rel="stylesheet" href="([^"]*\/swagger-ui\.css)"/)?.[1] ?? '';
+        assert(!!script && !!style, `bundle "${script}", stylesheet "${style}"`);
+        if (script.startsWith('/')) {
+            const js = await text(script);
+            assert(js.status === 200 && js.ct.includes('javascript'), `${script}: ${js.status} ${js.ct}`);
+            assert(js.body.includes('SwaggerUIBundle'), 'the bundle does not define SwaggerUIBundle');
+        }
+        if (style.startsWith('/')) {
+            const css = await text(style);
+            assert(css.status === 200 && css.ct.includes('text/css'), `${style}: ${css.status} ${css.ct}`);
+            assert(css.body.includes('.swagger-ui'), 'the stylesheet has no .swagger-ui rules');
+        }
+        assert(html.includes("SwaggerUIBundle({ url: '/v1/spec'"), 'the page does not start Swagger UI on /v1/spec');
+        const spec = await text('/v1/spec');
+        assert(spec.status === 200 && spec.body.startsWith('openapi:'), `/v1/spec: ${spec.status}`);
+    });
+
     // Failure mode: the injection is for the empty shell only. A route with no registry entry has
     // no text to inject, and a registry page served as its own HTML file already has its own.
     await test('pages that must not get an injected body do not', async () => {

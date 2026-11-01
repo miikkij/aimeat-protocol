@@ -8,6 +8,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.3.0 — 2026-11-01 — .poster-index-item--locked: a step that does not open yet, without the arrow.
  *   v1.2.0 — 2026-09-26 — The rule over the rows and the line under each row read --shape-frame-heavy, --shape-frame and --shape-rule-colour (a move: the AIMEAT values equal the old ones).
  *   v1.1.0 — 2026-09-26 — The line under a name, the first row on the sun with every mark dark, the
  *     opened row's number dark, the rows alone (IndexList) and a step that opens nothing (IndexStep)
@@ -47,6 +48,8 @@
 /* A step of a list of steps (IndexStep) opens nothing: no pointer, and no sun under it. */
 .poster-index .poster-index-item--step { cursor: auto; }
 .poster-index .poster-index-item--step:hover { background: none; color: var(--text); }
+/* A step that does not open yet has no arrow: nothing happens when it is pressed. */
+.poster-index .poster-index-item--locked::after { content: none; }
 .poster-index-tour { font-size: var(--text-note); color: var(--accent); text-decoration: underline; text-underline-offset: 4px; font-family: var(--font-mono); align-self: flex-start; margin-top: 0.8rem; }
 /* The opened playbook is poster.css .poster-record; this is only its distance from the index. */
 .poster-index-open { margin-top: 1rem; }

@@ -25,6 +25,7 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   2026-10-31 -- A dm.inbound reaches an identity without messages:read as an arrival notice (secaudit2026oct31w2 round 10).
  *   2026-10-16 -- closeForGaii takes 'rekeyed' (connect-tunnel-revocation.ts; QA audit F03b-01).
  *   v2.7.0 -- 2026-10-12 -- A connection carries what its connector's crew runtime honours (X-AIMEAT-Features), and a record is not sent to an agent retired from the workspace (connect-tunnel-push.ts).
  *   v2.6.0 -- 2026-10-11 -- A stopped agent: wake deliveries are held, setStopped() and stoppedOf() (agent-stop-rules.ts).
@@ -112,6 +113,7 @@ import { SocketIndex, Fairness } from './connect-tunnel-multiplex.js';
 import { forwardRequest } from './connect-tunnel-forward.js';
 import { sendBacklog, pushTaskCancellations, onMemoryWrite, notifyScopesChanged } from './connect-tunnel-push.js';
 import { isWakeDelivery } from './agent-stop-rules.js';
+import { dmPayloadForReach } from './connect-tunnel-dm-reach.js';
 import { logger } from '../utils/logger.js';
 import {
   principalsForOwner as rosterPrincipalsForOwner,
@@ -232,8 +234,10 @@ export class ConnectTunnelManager {
     if (!conn || conn.ws.readyState !== WebSocket.OPEN) return;          // offline → backlog handles it
     if (this.ackedDeliveries.get(evt.target)?.has(evt.id)) return;       // already acked — skip
     if (conn.stopped && isWakeDelivery(evt.kind)) return;                // stopped: the work stays in the store until a start
-    this.stats.deliveriesTotal++;
-    this.sendTo(conn, { type: 'deliver', id: evt.id, kind: evt.kind, payload: evt.payload });
+    // A dm.inbound to an identity without messages:read goes out as an arrival notice only (./connect-tunnel-dm-reach.ts).
+    const push = (payload: unknown) => { this.stats.deliveriesTotal++; this.sendTo(conn, { type: 'deliver', id: evt.id, kind: evt.kind, payload }); };
+    if (evt.kind === 'dm.inbound') { void dmPayloadForReach(this.storage, conn.identity, evt.payload).then(push); return; }
+    push(evt.payload);
   }
 
   /**

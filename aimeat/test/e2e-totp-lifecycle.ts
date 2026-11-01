@@ -17,6 +17,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=totp-lifecycle
  * @version-history
+ *   2026-10-31 — Thirty wrong codes sent at the same moment: at most the limit is compared, and a
+ *     person who mistypes and then types the right code gets in (secaudit2026oct31w2 round 10, W2-10).
  *   2026-10-25 — Wrong codes on DELETE /v1/ghii/totp and POST /v1/ghii/totp/backup-codes count toward
  *     the TOTP lock, and a correct code is refused while it holds (secaudit2026oct22,
  *     totp-code-check-without-lock-or-replay).
@@ -357,6 +359,64 @@ async function main() {
         assert(during.status === 429 && during.body.error?.code === 'TOTP_LOCKED', `a correct code during the lock is refused: ${during.status} ${JSON.stringify(during.body.error)}`);
         const ov = await json('/v1/security/overview', { headers: auth(lockerToken) });
         assert(ov.body.data.two_factor.enabled === true, 'the factor is still on');
+    });
+
+    // secaudit2026oct31w2 W2-10 (second-factor-compare-before-count): the lock was read from the
+    // account record the request had read at its start, and a wrong code was counted only after the
+    // compare, so codes sent at the same moment were each compared past the lock. An attempt is now
+    // counted before the compare, on the attempts record's version.
+    const burster = `totpburst${stamp}`;
+    let bursterToken = '';
+    let burstSecret = '';
+    await test('codes sent at the same moment: at most the limit of them is compared, the rest are refused by the lock', async () => {
+        if (!armed) return;
+        bursterToken = await registerOwner(burster);
+        const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: auth(bursterToken), body: '{}' });
+        assert(setup.status === 200, `setup: ${setup.status}`);
+        burstSecret = setup.body.data.totp_secret as string;
+        const on = await json('/v1/ghii/totp/verify', { method: 'POST', headers: auth(bursterToken), body: JSON.stringify({ code: codeNow(burstSecret) }) });
+        assert(on.status === 200, `verify: ${on.status}`);
+        // Thirty well-formed codes from long-gone periods, all different, none inside the window.
+        const wrong = Array.from({ length: 30 }, (_, i) => codeNow(burstSecret, -20 - i));
+        const answers = await Promise.all(wrong.map(code => json('/v1/ghii/totp/backup-codes', {
+            method: 'POST', headers: auth(bursterToken), body: JSON.stringify({ code }),
+        })));
+        const codes = answers.map(a => `${a.status} ${a.body.error?.code ?? 'ok'}`);
+        const compared = codes.filter(c => c === '401 INVALID_TOTP').length;
+        assert(answers.every(a => a.status === 401 || a.status === 429), `every answer is a refusal, no error: ${codes.join(', ')}`);
+        // The default limit is 5 wrong codes, and the fifth answers TOTP_LOCKED.
+        assert(compared <= 4, `SECURITY: ${compared} codes were compared and answered INVALID_TOTP past the limit of 5: ${codes.join(', ')}`);
+        const correct = await json('/v1/ghii/totp/backup-codes', { method: 'POST', headers: auth(bursterToken), body: JSON.stringify({ code: codeNow(burstSecret) }) });
+        assert(correct.status === 429 && correct.body.error?.code === 'TOTP_LOCKED', `a correct code after the burst waits for the lock: ${correct.status} ${JSON.stringify(correct.body.error)}`);
+    });
+
+    await test('usage: a person who mistypes a code and then types the right one is let through, on every second-factor door', async () => {
+        if (!armed) return;
+        const typo = await registerOwner(`totptypo${stamp}`);
+        const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: auth(typo), body: '{}' });
+        const s = setup.body.data.totp_secret as string;
+        assert((await json('/v1/ghii/totp/verify', { method: 'POST', headers: auth(typo), body: JSON.stringify({ code: codeNow(s) }) })).status === 200, 'armed');
+        for (let round = 0; round < 2; round++) {
+            const miss = await json('/v1/ghii/totp/backup-codes', { method: 'POST', headers: auth(typo), body: JSON.stringify({ code: codeNow(s, -10 - round) }) });
+            assert(miss.status === 401 && miss.body.error?.code === 'INVALID_TOTP', `a mistyped code: ${miss.status} ${JSON.stringify(miss.body.error)}`);
+        }
+        const fresh = await json('/v1/ghii/totp/backup-codes', { method: 'POST', headers: auth(typo), body: JSON.stringify({ code: codeNow(s) }) });
+        assert(fresh.status === 200 && (fresh.body.data.backup_codes ?? []).length > 0, `the right code after two mistakes: ${fresh.status} ${JSON.stringify(fresh.body.error)}`);
+        // Four more mistakes count from zero again: the right code cleared the count.
+        for (let i = 0; i < 4; i++) {
+            const miss = await json('/v1/ghii/totp/backup-codes', { method: 'POST', headers: auth(typo), body: JSON.stringify({ code: codeNow(s, -30 - i) }) });
+            assert(miss.status === 401 && miss.body.error?.code === 'INVALID_TOTP', `mistake ${i + 1} after a success: ${miss.status} ${JSON.stringify(miss.body.error)}`);
+        }
+        const off = await json('/v1/ghii/totp', { method: 'DELETE', headers: auth(typo), body: JSON.stringify({ code: codeNow(s) }) });
+        assert(off.status === 200, `the right code removes the factor after four mistakes: ${off.status} ${JSON.stringify(off.body.error)}`);
+        const del = await json(`/v1/owners/totptypo${stamp}`, { method: 'DELETE', headers: auth(typo) });
+        assert(del.status === 200, `cleanup typo: ${del.status}`);
+    });
+
+    await test('the burst account is erased (cleanup)', async () => {
+        if (!bursterToken) return;
+        const b = await json(`/v1/owners/${burster}`, { method: 'DELETE', headers: auth(bursterToken) });
+        assert(b.status === 200, `cleanup burster: ${b.status} ${JSON.stringify(b.body)}`);
     });
 
     await test('the accounts are erased (cleanup)', async () => {

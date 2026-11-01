@@ -27,6 +27,8 @@
  *          sending=${sending} onSend=${(recipient, markdown, files, reset) => …} draftKey=${'aimeat.inbox.draft.' + convId} />`
  *   Remount it (a `key` per conversation) so a draft never leaks between threads.
  * @version-history
+ *   2026-10-31 — The rich editor sanitizes HTML with js/editor-html-sanitizer.js, as the document
+ *     editor does (secaudit2026oct31w2 round 10).
  *   v1.0.1 — 2026-10-21 — clearDraft cancels a save still waiting: a message sent within 400 ms of the
  *     last keystroke came back as the draft of its conversation.
  *   v1.0.0 — 2026-09-26 — Moved out of views/profile/inbox-tab/components.js (Composer) with every
@@ -43,6 +45,7 @@ import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { Loud } from '/components/Action.js';
 import { fmtClock, VoicePlayer } from '/components/MessageFile.js';
 import { swallowed } from '/js/swallowed.js';
+import { sanitizeEditorHtml } from '/js/editor-html-sanitizer.js';
 
 const html = htm.bind(h);
 
@@ -182,6 +185,7 @@ export function MessageComposer({
         previewStyle: 'tab',
         initialValue: mdRef.current || seeded,   // whatever is in the thin input right now, else the draft
         usageStatistics: false,
+        customHTMLSanitizer: sanitizeEditorHtml, // not the DOMPurify 2.3.3 bundled in Toast UI
         // editorRef is set only AFTER construction, so the constructor's own change (initialValue) is
         // skipped — only real user edits auto-save the draft.
         events: { change: () => { if (editorRef.current) saveDraft(editorRef.current.getMarkdown()); } },
