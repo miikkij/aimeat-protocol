@@ -1044,7 +1044,10 @@ changed.
    - `disconnect()` lowers the count and closes the connection at zero.
 2. The profile shell (`public/views/profile.js`), the home (`views/home/index.js`) and the fleet
    view (`views/fleet.js`) connect on mount and dispatch the window event `aimeat-live-update`, with
-   `detail.domains` set to the domains that changed.
+   `detail.domains` set to the domains that changed. Any other route that listens for the event
+   opens the stream itself with `relayLiveUpdates(getJwt)`, which connects and dispatches the same
+   event (the home's subroutes, `views/appcat.js`, `views/appcat/structure.js`). Without it the
+   listener never fires.
 3. A tab listens for that event and re-fetches its data.
 
 **Rule: every profile or admin tab that shows server data listens for live updates**

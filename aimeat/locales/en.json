@@ -5169,6 +5169,10 @@
       "other": "Other / Unknown"
     }
   },
+  "appBadge": {
+    "label": "Publish your own app on {{site}}",
+    "free": "Publish your own app for free"
+  },
   "aiUseBadge": {
     "title": "Use this app with your AI",
     "counts": "App tools: {{tools}} · Skills: {{skills}}",
@@ -25767,6 +25771,7 @@
     "structure.ai": "Your AI",
     "structure.live.working": "{who} is working on it",
     "structure.live.idle": "This page updates itself when the work moves on.",
+    "structure.live.last": "Last note",
     "structure.steps": "Steps",
     "structure.stepsCount": "{fine} / {total} done",
     "structure.state.fine": "Done",

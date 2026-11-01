@@ -5188,6 +5188,10 @@
       "other": "Muu / Tuntematon"
     }
   },
+  "appBadge": {
+    "label": "Julkaise oma sovelluksesi palvelussa {{site}}",
+    "free": "Julkaise oma sovelluksesi ilmaiseksi"
+  },
   "aiUseBadge": {
     "title": "Käytä sovellusta omalla tekoälylläsi",
     "counts": "Sovelluksen työkaluja: {{tools}} · Taitoja: {{skills}}",
@@ -25946,6 +25950,7 @@
     "structure.ai": "Tekoälysi",
     "structure.live.working": "{who} tekee tätä nyt",
     "structure.live.idle": "Sivu päivittyy itse, kun työ etenee.",
+    "structure.live.last": "Viimeisin viesti",
     "structure.steps": "Vaiheet",
     "structure.stepsCount": "{fine} / {total} kunnossa",
     "structure.state.fine": "Kunnossa",

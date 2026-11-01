@@ -19,6 +19,7 @@
  *   - the visible AI label is pure ASCII in both locales
  * @usage pnpm exec vitest run test/unit/app-badge-encoding.test.ts
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The attribution badge in the visitor's language, still ASCII only.
  *   v1.3.0 — 2026-09-05 — The lightning-bolt assertion flips from "present as an entity" to
  *     ABSENT, and gains the reason: the badge draws the bolt as an inline SVG now (the house
  *     rule is no emoji in the interface, and a glyph owed 4.5 of text contrast where a drawing
@@ -107,6 +108,19 @@ describe('the visible AI label survives it too, in every language the node ships
       expect(html).toContain('id="aimeat-ai-label"');
     });
   }
+
+  // The badge spoke English on every page until 2026-11-01: on a Finnish place the bolt's name for a
+  // screen reader and the pill read "Publish your own app" beside a Finnish AI label. The source was broken.
+  it('the attribution badge speaks the visitor\'s language, as entities, and English without one', () => {
+    const fi = applyServeMarks(DOC, { badge: true, provenance: served, visibleLabel: { config, locale: 'fi' } }).toString('utf-8');
+    expect(fi).toContain('aria-label="Julkaise oma sovelluksesi palvelussa aimeat.io"');
+    expect(fi).toContain('&#183; Julkaise oma sovelluksesi ilmaiseksi');
+    expect(nonAscii(fi)).toEqual([]);
+    const es = applyServeMarks(DOC, { badge: true, provenance: served, visibleLabel: { config, locale: 'es' } }).toString('utf-8');
+    expect(es).toContain('Publica tu propia aplicaci&#243;n en aimeat.io');
+    const none = applyServeMarks(DOC, { badge: true }).toString('utf-8');
+    expect(none).toContain('aria-label="Publish your own app on aimeat.io"');
+  });
 
   it('fi: the Finnish compliance string is present as entities, not dropped', () => {
     const html = applyServeMarks(DOC, { provenance: served, visibleLabel: { config, locale: 'fi' } }).toString('utf-8');
