@@ -8,6 +8,7 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.16.0 - 2026-11-01 - Serves aimeat-parties.js, which answered 404 since D4 shipped it (WP9d).
  * v2.15.0 - 2026-10-31 - The aimeat-auth prelude says whether the sign-in dialog opens on the emailed link (linkFirst, a store-bought node; v28 #7).
  * v2.14.0 - 2026-10-05 - Serves aimeat-validate.js (input checked against a JSON Schema, messages per field).
  * v2.13.0 - 2026-09-29 - Serves aimeat-labels.js (content classification, TARGET-082 V5).
@@ -225,6 +226,9 @@ const SDK_LIB_NAMES = [
   // aimeat-webhook.js — an app POSTs a JSON payload to an owner-allowlisted URL, or reads one,
   // through the living-hooks extension (the same code path the living library uses).
   'webhook',
+  // aimeat-parties.js — an app's own users without an account sign up and in (plan doc-mvwxcas3dom3,
+  // D4.2). Built and in the packs table since D4 and missing here, so it answered 404 (found in WP9d).
+  'parties',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

@@ -13,6 +13,7 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   2026-11-01 — ctx.caller.party: a person registered to the gated app, with no account (WP9d).
  *   2026-10-30 — ctx.files.read answers `visibility` and `workspaceRef`.
  *   2026-10-25 — ctx.email's comment: one recipient per message and the hourly allowance (secaudit2026oct22, lead 325).
  *   2026-10-18 — ctx.ai.result(jobId): the answer of a job this extension started, for its installer.
@@ -328,6 +329,13 @@ export interface ExtensionCtx {
        * by the node from the records only it writes; empty for a visitor (Comicland v3 A-5).
        */
       subscriptions?: Array<{ plan: string; active_until: string }>;
+      /**
+       * Set when a person registered to the app the extension gates calls it with the app's sign-in
+       * (services/app-parties/iam-gate.ts): its identity `party:<owner>/ap-…@<node>` (also `gaii` and
+       * `owner`), its name, display name and app. Such a caller has no account here: `member` is its
+       * roster row, `isAppOwner` is false, and the capabilities that act for an account are absent.
+       */
+      party?: { ref: string; name: string; displayName: string; app: string };
     };
     config: Record<string, unknown>;
     /**

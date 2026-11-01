@@ -12,7 +12,12 @@
  *   THE LINK COMES BACK TO THE APP. signUp(email) and signIn(email) mail a link to the app's own
  *   address with `?aimeat_party_link=`; on load the library finds it, opens it with the node, removes
  *   it from the address and holds the session. `ready()` resolves when that is done.
- * @structure call · AIMEAT.parties { signUp, signIn, me, signOut, ready, registration, signedIn, data { get, set, remove } }
+ *
+ *   ONE MEMBER MODEL. This library signs a person up and in. What the person may do in the app is
+ *   AIMEAT.iam's to answer, for them as for an account holder: load this library before
+ *   aimeat-iam.js and AIMEAT.iam.me(), can() and guard() read the signed-in person through `fetch`.
+ *   A sign-in that starts or ends sends the window event `aimeat-party-session`.
+ * @structure call · AIMEAT.parties { signUp, signIn, me, fetch, signOut, ready, registration, signedIn, data { get, set, remove } }
  * @usage
  *   <script src="/v1/libs/aimeat-parties.js"></script>
  *   await AIMEAT.parties.ready();
@@ -20,6 +25,8 @@
  *   const me = await AIMEAT.parties.me();
  *   await AIMEAT.parties.data.set('cart', { items: [] });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — fetch(path, opts): a node request with the person's sign-in, which AIMEAT.iam
+ *     uses; the window event `aimeat-party-session` when the sign-in starts or ends (WP9d).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4.2).
  */
 import { APEX_URL, NODE_URL } from '../_core/config.js';
@@ -28,6 +35,8 @@ import { attach } from '../_core/namespace.js';
 
 const BASE = (APEX_URL || NODE_URL || '').replace(/\/+$/, '');
 const STORE_KEY = 'aimeat-party-session';
+/** The window event sent when the sign-in starts or ends (AIMEAT.iam listens for it). */
+const SESSION_EVENT = 'aimeat-party-session';
 
 /** @returns {{ owner: string, filename: string }} */
 function app() {
@@ -53,6 +62,7 @@ function token() {
 
 /** @param {string|null} t */
 function keep(t) {
+  const before = token() || memory;
   try {
     if (t) sessionStorage.setItem(STORE_KEY, t); else sessionStorage.removeItem(STORE_KEY);
   } catch (e) {
@@ -60,6 +70,13 @@ function keep(t) {
     console.debug('[aimeat-parties] no session storage:', e instanceof Error ? e.message : e);
   }
   memory = t;
+  // AIMEAT.iam (and the app) read who is signed in again when the sign-in starts or ends.
+  if ((before || null) !== (t || null) && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    try { window.dispatchEvent(new CustomEvent(SESSION_EVENT, { detail: { signedIn: !!t } })); } catch (e) {
+      // A page without CustomEvent (an old test harness): nobody listens there either.
+      console.debug('[aimeat-parties] the session event was not sent:', e instanceof Error ? e.message : e);
+    }
+  }
 }
 /** @type {string|null} */
 let memory = null;
@@ -124,6 +141,26 @@ const parties = {
   signIn: (email) => call('/parties/signin', { body: { email, lang: lang() } }),
   /** Who is signed in, and its role in the app. */
   me: () => call('/parties/me', { auth: true }),
+  /**
+   * A request to the node with this person's sign-in, for the libraries that read a member's standing
+   * (AIMEAT.iam): `path` starts at /v1. Answers the parsed envelope, a refusal included, and never
+   * throws for one, as AIMEAT.auth's session fetch does. The node takes the sign-in on this app's own
+   * endpoints, its roster standing and its IAM extension's actions only.
+   * @param {string} p @param {RequestInit} [opts]
+   */
+  fetch: async (p, opts = {}) => {
+    const t = token() || memory;
+    /** @type {Record<string, string>} */
+    const headers = { 'Content-Type': 'application/json', .../** @type {Record<string, string>} */ (opts.headers || {}) };
+    if (t) headers.Authorization = `Bearer ${t}`;
+    const r = await fetch(`${BASE}${p}`, { ...opts, headers });
+    if (r.status === 401 && t) keep(null);
+    try { return await r.json(); } catch (e) {
+      // A proxy or a crash page answered with something that is not JSON.
+      console.warn('[aimeat-parties] the node answer was not JSON:', r.status, e instanceof Error ? e.message : e);
+      return { ok: false, error: { code: 'REQUEST_FAILED', message: `The node answered ${r.status}.` } };
+    }
+  },
   /** End every session of this person in this app. */
   signOut: async () => {
     try { await call('/parties/signout', { body: {}, auth: true }); } finally { keep(null); }

@@ -18,6 +18,8 @@
  *   body += buildRenderedContentParagraphs();   // last in the Data Storage section
  *   body += buildAgentDataSection();            // after the row-spaces section
  * @version-history
+ *   v1.2.0 — 2026-11-01 — ADDITIVE: the outside users paragraph says AIMEAT.iam serves every member,
+ *     AIMEAT.parties the signup and the sign-in only (WP9d).
  *   v1.1.0 — 2026-11-01 — ADDITIVE: buildOutsideUsersParagraph (plan doc-mvwxcas3dom3, D4.4).
  *   v1.0.1 — 2026-09-30 — The classification paragraph's action list names explorer and exception_list.
  *   v1.0.0 — 2026-09-29 — Initial: the provenance paragraph and the agents section moved verbatim,
@@ -30,7 +32,9 @@
  */
 export function buildOutsideUsersParagraph(): string {
   return '### Users who have no AIMEAT account\n'
-    + 'When the app is for people who have no account on this node (the buyers and sellers of a market place, the members of a club, the customers of a shop), do not build your own sign-up or password store. Load `aimeat-parties.js`: `AIMEAT.parties.signUp(email)` mails the person a link, `await AIMEAT.parties.ready()` opens it when they come back, `AIMEAT.parties.me()` says who is signed in and their role, and `AIMEAT.parties.data.get/set/remove(key)` keeps one record per collection for that person only. The node lets them register only when its operator allows it and the owner opens the signup (`PUT /v1/apps/{owner}/{app}/parties/registration { "open": true }`); otherwise show that registration is closed. These people are personal data the owner holds, so the data map says so: `"registers-parties"` in `machinery`, or `"registers": { "who": "the buyers and sellers", "keeps": ["e-mail address", "listings"] }`.\n\n';
+    + 'When the app is for people who have no account on this node (the buyers and sellers of a market place, the members of a club, the customers of a shop), do not build your own sign-up or password store. Load `aimeat-parties.js`: `AIMEAT.parties.signUp(email)` mails the person a link, `await AIMEAT.parties.ready()` opens it when they come back, `AIMEAT.parties.me()` says who is signed in and their role, and `AIMEAT.parties.data.get/set/remove(key)` keeps one record per collection for that person only. The node lets them register only when its operator allows it and the owner opens the signup (`PUT /v1/apps/{owner}/{app}/parties/registration { "open": true }`); otherwise show that registration is closed. These people are personal data the owner holds, so the data map says so: `"registers-parties"` in `machinery`, or `"registers": { "who": "the buyers and sellers", "keeps": ["e-mail address", "listings"] }`.\n\n'
+    // ADDITIVE (WP9d): one member model for every member.
+    + 'Their roles and what they may do go through `AIMEAT.iam`, the same library that serves the account holders, never a second member model: load `aimeat-parties.js` before `aimeat-iam.js` and call `AIMEAT.iam.init({ app, roles })` once. Then `AIMEAT.iam.me()` (with `kind: "party"` for a registered person), `can()`, `gate()` and `guard()` answer for whoever is signed in, the app\'s IAM extension sees a registered person in `ctx.caller` (`ctx.caller.party`, `ctx.caller.member`), and `AIMEAT.iam.MemberAdmin({ target })` shows the owner the registered people beside the account holders, with their roles, stop and remove. Use `AIMEAT.parties` for the signup, the sign-in and the person\'s own records only.\n\n';
 }
 
 export function buildRenderedContentParagraphs(): string {

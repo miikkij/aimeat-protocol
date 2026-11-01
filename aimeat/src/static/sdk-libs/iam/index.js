@@ -11,13 +11,24 @@
  *   The one thing to remember: `can()` is a HINT. It reads a cached list and exists so a user is not
  *   shown a control that will refuse them. `guard()` asks the server. Enforcement lives in the
  *   extension action that mutates data, and nothing in this file changes that.
+ *
+ *   EVERY MEMBER, ONE LIBRARY. A person registered to the app without an account (aimeat-parties.js,
+ *   AIMEAT.parties) is a member here like an account holder. When the page holds no account session
+ *   and AIMEAT.parties holds a sign-in, every read goes with the person's sign-in (AIMEAT.parties.fetch):
+ *   me() answers `kind: 'party'` with the identity, display name and roster role, can() reads the
+ *   role's capabilities from the same vocabulary, and guard() asks the node or the app's IAM extension,
+ *   which sees the person in ctx.caller. AIMEAT.parties is detected, never required.
  * @structure init() · me() · refresh() · check() · can/gate/guard (gate.js) · request() · roster() ·
- *   admin() · adminFetch() · MemberAdmin/JoinPanel (panel.js) · normalise() · attach('iam', …)
+ *   admin() · adminFetch() · parties() · party() · setRegistration() · MemberAdmin/JoinPanel (panel.js) ·
+ *   normalise() · attach('iam', …)
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-iam.js"></script>
  *   await AIMEAT.iam.init({ ext: 'nuotta-iam' });
  *   if (AIMEAT.iam.can('analyse')) showTab();            // hint
  *   await AIMEAT.iam.guard('bid', () => runScoring());   // asks the server
  * @version-history
+ *   v1.4.0 — 2026-11-01 — A person registered to the app (AIMEAT.parties) is a member: me().kind and
+ *     identity, can() and guard() with their sign-in, the session event; parties(), party(op, person)
+ *     and setRegistration() for the owner, and MemberAdmin's registered people section (WP9d).
  *   v1.3.0 — 2026-10-01 — invite(email, role), invites(), cancelInvite(id), audit(), people(q), and
  *     me().canManage and displayName: the library side of the members round 2 (the node routes are
  *     docs/internal/iam-members-and-library-blocks-plan.md A1 to B3).
@@ -40,8 +51,50 @@ import { makeGate } from './gate.js';
 import { mountMemberAdmin, mountJoinPanel, leastPower } from './panel.js';
 import { nodeMe, nodeState, nodeAssign, nodeRevoke, nodeDecline, nodeRequest, nodeDismissGuest,
   nodeInvites, nodeCancelInvite, nodeAudit, nodePeople } from './node-roster.js';
+import { partiesState, partySetRole, partyRemove, partyStop, partyResume, partyRegistrationSet } from './node-parties.js';
 
-const { authFetch } = makeSession('aimeat-iam.js');
+const { authFetch: accountFetch } = makeSession('aimeat-iam.js');
+
+/**
+ * The page's AIMEAT.parties, when aimeat-parties.js is loaded. Never a hard dependency: an app with no
+ * registered people loads only this library and nothing below changes for it.
+ * @returns {any}
+ */
+function partiesLib() {
+  const w = /** @type {any} */ (typeof window !== 'undefined' ? window : {});
+  return (w.AIMEAT && w.AIMEAT.parties) || null;
+}
+
+/** Is an account signed in on the node in this page? */
+function accountSignedIn() {
+  try {
+    const auth = /** @type {any} */ (typeof window !== 'undefined' ? window : {}).AIMEAT?.auth;
+    return !!(auth && typeof auth.getSession === 'function' && auth.getSession());
+  } catch (e) {
+    // aimeat-auth.js answers getSession() by reading storage, which a private window may refuse.
+    console.debug('aimeat-iam: the account session was not read', e);
+    return false;
+  }
+}
+
+/**
+ * Whose sign-in this library reads with: an account's when one is signed in, else a person registered
+ * to the app (AIMEAT.parties), else the account path, which then says "not logged in" as before.
+ * @returns {boolean}
+ */
+function viaParty() {
+  const p = partiesLib();
+  return !accountSignedIn() && !!(p && typeof p.signedIn === 'function' && p.signedIn() && typeof p.fetch === 'function');
+}
+
+/**
+ * Every request of this library: the parsed envelope, a refusal included. The node answers a
+ * registered person on the app's roster standing and on its IAM extension's actions (WP9d).
+ * @param {string} path @param {RequestInit} [opts] @returns {Promise<any>}
+ */
+function authFetch(path, opts) {
+  return viaParty() ? partiesLib().fetch(path, opts) : accountFetch(path, opts);
+}
 
 /**
  * @typedef {Object} IamMe
@@ -59,6 +112,9 @@ const { authFetch } = makeSession('aimeat-iam.js');
  * @property {boolean} [canManage] The caller may manage members: the owner, or a member whose role
  *   the plan lists in manageRoles.
  * @property {string|null} [displayName] The caller's public display name, on the node roster.
+ * @property {'account'|'party'} [kind] `party` for a person registered to the app without an account
+ *   (AIMEAT.parties), `account` for everybody else.
+ * @property {string|null} [identity] A registered person's identity, `party:<owner>/ap-…@<node>`.
  */
 
 /** @typedef {import('./dialect.js').Dialect} Dialect */
@@ -165,6 +221,13 @@ const iam = {
     if (!opts || (!opts.ext && !opts.app)) {
       throw new Error('aimeat-iam: init needs { app } for the node roster, or { ext } for an extension gate');
     }
+    // A page opened from a mailed sign-in link is signed in only once aimeat-parties.js has opened
+    // the link, so the standing is read after that. Waited for before anything below is set: the
+    // sign-in event that opening sends must not find a half-set state and read with it.
+    const parties = partiesLib();
+    if (parties && typeof parties.ready === 'function') {
+      await Promise.resolve(parties.ready()).catch(function (e) { console.debug('aimeat-iam: the sign-in link was not opened', e); });
+    }
     state.ext = opts.ext || null;
     state.app = opts.app || null;
     // A second init starts from nothing: a vocabulary left over from the first one would hand a
@@ -247,6 +310,8 @@ const iam = {
         requested: raw.requested || null,
         canManage: !!raw.canManage,
         displayName: raw.displayName || null,
+        kind: raw.kind === 'party' ? 'party' : 'account',
+        identity: raw.identity || null,
       };
       return state.me;
     }
@@ -262,6 +327,17 @@ const iam = {
     // surface does, and it answers a redacted view rather than an error to everyone else. Reading
     // isOwner off the check response left every owner looking like a stranger to their own panel.
     if (adminState && typeof adminState.isOwner === 'boolean') state.me.isOwner = adminState.isOwner;
+    state.me.kind = 'account';
+    state.me.identity = null;
+    // A registered person: the extension answered for them (ctx.caller names them); who they are
+    // comes from their own sign-in.
+    if (viaParty()) {
+      state.me.kind = 'party';
+      state.me.isOwner = false;
+      const own = await partiesLib().me().catch(function (e) { console.debug('aimeat-iam: the registered person was not read', e); return null; });
+      state.me.identity = (own && own.party && own.party.party_ref) || null;
+      state.me.displayName = (own && own.party && own.party.display_name) || null;
+    }
     return state.me;
   },
 
@@ -488,6 +564,46 @@ const iam = {
   },
 
   /**
+   * The people registered to the app without an account (aimeat-parties), and the signup setting.
+   * Owner only, node roster only. Answers `{ ok, parties, registration, total }` or the refusal.
+   * @returns {Promise<any>}
+   */
+  parties() {
+    requireInit();
+    if (!state.app) return Promise.resolve({ ok: false, error: 'registered people belong to the node roster; init with { app }' });
+    return partiesState(authFetch, /** @type {string} */ (state.app));
+  },
+
+  /**
+   * Change what the owner holds about one registered person. `op` is role (with `role`), stop,
+   * resume or remove; remove ends the sign-in and deletes what the person kept in the app.
+   * @param {'role'|'stop'|'resume'|'remove'} op
+   * @param {{ name: string, party_ref?: string, role?: string }} person  A row of parties().parties.
+   * @returns {Promise<any>}
+   */
+  party(op, person) {
+    requireInit();
+    if (!state.app) return Promise.resolve({ ok: false, error: 'registered people belong to the node roster; init with { app }' });
+    const app = /** @type {string} */ (state.app);
+    if (op === 'role') return partySetRole(authFetch, app, String(person.party_ref || ''), String(person.role || ''));
+    if (op === 'stop') return partyStop(authFetch, app, person.name);
+    if (op === 'resume') return partyResume(authFetch, app, person.name);
+    if (op === 'remove') return partyRemove(authFetch, app, person.name);
+    return Promise.resolve({ ok: false, error: '"' + op + '" is not an operation on a registered person' });
+  },
+
+  /**
+   * Open or close the app's signup for people without an account, and the role they get. Owner only.
+   * @param {{ open: boolean, role?: string }} args
+   * @returns {Promise<any>}
+   */
+  setRegistration(args) {
+    requireInit();
+    if (!state.app) return Promise.resolve({ ok: false, error: 'registration belongs to the node roster; init with { app }' });
+    return partyRegistrationSet(authFetch, /** @type {string} */ (state.app), args || { open: false });
+  },
+
+  /**
    * The role one click on Approve should grant, from the state admin('state') answered: `preferred`
    * when it is one of the roles, else the role with the least power, leaving out the role a stranger
    * already gets. The owner panel and the Atelier kit's members block both ask this, so the two
@@ -550,4 +666,15 @@ if (authLib && typeof authLib.on === 'function') {
   };
   authLib.on('login', forget);
   authLib.on('logout', forget);
+}
+
+// The same for a person registered to the app: aimeat-parties.js sends this when their sign-in starts
+// (the mailed link opened) or ends (signed out, or the node refused it).
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('aimeat-party-session', function () {
+    state.me = null;
+    if (state.app || state.ext) {
+      iam.refresh().catch(function (e) { console.debug('aimeat-iam: standing not read after a sign-in change', e); });
+    }
+  });
 }

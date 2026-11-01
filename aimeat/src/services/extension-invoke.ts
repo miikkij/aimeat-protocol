@@ -27,6 +27,11 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   v1.5.0 -- 2026-11-01 -- Caller kind `party` with `party`: a person registered to an app runs the
+ *     extension that gates that app, and only that one (403 PARTY_NOT_FOR_EXTENSION, the same for an
+ *     extension that does not exist), never a priced action (403 PARTY_CANNOT_PAY), with ctx.caller
+ *     naming the party and its roster row, and none of the capabilities that act for an account
+ *     (services/app-parties/iam-gate.ts; WP9d).
  *   v1.4.3 -- 2026-11-01 -- ctx.datapackage's producer names the extension, for the personal-data check
  *     of a public publish (services/datapackage/personal-guard.ts; plan doc-mvwxcas3dom3, D1.7).
  *   v1.4.2 -- 2026-10-27 -- The seller runs one run's ctx.buy calls start go through a per-run queue,
@@ -82,16 +87,22 @@ import { readAdult, NOT_VERIFIED } from './adult-assurance.js';
 import { activeSubscriptions } from '../commerce/subscriptions.js';
 import { takeExtensionRunSlot, createRunQueue, SELLER_RUNS_PER_RUN } from './extension-run-slots.js';
 
+/**
+ * What kind of principal runs the action: the caller object's kind (services/caller-context.ts), or
+ * `party`, a person registered to an app with no account here (services/app-parties/iam-gate.ts).
+ */
+export type InvokeCallerKind = CallerKind | 'party';
+
 /** Who runs the action. Built by the surface from its own session, once. */
 export interface ExtensionInvokeCaller {
-  /** The resolved principal: whose namespace the call runs in and who pays. */
+  /** The resolved principal: whose namespace the call runs in and who pays. A party's identity for a party. */
   gaii: string;
   /** Who acted, for the money path: a hosted app's GEAI where `gaii` is its owner (callerPrincipal). */
   metered: string;
-  /** The bare account name the principal acts for. */
+  /** The bare account name the principal acts for. A party acts for no account: its identity again. */
   owner: string;
-  /** What kind of principal it is, from the caller object (services/caller-context.ts). */
-  kind: CallerKind;
+  /** What kind of principal it is. */
+  kind: InvokeCallerKind;
   roles: string[];
   /** What this credential may do, as the token granted it: the list requireScope reads. */
   scopes: string[];
@@ -152,7 +163,19 @@ export interface ExtensionInvokeArgs {
    * inside another run (ctx.buy's seller action), which runs within the slot its buyer holds.
    */
   admission?: { account: string } | 'inherited';
+  /**
+   * Set with caller kind `party`: the person registered to an app, verified by the surface
+   * (services/app-parties/iam-gate.ts). The run is refused for every extension that does not gate
+   * `appId`, and for a priced action.
+   */
+  party?: { appId: string; appOwner: string; ref: string; name: string; displayName: string };
 }
+
+/** The one answer a party gets for an extension that is not its app's member check, or does not exist. */
+const PARTY_NOT_FOR_EXTENSION = {
+  kind: 'refused' as const, status: 403, code: 'PARTY_NOT_FOR_EXTENSION',
+  message: 'This sign-in works only with the member check of the app it was made for.',
+};
 
 /**
  * Run one extension action as `caller`. Never throws for a refusal or a script failure; an error the
@@ -176,14 +199,21 @@ export async function invokeExtensionAction(args: ExtensionInvokeArgs): Promise<
 
 async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvokeOutcome> {
   const { config, storage, caller, instanceId, actionId } = args;
+  // A person registered to an app: the surface verified it and names its app (services/app-parties/iam-gate.ts).
+  const party = caller.kind === 'party' ? args.party ?? null : null;
+  if (caller.kind === 'party' && (!party || instanceId)) return PARTY_NOT_FOR_EXTENSION;
   // A bare name is the bare record, else the caller's own extension of that name (services/component-address.ts).
-  const resolved = await resolveExtensionForCall(storage, args.extRef, caller.kind === 'anonymous' ? null : caller.owner);
+  // A party has no extensions of its own: a bare name reads as the app owner's, whose app it signed in to.
+  const resolved = await resolveExtensionForCall(storage, args.extRef, party ? party.appOwner : caller.kind === 'anonymous' ? null : caller.owner);
   const extName = resolved.name;
   // The caller's organism workspace, when the manifest declares it. Declared before the run so a
   // failure can tell a workspace refusal from a script error.
   let wsCap: Partial<ExtensionWorkspaceCapability> = {};
   const label = instanceId ? `${extName}/${instanceId}/${actionId}` : `${extName}/${actionId}`;
 
+  // A party runs only the extension that gates its own app, and learns nothing about any other:
+  // a missing extension and somebody else's answer the same, before the status or an action is read.
+  if (party && (!resolved.ok || resolveGatedApp(resolved.ext) !== party.appId)) return PARTY_NOT_FOR_EXTENSION;
   if (!resolved.ok) {
     return { kind: 'refused', status: 404, code: 'NOT_FOUND', message: resolved.reason === 'version'
       ? `Version "${resolved.pinned}" of extension "${extName}" is not kept on this node`
@@ -201,20 +231,31 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
       return { kind: 'refused', status: 401, code: 'UNAUTHORIZED', message: 'Sign in to use this action.' };
     }
   }
+  // A party holds no wallet and no subscription, so it runs only an action priced at nothing.
+  if (party) {
+    const target = ext.actions.find(a => a.id === actionId);
+    if (target && ((target.tollMorsels ?? 0) > 0 || target.commercial?.payMoney || target.commercial?.plans?.length)) {
+      return { kind: 'refused', status: 403, code: 'PARTY_CANNOT_PAY', message: 'This action has a price, and a person registered to the app has no account to pay from.' };
+    }
+  }
+  // Nobody signed in, or a person with no account here: the run acts for no account (see below).
+  const bare = visitor || !!party;
 
   // The caller's standing in the app this extension gates, resolved BEFORE the sandbox. A gate needs
   // the role, but the roster is private and must stay that way, so the node reads it here rather
   // than opening a lookup the sandbox could call. An extension declares which app it gates with
   // `config: { app: owner/file.html }`; without that it gets null and keeps its own membership model.
+  // A party's row is keyed by its identity (services/app-parties/service.ts verifyLink), which
+  // accountOf keeps whole, so it never reads as the app's owner.
   const gatedApp = visitor ? null : resolveGatedApp(ext);
   const callerAccount = accountOf(caller.gaii);
-  const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
-  const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;
+  const isAppOwner = !party && !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
+  const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, party ? party.ref : callerAccount) : null;
   // Verified adult yes or no, for an extension that serves adult content (services/adult-assurance.ts):
-  // the account holder's, whichever of their principals called; never anything about a visitor.
-  const adult = visitor ? NOT_VERIFIED : await readAdult(storage, ownerGhiiOf(caller.gaii));
+  // the account holder's, whichever of their principals called; never anything about a visitor or a party.
+  const adult = bare ? NOT_VERIFIED : await readAdult(storage, ownerGhiiOf(caller.gaii));
   // The caller's running subscriptions to this extension's plans (commerce/subscriptions.ts).
-  const subscriptions = visitor ? [] : await activeSubscriptions(storage, ownerGhiiOf(caller.gaii), ext.name);
+  const subscriptions = bare ? [] : await activeSubscriptions(storage, ownerGhiiOf(caller.gaii), ext.name);
 
   let instanceConfig: Record<string, unknown> | undefined;
   if (instanceId) {
@@ -241,8 +282,9 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
   // Cross-owner invocation is intended (an extension is a sellable capability), so the paywall is
   // what makes it safe: the owner and their own principals are free, everyone else pays or holds an
   // entitlement.
-  // A visitor's action has no price and no toll (checked above and at install), so nothing is charged.
-  const pay = visitor ? { ok: true as const } : await args.enforcePaywall({
+  // A visitor's action has no price and no toll (checked above and at install), so nothing is charged;
+  // a party's neither (checked above).
+  const pay = bare ? { ok: true as const } : await args.enforcePaywall({
     config, storage, ext, action, callerGaii: caller.metered, res: args.paywall.res,
     payToken: args.paywall.payToken, internalPass: args.paywall.internalPass, namedAppTool: args.paywall.namedAppTool,
     session: { roles: caller.roles, scopes: caller.scopes, appGrantId: caller.appGrantId ?? null },
@@ -256,7 +298,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
     // The caller's organism workspace, as the caller, with the caller's own scopes deciding the
     // authority question the way requireScope would (services/extension-workspace.ts). Each consumer
     // gets its own copy of the lists, so nothing the script does to ctx.caller reaches them.
-    if (!visitor) {
+    if (!bare) {
       wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
         caller: { gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] } });
     }
@@ -270,12 +312,18 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
       anonymous: visitor,
       adult: { ...adult },
       subscriptions,
+      // A person registered to the app: who it is, never the owner and never anonymous.
+      ...(party ? { party: { ref: party.ref, name: party.name, displayName: party.displayName, app: party.appId } } : {}),
     };
     // A visitor's run reads the extension's memory and may fetch. Everything that acts for a person
     // (their wallet, files, data packages, workspace, notifications, mail, purchases, AI jobs billed
-    // to the installer) is left out, and the memory refuses writes (Comicland v3 A-7).
+    // to the installer) is left out, and the memory refuses writes (Comicland v3 A-7). A party's run
+    // is built the same way, except that the extension's memory takes its writes: the party is a
+    // known person of the app, and an IAM extension may keep what it decided about it.
     const sellerRuns = createRunQueue(SELLER_RUNS_PER_RUN);
-    const ctx: ExtensionCtx = visitor ? buildExtensionCtx({
+    // An account's caller: the branch below runs only when `bare` is false, so the kind is never `party`.
+    const account = { ...caller, kind: caller.kind as CallerKind };
+    const ctx: ExtensionCtx = bare ? buildExtensionCtx({
       config, storage, extMemoryOwner,
       extension: { name: ext.name, owner: ext.installedBy },
       capabilities: capabilitiesOfRecord(ext),
@@ -285,8 +333,8 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
         id: instanceId,
         config: decryptSecretFields(instanceConfig ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config), { extension: ext.name, instance: instanceId }),
       } : undefined,
-      logPrefix: instanceId ? `[ext:${ext.name}:${instanceId}:visitor]` : `[ext:${ext.name}:visitor]`,
-      visitor: true,
+      logPrefix: instanceId ? `[ext:${ext.name}:${instanceId}:${party ? 'party' : 'visitor'}]` : `[ext:${ext.name}:${party ? 'party' : 'visitor'}]`,
+      visitor,
     }) : buildExtensionCtx({
       config, storage, extMemoryOwner,
       extension: { name: ext.name, owner: ext.installedBy },
@@ -304,7 +352,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
       // A public file or package asks the node's publish gate about the caller, as the upload and
       // data package routes do (services/publish-actors.ts; secaudit 2026-10, v68 and v69).
       files: makeExtensionFiles({ config, storage, callerGaii: caller.gaii, callerOwner: caller.owner, callerRoles: [...caller.roles], callerScopes: [...caller.scopes], extName: ext.name,
-        publishers: [invokingActor(storage, config.nodeId, caller)] }),
+        publishers: [invokingActor(storage, config.nodeId, account)] }),
       // Data packages land in the OWNER's namespace whichever principal called, so one package has
       // one permanent address; `producedBy` still records the exact principal.
       datapackage: makeExtensionDataPackage({
@@ -312,8 +360,8 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
         ownerGhii: ownerGhiiOf(caller.gaii),
         // `extension` links the publish to the data maps of the apps that name this extension
         // (services/datapackage/personal-guard.ts); it is not stored.
-        producedBy: { gaii: caller.gaii, kind: producerKindOf(caller.kind), ref: `${ext.name}/${action.id}`, extension: ext.name },
-        publishers: [invokingActor(storage, config.nodeId, caller)],
+        producedBy: { gaii: caller.gaii, kind: producerKindOf(account.kind), ref: `${ext.name}/${action.id}`, extension: ext.name },
+        publishers: [invokingActor(storage, config.nodeId, account)],
       }),
       // Background model calls are billed to the INSTALLER, read from the record, never the caller.
       ai: maybeExtensionAi({

@@ -253,7 +253,26 @@
       failedWith: "That did not go through: {why}",
       on: "On",
       off: "Off",
-      loading: "Loading…"
+      loading: "Loading…",
+      partiesTitle: "Registered without an account: {n}",
+      partiesLead: "These people signed up with an e-mail address and sign in with a link the server mails them. They have no account here, and their sign-in works in this app only.",
+      partiesNone: "Nobody has registered yet.",
+      partiesRegOff: "This server does not let people register without an account. Its operator decides that.",
+      partiesRegOpen: 'The signup is open. A new person gets the role "{role}".',
+      partiesRegClosed: "The signup is closed.",
+      partiesRegRequested: "You asked to open the signup. The operator of this server decides.",
+      partiesRegRefused: "The operator of this server did not approve opening the signup.",
+      partiesRegAsk: "On this server the operator approves the signup first.",
+      partiesOpen: "Open the signup",
+      partiesClose: "Close the signup",
+      partiesRoleNew: "Role for new people",
+      partiesJoined: "joined {d}",
+      partiesSeen: "last seen {d}",
+      partiesPending: "has not opened the link yet",
+      partiesStopped: "stopped",
+      partiesStop: "Stop",
+      partiesResume: "Let in again",
+      partiesRemoveConfirm: "Remove {name}? Their sign-in ends, and everything they kept in the app is deleted."
     },
     fi: {
       whoTitle: "Ketkä saavat käyttää",
@@ -308,7 +327,26 @@
       failedWith: "Se ei mennyt läpi: {why}",
       on: "Päällä",
       off: "Pois",
-      loading: "Ladataan…"
+      loading: "Ladataan…",
+      partiesTitle: "Rekisteröityneet ilman tiliä: {n}",
+      partiesLead: "Nämä ihmiset rekisteröityivät sähköpostiosoitteella ja kirjautuvat linkillä, jonka palvelin lähettää heille. Heillä ei ole tiliä täällä, ja heidän kirjautumisensa toimii vain tässä sovelluksessa.",
+      partiesNone: "Kukaan ei ole vielä rekisteröitynyt.",
+      partiesRegOff: "Tämä palvelin ei päästä ihmisiä rekisteröitymään ilman tiliä. Sen päättää palvelimen ylläpitäjä.",
+      partiesRegOpen: 'Rekisteröityminen on avoin. Uusi ihminen saa roolin "{role}".',
+      partiesRegClosed: "Rekisteröityminen on suljettu.",
+      partiesRegRequested: "Pyysit avaamaan rekisteröitymisen. Palvelimen ylläpitäjä päättää.",
+      partiesRegRefused: "Palvelimen ylläpitäjä ei hyväksynyt rekisteröitymisen avaamista.",
+      partiesRegAsk: "Tällä palvelimella ylläpitäjä hyväksyy rekisteröitymisen ensin.",
+      partiesOpen: "Avaa rekisteröityminen",
+      partiesClose: "Sulje rekisteröityminen",
+      partiesRoleNew: "Uuden ihmisen rooli",
+      partiesJoined: "liittyi {d}",
+      partiesSeen: "kävi viimeksi {d}",
+      partiesPending: "ei ole vielä avannut linkkiä",
+      partiesStopped: "pysäytetty",
+      partiesStop: "Pysäytä",
+      partiesResume: "Päästä takaisin",
+      partiesRemoveConfirm: "Poistetaanko {name}? Hänen kirjautumisensa päättyy, ja kaikki, mitä hän tallensi sovellukseen, poistetaan."
     },
     es: {
       whoTitle: "Quién puede usar esto",
@@ -363,7 +401,26 @@
       failedWith: "No se pudo completar: {why}",
       on: "Activado",
       off: "Desactivado",
-      loading: "Cargando…"
+      loading: "Cargando…",
+      partiesTitle: "Registrados sin cuenta: {n}",
+      partiesLead: "Estas personas se registraron con un correo electrónico y entran con un enlace que el servidor les envía. No tienen cuenta aquí, y su acceso funciona solo en esta app.",
+      partiesNone: "Todavía no se ha registrado nadie.",
+      partiesRegOff: "Este servidor no permite registrarse sin cuenta. Eso lo decide su operador.",
+      partiesRegOpen: 'El registro está abierto. Una persona nueva recibe el rol "{role}".',
+      partiesRegClosed: "El registro está cerrado.",
+      partiesRegRequested: "Pediste abrir el registro. El operador de este servidor decide.",
+      partiesRegRefused: "El operador de este servidor no aprobó abrir el registro.",
+      partiesRegAsk: "En este servidor, el operador aprueba primero el registro.",
+      partiesOpen: "Abrir el registro",
+      partiesClose: "Cerrar el registro",
+      partiesRoleNew: "Rol para personas nuevas",
+      partiesJoined: "se unió el {d}",
+      partiesSeen: "última visita el {d}",
+      partiesPending: "todavía no abrió el enlace",
+      partiesStopped: "detenido",
+      partiesStop: "Detener",
+      partiesResume: "Dejar entrar de nuevo",
+      partiesRemoveConfirm: "¿Quitar a {name}? Su acceso termina y se borra todo lo que guardó en la app."
     }
   };
   function pickLang(explicit) {
@@ -378,6 +435,91 @@
       for (const k of Object.keys(vars)) s = s.split("{" + k + "}").join(String(vars[k]));
     }
     return s;
+  }
+
+  // src/static/sdk-libs/iam/panel-parties.js
+  function isAppPartyRow(id) {
+    return /^party:[^/]+\/ap-/.test(String(id || ""));
+  }
+  async function partiesSection(iam2, h) {
+    const { S, cls, act } = h;
+    const st = await iam2.parties().catch((e) => {
+      console.debug("aimeat-iam: the registered people were not read", e);
+      return null;
+    });
+    if (!st || st.ok === false) return null;
+    const reg = st.registration || {};
+    const roles = h.roles.filter((r) => r && r !== "owner");
+    const body = [
+      el("h3", { cls: cls("aim-iam-h"), text: S("partiesTitle", { n: st.parties.length }) }),
+      el("p", { cls: cls("aim-iam-lead"), text: S("partiesLead") })
+    ];
+    if (reg.node_setting === "off" || reg.effective === "off") {
+      body.push(el("p", { cls: cls("aim-iam-muted"), text: S("partiesRegOff") }));
+    } else {
+      const line = reg.open ? S("partiesRegOpen", { role: reg.role || "member" }) : reg.state === "requested" ? S("partiesRegRequested") : reg.state === "refused" ? S("partiesRegRefused") : S("partiesRegClosed");
+      const roleSel = roles.length ? el(
+        "select",
+        { attrs: { "aria-label": S("partiesRoleNew") } },
+        roles.map((r) => el("option", { text: r, attrs: Object.assign({ value: r }, r === reg.role ? { selected: "selected" } : {}) }))
+      ) : null;
+      const isOpen = reg.open || reg.state === "requested";
+      body.push(el("div", { cls: cls("aim-iam-form") }, [
+        el("span", { cls: cls("aim-iam-muted"), text: line }),
+        isOpen ? null : roleSel,
+        el("button", {
+          cls: cls("aim-iam-btn"),
+          text: isOpen ? S("partiesClose") : S("partiesOpen"),
+          attrs: { type: "button" },
+          on: { click: () => act(() => iam2.setRegistration(isOpen ? { open: false } : { open: true, role: roleSel ? (
+            /** @type {HTMLSelectElement} */
+            roleSel.value
+          ) : void 0 })) }
+        })
+      ]));
+      if (reg.effective === "apps-ask" && !reg.open) body.push(el("p", { cls: cls("aim-iam-lead"), text: S("partiesRegAsk") }));
+    }
+    if (!st.parties.length) body.push(el("p", { cls: cls("aim-iam-empty"), text: S("partiesNone") }));
+    for (const p of st.parties) {
+      const sel = roles.length ? el(
+        "select",
+        { attrs: { "aria-label": S("colRole") } },
+        roles.map((r) => el("option", { text: r, attrs: Object.assign({ value: r }, r === p.role ? { selected: "selected" } : {}) }))
+      ) : null;
+      if (sel) sel.addEventListener("change", () => act(() => iam2.party("role", { name: p.name, party_ref: p.party_ref, role: (
+        /** @type {HTMLSelectElement} */
+        sel.value
+      ) })));
+      const stopped = p.status === "stopped";
+      const name = p.display_name || p.name;
+      body.push(el("div", { cls: cls("aim-iam-row") }, [
+        el("span", { cls: cls("aim-iam-id"), text: name }),
+        p.email ? el("span", { cls: cls("aim-iam-muted"), text: p.email }) : null,
+        el("span", { cls: cls("aim-iam-muted"), text: S("partiesJoined", { d: fmtDate(p.verified_at || p.created_at) }) }),
+        p.last_seen_at ? el("span", { cls: cls("aim-iam-muted"), text: S("partiesSeen", { d: fmtDate(p.last_seen_at) }) }) : null,
+        p.status === "pending" ? el("span", { cls: cls("aim-iam-badge"), text: S("partiesPending") }) : null,
+        stopped ? el("span", { cls: cls("aim-iam-badge") + " " + cls("aim-iam-warn"), text: S("partiesStopped") }) : null,
+        !sel && p.role ? el("span", { cls: cls("aim-iam-badge"), text: p.role }) : null,
+        sel,
+        el("button", {
+          cls: cls("aim-iam-btn"),
+          text: stopped ? S("partiesResume") : S("partiesStop"),
+          attrs: { type: "button" },
+          on: { click: () => act(() => iam2.party(stopped ? "resume" : "stop", p)) }
+        }),
+        el("button", {
+          cls: cls("aim-iam-btn"),
+          text: S("remove"),
+          attrs: { type: "button" },
+          on: { click: () => {
+            const sure = typeof window.confirm === "function" ? window.confirm(S("partiesRemoveConfirm", { name })) : true;
+            if (sure) return act(() => iam2.party("remove", p));
+            return void 0;
+          } }
+        })
+      ]));
+    }
+    return el("section", { cls: cls("aim-iam-sec") }, body);
   }
 
   // src/static/sdk-libs/iam/panel.js
@@ -607,9 +749,10 @@
         ]));
       }
       wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, gBody));
-      const mBody = [el("h3", { cls: cls("aim-iam-h"), text: S("membersTitle") + ": " + roster.members.length })];
-      if (!roster.members.length) mBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("membersNone") }));
-      for (const m of roster.members) {
+      const accounts = roster.members.filter((m) => !isAppPartyRow(m.id));
+      const mBody = [el("h3", { cls: cls("aim-iam-h"), text: S("membersTitle") + ": " + accounts.length })];
+      if (!accounts.length) mBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("membersNone") }));
+      for (const m of accounts) {
         const sel = roles.length ? el(
           "select",
           { attrs: { "aria-label": S("colRole") } },
@@ -640,6 +783,10 @@
         ]));
       }
       wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, mBody));
+      if (nodeRoster) {
+        const people = await partiesSection(iam2, { S, cls, act, roles });
+        if (people) wrap.appendChild(people);
+      }
       if (opts.sections && opts.sections.length) {
         const sBody = [el("h3", { cls: cls("aim-iam-h"), text: S("settingsTitle") })];
         for (const s of opts.sections) {
@@ -761,7 +908,10 @@
       requested: d ? d.requested : null,
       // A member whose role the plan lists in manageRoles manages members too (not the plan).
       canManage: !!(d && (d.isOwner || d.canManage)),
-      displayName: d && d.displayName ? d.displayName : null
+      displayName: d && d.displayName ? d.displayName : null,
+      // A person registered to the app without an account (the node answers kind 'party' and the identity).
+      kind: d && d.kind === "party" ? "party" : "account",
+      identity: d && d.identity ? d.identity : null
     };
   }
   async function nodeState(call, appId, roles, caps) {
@@ -865,8 +1015,66 @@
     return people;
   }
 
+  // src/static/sdk-libs/iam/node-parties.js
+  function base2(appId) {
+    const [owner, filename] = String(appId).split("/");
+    return "/v1/apps/" + encodeURIComponent(owner || "") + "/" + encodeURIComponent(filename || "");
+  }
+  async function un2(p) {
+    const body = await p;
+    return body && body.data !== void 0 ? body.data : body;
+  }
+  async function partiesState(call, appId) {
+    const d = await un2(call(base2(appId) + "/parties"));
+    if (!d || d.ok === false) return d || { ok: false, error: { message: "No answer" } };
+    return { ok: true, parties: d.parties || [], registration: d.registration || null, total: d.total || 0 };
+  }
+  function partySetRole(call, appId, partyRef, role) {
+    return un2(call(base2(appId) + "/members", { method: "POST", body: JSON.stringify({ party: partyRef, role }) }));
+  }
+  function partyRemove(call, appId, name) {
+    return un2(call(base2(appId) + "/parties/" + encodeURIComponent(String(name)), { method: "DELETE" }));
+  }
+  function partyStop(call, appId, name) {
+    return un2(call(base2(appId) + "/parties/" + encodeURIComponent(String(name)) + "/stop", { method: "POST", body: "{}" }));
+  }
+  function partyResume(call, appId, name) {
+    return un2(call(base2(appId) + "/parties/" + encodeURIComponent(String(name)) + "/resume", { method: "POST", body: "{}" }));
+  }
+  function partyRegistrationSet(call, appId, args) {
+    const body = { open: !!args.open };
+    if (args.role) body.role = args.role;
+    return un2(call(base2(appId) + "/parties/registration", { method: "PUT", body: JSON.stringify(body) }));
+  }
+
   // src/static/sdk-libs/iam/index.js
-  var { authFetch: authFetch2 } = makeSession("aimeat-iam.js");
+  var { authFetch: accountFetch } = makeSession("aimeat-iam.js");
+  function partiesLib() {
+    const w = (
+      /** @type {any} */
+      typeof window !== "undefined" ? window : {}
+    );
+    return w.AIMEAT && w.AIMEAT.parties || null;
+  }
+  function accountSignedIn() {
+    try {
+      const auth = (
+        /** @type {any} */
+        (typeof window !== "undefined" ? window : {}).AIMEAT?.auth
+      );
+      return !!(auth && typeof auth.getSession === "function" && auth.getSession());
+    } catch (e) {
+      console.debug("aimeat-iam: the account session was not read", e);
+      return false;
+    }
+  }
+  function viaParty() {
+    const p = partiesLib();
+    return !accountSignedIn() && !!(p && typeof p.signedIn === "function" && p.signedIn() && typeof p.fetch === "function");
+  }
+  function authFetch2(path, opts) {
+    return viaParty() ? partiesLib().fetch(path, opts) : accountFetch(path, opts);
+  }
   var state = {
     ext: null,
     app: (
@@ -963,6 +1171,12 @@
       if (!opts || !opts.ext && !opts.app) {
         throw new Error("aimeat-iam: init needs { app } for the node roster, or { ext } for an extension gate");
       }
+      const parties = partiesLib();
+      if (parties && typeof parties.ready === "function") {
+        await Promise.resolve(parties.ready()).catch(function(e) {
+          console.debug("aimeat-iam: the sign-in link was not opened", e);
+        });
+      }
       state.ext = opts.ext || null;
       state.app = opts.app || null;
       const vocab = readVocabulary(opts.roles);
@@ -1029,7 +1243,9 @@
           // same form again to somebody who is already waiting.
           requested: raw2.requested || null,
           canManage: !!raw2.canManage,
-          displayName: raw2.displayName || null
+          displayName: raw2.displayName || null,
+          kind: raw2.kind === "party" ? "party" : "account",
+          identity: raw2.identity || null
         };
         return state.me;
       }
@@ -1042,6 +1258,18 @@
       const raw = await callCheck(authFetch2, state.ext, state.dialect, probe);
       state.me = normalise(raw, state.roles, state.dialect);
       if (adminState && typeof adminState.isOwner === "boolean") state.me.isOwner = adminState.isOwner;
+      state.me.kind = "account";
+      state.me.identity = null;
+      if (viaParty()) {
+        state.me.kind = "party";
+        state.me.isOwner = false;
+        const own = await partiesLib().me().catch(function(e) {
+          console.debug("aimeat-iam: the registered person was not read", e);
+          return null;
+        });
+        state.me.identity = own && own.party && own.party.party_ref || null;
+        state.me.displayName = own && own.party && own.party.display_name || null;
+      }
       return state.me;
     },
     /**
@@ -1300,6 +1528,55 @@
       return nodePeople(authFetch2, q);
     },
     /**
+     * The people registered to the app without an account (aimeat-parties), and the signup setting.
+     * Owner only, node roster only. Answers `{ ok, parties, registration, total }` or the refusal.
+     * @returns {Promise<any>}
+     */
+    parties() {
+      requireInit();
+      if (!state.app) return Promise.resolve({ ok: false, error: "registered people belong to the node roster; init with { app }" });
+      return partiesState(
+        authFetch2,
+        /** @type {string} */
+        state.app
+      );
+    },
+    /**
+     * Change what the owner holds about one registered person. `op` is role (with `role`), stop,
+     * resume or remove; remove ends the sign-in and deletes what the person kept in the app.
+     * @param {'role'|'stop'|'resume'|'remove'} op
+     * @param {{ name: string, party_ref?: string, role?: string }} person  A row of parties().parties.
+     * @returns {Promise<any>}
+     */
+    party(op, person) {
+      requireInit();
+      if (!state.app) return Promise.resolve({ ok: false, error: "registered people belong to the node roster; init with { app }" });
+      const app = (
+        /** @type {string} */
+        state.app
+      );
+      if (op === "role") return partySetRole(authFetch2, app, String(person.party_ref || ""), String(person.role || ""));
+      if (op === "stop") return partyStop(authFetch2, app, person.name);
+      if (op === "resume") return partyResume(authFetch2, app, person.name);
+      if (op === "remove") return partyRemove(authFetch2, app, person.name);
+      return Promise.resolve({ ok: false, error: '"' + op + '" is not an operation on a registered person' });
+    },
+    /**
+     * Open or close the app's signup for people without an account, and the role they get. Owner only.
+     * @param {{ open: boolean, role?: string }} args
+     * @returns {Promise<any>}
+     */
+    setRegistration(args) {
+      requireInit();
+      if (!state.app) return Promise.resolve({ ok: false, error: "registration belongs to the node roster; init with { app }" });
+      return partyRegistrationSet(
+        authFetch2,
+        /** @type {string} */
+        state.app,
+        args || { open: false }
+      );
+    },
+    /**
      * The role one click on Approve should grant, from the state admin('state') answered: `preferred`
      * when it is one of the roles, else the role with the least power, leaving out the role a stranger
      * already gets. The owner panel and the Atelier kit's members block both ask this, so the two
@@ -1355,5 +1632,15 @@
     };
     authLib.on("login", forget);
     authLib.on("logout", forget);
+  }
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("aimeat-party-session", function() {
+      state.me = null;
+      if (state.app || state.ext) {
+        iam.refresh().catch(function(e) {
+          console.debug("aimeat-iam: standing not read after a sign-in change", e);
+        });
+      }
+    });
   }
 })();

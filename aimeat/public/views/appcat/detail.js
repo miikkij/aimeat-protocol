@@ -36,6 +36,7 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   2026-11-01 — The section "People registered without an account" after the builders (sections/people.js; WP9d).
  *   2026-10-31 — shotUrl takes the listing's screenshot address when it carries a screenshot grant: the
  *     screenshot of an app that opens for fewer people follows who may open it (secaudit2026oct31w2 round 10, W2-12).
  *   v1.8.0 — 2026-10-29 — The section "Structure" after About (sections/structure.js): how many of the
@@ -110,6 +111,7 @@ const SECTION_LOADERS = {
   manage: () => import('/views/appcat/sections/manage.js'),
   internet: () => import('/views/appcat/sections/internet.js'),
   builders: () => import('/views/appcat/sections/builders.js'),
+  people: () => import('/views/appcat/sections/people.js'),
   skills: () => import('/views/appcat/sections/skills.js'),
   search: () => import('/views/appcat/sections/search.js'),
   marks: () => import('/views/appcat/sections/marks.js'),
