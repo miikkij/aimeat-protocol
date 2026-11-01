@@ -18,9 +18,15 @@
  *   (services/app-tool-interfaces.ts, `datapkg:{name}` / `read`): unchanged schemas reuse the version,
  *   changed ones mint the next. The listing's surface names it and its sourceHash carries it, so a
  *   schema change updates the same listing and a contract signed earlier keeps its own version.
+ *
+ *   FRESHNESS (plan D6). Each listing carries the package's freshness (fresh, late, stale, unscheduled,
+ *   with due_at and stale_at), read by services/datapackage/freshness-read.ts on the recorded version.
+ *   It is in the sourceHash, so a pass that sees another state updates the listing; the hourly freshness
+ *   check starts that pass when a state changes (services/exchange-projection.ts onFreshnessSwept).
  * @structure desiredFromDataPackages · packageNamesOf
  * @usage const desired = await desiredFromDataPackages(storage, ownerGhii, ownerName, only, changes, dryRun);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Each listing carries the package's freshness (plan D6).
  *   v1.0.1 — 2026-11-01 — Lists from the service's records through packageForSale, not the pointer (WP9e).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.1, D5.5).
  */
@@ -33,6 +39,9 @@ import {
     proposeDeliversData, DATAPACKAGE_ACTION,
 } from './exchange-datapackage.js';
 import type { OdpsExtras, Provenance } from '../models/odps-schemas.js';
+import { packageFreshness } from './datapackage/freshness-read.js';
+import { freshnessBrief } from './datapackage/freshness.js';
+import { currentNodeId } from '../utils/gaii.js';
 
 const POINTER_RE = /^datapkg\/([a-z0-9][a-z0-9-]{0,62}[a-z0-9])\/latest\.json$/;
 
@@ -68,6 +77,12 @@ export async function desiredFromDataPackages(
         if (!terms.usageTerms) { skip('USAGE_TERMS_REQUIRED'); continue; }
         const sold = listingTerms(terms.tollMorsels, terms.price?.morsels ?? 0, moneyPricesOf(null, terms.pricesMoney));
         if (!sold) { skip('NOT_PRICED'); continue; }
+        // Freshness on the version the service recorded; the pointer gives only its display fields
+        // (the last success, a failed run), as every other freshness read takes them (plan D6).
+        const fresh = await packageFreshness({ storage, config: { nodeId: currentNodeId() ?? '' } }, ownerGhii, name, {
+            pointer: { ...sale.pointer, contentHash: current },
+        });
+        const freshness = fresh ? freshnessBrief(fresh) : null;
         const def = packageSchemaDef(descriptor);
         const iface = dryRun
             ? await getLatestInterface(storage, ownerGhii, packageIfaceApp(name), DATAPACKAGE_ACTION)
@@ -82,7 +97,7 @@ export async function desiredFromDataPackages(
             usageTerms: usageTermsOf(terms.usageTerms), tags: terms.tags ?? descriptor.keywords ?? [],
             provenance: provenanceOf((terms.provenance ?? undefined) as Provenance | undefined),
             odps: (terms.odps ?? null) as OdpsExtras | null,
-            tollMorsels: sold.tollMorsels, deliversData,
+            tollMorsels: sold.tollMorsels, deliversData, freshness,
         };
         for (const p of sold.rows) {
             // A morsel row is free with pacing per read: a month of reads has no money to charge.
@@ -92,7 +107,7 @@ export async function desiredFromDataPackages(
                 ...base, ...p, plans,
                 surface: { kind: 'datapackage', ownerName, packageName: name, ifaceVersion, model },
                 key: `datapackage|${coord.ext}|${coord.action}|${p.unit}|${p.currency ?? ''}`,
-                sourceHash: contentHash([base.title, base.description, base.usageTerms, base.provenance, base.odps, base.tollMorsels, base.tags, deliversData, ifaceVersion, model, plans, p]),
+                sourceHash: contentHash([base.title, base.description, base.usageTerms, base.provenance, base.odps, base.tollMorsels, base.tags, deliversData, ifaceVersion, model, plans, p, freshness]),
             });
         }
     }

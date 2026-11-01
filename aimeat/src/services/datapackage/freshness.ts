@@ -30,9 +30,11 @@
  *   sources' own freshness, as above: a source package that is late or stale makes the product so.
  *   `trigger: 'change'` says which rule was used.
  * @structure FRESHNESS_STATES · FreshnessState · FreshnessPromise · Freshness · FreshnessInput ·
- *   SCHEDULED_BY_NATURE · STALE_UNPROMISED_DAYS · freshnessOf · freshnessBrief · worstOf
+ *   SCHEDULED_BY_NATURE · STALE_UNPROMISED_DAYS · freshnessOf · FreshnessBrief · freshnessBrief · worstOf
  * @usage const f = freshnessOf({ promise: { cron: '0 6 * * *', source: 'producer' }, lastSuccessAt, now: new Date() });
  * @version-history
+ *   v1.2.0 — 2026-11-01 — freshnessBrief carries `stale_at` too, so every listing (discovery, catalogue,
+ *     ODPS, the EXCHANGE offering) names both deadlines (plan D6).
  *   v1.1.0 — 2026-11-01 — `onChange`: a product that runs when its source changes follows its sources'
  *     freshness and its own newest run, not a clock (reason codes on-change, on-change-run-failed; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.1, D9.9).
@@ -96,9 +98,18 @@ export const STALE_UNPROMISED_DAYS = 30;
 const MINUTE = 60_000;
 const RANK: Record<FreshnessState, number> = { fresh: 0, unscheduled: 1, late: 2, stale: 3 };
 
-/** The short form a listing carries: the state, why, when the next version is due. */
-export function freshnessBrief(f: Freshness): { state: FreshnessState; reason: string; reason_code: string; due_at: string | null; last_success_at: string | null; limited_by?: string } {
-    return { state: f.state, reason: f.reason, reason_code: f.reason_code, due_at: f.due_at, last_success_at: f.last_success_at, ...(f.limited_by ? { limited_by: f.limited_by } : {}) };
+/** The short form a listing carries: the state, why, when the next version is due and when it goes stale. */
+export interface FreshnessBrief {
+    state: FreshnessState; reason: string; reason_code: string;
+    due_at: string | null; stale_at: string | null; last_success_at: string | null; limited_by?: string;
+}
+
+/** The short form of `f` a listing carries. */
+export function freshnessBrief(f: Freshness): FreshnessBrief {
+    return {
+        state: f.state, reason: f.reason, reason_code: f.reason_code, due_at: f.due_at, stale_at: f.stale_at,
+        last_success_at: f.last_success_at, ...(f.limited_by ? { limited_by: f.limited_by } : {}),
+    };
 }
 
 /** The worse of two states. */
