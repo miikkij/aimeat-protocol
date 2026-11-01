@@ -8,6 +8,9 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.10.1 — 2026-11-02 — The agent picker leaves out the node's own agents (the place's chat and the
+      basic agents), so an outside AI is never preselected onto the chat; with no other agent the page
+      opens on "create a new agent".
     v1.10.0 — 2026-11-01 — An emailed sign-in link beside the password: an account made by a link has
         none, and could not approve here without a session already in the browser. The link returns
         to this page with the request in its address. The page's language comes from `lang`, which
@@ -509,7 +512,12 @@
       });
       const d = await r.json();
       if (!d.ok) return [];
-      const list = d.data?.agents || d.data || [];
+      // The node's own agents are not for an outside AI to take: the place's chat ('chat') and the
+      // basic agents made with the account (tag crew.basic). Preselected, a connector bound itself to
+      // the chat and a level choice rewrote the chat's permissions (commercial's own-AI test on
+      // guestkoey3wfwk, 2026-11-02). Without them, a person with no other agent gets the create form.
+      const resident = (a) => a?.name === 'chat' || (Array.isArray(a?.tags) && a.tags.includes('crew.basic'));
+      const list = (d.data?.agents || d.data || []).filter((a) => !resident(a));
       // Alphabetical by the name a person sees (the node returns creation order); the browser's own
       // language decides the alphabet, as this page loads none of the SPA's format settings.
       const shown = (a) => a.display_name || a.displayName || a.name || '';
