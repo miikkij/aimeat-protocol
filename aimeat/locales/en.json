@@ -25754,6 +25754,7 @@
     "structure.ai": "Your AI",
     "structure.live.working": "{who} is working on it",
     "structure.live.idle": "This page updates itself when the work moves on.",
+    "structure.live.last": "Last note",
     "structure.steps": "Steps",
     "structure.stepsCount": "{fine} / {total} done",
     "structure.state.fine": "Done",
