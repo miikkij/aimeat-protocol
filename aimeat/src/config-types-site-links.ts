@@ -9,6 +9,7 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.9.0 — 2026-11-01 — buildQueue: the operator's build queue for "build it with you" (Jouni, 1.11 16.22).
  *   v1.8.0 — 2026-11-01 — aiEurPerMessage removed the same night: no message counts are shown to a
  *     customer (Jouni, 1.11 04.00).
  *   v1.7.0 — 2026-11-01 — aiEurPerMessage: euros of AI credit per ordinary message, set by the fleet
@@ -108,6 +109,13 @@ export interface SiteLinksConfig {
    * spent offers no purchase.
    */
   storeTopup: string;
+  /**
+   * The operator's build queue for "build it with you": the owner's one build request waits on the
+   * node until the operator's fleet service hands it to this queue, and the node then asks its status
+   * at `<buildQueue>/getStatus` (services/build-with-you.ts). Set by the store's fleet service on a
+   * node it sold. Empty: off.
+   */
+  buildQueue: string;
   /**
    * Euros of AI credit per US dollar of the node's key limit, written by the fleet service when it
    * mints the key and again as a total on every top-up: the AI credit after the store's fee divided

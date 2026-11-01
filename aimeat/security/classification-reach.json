@@ -1157,6 +1157,12 @@
       },
       "why": "Reviewed 2026-10-11: the latest finished result of the caller's own agent, read to describe its STRUCTURE in the build instructions. The record goes through presentMemory with the caller's classification reader before anything is derived from it, so a result the caller may not read is not described; what is derived is field names and value types only, with no text of the value."
     },
+    "src/services/build-with-you.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01: the node's own record of the place's one build request, under system@<node> (build-with-you.request), which only this file writes. It holds the request's four fields as the owner sent them and the queue's answer; it is no person's content read for another reader, and no model reads it."
+    },
     "src/services/cache-cleanup.ts": {
       "reads": {
         "getMemory": 1,
@@ -1576,11 +1582,19 @@
     },
     "src/services/datapackage/audience-record.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 3,
+        "listStorageFilesForOwners": 1,
+        "getStorageFile": 2
+      },
+      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned audience record and the boot step's record, and in the once-only boot step every namespace's file list and data package pointers, to record each package's audience. 2026-11-01 (WP9e): the pointer-state boot step's record (pointerStateInForce), and trustedPackageOf reads a package's pointer to answer the record's facts beside it; the pointer's display fields go to a caller who already decided on the record, and no rows are read. Nothing else read is returned to a caller."
+    },
+    "src/services/datapackage/sale-terms-record.ts": {
+      "reads": {
+        "getMemory": 1,
         "listStorageFilesForOwners": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned audience record and the boot step's record, and in the once-only boot step every namespace's file list and data package pointers, to record each package's audience. Nothing read is returned to a caller."
+      "why": "Reviewed 2026-11-01 (WP9e), the node's own read: the service-owned sale terms record of a data package, and in the once-only boot step every namespace's file list and data package pointers, to copy their sale terms, withdrawal and public confirmation onto the service's records. The terms are returned only to the owner's own sale path and the EXCHANGE projection, which publishes them as the listing; no rows are read."
     },
     "src/services/datapackage/version-audience.ts": {
       "reads": {
@@ -3168,7 +3182,7 @@
     },
     "src/services/parties/shares.ts": {
       "reads": {
-        "getStorageFile": 4
+        "getStorageFile": 2
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3), the node's own read: a data package's pointer and descriptor (metadata the package service wrote) to check a share names a package and version that exist, and to build the connection file's table list for the owner or the party the owner shared it with. The rows themselves are read through openPackage and readRows, which pass the classification reader."
     },

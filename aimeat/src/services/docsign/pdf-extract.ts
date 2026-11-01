@@ -17,11 +17,20 @@
  *   file length, nothing was appended after signing. When it is not, the file carries later
  *   incremental updates. Those are normal when they hold later signatures, a document timestamp
  *   or validation data (/DSS), and a change of content otherwise. The scan classifies the appended
- *   bytes by the object types they declare; a deep object-by-object comparison of revisions is out
- *   of scope and the report says so.
- * @structure PdfSignatureField · extractPdfSignatures · classifyAppended · scanAppendedObjects
+ *   bytes by the object types they declare, and compares every object the update rewrites with its
+ *   value in the revision the signature covers: around a later signature, the Catalog keeps its page
+ *   tree, a page keeps everything but its annotation list (which only grows), the page tree stays as
+ *   signed, and no page is added.
+ * @structure PdfSignatureField · extractPdfSignatures · classifyAppended · scanAppendedObjects ·
+ *   pageKeepsSigned · growableLists
  * @usage const sigs = extractPdfSignatures(buffer);
  * @version-history
+ *   2026-11-01 — Around a real later signature, a rewritten Catalog keeps every entry but its form,
+ *     validation data, extensions, metadata, permissions and optional content; a rewritten page keeps
+ *     every entry but its annotation list, which only grows, and its tab order; a page-tree node stays
+ *     as signed; a new page is a change; and a rewritten reference list is allowed only as the signed
+ *     revision's annotation or field list, only grown. A later signature had covered a page pointed at
+ *     new content (finding w3-docsign-later-signature-adds-page, Jouni's ruling).
  *   2026-11-01 — classifyAppended: an all-zero placeholder /ByteRange is not a later signature;
  *     validation data comes only from a /DSS an updated Catalog names (or a rewrite of the signed
  *     revision's DSS), not from the characters /DSS anywhere; an object the signed revision had,
@@ -247,8 +256,12 @@ export function classifyAppended(text: string, from: number, objects: PdfObjects
 const VALIDATION_TYPES = new Set(['Catalog', 'DSS', 'VRI', 'XRef', 'ObjStm', 'Metadata', 'Extensions', 'DeveloperExtensions']);
 /** Catalog entries a validation-data update may change; every other entry stays as signed. */
 const VALIDATION_CATALOG_KEYS = new Set(['DSS', 'Extensions', 'Metadata']);
-/** What a later signature's revision may rewrite in place: the form, its pages and annotations. */
-const SIGNATURE_REWRITES = new Set(['catalog', 'page', 'annot', 'acroform', 'refs', 'sig', 'metadata', 'dss']);
+/**
+ * What a later signature's revision may rewrite in place as it was: the form, annotations,
+ * signatures, metadata and validation data. The Catalog, pages and page tree, and reference lists
+ * are compared with the signed revision instead (keepsEntries, pageKeepsSigned, growableLists).
+ */
+const SIGNATURE_REWRITES = new Set(['annot', 'acroform', 'sig', 'metadata', 'dss']);
 
 type Kind = 'catalog' | 'page' | 'annot' | 'acroform' | 'refs' | 'sig' | 'metadata' | 'dss' | 'other';
 
@@ -270,14 +283,85 @@ function kindOf(v: PdfValue | null | undefined): Kind {
   return 'other';
 }
 
-/** Does `after` keep every entry of the signed Catalog `before` except the validation-data ones? */
-function catalogKeepsSigned(before: PdfValue | null | undefined, after: PdfValue | null): boolean {
+/**
+ * Catalog entries a later signature's revision may change: its form, validation data, extensions,
+ * metadata, permissions and optional-content settings. The page tree, names, actions and the rest
+ * stay as signed.
+ */
+const SIGNATURE_CATALOG_KEYS = new Set(['AcroForm', 'DSS', 'Extensions', 'Metadata', 'Perms', 'OCProperties']);
+/** Page entries a later signature's revision may change: the annotation list (only added to) and the tab order. */
+const SIGNATURE_PAGE_KEYS = new Set(['Annots', 'Tabs']);
+
+/** Does dictionary `after` keep every entry of `before` except the `free` ones? */
+function keepsEntries(before: PdfValue | null | undefined, after: PdfValue | null, free: Set<string>): boolean {
   if (before?.k !== 'dict' || after?.k !== 'dict') return false;
   for (const key of new Set([...before.entries.keys(), ...after.entries.keys()])) {
-    if (VALIDATION_CATALOG_KEYS.has(key)) continue;
+    if (free.has(key)) continue;
     if (canonical(before.entries.get(key)) !== canonical(after.entries.get(key))) return false;
   }
   return true;
+}
+
+/** Does `after` keep every entry of the signed Catalog `before` except the validation-data ones? */
+function catalogKeepsSigned(before: PdfValue | null | undefined, after: PdfValue | null): boolean {
+  return keepsEntries(before, after, VALIDATION_CATALOG_KEYS);
+}
+
+/** Does array `after` still hold every item of `before`? A list a signature only adds to. */
+function keepsItems(before: PdfValue | null | undefined, after: PdfValue | null | undefined): boolean {
+  if (before?.k !== 'array' || after?.k !== 'array') return false;
+  const now = new Set(after.items.map(canonical));
+  return before.items.every((i) => now.has(canonical(i)));
+}
+
+/**
+ * Is a page or page-tree node, rewritten in a later signature's revision, the signed one plus the
+ * signature's widget? A page keeps every entry but its annotation list, which only grows, and its
+ * tab order; a page-tree node stays exactly as signed, so no page is added, removed or reordered.
+ */
+function pageKeepsSigned(before: PdfValue | null | undefined, after: PdfValue | null): boolean {
+  if (before?.k !== 'dict' || after?.k !== 'dict') return false;
+  if (typeOf(before) !== 'Page' || typeOf(after) !== 'Page') return canonical(before) === canonical(after);
+  if (!keepsEntries(before, after, SIGNATURE_PAGE_KEYS)) return false;
+  const was = before.entries.get('Annots');
+  const now = after.entries.get('Annots');
+  if (!was) return !now || now.k === 'array';
+  // An indirect list keeps its reference; the list object itself is compared where it is rewritten.
+  if (was.k === 'ref') return canonical(was) === canonical(now);
+  return keepsItems(was, now);
+}
+
+/**
+ * The object numbers of the signed revision's indirect annotation and field lists, which a later
+ * signature's revision may add to, minus any that the signed revision also uses as page content.
+ * Read in the signed revision only, through the page tree and the form, bounded.
+ */
+function growableLists(objects: PdfObjects, from: number, signedCatalog: PdfValue | null | undefined): Set<number> {
+  const lists = new Set<number>();
+  const contents = new Set<number>();
+  const form = signedCatalog?.k === 'dict' ? signedCatalog.entries.get('AcroForm') : undefined;
+  const formDict = form?.k === 'ref' ? objects.valueBefore(form.num, from) : form;
+  const fields = topLevelRef(formDict, 'Fields');
+  if (fields !== null) lists.add(fields);
+  const seen = new Set<number>();
+  const queue = [topLevelRef(signedCatalog, 'Pages')].filter((n): n is number => n !== null);
+  while (queue.length && seen.size < 65536) {
+    const n = queue.shift()!;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    const node = objects.valueBefore(n, from);
+    if (node?.k !== 'dict') continue;
+    const kids = node.entries.get('Kids');
+    const kidList = kids?.k === 'ref' ? objects.valueBefore(kids.num, from) : kids;
+    if (kids?.k === 'ref') contents.add(kids.num);
+    if (kidList?.k === 'array') for (const k of kidList.items) if (k.k === 'ref') queue.push(k.num);
+    const annots = topLevelRef(node, 'Annots');
+    if (annots !== null) lists.add(annots);
+    const content = topLevelRef(node, 'Contents');
+    if (content !== null) contents.add(content);
+  }
+  for (const n of contents) lists.delete(n);
+  return lists;
 }
 
 /** A new object a validation-data update may write: its typed objects, and untyped data such as certificates. */
@@ -340,20 +424,27 @@ function scanAppendedObjects(text: string, from: number, objects: PdfObjects, si
 
   let rewritten = false;
   let notValidationData = false;
+  let lists: Set<number> | null = null;
   for (const o of added) {
     const before = objects.valueBefore(o.num, from);
     const kind = kindOf(o.value);
     if (!signatureRevision && kind === 'catalog' && !catalogKeepsSigned(signedCatalog, o.value)) notValidationData = true;
     if (before === undefined) {
       if (!signatureRevision && !fitsValidationData(o.value)) notValidationData = true;
+      // A later signature adds a widget, never a page or a page-tree node.
+      if (signatureRevision && kind === 'page') rewritten = true;
       continue;
     }
-    // A rewrite of an object the signed revision had.
+    // A rewrite of an object the signed revision had, compared with its value in that revision.
     if (validationObjects.has(o.num)) continue;
     if (o.num === infoNum && o.value?.k === 'dict' && !typeOf(o.value)) continue;
     if (kind === 'metadata' && kindOf(before) === 'metadata') continue;
-    if (kind === 'catalog' && kindOf(before) === 'catalog' && (signatureRevision || catalogKeepsSigned(before, o.value))) continue;
+    if (kind === 'catalog' && kindOf(before) === 'catalog'
+      && keepsEntries(before, o.value, signatureRevision ? SIGNATURE_CATALOG_KEYS : VALIDATION_CATALOG_KEYS)) continue;
     if (signatureRevision && named.has(o.num) && o.value?.k === 'dict') continue;
+    if (signatureRevision && kind === 'page' && kindOf(before) === 'page' && pageKeepsSigned(before, o.value)) continue;
+    if (signatureRevision && kind === 'refs' && kindOf(before) === 'refs'
+      && (lists ??= growableLists(objects, from, signedCatalog)).has(o.num) && keepsItems(before, o.value)) continue;
     if (signatureRevision && kind === kindOf(before) && SIGNATURE_REWRITES.has(kind)) continue;
     rewritten = true;
   }

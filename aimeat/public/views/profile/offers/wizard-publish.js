@@ -13,6 +13,8 @@
  * @structure stepSchedule · stepWho · stepDone · ShareQueue
  * @usage const body = stepSchedule(s);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — Step 6 says what became of each share's e-mailed link (LinkResult), and its
+ *     connection steps follow the Power-BI-Excel board (WP9b).
  *   v1.1.0 — 2026-11-01 — Step 4 "When the source changes", refused next to the option for a product with
  *     an extension source; step 5's shares take a person on another AIMEAT node by their account; step 6
  *     says each share's sentence and key note in the page's language (WP9c).
@@ -37,7 +39,7 @@ import { Note } from '/components/Note.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { d, scheduleWords, cronFor, shareSentence, keyNote } from './data-model.js';
 import { SellFields } from './sell-dialog.js';
-import { partyNameOf, VisitorRead, SHARE_HOWS, isAccount } from './share-dialog.js';
+import { partyNameOf, VisitorRead, LinkResult, SHARE_HOWS, isAccount } from './share-dialog.js';
 import { ConnectSteps } from './data-connect.js';
 
 const DAY = 86_400_000;
@@ -179,7 +181,7 @@ export function stepDone(s) {
           ? html`<${Box} key=${i} tone="attention" name=${sh.who}><${Note} kind="message" error>${sh.error}<//><//>`
           : html`<${Box} key=${i} name=${sh.who} marks=${html`<${Mark}>${d('party.kind.' + sh.how)}<//>`}>
               <${Note} kind="lead">${shareSentence(sh.out, sh.who)}<//>
-              ${sh.link && !sh.link.sent ? html`<${Note} kind="aside" size="small">${d('share.notSent', { email: sh.email })}<//>` : null}
+              <${LinkResult} link=${sh.link} email=${sh.email} />
               ${sh.out.recipient_kind === 'visitor' ? html`<${VisitorRead} out=${sh.out} />` : html`
                 <${Note}>${keyNote(sh.out, sh.who)}<//>
                 <${Code} block scroll>${JSON.stringify(sh.out.connection, null, 2)}<//>

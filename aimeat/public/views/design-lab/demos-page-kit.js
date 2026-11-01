@@ -9,6 +9,7 @@
  * @structure PAGE_KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { PAGE_KIT_DEMOS } from './demos-page-kit.js';
  * @version-history
+ *   v1.5.0 — 2026-11-01 — PageSection's `step`: three numbered steps in a raised box (WP9b).
  *   v1.4.0 — 2026-10-11 — PageSection's `ends`, shown as two small bands in a row.
  *   v1.3.0 — 2026-09-27 — What appcat added: Tabs' line, glyph, caption and fill; Layout's step 'part'
  *     and Space inset; Rail's ink tone; the crumb sheet's dashed, inline and file Action tones;
@@ -281,6 +282,10 @@ export const PAGE_KIT_DEMOS = {
     { name: 'plain', render: () => inPage(html`<${PageSection} plain><${Note} kind="lead">You can come back when someone invites you.<//><//>`) },
     { name: 'band', render: () => inPage(html`<${PageSection} band id="dl-pk-p5" num="02" title="Nodes"><${Note} kind="lead">Three nodes: aimeat.io, harbour-studio and lumo-bakery.<//><//>`) },
     // Two small bands that each show where they stop (2026-10-11, the home's agent page).
+    { name: 'steps in a box', render: () => inPage(html`<${Box} tone="raised">
+        <${PageSection} step first num="1" title="Accept the terms"><${Note}>I use the data for reporting.<//><//>
+        <${PageSection} step num="2" title="Take the key"><${Note}>The key is shown only now.<//><//>
+        <${PageSection} step num="3" title="Connect your program"><${Actions}><${Loud} onClick=${noop}>Download the connection file<//><//><//><//>`) },
     { name: 'group that ends, two in a row', render: () => inPage(html`
         <${PageSection} group ends id="dl-pk-p12" title="Give it a task"><${Note} kind="lead">Say it as you would say it to a person.<//><//>
         <${PageSection} group ends id="dl-pk-p13" title="Latest work"><${Note} kind="lead">Weekly news summary, done two hours ago.<//><//>`) },

@@ -7,12 +7,14 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.59.0 -- 2026-11-01 -- Discover names aimeat_party "share" with `email` and "send_link": the one-time share link (WP9b).
  *   v1.58.0 -- 2026-11-01 -- Discover names aimeat_dataspace: the data space requests that wait for the person (plan doc-mvwxcas3dom3, D8).
  *   v1.57.0 -- 2026-11-01 -- Discover: a data product and its share are one proposal, and the follow-ups name their tools (WP9a).
  *   v1.56.0 -- 2026-11-01 -- Discover names aimeat_datapackage_sell: a package sold on EXCHANGE (plan doc-mvwxcas3dom3, D5).
  *   v1.56.0 -- 2026-11-01 -- Discover names a run on a source change, aimeat_dataproduct "describe" and a share by `recipient` (WP9c).
  *   v1.55.0 -- 2026-11-01 -- Discover names aimeat_party "share": a package shared by name with an outside party (plan doc-mvwxcas3dom3, D3.4).
  *   v1.54.0 -- 2026-11-01 -- Discover names aimeat_dataproduct: a table built from material, previewed, then run (plan doc-mvwxcas3dom3, D9).
+ *   v1.54.0 -- 2026-11-01 -- Build it with you: aimeat_build_request_status, _submit, and aimeat_trail_list.
  *   v1.53.0 -- 2026-11-01 -- Discover lists datasets: a data package with its rows, freshness and read addresses (plan doc-mvwxcas3dom3, D1.1).
  *   v1.52.0 -- 2026-10-31 -- Rules for pictures and videos: aimeat_ai_gen_rules, the directive for a model elsewhere, rules_followed.
  *   v1.51.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
@@ -246,6 +248,14 @@ takes one and gives you a task (complete it as usual), \`leave\` hands the next 
 (never to yourself). A goal's coordinator is woken by a task when something happens; read the goal,
 decide, and say why in \`reason\`. Ask before a change that \`preview\` says ends running work.
 
+**Build it with you, and what was done.** \`aimeat_build_request_status\` · \`aimeat_build_request_submit\`
+· \`aimeat_trail_list\`. A place may send ONE build request to the operator's builders: the first agent or
+small app the person wants built with them. Read the status first; when the offer is open, fill the four
+fields in with the person in their words (what, for whom, what for, when it is ready) and send it. Its
+status then says the queue's state and place in line; there is no time estimate, so give none.
+\`aimeat_trail_list\` answers "what did you do" and "who changed this": every action on the account, newest
+first, with who did it (the person, their AI, an agent, an app, the operator).
+
 **Messages — the owner conversation.** \`aimeat_message_inbox\` (pending inbound) ·
 \`aimeat_message_send\` (markdown; can carry a proposed_task or a single-select prompt for the owner)
 · \`aimeat_message_history\` (full thread, oldest-first — use it to read back the owner's answer to a
@@ -350,7 +360,10 @@ a person with an AIMEAT account on another server, \`aimeat_party\` \`share\` ta
 "name@their-server"\` in place of a name and makes no key. To give one package to someone with no
 account here (a Power BI, a partner's program, a person), use \`aimeat_party\` action \`share\` with a
 name, the package, the purpose and \`days\`: it answers a key, a connection file and the one sentence to
-tell the person (until when, ending it stops the next read, copies already taken stay). It needs
+tell the person (until when, ending it stops the next read, copies already taken stay). With the
+person's e-mail, pass \`email\` (and \`locale\`): the node mails a one-time link where they accept the
+terms and take a key of their own; \`link.sent\` false means no mail goes out here, so hand the owner
+\`link.link\` to pass on, and \`send_link\` sends a new one. It needs
 \`party:manage\`, which the owner ticks on its own. A request that asks for both ("make a data product
 of X, update it on Mondays and share it with Matti for a month") is ONE proposal: \`preview\` first and
 show the person the source, the columns, a personal column left out, the rows, the schedule and who

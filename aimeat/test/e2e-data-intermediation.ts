@@ -18,6 +18,8 @@
  *   Slices: B's own report holds none of A's findings; A's holds A's own; B cannot read the node report.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-intermediation
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A review of a finding about one owner (an id with a colon) is accepted; it was
+ *     refused by the id pattern, so the assertion fails on the previous code (WP9b).
  *   v1.1.0 — 2026-11-01 — The test actions return records: since D5.5 an offering's deliversData is
  *     proposed from its output schema, and the gate this suite proves acts on data offerings.
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D7).
@@ -209,6 +211,13 @@ await test('D7.3 a person party with a contact is found for A (records of proces
     assert(w.status === 200, `review: ${show(w)}`);
     const a = finding(await nodeReport(), 'data_offering_public');
     assert(a.source === 'human' && a.review?.decision === 'accepted' && a.review.note === 'Our marketplace; notified.', `reviewed: ${JSON.stringify(a)}`);
+    // A finding about one thing has its id after a colon, and its review takes that id (WP9b: the
+    // id pattern refused the colon, so the Compliance page could not decide such a finding).
+    const cur2 = await call('/v1/compliance/docs/intermediation', { token: OP.token });
+    const per = await call('/v1/compliance/docs/intermediation', { token: OP.token, method: 'PUT', body: { items: [...cur2.body.data.items, { id: `person_party_contact:${A.name}`, type: 'review', decision: 'dismissed', note: 'Kept in our register.' }] } });
+    assert(per.status === 200, `a per-owner review: ${show(per)}`);
+    const pd = finding(await nodeReport(), `person_party_contact:${A.name}`);
+    assert(pd?.source === 'human' && pd.review?.decision === 'dismissed', `the per-owner finding reviewed: ${JSON.stringify(pd)}`);
 });
 
 console.log('\nOwner slices');

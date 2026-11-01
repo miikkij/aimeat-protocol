@@ -21,6 +21,8 @@
  *   setPartyMember · listRegistrationRequests · decideRegistration
  * @usage const out = await setRegistration(deps, caller, { owner, filename }, { open: true });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Each request in the operator's list names its app's `filename`, which the
+ *     decision takes (WP9b: the Config page and aimeat_admin_app_party_registrations decide from the list).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4.1, D4.3).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -166,7 +168,9 @@ export async function listRegistrationRequests(deps: Deps): Promise<AppOpOutcome
         if (!r.ownerGaii.endsWith(`@${deps.config.nodeId}`) || r.ownerGaii.includes('#')) continue;
         const v = parseAppPartiesValue(r.value);
         if (v.registration.state === 'closed') continue;
-        out.push({ owner: r.ownerGaii.slice(0, -(deps.config.nodeId.length + 1)), key: r.key, ...registrationView(deps.config, v.registration), parties: v.parties.length });
+        // `filename`: the app the decision names (POST .../app-party-registrations/{owner}/{filename}).
+        const filename = v.appId && v.appId.includes('/') ? v.appId.slice(v.appId.indexOf('/') + 1) : null;
+        out.push({ owner: r.ownerGaii.slice(0, -(deps.config.nodeId.length + 1)), key: r.key, filename, ...registrationView(deps.config, v.registration), parties: v.parties.length });
     }
     return done({ setting: deps.config.partySelfRegistration ?? 'off', effective: registrationMode(deps.config), apps: out, total: out.length });
 }

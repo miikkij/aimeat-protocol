@@ -37,6 +37,11 @@
  *   cd aimeat && pnpm check:datapackage-pointer-reads          # the gate
  *   cd aimeat && pnpm check:datapackage-pointer-reads --list   # every finding, allowed or not
  * @version-history
+ *   v1.0.3 — 2026-11-01 — routes/datapackages.ts no longer reads the pointer: the schema.org block is built
+ *     by services/datapackage/landing-page.ts, inside the service (WP9b).
+ *   v1.0.2 — 2026-11-01 — The ten DEBT entries are gone: withdraw.ts, dataspace/catalog.ts,
+ *     dataproduct/sources-io.ts, parties/shares.ts and exchange-datapackage.ts decide on the service's
+ *     records (trustedPackageOf, saleTermsOf) and read no pointer (WP9e, cc-jouni-dataulos).
  *   v1.0.1 — 2026-11-01 — ALLOWED: the on-change source key (dataproduct/on-change.ts) and the visitor read's
  *     pointer handed to trustedAudienceOf (routes/package-reader.ts) (WP9c, cc-jouni-dataulos).
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2, after round 10; approved by Jouni 2026-11-01).
@@ -197,15 +202,8 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   'src/services/datapackage/odps-read.ts': {
     'pointer.visibility': 'The audience written on the ODPS sheet of a version the caller already opened through openPackage, which decided on the record; it selects text, not access.',
   },
-  'src/services/datapackage/withdraw.ts': {
-    'pointer!.visibility': 'DEBT: decides on the pointer; handed to cc-jouni-dataulos as Lifecycle Central incident incident-datapackage-withdraw-ts-decides-on-latest-json-s-visibility--mvxmm7ex.',
-    'pointer.visibility': 'DEBT: the withdrawn pointer\'s file tier; same incident, incident-datapackage-withdraw-ts-decides-on-latest-json-s-visibility--mvxmm7ex.',
-  },
 
   // ── Outside the service: the pointer is read for display, freshness or the record's own input ──
-  'src/routes/datapackages.ts': {
-    'readPointer(store, ownerGhii, d.name)': 'Feeds the schema.org block of a version the caller already opened through openPackage (which decided on the record); the audience only selects whether the public landing address is shown.',
-  },
   'src/services/publish-requests/apply-datapackage.ts': {
     'readPointer(ctx, ownerGhii, name)': 'Tells a deleted package and hands the pointer to trustedAudienceOf; the version, the audience and the answered address are the record\'s.',
   },
@@ -223,9 +221,6 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   'src/services/dataspace/owner.ts': {
     'readPointer(ctx.deps, ctx.caller.ownerGhii, pkg)': 'Tells whether the owner has the package before the owner\'s own auto-agree setting for it is stored; it opens nothing.',
   },
-  'src/services/dataspace/catalog.ts': {
-    'readPointer(deps, ownerGhii, name)': 'DEBT: a Dataspace participant\'s catalogue takes the package\'s existence, withdrawn mark and usage terms off the pointer; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
-  },
   'src/services/dataproduct/scheduled-job.ts': {
     '`datapkg/${name}/latest.json`': 'Names the key a scheduled data product run writes, for the scheduler\'s reads and writes list; it decides nothing.',
   },
@@ -234,19 +229,6 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   },
   'src/routes/package-reader.ts': {
     'readPointer(deps, ownerGhii, opts.name)': 'Hands the pointer straight to trustedAudienceOf, which decides on the record once the audience rule is in force; the visitor read takes trusted.visibility.',
-  },
-  'src/services/dataproduct/sources-io.ts': {
-    'readPointer(deps, ownerGhii, spec.name!)': 'DEBT: a source package\'s audience label; Lifecycle Central incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
-    'pointer?.visibility': 'DEBT: same incident, incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
-  },
-  'src/services/parties/shares.ts': {
-    'latestKey(packageName)': 'DEBT: share creation reads the version and withdrawn mark off the pointer; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
-    'latestKey(name)': 'DEBT: descriptorFor serves a party the pointer\'s version; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
-  },
-  'src/services/exchange-datapackage.ts': {
-    'readPointer({ storage, config }, ownerGhii, name)': 'DEBT: sale terms set on the pointer\'s version; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
-    'latestKey(name)': 'DEBT: the terms are written back to the pointer and the listing projection reads it; same incident.',
-    'pointer.visibility': 'DEBT: the pointer file\'s tier on the terms write; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
   },
   'src/services/anonymous-principal-records.ts': {
     "'/latest.json'": 'Finds the anonymous account\'s packages by their pointer key for the operator\'s list of what that account holds; it shows the file\'s tier and decides no access.',
