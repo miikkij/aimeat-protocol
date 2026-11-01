@@ -15713,7 +15713,7 @@
     "title": "Tämä on {host} – oma AIMEAT",
     "intro": "AIMEAT on sinun oma paikkasi, jossa tekoäly tekee työtä puolestasi. Se muistaa, mitä kerrot, tekee sinulle agentteja ja sovelluksia, ja kaikki tieto on sinun.",
     "signInNote": "Kirjaudu sisään sähköpostilinkillä. Kirjoita osoite, jolla ostit AIMEATin. Lähetämme siihen linkin, joka kirjaa sinut sisään ilman salasanaa.",
-    "next": "Kun olet kirjautunut, pääset Kotiin. Siellä kirjoitat yhdellä lauseella, mitä haluat saada tehdyksi. AIMEAT tekee lauseesta agentin, ja näet agentin ennen kuin se aloittaa.",
+    "next": "Kun olet kirjautunut, pääset Koti-näkymään. Siellä kirjoitat yhdellä lauseella, mitä haluat saada tehdyksi. AIMEAT tekee lauseesta agentin, ja näet agentin ennen kuin se aloittaa.",
     "signInLabel": "Kirjaudu sisään",
     "emailField": "Sähköpostiosoitteesi",
     "sendLink": "Lähetä kirjautumislinkki",
