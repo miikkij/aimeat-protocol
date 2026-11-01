@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-11-01 — PROBE_SETUP for aimeat_dataproduct (an action and a product name).
  *   2026-11-01 — PROBE_SETUP for aimeat_datapackage_withdraw (a package ref, as for the export tool).
  *   2026-10-31 — PROBE_SETUP for aimeat_admin_federation_settlement_ceiling_set (a ceiling, or "node";
  *     secaudit2026oct31w2 round 10).
@@ -80,6 +81,7 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_datapackage_withdraw: { ref: 'pkg:someone/thing' },
   // The ceiling is a whole number, "none" or "node" on the catalog's pattern; 'probe' is none of them.
   aimeat_admin_federation_settlement_ceiling_set: { settlement_ceiling: 'node' },
+  aimeat_dataproduct: { action: 'get', name: 'thing' },
   // Neither field is required, because clear: true takes the place of the kit, so the probe names one.
   aimeat_designbook_kit_default: { kit: 'kit-probe' },
   // value became optional (item_id + set change one entry instead), so the probe sends the document.

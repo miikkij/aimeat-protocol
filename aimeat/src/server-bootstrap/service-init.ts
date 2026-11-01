@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-01 — The schedule kinds handed to the Scheduler moved to ./schedule-kinds.ts, which adds dataproduct (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-29 — The peer registry is made with peerRegistry(config.nodeId), so gatePeer refuses this node's own id at every door (secaudit2026oct26 round 8c).
  *   2026-10-27 — A stored peer with this node's own id is not loaded into the peer registry, with a log line (secaudit2026oct26).
  *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/). scheduleGoalSweep: the agent goals' minute sweep (services/goals/goals-sweep.ts). seedBundledCortexes gets the node id, for the incident a shipped cortex name held by another account opens (secaudit2026oct22).
@@ -169,8 +170,7 @@ import { sweepHeldPushes, sweepNotificationDigests } from '../services/notificat
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 import { refreshOpenings } from '../services/internet-opening/opening-registry.js';
-import { runRefineryJob } from '../services/refinery/scheduled-job.js';
-import { runAiJob } from '../services/scheduler-ai-job.js';
+import { registerScheduleKinds } from './schedule-kinds.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { bindLegacyExtensionSecrets } from '../services/extension-secrets.js';
 import { sealLegacyTransportSecrets } from '../services/mcp-client/transport-secrets.js';
@@ -240,10 +240,8 @@ export async function initializeServices(
   registerCoreHandlers(scheduler, config, storage);
   // The apps open to the internet on a closed node, loaded before the first request asks the gate.
   void refreshOpenings({ storage, config });
-  scheduler.registerKindExecutor('refinery', (job) => runRefineryJob(storage, config, job));
-  // The `ai` kind for the same reason: it writes its answer through the shared memory write
-  // service, which reaches the Scheduler, so the Scheduler cannot import it (secaudit 2026-10).
-  scheduler.registerKindExecutor('ai', (job) => runAiJob(storage, config, job));
+  // The refinery, ai and dataproduct kinds (./schedule-kinds.ts).
+  registerScheduleKinds(scheduler, storage, config);
 
   // Seed standardized profile schemas — Phase 0.4
   seedProfileSchemas(storage, `system@${config.nodeId}`)
