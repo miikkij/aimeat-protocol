@@ -15,6 +15,8 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.4.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION: report, the code default |
+ *     none | node | owners; plan doc-mvwxcas3dom3, D7.1).
  *   v1.3.0 — 2026-11-01 — shareMaxDays (AIMEAT_SHARE_MAX_DAYS, 365) and partyReadsPerMinute
  *     (AIMEAT_PARTY_READS_PER_MINUTE, 60): the longest named share and an outside party's read rate
  *     (plan doc-mvwxcas3dom3, D2.9, D3.1).
@@ -72,7 +74,24 @@ export function dataAccessDefaults() {
     shareMaxDays: positiveInt(process.env.AIMEAT_SHARE_MAX_DAYS, 365, 3650),
     // How many reads one outside party may make a minute; past it 429 (services/parties/read-gate.ts).
     partyReadsPerMinute: positiveInt(process.env.AIMEAT_PARTY_READS_PER_MINUTE, 60, 100_000),
+    // Whether this node runs a data intermediation service (EU 2022/868), and who provides it
+    // (services/data-intermediation/). report, the code default, refuses nothing.
+    dataIntermediation: parseDataIntermediationMode(process.env.AIMEAT_DATA_INTERMEDIATION),
   };
+}
+
+/**
+ * The data intermediation setting (plan doc-mvwxcas3dom3, D7.1). report: nothing is refused, the
+ * compliance report lists the findings. none: the node intermediates nothing, so an offering that
+ * delivers data is not listed to everyone. node: the operator is the provider. owners: an owner or an
+ * organism that declared itself a provider may run an open marketplace; everyone else is as none.
+ */
+export type DataIntermediationMode = 'report' | 'none' | 'node' | 'owners';
+export const DATA_INTERMEDIATION_MODES: readonly DataIntermediationMode[] = ['report', 'none', 'node', 'owners'];
+
+/** An unknown value is `report`, the one that refuses nothing. */
+export function parseDataIntermediationMode(v: unknown): DataIntermediationMode {
+  return DATA_INTERMEDIATION_MODES.find(m => m === v) ?? 'report';
 }
 
 /** A whole number from 1 to `max`; anything else is `fallback`. */

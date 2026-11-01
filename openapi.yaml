@@ -23267,7 +23267,22 @@ paths:
         labelling, node-wide AI usage, consent grants - to the use-case register the operator wrote,
         and reports what is in one and not the other.
 
-        Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail }`.
+        Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail,
+        data_intermediation }`.
+
+        `data_intermediation` is section 12 (Data Governance Act 2022/868): `{ section, mode,
+        mode_code, mode_text, notification, providers, findings, totals, art12, regulation, edit,
+        note }`. `mode` is AIMEAT_DATA_INTERMEDIATION (report, none, node, owners). `findings` holds
+        `{ id, kind, count, items, reason, code, regulation, source, review?, proposal?, owner? }`:
+        data offerings listed to everyone, contracts with outside buyers, organisms anyone may join
+        that carry data packages (each with the proposal to require approval, a PUT the organism's
+        creator or admin makes), apps with open party registration and commerce, priced named
+        shares, person parties whose contact the account holds, a missing notification record, and
+        the node's own AI reading exchanged data. `source` is `proposed` until a review in the
+        compliance document `intermediation` names the finding's id. `art12` holds the Article 12
+        rows (a, c, d, h, i, k, n, o), each `{ point, code, title, status: evidence | check |
+        missing, evidence, text }`. The owner's slice (GET /v1/compliance/report/mine) holds only that
+        account's own findings.
 
         `gaps` is the part worth reading. Each entry is one of: a model used on this node that no
         use case mentions; a use case with unanswered questions and therefore no risk class; public
@@ -23790,7 +23805,14 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks] }
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation] }
+        description: >-
+          `intermediation` (node and organism) holds the data intermediation notification record (an
+          item `{ id, type: notification, legalName, businessId, notifiedAt?, authorityRef?,
+          euRegisterUrl?, confirmedAt?, scope }`, Data Governance Act 2022/868 art. 11) and a
+          person's review of each data intermediation finding of the compliance report (an item
+          `{ id: <the finding's id>, type: review, decision: accepted | dismissed, note?, reviewedAt? }`).
+          A finding without a review reads source `proposed`.
       - name: scope
         in: query
         required: false
@@ -25863,6 +25885,11 @@ paths:
         is read as a free offering with `basePrice` as its pacing, and responses keep those two fields
         as deprecated mirrors beside a `deprecated` object that names them. From 4.0.0 they are
         refused on write (400 MORSEL_PRICE_REMOVED) and not sent.
+        An `ext-action` offering delivers data, and every listing reaches everyone: when
+        AIMEAT_DATA_INTERMEDIATION is `none`, or `owners` and the provider manages no organism that
+        keeps a data intermediation notification record, it is refused 403
+        DATA_INTERMEDIATION_NOT_OFFERED before anything is written (`details.setting` names the
+        setting). A listing that already exists stays, and the compliance report lists it.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -27920,7 +27947,19 @@ paths:
             for a public package only. The same readers as the descriptor read.
       responses:
         '200':
-          description: The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS product sheet (`odps_url`), of its schema.org description (`schema_org_url`), and the latest pointer when unpinned; with format=schemaorg the schema.org Dataset JSON-LD instead
+          description: >-
+            The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS
+            product sheet (`odps_url`), of its schema.org description (`schema_org_url`), the latest
+            pointer when unpinned, and `freshness`: the package's state against its producer's promise,
+            computed when it is read. `state` is fresh (the last successful run is within one promised
+            interval plus grace), late (within three), stale (past three, or a workflow or extension
+            producer with no schedule silent for 30 days) or unscheduled (nothing is promised; never
+            called fresh). `promise` names the cron (a data product's schedule wins over the producer's)
+            and its interval, `last_success_at` the last run that succeeded (a new version or the same
+            bytes again), `due_at` and `stale_at` the next deadlines, `last_error` a newer failed run,
+            and for a data product built from other packages `sources` with each one's state and
+            `limited_by` the least fresh one, which the product's state follows. With format=schemaorg
+            the schema.org Dataset JSON-LD instead.
         '403':
           description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
@@ -28015,6 +28054,16 @@ paths:
         nobody can see is not a history a consumer can rely on. A non-public package answers as the
         descriptor does. The list is the caller's: an earlier version whose own audience does not
         admit the caller (an earlier private version of a package made public later) is not listed.
+
+        The owner in person, or the owner's agent, app grant or ecosystem app holding `storage:read`,
+        also reads which versions are in use: each version carries `in_use` with
+        `pinned_by_shares` (the live named shares to outside parties that pin it), `party_reads_30d`
+        and `last_party_read_at` (served reads by outside parties in the last 30 days, from the party
+        read log; a read that named no version counts on the version that was newest then) and
+        `removed_next` (the next publish removes it under the retention policy of the current
+        version). The answer adds `retention_policy` (`{ keep, unit }` or null) and
+        `read_window_days`. A version a live named share pins is never removed by the retention
+        policy. Anyone else gets the list without these fields.
       tags: [Data Packages]
       security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:

@@ -1453,6 +1453,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An app's public data-map declaration."
     },
+    "src/services/data-intermediation/findings.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D7.3), the node's own read: the owners' `parties` records (service-owned), counted for the compliance report's data intermediation findings (how many person parties hold a contact, per account). The operator's report gets counts and account names; an owner's slice only their own. No party contact or other content leaves."
+    },
     "src/services/datapackage/images.ts": {
       "reads": {
         "getStorageFileMeta": 1
@@ -1495,10 +1501,29 @@
     "src/services/datapackage/store.ts": {
       "reads": {
         "getStorageFile": 8,
-        "listStorageFiles": 3,
+        "listStorageFiles": 2,
         "getStorageFileMeta": 1
       },
-      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10, W2-15): the rows of a resource reach a caller only through loadResourceRows, which passes the CSV through the classification reader (readerFor(...).show with fileTarget), as GET /v1/pub does for the same bytes. The other reads are the node's own: the latest.json pointer and the version descriptors a read decides the package's audience and version on (their content is the package's metadata, returned only after the audience decision), the version list, and the pointer read before a publish. 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry. 2026-11-01: a dry run (a data product preview) reads the descriptor file's metadata to say whether those bytes are already published; no content."
+      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10, W2-15): the rows of a resource reach a caller only through loadResourceRows, which passes the CSV through the classification reader (readerFor(...).show with fileTarget), as GET /v1/pub does for the same bytes. The other reads are the node's own: the latest.json pointer and the version descriptors a read decides the package's audience and version on (their content is the package's metadata, returned only after the audience decision), the version list, and the pointer read before a publish. 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry. 2026-11-01: a dry run (a data product preview) reads the descriptor file's metadata to say whether those bytes are already published; no content. 2026-11-01: the retention listing moved to ./retention.ts."
+    },
+    "src/services/datapackage/retention.ts": {
+      "reads": {
+        "listStorageFiles": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.4), the node's own read, moved from ./store.ts: the owner's own package file list (keys and creation times), read to apply the owner's retention policy after a publish. No content reaches anyone."
+    },
+    "src/services/datapackage/freshness-read.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.1), the node's own read: the owner's data product definition (`dataproducts.<name>`, service-owned) for its schedule, and the current version's descriptor for the producer's schedule and kind. Only the freshness state, the cron and timestamps leave, to a caller the package's own read already admitted. No row of data."
+    },
+    "src/services/datapackage/versions-in-use.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.4), the node's own read: the current version's descriptor for its retention policy, for the owner's versions list. No row of data."
     },
     "src/services/datapackage/audience-record.ts": {
       "reads": {

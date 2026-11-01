@@ -20,11 +20,18 @@
  *   why the MCP path had to fabricate a fake Response object to call it at all. A decision is a value;
  *   turning it into a status code is the door's business. `metered-response.ts` does that for HTTP
  *   doors, and MCP renders the same value as text.
+ *
+ *   THE RESULT OF A METERED CALL GOES TO THE BUYER ONLY (Data Governance Act 2022/868, art. 12(a); plan
+ *   doc-mvwxcas3dom3, D7.5). This chokepoint decides and settles; the door hands the capability's answer
+ *   to the caller that paid for it, and no node-side analytics or AI path reads it on the way. A change
+ *   that makes one read it adds that code path to NODE_SIDE_READERS_OF_EXCHANGED_DATA
+ *   (services/data-intermediation/art12.ts), which the compliance report's Article 12 row (a) states.
  * @structure MeteredOutcome · authoriseMeteredCall · providerOwnerOfCoordinate
  * @usage
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.3.2 — 2026-11-01 — The header states that a metered result goes to the buyer only (plan D7.5).
  *   v1.3.1 — 2026-10-31 — The contract's state, rate window, a grant's carried ceiling and the budget
  *     are asked before the pacing is charged, so a call they refuse moves no morsels; a settlement that
  *     refuses after the pacing (the morsel price not covered, the money rail failing) gives the pacing

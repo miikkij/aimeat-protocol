@@ -14,12 +14,14 @@
  * @structure namedShareSource · outsidePartySource
  * @usage import { namedShareSource, outsidePartySource } from './sources-parties.js';
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A named share carries the freshness of the package it shares (plan D6.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3).
  */
 import type { ExposureItem, ExposureSource } from './exposure-types.js';
 import { isLiveShare, packageOfPattern } from '../parties/shares.js';
 import { readParties } from '../parties/store.js';
 import { parsePartyRef } from '../parties/contract.js';
+import { packageFreshness } from '../datapackage/freshness-read.js';
 
 const enc = encodeURIComponent;
 
@@ -27,15 +29,21 @@ export const namedShareSource: ExposureSource = {
   kind: 'named_share',
   async list(ctx, _ownerName, ownerGhii) {
     const active = await ctx.storage.listConsents(ownerGhii, { status: 'active' });
-    return active
-      .filter(c => c.recipient.startsWith('party:') && isLiveShare(c, ctx.nowMs))
-      .map((c): ExposureItem => {
+    const live = active.filter(c => c.recipient.startsWith('party:') && isLiveShare(c, ctx.nowMs));
+    // The shared package's freshness, once per package (plan D6.1).
+    const states = new Map<string, string>();
+    for (const pkg of new Set(live.map(c => packageOfPattern(c.dataPattern)).filter((p): p is string => !!p))) {
+      const f = await packageFreshness({ storage: ctx.storage, config: ctx.config }, ownerGhii, pkg, { now: new Date(ctx.nowMs) });
+      if (f) states.set(pkg, f.state);
+    }
+    return live.map((c): ExposureItem => {
         const pkg = packageOfPattern(c.dataPattern) ?? c.dataPattern;
         const party = parsePartyRef(c.recipient)?.name ?? c.recipient;
         return {
           kind: 'named_share', id: c.id, title: `${pkg} shared with ${party} until ${(c.expires ?? '').slice(0, 10)}`,
           level: 'named', url: `${ctx.base}/v1/odata/${enc(parsePartyRef(c.recipient)?.owner ?? '')}/${enc(pkg)}`,
           how_to_close: `End it with aimeat_consent_revoke (consent_id ${c.id}; DELETE /v1/consent/${enc(c.id)}). The next read is refused; copies already taken stay with the party.`,
+          ...(states.get(pkg) ? { freshness: states.get(pkg) } : {}),
         };
       });
   },

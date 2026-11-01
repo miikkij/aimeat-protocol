@@ -34,6 +34,8 @@
  * @structure descriptorToOdps · odpsVisibilityOf
  * @usage const doc = descriptorToOdps({ descriptor, ownerGhii, baseUrl, resourceUrls, audience });
  * @version-history
+ *   v1.3.0 -- 2026-11-01 -- The SLA cadence is the freshness promise (a data product's schedule wins over
+ *     the producer's), and x-aimeat.freshness states the package's state now (plan doc-mvwxcas3dom3, D6.1).
  *   v1.2.0 -- 2026-11-01 -- `dataHolder` from the owner's stated company (./data-holder.ts) and a
  *     `pricingPlans` slot an offering fills; absent stays absent (plan doc-mvwxcas3dom3, D1.2).
  *   v1.1.0 -- 2026-11-01 -- The sheet states the version's real audience (`audience`): visibility,
@@ -45,6 +47,7 @@
 import { stringify as yamlStringify } from 'yaml';
 import { ODPS_VERSION, ODPS_SCHEMA_URL_YAML } from '../exchange-odps.js';
 import { bare, type Descriptor } from './contract.js';
+import { freshnessBrief, type Freshness } from './freshness.js';
 
 /**
  * A cron expression as an ODPS `updateFrequency` objective.
@@ -88,6 +91,11 @@ export interface OdpsProjectionInput {
      * read has no price, and a sheet without plans says nothing is charged rather than inventing a plan.
      */
     pricingPlans?: Record<string, unknown> | null;
+    /**
+     * The package's freshness against its producer's promise (./freshness.ts). Its promise is the SLA's
+     * cadence (a data product's schedule wins over the producer's), and its state is stated in x-aimeat.
+     */
+    freshness?: Freshness | null;
 }
 
 /** ODPS v4.1 `details.visibility` for an AIMEAT audience. */
@@ -180,13 +188,16 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
         },
     };
 
-    const freq = updateFrequencyFrom(a.producer.schedule);
+    // The promise the freshness was computed against: a data product's schedule, else the producer's.
+    const promised = input.freshness?.promise?.cron ?? a.producer.schedule;
+    const promisedBy = input.freshness?.promise?.source === 'dataproduct' ? 'dataproduct' : a.producer.kind;
+    const freq = updateFrequencyFrom(promised);
     const sla = freq
         ? {
             declarative: [{
                 name: { [lang]: 'Producer cadence' },
                 description: {
-                    [lang]: `Refreshed by a ${a.producer.kind} producer on the schedule "${a.producer.schedule}". `
+                    [lang]: `Refreshed by a ${promisedBy} producer on the schedule "${promised}". `
                         + 'A run that fails writes no version: the package stays on its previous one and the '
                         + 'failure is recorded on the package pointer.',
                 },
@@ -219,6 +230,8 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
                 audience,
                 schemaSource: a.schemaSource,
                 producer: a.producer,
+                // Fresh, late, stale or unscheduled now, against the promise above (./freshness.ts).
+                ...(input.freshness ? { freshness: freshnessBrief(input.freshness) } : {}),
                 producedBy: a.producedBy,
                 resources: d.resources.map(r => ({
                     name: r.name, rowCount: r.rowCount, bytes: r.bytes, hash: r.hash,

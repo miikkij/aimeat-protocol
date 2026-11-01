@@ -29,10 +29,12 @@
  *   party declining it, by the party's deletion, and by the package's withdrawal; each of the last
  *   three sets status `revoked` with `endedReason` (`declined`, `party-deleted`, `package-withdrawn`).
  * @structure SHARE_PATTERN_PREFIX · sharePatternOf · packageOfPattern · ShareMeta · shareMetaOf ·
- *   isLiveShare · partySharesOf · normalizePartyShare · endShares · setShareMeta · connectionFileOf ·
+ *   isLiveShare · partySharesOf · normalizePartyShare · endShares · endSharesListed · setShareMeta · connectionFileOf ·
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.1.0 — 2026-11-01 — endSharesListed answers the shares it ended, so a withdrawal mails their
+ *     parties (services/datapackage/share-notices.ts; plan D6.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3; lead decision L3).
  */
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
@@ -197,13 +199,18 @@ export async function setShareMeta(storage: Storage, share: ConsentRecord, chang
  * audit entry each. Answers how many ended. The next read through any of them is refused.
  */
 export async function endShares(storage: Storage, ownerGhii: string, match: (c: ConsentRecord) => boolean, reason: string): Promise<number> {
+    return (await endSharesListed(storage, ownerGhii, match, reason)).length;
+}
+
+/** endShares, answering the shares it ended as they were before, so a caller can tell their parties. */
+export async function endSharesListed(storage: Storage, ownerGhii: string, match: (c: ConsentRecord) => boolean, reason: string): Promise<ConsentRecord[]> {
     const active = await storage.listConsents(ownerGhii, { status: 'active' });
-    let ended = 0;
+    const ended: ConsentRecord[] = [];
     for (const c of active) {
         if (!c.recipient.startsWith('party:') || !match(c)) continue;
         await setShareMeta(storage, c, { endedReason: reason }, 'revoked');
         await auditDataAccess(storage, c.id, c.ownerGaii, c.recipient, c.dataPattern, 'revoke', true);
-        ended++;
+        ended.push(c);
     }
     return ended;
 }

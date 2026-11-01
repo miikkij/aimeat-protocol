@@ -22,6 +22,7 @@
  *   const sheet = await odpsSheetFor({ storage, config }, 'pkg:alice/shortages', nodeId, req.auth);
  *   if (sheet) res.type('text/yaml').send(sheet.yaml);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The sheet carries the package's freshness (./freshness-read.ts; plan D6.1).
  *   v1.1.0 — 2026-11-01 — The sheet names the owner's stated company as `dataHolder` (./data-holder.ts;
  *     plan doc-mvwxcas3dom3, D1.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D0.1).
@@ -34,6 +35,7 @@ import { bare, descriptorKey, publicUrl, resourceKey, type LatestPointer } from 
 import { descriptorToOdps, odpsToYamlDocument } from './odps.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { dataHolderFor } from './data-holder.js';
+import { packageFreshness } from './freshness-read.js';
 
 /**
  * The audience of one stored version: the pointer's when the pointer names it, else the audience
@@ -65,6 +67,8 @@ export async function odpsSheetFor(
         descriptor: d, ownerGhii, baseUrl: deps.config.baseUrl, descriptorUrl: opened.descriptorUrl, audience,
         // The legal entity behind it, when the owner stated a company it can be said to be held by.
         dataHolder: await dataHolderFor(deps, ownerGhii, audience),
+        // The package's freshness against its producer's promise (./freshness.ts, D6.1).
+        freshness: await packageFreshness(deps, ownerGhii, d.name, opened.latest ? { pointer: opened.latest } : {}),
         resourceUrls: Object.fromEntries(d.resources.map(r => [r.name, publicUrl(deps.config.baseUrl, ownerGhii, resourceKey(d.name, contentHash, r.name))])),
     });
     return { doc, yaml: odpsToYamlDocument(doc), contentHash };
