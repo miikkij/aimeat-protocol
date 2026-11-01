@@ -14461,6 +14461,7 @@
       "codeStepConnect": "Conecta tu propia IA (Claude, ChatGPT o Grok) a {host} y a este sitio.",
       "codeConnectThere": "Conectar a {host}",
       "codeConnectHere": "Conectar a este sitio",
+      "codeFullAccess": "Cuando {host} te lo pida, elige un agente con acceso completo.",
       "codeChatPath": "También puedes usar el chat de este sitio: conéctalo a {host} en Acceso y seguridad.",
       "codeChatButton": "Conectar el chat a {host}",
       "codeStepAsk": "Pide a tu IA que envíe tu solicitud de desarrollo con este código.",
