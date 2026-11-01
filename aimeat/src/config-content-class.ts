@@ -16,11 +16,16 @@
  *   A PDF THE BUDGET CANNOT MEASURE is read under a time and a memory limit (pdf_text_seconds,
  *   pdf_text_memory_mb; 0 is no limit), wherever its text is read: the content facts, a chat
  *   attachment, the refinery.
+ *
+ *   A PICTURE'S OR VIDEO'S METADATA is read in a worker under a time and a memory limit
+ *   (media_read_seconds, media_read_memory_mb; 0 is no limit; services/content/media-read-bounded.ts).
  * @structure ContentClassMode · ContentClassConfig · parseContentClassMode() · contentClassDefaults()
  * @usage
  *   import { contentClassDefaults } from './config-content-class.js';
  *   const config = { ...contentClassDefaults(), ... };
  * @version-history
+ *   v1.2.0 — 2026-11-01 — mediaReadSeconds and mediaReadMemoryMb (secaudit2026oct31w2 round 12, the
+ *     exifr and c2pa-ts readers).
  *   v1.1.0 — 2026-10-29 — pdfTextSeconds and pdfTextMemoryMb (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  */
@@ -46,6 +51,13 @@ export interface ContentClassConfig {
   pdfTextSeconds: number;
   /** The memory limit, in MB, for the same read. 0 is no limit. */
   pdfTextMemoryMb: number;
+  /**
+   * The time limit, in seconds, for reading a picture's or video's metadata with exifr and c2pa-ts
+   * (services/content/media-read-bounded.ts). 0 is no limit.
+   */
+  mediaReadSeconds: number;
+  /** The memory limit, in MB, for the same read. 0 is no limit. */
+  mediaReadMemoryMb: number;
 }
 
 /** A whole number 0 or above from the environment, else `fallback`. */
@@ -73,5 +85,8 @@ export function contentClassDefaults(): ContentClassConfig {
     // Above any real document (services/file-text/pdf-bounded.ts DEFAULT_PDF_TEXT_*).
     pdfTextSeconds: wholeOrDefault(process.env.AIMEAT_PDF_TEXT_SECONDS, 120),
     pdfTextMemoryMb: wholeOrDefault(process.env.AIMEAT_PDF_TEXT_MEMORY_MB, 1024),
+    // Far above what a real picture's or video's metadata takes (media-read-bounded.ts DEFAULT_MEDIA_READ_*).
+    mediaReadSeconds: wholeOrDefault(process.env.AIMEAT_MEDIA_READ_SECONDS, 30),
+    mediaReadMemoryMb: wholeOrDefault(process.env.AIMEAT_MEDIA_READ_MEMORY_MB, 512),
   };
 }
