@@ -15,9 +15,11 @@
  *   as a euro, which is how the keys before 2026-10-31 were made. Only on a node the store sold
  *   (site.js customerNode()); elsewhere the allowance stays in dollars, as the node's own key
  *   reports it.
- * @structure eurPerUsd() · aiCredit(status) · creditEur(usd) · topupHref()
+ * @structure eurPerUsd() · aiCredit(status) · chatWorks(status) · creditEur(usd) · topupHref()
  * @usage const credit = aiCredit(chatStatus); // { eur, state } or null
  * @version-history
+ *   v1.5.0 — 2026-11-01 — chatWorks(status): the Home's steps that go through the chat are open while
+ *     the place's chat answers, before an outside AI is connected (commercial's crew52 check).
  *   v1.4.0 — 2026-11-01 — messagesFor removed: the credit is shown in euros only, never as messages
  *     (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
  *   v1.3.0 — 2026-11-01 — messagesFor(eur): the messages the credit buys, by the store's price of one
@@ -65,6 +67,17 @@ export function aiCredit(status) {
       : status.allowance_low ? 'low'
         : 'ready';
   return { eur, state };
+}
+
+/**
+ * Whether the place's own chat answers now: it is switched on and the node names who pays for a turn
+ * (`pays` is null when the gate would refuse the call, a spent credit included). On a node the store
+ * sold this is true from the start, before any outside AI is connected.
+ * @param {any} status the data of GET /v1/chat/status
+ * @returns {boolean}
+ */
+export function chatWorks(status) {
+  return !!status && status.enabled !== false && !!status.pays;
 }
 
 /**

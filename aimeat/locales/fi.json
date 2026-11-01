@@ -9645,6 +9645,7 @@
   "accesspage.rail.elsewhere": "Muualla",
   "accesspage.rail.groups": "Jakoryhmät",
   "accesspage.rail.mcp": "MCP-palvelimet",
+  "accesspage.rail.mcpPlace": "Muut palvelut",
   "accesspage.rail.addresses": "Osoitteet",
   "accesspage.rail.ai": "Tekoäly ja pääsy",
   "accesspage.chipApps": "{n} sovellusta toimii nimissäsi",
@@ -9945,6 +9946,8 @@
   "accesspage.secAccounts": "Tilisi muissa palveluissa",
   "accesspage.secAccountsSub": "{n} liitetty · {providers} palvelua tarjolla",
   "accesspage.secMcp": "Liittämäsi MCP-palvelimet",
+  "accesspage.secMcpPlace": "Yhteydet muihin palveluihin",
+  "accesspage.mcpIntroPlace": "Täällä yhdistät AIMEATisi muihin palveluihin, esimerkiksi aimeat.io:hon. Kun yhteys on tehty, tämän paikan chat ja agenttisi voivat käyttää palvelua sinun nimissäsi. Kirjaudut palveluun kerran, ja kirjautumistiedot pysyvät vain omassa AIMEATissasi.",
   "accesspage.secMcpSub": "{n} liitetty",
   "accesspage.secAccountsOff": "ei käytössä tällä palvelimella",
   "accesspage.accountsIntro": "Tili, jonka liität tänne, jää tänne: sovellus tai agentti saa tietää vain, minkä tilin se saa käyttöönsä, eikä koskaan itse tunnuksia. Lukeminen ja lähettäminen ovat eri liitokset, koska ne ovat eri luottamus.",
@@ -16279,6 +16282,7 @@
       "stepsLabel": "Kaksi askelta",
       "step2": "Kerro yhdellä lauseella, mitä haluat saada tehdyksi. AIMEAT tekee siihen agentin ja näyttää sen sinulle ennen kuin se aloittaa.",
       "step2Waits": "Tämä aukeaa, kun tekoälysi on yhdistetty.",
+      "step2Open": "Avaa chat",
       "settings": "Asetukset"
     },
     "buildWithYou": {
@@ -22765,6 +22769,7 @@
       "mcpTitle": "MCP-palvelimet",
       "mcpIntro": "Muut MCP-palvelimet, jotka olet liittänyt. Tekoälysi, agenttisi ja sovelluksesi voivat käyttää niitä, ja kirjautumistiedot pysyvät tässä AIMEATissa — mikään puolestasi toimiva ei näe niitä.",
       "mcpEmpty": "Et ole vielä liittänyt MCP-palvelimia.",
+      "mcpEmptyPlace": "Et ole vielä yhdistänyt muita palveluja.",
       "mcpToolCount": "{n} työkalua",
       "mcpOff": "pois käytöstä",
       "mcpNeedsReauth": "vaatii uuden liittämisen",
@@ -24301,6 +24306,7 @@
   },
   "setup": {
     "pickTool": "Mihin AI-työkaluun kytket? Askeleet eroavat sen verran että yleisversiosta ei ole hyötyä.",
+    "moreTools": "Muut tekoälytyökalut ({n})",
     "recommendedBadge": "suositus aloitukseen",
     "paramsTitle": "Mitä mihinkin kenttään laitetaan",
     "copyCmd": "Kopioi komento",

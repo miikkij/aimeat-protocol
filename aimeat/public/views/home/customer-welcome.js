@@ -16,6 +16,8 @@
  * @structure CustomerWelcome({ session, initialized })
  * @usage html`<${CustomerWelcome} session=${session} initialized=${state.initialized} />`
  * @version-history
+ *   v1.3.0 — 2026-11-01 — While the place's own chat answers (ai-credit.js chatWorks), step 2 is open
+ *     with a link to the chat, not greyed as waiting for the outside AI.
  *   v1.2.0 — 2026-10-31 — Jouni's review of v31 (K26): "Tervetuloa omaan AIMEATiisi, <nimi>" with a
  *     real name only, never the account id; the address in small type; "oikea kätesi" in place of
  *     "esikuntapäällikkö", and MCP only behind "Mikä tämä on?"; the connect buttons are the one loud
@@ -38,6 +40,8 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { ChooserFold } from '/components/Chooser.js';
 import { Note } from '/components/Note.js';
 import { rememberTool } from '/components/SetupGuide.js';
+import { useShared } from '/views/surface/shared-read.js';
+import { chatWorks } from '/js/ai-credit.js';
 
 /**
  * The AIs a buyer most likely has, as the connect guide names them (GET /v1/ai-tools ids). Each
@@ -53,7 +57,10 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
  * @param {{ session: any, initialized: boolean }} props
  */
 export function CustomerWelcome({ session, initialized }) {
-  if (!customerNode() || initialized) return null;
+  const show = customerNode() && !initialized;
+  const { data: chatStatus } = useShared('chat-status', show ? '/v1/chat/status' : null, ['chat']);
+  if (!show) return null;
+  const step2 = tr('home.buyerWelcome.step2', 'Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.');
 
   // A real name only: a buyer the store named no one gets the account id as their name, and a machine
   // id in the heading reads as a fault (v31 K26: "KOEUUSI417276" was the big heading).
@@ -88,9 +95,16 @@ export function CustomerWelcome({ session, initialized }) {
               <p>${tr('homeConnect.mcpWhat', 'The connection uses the open MCP technology. You do not need to know more about it.')}</p>
             <//>
           <//>
-          <${IndexStep} line=${tr('home.buyerWelcome.step2Waits', 'This opens when your AI is connected.')}>
-            <${Note} kind="quiet">${tr('home.buyerWelcome.step2', 'Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.')}<//>
-          <//>
+          ${chatWorks(chatStatus)
+            // The place's own chat answers before any outside AI is connected, so step 2 is open there
+            // (commercial's crew52 check: it looked locked although the chat worked).
+            ? html`<${IndexStep}>
+                ${step2}
+                <${Actions}><${Action} small href="/v1/chat">${tr('home.buyerWelcome.step2Open', 'Open the chat')} →<//><//>
+              <//>`
+            : html`<${IndexStep} line=${tr('home.buyerWelcome.step2Waits', 'This opens when your AI is connected.')}>
+                <${Note} kind="quiet">${step2}<//>
+              <//>`}
         <//>
       <//>
 

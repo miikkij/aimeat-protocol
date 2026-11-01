@@ -27,6 +27,7 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.35.0 -- 2026-11-01 -- On a node the store sold with a build queue (site.build_queue_url), the MCP servers section, with its "Connect to aimeat.io", is section 02 before the "Lisätiedot" fold, so the build code card's link reaches it (commercial's crew52 walk).
  *   v1.34.0 -- 2026-11-01 -- On a node the store sold (Jouni's review of v33): "kuka pääsee tiliisi ja miten"; one button at the top, the fingerprint or face sign-in while there is none; no tags and no counters up front; the sign-in rows are the link, the fingerprint or face, two-step and "Olet kirjautuneena N laitteella" with "Kirjaudu ulos muilta laitteilta", without the other servers' row; everything else, counters included, is in one fold, "Lisätiedot".
  *   v1.33.0 -- 2026-11-01 -- On a node the store sold (Jouni's review of the Access page): the sign-in row is the emailed sign-in link, in use; no "set by the store" password, no coral two-step chip, no warning that anyone with the password gets in; the recovery key and the public key rows are left out, and the words come from the `Place` variants (frame.js x), which say permission where the page said key.
  *   v1.32.0 -- 2026-10-29 -- On a customer's node the password reads as the one the store set, which the buyer signing in by email link does not need (UX review 2026-10-29, D).
@@ -92,7 +93,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { customerNode } from '/js/site.js';
+import { customerNode, siteLink } from '/js/site.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
@@ -139,14 +140,23 @@ export function renderPage(ctx) {
   // On a node the store sold the page leads with how the buyer signs in; the counters, the keys and
   // everything for agents and developers wait in one fold, "Lisätiedot" (Jouni's review of v33).
   const place = customerNode();
+  // On such a node with a build queue ("Rakennamme kanssasi"), the MCP servers section stands before
+  // the fold: its "Connect to aimeat.io" is a step the Home's build code card sends the buyer to
+  // (commercial's crew52 walk: inside "Lisätiedot" nobody found it).
+  const builders = place && !!siteLink('buildQueue');
+  const moreNum = builders ? '03' : '02';
   const sections = place
-    ? [{ id: 'ac-signin', num: '01', label: x('rail.signIn'), count: '' }, { id: 'ac-more', num: '02', label: x('morePlace'), count: '' }]
+    ? [
+      { id: 'ac-signin', num: '01', label: x('rail.signIn'), count: '' },
+      ...(builders ? [{ id: 'ac-mcp', num: '02', label: x('rail.mcp'), count: ctx.mcpCount == null ? '' : String(ctx.mcpCount) }] : []),
+      { id: 'ac-more', num: moreNum, label: x('morePlace'), count: '' },
+    ]
     : rail.map(([num, id, label, count]) => ({ id, num, label, count }));
   // Built only once the overview is in: every section reads it.
   const rest = () => html`
     ${secKeys(ctx)}
     ${secAccounts(ctx)}
-    ${secMcp(ctx)}
+    ${builders ? null : secMcp(ctx)}
     ${secSecrets(ctx)}
     ${secGroups(ctx)}
     ${secAddresses(ctx)}
@@ -170,8 +180,9 @@ export function renderPage(ctx) {
       after=${html`<${ctx.ConfirmUI} />`}>
       ${!ov ? html`<${Note} kind=${ctx.failed ? 'quiet' : 'loading'}>${ctx.failed ? x('loadFailed') : x('loading')}<//>` : html`
         ${secSignIn(ctx)}
+        ${builders ? secMcp(ctx, '02') : null}
         ${place
-          ? html`<${Section} fold id="ac-more" num="02" title=${x('morePlace')} sub=${x('moreSubPlace')}
+          ? html`<${Section} fold id="ac-more" num=${moreNum} title=${x('morePlace')} sub=${x('moreSubPlace')}
               open=${ctx.moreOpen} onToggle=${() => ctx.setMoreOpen(!ctx.moreOpen)}>${ctx.moreOpen ? html`${strip(ctx)}${rest()}` : null}<//>`
           : rest()}`}
     <//>`;
@@ -385,9 +396,9 @@ function secAccounts(ctx) {
  * is a set of tools, not an account, and it does not follow the accounts switch, so it gets its own
  * number, title and count. The section supplies the title and intro; `inRow` leaves out the panel's own.
  */
-function secMcp(ctx) {
+function secMcp(ctx, num = '04') {
   return html`
-    <${Section} id="ac-mcp" num="04" title=${x('secMcp')} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
+    <${Section} id="ac-mcp" num=${num} title=${x('secMcp')} count=${ctx.mcpCount == null ? '' : x('secMcpSub', { n: ctx.mcpCount })}>
       <${Note} kind="lead">${x('mcpIntro')}<//>
       <${McpServersSection} inRow showToast=${ctx.showToast} />
     <//>`;
