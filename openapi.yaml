@@ -653,7 +653,7 @@ components:
         ok: { type: boolean, description: Every host was accepted (200 or 202) }
         status: { type: integer, nullable: true, description: The first refusal's status when one host was refused, otherwise the accepted status; null when a request never completed }
         failed: { type: array, items: { type: string }, description: The hosts whose batch was refused or never answered }
-        scope: { type: string, enum: [app, pages, all], description: What the notice covered }
+        scope: { type: string, enum: [app, pages, all, dataset], description: What the notice covered; dataset is one public data package's page, sent when a public version was published }
         by: { type: string, description: Who asked for an explicit notice; absent when a publish fired it }
     IndexNowPlan:
       type: object
@@ -20491,7 +20491,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits, data.free_model { available, model, node_default, in_effect }, data.openrouter_region { hosts, node_key, node { region, fallback, allowed, person_may_choose }, in_effect { node_key, own_key }, note }.
+          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits, data.free_model { available, model, node_default, in_effect }, data.openrouter_region { hosts, node_key, mode { id, limits } | null, node { region, fallback, allowed, person_may_choose }, in_effect { node_key, own_key }, note }. mode is the AI region choice made when the node was bought (ai.region_mode eu, eu-only or own); while one is set, node follows it.
           content:
             application/json:
               schema:
@@ -20696,7 +20696,9 @@ paths:
             processed (eu.openrouter.ai, us.openrouter.ai or openrouter.ai), the operator's choice
             (ai.openrouter_region, ai.openrouter_region_fallback, ai.openrouter_regions,
             ai.openrouter_region_person_choice) and what applies to this account now, on the node's
-            key and on its own OpenRouter key.
+            key and on its own OpenRouter key. Its `mode` is the AI region choice made when the node
+            was bought (ai.region_mode: eu, eu-only or own, with `limits`), null when none was made;
+            while one is set the four settings follow it.
           content:
             application/json:
               schema:
@@ -23048,8 +23050,14 @@ paths:
         that this node does not watermark text - it does not sample the tokens, and that layer
         belongs to whoever runs the model.
 
-        Response `data`: `{ node_id, operator, supervisory_authority, marking, detection, labelling,
-        code_of_practice, posture }`.
+        Response `data`: `{ node_id, operator, supervisory_authority, ai_processing_region, marking,
+        detection, labelling, code_of_practice, posture }`.
+
+        `ai_processing_region` is where the node's own AI key has prompts processed: `{ mode,
+        mode_limits?, node_key, region?, host?, fallback?, regions_in_use?, note }`. `mode` is the AI
+        region choice made when the node was bought (`ai.region_mode`: `eu`, `eu-only`, `own`, or null
+        when none was made) and `mode_limits` what it switches off; the region fields appear when the
+        node holds its own key.
 
         `code_of_practice` reports the EU Code of Practice on Transparency of AI-generated Content
         signature of THIS node's operator, from `AIMEAT_AI_COP_SECTIONS` / `_SIGNED_ON` - the
@@ -26214,9 +26222,16 @@ paths:
           schema: { type: string }
           description: >
             CSV of types to include (capability, workflow, knowledge, decision, research, material,
-            company, offering, document, organism, app, tool, template, skill, designbook, memory).
+            company, offering, document, organism, app, tool, template, skill, designbook, dataset, memory).
             A `tool` entry is one published app tool, listed per tool rather than per app; its id is
-            `owner/appId#tool` and its href is that app's WebMCP listing.
+            `owner/appId#tool` and its href is that app's WebMCP listing. A `dataset` entry is one data
+            package: its id is `pkg:{owner}/{name}`, its segment the audience level (public, members,
+            organism, private), and its `dataset` block carries the audience, the row count, the
+            resources, `lastPublishedAt`, the last failed run (`lastError`) and `links` (api, descriptor,
+            odata, odps, schemaOrg, and `landing` for a public one). `own` lists the caller's account's
+            packages it may read, `shared` other accounts' members and organism packages it may read,
+            `public` the public ones; a withdrawn package is never listed, and a private one of the
+            owner reaches an agent only with `storage:read`, as the descriptor read answers.
         - name: segment
           in: query
           schema: { type: string }
@@ -27668,6 +27683,13 @@ paths:
                     (AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY, public unless the operator chose otherwise).
                     The owner always reads it. The files, the latest pointer and the
                     catalogue entry carry it; only a public package is in the public catalogue.
+                confirm_personal_public:
+                  type: boolean
+                  description: >-
+                    The owner confirms that this package goes public although the data map of the app
+                    that publishes it (an app grant) marks its data personal. Without it such a publish
+                    to public answers 409 PERSONAL_DATA_PUBLIC and nothing is written. Recorded on the
+                    package pointer as `personalPublicConfirmed`, so later public versions are not asked again.
       responses:
         '201':
           description: A new version was written
@@ -27682,6 +27704,12 @@ paths:
             organism the caller is not an active member of. Nothing is written.
         '422':
           description: The quality gate refused — issues[] carries the row and column of each problem
+        '409':
+          description: >-
+            PERSONAL_DATA_PUBLIC. An app grant publishes to public, and its app's data map marks the data
+            personal (a row with personalData yes or with domains; a row naming the package's own
+            datapkg/ family decides alone). Nothing was written. Send it again with
+            confirm_personal_public true once the owner agrees, or publish it below public.
         '401':
           description: Authentication required
         '403':
@@ -27762,9 +27790,18 @@ paths:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
         - { name: name, in: path, required: true, schema: { type: string } }
         - { name: version, in: query, required: false, schema: { type: string }, description: 'sha256:… to pin one version.' }
+        - name: format
+          in: query
+          required: false
+          schema: { type: string, enum: [schemaorg] }
+          description: >-
+            schemaorg answers the schema.org Dataset JSON-LD of the version (application/ld+json) for a
+            page to embed: name, description, identifier, version, licence, creator, keywords, the
+            columns as variableMeasured and a DataDownload per CSV; `url` is the public dataset page,
+            for a public package only. The same readers as the descriptor read.
       responses:
         '200':
-          description: The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS product sheet (`odps_url`), and the latest pointer when unpinned
+          description: The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS product sheet (`odps_url`), of its schema.org description (`schema_org_url`), and the latest pointer when unpinned; with format=schemaorg the schema.org Dataset JSON-LD instead
         '403':
           description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
@@ -29860,11 +29897,55 @@ paths:
     get:
       operationId: getCatalogueKnowledge
       summary: Knowledge packages catalogue
-      description: List discoverable knowledge packages in the catalogue.
+      description: >
+        List discoverable knowledge packages in the catalogue. The item of a data package
+        (content_type `dataset`) carries `datapackage`: package_id, content_hash, descriptor_url,
+        odata_url, odps_url, schema_org_url, landing_url (the public dataset page) and per resource its
+        name, row_count, fields, bytes and csv_url.
       tags: [Catalogue]
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/catalogue/dcat:
+    get:
+      operationId: getCatalogueDcat
+      summary: DCAT-AP 3.0 catalogue of the public data packages
+      description: >
+        The public, non-withdrawn data packages of this node as a DCAT-AP 3.0 `dcat:Catalog`, for an
+        open-data harvester. No authentication. JSON-LD (`application/ld+json`) by default; Turtle
+        (`text/turtle`) with `?format=ttl` or `Accept: text/turtle`. Each `dcat:Dataset` carries
+        dct:title, dct:description, dct:identifier (`pkg:{owner}/{name}`), dct:publisher (the owner's
+        account as a foaf:Agent with the node's address), dct:issued, dct:modified, dcat:keyword,
+        dct:license when the package names one, dct:accrualPeriodicity when a schedule produces it and
+        its cron has an EU frequency word (DAILY, WEEKLY, MONTHLY and the rest), dcat:landingPage (the
+        public dataset page), and a dcat:distribution per resource CSV (dcat:downloadURL, dcat:mediaType
+        text/csv, dcat:byteSize), one for the OData v4 service (dct:conformsTo OData v4) and one for the
+        Frictionless descriptor. PAGING: the catalogue carries hydra:totalItems and a
+        hydra:PartialCollectionView with hydra:first, hydra:last, hydra:next and hydra:previous. A node
+        that shows its content to signed-in accounts only lists no dataset.
+      tags: [Catalogue]
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [jsonld, ttl] }
+          description: jsonld (the default) or ttl (Turtle).
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: The catalogue page.
+          content:
+            application/ld+json:
+              schema: { type: object, description: 'JSON-LD with @context (dcat, dct, foaf, xsd, hydra, rdfs) and @graph: the dcat:Catalog node first, then the datasets of this page.' }
+            text/turtle:
+              schema: { type: string }
+        '400':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/catalogue/{actionId}:
     get:

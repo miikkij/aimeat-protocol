@@ -22,6 +22,8 @@
  *   const sheet = await odpsSheetFor({ storage, config }, 'pkg:alice/shortages', nodeId, req.auth);
  *   if (sheet) res.type('text/yaml').send(sheet.yaml);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The sheet names the owner's stated company as `dataHolder` (./data-holder.ts;
+ *     plan doc-mvwxcas3dom3, D1.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D0.1).
  */
 import type { StoreDeps } from './store.js';
@@ -31,6 +33,7 @@ import { recordedAudienceOf, type DatapackageReader } from './audience.js';
 import { bare, descriptorKey, publicUrl, resourceKey, type LatestPointer } from './contract.js';
 import { descriptorToOdps, odpsToYamlDocument } from './odps.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { dataHolderFor } from './data-holder.js';
 
 /**
  * The audience of one stored version: the pointer's when the pointer names it, else the audience
@@ -60,6 +63,8 @@ export async function odpsSheetFor(
     const audience = await versionAudienceOf(deps, ownerGhii, d.name, contentHash, opened.latest ?? await readPointer(deps, ownerGhii, d.name));
     const doc = descriptorToOdps({
         descriptor: d, ownerGhii, baseUrl: deps.config.baseUrl, descriptorUrl: opened.descriptorUrl, audience,
+        // The legal entity behind it, when the owner stated a company it can be said to be held by.
+        dataHolder: await dataHolderFor(deps, ownerGhii, audience),
         resourceUrls: Object.fromEntries(d.resources.map(r => [r.name, publicUrl(deps.config.baseUrl, ownerGhii, resourceKey(d.name, contentHash, r.name))])),
     });
     return { doc, yaml: odpsToYamlDocument(doc), contentHash };

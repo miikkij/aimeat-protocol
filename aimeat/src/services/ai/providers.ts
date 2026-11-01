@@ -36,6 +36,7 @@
  *   PROVIDER_PREFIX · fixedBaseUrlOf · typeAllowed · parseAiProvider · nodeAiProviders ·
  *   ownerProviderRecords · providerTarget · providerView
  * @version-history
+ *   2026-11-01 — The node's own OpenRouter provider exists only when nodeOpenRouterKey gives a key: none on the own-key choice (ai.region_mode own).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — ownerProviderRecords answers in id order, the same on every backend (V5).
  *   v1.1.0 — 2026-09-28 — Type `extension` (V6): a record names the owner's extension instead of an
@@ -68,6 +69,7 @@ import {
   FIXED_BASE_URLS, FIXED_PROVIDER_TYPES, isFixedType,
   type AiAdapterType, type AiCapability, type AiTarget, type FixedProviderType,
 } from './types.js';
+import { nodeOpenRouterKey } from './node-openrouter-key.js';
 
 export type AiProviderSource = 'node' | 'builtin' | 'owner';
 
@@ -470,7 +472,8 @@ function capsOf(type: AiAdapterType, only?: readonly AiCapability[]): Partial<Re
 
 /** The provider that holds the node's own key, or null when the node has none. */
 function nodeKeyProvider(config: AimeatConfig): AiProvider | null {
-  if (!(config.openrouterInstanceKey ?? '').trim() || !typeAllowed(config, 'openrouter')) return null;
+  // None on the own-key choice (ai.region_mode own): each person's own key pays there.
+  if (!nodeOpenRouterKey(config) || !typeAllowed(config, 'openrouter')) return null;
   const baseUrl = fixedBaseUrlOf(config, 'openrouter');
   // J4: text as it always was; an image or a transcription only when the operator named a node
   // default model for it. Speech stays as it is until the node has a default speech model (V5).

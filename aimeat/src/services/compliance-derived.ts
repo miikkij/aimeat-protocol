@@ -23,6 +23,9 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.5.0 — 2026-11-01 — Each OpenRouter region row carries its transfer basis (eu: adequacy for the
+ *     UK and Switzerland; us and any: SCC) with a note, and the own-key choice (ai.region_mode own)
+ *     adds a row for each person's own key (Jouni, 2026-11-01).
  *   v1.4.0 — 2026-10-31 — The node's OpenRouter key is one processor per region it can reach (eu, us,
  *     any; ai/openrouter-region.ts regionsInUse), eu and us with their country.
  *   v1.3.0 — 2026-10-29 — An app gets a register only when someone other than its user can read its
@@ -42,7 +45,14 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { nodeAiProviders, NODE_OPENROUTER_ID } from './ai/providers.js';
-import { regionsInUse, REGION_COUNTRY, REGION_HOSTS } from './ai/openrouter-region.js';
+import { regionModeOf, regionsInUse, REGION_COUNTRY, REGION_HOSTS, type OpenRouterRegion } from './ai/openrouter-region.js';
+
+/** What each region's transfer basis rests on, as the records of processing state it. */
+const REGION_TRANSFER_NOTE: Readonly<Record<OpenRouterRegion, string>> = {
+  eu: 'Prompts and answers are processed in the EU/EEA, or in the United Kingdom or Switzerland under the EU adequacy decisions. OpenRouter keeps account, billing and security records in the United States under the SCC in its data processing agreement.',
+  us: 'Prompts and answers are processed in the United States, under the SCC in OpenRouter\'s data processing agreement.',
+  any: 'Prompts and answers can be processed by the model\'s provider in any country; transfers outside the EEA rest on the SCC in OpenRouter\'s data processing agreement.',
+};
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { appAiSignals } from './compliance-app-signals.js';
 import { appReach, type AppReachReading } from './compliance-app-reach.js';
@@ -210,17 +220,33 @@ export function derivedProcessors(config: AimeatConfig): ComplianceProcessor[] {
     // about it stays attached.
     if (p.id === NODE_OPENROUTER_ID) {
       for (const r of regionsInUse(config)) {
+        // The transfer basis each region stands on (Jouni, 2026-11-01): the EU region is the EU/EEA,
+        // with the United Kingdom and Switzerland under adequacy decisions; the United States and any
+        // country rest on the SCC in OpenRouter's data processing agreement, which also covers the
+        // account and billing records OpenRouter keeps in the United States whatever the region.
         out.push({
           id: r === 'any' ? 'ai-node-openrouter' : `ai-node-openrouter-${r}`,
           name: `This node's OpenRouter key (${REGION_HOSTS[r]})`, service: 'ai', host: REGION_HOSTS[r],
           ...(r === 'any' ? {} : { country: REGION_COUNTRY[r] }),
-          answerSources: src(r === 'any' ? ['name', 'service', 'host'] : ['name', 'service', 'host', 'country']),
+          transferBasis: r === 'eu' ? 'adequacy' : 'scc',
+          notes: REGION_TRANSFER_NOTE[r],
+          answerSources: src(r === 'any' ? ['name', 'service', 'host', 'transferBasis'] : ['name', 'service', 'host', 'country', 'transferBasis']),
         });
       }
       continue;
     }
     const host = hostOf(p.baseUrl);
     out.push({ id: `ai-${p.id}`.replace(/[^A-Za-z0-9._-]+/g, '-'), name: p.title || p.id, service: 'ai', ...(host ? { host } : {}), answerSources: src(['name', 'service', 'host']) });
+  }
+  // The own-key choice (ai.region_mode own): the node holds no AI key; each person's own OpenRouter
+  // key runs under that person's own agreement, which the record names so the register is complete.
+  if (regionModeOf(config) === 'own' && !out.some(p => p.id.startsWith('ai-node-openrouter'))) {
+    out.push({
+      id: 'ai-person-openrouter', name: 'Each person\'s own OpenRouter key', service: 'ai', host: REGION_HOSTS.any,
+      transferBasis: 'scc',
+      notes: 'The node holds no shared AI key (ai.region_mode own). Each person adds their own OpenRouter key and uses it under their own agreement with OpenRouter, Inc. (United States); the region is their own choice in their AI settings.',
+      answerSources: src(['name', 'service', 'host', 'transferBasis']),
+    });
   }
   if (config.smtpHost) out.push({ id: 'email-smtp', name: config.smtpHost, service: 'email', host: config.smtpHost, answerSources: src(['name', 'service', 'host']) });
   const op = config.operator;
