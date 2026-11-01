@@ -20,8 +20,12 @@
  *     package's own sheet carries the listing's plans.
  *   D7.1 the data intermediation gate on the new kind, per mode: report and node list, none refuses a
  *     new listing and keeps the existing one, owners refuses until the owner declared itself a provider.
+ *   D6 the listing's freshness: a hand-published package lists unscheduled; a daily product lists fresh
+ *     with due_at and stale_at, on the browse and the detail, and the freshness check makes it late once
+ *     its promised run has passed (the pointer's time set back).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=exchange-datapackage
  * @version-history
+ *   v1.1.0 — 2026-11-01 — D6: the listing carries the package's freshness.
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5).
  */
 import { registerOwner, setupOperator } from './helpers/owner-login.js';
@@ -59,7 +63,7 @@ const stamp = Date.now() % 10_000_000;
 
 console.log('\n=== AIMEAT EXCHANGE data package E2E ===\n');
 let OP = { name: '', token: '' }, A = { name: '', token: '' }, B = { name: '', token: '' }, C = { name: '', token: '' };
-const PKG = `xdp${stamp}`, OTHER = `xdo${stamp}`, MONTH = `xdm${stamp}`, READS = `xdr${stamp}`, NEW1 = `xdn${stamp}`, NEW2 = `xdq${stamp}`;
+const PKG = `xdp${stamp}`, OTHER = `xdo${stamp}`, MONTH = `xdm${stamp}`, READS = `xdr${stamp}`, NEW1 = `xdn${stamp}`, NEW2 = `xdq${stamp}`, DAILY = `xdd${stamp}`;
 const terms = { derivatives: true, resale: false, attribution: true };
 let offering = '', monthOffering = '', readsOffering = '';
 let v1 = '';
@@ -308,6 +312,42 @@ await test('D5.1 aimeat_datapackage_sell: an agent with exchange:write sells; wi
     const refused = await callTool(s2, 'aimeat_datapackage_sell', { ref: `pkg:${A.name}/${OTHER}`, exchange: false });
     assert(refused.isError && /SCOPE_DENIED|not offered/i.test(refused.text), `no exchange:write: ${refused.text.slice(0, 300)}`);
     assert(await listingOf(OTHER), 'the refused call delisted');
+});
+
+console.log('\nD6 freshness on the listing');
+
+await test('D6 a hand-published package lists as unscheduled, never fresh', async () => {
+    const o = await listingOf(PKG);
+    assert(o?.freshness?.state === 'unscheduled' && o.freshness.due_at === null && o.freshness.reason_code === 'no-promise', `listing freshness: ${JSON.stringify(o?.freshness)}`);
+});
+
+await test('D6 a daily product lists fresh with both deadlines; after its promised run passes the freshness check makes the listing late', async () => {
+    const mem = await call('/v1/memory', { token: A.token, body: { key: 'xdp.rows', value: { items: [{ k: 1, v: 'one' }, { k: 2, v: 'two' }] } } });
+    assert(mem.status === 201 || mem.status === 200, `memory: ${show(mem)}`);
+    const def = await call(`/v1/dataproducts/${DAILY}`, { token: A.token, method: 'PUT', body: { sources: [{ kind: 'memory', key: 'xdp.rows', rows_at: 'items' }], schedule: { cron: '0 6 * * *', timezone: 'UTC' } } });
+    assert(def.status === 201, `define: ${show(def)}`);
+    const run = await call(`/v1/dataproducts/${DAILY}/run`, { token: A.token, body: {} });
+    assert(run.status === 201, `run: ${show(run)}`);
+    const s = await sell(DAILY, { model: 'per_read', prices_money: [{ amount: 5_000, currency: 'EUR' }], usage_terms: terms });
+    assert(s.status === 200 && s.body.data.listing.listed?.[0]?.change === 'created', `sell: ${show(s)}`);
+    const o = await listingOf(DAILY);
+    assert(o?.freshness?.state === 'fresh' && typeof o.freshness.due_at === 'string' && typeof o.freshness.stale_at === 'string', `fresh: ${JSON.stringify(o?.freshness)}`);
+    const detail = await call(`/v1/exchange/offerings/${o.offeringId}`);
+    assert(detail.status === 200 && detail.body.data.offering.freshness?.state === 'fresh', `detail: ${show(detail)}`);
+    // The pointer's last success set back a day and a half, as e2e-data-lifecycle does. A storage write
+    // reconciles nothing, so the listing still says fresh until the freshness check runs.
+    const d = await call(`/v1/datapackages/${A.name}/${DAILY}`, { token: A.token });
+    assert(d.status === 200 && d.body.data.latest?.contentHash, `pointer: ${show(d)}`);
+    const pointer = { ...d.body.data.latest, updatedAt: new Date(Date.now() - 36 * 3_600_000).toISOString() };
+    const w = await call('/v1/storage', { token: A.token, body: { key: `datapkg/${DAILY}/latest.json`, data: Buffer.from(JSON.stringify(pointer), 'utf8').toString('base64'), mime_type: 'application/json', visibility: 'private' } });
+    assert(w.status === 201, `write pointer: ${show(w)}`);
+    assert((await listingOf(DAILY))?.freshness?.state === 'fresh', 'the listing changed before the check');
+    const sw = await call('/v1/admin/scheduler/jobs/core:datapackage-freshness/trigger', { token: OP.token, method: 'POST' });
+    assert(sw.status === 200, `sweep: ${show(sw)}`);
+    const late = await listingOf(DAILY);
+    assert(late?.offeringId === o.offeringId && late.freshness?.state === 'late' && late.freshness.reason_code === 'missed-one', `late: ${JSON.stringify(late?.freshness)}`);
+    const lateDetail = await call(`/v1/exchange/offerings/${o.offeringId}`);
+    assert(lateDetail.body.data?.offering?.freshness?.state === 'late', `late detail: ${show(lateDetail)}`);
 });
 
 console.log('\nD7.1 the data intermediation gate on the new kind');
