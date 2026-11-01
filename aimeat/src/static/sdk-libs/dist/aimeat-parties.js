@@ -52,6 +52,7 @@
   // src/static/sdk-libs/parties/index.js
   var BASE = (APEX_URL || NODE_URL || "").replace(/\/+$/, "");
   var STORE_KEY = "aimeat-party-session";
+  var SESSION_EVENT = "aimeat-party-session";
   function app() {
     const ref = appRef();
     if (!ref) throw Object.assign(new Error("This page is not an app served by an AIMEAT node."), { code: "NOT_AN_APP" });
@@ -70,6 +71,7 @@
     }
   }
   function keep(t) {
+    const before = token() || memory;
     try {
       if (t) sessionStorage.setItem(STORE_KEY, t);
       else sessionStorage.removeItem(STORE_KEY);
@@ -77,6 +79,13 @@
       console.debug("[aimeat-parties] no session storage:", e instanceof Error ? e.message : e);
     }
     memory = t;
+    if ((before || null) !== (t || null) && typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      try {
+        window.dispatchEvent(new CustomEvent(SESSION_EVENT, { detail: { signedIn: !!t } }));
+      } catch (e) {
+        console.debug("[aimeat-parties] the session event was not sent:", e instanceof Error ? e.message : e);
+      }
+    }
   }
   var memory = null;
   async function call(suffix, opts = {}) {
@@ -129,6 +138,27 @@
     signIn: (email) => call("/parties/signin", { body: { email, lang: lang() } }),
     /** Who is signed in, and its role in the app. */
     me: () => call("/parties/me", { auth: true }),
+    /**
+     * A request to the node with this person's sign-in, for the libraries that read a member's standing
+     * (AIMEAT.iam): `path` starts at /v1. Answers the parsed envelope, a refusal included, and never
+     * throws for one, as AIMEAT.auth's session fetch does. The node takes the sign-in on this app's own
+     * endpoints, its roster standing and its IAM extension's actions only.
+     * @param {string} p @param {RequestInit} [opts]
+     */
+    fetch: async (p, opts = {}) => {
+      const t = token() || memory;
+      const headers = { "Content-Type": "application/json", .../** @type {Record<string, string>} */
+      opts.headers || {} };
+      if (t) headers.Authorization = `Bearer ${t}`;
+      const r = await fetch(`${BASE}${p}`, { ...opts, headers });
+      if (r.status === 401 && t) keep(null);
+      try {
+        return await r.json();
+      } catch (e) {
+        console.warn("[aimeat-parties] the node answer was not JSON:", r.status, e instanceof Error ? e.message : e);
+        return { ok: false, error: { code: "REQUEST_FAILED", message: `The node answered ${r.status}.` } };
+      }
+    },
     /** End every session of this person in this app. */
     signOut: async () => {
       try {

@@ -18,9 +18,11 @@
  *   REMOVING A PARTY ends everything it held at once: it leaves the record (its token answers 401 on the
  *   next request), the roster, and every collection of party data it kept in the app.
  * @structure registrationView · getRegistration · setRegistration · listAppParties · removeAppParty ·
- *   setPartyMember · listRegistrationRequests · decideRegistration
+ *   setAppPartyStatus · setPartyMember · listRegistrationRequests · decideRegistration
  * @usage const out = await setRegistration(deps, caller, { owner, filename }, { open: true });
  * @version-history
+ *   v1.2.0 — 2026-11-01 — setAppPartyStatus: the owner stops a registered person and lets it in again
+ *     (POST .../parties/{name}/stop and /resume, aimeat_app_manage party_stop and party_resume; WP9d).
  *   v1.1.0 — 2026-11-01 — Each request in the operator's list names its app's `filename`, which the
  *     decision takes (WP9b: the Config page and aimeat_admin_app_party_registrations decide from the list).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4.1, D4.3).
@@ -135,6 +137,37 @@ export async function removeAppParty(deps: Deps, caller: RosterCaller, ref: AppR
     }
     await rosterAudit(deps.storage, deps.config, c, 'member.removed', { account: partyRefOf(c.owner, gone.name, deps.config.nodeId), from: 'party', to: null });
     return done({ removed: true, name: gone.name, uid: gone.uid, data_deleted: dataDeleted });
+}
+
+/**
+ * Stop a registered person, or let a stopped one in again (WP9d). Stopped: every request with its
+ * sign-in answers 403 PARTY_STOPPED (appPartyFromRequest) and no new link is mailed to it, while its
+ * roster row and its data stay, so a resume puts it back where it was. A pending person (the mailed
+ * link never opened) cannot be resumed into active; it stays pending.
+ */
+export async function setAppPartyStatus(deps: Deps, caller: RosterCaller, ref: AppRef, name: string, to: 'stopped' | 'active'): Promise<AppOpOutcome> {
+    const c = await ownerCtx(deps, caller, ref);
+    if (!c.ok) return c;
+    const ownerGhii = await rosterBucketOf(deps.storage, deps.config, c.owner);
+    let found: { uid: string; name: string; status: string } | null = null;
+    const now = new Date().toISOString();
+    await changeAppParties(deps.storage, ownerGhii, c.appId, cur => {
+        const i = cur.parties.findIndex(x => x.name === name);
+        if (i < 0) return UNCHANGED;
+        const p = cur.parties[i]!;
+        const status = to === 'stopped' ? 'stopped' : (p.verifiedAt ? 'active' : 'pending');
+        found = { uid: p.uid, name: p.name, status };
+        if (p.status === status) return UNCHANGED;
+        const parties = [...cur.parties];
+        parties[i] = to === 'stopped'
+            ? { ...p, status, stoppedBy: 'owner', stoppedAt: now, link: null }
+            : { ...p, status, stoppedBy: undefined, stoppedAt: undefined };
+        return { ...cur, parties };
+    });
+    const hit = found as { uid: string; name: string; status: string } | null;
+    if (!hit) return refuse(404, 'NOT_FOUND', `No registered person "${name}" in this app.`);
+    await rosterAudit(deps.storage, deps.config, c, to === 'stopped' ? 'party.stopped' : 'party.resumed', { account: partyRefOf(c.owner, hit.name, deps.config.nodeId), state: hit.status });
+    return done({ name: hit.name, uid: hit.uid, status: hit.status });
 }
 
 /**

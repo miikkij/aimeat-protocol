@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-01 — Section 4: an extension that gates an app answers the people registered to it
+ *     without an account, with ctx.caller.party (WP9d).
  *   2026-11-01 — Section 8: `commercial.deliversData`, and the node's proposal from the output schema (plan D5.5).
  *   2026-10-30 — Section 9: a file linked from a workspace record opens to the members; ctx.files.read
  *     answers visibility and workspaceRef.
@@ -201,6 +203,12 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
   also answers a visitor with no account, read-only: \`ctx.caller.anonymous\` is true, memory writes
   throw VISITOR_READ_ONLY, and the capabilities that act for a person are absent. It takes no price
   and no \`tollMorsels\`. Use it for what a stranger may read: a catalogue, a free episode.
+- An extension that gates an app (\`config.app\`) also answers the people registered to that app
+  without an account (aimeat-parties), when they call it with the app's sign-in: \`ctx.caller.party\`
+  names the person (\`ref\`, \`name\`, \`displayName\`, \`app\`), \`gaii\` and \`owner\` are their identity
+  \`party:<owner>/ap-…@<node>\`, \`ctx.caller.member\` is their row on the app's roster, and
+  \`isAppOwner\` is false. Memory writes work; the capabilities that act for an account are absent,
+  and a priced action refuses them. Decide on \`ctx.caller.member.role\` as for everybody else.
 
 ## 5. What an extension cannot do
 

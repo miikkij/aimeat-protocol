@@ -21,6 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-01 — party_stop and party_resume: the owner stops a registered person and lets it in again (WP9d).
  *   2026-11-01 — member_set takes `party` (an outside party of the owner), and parties, party_remove and
  *     party_registration_set manage the people who register to the app without an account (plan D4.1 to D4.3).
  *   2026-10-30 — structure_set: proposals, the layouts and navigations the AI drew for the app; it takes ai_provenance and leaves it unused.
@@ -168,7 +169,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
     // the app's users without an account (routes/app-parties.ts; plan doc-mvwxcas3dom3, D4)
     party: { type: 'string', description: 'For member_set, instead of account or email: an outside party of the app\'s owner, party:<owner>/<name>@<node> (a person registered to the app, or a party of aimeat_party). The role carries no free access, because a party has no account.', zod: z.string().max(INPUT_LIMITS.id) },
-    party_name: { type: 'string', description: 'For party_remove: the name of a person registered to the app (ap-..., from parties).', zod: z.string().max(40) },
+    party_name: { type: 'string', description: 'For party_remove, party_stop and party_resume: the name of a person registered to the app (ap-..., from parties).', zod: z.string().max(40) },
     open: { type: 'boolean', description: 'For party_registration_set: true lets people without an account register to the app (when this server allows it), false closes the signup.' },
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
@@ -232,6 +233,10 @@ const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'the people without an account who registered to the app (outside parties of yours), each with their e-mail address, state and role, and whether the signup is open. Owner only' },
     party_remove: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
         summary: 'remove one registered person: their sign-in ends at once, they leave the roster, and everything they kept in the app is deleted. Owner only' },
+    party_stop: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
+        summary: 'stop one registered person: their sign-in is refused at once and no new sign-in link is mailed, while their role and what they kept in the app stay. party_resume lets them in again. Owner only' },
+    party_resume: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
+        summary: 'let a stopped registered person in again, with the role and the data they had. A person who never opened the mailed link stays waiting for it. Owner only' },
     party_registration_set: { fields: F(['filename', 'open'], ['role']), scope: 'app:manage',
         summary: 'open or close the app\'s signup for people without an account, and with role the roster role they get. When this server asks its operator first (apps-ask), opening files a request and the signup opens when the operator approves. Owner only' },
 };

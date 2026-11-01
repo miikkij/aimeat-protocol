@@ -8,6 +8,8 @@
  * @structure PARTIES_PACKS
  * @usage Spread into SDK_PACKS by library-packs/sdk.ts.
  * @version-history
+ *   v1.1.0 - 2026-11-01 - aimeat-parties 1.1.0: AIMEAT.iam for every member, this library for the signup
+ *     and the sign-in only; fetch() and the session event (WP9d).
  *   v1.0.0 - 2026-11-01 - Initial (plan doc-mvwxcas3dom3, D4.2).
  */
 import type { LibraryPack } from './types.js';
@@ -55,17 +57,31 @@ export const PARTIES_PACKS: LibraryPack[] = [
       '4. The session is a token for THIS app only: no other app and no node route takes it.',
       '5. The people are personal data the owner holds. The data map says so: "registers-parties" in',
       '   machinery, or "registers": { "who": "...", "keeps": ["e-mail address", ...] }.',
+      '',
+      'ROLES AND WHAT A PERSON MAY DO: AIMEAT.iam, never this library. Use AIMEAT.iam for EVERY member,',
+      'the account holders and the registered people alike, and this library for the signup and the sign-in',
+      'only. Load this file BEFORE aimeat-iam.js; AIMEAT.iam then reads the signed-in person through',
+      'AIMEAT.parties.fetch, so one init({ app, roles }) and one can()/guard() serve both:',
+      "  await AIMEAT.iam.init({ app: 'owner/market.html', roles: { member: ['buy'], seller: ['buy', 'sell'] } });",
+      "  AIMEAT.iam.me().kind;               // 'party' for a registered person, 'account' otherwise",
+      "  await AIMEAT.iam.guard('sell', () => list());   // asks the node, or the app's IAM extension",
+      'The app\'s IAM extension (config.app = this app) sees the person in ctx.caller: gaii and owner are',
+      '`party:<owner>/ap-…@<node>`, ctx.caller.party names them, ctx.caller.member is their roster row.',
+      'MemberAdmin shows the owner the registered people beside the account holders.',
+      '  AIMEAT.parties.fetch(path, opts)    // a node request with the person\'s sign-in (what AIMEAT.iam uses)',
+      'A sign-in that starts or ends sends the window event `aimeat-party-session`.',
     ].join('\n'),
     changelog: [
+      { version: '1.1.0', date: '2026-11-01', summary: 'A fetch method carries the person\'s sign-in to the node for AIMEAT.iam, which now answers for a registered person as for an account holder; the window event aimeat-party-session when the sign-in starts or ends. Additive.' },
       { version: '1.0.0', date: '2026-11-01', summary: 'Initial: signUp, signIn, ready, me, signOut, registration, and data.get/set/remove over /v1/apps/{owner}/{app}/parties and party-data.' },
     ],
     tierHint: 'T1',
     interviewTriggers: ['register', 'sign up', 'customers', 'members without account', 'marketplace users', 'rekisteröityminen', 'asiakkaat', 'kauppapaikka'],
-    sizeEstimate: '~3KB',
+    sizeEstimate: '~4KB',
     status: 'preview',
     modelTier: 'needs-doc',
     proofs: [],
     promptGroup: 'core',
-    promptLine: '- aimeat-parties.js — people without an AIMEAT account register to the app with an e-mail link and keep their own records in it (`AIMEAT.parties.signUp(email)`, `signIn`, `me`, `signOut`, `data.get/set/remove`). Works only when the node and the app owner allow registration.',
+    promptLine: '- aimeat-parties.js — people without an AIMEAT account register to the app with an e-mail link and keep their own records in it (`AIMEAT.parties.signUp(email)`, `signIn`, `me`, `signOut`, `data.get/set/remove`). Sign-up and sign-in only: their roles and what they may do go through `AIMEAT.iam` like every other member (load this file first). Works only when the node and the app owner allow registration.',
   },
 ];
