@@ -26,7 +26,8 @@
  * @usage html`<${BuildWithYou} />` (views/home/index.js, under the buyer's welcome)
  * @version-history
  *   v1.1.0 — 2026-11-01 — BuildCodeCard: the build code and three steps, shown when the node has a
- *     code and no request (commercial-1c and aimeat-protocol-4e, the new model).
+ *     code and no request (commercial-1c and aimeat-protocol-4e, the new model); aimeat.io is the
+ *     node's queueOrigin, and the place's chat is the second way in when the node has it.
  *   v1.0.1 — 2026-11-01 — The first state names the operator: the operator's agent takes the request
  *     to the queue, not the place. The node calls it 'waiting-for-operator' ('received' before).
  *   v1.0.0 — 2026-11-01 — Initial (Jouni, 1.11 16.22, via Grok and commercial-1c; the node's routes
@@ -54,7 +55,7 @@ const fill = (s, vars) => Object.entries(vars).reduce((out, [k, v]) => out.split
 
 const KEY = 'build-with-you';
 const PATH = '/v1/build-with-you/request';
-/** Where the build request is sent, when the node does not name it (the store's own node). */
+/** Where the build request is sent when the node has no queue address (the store's own node). */
 const AIMEAT_ORIGIN = 'https://aimeat.io';
 
 /** The four parts of the request, in the order the person fills them. */
@@ -99,9 +100,8 @@ export function BuildWithYou() {
   const buildCode = typeof data.buildCode === 'string' ? data.buildCode.trim() : '';
 
   if (!request && buildCode) {
-    const aimeatOrigin = typeof data.aimeatOrigin === 'string' && URL.canParse(data.aimeatOrigin)
-      ? new URL(data.aimeatOrigin).origin : AIMEAT_ORIGIN;
-    return html`<${BuildCodeCard} code=${buildCode} aimeatOrigin=${aimeatOrigin} />`;
+    return html`<${BuildCodeCard} code=${buildCode} aimeatOrigin=${queueOrigin || AIMEAT_ORIGIN}
+      chatPath=${!!queueOrigin} />`;
   }
   if (!request) return offer?.available ? html`<${OfferForm} />` : null;
   if (request.state === 'done') return html`<${Finished} />`;
@@ -114,9 +114,11 @@ export function BuildWithYou() {
 /**
  * The build code and the three steps: the person's own AI, connected to aimeat.io and to this place,
  * sends the request from their own aimeat.io account with the code; the work is followed in the
- * request's workspace there. The words follow the store panel's (commercial-1c, 1.11).
+ * request's workspace there. The words follow the store panel's (commercial-1c, 1.11). `chatPath`:
+ * the node has the queue's address, so Access and security offers "Connect to aimeat.io" for the
+ * place's own chat, the second way in.
  */
-function BuildCodeCard({ code, aimeatOrigin }) {
+function BuildCodeCard({ code, aimeatOrigin, chatPath }) {
   const host = hostOf(aimeatOrigin) || 'aimeat.io';
   const say = fill(tr('home.buildWithYou.codeSay', 'Send my build request to {host} with the code {code}.'), { host, code });
   return html`
@@ -133,6 +135,11 @@ function BuildCodeCard({ code, aimeatOrigin }) {
             <${Action} small href=${`${aimeatOrigin}/v1/profile?tab=mcp`} newTab>${fill(tr('home.buildWithYou.codeConnectThere', 'Connect to {host}'), { host })} →<//>
             <${Action} small href="/v1/profile?tab=mcp">${tr('home.buildWithYou.codeConnectHere', 'Connect to this place')} →<//>
           <//>
+          ${chatPath && html`
+            <${Note} kind="hint">${fill(tr('home.buildWithYou.codeChatPath', 'You can also use this place\'s chat: connect it to {host} under Access and security.'), { host })}<//>
+            <${Actions}>
+              <${Action} small soft href="/v1/profile?tab=access">${fill(tr('home.buildWithYou.codeChatButton', 'Connect the chat to {host}'), { host })} →<//>
+            <//>`}
         <//>
         <${IndexStep}>
           ${tr('home.buildWithYou.codeStepAsk', 'Ask your AI to send your build request with this code.')}

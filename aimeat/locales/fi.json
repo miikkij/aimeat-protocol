@@ -16312,6 +16312,8 @@
       "codeStepConnect": "Yhdistä oma tekoälysi (Claude, ChatGPT tai Grok) {host}:hon ja tähän paikkaan.",
       "codeConnectThere": "Yhdistä {host}:hon",
       "codeConnectHere": "Yhdistä tähän paikkaan",
+      "codeChatPath": "Voit käyttää myös tämän paikan chatia. Yhdistä se {host}:hon sivulla Pääsy ja turvallisuus.",
+      "codeChatButton": "Yhdistä chat {host}:hon",
       "codeStepAsk": "Pyydä tekoälyäsi lähettämään rakennuspyyntösi tällä koodilla.",
       "codeSayHint": "Voit sanoa esimerkiksi: ”{say}”",
       "codeSay": "Lähetä rakennuspyyntöni {host}:hon koodilla {code}.",

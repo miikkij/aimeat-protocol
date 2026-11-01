@@ -16119,6 +16119,8 @@
       "codeStepConnect": "Connect your own AI (Claude, ChatGPT or Grok) to {host} and to this place.",
       "codeConnectThere": "Connect to {host}",
       "codeConnectHere": "Connect to this place",
+      "codeChatPath": "You can also use this place's chat: connect it to {host} under Access and security.",
+      "codeChatButton": "Connect the chat to {host}",
       "codeStepAsk": "Ask your AI to send your build request with this code.",
       "codeSayHint": "You can say, for example: \"{say}\"",
       "codeSay": "Send my build request to {host} with the code {code}.",
