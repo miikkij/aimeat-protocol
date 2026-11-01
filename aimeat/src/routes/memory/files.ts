@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 -- 2026-11-01 -- The presigned mint carries the welcome page's writer in the token
+ *     (`page_writer`), and DELETE notes it through the shared delete (services/storage-page-keys.ts;
+ *     secaudit2026oct31w2 round 11).
  *   v1.14.0 -- 2026-11-01 -- The presigned mint and DELETE of a company's page key ask what the company
  *     page route asks, as the inline write does through the shared write (services/storage-page-keys.ts;
  *     secaudit2026oct31w2 round 11).
@@ -71,7 +74,7 @@ import { generateUploadToken, buildUploadMeta } from '../../services/upload-toke
 import {
   removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
 } from '../../services/storage-file-write.js';
-import { pageKeyWriteRefusal, pageWriterOf } from '../../services/storage-page-keys.js';
+import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta } from '../../services/storage-page-keys.js';
 import { mintPublishCarry, closedFileLevel, fileCapRefusal } from '../../services/storage-file-publish.js';
 import { closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -175,6 +178,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
           ai_provenance: stated.provenance.wireBlock, ai_provenance_id: stated.provenance.declaredId,
           publish_ask: carry.requester,
           store: store?.id,
+          page_writer: pageWriterMeta(String(key), pageWriterOf({ storage, config }, publishGate)),
         }),
         maxBytes,
         contentType,

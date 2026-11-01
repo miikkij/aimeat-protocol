@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-01 — aimeat_storage_delete hands the shared delete the session's caller, for the keys a page
+ *     origin serves (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   2026-10-31 — aimeat_storage_upload takes `direct`: the upload_url is in the file store itself and the
  *     answer names upload_headers and complete_url (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   2026-10-30 — aimeat_storage_upload takes `store`, the store the writer names for the bytes (inline and
@@ -297,8 +299,10 @@ export function registerCoreStorageTools(
             annotations: annotationsFor('aimeat_storage_delete'),
         },
         async ({ key }) => {
+            // The session's caller, so a removed welcome page notes who put the next copy on show.
             const removed = await removeStorageFile(
                 { storage, config, emitResourceUpdated, emitResourceListChanged }, agentGaii, key,
+                ...(caller ? [{ caller: caller() }] : []),
             );
             if (!removed.ok) {
                 return { content: [{ type: 'text' as const, text: removed.message }], isError: true };
