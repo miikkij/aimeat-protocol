@@ -8,6 +8,11 @@
  *   not. Plus scope enforcement (events:emit) on the inbound route.
  *   Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-events
  * @version-history
+ *   v1.2.0 — 2026-11-01 — Phase 5 (secaudit2026oct31w2 round 12, ecosystem-subscriptions:
+ *     node-wide-registry-unbounded-size): a match with more fields than any event carries is refused
+ *     with its reason; the app's own token is refused on GET and POST /v1/ecosystem/subscriptions; a
+ *     two-field match still delivers; a second owner's subscription is listed and delivered for that
+ *     owner only. Phases 1-4 unchanged.
  *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-ecosystem-events:116): one owner in the
  *     suite, so nothing distinguished "my connector fired my workflow" from "any connector fires
  *     every matching workflow on the node". A second owner now holds a WORD-FOR-WORD identical
@@ -252,6 +257,84 @@ async function run() {
     const r = await emitEvent(g.token, 'table.updated', 1, { table_id: 'tbl1' });
     assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
     assert(r.body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${r.body.error?.code}`);
+  });
+
+  // ── Phase 5: subscriptions are kept per owner, and a match is a small filter ──
+  // secaudit2026oct31w2 round 12 (ecosystem-subscriptions:node-wide-registry-unbounded-size): every
+  // memory write on the node read one node-wide subscription record, which any account could grow.
+  console.log('\nPhase 5 — Subscriptions per owner + match size');
+  await test('A match that names more fields than any event carries is refused, and the reason says so', async () => {
+    const match: Record<string, string> = {};
+    for (let i = 0; i < 2000; i++) match[`f${i}`] = `v${i}`;
+    const r = await json('/v1/ecosystem/subscriptions', { method: 'POST', headers: auth, body: JSON.stringify({ app: 'zendesk', event: 'memory.write', match }) });
+    assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
+    assert(r.body.error?.code === 'INVALID_INPUT' && /match/.test(r.body.error?.message ?? '') && /16/.test(r.body.error?.message ?? ''),
+      `the refusal names the match limit: ${JSON.stringify(r.body.error)}`);
+    const list = await json('/v1/ecosystem/subscriptions', { headers: auth });
+    assert(!(list.body.data?.subscriptions ?? []).some((s: any) => s.match && 'f0' in s.match), 'the refused subscription is not stored');
+  });
+
+  await test('The app\'s own token neither lists nor adds subscriptions: the owner decides what it hears (403)', async () => {
+    const appAuth = { Authorization: `Bearer ${geaiToken}` };
+    const list = await json('/v1/ecosystem/subscriptions', { headers: appAuth });
+    assert(list.status === 403, `GET as the app: expected 403, got ${list.status}: ${JSON.stringify(list.body)}`);
+    const add = await json('/v1/ecosystem/subscriptions', { method: 'POST', headers: appAuth, body: JSON.stringify({ app: 'zendesk', event: '*' }) });
+    assert(add.status === 403, `POST as the app: expected 403, got ${add.status}: ${JSON.stringify(add.body)}`);
+  });
+
+  await test('A match on both memory.write fields is taken and delivers as before', async () => {
+    const r = await json('/v1/ecosystem/subscriptions', { method: 'POST', headers: auth, body: JSON.stringify({ app: 'zendesk', event: 'memory.write', match: { key: 'service.both.*', owner_gaii: `${ownerName}@*` } }) });
+    assert(r.status === 200 && r.body.data?.subscription?.geai === geai, `subscribe: ${r.status} ${JSON.stringify(r.body)}`);
+    const tunnel = await TunnelClient.connect(BASE, geaiToken);
+    try {
+      await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'service.both.one', value: { z: 1 }, visibility: 'private' }) });
+      const frame = await tunnel.waitForDeliver(2000);
+      assert(!!frame && (frame.payload as any)?.data?.key === 'service.both.one', `expected a deliver frame: ${JSON.stringify(frame)}`);
+    } finally {
+      await tunnel.close();
+    }
+  });
+
+  await test('A second owner\'s subscription stays with that owner: listed for them only, delivered for their writes only', async () => {
+    const otherName = `ecoevsub${Date.now()}`;
+    const otherAuth = { Authorization: `Bearer ${(await registerOwner(BASE, otherName)).token}` };
+    const pub = Buffer.from('verify-key-zendesk-other').toString('base64');
+    const scopes = ['memory:read', 'events:subscribe'];
+    const hello = await json('/v1/ecosystem-apps/hello', { method: 'POST', body: JSON.stringify({ owner: otherName, app: 'zendesk', public_key: pub, scopes }) });
+    assert(hello.body.ok === true, `hello: ${JSON.stringify(hello.body.error)}`);
+    const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, { method: 'POST', headers: otherAuth, body: JSON.stringify({ action: 'approve', scopes }) });
+    assert(approve.body.data?.status === 'approved', `approve: ${JSON.stringify(approve.body)}`);
+    const otherGeai = approve.body.data.geai as string;
+    const tok = await json('/v1/ecosystem-apps/token', { method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: GRANT }) });
+    assert(typeof tok.body.access_token === 'string', `token: ${JSON.stringify(tok.body)}`);
+
+    const sub = await json('/v1/ecosystem/subscriptions', { method: 'POST', headers: otherAuth, body: JSON.stringify({ app: 'zendesk', event: 'memory.write', match: { key: 'service.zendesk.*' } }) });
+    assert(sub.status === 200 && sub.body.data?.subscription?.geai === otherGeai, `B subscribes: ${sub.status} ${JSON.stringify(sub.body)}`);
+
+    const mine = await json('/v1/ecosystem/subscriptions', { headers: auth });
+    const theirs = await json('/v1/ecosystem/subscriptions', { headers: otherAuth });
+    assert(!(mine.body.data?.subscriptions ?? []).some((s: any) => s.geai === otherGeai), 'A\'s list does not show B\'s subscription');
+    assert((theirs.body.data?.subscriptions ?? []).length === 1 && theirs.body.data.subscriptions[0].geai === otherGeai, `B's list holds B's only: ${JSON.stringify(theirs.body.data)}`);
+
+    // A's app hears A's write and not B's; B's app hears B's write and not A's.
+    const tunnelA = await TunnelClient.connect(BASE, geaiToken);
+    const tunnelB = await TunnelClient.connect(BASE, tok.body.access_token);
+    try {
+      await json('/v1/memory', { method: 'POST', headers: otherAuth, body: JSON.stringify({ key: 'service.zendesk.fromB', value: { b: 1 }, visibility: 'private' }) });
+      const toB = await tunnelB.waitForDeliver(2000);
+      assert(!!toB && (toB.payload as any)?.geai === otherGeai && (toB.payload as any)?.data?.key === 'service.zendesk.fromB', `B's app hears B's write: ${JSON.stringify(toB)}`);
+      const toA = await tunnelA.waitForDeliver(800);
+      assert(toA === null, `A's app must not hear B's write (got ${JSON.stringify(toA)})`);
+
+      await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'service.zendesk.fromA', value: { a: 1 }, visibility: 'private' }) });
+      const toA2 = await tunnelA.waitForDeliver(2000);
+      assert(!!toA2 && (toA2.payload as any)?.data?.key === 'service.zendesk.fromA', `A's app hears A's write: ${JSON.stringify(toA2)}`);
+      const toB2 = await tunnelB.waitForDeliver(800);
+      assert(toB2 === null, `B's app must not hear A's write (got ${JSON.stringify(toB2)})`);
+    } finally {
+      await tunnelA.close();
+      await tunnelB.close();
+    }
   });
 
   // ── Summary ──

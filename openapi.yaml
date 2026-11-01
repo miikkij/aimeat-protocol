@@ -8822,8 +8822,9 @@ paths:
                 event: { type: string, description: "Outbound event name (e.g. memory.write), or * for all granted." }
                 match:
                   type: object
-                  additionalProperties: { type: string }
-                  description: "Optional glob filter, e.g. key: crm.*"
+                  maxProperties: 16
+                  additionalProperties: { type: string, maxLength: 400 }
+                  description: "Optional glob filter, e.g. key: crm.* At most 16 fields: a match passes only when the event carries every field it names, and an outbound event carries two."
                 transport:
                   type: array
                   items: { type: string, enum: [tunnel, webhook] }
@@ -8832,11 +8833,15 @@ paths:
         '200':
           description: The stored subscription.
         '400':
-          description: Invalid body.
+          description: Invalid body, or a match of more than 16 fields.
         '403':
           description: Owner role required.
         '404':
           description: Ecosystem app not found for this owner.
+        '413':
+          description: >-
+            QUOTA_EXCEEDED. The owner's subscription list would pass the size one memory value may hold
+            (quota.memory_max_value_size_kb). Remove unused subscriptions with DELETE, or the operator raises the setting.
     delete:
       operationId: ecosystemUnsubscribe
       summary: Remove subscription(s) for a GEAI

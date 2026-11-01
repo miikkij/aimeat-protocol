@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-01 -- moveEcosystemSubscriptionsByOwnerOnce, after the welcome page step: the node-wide ecosystem
+ *     subscription record moves to one record per owner (secaudit2026oct31w2 round 12).
  *   2026-11-01 -- recordPointerStateOnce, right after the data package audience step: the sale terms and
  *     the withdrawal mark of every existing package pointer are copied onto the service's records (WP9e).
  *   2026-11-01 -- markExistingPortfolioPagesOnce, after the data package step: every welcome page that
@@ -94,6 +96,7 @@ import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-k
 import { recordDatapackageAudiencesOnce } from '../services/datapackage/audience-record.js';
 import { recordPointerStateOnce } from '../services/datapackage/sale-terms-record.js';
 import { markExistingPortfolioPagesOnce } from '../services/portfolio-read-hold-keep.js';
+import { moveEcosystemSubscriptionsByOwnerOnce } from '../services/ecosystem-subscriptions-by-owner.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
 import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain-site-origin-keep.js';
@@ -130,6 +133,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // Awaited, so no read meets a missing record first; until it has run, a missing record is adopted.
   await markExistingPortfolioPagesOnce(storage, config)
     .catch(err => logger.error('Failed to record the existing welcome pages; the next boot tries again', { error: String(err) }));
+  // The ecosystem app event subscriptions of the one node-wide record go to one record per owner, so a
+  // memory write reads only its owner's list (services/ecosystem-subscriptions-by-owner.ts). Awaited, so
+  // the subscriptions made before the update deliver from the first write.
+  await moveEcosystemSubscriptionsByOwnerOnce(storage, config)
+    .catch(err => logger.error('Failed to move the ecosystem subscriptions to their owners; the next boot tries again', { error: String(err) }));
   // The knowledge link rows written before link rows carried their owner get the namespace that holds
   // their source package (services/knowledge-link-owner-keep.ts). Awaited, so a package's links show
   // from the first request.
