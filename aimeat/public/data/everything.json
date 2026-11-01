@@ -713,6 +713,15 @@
      "plain": "App grants A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap the morsels it may use, or revoke it. A permission you took away by hand stays away: when the app asks for it again, even your own app asks you first. A revoke ends its access at once; a narrowing reaches the app when its current token runs out (15 minutes by default). An app may ask for the marketplace words too: exchange:read shows your contracts, your work and who uses what you sell, exchange:write makes and ends contracts within the budget you set, posts needs and bids, delivers work and lists what you sell; spending under a contract still needs contract:spend with its own ceiling, and publishing tells the app which word its calls need. /v1/app-grants/*, aimeat-scopes"
     },
     {
+     "slug": "g-4-your-company-s-web-page-asks-before-an-app-changes-it",
+     "cells": [
+      "<strong>Your company's web page asks before an app changes it</strong>",
+      "Your company's web page is what everyone sees at the company's address. An app that may save your files but may not change your companies' web pages cannot change or remove that page through the file routes: the node asks you once, in the bell, with Allow and Don't allow. After Allow, that app changes and removes the page as before; after Don't allow, the page stays as it is and the app is not asked about again. You in person, and an app or agent that may change your companies' web pages, change it as before. An agent of yours that may change your companies' web pages can answer for you.",
+      "<code>GET /v1/publish-requests</code> (kind <code>company-page-write</code>), <code>aimeat_publish_requests</code>, <code>PUT /v1/companies/{id}/portfolio</code>"
+     ],
+     "plain": "Your company's web page asks before an app changes it Your company's web page is what everyone sees at the company's address. An app that may save your files but may not change your companies' web pages cannot change or remove that page through the file routes: the node asks you once, in the bell, with Allow and Don't allow. After Allow, that app changes and removes the page as before; after Don't allow, the page stays as it is and the app is not asked about again. You in person, and an app or agent that may change your companies' web pages, change it as before. An agent of yours that may change your companies' web pages can answer for you. GET /v1/publish-requests (kind company-page-write), aimeat_publish_requests, PUT /v1/companies/{id}/portfolio"
+    },
+    {
      "slug": "g-4-sharing-groups-and-key-space-shares",
      "cells": [
       "<strong>Sharing groups and key-space shares</strong>",
@@ -4667,6 +4676,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 475
+  "rows": 476
  }
 }
