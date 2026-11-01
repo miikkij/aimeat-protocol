@@ -8,6 +8,8 @@
  * @structure CONTENT_CLASS_CONFIG_FIELDS
  * @usage import { CONTENT_CLASS_CONFIG_FIELDS } from './config-schema-content-class.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — content_class.media_read_seconds and media_read_memory_mb (secaudit2026oct31w2
+ *     round 12, the exifr and c2pa-ts readers).
  *   v1.1.0 — 2026-10-29 — content_class.pdf_text_seconds and pdf_text_memory_mb (secaudit2026oct26
  *     round 8c, memory-b-09).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -25,4 +27,6 @@ export const CONTENT_CLASS_CONFIG_FIELDS: ConfigFieldShape<keyof ContentClassCon
   { key: 'ffmpegPath', dotPath: 'content_class.ffmpeg_path', envVar: 'AIMEAT_FFMPEG_PATH', type: 'string', validate: isProgram, immutable: false, description: 'The ffmpeg program that takes still pictures and the sound out of a video for its description: a name on PATH or a full path' },
   { key: 'pdfTextSeconds', dotPath: 'content_class.pdf_text_seconds', envVar: 'AIMEAT_PDF_TEXT_SECONDS', type: 'number', validate: isWhole, immutable: false, range: '0-86400', description: 'Seconds the node may spend reading the text of a PDF whose decoded size it cannot measure first (an encrypted PDF, or one written in a way the size check does not know). Past it the file stays stored and its text is not read. 0 = no limit' },
   { key: 'pdfTextMemoryMb', dotPath: 'content_class.pdf_text_memory_mb', envVar: 'AIMEAT_PDF_TEXT_MEMORY_MB', type: 'number', validate: isWhole, immutable: false, range: '0-65536', description: 'Memory in MB the node may use to read the text of such a PDF. Past it the file stays stored and its text is not read. 0 = no limit' },
+  { key: 'mediaReadSeconds', dotPath: 'content_class.media_read_seconds', envVar: 'AIMEAT_MEDIA_READ_SECONDS', type: 'number', validate: isWhole, immutable: false, range: '0-86400', description: 'Seconds the node may spend reading the metadata of a stored picture or video (EXIF, IPTC, XMP, the colour profile, the C2PA manifest). Past it the file stays stored, its format and size are still known, and its details say the rest was not read. 0 = no limit' },
+  { key: 'mediaReadMemoryMb', dotPath: 'content_class.media_read_memory_mb', envVar: 'AIMEAT_MEDIA_READ_MEMORY_MB', type: 'number', validate: isWhole, immutable: false, range: '0-65536', description: 'Memory in MB the node may use to read the metadata of a stored picture or video. Past it the file stays stored, its format and size are still known, and its details say the rest was not read. A PNG colour profile larger than half of it is not read. 0 = no limit' },
 ];

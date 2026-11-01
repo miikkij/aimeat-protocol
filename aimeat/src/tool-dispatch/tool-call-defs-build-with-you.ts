@@ -6,6 +6,7 @@
  *   connector MCP: a thin REST proxy over /v1/build-with-you/*, so the node decides everything
  *   (services/build-with-you.ts, services/place-trail.ts).
  * @version-history
+ *   v1.1.0 — 2026-11-01 — aimeat_build_request_submit forwards `spec`, the four fields as one object.
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi").
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -23,6 +24,7 @@ export const buildWithYouCliTools: ConnectCliToolDefinition[] = [
         const v = optionalString(input, k);
         if (v !== undefined) body[k] = v;
       }
+      if (input.spec && typeof input.spec === 'object' && !Array.isArray(input.spec)) body.spec = input.spec;
       return client.post(`${BASE}/request`, body);
     },
   },

@@ -23,6 +23,7 @@
  *   - POST /v1/operator/notify-owner        one notice to the owners, once per code (operator)
  * @usage app.use(buildWithYouRouter(config, storage));   // server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — POST /v1/build-with-you/request takes the four fields flat or under `spec`.
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi", parts B, C and D).
  */
 import { timingSafeEqual } from 'node:crypto';
@@ -40,8 +41,10 @@ import { readOwnTrail, readTrail, TrailError } from '../services/place-trail.js'
 import { NotifyOwnerError, notifyOwnerOnce } from '../services/operator-notify-owner.js';
 
 const field = z.string().trim().min(1).max(INPUT_LIMITS.line);
+// The four fields flat or under `spec` (the shape GET's `send` shows); submitOp names a missing one.
 const BuildRequestBody = z.object({
-  what: field, forWhom: field, use: field, readyWhen: field,
+  what: field.optional(), forWhom: field.optional(), use: field.optional(), readyWhen: field.optional(),
+  spec: z.object({ what: field.optional(), forWhom: field.optional(), use: field.optional(), readyWhen: field.optional() }).optional(),
   lang: z.enum(['en', 'fi', 'es']).optional(),
   email: z.string().trim().max(INPUT_LIMITS.email).optional(),
 });
@@ -125,7 +128,7 @@ export function buildWithYouRouter(config: AimeatConfig, storage: Storage): Rout
   router.post('/v1/build-with-you/request', requireAuth(), requireScope('memory:write'), validateBody(BuildRequestBody, config.nodeId), async (req: Request, res: Response) => {
     const b = req.body as z.infer<typeof BuildRequestBody>;
     await send(res, () => submitOp(deps, who(req), {
-      what: b.what, forWhom: b.forWhom, use: b.use, readyWhen: b.readyWhen, lang: b.lang, email: b.email,
+      what: b.what, forWhom: b.forWhom, use: b.use, readyWhen: b.readyWhen, spec: b.spec, lang: b.lang, email: b.email,
     }), 201);
   });
   router.get('/v1/build-with-you/trail', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {

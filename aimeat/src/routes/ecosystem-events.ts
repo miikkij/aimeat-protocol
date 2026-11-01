@@ -14,6 +14,10 @@
  *   - DELETE /v1/ecosystem/subscriptions   — owner removes a subscription (?app=&event=)
  * @usage app.use(ecosystemEventsRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-11-01 — POST /subscriptions refuses a match of more than 16 fields (400, an event
+ *     carries two) and a list past quota.memory_max_value_size_kb (413, naming the DELETE route and the
+ *     setting); subscriptions are kept per owner (secaudit2026oct31w2 round 12,
+ *     ecosystem-subscriptions:node-wide-registry-unbounded-size).
  *   v1.2.0 — 2026-10-27 — POST /read-through answers a reference that one ecosystem app wrote naming
  *     another app from its cached metadata (reason `ref_names_another_app`) instead of invoking the
  *     other app (secaudit2026oct26, ecosystem-read-through:ref-target-unbound-to-writer).
@@ -36,7 +40,7 @@ import { presentMemory } from '../services/classification/present-memory.js';
 import { ECOSYSTEM_EVENT_VERSION } from '../models/ecosystem-event-schemas.js';
 import {
   listSubscriptions, addSubscription, removeSubscriptions, appendInboundEcosystemLog,
-  type EcosystemSubscription,
+  EcosystemSubscriptionsFullError, type EcosystemSubscription,
 } from '../services/ecosystem-events.js';
 import { logger } from '../utils/logger.js';
 
@@ -46,10 +50,22 @@ const InboundEventBody = z.object({
   data: z.record(z.string(), z.unknown()).optional(),
 });
 
+/**
+ * The most fields one subscription's match names. A match passes only when the event carries every
+ * field it names, and an outbound event carries two (memory.write: key and owner_gaii; binding.revoked:
+ * geai and reason), so a match past this never delivers. Without it one request could store a match
+ * the size of the whole request body (secaudit2026oct31w2 round 12).
+ */
+const MATCH_FIELDS_MAX = 16;
+
 const SubscriptionBody = z.object({
   app: z.string().min(1).max(100),
   event: z.string().min(1).max(120),               // outbound event name, or '*'
-  match: z.record(z.string().max(120), z.string().max(400)).optional(),
+  match: z.record(z.string().max(120), z.string().max(400))
+    .refine(m => Object.keys(m).length <= MATCH_FIELDS_MAX, {
+      message: `match names at most ${MATCH_FIELDS_MAX} fields; an event carries fewer, so a match with more never delivers. Name only the fields to filter on, such as key`,
+    })
+    .optional(),
   transport: z.array(z.enum(['tunnel', 'webhook'])).min(1).optional(),
 });
 
@@ -113,7 +129,19 @@ export function ecosystemEventsRouter(config: AimeatConfig, storage: Storage): R
       geai: rec.geai, ownerGhii, event, match,
       transport: transport ?? ['tunnel', 'webhook'],
     };
-    const stored = await addSubscription(storage, config.nodeId, sub);
+    // One owner's list is one memory value, so it holds what any memory value may hold.
+    let stored: EcosystemSubscription;
+    try {
+      stored = await addSubscription(storage, config.nodeId, sub, { maxBytes: config.memoryMaxValueSizeKb * 1024 });
+    } catch (err) {
+      if (!(err instanceof EcosystemSubscriptionsFullError)) throw err;
+      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+        `Your ecosystem subscriptions would take ${err.bytes} bytes, past the ${config.memoryMaxValueSizeKb} kB one memory value may hold. `
+        + 'Remove the ones you no longer use with DELETE /v1/ecosystem/subscriptions?app=<app>&event=<event>, '
+        + 'or ask the operator to raise quota.memory_max_value_size_kb.', 413,
+        { limit_kb: config.memoryMaxValueSizeKb, setting: 'quota.memory_max_value_size_kb' }));
+      return;
+    }
     res.json(success(config.nodeId, { subscription: stored }));
   });
 

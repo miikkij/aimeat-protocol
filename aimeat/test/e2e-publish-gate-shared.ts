@@ -13,6 +13,10 @@
  *     - the MCP tool of the same door answers publish_request in its text, not as an error;
  *     - refusals: another owner changing A's organism (403) or A's cortex visibility (403).
  * @version-history
+ *   2026-11-01 — A page whose end date has passed: an agent without publish:public removing or moving
+ *     the end files a publish request (REST and MCP) and the page stays closed until approval, which
+ *     opens it with no end; the owner in person and an agent with publish:public open it at once; an
+ *     end not yet passed is extended at once as before (secaudit2026oct31w2 round 12).
  *   2026-10-31 — An organisation board asked to public with federate true keeps its level and is not
  *     federated (secaudit 2026-10-31 inv-13).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
@@ -354,6 +358,74 @@ await test('Share: the owner in person and the agent with publish:public open it
     const pub = await share(publisher.token, { access: 'open' });
     assert(pub.status === 200 && pub.body.data.share.access === 'open' && !pub.body.data.publish_request, `publisher: ${pub.status} ${JSON.stringify(pub.body.error)}`);
     assert((await anonPage(pages[1])).status === 200, 'open by the publisher');
+});
+
+console.log('\nWorkspace shares: a page whose end date has passed');
+
+// Pages shared with an end a few seconds ahead, so they are ended when the tests below run. A passed
+// end reads as not shared (isDocPublicAt), so moving it into the future or removing it opens the page
+// again, and the gate asks about that as about a page never shared (secaudit2026oct31w2 round 12).
+const ended: Record<'asked' | 'own' | 'pub' | 'mcp', string> = { asked: '', own: '', pub: '', mcp: '' };
+let livePage = '';
+const shareOf = async (): Promise<Body> => (await call(`/v1/organisms/${orgId}/workspace/share?ws=${ws}`, { token: A.token })).body.data.share as Body;
+
+await test('Ended pages: the owner shares four pages with an end a few seconds ahead and one with an end a day ahead', async () => {
+    const made: string[] = [];
+    for (const n of [5, 6, 7, 8, 9]) {
+        const d = await call(`/v1/organisms/${orgId}/workspace/drafts`, { token: A.token, body: { ws, space: 'pages', value: { title: `Page ${n}`, markdown: `# Page ${n} ${tag}` } } });
+        assert(d.status === 200, `draft ${n}: ${d.status} ${JSON.stringify(d.body.error)}`);
+        const p = await call(`/v1/organisms/${orgId}/publish`, { token: A.token, body: { ws, namespace: 'shared.pages', id: d.body.data.id } });
+        assert(p.status === 200, `publish ${n}: ${p.status} ${JSON.stringify(p.body.error)}`);
+        made.push(d.body.data.id as string);
+    }
+    [ended.asked, ended.own, ended.pub, ended.mcp, livePage] = made;
+    const soon = new Date(Date.now() + 4000).toISOString();
+    const day = new Date(Date.now() + 86_400_000).toISOString();
+    const docs: Body = {}, until: Body = {};
+    for (const id of made) { docs[`pages/${id}`] = true; until[`pages/${id}`] = id === livePage ? day : soon; }
+    const s = await share(A.token, { docs, until });
+    assert(s.status === 200 && !s.body.data.publish_request, `owner shares: ${s.status} ${JSON.stringify(s.body.error ?? s.body.data?.publish_request)}`);
+    await new Promise(r => setTimeout(r, 5000));
+    for (const id of [ended.asked, ended.own, ended.pub, ended.mcp]) assert((await anonPage(id)).status === 404, `the page ${id} is still served after its end`);
+    assert((await anonPage(livePage)).status === 200, 'the page with a day left is served');
+});
+
+await test('Ended page: the agent without publish:public removing the end waits for the owner; approval opens it with no end', async () => {
+    const key = `pages/${ended.asked}`;
+    const r = await share(asker.token, { docs: { [key]: true }, until: { [key]: null } });
+    const pr = asked(r, 'remove the end of an ended page');
+    assert(typeof r.body.data.share.until[key] === 'string' && Date.parse(r.body.data.share.until[key]) <= Date.now(), `the passed end was not kept: ${JSON.stringify(r.body.data.share.until)}`);
+    assert((await anonPage(ended.asked)).status === 404, 'anonymous does not open the waiting page');
+    const d = await approve(pr.request_id);
+    assert(d.status === 200 && d.body.data.request.state === 'approved', `approve: ${d.status} ${JSON.stringify(d.body.error ?? d.body.data)}`);
+    assert((await anonPage(ended.asked)).status === 200, 'anonymous opens the approved page');
+    assert(!(key in ((await shareOf()).until as Body)), 'the approved page still has an end');
+});
+
+await test('Ended page: aimeat_workspace_share with a new end by the agent without publish:public answers publish_request; the page stays closed', async () => {
+    const s = await openSession(BASE, asker.token);
+    const sh = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws, space: 'pages', id: ended.mcp, shared: true, until: '2099-12-31' });
+    assert(!sh.isError && sh.text.includes('publish_request'), `workspace_share: ${sh.text.slice(0, 300)}`);
+    assert((await anonPage(ended.mcp)).status === 404, 'the page the tool asked about is not open');
+});
+
+await test('Ended page: the owner in person and the agent with publish:public open it again at once', async () => {
+    const own = await share(A.token, { docs: { [`pages/${ended.own}`]: true }, until: { [`pages/${ended.own}`]: null } });
+    assert(own.status === 200 && !own.body.data.publish_request, `owner: ${own.status} ${JSON.stringify(own.body.error ?? own.body.data?.publish_request)}`);
+    assert((await anonPage(ended.own)).status === 200, 'anonymous opens the page the owner opened again');
+    const later = new Date(Date.now() + 7 * 86_400_000).toISOString();
+    const pub = await share(publisher.token, { docs: { [`pages/${ended.pub}`]: true }, until: { [`pages/${ended.pub}`]: later } });
+    assert(pub.status === 200 && !pub.body.data.publish_request, `publisher: ${pub.status} ${JSON.stringify(pub.body.error ?? pub.body.data?.publish_request)}`);
+    assert((await anonPage(ended.pub)).status === 200, 'anonymous opens the page the publisher opened again');
+});
+
+await test('Live page: the agent without publish:public extends an end that has not passed at once, as before', async () => {
+    const key = `pages/${livePage}`;
+    const later = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const r = await share(asker.token, { docs: { [key]: true }, until: { [key]: later } });
+    assert(r.status === 200 && !r.body.data.publish_request, `extend: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.publish_request)}`);
+    assert(Date.parse(r.body.data.share.until[key]) === Date.parse(later), `stored end ${r.body.data.share.until[key]}`);
+    assert((await anonPage(livePage)).status === 200, 'the page stays served');
 });
 
 console.log('\nMCP');
