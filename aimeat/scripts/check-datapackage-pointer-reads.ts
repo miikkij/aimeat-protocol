@@ -37,6 +37,8 @@
  *   cd aimeat && pnpm check:datapackage-pointer-reads          # the gate
  *   cd aimeat && pnpm check:datapackage-pointer-reads --list   # every finding, allowed or not
  * @version-history
+ *   v1.0.1 — 2026-11-01 — ALLOWED: the on-change source key (dataproduct/on-change.ts) and the visitor read's
+ *     pointer handed to trustedAudienceOf (routes/package-reader.ts) (WP9c, cc-jouni-dataulos).
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2, after round 10; approved by Jouni 2026-11-01).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -226,6 +228,12 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   },
   'src/services/dataproduct/scheduled-job.ts': {
     '`datapkg/${name}/latest.json`': 'Names the key a scheduled data product run writes, for the scheduler\'s reads and writes list; it decides nothing.',
+  },
+  'src/services/dataproduct/on-change.ts': {
+    'latestKey(s.name!)': 'Names the storage key a source package\'s new version writes, so a data product that runs on a change listens for it; it reads nothing and decides no access.',
+  },
+  'src/routes/package-reader.ts': {
+    'readPointer(deps, ownerGhii, opts.name)': 'Hands the pointer straight to trustedAudienceOf, which decides on the record once the audience rule is in force; the visitor read takes trusted.visibility.',
   },
   'src/services/dataproduct/sources-io.ts': {
     'readPointer(deps, ownerGhii, spec.name!)': 'DEBT: a source package\'s audience label; Lifecycle Central incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
