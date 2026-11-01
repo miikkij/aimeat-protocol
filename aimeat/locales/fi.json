@@ -25933,6 +25933,7 @@
     "structure.ai": "Tekoälysi",
     "structure.live.working": "{who} tekee tätä nyt",
     "structure.live.idle": "Sivu päivittyy itse, kun työ etenee.",
+    "structure.live.last": "Viimeisin viesti",
     "structure.steps": "Vaiheet",
     "structure.stepsCount": "{fine} / {total} kunnossa",
     "structure.state.fine": "Kunnossa",

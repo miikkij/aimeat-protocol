@@ -23573,6 +23573,7 @@
     "structure.ai": "Tu IA",
     "structure.live.working": "{who} está trabajando en ello",
     "structure.live.idle": "Esta página se actualiza sola cuando el trabajo avanza.",
+    "structure.live.last": "Última nota",
     "structure.steps": "Pasos",
     "structure.stepsCount": "{fine} / {total} listos",
     "structure.state.fine": "Listo",
