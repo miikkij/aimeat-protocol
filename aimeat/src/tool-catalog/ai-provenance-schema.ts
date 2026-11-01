@@ -18,6 +18,8 @@
  * @structure AiProvenanceBlockSchema · AiProvenanceBodyFields
  * @usage import { AiProvenanceBlockSchema } from '../ai-provenance-schema.js';
  * @version-history
+ *   v1.3.0 — 2026-10-31 — Optional `rules_followed`: the generation rules a declarer followed for an
+ *     image or a video it made elsewhere (services/ai/gen-rules.ts).
  *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-08 — AiProvenanceBodyFields: ai_provenance and ai_provenance_id for a REST body
  *     schema to spread (aiprov D5).
@@ -75,6 +77,10 @@ export const AiProvenanceBlockSchema = z.object({
     'For image, audio or video: does it resemble a real person, place, object or event (a cloned '
     + "voice, a likeness)? 'yes' | 'no' | 'unknown'. Public synthetic media is labelled either way; "
     + "this decides only whether the record cites the deep-fake rule ('yes') or labels as a precaution."),
+  rules_followed: z.array(z.string().trim().min(1).max(INPUT_LIMITS.id)).max(20).optional().describe(
+    'For an image or a video you made OUTSIDE this node: the generation rules you followed, by id '
+    + '(aimeat_ai_gen_rules lists the rules in force and their directive text, e.g. people-artistic). '
+    + 'A rule in force you do not name is recorded as unknown.'),
   sources: z.array(sourceInput).max(100).optional().describe(
     'For synthesized content: where the material came from.'),
   notes: z.string().max(1_000).optional().describe(

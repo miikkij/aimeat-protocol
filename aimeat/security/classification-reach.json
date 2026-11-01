@@ -692,12 +692,18 @@
     },
     "src/routes/storage-files.ts": {
       "reads": {
-        "getStorageFileMeta": 5,
+        "getStorageFileMeta": 4,
         "readStorageFileRange": 1,
         "getStorageFile": 3,
         "generateDownloadToken": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it). fileKeyFor (2026-10-26) reads metadata only to decide which key the request names; nothing it reads is answered, and the file under that key then passes the reader."
+    },
+    "src/routes/storage-files-download.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Moved 2026-11-01 from src/routes/storage-files.ts by pure extraction (GET /v1/download/:token), reviewed there 2026-09-29: the token is minted only after the file's metadata passed the classification reader on the request that minted it, and the route serves only the file version the token names."
     },
     "src/routes/storage-files-list.ts": {
       "reads": {
@@ -915,6 +921,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI policy record."
+    },
+    "src/services/ai/gen-rules-store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: the owner's generation rules record (ai.policy.gen-rules), read to decide what a generation call or a provenance mint is given; it is a setting, not content, and nothing of it goes to a model but the built-in directive text."
     },
     "src/services/ai/provider-store.ts": {
       "reads": {
@@ -1446,6 +1458,25 @@
         "getStorageFileMeta": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence check through file metadata; no bytes are read."
+    },
+    "src/services/datapackage/file-read.ts": {
+      "reads": {
+        "getStorageFile": 2
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.4), the node's own read: a data package's latest.json pointer and a version's descriptor, read to decide who may read a file under datapkg/. Nothing read is answered; GET /v1/pub then passes the file it serves through the classification reader (hiddenFromCaller)."
+    },
+    "src/services/datapackage/odps-read.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.1), the node's own read: the tags of a version's descriptor file, for the audience the ODPS sheet states. No bytes are read and nothing read is answered; the package itself is opened through openPackage, which asks the package's audience."
+    },
+    "src/services/datapackage/withdraw.ts": {
+      "reads": {
+        "listStorageFiles": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.3), the node's own read: the owner's own package files listed to delete them on a purge, and the package's catalogue manifest read for the entry keys to remove. Nothing read is answered; the caller is the owner or the owner's principal with storage:write."
     },
     "src/services/datapackage/store.ts": {
       "reads": {

@@ -2,9 +2,11 @@
  * @file src/services/datapackage/odps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The product sheet, as a projection of the descriptor. `odps.yaml` is generated into
- *   every published version so a package is describable to a buyer without anyone authoring a second
- *   document about it.
+ * @description The product sheet, as a projection of the descriptor. It is projected when it is read
+ *   (GET /v1/datapackages/{owner}/{name}/odps, ./odps-read.ts), so a package is describable to a buyer
+ *   without anyone authoring a second document about it, and the sheet states the audience the version
+ *   has now. A version published before 2026-11-01 also has an `odps.yaml` stored beside it; its
+ *   /v1/pub address answers the projection too.
  *
  *   ONE SCHEMA, MANY PROJECTIONS, and this is one of the projections. The Table Schema is the only
  *   place columns and types are declared; the ODPS sheet, the CSV header and an agent's view of the
@@ -22,18 +24,25 @@
  *   - `updateFrequency` IS in the SLA dimension enum, and it is filled from the producer's cron —
  *     recorded, not described. A package nobody schedules gets no SLA block at all: an unstated
  *     service level is an absent one, never a promise of daily.
- * @structure descriptorToOdps · odpsYamlKey
- * @usage const doc = descriptorToOdps({ descriptor, ownerGhii, baseUrl, resourceUrls });
+ *
+ *   WHO READS IT is the version's audience (./audience.ts), passed in by the caller at read time. ODPS
+ *   v4.1 `details.visibility` takes private|invitation|organisation|dataspace|public; public maps to
+ *   public, members (every account of this node) to dataspace, organism:<id> to organisation and
+ *   private to private, and the AIMEAT audience itself is stated under `x-aimeat.audience`.
+ *   `authenticationMethod` is 'none' only for a public package and 'Token' (an AIMEAT bearer token)
+ *   for the others.
+ * @structure descriptorToOdps · odpsVisibilityOf
+ * @usage const doc = descriptorToOdps({ descriptor, ownerGhii, baseUrl, resourceUrls, audience });
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- The sheet states the version's real audience (`audience`): visibility,
+ *     authenticationMethod and the access descriptions follow it, and x-aimeat.audience names it. It
+ *     said public and "No authentication" for every package (plan doc-mvwxcas3dom3, D0.1). odpsYamlKey
+ *     went with the stored sheet: a publish writes none (./odps-read.ts).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1: "the package is sellable").
  */
 import { stringify as yamlStringify } from 'yaml';
 import { ODPS_VERSION, ODPS_SCHEMA_URL_YAML } from '../exchange-odps.js';
-import { bare, packageKeyRoot, type Descriptor } from './contract.js';
-
-/** Where the generated sheet sits, beside the descriptor it was projected from. */
-export const odpsYamlKey = (name: string, contentHash: string): string =>
-    `${packageKeyRoot(name)}/${bare(contentHash)}/odps.yaml`;
+import { bare, type Descriptor } from './contract.js';
 
 /**
  * A cron expression as an ODPS `updateFrequency` objective.
@@ -68,6 +77,22 @@ export interface OdpsProjectionInput {
     descriptorUrl: string;
     /** ISO 639-1 language the `details` block is keyed by. v4.1 requires the map. */
     lang?: string;
+    /** Who reads this version (./audience.ts): public, members, organism:<id> or private. Default public. */
+    audience?: string;
+}
+
+/** ODPS v4.1 `details.visibility` for an AIMEAT audience. */
+export function odpsVisibilityOf(audience: string): 'public' | 'dataspace' | 'organisation' | 'private' {
+    if (audience === 'public') return 'public';
+    if (audience === 'members') return 'dataspace';
+    return audience.startsWith('organism:') ? 'organisation' : 'private';
+}
+
+/** Who reads a non-public version, in words for the access descriptions. */
+function readersOf(audience: string): string {
+    if (audience === 'members') return 'every signed-in account of this node';
+    if (audience.startsWith('organism:')) return 'the active members of one organism';
+    return 'the owner, and the agents and apps the owner gave storage:read';
 }
 
 /**
@@ -81,6 +106,10 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
     const { descriptor: d, resourceUrls, descriptorUrl } = input;
     const lang = input.lang ?? 'en';
     const a = d.aimeat;
+    const audience = input.audience ?? 'public';
+    const open = audience === 'public';
+    const authenticationMethod = open ? 'none' : 'Token';
+    const tokenNote = open ? '' : ` Readable by ${readersOf(audience)}: send an AIMEAT bearer token (Authorization: Bearer) of an account or agent the package admits.`;
 
     const columns = d.resources.flatMap(r => r.schema.fields.map(f => `${r.name}.${f.name} (${f.type})`));
     const rowTotal = d.resources.reduce((n, r) => n + r.rowCount, 0);
@@ -91,7 +120,7 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
         // v4.1 `type`: this is a dataset delivered as files, which is what 'dataset' means here.
         type: 'dataset',
         status: 'production',
-        visibility: 'public',
+        visibility: odpsVisibilityOf(audience),
         version: bare(a.contentHash).slice(0, 12),
         description: d.description
             ?? `${rowTotal} rows across ${d.resources.length} resource(s), as a Frictionless Data Package.`,
@@ -105,8 +134,8 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
         ...(a.sources?.length ? {
             recommendedDataProducts: a.sources.filter(s => s.url).map(s => s.url as string),
         } : {}),
-        // A free sample without a separate artefact: the first resource IS the file, and it is
-        // world-readable. Nobody buys data blind, and here they do not have to.
+        // A free sample without a separate artefact: the first resource IS the file, readable by the
+        // package's audience. Nobody buys data blind, and here they do not have to.
         ...(Object.values(resourceUrls)[0] ? { contentSample: Object.values(resourceUrls)[0] } : {}),
     };
 
@@ -114,13 +143,15 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
         default: {
             name: { [lang]: 'Permanent file address' },
             description: {
-                [lang]: 'The resource CSV at a permanent, immutable URL. No authentication, no API key, '
+                [lang]: (open
+                    ? 'The resource CSV at a permanent, immutable URL. No authentication, no API key, '
+                    : 'The resource CSV at a permanent, immutable URL. No API key, ')
                     + 'byte ranges supported. The version is the content hash in the path, so this address '
-                    + 'can never answer with different bytes.',
+                    + 'can never answer with different bytes.' + tokenNote,
             },
             outputPortType: 'file',
             format: 'CSV',
-            authenticationMethod: 'none',
+            authenticationMethod,
             accessURL: Object.values(resourceUrls)[0] ?? descriptorUrl,
             documentationURL: descriptorUrl,
             hashType: 'SHA-256',
@@ -130,11 +161,11 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
             name: { [lang]: 'Frictionless descriptor' },
             description: {
                 [lang]: 'datapackage.json with a Table Schema per resource. frictionless-py, R and the JS '
-                    + 'client resolve the resources from it with no AIMEAT knowledge.',
+                    + 'client resolve the resources from it with no AIMEAT knowledge.' + tokenNote,
             },
             outputPortType: 'file',
             format: 'JSON',
-            authenticationMethod: 'none',
+            authenticationMethod,
             accessURL: descriptorUrl,
             documentationURL: descriptorUrl,
         },
@@ -173,6 +204,8 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
                 contentHash: a.contentHash,
                 descriptorUrl,
                 profile: 'aimeat.datapackage/v1',
+                // The AIMEAT audience the ODPS visibility enum can only approximate.
+                audience,
                 schemaSource: a.schemaSource,
                 producer: a.producer,
                 producedBy: a.producedBy,

@@ -11,10 +11,12 @@
  *   listing. It now gives the version's files, the pointer and the catalogue entry the audience asked
  *   for, and an approved publish request calls the same function (services/publish-requests/
  *   apply-datapackage.ts; plan doc-mvcn6c7e4e5q, V4).
- * @structure readPointer · writeLatest · upsertCatalogueEntry · setVersionAudience
+ * @structure readPointer · writeLatest · catalogueKeyRoot · upsertCatalogueEntry · setVersionAudience
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.2.0 — 2026-11-01 — catalogueKeyRoot names the catalogue entry's key root, which ./withdraw.ts
+ *     removes on a withdrawal; upsertCatalogueEntry reads it from there (plan doc-mvwxcas3dom3, D0.3).
  *   v1.1.0 — 2026-10-21 — setVersionAudience records the audience on the version's descriptor file as a
  *     tag (./audience.ts withAudienceTag) and keeps a file's tags when it re-tiers it (secaudit 2026-10 v42).
  *   v1.0.0 — 2026-10-18 — Extracted from ./store.ts (writeLatest, upsertCatalogueEntry) with
@@ -69,6 +71,14 @@ export async function writeLatest(
 }
 
 /**
+ * The memory key root of a package's catalogue entry: `packages/{id}` with a deterministic id from the
+ * packageId. The manifest is `{root}/manifest` and each resource's entry `{root}/{resource}`.
+ */
+export function catalogueKeyRoot(packageIdValue: string): string {
+    return `packages/${bare(bytesHash(Buffer.from(packageIdValue, 'utf8'))).slice(0, 32)}`;
+}
+
+/**
  * The catalogue side: a knowledge package so the data package appears where people and agents look
  * for knowledge. `content_type: 'dataset'` because the union is closed and `dataset` is already the
  * right word for this; inventing `data-package` would be a type change for no gain.
@@ -80,8 +90,8 @@ export async function writeLatest(
 export async function upsertCatalogueEntry(
     deps: StoreDeps, ownerGhii: string, descriptor: Descriptor, descriptorUrl: string, visibility: string,
 ): Promise<void> {
-    const id = bare(bytesHash(Buffer.from(descriptor.aimeat.packageId, 'utf8'))).slice(0, 32);
-    const key = `packages/${id}/manifest`;
+    const root = catalogueKeyRoot(descriptor.aimeat.packageId);
+    const key = `${root}/manifest`;
     const now = new Date().toISOString();
     const existing = await deps.storage.getMemory(ownerGhii, key);
     const manifest = {
@@ -98,7 +108,7 @@ export async function upsertCatalogueEntry(
         synthesis: { level: 'original', description: descriptor.aimeat.changes },
         references: (descriptor.aimeat.sources ?? []).map(s => ({ url: s.url ?? '', title: s.title ?? '' })),
         entries: descriptor.resources.map(r => ({
-            key: `packages/${id}/${r.name}`,
+            key: `${root}/${r.name}`,
             title: r.title ?? r.name,
             visibility: catalogueEntryVisibilityOf(visibility),
         })),
@@ -127,7 +137,7 @@ export async function upsertCatalogueEntry(
     // One entry per resource, holding its schema — so an agent that found the package through the
     // catalogue learns the columns without fetching a single byte of data.
     for (const r of descriptor.resources) {
-        const entryKey = `packages/${id}/${r.name}`;
+        const entryKey = `${root}/${r.name}`;
         const prev = await deps.storage.getMemory(ownerGhii, entryKey);
         await deps.storage.setMemory({
             key: entryKey, ownerGaii: ownerGhii,

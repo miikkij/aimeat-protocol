@@ -15,6 +15,8 @@
  *     - the refusals: anonymous 401, B's agent without memory:read 403 (REST) and refused (MCP),
  *       GET /v1/admin/exposure 403 for a non-operator and numbers only for the operator.
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Data packages are listed at their own audience, a private one not at all, and a
+ *     withdrawn one leaves the report; how_to_close names DELETE /v1/datapackages (plan doc-mvwxcas3dom3, D0.2).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.3).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-exposure-report
@@ -162,6 +164,27 @@ await test('A\'s report lists none of the private things', async () => {
     for (const [kind, id] of [['memory', K.privMem], ['file', K.privFile], ['app', K.codedApp], ['organism', privateOrg], ['board', privateBoard]]) {
         assert(!find(rep, kind, id), `${kind} ${id} is private and was listed`);
     }
+});
+
+await test('Data packages are listed at their own audience: public, members as signed-in, an organism one as organism, a private one not at all; a withdrawn one leaves the report', async () => {
+    const names = { pub: `exppub${stamp}`, mem: `expmem${stamp}`, org: `exporg${stamp}`, priv: `exppriv${stamp}`, gone: `expgone${stamp}` };
+    for (const [name, visibility] of [[names.pub, 'public'], [names.mem, 'members'], [names.org, `organism:${privateOrg}`], [names.priv, 'private'], [names.gone, 'public']] as const) {
+        const p = await call('/v1/datapackages', { token: A.token, body: { name, changes: 'first', visibility, resources: [{ name: 'items', rows: [{ id: 1 }] }] } });
+        assert(p.status === 201, `data package ${name}: ${p.status} ${JSON.stringify(p.body.error)}`);
+    }
+    const id = (name: string) => `pkg:${A.name}/${name}`;
+    let rep = await report(A.token);
+    const at = (name: string) => find(rep, 'datapackage', id(name));
+    assert(at(names.pub)?.level === 'public', `public package: ${JSON.stringify(at(names.pub))}`);
+    assert(at(names.mem)?.level === 'signed-in', `members package: ${JSON.stringify(at(names.mem))}`);
+    assert(at(names.org)?.level === 'organism' && at(names.org)?.organism_id === privateOrg, `organism package: ${JSON.stringify(at(names.org))}`);
+    assert(!at(names.priv), `a private package is listed: ${JSON.stringify(at(names.priv))}`);
+    const close = at(names.gone)!.how_to_close as string;
+    assert(close.includes(`DELETE /v1/datapackages/${A.name}/${names.gone}`) && close.includes('aimeat_datapackage_withdraw'), `how_to_close: ${close}`);
+    const w = await call(`/v1/datapackages/${A.name}/${names.gone}`, { token: A.token, method: 'DELETE' });
+    assert(w.status === 200, `withdraw: ${w.status} ${JSON.stringify(w.body.error)}`);
+    rep = await report(A.token);
+    assert(!at(names.gone), 'the withdrawn package is still on the report');
 });
 
 await test('A\'s own agent with memory:read reads A\'s report, over REST and over MCP', async () => {

@@ -8,6 +8,7 @@
  * @structure SYSTEM2_AI_CONFIG_FIELDS
  * @version-history
  *   2026-11-01 — ai.region_mode: the buyer's AI region choice (Jouni, 2026-11-01).
+ *   2026-10-31 — ai.gen_rules (AIMEAT_AI_GEN_RULES): the node's level per generation rule.
  *   2026-10-31 — ai.openrouter_region, ai.openrouter_region_fallback, ai.openrouter_regions,
  *     ai.openrouter_region_person_choice (Jouni, 2026-10-31).
  *   2026-10-25 — ai.free_model_last_resort (secaudit2026oct22 follow-up, the developer's ruling on the free model).
@@ -29,6 +30,7 @@
 import type { AiCapabilityConfig } from '../config-types-ai.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { parseRecommendedModels } from './ai/policy.js';
+import { GEN_RULES, parseNodeGenRules } from './ai/gen-rules.js';
 import { isJsonObject, oneOf, REMOVAL_SWITCHES } from './config-schema-validators.js';
 
 export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig>[] = [
@@ -52,6 +54,9 @@ export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig
   { key: 'modelDefaultTts', dotPath: 'ai.model_default_tts', envVar: 'AIMEAT_MODEL_DEFAULT_TTS', type: 'string', validate: () => true, immutable: false, description: 'Default model for speech (text to speech), when the owner has not set one. Empty: the server\'s own key makes no speech' },
   { key: 'ttsVoiceDefault', dotPath: 'ai.tts_voice_default', envVar: 'AIMEAT_TTS_VOICE_DEFAULT', type: 'string', validate: () => true, immutable: false, description: 'The voice a speech call gets when neither the call nor the owner named one. The voice names depend on the model' },
   { key: 'modelDefaultEmbed', dotPath: 'ai.model_default_embed', envVar: 'AIMEAT_MODEL_DEFAULT_EMBED', type: 'string', validate: () => true, immutable: false, description: 'Default embedding model, when the owner has not set one. Empty: the server\'s own key makes no embeddings. Changing it makes every stored vector incomparable with new ones' },
+  // The generation rules (services/ai/gen-rules.ts): the operator's level per rule; the owner
+  // decides within it (wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
+  { key: 'aiGenRules', dotPath: 'ai.gen_rules', envVar: 'AIMEAT_AI_GEN_RULES', type: 'string', validate: v => typeof v === 'string' && parseNodeGenRules(v).problems.length === 0, immutable: false, description: `The node's level for each generation rule, as <rule>=<level> pairs separated by commas. Levels: off (each owner may switch the rule on), on (on for every owner, who may switch it off) and required (on for everyone, nobody bypasses it). A rule not named is off. Rules: ${GEN_RULES.map(r => r.id).join(', ')} (people-artistic: people in pictures and videos only in an artistic, non-photorealistic style)`, range: 'people-artistic=off|on|required' },
   // The operator's AI providers (System 2 plan, V3; services/ai/providers.ts). Immutable where an
   // address or a key name is at stake, as System 1's decide.providers and decide.provider_egress are.
   { key: 'aiProviders', dotPath: 'ai.providers', envVar: 'AIMEAT_AI_PROVIDERS', type: 'string', validate: v => typeof v === 'string', immutable: true, description: 'More AI providers of the node, as a JSON array of provider records (id, title, type, baseUrl, auth, capabilities). Auth is none or the NAME of an environment variable, never a key' },

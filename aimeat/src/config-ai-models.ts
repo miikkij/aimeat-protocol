@@ -16,6 +16,7 @@
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
  *   2026-11-01 — The buyer's AI region choice (AIMEAT_AI_REGION_MODE: eu, eu-only, own; Jouni, 2026-11-01).
+ *   2026-10-31 — aiGenRules (AIMEAT_AI_GEN_RULES, default empty: every rule off).
  *   2026-10-31 — The OpenRouter region (AIMEAT_AI_OPENROUTER_REGION, _REGION_FALLBACK, _REGIONS,
  *     _REGION_PERSON_CHOICE; Jouni, 2026-10-31).
  *   2026-10-25 — aiFreeModelLastResort (AIMEAT_AI_FREE_MODEL_LAST_RESORT, default true; secaudit2026oct22
@@ -63,7 +64,7 @@ type AiModelSettings = Pick<AiCapabilityConfig,
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
   | 'modelDefaultTts' | 'modelDefaultEmbed' | 'ttsVoiceDefault'
-  | 'aiRecommendedModels' | 'aiProviders' | 'aiBuiltinProviders' | 'aiProviderEgress'
+  | 'aiRecommendedModels' | 'aiGenRules' | 'aiProviders' | 'aiBuiltinProviders' | 'aiProviderEgress'
   | 'aiProviderTypes' | 'aiFixedBaseUrlOverrides' | 'aiLegacySettingsRoutes'
   | 'aiCatalogRefresh' | 'aiPriceOverrides' | 'aiCatalogSources'>;
 
@@ -102,6 +103,7 @@ export function aiModelDefaults(): AiModelSettings {
     modelDefaultEmbed: process.env.AIMEAT_MODEL_DEFAULT_EMBED ?? '',
     ttsVoiceDefault: process.env.AIMEAT_TTS_VOICE_DEFAULT ?? '',
     aiRecommendedModels: process.env.AIMEAT_AI_RECOMMENDED_MODELS ?? '',
+    aiGenRules: process.env.AIMEAT_AI_GEN_RULES ?? '',
     aiProviders: process.env.AIMEAT_AI_PROVIDERS ?? '',
     aiBuiltinProviders: process.env.AIMEAT_AI_BUILTIN_PROVIDERS ?? '',
     aiProviderEgress: process.env.AIMEAT_AI_PROVIDER_EGRESS ?? '',

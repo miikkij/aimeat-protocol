@@ -7,6 +7,7 @@
  *   test/unit/cli-tool-param-forwarding.test.ts proves each one leaves the process.
  * @structure aiModelCliTools[] — registered by tool-dispatch/index.ts
  * @version-history
+ *   v1.5.0 — 2026-10-31 — aimeat_ai_gen_rules and aimeat_ai_gen_rules_set over GET and PUT /v1/ai/gen-rules.
  *   v1.4.0 — 2026-10-05 — Each definition writes its `name` literally beside the catalog spread, so
  *     check:field-reach's CodeQL query sees these tools; the connector serves them through here now
  *     (secaudit 2026-10, M3).
@@ -36,6 +37,23 @@ export const aiModelCliTools: ConnectCliToolDefinition[] = [
       // without a policy with the reason rather than this door dropping it.
       if (!policy && token === undefined) return client.get('/v1/ai/policy');
       return client.put('/v1/ai/policy', { ...(policy ? { policy } : {}), ...(token !== undefined ? { confirm_token: token } : {}) });
+    },
+  },
+  {
+    ...def('aimeat_ai_gen_rules'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_gen_rules',
+    handler: ({ client }) => client.get('/v1/ai/gen-rules'),
+  },
+  {
+    ...def('aimeat_ai_gen_rules_set'),
+    // Written out for the static analysis (check:field-reach reads a literal name).
+    name: 'aimeat_ai_gen_rules_set',
+    handler: ({ client }, input) => {
+      const genRules = optionalRecord(input, 'gen_rules');
+      const token = optionalString(input, 'confirm_token');
+      // The node answers a missing gen_rules with the reason, so nothing is decided here.
+      return client.put('/v1/ai/gen-rules', { ...(genRules ? { gen_rules: genRules } : {}), ...(token !== undefined ? { confirm_token: token } : {}) });
     },
   },
   {

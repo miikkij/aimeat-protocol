@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.52.0 -- 2026-10-31 -- Rules for pictures and videos: aimeat_ai_gen_rules, the directive for a model elsewhere, rules_followed.
  *   v1.51.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
  *   v1.50.0 -- 2026-10-31 -- aimeat_overview: the whole account in one call, and the page to give the person.
  *   v1.49.0 -- 2026-10-30 -- Several stores of one's own, and `store` on aimeat_storage_upload
@@ -419,6 +420,14 @@ them, or without a model and let the node choose (the answer then says \`policy_
 your owner has a provider and no policy and the node recommends models, suggest \`{ mode:
 "recommended" }\` once; the tool proposes, you show the change, and the same call with
 \`confirm_token\` applies it. Skill: aimeat-ai-model-policy.
+
+**Rules for pictures and videos.** Your owner and the node may switch on generation rules, for
+example people only in an artistic, non-photorealistic style. \`aimeat_image_generate\` follows them
+by itself. Before you make a picture or a video ANYWHERE ELSE for your owner (another model, another
+service), read \`aimeat_ai_gen_rules\` and put \`for_caller.image.directive\` or
+\`for_caller.video.directive\` into your prompt. When you store or send what you made, declare
+\`ai_provenance\` with \`rules_followed\`: a rule in force you do not name is recorded as unknown. You
+cannot skip a rule; ask your owner for an exception (\`aimeat_ai_gen_rules_set\`, propose and confirm).
 
 **Which provider answers.** Your owner may have several AI providers (their own OpenAI, Anthropic,
 Mistral, xAI or OpenRouter account, a model on their own machine) beside the node's.
