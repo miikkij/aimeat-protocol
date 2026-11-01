@@ -56,6 +56,8 @@
  *     to store a key "for host X" (secaudit 2026-10, v58 and v59 follow-up).
  *   2026-10-25 — A call past the operator's run slots answers 503 EXTENSION_RUNS_BUSY with Retry-After
  *     (secaudit2026oct22, lead 817).
+ *   2026-11-01 — ctx.email's body: a `[Label](https://…)` line is a button and a bare https line a link
+ *     (services/email-text-links.ts).
  *   2026-10-25 — ctx.email takes one recipient per call, within the account's hourly allowance
  *     (extensions.email_per_hour; secaudit2026oct22, lead 325).
  *   2026-10-25 — The operator's limits on one namespace's data and on the copies of one extension
@@ -153,6 +155,8 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
   limits \`ctx.fetch\` to those hosts. \`ctx.email(to, subject, body)\` takes one address per call
   (several recipients: one call each), and one account's extensions send at most
   \`extensions.email_per_hour\` (200 by default) in an hour; past it the call throws naming it.
+  The body is plain text and shows as text: a line that is only \`[Label](https://…)\` becomes a
+  button, and a line that is only an https address a link.
 - \`workspace: { read: true, write: true }\` gives \`ctx.workspace\`, which acts on the caller's
   organism workspace as the caller.
 - Write it in YAML **block style**. A flow mapping with a comma inside a value breaks the value and
