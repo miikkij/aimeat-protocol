@@ -28,6 +28,8 @@
  *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   2026-11-01 — A server attached to sign in afterwards (deferCredential) is stored with auth 'oauth',
+ *     not 'none', so the token the round stores is sent (models/mcp-server-schemas.ts mcpAuthModeOf).
  *   2026-10-15 — Comment: the node-wide door admits the operator in person and the operator's own agent holding operator:admin (feature-list audit 18).
  *   v1.6.0 — 2026-10-09 — The three attach doors store the row through sealServerRowSecrets: a stdio env and transport headers are sealed at rest (secrets audit 2026-10-09).
  *   v1.5.0 — 2026-09-26 — A group's server compares whole identities on every road: attaching one takes
@@ -52,7 +54,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import {
-  MCP_SLUG_RE, toPublicMcpServer, normalizeMcpPrice,
+  MCP_SLUG_RE, toPublicMcpServer, normalizeMcpPrice, mcpAuthModeOf,
   type McpServerRecord, type McpServerCredential, type McpTransport,
   type McpCallerIdentity, type McpExposure, type PublicMcpServer,
   type McpAvailability,
@@ -224,7 +226,7 @@ export async function attachMcpServer(input: AttachInput): Promise<AttachResult>
     ws: null,
     createdBy: input.createdBy,
     transport: input.transport,
-    auth: input.credential ? (input.credential.shape === 'oauth2' ? 'oauth' : 'static') : 'none',
+    auth: mcpAuthModeOf(input),
     credential: sealed,
     credentialShape: input.credential?.shape ?? null,
     expiresAt: null,
@@ -409,7 +411,7 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
     ws: null,
     createdBy: input.createdBy,
     transport: input.transport,
-    auth: input.credential ? (input.credential.shape === 'oauth2' ? 'oauth' : 'static') : 'none',
+    auth: mcpAuthModeOf(input),
     credential: sealed,
     credentialShape: input.credential?.shape ?? null,
     expiresAt: null,
@@ -618,7 +620,7 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
     ws: input.ws ?? null,
     createdBy: input.createdBy,
     transport: input.transport,
-    auth: input.credential ? (input.credential.shape === 'oauth2' ? 'oauth' : 'static') : 'none',
+    auth: mcpAuthModeOf(input),
     credential: sealed,
     credentialShape: input.credential?.shape ?? null,
     expiresAt: null,

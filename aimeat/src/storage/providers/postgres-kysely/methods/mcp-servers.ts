@@ -13,6 +13,7 @@
  * @structure mcpServerMethods — attach · read · patch · credential · tool cache · refresh claim
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — updateMcpServerCredential writes the auth mode when given.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy. Schema: migrations/0076_mcp_servers.sql.
  */
 import { sql } from 'kysely';
@@ -180,12 +181,12 @@ export const mcpServerMethods = {
   },
 
   async updateMcpServerCredential(
-    this: HasDb, id: string, credential: string | null, expiresAt: string | null,
+    this: HasDb, id: string, credential: string | null, expiresAt: string | null, auth?: McpAuthMode,
   ): Promise<void> {
     // status back to active and lastError cleared: a token exchange that worked is exactly the
     // evidence that whatever was wrong no longer is.
     await this.db.updateTable('McpServer').set({
-      credential, expiresAt, status: 'active', lastError: null,
+      credential, expiresAt, ...(auth ? { auth } : {}), status: 'active', lastError: null,
       updatedAt: new Date().toISOString(),
     }).where('id', '=', id).execute();
   },
