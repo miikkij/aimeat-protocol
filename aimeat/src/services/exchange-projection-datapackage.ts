@@ -3,7 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The fourth EXCHANGE source (plan doc-mvwxcas3dom3, D5.1): an owner's data packages
- *   whose pointer `latest.json` carries sale terms with `exchange: true`. Each one projects one listing
+ *   whose sale terms record (services/datapackage/sale-terms-record.ts) says `exchange: true`, listed
+ *   on the version and withdrawal the service recorded (packageForSale), never on the `latest.json`
+ *   pointer's own word, which an app with storage:write rewrites. Each one projects one listing
  *   per money currency (or one free listing with pacing), kind `datapackage`, coordinate
  *   `datapkg:{owner}/{name}` + `read`, as services/exchange-projection.ts projects the other three.
  *
@@ -19,6 +21,7 @@
  * @structure desiredFromDataPackages · packageNamesOf
  * @usage const desired = await desiredFromDataPackages(storage, ownerGhii, ownerName, only, changes, dryRun);
  * @version-history
+ *   v1.0.1 — 2026-11-01 — Lists from the service's records through packageForSale, not the pointer (WP9e).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.1, D5.5).
  */
 import type { Storage } from '../storage/interface.js';
@@ -26,7 +29,7 @@ import type { ReconcileChange, DesiredListing } from './exchange-projection-type
 import { usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './exchange-source-terms.js';
 import { ensureInterfaceVersion, getLatestInterface } from './app-tool-interfaces.js';
 import {
-    datapackageCoordinate, packageIfaceApp, packagePointer, packageDescriptor, packageSchemaDef, plansForTerms,
+    datapackageCoordinate, packageIfaceApp, packageForSale, packageDescriptor, packageSchemaDef, plansForTerms,
     proposeDeliversData, DATAPACKAGE_ACTION,
 } from './exchange-datapackage.js';
 import type { OdpsExtras, Provenance } from '../models/odps-schemas.js';
@@ -51,14 +54,16 @@ export async function desiredFromDataPackages(
     const out: DesiredListing[] = [];
     const names = only ? [only] : await packageNamesOf(storage, ownerGhii);
     for (const name of names) {
-        const pointer = await packagePointer(storage, ownerGhii, name);
-        const terms = pointer?.exchange;
-        if (!pointer || terms?.exchange !== true) continue;
+        // The terms, the version and the withdrawal are the service's records, not the pointer's word.
+        const sale = await packageForSale(storage, ownerGhii, name);
+        const terms = sale?.terms;
+        if (!sale || !terms || terms.exchange !== true) continue;
         const label = `datapkg/${name}`;
         const skip = (reason: string) => skips.push({ action: 'skipped', offeringId: null, kind: 'datapackage', label, unit: null, currency: null, reason });
-        if (pointer.status === 'withdrawn') { skip('PACKAGE_WITHDRAWN'); continue; }
-        if (!pointer.contentHash) { skip('NOT_PUBLISHED'); continue; }
-        const descriptor = await packageDescriptor(storage, ownerGhii, name, pointer.contentHash);
+        if (sale.trusted.withdrawnAt) { skip('PACKAGE_WITHDRAWN'); continue; }
+        const current = sale.trusted.current;
+        if (!current) { skip('NOT_PUBLISHED'); continue; }
+        const descriptor = await packageDescriptor(storage, ownerGhii, name, current);
         if (!descriptor?.resources?.length || descriptor.resources.some(r => !r.schema?.fields?.length)) { skip('SCHEMA_REQUIRED'); continue; }
         if (!terms.usageTerms) { skip('USAGE_TERMS_REQUIRED'); continue; }
         const sold = listingTerms(terms.tollMorsels, terms.price?.morsels ?? 0, moneyPricesOf(null, terms.pricesMoney));

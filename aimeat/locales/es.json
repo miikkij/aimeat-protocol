@@ -24077,6 +24077,8 @@
     "structure.next.visibility": "Decide quién ve la aplicación antes de publicarla.",
     "structure.next.requirements": "Escribe las páginas legales y responde a las preguntas abiertas en la página de la aplicación en el catálogo.",
     "structure.next.none": "Nada te espera. Tu IA sigue con el trabajo.",
+    "structure.next.done": "Todos los pasos están hechos y la aplicación está publicada.",
+    "structure.door.app": "Abrir la aplicación",
     "structure.optional": "Esta página es una ayuda, no una obligación. Puedes decirle a tu IA \"construye la aplicación sin más\". Entonces decide por su cuenta, y esta página muestra lo que decidió.",
     "structure.parts": "De qué se compone la aplicación",
     "structure.part.view": "vista",
