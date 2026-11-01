@@ -5169,6 +5169,10 @@
       "other": "Other / Unknown"
     }
   },
+  "appBadge": {
+    "label": "Publish your own app on {{site}}",
+    "free": "Publish your own app for free"
+  },
   "aiUseBadge": {
     "title": "Use this app with your AI",
     "counts": "App tools: {{tools}} · Skills: {{skills}}",

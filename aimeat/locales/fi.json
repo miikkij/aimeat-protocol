@@ -5188,6 +5188,10 @@
       "other": "Muu / Tuntematon"
     }
   },
+  "appBadge": {
+    "label": "Julkaise oma sovelluksesi palvelussa {{site}}",
+    "free": "Julkaise oma sovelluksesi ilmaiseksi"
+  },
   "aiUseBadge": {
     "title": "Käytä sovellusta omalla tekoälylläsi",
     "counts": "Sovelluksen työkaluja: {{tools}} · Taitoja: {{skills}}",
