@@ -13857,6 +13857,7 @@
   },
   "siteStart": {
     "signInPill": "Entrar",
+    "signInPillShort": "Entrar",
     "title": "Esto es {host}: tu propio AIMEAT",
     "intro": "AIMEAT es tu propio sitio, donde la IA trabaja para ti. Recuerda lo que le cuentas, te hace agentes y aplicaciones, y todo lo que hay en él es tuyo.",
     "signInNote": "Entra con un enlace por correo. Escribe la dirección con la que compraste tu AIMEAT y te enviaremos un enlace que te deja entrar sin contraseña.",

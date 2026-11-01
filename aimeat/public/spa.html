@@ -2102,7 +2102,13 @@
               // A node the store sold has its owner already, so its sign-in offers no registration
               // (Jouni v27 P3): the pill says "Sign in" instead of "Sign in / Register".
               // Its dialog has no "Create account" tab either: others come in by invitation (v31 K24).
-              ...(customerNode() ? { buttonText: t('siteStart.signInPill'), signInOnly: true } : {}),
+              // The button carries a short form for a phone, which top-bar.css shows under 420px
+              // ("Kirjaudu", Jouni 1.11 13.50). Both are locale strings, inserted as the button's HTML.
+              ...(customerNode() ? {
+                buttonText: '<span class="topnav-sign-full">' + t('siteStart.signInPill') + '</span>'
+                  + '<span class="topnav-sign-short">' + t('siteStart.signInPillShort') + '</span>',
+                signInOnly: true,
+              } : {}),
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               i18n: authI18n(),
