@@ -19,6 +19,8 @@
  * @structure PackageReadOpts · PackageReader · packageReaderFor
  * @usage const who = await packageReaderFor(req, res, deps, { owner, name, what }); if (!who) return;
  * @version-history
+ *   v1.1.1 — 2026-11-01 — Path 1b decides a visitor's read on trustedAudienceOf, not the pointer's
+ *     visibility (check:datapackage-pointer-reads).
  *   v1.1.0 — 2026-11-01 — Path 1b: a visitor from another AIMEAT node reads by a named share to their
  *     home account (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.3).
@@ -32,6 +34,7 @@ import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { visitorReadVerdict } from '../services/parties/visitor-read.js';
 import { readPointer } from '../services/datapackage/version-audience.js';
 import { datapackageReadable } from '../services/datapackage/audience.js';
+import { trustedAudienceOf } from '../services/datapackage/audience-record.js';
 import { partyReaderFor, renderMeteredRead, sendReadRefusal, type PartyReadOpts } from './party-read.js';
 
 export type PackageReadOpts = PartyReadOpts;
@@ -73,8 +76,9 @@ export async function packageReaderFor(
             res.vary('Authorization');
             return { reader: v.reader, ref: refOf(opts.owner, opts.name, v.version), admitted: true, party: true, served: v.served, charge: async () => true };
         }
-        const pointer = await readPointer(deps, ownerGhii, opts.name);
-        if (!(await datapackageReadable(deps.storage, ownerGhii, pointer?.visibility, auth as DatapackageReader, opts.name))) {
+        // The audience is the service's record (trustedAudienceOf), never the pointer file an app can rewrite.
+        const trusted = await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, opts.name, await readPointer(deps, ownerGhii, opts.name));
+        if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, auth as DatapackageReader, opts.name))) {
             sendReadRefusal(res, deps.config.nodeId, opts.odata, 403, 'NOT_SHARED', 'The owner has not shared this data package with you.');
             return null;
         }
