@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-11-01 — party:manage (PARTY_MANAGE_SCOPE) joins the own-tick family: outside parties and the
+ *     named shares to them (plan doc-mvwxcas3dom3, D2.7).
  *   2026-10-29 — agent:permissions-add (PERMISSIONS_ADD_SCOPE) joins the own-tick family: an agent adding
  *     permissions it holds to another of the owner's agents
  *     (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
@@ -276,6 +278,15 @@ export const PUBLISH_PUBLIC_SCOPE = 'publish:public';
 export const PERMISSIONS_ADD_SCOPE = 'agent:permissions-add';
 
 /**
+ * Make, change, stop and delete the owner's outside parties (people and programs with no account on
+ * this node), give them keys, and share a data package with one (services/parties/; plan
+ * doc-mvwxcas3dom3, D2.7). A key handed to a stranger reads the owner's data from outside the node, so
+ * "Full access" does not carry it. Outside every wildcard and not grandfathered: the capability did not
+ * exist before.
+ */
+export const PARTY_MANAGE_SCOPE = 'party:manage';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -346,6 +357,8 @@ const OWN_TICK_SCOPES = [
     PUBLISH_PUBLIC_SCOPE,
     // Add permissions to another of the owner's agents (PERMISSIONS_ADD_SCOPE above).
     PERMISSIONS_ADD_SCOPE,
+    // Give an outside party a key and share data with it (PARTY_MANAGE_SCOPE above).
+    PARTY_MANAGE_SCOPE,
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [

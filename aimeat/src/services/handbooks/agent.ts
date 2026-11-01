@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.55.0 -- 2026-11-01 -- Discover names aimeat_party "share": a package shared by name with an outside party (plan doc-mvwxcas3dom3, D3.4).
+ *   v1.54.0 -- 2026-11-01 -- Discover names aimeat_dataproduct: a table built from material, previewed, then run (plan doc-mvwxcas3dom3, D9).
  *   v1.53.0 -- 2026-11-01 -- Discover lists datasets: a data package with its rows, freshness and read addresses (plan doc-mvwxcas3dom3, D1.1).
  *   v1.52.0 -- 2026-10-31 -- Rules for pictures and videos: aimeat_ai_gen_rules, the directive for a model elsewhere, rules_followed.
  *   v1.51.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
@@ -335,7 +337,14 @@ version; \`purchases\` lists what they bought. Tell your owner the price before 
 EVERY domain (capabilities, workflows, knowledge, decisions, research, produced material, companies +
 offerings, documents, apps, datasets, memory). A \`dataset\` is a published data package (a table):
 its entry carries the row count, when it was last published and the addresses to read it from
-(descriptor, OData, ODPS sheet), and \`aimeat_datapackage_export\` reads its rows. Use \`mode:"map"\` for a cheap counts-by-type/tag probe to see
+(descriptor, OData, ODPS sheet), and \`aimeat_datapackage_export\` reads its rows. To build a table
+that refreshes itself from the person's own material (workspace records, an app's publishable data, a
+record, an extension action, a CSV or Excel file, another package), use \`aimeat_dataproduct\`:
+\`define\` with sources and a schedule, \`preview\`, then \`run\`. To give one package to someone with no
+account here (a Power BI, a partner's program, a person), use \`aimeat_party\` action \`share\` with a
+name, the package, the purpose and \`days\`: it answers a key, a connection file and the one sentence to
+tell the person (until when, ending it stops the next read, copies already taken stay). It needs
+\`party:manage\`, which the owner ticks on its own. Use \`mode:"map"\` for a cheap counts-by-type/tag probe to see
 WHAT exists before pulling content, then \`mode:"find"\` with \`q\`/\`type\`/\`tags\`; \`scope\` is
 \`own\` (default), \`public\`, or \`shared\` (organisms you belong to). Reach for the narrow tools only
 when you already know the domain: \`aimeat_catalogue_agents\` (find peers to delegate to) ·

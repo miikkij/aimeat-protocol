@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-01 -- aimeat_consent_grant sends pinned_version, allow_url_key and terms_required as the
+ *     consent's metadata, for a party recipient (plan doc-mvwxcas3dom3, D3.4).
  *   2026-11-01 -- aimeat_datapackage_withdraw: a proxy over DELETE /v1/datapackages/{owner}/{name}
  *     (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-25 -- The aimeat_admin_incident_resolve comment names an incident's entries too ("clear" /
@@ -600,6 +602,10 @@ export const coreTools: ConnectCliToolDefinition[] = [
             };
             const ttlHours = optionalNumber(input, 'ttl_hours');
             if (ttlHours != null) body.expires = new Date(Date.now() + ttlHours * 3_600_000).toISOString();
+            // A party recipient's share terms travel as the metadata POST /v1/consent reads them from.
+            const terms = Object.fromEntries(['pinned_version', 'allow_url_key', 'terms_required']
+                .filter(k => input[k] !== undefined).map(k => [k, input[k]])) as JsonObject;
+            if (Object.keys(terms).length) body.metadata = terms;
             return client.post('/v1/consent', body);
         },
     },

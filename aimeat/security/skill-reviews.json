@@ -57,7 +57,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:4cb8a2fd2519bd90f0066350"
+      "digest": "sha256:5cd5ed7558b7edcb1c0fde3e"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-30",
@@ -415,7 +415,7 @@
         "aimeat/src/services/finance/invoice-service.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:f66970eb6b0b088f5feac557",
+      "digest": "sha256:e7ee00dac870f3601ace7704",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -707,10 +707,10 @@
       "aimeat/scripts/locale-merge.ts": "e1c28235732aafa5"
     },
     "node:aimeat-recurring-work": {
-      "aimeat/src/services/schedule-gate.ts": "6f39d8b8560e1e2b",
+      "aimeat/src/services/schedule-gate.ts": "4d2c13ef4ace9e0e",
       "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "168debe4df9511ba",
-      "aimeat/src/services/schedule-write.ts": "14690df8e4149e6e"
+      "aimeat/src/services/schedule-write.ts": "8f52d2068d62fe41"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
@@ -791,7 +791,7 @@
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
-      "aimeat/src/routes/odata.ts": "4e1684171794302d"
+      "aimeat/src/routes/odata.ts": "e15eee911332aa63"
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",

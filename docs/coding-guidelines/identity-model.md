@@ -11,6 +11,7 @@
 | **GHII** | `owner@node-id` | `alice@aimeat-fi-001-genesis` | Human user. Owns everything. Has morsel balance, profile, trust score. |
 | **GAII** | `agent#owner@node-id` | `claude#alice@aimeat-fi-001-genesis` | AI agent. Scoped permissions and its own trust score. Its morsel balance is always 0: pacing belongs to the owner. |
 | **GEAI** | `eco:app#owner@node-id` | `eco:example#alice@aimeat-fi-001-genesis` | Ecosystem app. Scoped permissions and a data-area allowlist. The owner holds the balance. |
+| **Party** | `party:owner/name@node-id` | `party:alice/matti@aimeat-fi-001-genesis` | An outside party: a person or a program with NO account here (a Power BI, an ETL job, a partner). Not a principal: no namespace, no scopes, no balance. Reads only the data packages its owner shared with it by name (Core §3.8). |
 
 There is also a bare **Owner** name (`alice`) which is the account layer. It appears in `req.auth!.sub` for owner JWTs. `req.auth!.owner` carries it on every principal that acts for this person: the owner, an agent, an app grant and an ecosystem app alike, so comparing it answers "same person", never "which principal" ([invariant 11](security-development-dna.md#11-the-owner-name-is-not-a-principal)). A visitor from another node is the exception: its `sub` and `owner` are both its home GHII (`alice@home-node`), never a bare name.
 
@@ -21,6 +22,31 @@ There is also a bare **Owner** name (`alice`) which is the account layer. It app
 | **GHII login** (password/TOTP) | `alice` (bare owner name) | `['owner']` or `['owner','operator']` | Bypassed (owners can do anything) |
 | **Agent device auth** (RFC 8628) | `claude#alice@node-id` (full GAII) | `['agent']` | Enforced per agent's scope list |
 | **Federated login** (a visitor signed in on its home node) | `alice@home-node` (its home GHII) | `['federated']` | Enforced: the scopes this node grants the peer |
+
+## An outside party
+
+An outside party (`src/services/parties/`, plan doc-mvwxcas3dom3 D2 and D3) is made by an owner and
+reads what that owner shared with it by name. Three rules, each decided on 2026-11-01 from an audit
+of the auth layer:
+
+- **L1, the identity string is `party:<owner>/<name>@<node>`, never `<x>#<owner>@<node>`.**
+  `parseGaiiLoose`, `localAccountName`, `isSameOwner`, `ownerGhiiOf`, `matchesRecipient` (its `ghii:`
+  form), `checkConsentForRead` and the access guard's members tier all read `x#alice@node` as one of
+  alice's OWN principals. A consent recipient `party:…` is matched only by that exact party, and a
+  party accessor by no other recipient (`src/storage/consent-recipient.ts`).
+- **L2, a party is never a node session and never `req.auth`.** Its credentials are HTTP Basic (user
+  `<owner>/<name>`, password the key), a party token from `POST /v1/parties/token` (`typ: 'party'`,
+  prefix `aimeat_party_`, about 15 minutes) or, for a CSV download a share allows it on, `?key=`. Only
+  `services/parties/verify.ts` reads them, and only on the endpoints in `PARTY_TOKEN_ROUTES`
+  (`services/parties/contract.ts`): the data package reads, OData, `/v1/pub/<owner>/datapkg/…` and
+  `/v1/parties/me*`. `optionalAuth` answers 401 for a party token anywhere else. Every request
+  re-reads the party (by uid for a token) and its share.
+- **L3, one `parties` record per owner**, service-owned (`utils/reserved-keys.ts`), with each key's
+  SHA-256; a share is a consent bound to the party's uid, so a name made again inherits nothing.
+
+A party's reader (`DatapackageReader.party`) carries no `owner`, so `isNodeAccount` refuses it and the
+members and organism levels never admit it; `datapackageReadable` admits it only to the package its
+share names, and `versionOpenTo` only to the version the share pins.
 
 ## A visitor from another node
 

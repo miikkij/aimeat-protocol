@@ -17,6 +17,7 @@
  * @structure aiRegionNotice(config, locale)
  * @usage vars.aiRegionNotice = aiRegionNotice(config, locale)
  * @version-history
+ *   v1.2.1 — 2026-11-01 — The paragraph also names the model that reads pictures, when it is another one.
  *   v1.2.0 — 2026-11-01 — The paragraph names the node's default model for the chat and the agents (Jouni, 2026-11-01 02.54).
  *   v1.1.0 — 2026-11-01 — The buyer's AI region choice (ai.region_mode): the settings in effect come
  *     from regionSettingsOf, eu-only names what is off, and own says each person brings their own key.
@@ -24,7 +25,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import { typeAllowed } from './ai/providers.js';
-import { allowedRegions, nodeTextModel, regionModeOf, regionSettingsOf, REGION_HOSTS, type OpenRouterRegion, type RegionFallback } from './ai/openrouter-region.js';
+import { allowedRegions, nodePictureModel, nodeTextModel, regionModeOf, regionSettingsOf, REGION_HOSTS, type OpenRouterRegion, type RegionFallback } from './ai/openrouter-region.js';
 import { nodeOpenRouterKey } from './ai/node-openrouter-key.js';
 
 type Lang = 'en' | 'fi' | 'es';
@@ -47,6 +48,8 @@ interface Words {
   own: string;
   /** The node's default model for the chat and the agents; {model} is filled in. */
   model: string;
+  /** The model that reads pictures when it is another one; {model} is filled in. */
+  picture: string;
 }
 
 const WORDS: Record<Lang, Words> = {
@@ -71,6 +74,7 @@ const WORDS: Record<Lang, Words> = {
     euOnly: 'This node was set up to use AI in the EU only. Speech-to-text, read-aloud, image generation, embeddings and the free models are therefore off here, because the EU region offers none of them.',
     own: 'This node has no shared AI key. Each person adds their own OpenRouter key in their AI settings and uses it under their own agreement with OpenRouter, Inc., a company in the United States. Where your requests are processed is your own choice in your AI settings.',
     model: 'The chat and the agents use the model {model} unless you choose another one in your AI settings.',
+    picture: 'Pictures are read by the model {model}.',
   },
   fi: {
     title: 'Missä tämän solmun tekoälyn tarjoaja käsittelee pyyntösi.',
@@ -93,6 +97,7 @@ const WORDS: Record<Lang, Words> = {
     euOnly: 'Tämä solmu on otettu käyttöön niin, että tekoäly toimii vain EU:ssa. Siksi puheentunnistus, ääneen luku, kuvien luonti, upotukset ja ilmaiset mallit eivät ole käytössä. EU-alueella ei ole niistä yhtäkään.',
     own: 'Tällä solmulla ei ole yhteistä tekoälyavainta. Jokainen lisää oman OpenRouter-avaimensa tekoälyasetuksiinsa ja käyttää sitä oman sopimuksensa mukaan. OpenRouter, Inc. on yhdysvaltalainen yritys. Sinä valitset tekoälyasetuksissasi, missä pyyntösi käsitellään.',
     model: 'Keskustelu ja agentit käyttävät mallia {model}, ellet valitse tekoälyasetuksissasi toista mallia.',
+    picture: 'Kuvat lukee malli {model}.',
   },
   es: {
     title: 'Dónde procesa tu solicitud el proveedor de IA de este nodo.',
@@ -115,6 +120,7 @@ const WORDS: Record<Lang, Words> = {
     euOnly: 'Este nodo se configuró para usar la IA solo en la UE. Por eso aquí no funcionan el dictado por voz, la lectura en voz alta, la generación de imágenes, las incrustaciones ni los modelos gratuitos: la región de la UE no ofrece ninguno de ellos.',
     own: 'Este nodo no tiene una clave de IA compartida. Cada persona añade su propia clave de OpenRouter en sus ajustes de IA y la usa según su propio acuerdo con OpenRouter, Inc., una empresa de Estados Unidos. Tú eliges en tus ajustes de IA dónde se procesan tus solicitudes.',
     model: 'El chat y los agentes usan el modelo {model}, salvo que elijas otro en tus ajustes de IA.',
+    picture: 'Las imágenes las lee el modelo {model}.',
   },
 };
 
@@ -149,6 +155,8 @@ export function aiRegionNotice(config: AimeatConfig, locale: string): string {
   // The model is named when the node sets one (the transparency statement also names eu-only's stand-in).
   const model = nodeTextModel(config);
   const named = model ? w.model.replace('{model}', model) : '';
-  const sentences = [w.key, w.region[region], fb ? w.fallback[fb] : '', mode === 'eu-only' ? w.euOnly : '', named, choose, w.tail].filter(Boolean);
+  const pictureModel = nodePictureModel(config);
+  const picture = pictureModel ? w.picture.replace('{model}', pictureModel) : '';
+  const sentences = [w.key, w.region[region], fb ? w.fallback[fb] : '', mode === 'eu-only' ? w.euOnly : '', named, picture, choose, w.tail].filter(Boolean);
   return `<p><strong>${w.title}</strong> ${sentences.join(' ')}</p>`;
 }

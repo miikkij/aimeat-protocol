@@ -244,6 +244,23 @@ When an owner account is deactivated, by the operator or by an organisation's di
 - **ID-11** Deleting an owner account MUST erase the account's records, files, consents, memberships, agents, applications and credentials. Content the owner contributed to an organism MUST be erased or attributed to the erasure, so that the deleted owner's name does not remain on other people's data.
 - **ID-12** An owner MUST be able to export the account's data in a machine-readable form.
 
+### 3.8 Outside parties
+
+An **outside party** is a person or a program that has no account on the node and reads only what an owner shared with it by name: a spreadsheet, a reporting tool, another organisation's service. It is not a principal of §3.1. It holds no namespace, no scopes and no balance, and it is never an account of the node. An owner makes a party, gives it a key, and grants it a **named share**: a consent (§5.4) whose recipient is the party and whose pattern names one data package.
+
+| Part | Grammar |
+|---|---|
+| Party identity | `party:<owner>/<name>@<node-id>`, for example `party:alice/matti@node-id` |
+| Party name | `^[a-z0-9][a-z0-9-]{0,39}$`, unique per owner |
+
+The identity carries a slash and the `party:` prefix, and never the `x#owner@node` form of an agent, so that no parser of an agent, owner or ecosystem identifier reads a party as one of the owner's own principals.
+
+- **ID-13** A party's credential MUST be a key the owner was shown once and the node stores only as a one-way hash compared in constant time, or a short-lived purpose token made from that key. A node MUST accept the credential only on the endpoints that read what was shared with a party (the data package reads, the OData feed, the package files, the party's own endpoints) and MUST refuse it, 401, on every other endpoint. A party credential MUST NOT become a node session.
+- **ID-14** A party MUST NOT be admitted by any audience that names the node's accounts: neither the `members` level nor an organism (§6.3). A party reads a package only through a live named share to exactly that package, and only the version the share pins when it pins one.
+- **ID-15** Every request with a party credential MUST re-check that the party exists, is not stopped, holds the key, and that the share is active and not expired. Revoking the share, deleting the key or deleting the party MUST refuse the next request, a token made before it included. A share and a token MUST be bound to the party's own identifier made at creation, not only to its name, so that a party made again under a deleted party's name inherits nothing.
+- **ID-16** The owner MUST be able to list, stop and delete each of the account's parties, and to read which reads each party made and which were refused. An agent or application of the owner MUST make, change or share with a party only with a scope that no wildcard grants.
+- **ID-17** The operator MUST be able to stop any party for abuse; the owner MUST NOT be able to resume a party the operator stopped.
+
 ---
 
 ## 4. Authentication
@@ -364,7 +381,7 @@ A consent is a grant by a record's owner. It names a recipient, a pattern over t
 
 | Field | Meaning |
 |---|---|
-| recipient | a GAII, a GEAI, a GHII (covering that owner's agents), an organism, a node, a domain, or `*` |
+| recipient | a GAII, a GEAI, a GHII (covering that owner's agents), an organism, a node, a domain, `*`, or an outside party `party:<owner>/<name>@<node-id>` (§3.8), matched only by that exact party |
 | data pattern | a glob over the grantor's record keys |
 | purpose | free text the owner and the recipient read |
 | reach | `local`, `federation` or `auth` (see below) |
@@ -927,6 +944,11 @@ One line per requirement. The profile column says which profile the line belongs
 | ID-10 | 3.7 | Base | Removing an agent ends every token it holds at once |
 | ID-11 | 3.7 | Base | Deleting an account erases its data and leaves no trace of the name on others' data |
 | ID-12 | 3.7 | Base | An owner can export the account's data |
+| ID-13 | 3.8 | Base | A party key is shown once and stored hashed; a party credential reads only shared data and is never a session |
+| ID-14 | 3.8 | Base | A party passes no members or organism audience, only a live named share |
+| ID-15 | 3.8 | Base | Every party request re-checks the party, the key and the share; shares and tokens bind to the party's own identifier |
+| ID-16 | 3.8 | Base | The owner lists, stops and deletes parties and reads their reads; a delegate needs a word no wildcard grants |
+| ID-17 | 3.8 | Base | The operator stops a party for abuse; the owner cannot resume it |
 | AUTH-01 | 4.1 | Base | At least one owner sign-in that needs no private key |
 | AUTH-02 | 4.1 | Base | Passwords hashed with a memory-hard function |
 | AUTH-03 | 4.1 | Base | An armed second factor is required on password and emailed-link sign-in |
