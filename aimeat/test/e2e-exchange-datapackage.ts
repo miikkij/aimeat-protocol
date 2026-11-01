@@ -25,6 +25,8 @@
  *     its promised run has passed (the pointer's time set back).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=exchange-datapackage
  * @version-history
+ *   v1.2.0 — 2026-11-01 — D5.4: the card page of a provider with no Stripe account answers 409
+ *     PROVIDER_TAKES_NO_CARD and keeps no purchase.
  *   v1.1.0 — 2026-11-01 — D6: the listing carries the package's freshness.
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5).
  */
@@ -245,6 +247,20 @@ await test('D5.4 a block of reads ends with 402 PREPAID_ENDED, uncharged; buying
     assert((await call(`/v1/datapackages/${A.name}/${READS}/rows/items`, { basic })).status === 200, 'the same key reads again');
     const wrongProvider = await call(`/v1/exchange/offerings/${offering}/buy`, { basic: `${conn.authentication.basic.user}:wrong`, body: { reads: 1 } });
     assert(wrongProvider.status === 401, `a wrong key: ${show(wrongProvider)}`);
+});
+
+await test('D5.4 the card page of a provider with no Stripe account is refused with 409 PROVIDER_TAKES_NO_CARD, and no purchase is kept', async () => {
+    const month = new Date().toISOString().slice(0, 7);
+    const purchases = async (): Promise<number> => {
+        const rec = await call(`/v1/memory/party-purchases.${month}`, { token: A.token });
+        assert(rec.status === 200, `the purchase record: ${show(rec)}`);
+        return ((rec.body.data?.value ?? rec.body.data?.memory?.value)?.purchases ?? []).length;
+    };
+    const before = await purchases();
+    const r = await call(`/v1/exchange/offerings/${monthOffering}/buy`, { body: { party: { display_name: 'Card Buyer', kind: 'person', contact: 'card@example.org' }, months: 1, handler: 'com.stripe.checkout' } });
+    assert(r.status === 409 && codeOf(r) === 'PROVIDER_TAKES_NO_CARD', `no Stripe account: ${show(r)}`);
+    assert(/card payments/.test(r.body.error?.message ?? '') && (r.body.error?.message ?? '').includes('test.money'), `the message names the other handler: ${show(r)}`);
+    assert(await purchases() === before, 'a purchase was kept for a refused card page');
 });
 
 await test('D5.4 a party cannot buy an offering of another kind, nor one with no money price', async () => {
