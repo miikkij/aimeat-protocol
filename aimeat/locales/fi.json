@@ -16345,7 +16345,8 @@
     "away": {
       "title": "Sillä aikaa kun olit poissa",
       "nothing": "Poissa ollessasi ei tapahtunut mitään uutta.",
-      "more": "Katso kaikki, mitä on tapahtunut"
+      "more": "Katso kaikki, mitä on tapahtunut",
+      "agentNew": "Uusi agentti on käytössä: {name}"
     },
     "trail": {
       "title": "Toimintaloki",

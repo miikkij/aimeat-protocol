@@ -16151,7 +16151,8 @@
     "away": {
       "title": "While you were away",
       "nothing": "Nothing new happened while you were away.",
-      "more": "See everything that has happened"
+      "more": "See everything that has happened",
+      "agentNew": "A new agent is at work: {name}"
     },
     "trail": {
       "title": "Activity log",

@@ -20,6 +20,9 @@
  * @structure AwayCard() · internal: readVisit, noteVisit, AWAY_AFTER_MS, ROWS
  * @usage html`<${AwayCard} />`
  * @version-history
+ *   v1.1.0 — 2026-11-02 — An agent is named by the name the person sees (GET /v1/agents), a title that
+ *     repeats it is left out, and a new agent reads "Uusi agentti on käytössä: <nimi>" instead of the
+ *     feed's "on kotona" (commercial's crew59 test).
  *   v1.0.0 — 2026-11-02 — Initial (three visits, visit 2; aimeat-commercial-1c).
  */
 import { h } from 'preact';
@@ -33,6 +36,7 @@ import { Timeline, TimelineRow } from '/components/Timeline.js';
 import { Note } from '/components/Note.js';
 import { line, kindCategory } from './feed.js';
 import { titleOf } from '/js/services/notifications.js';
+import { getSession } from '/js/services/auth.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -75,6 +79,27 @@ function noteVisit(now = Date.now()) {
   return awaySince;
 }
 
+/** The events whose `data.agent` is an agent's short name (services/agent-task-fanout.ts and friends). */
+const AGENT_KINDS = new Set(['agent_task_done', 'agent_task_failed', 'agent_task_declined']);
+
+/**
+ * One feed row in the card's words. An agent is named by the name the person sees, not its short
+ * name; a title that only repeats that name is left out; a new agent is said plainly, not as the
+ * feed's "is home" (commercial's crew59 test: "morning-digest sai valmiiksi: Aamukatsaus" and
+ * "morning-digest on kotona").
+ */
+function awayLine(item, shownName) {
+  const d = item.data || {};
+  if (item.kind === 'agent_connected') {
+    const name = shownName(d.name || d.agent || '');
+    return name ? tr('home.away.agentNew', 'A new agent is at work: {name}').replace('{name}', name) : '';
+  }
+  if (!AGENT_KINDS.has(item.kind)) return line(item);
+  const agent = shownName(d.agent || '');
+  const title = String(d.title || '').trim().toLowerCase() === agent.toLowerCase() ? '' : d.title;
+  return line({ ...item, data: { ...d, agent, title } });
+}
+
 /** A notification's own address when it is a page of this node, else the Notifications page. */
 const notifHref = (n) => (typeof n?.link === 'string' && n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : '/v1/profile?tab=notifications');
 
@@ -84,12 +109,18 @@ export function AwayCard() {
   const { data: feed } = useShared('home-feed', since ? '/v1/home/feed' : null, ['home'], (d) => d?.items ?? []);
   const { data: notes } = useShared('notifications-unread', since ? '/v1/notifications?unread=1&limit=50' : null,
     ['notifications'], (d) => d?.notifications ?? []);
+  // The names the person sees for their agents, by short name (GET /v1/agents, as the Agents page).
+  const owner = getSession()?.owner || '';
+  const { data: names } = useShared('away-agent-names', since && owner ? `/v1/agents?owner=${encodeURIComponent(owner)}` : null,
+    ['agents'], (d) => Object.fromEntries((d?.agents || d || []).map((a) => [a.name, a.display_name || a.displayName || a.name])));
   if (!since || !feed || !notes) return null;
 
+  const shownName = (short) => (names && names[short]) || short;
   const after = Date.parse(since);
   const rows = [
-    ...feed.filter((it) => Date.parse(it.at) > after && it.kind !== 'agent_knocking' && line(it))
-      .map((it) => ({ at: it.at, category: kindCategory(it.kind), href: it.link, text: line(it) })),
+    ...feed.filter((it) => Date.parse(it.at) > after && it.kind !== 'agent_knocking')
+      .map((it) => ({ at: it.at, category: kindCategory(it.kind), href: it.link, text: awayLine(it, shownName) }))
+      .filter((r) => r.text),
     ...notes.filter((n) => Date.parse(n.createdAt) > after && titleOf(n))
       .map((n) => ({ at: n.createdAt, category: 'system', href: notifHref(n), text: titleOf(n) })),
   ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
