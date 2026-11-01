@@ -37,6 +37,11 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.4.0 — 2026-11-01 — LEVELS gains `named`, outside the widest-first order a cap reads; the strip
+ *     counts the named shares and the outside parties; sections for the named shares ("End share"),
+ *     the outside parties ("Manage" in the Data Wallet) and every data package at its own level
+ *     ("Change" on the Offers page), and the list of everything else leaves those three kinds out
+ *     (exposure/named.js; WP9a, design canvas "Data ulos", board Mita-muut-nakevat).
  *   v1.3.0 — 2026-10-18 — Each item's classification beside who can read it, and the conflicts first with
  *     "Lower the level" (plan doc-mvdipuyqraas, L4.2, L4.3).
  *   v1.2.0 — 2026-10-18 — The figures are the stacked strip (number, word and line on shared rows), and
@@ -66,6 +71,8 @@ import { Note } from '/components/Note.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 import { openTab } from '/components/Rail.js';
 import { useConfirm } from '/components/Modal.js';
+import * as dp from '/js/services/dataproducts.js';
+import { secNamedShares, secParties, secProducts, NAMED_KINDS } from './exposure/named.js';
 
 const html = htm.bind(h);
 const x = (key, vars) => t(`exposure.${key}`, vars);
@@ -73,12 +80,14 @@ const enc = encodeURIComponent;
 /** A storage key as a path: each segment encoded, the slashes kept. */
 const keyPath = (key) => String(key).split('/').map(enc).join('/');
 
-/** The report's levels, widest first (services/exposure/exposure-types.ts LEVELS). */
-const LEVELS = ['public', 'link', 'signed-in', 'organism'];
+/** The report's levels (services/exposure/exposure-types.ts LEVELS): the four widest first, then `named`. */
+const LEVELS = ['public', 'link', 'signed-in', 'organism', 'named'];
+/** The widest-first order a classification's cap reads; `named` stands outside it (WP4's ruling). */
+const CAP_LEVELS = LEVELS.filter((lv) => lv !== 'named');
 
 /** The kinds the report lists, as the person knows them (services/exposure/exposure-types.ts KINDS). */
 const KINDS = ['memory', 'file', 'app', 'workspace_share', 'organism', 'board', 'knowledge', 'package',
-  'datapackage', 'skill', 'portfolio', 'company', 'exchange', 'agent'];
+  'datapackage', 'skill', 'portfolio', 'company', 'exchange', 'agent', 'named_share', 'outside_party'];
 
 const kindWord = (kind) => (KINDS.includes(kind) ? x(`kind.${kind}`) : kind);
 
@@ -197,13 +206,20 @@ function WhoCell({ item }) {
 
 function Strip({ report }) {
   const failed = report.failed.length > 0;
-  return html`<${FigureStrip} lead wrap stacked items=${LEVELS.map((lv) => ({
-    key: lv,
-    n: report.counts.by_level[lv] ?? 0,
-    tone: lv === 'public' && report.counts.by_level[lv] ? 'notice' : undefined,
-    label: x(`level.${levelKey(lv)}`),
-    sub: failed ? x('levelSubPartial') : x(`level.${levelKey(lv)}Sub`),
-  }))} />`;
+  // `named` stands after the four, outside their widest-first order (WP4's ruling): one person or
+  // program chosen by name is not a wider or a narrower audience than the members of one place.
+  const byKind = (kind) => report.counts.by_kind?.[kind]?.named ?? 0;
+  return html`<${FigureStrip} lead wrap stacked items=${[
+    ...CAP_LEVELS.map((lv) => ({
+      key: lv,
+      n: report.counts.by_level[lv] ?? 0,
+      tone: lv === 'public' && report.counts.by_level[lv] ? 'notice' : undefined,
+      label: x(`level.${levelKey(lv)}`),
+      sub: failed ? x('levelSubPartial') : x(`level.${levelKey(lv)}Sub`),
+    })),
+    { key: 'named_share', n: byKind('named_share'), label: x('level.namedShares'), sub: x('level.namedSharesSub') },
+    { key: 'outside_party', n: byKind('outside_party'), label: x('level.parties'), sub: x('level.partiesSub') },
+  ]} />`;
 }
 
 /** What the report could not do, said before the list so nobody reads a short list as a clean one. */
@@ -266,6 +282,9 @@ export default function ExposureTab({ showToast }) {
   const [busy, setBusy] = useState('');
   const { confirm, ConfirmUI } = useConfirm();
 
+  const [packages, setPackages] = useState([]);
+  const [products, setProducts] = useState([]);
+
   const load = useCallback(async () => {
     try {
       const res = await apiGet('/v1/exposure/mine');
@@ -275,6 +294,9 @@ export default function ExposureTab({ showToast }) {
       swallowed('exposure-tab: load failed', err);
       setError(err?.message || x('loadFailed'));
     }
+    // The owner's packages and products, private ones included, for the data products section.
+    dp.listPackages().then((r) => setPackages(r?.packages || [])).catch((err) => swallowed('exposure-tab: packages', err));
+    dp.listProducts().then((r) => setProducts(r?.products || [])).catch((err) => swallowed('exposure-tab: products', err));
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -330,11 +352,28 @@ export default function ExposureTab({ showToast }) {
   // The site's toast after a copy, as the other copy doors say it (the link's own "✓ Copied" too).
   const copied = () => showToast?.(x('copiedForAi'));
 
-  const items = report?.items ?? [];
-  const total = report?.counts?.total ?? 0;
+  /** End a named share, after the site's confirm: the next read is refused. */
+  const onRevoke = (item) => confirm(x('named.revokeConfirm', { who: item.share.party_name, what: item.share.package }), async () => {
+    setBusy(`${item.kind}|${item.id}`);
+    setMessage('');
+    try {
+      await dp.revokeShare(item.id);
+      setMessage(x('named.revoked', { who: item.share.party_name }));
+      await load();
+    } catch (err) {
+      swallowed('exposure-tab: revoke failed', err);
+      setError(err?.message || x('closeFailed'));
+    } finally { setBusy(''); }
+  }, { title: x('named.revoke'), confirmLabel: x('named.revoke'), danger: true });
+
+  const all = report?.items ?? [];
+  // The named shares, the parties and the data packages have sections of their own above the rest.
+  const items = all.filter((i) => !NAMED_KINDS.includes(i.kind));
+  const total = (report?.counts?.total ?? 0) - (all.length - items.length);
+  const titles = Object.fromEntries(products.map((p) => [p.name, p.title || p.name]));
   // Where classification is on, the conflicts come first, in a section of their own.
   const cls = report?.classification ?? null;
-  const conflicts = items.filter((i) => i.classification?.conflict);
+  const conflicts = all.filter((i) => i.classification?.conflict);
   const num = (n) => String(n + (cls ? 1 : 0)).padStart(2, '0');
   return html`
     <${SettingsPage}
@@ -360,7 +399,10 @@ export default function ExposureTab({ showToast }) {
             ${cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsWhy')}<//>` : null}
             ${cls.excepted ? html`<${Note} kind="hint">${x('cls.excepted', { n: cls.excepted })}<//>` : null}
           <//>` : null}
-        <${Section} id="ex-items" num=${num(1)} title=${x('itemsTitle')} count=${total}>
+        ${secNamedShares({ items: all, num: num(1), busy: !!busy, onRevoke, titles })}
+        ${secParties({ items: all, num: num(2) })}
+        ${secProducts({ packages, products, items: all, num: num(3) })}
+        <${Section} id="ex-items" num=${num(4)} title=${x('itemsTitle')} count=${total}>
           <${List} cols="item-kind-state-doors" keepCols
             head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
             empty=${report.failed.length ? x('emptyPartial') : x('empty')}
@@ -370,7 +412,7 @@ export default function ExposureTab({ showToast }) {
           ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
           <${Note} kind="hint">${x('askYourAi')}<//>
         <//>
-        <${Section} fold id="ex-notes" num=${num(2)} title=${x('notesTitle')} sub=${x('notesSub')}>
+        <${Section} fold id="ex-notes" num=${num(5)} title=${x('notesTitle')} sub=${x('notesSub')}>
           ${report.notes.map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}
         <//>` : null}
     <//>`;
