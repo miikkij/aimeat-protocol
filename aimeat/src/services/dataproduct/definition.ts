@@ -18,11 +18,13 @@
  *   built from somebody's records, memory and files does not, because the sources it reads are mostly
  *   private and the build refuses an audience wider than its narrowest source anyway.
  * @structure DATAPRODUCT_SPEC · DataProductDefinition · SourceSpec · normaliseDefinition · dataProductKey
- *   · DataProductError · SOURCE_KINDS · COMBINE_MODES · FILTER_OPS
+ *   · DataProductError · SOURCE_KINDS · COMBINE_MODES · FILTER_OPS · sourceLabel
  * @usage
  *   const out = normaliseDefinition(name, body);
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — `retention` { keep, unit }: how many earlier versions a run keeps (the
+ *     package's retention policy); sourceLabel, a source in a few words for a list row (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import type { FieldType } from '../datapackage/contract.js';
@@ -118,6 +120,9 @@ export interface DataProductDefinition {
     columns?: ColumnMapping[];
     filter?: FilterSpec | null;
     schedule?: { cron: string; timezone?: string } | null;
+    /** How many earlier versions a run keeps (the package's retention policy, ../datapackage/retention.ts).
+     *  Absent: every version stays. A version a share pins or a contract reads is kept regardless. */
+    retention?: { keep: number; unit: 'versions' | 'months' } | null;
     visibility: string;
     /** The owner's confirmation that a public product may carry a column the data map marks personal. */
     confirmPersonalPublic?: boolean;
@@ -230,6 +235,17 @@ export function normaliseDefinition(name: string, raw: Record<string, unknown>):
         schedule = { cron, ...(str(s.timezone) ? { timezone: str(s.timezone)! } : {}) };
     } else if (raw.schedule === null) schedule = null;
 
+    let retention: DataProductDefinition['retention'];
+    if (raw.retention !== undefined && raw.retention !== null) {
+        const r = raw.retention as Record<string, unknown>;
+        const keep = Number(r.keep);
+        const unit = r.unit ?? 'versions';
+        if (!Number.isInteger(keep) || keep < 1 || keep > 1000 || (unit !== 'versions' && unit !== 'months')) {
+            return bad('retention is { keep, unit }: keep a whole number from 1 to 1000, unit "versions" (the default) or "months"; null keeps every version.');
+        }
+        retention = { keep, unit };
+    } else if (raw.retention === null) retention = null;
+
     const visibility = str(raw.visibility) ?? 'private';
     if (!parseAudience(visibility)) return bad('visibility is private (the default), members, organism:<id> or public.');
 
@@ -245,6 +261,7 @@ export function normaliseDefinition(name: string, raw: Record<string, unknown>):
             ...(columns ? { columns } : {}),
             ...(filter !== undefined ? { filter } : {}),
             ...(schedule !== undefined ? { schedule } : {}),
+            ...(retention !== undefined ? { retention } : {}),
             ...(raw.confirm_personal_public === true || raw.confirmPersonalPublic === true ? { confirmPersonalPublic: true } : {}),
         },
     };
@@ -259,6 +276,22 @@ function validSourceColumns(v: unknown): boolean {
 export function splitRef(ref: string): [string, string] {
     const dot = ref.indexOf('.');
     return dot > 0 ? [ref.slice(0, dot), ref.slice(dot + 1)] : ['', ref];
+}
+
+/**
+ * A source in a few words, for a list row: the extension and its action, the app and its prefix, the
+ * memory key, the file, the records space, the other package. The words are identifiers, so they are
+ * the same in every language.
+ */
+export function sourceLabel(s: SourceSpec): { label: string } {
+    switch (s.kind) {
+        case 'extension': return { label: `${s.ext} › ${s.action}` };
+        case 'app': return { label: `${s.app} › ${s.key_prefix}` };
+        case 'records': return { label: `${s.ws} › ${s.space}` };
+        case 'datapackage': return { label: `${s.owner ? `${s.owner}/` : ''}${s.name}${s.resource ? ` › ${s.resource}` : ''}` };
+        case 'file': return { label: String(s.key).split('/').pop() || String(s.key) };
+        default: return { label: `${s.key}${s.rows_at ? ` › ${s.rows_at}` : ''}` };
+    }
 }
 
 /** Read a stored record value as a definition, or null when it is not one. */
