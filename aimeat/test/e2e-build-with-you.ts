@@ -11,6 +11,8 @@
 //   4. An owner's trail is their own account's; the operator's activity is the whole node's.
 //   5. notify-owner tells the owner once per code.
 //
+// v1.1.0 -- 2026-11-01 -- With a build code a submit before connecting is BUILD_CONNECT_FIRST; the
+//   place's own send is test/e2e-build-with-you-send.ts.
 // v1.0.0 -- 2026-11-01 -- Initial ("Rakennamme kanssasi"; Jouni, 1.11 16.22).
 
 import { createServer, type Server } from 'node:http';
@@ -268,7 +270,7 @@ try {
         assert(approved, 'agent.approved when the customer made the agent');
     });
 
-    await test('a store place\'s build code: the owner reads it and where the request goes, and the place\'s own submit is refused', async () => {
+    await test('a store place\'s build code: the owner reads it and where the request goes, and a submit before connecting is refused', async () => {
         const put = (path: string, value: unknown) => json('/v1/admin/config', bearer(operatorToken, {
             method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }),
         }));
@@ -283,8 +285,10 @@ try {
             assert(d.send?.mcp === `${queueUrl}/v1/mcp` && d.send.tool === 'aimeat_app_tool_invoke', `send ${JSON.stringify(d.send)}`);
             assert(d.send.arguments.owner === 'builder' && d.send.arguments.app === 'rakennamme.html' && d.send.arguments.tool === 'submitRequest'
                 && d.send.arguments.input.code === 'RK-0000-1111-2222' && d.send.arguments.input.nodeId === NODE_ID, `send arguments ${JSON.stringify(d.send.arguments)}`);
+            // Not connected to the builders' node: the place has nothing to send it through
+            // (the sending itself is test/e2e-build-with-you-send.ts).
             const own = await json('/v1/build-with-you/request', bearer(customerToken, { method: 'POST', body: JSON.stringify(spec) }));
-            assert(own.status === 409 && own.body.error?.code === 'BUILD_REQUEST_ELSEWHERE', `own submit ${own.status} ${own.text}`);
+            assert(own.status === 409 && own.body.error?.code === 'BUILD_CONNECT_FIRST', `own submit ${own.status} ${own.text}`);
             const site = await fetch(`${BASE}/v1/chat`).then((r) => r.text());
             assert(!site.includes('RK-0000-1111-2222'), 'the code is not on a page a visitor loads');
         } finally {

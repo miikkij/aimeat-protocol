@@ -1130,6 +1130,9 @@ const ALL_SUITES = [
     // "Build it with you": the place's one build request, the operator's relay with the admin password,
     // the queue's public status, the place's trail, and the once-per-code notice (Jouni, 1.11 16.22).
     'test/e2e-build-with-you.ts',
+    // A store place sends that request itself, with the person's own account on the builders' node,
+    // through the MCP server they attached (aimeat-commercial-1c, crew54).
+    'test/e2e-build-with-you-send.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',
