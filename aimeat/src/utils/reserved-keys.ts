@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-11-01 -- `datapkg-exchange.` is service-owned: the EXCHANGE sale terms of a data package, written
+ *     only by the data package service (services/datapackage/sale-terms-record.ts; WP9e). A new prefix.
  *   2026-11-01 -- `company-page-writers.` is service-owned: which writers without company:write the owner
  *     allowed to change a company's page through the file routes (services/company/company-page-key.ts;
  *     secaudit2026oct31w2 round 11). A new prefix, so nothing wrote it through the memory API before.
@@ -444,8 +446,14 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * of the `latest.json` pointer and the descriptor tag, which the generic storage routes write. The
  * service's writeLatest is its one writer, straight to storage. A new prefix: nothing wrote it through
  * the memory API before this.
+ *
+ * `datapkg-exchange.` (2026-11-01, WP9e) is the EXCHANGE sale terms of a data package
+ * (services/datapackage/sale-terms-record.ts): the price, the model and the usage terms a buyer signs
+ * under. They lived on the `latest.json` pointer, which an app with storage:write rewrites. The
+ * service's setPackageExchange is its one writer, straight to storage; a new prefix, so nothing wrote it
+ * through the memory API before this.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'company-page-writers.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.', 'dsp.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'datapkg-exchange.', 'living-spend-hold.', 'company-page-writers.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.', 'dsp.'];
 
 /**
  * Exact keys one named service owns, under the same rule as SERVICE_OWNED_KEY_PREFIXES: no memory route
@@ -491,6 +499,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['datapkg-freshness-notices', 'which of your data packages you were told are out of date, and only the node writes it. Read a package\'s freshness with GET /v1/datapackages/{owner}/{name}.'],
   ['portfolio-read-hold.', 'whether your welcome page may read your memory, and only the node writes it. You allow a page with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
   ['datapkg-audience.', 'who reads a data package, and only the data package service writes it. Publish with POST /v1/datapackages or the aimeat_datapackage_publish MCP tool, which takes the visibility.'],
+  ['datapkg-exchange.', 'the EXCHANGE sale terms of a data package, and only the data package service writes it. Set them with PUT /v1/datapackages/{owner}/{name}/exchange or the aimeat_datapackage_sell MCP tool.'],
   ['living-spend-hold.', 'whether a living document may refresh itself with your AI, and only the node writes it. You allow it with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
   ['company-page-writers.', 'which apps and agents may change your company\'s page through the file routes, and only the node writes it. You allow one with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
 ];

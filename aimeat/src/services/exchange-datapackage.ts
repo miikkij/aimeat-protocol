@@ -5,11 +5,14 @@
  * @description A data package sold on EXCHANGE (plan doc-mvwxcas3dom3, D5.1, D5.2, D5.5): the fourth
  *   offering kind, `datapackage`. This file holds what every surface of it shares:
  *
- *     THE SOURCE. The package pointer `latest.json` carries the sale terms (`exchange`, contract.ts
- *     DatapackageExchangeTerms): the switch, the money prices, the model (`per_month` or `per_read`), the
- *     pacing, the usage terms (required) and the ODPS fields. setPackageExchange writes them, after the
- *     same refusals the REST route and the MCP tool ask, and the EXCHANGE projection lists the package
- *     from them (services/exchange-projection-datapackage.ts). writeLatest keeps them on a new version.
+ *     THE SOURCE. The service-owned record `datapkg-exchange.<name>` (datapackage/sale-terms-record.ts)
+ *     carries the sale terms (contract.ts DatapackageExchangeTerms): the switch, the money prices, the
+ *     model (`per_month` or `per_read`), the pacing, the usage terms (required) and the ODPS fields.
+ *     setPackageExchange writes them, after the same refusals the REST route and the MCP tool ask, and
+ *     the EXCHANGE projection lists the package from them (services/exchange-projection-datapackage.ts),
+ *     on the version the service recorded. The record is per package, so a new version stays on sale.
+ *     The pointer `latest.json` gets a copy of the terms, which no decision reads: the generic storage
+ *     routes write that file, and an app with storage:write must not set the price a buyer pays.
  *
  *     THE COORDINATE. `datapkg:{owner}/{name}` and the action `read`: the key an entitlement, a grant and
  *     the usage rows are kept on. One metered call is one data read: an OData entity set, a row window
@@ -32,11 +35,14 @@
  *     whose output schema returns rows or records, false for agent work and for any other output.
  * @structure DATAPACKAGE_ACTION · PER_MONTH_SECONDS · datapackageCoordinate · parseDatapackageCoordinate ·
  *   packageIfaceApp · proposeDeliversData · validateExchangeTerms · plansForTerms · setPackageExchange ·
- *   resolveDatapackagePricing · packageSchemaDef · contractVersionHashes
+ *   resolveDatapackagePricing · packageSchemaDef · contractVersionHashes · packageForSale · packageDescriptor
  * @usage
  *   const coord = datapackageCoordinate('alice', 'budget');   // { ext: 'datapkg:alice/budget', action: 'read' }
  *   const out = await setPackageExchange(deps, caller, 'alice', 'budget', body);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The sale terms live on the service-owned record, and the version and the
+ *     withdrawal come from the audience record; packagePointer became packageForSale (WP9e, incident
+ *     incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.1, D5.2, D5.5).
  */
 import type { Storage } from '../storage/interface.js';
@@ -44,12 +50,12 @@ import type { AimeatConfig } from '../config.js';
 import type { CallerContext } from './caller-context.js';
 import { OdpsExtrasSchema, ProvenanceSchema } from '../models/odps-schemas.js';
 import {
-    latestKey, descriptorKey, validateName, bare,
+    descriptorKey, validateName, bare,
     type DatapackageExchangeTerms, type Descriptor, type LatestPointer,
 } from './datapackage/contract.js';
-import { readPointer } from './datapackage/version-audience.js';
-import { fileVisibilityOf } from './datapackage/audience.js';
-import { writeStorageFile } from './storage-file-write.js';
+import { trustedPackageOf, type TrustedAudience } from './datapackage/audience-record.js';
+import { saleTermsOf, writeSaleTerms } from './datapackage/sale-terms-record.js';
+import { currentNodeId } from '../utils/gaii.js';
 import { hashDef, getInterfaceVersion, type InterfaceDef } from './app-tool-interfaces.js';
 import { resolveActionPricing, type OfferingPlan } from './exchange-action-pricing.js';
 import type { EntitlementUnit, PricingSpec, DatapackageSurface } from './metered-entitlements.js';
@@ -224,23 +230,21 @@ export async function setPackageExchange(
     const nameError = validateName(name);
     if (nameError) return refuse(400, 'INVALID_INPUT', nameError);
     const ownerGhii = caller.ownerGhii;
-    const pointer = await readPointer({ storage, config }, ownerGhii, name);
-    if (!pointer?.contentHash) return refuse(404, 'NOT_FOUND', `You have no data package called "${name}". Publish a version first.`);
-    if (pointer.status === 'withdrawn') return refuse(409, 'PACKAGE_WITHDRAWN', `The data package "${name}" is withdrawn. Publish a version again before you sell it.`);
+    // The version, the withdrawal and the terms now on sale are the service's records, never the
+    // pointer file an app with storage:write rewrites (services/datapackage/audience-record.ts,
+    // sale-terms-record.ts).
+    const pkg = await trustedPackageOf(storage, config.nodeId, ownerGhii, name);
+    if (!pkg?.trusted.current) return refuse(404, 'NOT_FOUND', `You have no data package called "${name}". Publish a version first.`);
+    if (pkg.trusted.withdrawnAt) return refuse(409, 'PACKAGE_WITHDRAWN', `The data package "${name}" is withdrawn. Publish a version again before you sell it.`);
     const parsed = validateExchangeTerms(body, caller.principal);
     if (!parsed.ok) return parsed;
     const terms = parsed.terms;
-    if (terms.exchange && !pointer.exchange?.exchange) {
+    const onSale = await saleTermsOf(storage, config.nodeId, ownerGhii, name, pkg.pointer);
+    if (terms.exchange && !onSale?.exchange) {
         const refused = await dataListingRefusal({ storage, config }, { providerOwner: ownerName, kind: 'datapackage', deliversData: terms.deliversData ?? true });
         if (refused) return refuse(refused.status, refused.code, refused.message);
     }
-    const next: LatestPointer = { ...pointer, exchange: terms };
-    const written = await writeStorageFile(deps, ownerGhii, {
-        key: latestKey(name),
-        data: Buffer.from(JSON.stringify(next, null, 2) + '\n', 'utf8'),
-        mimeType: 'application/json; charset=utf-8',
-        visibility: fileVisibilityOf(pointer.visibility ?? 'public'),
-    });
+    const written = await writeSaleTerms(deps, ownerGhii, name, terms, pkg.pointer, pkg.trusted.visibility);
     if (!written.ok) return refuse(500, 'WRITE_FAILED', `The sale terms could not be stored: ${written.message}`);
     return { ok: true, terms, listing: await project(ownerGhii, name) };
 }
@@ -284,9 +288,18 @@ export async function contractVersionHashes(storage: Storage, ownerGhii: string,
     return out;
 }
 
-/** The pointer of a package, read without the store (the projection reads it for every package of an owner). */
-export async function packagePointer(storage: Storage, ownerGhii: string, name: string): Promise<LatestPointer | null> {
-    return storedJson<LatestPointer>(storage, ownerGhii, latestKey(name));
+/**
+ * A package as the EXCHANGE projection lists it, read without the store: its version and withdrawal as
+ * the service recorded them (`trusted`), and the terms it is sold under from the service's own record.
+ * Null when the package has no pointer. The pointer comes back for display fields only.
+ */
+export async function packageForSale(storage: Storage, ownerGhii: string, name: string): Promise<{
+    pointer: LatestPointer; trusted: TrustedAudience; terms: DatapackageExchangeTerms | null;
+} | null> {
+    const nodeId = currentNodeId() ?? '';
+    const pkg = await trustedPackageOf(storage, nodeId, ownerGhii, name);
+    if (!pkg) return null;
+    return { ...pkg, terms: await saleTermsOf(storage, nodeId, ownerGhii, name, pkg.pointer) };
 }
 
 /** The descriptor of one stored version, read without the store. */

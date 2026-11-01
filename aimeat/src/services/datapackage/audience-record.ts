@@ -26,12 +26,27 @@
  *   a version, from its pointer and each version's descriptor file as they are at the update, by the
  *   rule the reads used then (versionAudienceAtUpdate). Until it has run (a start where it failed),
  *   reads take the pointer and the tags as before.
+ *
+ *   THE WITHDRAWAL. withdrawPackage (./withdraw.ts) records `withdrawnAt` on the record as well as on
+ *   the pointer, and the next publish (writeLatest) writes the record without it. A read takes the
+ *   package as withdrawn when the record or the pointer says so: a writer of the pointer can then only
+ *   withdraw a package, which storage:write already lets it do, and never bring a withdrawn one back.
+ *   The pointer's mark still counts for a package withdrawn before the record carried the mark;
+ *   recordPointerStateOnce (./sale-terms-record.ts) copies those marks onto the records.
+ *
+ *   OUTSIDE THE SERVICE. trustedPackageOf reads the pointer and answers it with the trusted facts, so
+ *   a share, a sale, a data product source or the Dataspace catalogue decides on the record without
+ *   reading the pointer itself; the pointer it hands back is for display fields only.
  * @structure AUDIENCE_RECORD_PREFIX · DATAPACKAGE_AUDIENCE_STEP_KEY · audienceRecordKey ·
- *   recordPackageAudience · TrustedAudience · trustedAudienceOf · recordDatapackageAudiencesOnce
+ *   recordPackageAudience · recordPackageWithdrawal · TrustedAudience · trustedAudienceOf ·
+ *   trustedPackageOf · packageNamespaces · recordDatapackageAudiencesOnce
  * @usage
  *   const trusted = await trustedAudienceOf(storage, nodeId, ownerGhii, name, pointer);
  *   if (!(await datapackageReadable(storage, ownerGhii, trusted.visibility, reader))) return null;
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- The record carries the withdrawal (recordPackageWithdrawal); TrustedAudience
+ *     answers the current version (`current`) and the withdrawal (`withdrawnAt`); trustedPackageOf for
+ *     the readers outside the service (WP9e, Lifecycle Central incidents ...-mvxmm7ex and ...-mvxozs2r).
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -40,7 +55,7 @@ import { logger } from '../../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
 import { withAudienceTag, recordedAudienceOf, fileVisibilityOf } from './audience.js';
-import { bare, type LatestPointer } from './contract.js';
+import { bare, latestKey, type LatestPointer } from './contract.js';
 
 /** The service-owned memory prefix the record lives under, in the package owner's namespace. */
 export const AUDIENCE_RECORD_PREFIX = 'datapkg-audience.';
@@ -57,6 +72,8 @@ interface AudienceRecord {
     current: string;
     /** Each version's own audience, by bare content hash. */
     versions: Record<string, string>;
+    /** When the owner withdrew the package; absent once a version is published again. */
+    withdrawnAt?: string;
 }
 
 export function audienceRecordKey(name: string): string {
@@ -68,13 +85,17 @@ function parseRecord(v: unknown): AudienceRecord | null {
     const r = v as Partial<AudienceRecord>;
     if (typeof r.visibility !== 'string' || typeof r.current !== 'string') return null;
     const versions = r.versions && typeof r.versions === 'object' ? r.versions : {};
-    return { name: String(r.name ?? ''), visibility: r.visibility, current: r.current, versions: { ...versions } };
+    return {
+        name: String(r.name ?? ''), visibility: r.visibility, current: r.current, versions: { ...versions },
+        ...(typeof r.withdrawnAt === 'string' && r.withdrawnAt ? { withdrawnAt: r.withdrawnAt } : {}),
+    };
 }
 
 /**
  * Record that `name` points at `contentHash` with `visibility`, and that this version's audience is
  * `visibility`. Called by writeLatest before it moves the pointer, so a pointer never names a version
- * the record does not.
+ * the record does not. A publish restores a withdrawn package, so the record it writes has no
+ * `withdrawnAt`.
  */
 export async function recordPackageAudience(
     storage: Storage, ownerGhii: string, name: string, contentHash: string, visibility: string,
@@ -87,6 +108,29 @@ export async function recordPackageAudience(
     }), { tag: 'datapackage-audience', ttlHours: null });
 }
 
+/**
+ * Record that the owner withdrew `name` at `withdrawnAt` (./withdraw.ts). A package with no record
+ * (written past the service) keeps none; its pointer's mark is what withdraws it. A record that has a
+ * mark keeps its own. Answers whether this call wrote the mark.
+ */
+export async function recordPackageWithdrawal(storage: Storage, ownerGhii: string, name: string, withdrawnAt: string): Promise<boolean> {
+    let wrote = false;
+    await updateRecord(storage, ownerGhii, audienceRecordKey(name), parseRecord, cur => {
+        if (!cur || cur.withdrawnAt) return UNCHANGED;
+        wrote = true;
+        return { ...cur, withdrawnAt };
+    }, { tag: 'datapackage-audience', ttlHours: null });
+    return wrote;
+}
+
+/** The pointer fields a trusted read looks at: the version and audience it names and its withdrawal mark. */
+export type PointerFacts = Pick<LatestPointer, 'contentHash' | 'visibility'> & Partial<Pick<LatestPointer, 'status' | 'withdrawnAt'>>;
+
+/** The withdrawal a pointer names, or undefined. */
+function pointerWithdrawal(pointer: PointerFacts | undefined | null): string | undefined {
+    return pointer?.status === 'withdrawn' && pointer.withdrawnAt ? pointer.withdrawnAt : undefined;
+}
+
 /** The audience inputs a read decides on, as ./audience.ts takes them. */
 export interface TrustedAudience {
     /** The package's audience, for datapackageReadable (undefined reads as public, as a pointer without one did). */
@@ -95,6 +139,13 @@ export interface TrustedAudience {
     pointer: { contentHash?: string; visibility?: string } | undefined;
     /** A version file as versionOpenTo reads it: its stored tier, and the audience recorded for that version. */
     versionFile(contentHash: string, file: { visibility?: string; tags?: readonly string[] }): { visibility?: string; tags?: readonly string[] };
+    /**
+     * The version the package points at now: the record's, else (no record, or before the boot step
+     * ran) the pointer's own, as openPackage opens it. Undefined when no version is published.
+     */
+    current: string | undefined;
+    /** When the package was withdrawn: the record's mark, else the pointer's. Undefined when it is not withdrawn. */
+    withdrawnAt: string | undefined;
 }
 
 /** True once the boot step has recorded the existing packages; read once per process after it is true. */
@@ -108,28 +159,59 @@ async function audienceRuleInForce(storage: Storage, nodeId: string): Promise<bo
     return ruleInForce;
 }
 
+/** True once the boot step has recorded the existing packages, so a later step may build on the records. */
+export function audienceRecordsInPlace(storage: Storage, nodeId: string): Promise<boolean> {
+    return audienceRuleInForce(storage, nodeId);
+}
+
 /**
  * What a read of `ownerGhii`'s package `name` decides the audience on. `pointer` is the stored
  * `latest.json` as read (or undefined when there is none).
  */
 export async function trustedAudienceOf(
-    storage: Storage, nodeId: string, ownerGhii: string, name: string, pointer: Pick<LatestPointer, 'contentHash' | 'visibility'> | undefined | null,
+    storage: Storage, nodeId: string, ownerGhii: string, name: string, pointer: PointerFacts | undefined | null,
 ): Promise<TrustedAudience> {
+    const ownCurrent = pointer?.contentHash || undefined;
+    const ownWithdrawal = pointerWithdrawal(pointer);
     if (!(await audienceRuleInForce(storage, nodeId))) {
         // Before the existing packages are recorded: the pointer and the tags, as before.
-        return { visibility: pointer?.visibility, pointer: pointer ?? undefined, versionFile: (_h, f) => f };
+        return { visibility: pointer?.visibility, pointer: pointer ?? undefined, versionFile: (_h, f) => f, current: ownCurrent, withdrawnAt: ownWithdrawal };
     }
     const rec = parseRecord((await storage.getMemory(ownerGhii, audienceRecordKey(name)))?.value);
     if (!rec) {
         // Not written by the service: the owner and the owner's principals with storage:read only.
-        return { visibility: 'private', pointer: { visibility: 'private' }, versionFile: (_h, f) => ({ visibility: f.visibility, tags: [] }) };
+        return {
+            visibility: 'private', pointer: { visibility: 'private' }, versionFile: (_h, f) => ({ visibility: f.visibility, tags: [] }),
+            current: ownCurrent, withdrawnAt: ownWithdrawal,
+        };
     }
     return {
         visibility: rec.visibility,
         pointer: { contentHash: rec.current, visibility: rec.visibility },
         // A version the record does not name was not published by the service: its owner reads it.
         versionFile: (hash, f) => ({ visibility: f.visibility, tags: withAudienceTag([], rec.versions[bare(hash)] ?? 'private') }),
+        current: rec.current || undefined,
+        withdrawnAt: rec.withdrawnAt ?? ownWithdrawal,
     };
+}
+
+/** A package as a reader outside the service decides on it: the stored pointer for display, and the trusted facts. */
+export interface TrustedPackage {
+    /** The stored `latest.json`, for its display fields (updatedAt, lastError, packageId) only. */
+    pointer: LatestPointer;
+    trusted: TrustedAudience;
+}
+
+/**
+ * Read `ownerGhii`'s package `name` for a decision outside the datapackage service: null when it has
+ * no pointer (no such package, or a purged one), else the pointer and what trustedAudienceOf says of it.
+ * A pointer that is not readable JSON is no package, as every read already answers it.
+ */
+export async function trustedPackageOf(storage: Storage, nodeId: string, ownerGhii: string, name: string): Promise<TrustedPackage | null> {
+    const file = await storage.getStorageFile(ownerGhii, latestKey(name));
+    const pointer = file ? pointerOf(ownerGhii, latestKey(name), file.data) : null;
+    if (!pointer) return null;
+    return { pointer, trusted: await trustedAudienceOf(storage, nodeId, ownerGhii, name, pointer) };
 }
 
 /** A stored pointer, or null when it is not readable JSON: such a package stays unreadable, as every read already answers it. */
@@ -159,6 +241,18 @@ function versionAudienceAtUpdate(file: { visibility?: string; tags?: readonly st
     return file.visibility === 'members' ? 'members' : 'private';
 }
 
+/**
+ * Every namespace a package can sit in: each account and each agent of this node. Read whole, once per
+ * node, by the once-only start steps (this file's and ./sale-terms-record.ts recordPointerStateOnce),
+ * before the node serves and never in a request.
+ */
+export async function packageNamespaces(storage: Storage, nodeId: string): Promise<string[]> {
+    return [
+        ...(await storage.listOwners()).map(o => `${o.name}@${nodeId}`),
+        ...(await storage.listAgents()).map(a => a.gaii),
+    ];
+}
+
 /** How many namespaces one batched file listing asks for. */
 const NAMESPACE_BATCH = 200;
 
@@ -175,10 +269,7 @@ export async function recordDatapackageAudiencesOnce(
     if (!claim) return { ran: false };
     try {
         const at = new Date().toISOString();
-        const namespaces = [
-            ...(await storage.listOwners()).map(o => `${o.name}@${config.nodeId}`),
-            ...(await storage.listAgents()).map(a => a.gaii),
-        ];
+        const namespaces = await packageNamespaces(storage, config.nodeId);
         let recorded = 0;
         for (let i = 0; i < namespaces.length; i += NAMESPACE_BATCH) {
             const byOwner = await storage.listStorageFilesForOwners(namespaces.slice(i, i + NAMESPACE_BATCH));
@@ -198,11 +289,12 @@ export async function recordDatapackageAudiencesOnce(
                         if (/^[a-f0-9]{64}$/.test(hash)) versions[hash] = versionAudienceAtUpdate(f, visibility);
                     }
                     versions[bare(pointer.contentHash)] = visibility;
+                    const withdrawnAt = pointerWithdrawal(pointer);
                     let wrote = false;
                     await updateRecord(storage, owner, audienceRecordKey(name), parseRecord, cur => {
                         if (cur) return UNCHANGED;
                         wrote = true;
-                        return { name, visibility, current: pointer!.contentHash, versions };
+                        return { name, visibility, current: pointer!.contentHash, versions, ...(withdrawnAt ? { withdrawnAt } : {}) };
                     }, { tag: 'datapackage-audience', ttlHours: null });
                     if (wrote) recorded++;
                 }

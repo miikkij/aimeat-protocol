@@ -19,6 +19,8 @@
  * @structure readExtensionSource · readFileSource · readDatapackageSource · typedFromStrings
  * @usage const src = await readFileSource(call, exporting);
  * @version-history
+ *   v1.1.1 — 2026-11-01 — A package source's audience is the service's record (trustedPackageOf), not
+ *     the pointer's visibility (WP9e, incident ...-mvxozs2r).
  *   v1.1.0 — 2026-11-01 — An extension action's output schema gives its columns' types and descriptions,
  *     and another package's Table Schema its descriptions (WP9c, the wizard's step 2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.1).
@@ -32,7 +34,7 @@ import { fileTarget } from '../classification/labels.js';
 import { extractFileText } from '../file-text/index.js';
 import { fromCsv } from '../datapackage/table.js';
 import { openPackage, readAllRows } from '../datapackage/store.js';
-import { readPointer } from '../datapackage/version-audience.js';
+import { trustedPackageOf } from '../datapackage/audience-record.js';
 import { atPath } from '../workflow/engine-step-rows.js';
 import { findExtension } from '../component-address.js';
 import { logger } from '../../utils/logger.js';
@@ -185,11 +187,13 @@ export async function readDatapackageSource(call: SourceCall): Promise<ResolvedS
     const table = tableOf(spec.id, shaped, spec.columns ? {} : types, new Set(), spec.columns ? [] : all.schema.fields.map(f => f.name));
     // The other package's Table Schema says what each column is.
     const descriptions = spec.columns ? {} : Object.fromEntries(all.schema.fields.filter(f => f.description).map(f => [f.name, String(f.description)]));
+    // The source's audience bounds the product's: it is the one the service recorded, never the
+    // pointer file's word, which an app with storage:write rewrites (./audience-record.ts).
     const ownerGhii = owner.includes('@') ? owner : `${owner}@${deps.config.nodeId}`;
-    const pointer = await readPointer(deps, ownerGhii, spec.name!);
+    const pkg = await trustedPackageOf(deps.storage, deps.config.nodeId, ownerGhii, spec.name!);
     const license = d.licenses?.[0]?.name ?? d.aimeat.license;
     return {
-        ...table, descriptions, audience: audienceOfStored(pointer?.visibility ?? 'public'), fetchedAt: now(),
+        ...table, descriptions, audience: audienceOfStored(pkg ? pkg.trusted.visibility ?? 'public' : 'private'), fetchedAt: now(),
         lineage: `${d.aimeat.packageId}@${d.aimeat.contentHash}`,
         provenance: { kind: 'datapackage', address: opened.descriptorUrl, ...(d.title ? { title: d.title } : {}), ...(license ? { license } : {}) },
     };
