@@ -34,6 +34,8 @@
  * @usage
  *   import { buildDescriptor, contentHashOf, descriptorKey } from './contract.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-01 -- LatestPointer.status and withdrawnAt: a withdrawn package (./withdraw.ts;
+ *     plan doc-mvwxcas3dom3, D0.3).
  *   v1.1.0 -- 2026-10-17 -- PublishInput.visibility and LatestPointer.visibility: public (default),
  *     members, organism:<id> or private (plan doc-mvcn6c7e4e5q, V3.8; ./audience.ts). Not in the
  *     content hash: who reads a version is not what it contains.
@@ -273,4 +275,9 @@ export interface LatestPointer {
     lastError?: { at: string; message: string };
     /** Who reads the package (./audience.ts). Absent on a pointer written before 2026-10-17: public. */
     visibility?: string;
+    /** 'withdrawn' once the owner withdrew the package (./withdraw.ts); every read then refuses. A new
+     *  publish writes a pointer without it, which restores the package. */
+    status?: 'withdrawn';
+    /** When the package was withdrawn. Present exactly when `status` is 'withdrawn'. */
+    withdrawnAt?: string;
 }

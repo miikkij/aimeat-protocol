@@ -22,6 +22,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-10-31 — POST /v1/ai/image takes gen_rules_bypass (the owner in person only) and answers
+ *     gen_rules: what each generation rule did (services/ai/gen-rules.ts).
  *   2026-10-21 — POST /v1/ai/image with public: true asks the node's publish gate as POST /v1/storage
  *     does: a caller the owner is asked about gets the picture stored private (with its download_url)
  *     and a file request, answered 202 with `publish_request`; the owner's approval makes it public.
@@ -139,6 +141,7 @@ import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { resolveWriteTarget } from './memory/owner-target.js';
+import { parseGenRulesBypass } from '../services/ai/gen-rules.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
  *  JSON body limit; anything real goes through storage. */
@@ -400,11 +403,14 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       // Paid by the human, in the agent's name, like /v1/ai/complete; the picture lands in the
       // payer's storage, which is where the MCP tool has always put it.
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
-      const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback, role: roleField, reference_images, mask } = req.body as {
+      const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback, role: roleField, reference_images, mask, gen_rules_bypass } = req.body as {
         prompt?: string; model?: string; size?: string; storage_key?: string;
         public?: boolean; app_id?: string; provider?: string; fallback?: boolean; role?: unknown;
-        reference_images?: unknown; mask?: unknown;
+        reference_images?: unknown; mask?: unknown; gen_rules_bypass?: unknown;
       };
+      // Who may bypass a rule is the service's decision (the owner in person); the shape is read here.
+      const bypass = parseGenRulesBypass(gen_rules_bypass);
+      if ('problem' in bypass) return res.status(400).json(error(config.nodeId, 'INVALID_BODY', bypass.problem));
 
       try {
         const role = readCallRole(roleField);
@@ -427,6 +433,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           ...(role ? { role } : {}),
           ...(inputs?.references.length ? { references: inputs.references } : {}),
           ...(inputs?.mask ? { mask: inputs.mask } : {}),
+          ...(bypass.bypass ? { genRulesBypass: bypass.bypass } : {}),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
@@ -456,6 +463,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           route: r.route,
           reference_count: r.referenceCount,
           ...(r.maskMode ? { mask_mode: r.maskMode } : {}),
+          gen_rules: r.genRules,
           usage: { cost_usd: r.usage.costUsd, cost_exact: r.usage.costExact },
           budget: {
             daily_budget_usd: r.budget.dailyBudgetUsd,

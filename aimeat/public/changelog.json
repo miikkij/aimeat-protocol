@@ -24,6 +24,51 @@
       }
     },
     {
+      "date": "2026-11-01",
+      "kind": "feature",
+      "id": "2026-11-01-choose-where-your-ai-calls-are-processed",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Choose where your AI calls are processed",
+        "fi": "Valitse, missä tekoälykutsusi käsitellään"
+      },
+      "summary": {
+        "en": "AI calls through OpenRouter can stay in Europe, go to the United States, or go to any country.",
+        "fi": "OpenRouterin kautta kulkevat tekoälykutsut voivat pysyä Euroopassa, mennä Yhdysvaltoihin tai mihin tahansa maahan."
+      },
+      "body": {
+        "en": "Your AI calls through OpenRouter can stay in Europe, go to the United States, or go to any country. The operator sets the default, you can choose for yourself on your AI page or from your chat, and every answer says where it was processed. A model your region does not offer goes to the United States, or is refused if you choose so. The privacy page and the records of processing follow the setting.",
+        "fi": "OpenRouterin kautta kulkevat tekoälykutsusi voivat pysyä Euroopassa, mennä Yhdysvaltoihin tai mihin tahansa maahan. Ylläpitäjä valitsee oletuksen, voit valita itse tekoälysivullasi tai chatissa, ja jokainen vastaus kertoo, missä se käsiteltiin. Malli, jota alueellasi ei ole, menee Yhdysvaltoihin, tai palvelin hylkää kutsun, jos valitset niin. Tietosuojaseloste ja käsittelytoimien seloste seuraavat asetusta."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-rules-for-ai-pictures-and-videos",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Rules for AI pictures and videos",
+        "fi": "Säännöt tekoälyn kuville ja videoille"
+      },
+      "summary": {
+        "en": "Switch on a rule so people in AI pictures and videos appear only as art, never like a real person's photo.",
+        "fi": "Kytke päälle sääntö, jolla tekoälyn kuvien ja videoiden ihmiset näkyvät vain taiteena, eivät valokuvana."
+      },
+      "body": {
+        "en": "Switch on a rule so people in AI pictures and videos appear only as art, never like a photograph of a real person; agents get the same rule for tools they use elsewhere. You find it on the AI page in Settings & Controls, and your AI can switch it for you. The people who run your AIMEAT can turn a rule on for everyone or require it.",
+        "fi": "Kytke päälle sääntö, jolla tekoälyn kuvien ja videoiden ihmiset näkyvät vain taiteena, eivät koskaan valokuvalta oikeasta ihmisestä; agentit saavat saman säännön muihin työkaluihin. Löydät sen Asetusten tekoälysivulta, ja tekoälysi voi kytkeä sen puolestasi. AIMEATisi ylläpito voi laittaa säännön päälle kaikille tai vaatia sitä."
+      }
+    },
+    {
       "date": "2026-10-31",
       "kind": "feature",
       "id": "2026-10-31-the-aimeat-you-buy-is-yours-at-once",

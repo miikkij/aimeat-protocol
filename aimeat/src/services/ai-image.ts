@@ -21,6 +21,10 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.12.0 -- 2026-10-31 -- The generation rules (services/ai/gen-rules.ts): the directives of the
+ *     rules in force for the owner, the app and the agent go after the prompt; `genRulesBypass` lifts
+ *     a rule for one picture, the owner in person only, refused 403 GEN_RULE_BYPASS_REFUSED before
+ *     anything is spent otherwise. The result and the provenance record carry what each rule did.
  *   v2.11.0 -- 2026-10-21 -- `publishGate`: a picture asked to be public by a caller the node's publish
  *     gate asks the owner about is stored private and files a request of kind 'file', as an upload of
  *     the same bytes would (services/storage-file-publish.ts); the owner's approval makes it public.
@@ -87,6 +91,8 @@ import {
   fileRaiseAsk, fileFilePublishRequest, type StoragePublishGate, type FilePublishFiled,
 } from './storage-file-publish.js';
 import { publishAskOf } from './publish-requests/ask.js';
+import { directiveText, type GenRuleBypass, type GenRuleMark } from './ai/gen-rules.js';
+import { genRulesForCall } from './ai/gen-rules-store.js';
 import type { PublishRequester } from './publish-requests/store.js';
 
 /**
@@ -144,6 +150,9 @@ export interface GenerateForOwnerOptions {
   references?: ImageInput[];
   /** A PNG whose transparent pixels mark the area of the first reference to redraw. */
   mask?: ImageInput;
+  /** Skip these generation rules for this one picture, with the reason. Only the owner in person
+   *  may (services/ai/gen-rules.ts); anyone else is refused before anything is spent. */
+  genRulesBypass?: GenRuleBypass;
 }
 
 export interface GenerateForOwnerResult {
@@ -183,6 +192,9 @@ export interface GenerateForOwnerResult {
   warnings?: Array<Extract<FilePublishFiled, { ok: false }>['warning']>;
   /** With `deferRequest`: the picture waits for a request the caller files (fileFilePublishRequest). */
   pendingPublish?: { requester: PublishRequester; file: Pick<StorageFileRecord, 'ownerGaii' | 'key' | 'createdAt' | 'size' | 'visibility'> };
+  /** The generation rules in force for this picture and what each did: `applied` rules' directives
+   *  went into the prompt, `bypassed` ones carry the reason. Empty when no rule is in force. */
+  genRules: GenRuleMark[];
 }
 
 /**
@@ -247,6 +259,17 @@ export async function generateForOwner(
   const requester = await publicPictureRequester(storage, config, gaii, opts);
   // POST /v1/ai/image and aimeat_image_generate both arrive here: one count per account, before any spend.
   requireAiCallTurn(config, gaii, opts.limit);
+  // The generation rules, decided after the call is counted and before anything is spent: a bypass
+  // that is not the caller's to ask is refused here. The directives of the rules in force go after
+  // the caller's prompt, so the prompt limit above stays the caller's own. An owner's exception for
+  // an app matches only the app the grant names (verifiedApp), never `appId`, which a caller writes.
+  const rules = await genRulesForCall(storage, config, gaii, 'image', {
+    ownerInPerson: opts.caller === 'owner',
+    ...(opts.verifiedApp ? { app: opts.verifiedApp } : {}),
+    ...(opts.agent ? { agent: opts.agent } : {}),
+  }, opts.genRulesBypass);
+  const directive = directiveText(rules.given, 'image');
+  const modelPrompt = directive ? `${prompt}\n\n${directive}` : prompt;
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'image', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
@@ -264,7 +287,7 @@ export async function generateForOwner(
       storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
       allowFallback: plan.allowFallback, rules: plan.rules, ...(opts.signal ? { signal: opts.signal } : {}),
     }, (c) => gatewayImage({
-      target: c.target, model: c.model, prompt,
+      target: c.target, model: c.model, prompt: modelPrompt,
       ...(opts.size ? { size: opts.size } : {}),
       ...(opts.signal ? { signal: opts.signal } : {}),
       ...(opts.references?.length ? { references: opts.references } : {}),
@@ -317,7 +340,7 @@ export async function generateForOwner(
     // The provenance record names the picture by its bytes, the way a voice reply names its audio.
     contentHash: contentHashOf(result.data),
     // A picture, of the type the provider sent, decided against the visibility it was stored with.
-    media: { mediaKind: 'image', mediaType: result.mime, surface: { visibility, humanAudience: true } },
+    media: { mediaKind: 'image', mediaType: result.mime, surface: { visibility, humanAudience: true }, genRules: rules.marks },
     appId: opts.appId, source: 'ai-image',
     units: { images: 1 }, costSource: price.costSource, priceRef: price.priceRef,
   });
@@ -364,5 +387,6 @@ export async function generateForOwner(
     ...(filed?.ok ? { publishRequest: filed.publishRequest } : {}),
     ...(filed && !filed.ok ? { warnings: [filed.warning] } : {}),
     ...(pending ? { pendingPublish: pending } : {}),
+    genRules: rules.marks,
   };
 }

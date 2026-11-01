@@ -1293,6 +1293,11 @@
     if (!r || !r.ok) throw aiError(r, "Could not read the AI roles");
     return r.data;
   }
+  async function genRules() {
+    const r = await authFetch4("/v1/ai/gen-rules");
+    if (!r || !r.ok) throw aiError(r, "Could not read the generation rules");
+    return r.data;
+  }
   function clearCaches() {
     _capsCache.clear();
     _modelsCache.clear();
@@ -1794,6 +1799,13 @@
      * once boundTo is set; until then a call with that `role` is refused AI_ROLE_NOT_BOUND.
      */
     roles,
+    /**
+     * The generation rules for the person's AI pictures and videos (GET /v1/ai/gen-rules), such as
+     * people only in an artistic, non-photorealistic style. image() needs nothing: the node adds the
+     * directive itself. When the app composes a prompt for a model OUTSIDE the node, add
+     * for_caller.image.directive or for_caller.video.directive to it.
+     */
+    genRules,
     /**
      * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".
      */

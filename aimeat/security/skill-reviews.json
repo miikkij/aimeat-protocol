@@ -109,11 +109,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:61d4d881cddd71979e67cc51"
+      "digest": "sha256:0c43e49d702a84d6589266c4"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-10-16",
@@ -250,7 +250,7 @@
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:1ea7dfa493e75f47b2328855"
+      "digest": "sha256:83e26e7b02b3f6154df97a19"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-10-25",
@@ -300,7 +300,7 @@
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:a0efe7e6312628c2224d8848"
+      "digest": "sha256:1f11d34d798e7dd0cef775fc"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -310,6 +310,16 @@
         "aimeat/src/routes/ai-policy.ts"
       ],
       "digest": "sha256:e05a3f1ce04108721d635f0b"
+    },
+    "node:aimeat-gen-rules": {
+      "reviewedOn": "2026-10-31",
+      "watches": [
+        "aimeat/src/services/ai/gen-rules.ts",
+        "aimeat/src/services/ai/gen-rules-store.ts",
+        "aimeat/src/routes/ai-gen-rules.ts",
+        "aimeat/src/services/ai-image.ts"
+      ],
+      "digest": "sha256:2d418558132de8fbc92e13f6"
     },
     "node:aimeat-extension-builder": {
       "reviewedOn": "2026-10-31",
@@ -398,18 +408,18 @@
       "digest": "sha256:f7465674aff12a3ecb43197a"
     },
     "node:aimeat-bookkeeping": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/finance.ts",
         "aimeat/src/routes/finance-ledger.ts",
         "aimeat/src/services/finance/invoice-service.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:4dcd0bf4d817fb7f9dfed34e",
+      "digest": "sha256:5dc12b25280922ee3ac609c7",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/services/ai/capabilities.ts",
         "aimeat/src/services/ai-embed.ts",
@@ -417,7 +427,7 @@
         "aimeat/src/static/sdk-libs/ai/index.js",
         "aimeat/src/services/ai-jobs/ext-capability.ts"
       ],
-      "digest": "sha256:b8b91484608af79b78c64d6b"
+      "digest": "sha256:aa300e947fd7cef743a0330f"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-10-26",
@@ -541,7 +551,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "38f4fc11430a1cdd"
+      "aimeat/src/services/ai/completion.ts": "876de32badaa400b"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "4ed56ffc46c5c924",
@@ -622,8 +632,8 @@
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
-      "aimeat/src/mcp/ai-provenance-input.ts": "02f738b290959c61",
-      "aimeat/src/services/ai-provenance.ts": "4abad08da5b1ccbe"
+      "aimeat/src/mcp/ai-provenance-input.ts": "42efb1420ca3feda",
+      "aimeat/src/services/ai-provenance.ts": "dc4b6f07194fccf8"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "487cb90f6512b381"
@@ -647,7 +657,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "7628abf3c26aaa19",
+      "aimeat/src/routes/ai.ts": "730fc1b3ae6e6311",
       "aimeat/src/routes/ai-providers.ts": "41e102a20bb078b2",
       "aimeat/src/services/ai/routing.ts": "3ab2ace7eeab4d80"
     },
@@ -718,7 +728,7 @@
       "aimeat/src/services/ai/capabilities.ts": "c2bd2ada0b90307e",
       "aimeat/src/services/ai-embed.ts": "1f5aa10952622806",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
-      "aimeat/src/static/sdk-libs/ai/index.js": "09556928446b7c7b",
+      "aimeat/src/static/sdk-libs/ai/index.js": "230e6a57c0cd20e3",
       "aimeat/src/services/ai-jobs/ext-capability.ts": "bebc48a0defe8ffa"
     },
     "node:aimeat-refinery": {
@@ -781,7 +791,7 @@
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
-      "aimeat/src/routes/odata.ts": "fc920574f840ce8f"
+      "aimeat/src/routes/odata.ts": "439097d94a533a8c"
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
@@ -810,6 +820,12 @@
       "aimeat/src/services/content/service.ts": "1ba3ff26ed4bc45e",
       "aimeat/src/services/content/settings.ts": "20f4f279a29775ab",
       "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949"
+    },
+    "node:aimeat-gen-rules": {
+      "aimeat/src/services/ai/gen-rules.ts": "0f9bece086232cec",
+      "aimeat/src/services/ai/gen-rules-store.ts": "34377e884aa25b71",
+      "aimeat/src/routes/ai-gen-rules.ts": "012cd2933649f50b",
+      "aimeat/src/services/ai-image.ts": "107d839179362cae"
     }
   }
 }

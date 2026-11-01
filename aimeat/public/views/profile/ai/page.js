@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.38.0 -- 2026-11-01 -- Section 06, the rules for AI pictures and videos (gen-rules-section.js), in the full page and under the simple view's fold; budget and consumers move to 07 and 08.
  *   v1.37.0 -- 2026-10-31 -- Jouni's review of v31 (K58, K60): the credit shows once, on its own card, with "riittää noin N tavalliseen viestiin" when this place's 30-day average cost per call can tell (messagesLeft), and no tag; sums under a cent read "alle 1 snt" (creditWords); the daily limit says it protects the credit; under "Buy more credit" it says the same card pays and no new subscription is made; the decision model, transparency and compliance cards sit inside "Lisäasetukset" (ctx.extras); there the key section is "Oma tekoälytili (valinnainen)" and says that no own key is the usual way.
  *   v1.37.0 -- 2026-11-01 -- The simple view's daily limit is never more than today's use plus the credit left (todayLimit), and the head explains the credit in the help page's words (Jouni, K58).
  *   v1.36.0 -- 2026-10-31 -- The simple view (renderSimple) on a node the store sold, for a person with no key of their own: the head says how much AI credit is left and offers only "Buy more credit"; the strip is the credit, today's use against the daily limit and the month, all in euros; section 01 is today's use (secToday); everything else, the key and the budget's edit included, is under one fold, "Lisäasetukset" (v31 K58, K60).
@@ -114,6 +115,7 @@ function messagesLeft(ctx) {
 import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
 import { secRoles, roleTitle } from './roles-section.js';
+import { GenRulesSection } from './gen-rules-section.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { PageStart } from '/components/PageStart.js';
 import { scrollToSection, openTab } from '/components/Rail.js';
@@ -154,6 +156,7 @@ function renderSimple(ctx) {
           ${secRouting(ctx, '03')}
           ${secRoles(ctx, '04')}
           ${secPolicy(ctx, '05')}
+          <${GenRulesSection} num="06" />
           ${secBudget(ctx)}
           ${secConsumers(ctx)}
           ${ctx.extras || null}
@@ -209,8 +212,9 @@ export function renderPage(ctx) {
         { id: 'ai-routing', num: '03', label: x('rt.title'), count: '' },
         { id: 'ai-roles', num: '04', label: x('rl.title'), count: ctx.rl.view ? String(ctx.rl.roles.length) : '' },
         { id: 'ai-policy', num: '05', label: x('pol.title'), count: ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '' },
-        { id: 'ai-budget', num: '06', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
-        { id: 'ai-consumers', num: '07', label: x('secConsumers'), count: '' },
+        { id: 'ai-gen-rules', num: '06', label: x('gr.title'), count: '' },
+        { id: 'ai-budget', num: '07', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
+        { id: 'ai-consumers', num: '08', label: x('secConsumers'), count: '' },
       ]}
       pagesLabel=${x('pages')}
       pages=${pageLinks(ctx.navigate)}
@@ -221,6 +225,7 @@ export function renderPage(ctx) {
         ${secRouting(ctx, '03')}
         ${secRoles(ctx, '04')}
         ${secPolicy(ctx, '05')}
+        <${GenRulesSection} num="06" />
         ${secBudget(ctx)}
         ${secConsumers(ctx)}`}
     <//>
@@ -330,7 +335,7 @@ function secConnection(ctx) {
 function secBudget(ctx) {
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!u) return html`<${PageSection} id="ai-budget" num="06" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
+  if (!u) return html`<${PageSection} id="ai-budget" num="07" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
   const budget = Number(u.daily_budget_usd) || 0;
   const spent = Number(u.spent_today_usd) || 0;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
@@ -353,7 +358,7 @@ function secBudget(ctx) {
     ? html`<${Loud} control disabled=${ctx.busy === 'caps'} onClick=${() => ctx.saveCaps()}>${x('saveCaps')}<//><${Action} small soft onClick=${() => ctx.setCapsEditing(false)}>${x('cancel')}<//>`
     : html`<${Action} small soft onClick=${() => ctx.setCapsEditing(true)}>${x('setCaps')}<//>`;
   return html`
-    <${PageSection} id="ai-budget" num="06" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
+    <${PageSection} id="ai-budget" num="07" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
       <${Facts} rows=${[
         { key: 'budget', k: html`<${HelpLabel} term="ai.daily_budget" label=${x('dailyBudget')}>${x('dailyBudget')}<//>`, v: budgetValue },
         { k: x('monthLabel'), v: r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone'), sub: x('monthSub') },
@@ -407,7 +412,7 @@ function secConsumers(ctx) {
     v: !crewsMissed ? x('consumerCrewsNodeBody') : onNode.length ? x('consumerCrewsMixed', { agents: onNode.join(', ') }) : x('consumerCrewsBody'),
   };
   return html`
-    <${PageSection} id="ai-consumers" num="07" title=${x('secConsumers')} count=${null}>
+    <${PageSection} id="ai-consumers" num="08" title=${x('secConsumers')} count=${null}>
       <${Note} kind="lead">${x('consumersIntro')}<//>
       <${Facts} rows=${[
         { k: x('consumer.apps'), v: `${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}` },

@@ -36,6 +36,7 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   2026-10-31 — POST /v1/provenance takes `rulesFollowed`, the generation rules the declarer followed.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — POST /v1/provenance/embed answers 503 BUSY with Retry-After when every archive slot is in use (secaudit2026oct22, provenance-embed archive bound).
  *   2026-10-21 — callerOwner asks isAnonymousPrincipal: the token POST /v1/auth/anonymous mints carries
@@ -108,6 +109,8 @@ const DeclareProvenanceSchema = z.object({
   mediaType: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').max(INPUT_LIMITS.id).optional(),
   /** Does it resemble a real person, place or event? Only the declarer can say. */
   resemblesReal: z.enum(AI_RESEMBLES_REAL).optional(),
+  /** The generation rules the declarer followed for an image or a video (services/ai/gen-rules.ts). */
+  rulesFollowed: z.array(z.string().trim().min(1).max(INPUT_LIMITS.id)).max(20).optional(),
   /** The exact bytes, hashed server-side. Prefer this over `contentHash` when you hold them. */
   content: z.string().max(2_000_000).optional(),
   /** A pre-computed `sha256:<64 lower-case hex>`, when the declarer holds bytes we should not see. */
@@ -387,6 +390,7 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
         mediaKind: input.mediaKind,
         mediaType: input.mediaType,
         resemblesReal: input.resemblesReal,
+        ...(input.rulesFollowed?.length ? { rulesFollowed: input.rulesFollowed } : {}),
         content: input.content,
         contentHash: input.contentHash,
         generatedAt: input.generatedAt,

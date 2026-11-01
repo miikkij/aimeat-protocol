@@ -34,6 +34,9 @@
  *   import { AiProvenanceSchema, asKnownProvenance } from '../models/ai-provenance-schemas.js';
  *   const parsed = AiProvenanceSchema.safeParse(req.body.provenance);
  * @version-history
+ *   v1.5.0 — 2026-10-31 — Optional `rules` (AI_GEN_RULE_STATES): which generation rules were in force
+ *     for an image or a video and what each did. Additive within v1 (wish
+ *     wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
  *   v1.4.1 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.4.0 — 2026-10-08 — The record says what KIND of thing it describes: optional `mediaKind`
  *     (AI_MEDIA_KINDS), `mediaType` (IANA) and the declarer's `resemblesReal`, and method
@@ -115,6 +118,16 @@ export function isSyntheticMedia(kind: AiMediaKind | undefined): boolean {
  */
 export const AI_RESEMBLES_REAL = ['yes', 'no', 'unknown'] as const;
 export type AiResemblesReal = (typeof AI_RESEMBLES_REAL)[number];
+
+/**
+ * What a generation rule (services/ai/gen-rules.ts) did for this content. `applied`: this node gave
+ * the rule's directive to the model. `bypassed`: the rule was in force and the owner lifted it, with
+ * the reason. `declared`: the content was made elsewhere and the writer said it followed the rule.
+ * `unknown`: the content was made elsewhere and nobody said. A directive is not a check, so even
+ * `applied` says what the model was told, not what it drew.
+ */
+export const AI_GEN_RULE_STATES = ['applied', 'bypassed', 'declared', 'unknown'] as const;
+export type AiGenRuleState = (typeof AI_GEN_RULE_STATES)[number];
 
 /** An IANA media type, `type/subtype`, parameters dropped. */
 export const MEDIA_TYPE_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,63}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$/;
@@ -284,6 +297,15 @@ export const AiDisclosureBlockSchema = z.object({
   long: LocalizedTextSchema.optional(),
 });
 
+/** One generation rule's effect on this content (AI_GEN_RULE_STATES). */
+export const AiGenRuleMarkSchema = z.object({
+  id: z.string().trim().min(1).max(INPUT_LIMITS.id),
+  version: z.number().int().min(1).max(10_000),
+  state: z.enum(AI_GEN_RULE_STATES),
+  reason: z.string().trim().max(400).optional(),
+});
+export type AiGenRuleMark = z.infer<typeof AiGenRuleMarkSchema>;
+
 // ── The record ──────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -308,6 +330,8 @@ export const AiProvenanceSchema = z.object({
   mediaType: z.string().max(INPUT_LIMITS.id).trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').optional(),
   /** Does it resemble a real person, place or event? Declared; the node never infers it. */
   resemblesReal: z.enum(AI_RESEMBLES_REAL).optional(),
+  /** The generation rules in force for this image or video, and what each one did. */
+  rules: z.array(AiGenRuleMarkSchema).max(20).optional(),
 
   generator: AiProvenanceGeneratorSchema.optional(),
   sources: z.array(AiProvenanceSourceSchema).max(100).optional(),

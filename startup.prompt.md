@@ -128,9 +128,10 @@ is `AIMEAT_ENCRYPTION_KEY`, or `AIMEAT_TOTP_ENCRYPTION_KEY` when the first is no
 with the key file `~/.aimeat/nodes/<node id>/node-key.json`: the database alone does not restore
 the node's identity, and a changed data key makes every stored secret unreadable.
 
-**Where the node's AI runs is one choice; ask the person, do not pick for them.** It matters only
-when the node gets a shared OpenRouter key (`AIMEAT_OPENROUTER_INSTANCE_KEY`). Set
-`AIMEAT_AI_REGION_MODE` to their answer and tell them its limits in their words:
+**AI on the node's own key** (optional): with `AIMEAT_OPENROUTER_INSTANCE_KEY` set, every account
+can use AI on the day it arrives, metered per person. **Where it runs is one choice; ask the person,
+do not pick for them.** Set `AIMEAT_AI_REGION_MODE` to their answer and tell them its limits in their
+words:
 
 - `eu`: the EU first. A model the EU does not offer runs in the United States or elsewhere, and
   each answer records where.
@@ -139,9 +140,13 @@ when the node gets a shared OpenRouter key (`AIMEAT_OPENROUTER_INSTANCE_KEY`). S
 - `own`: no shared key. Each person adds their own OpenRouter key on the AI settings page and
   answers for it under their own agreement with OpenRouter.
 
-Left empty, the four `AIMEAT_AI_OPENROUTER_REGION*` settings decide (default: any country). The
-privacy page, the records of processing and `/v1/ai-transparency` follow the choice, and the
-operator can change it later on the Config tab (`ai.region_mode`).
+The privacy page, the records of processing and `/v1/ai-transparency` follow the choice, and the
+operator can change it later on the Config tab (`ai.region_mode`). Left empty, the finer settings
+decide: `AIMEAT_AI_OPENROUTER_REGION` is `eu` (model servers in the EU or the EEA, the United Kingdom
+and Switzerland), `us` (the United States) or `any` (the default, any country). `eu` and `us` need
+OpenRouter's Business plan on the key, and the EU offers fewer models. Read
+`docs/operations/openrouter-region.md` with them before choosing an EU option: it says which default
+models to check and what to record in the privacy records.
 
 > Opening the node to the public later? The operator fields (`AIMEAT_OPERATOR_*` in `.env.example`,
 > also on the admin Config page) are required for the privacy and terms pages; until they are set,

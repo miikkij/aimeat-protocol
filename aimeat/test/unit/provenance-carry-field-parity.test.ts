@@ -15,6 +15,7 @@
  *   AiProvenanceBlockSchema accepts must reach the declare body. A new field forgotten in the
  *   mapping fails here instead of going quiet in production.
  * @version-history
+ *   v1.2.0 — 2026-10-31 — rules_followed.
  *   v1.1.0 — 2026-10-08 — media_kind, media_type and resembles_real.
  *   v1.0.0 — 2026-08-02 — Initial: schema→body parity + the model/provider generator merge.
  */
@@ -37,6 +38,7 @@ const FIELD_DESTINATIONS: Record<string, (body: Record<string, unknown>) => unkn
   media_kind: (b) => b.mediaKind,
   media_type: (b) => b.mediaType,
   resembles_real: (b) => b.resemblesReal,
+  rules_followed: (b) => b.rulesFollowed,
 };
 
 /** A declaration exercising every field the schema accepts. */
@@ -49,6 +51,7 @@ const FULL_INPUT: AiProvenanceToolInput = AiProvenanceBlockSchema.parse({
   media_kind: 'audio',
   media_type: 'audio/mpeg',
   resembles_real: 'no',
+  rules_followed: ['people-artistic'],
   sources: [{ url: 'https://example.org/a', title: 'A', role: 'quoted' }],
   notes: 'carried through the connector',
 });
