@@ -26258,6 +26258,8 @@
     "structure.next.visibility": "Decide who sees the app before you publish.",
     "structure.next.requirements": "Write the legal pages and answer the open questions on the app's page in the catalogue.",
     "structure.next.none": "Nothing waits for you. Your AI goes on with the work.",
+    "structure.next.done": "Every step is done and the app is live.",
+    "structure.door.app": "Open the app",
     "structure.optional": "This page is help, not a must. You can tell your AI \"just build the app\". It then decides by itself, and this page shows what it decided.",
     "structure.parts": "What the app consists of",
     "structure.part.view": "view",
