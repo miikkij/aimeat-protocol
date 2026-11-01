@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   v1.4.3 -- 2026-11-01 -- ctx.datapackage's producer names the extension, for the personal-data check
+ *     of a public publish (services/datapackage/personal-guard.ts; plan doc-mvwxcas3dom3, D1.7).
  *   v1.4.2 -- 2026-10-27 -- The seller runs one run's ctx.buy calls start go through a per-run queue,
  *     at most SELLER_RUNS_PER_RUN at once; none is refused (secaudit2026oct26).
  *   v1.4.1 -- 2026-10-25 -- extRef may be `<owner>/<name>`; a bare name is the bare record, else the
@@ -308,7 +310,9 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
       datapackage: makeExtensionDataPackage({
         config, storage,
         ownerGhii: ownerGhiiOf(caller.gaii),
-        producedBy: { gaii: caller.gaii, kind: producerKindOf(caller.kind), ref: `${ext.name}/${action.id}` },
+        // `extension` links the publish to the data maps of the apps that name this extension
+        // (services/datapackage/personal-guard.ts); it is not stored.
+        producedBy: { gaii: caller.gaii, kind: producerKindOf(caller.kind), ref: `${ext.name}/${action.id}`, extension: ext.name },
         publishers: [invokingActor(storage, config.nodeId, caller)],
       }),
       // Background model calls are billed to the INSTALLER, read from the record, never the caller.

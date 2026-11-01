@@ -1471,6 +1471,20 @@
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.1), the node's own read: the tags of a version's descriptor file, for the audience the ODPS sheet states. No bytes are read and nothing read is answered; the package itself is opened through openPackage, which asks the package's audience."
     },
+    "src/services/datapackage/catalogue-facts.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemoryByKeysAnyOwner": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.1, D1.3), passes the reader at the point of use: the node-wide scan of the data package catalogue manifests (packages/*/manifest tagged data-package), cached and shared. publicDatasetFacts passes the anonymous classification reader before the DCAT feed, the dataset sitemap and the IndexNow plan; the discovery source passes the caller's reader (ctx.reader.show) and the package audience rule; the MCP resource list names packages the session's audience rule admits, as the descriptor read does."
+    },
+    "src/services/datapackage/personal-guard.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.7), the node's own read: the publishing app's data map (apps.{appId}.datamap, public by design), read to decide whether a public publish asks the owner first. Nothing read is answered beyond the map rows' own what and holds, which the map publishes."
+    },
     "src/services/datapackage/withdraw.ts": {
       "reads": {
         "listStorageFiles": 1,

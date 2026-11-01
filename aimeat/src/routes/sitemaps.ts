@@ -11,13 +11,15 @@
  *   still do.
  *
  * @structure
- *   - mountSitemapRoutes(router, config, storage) — registers both GET endpoints
+ *   - mountSitemapRoutes(router, config, storage) — registers the sitemap GET endpoints
  * @usage mountSitemapRoutes(router, config, storage);
  * @version-history
  *   v1.0.0 — 2026-08-16 — Extracted from bootstrap.ts (line ceiling), sitemap-index.xml included
  *   v1.0.1 — 2026-09-26 — The app owner comes from localAccountName (utils/gaii.ts), which keeps an
  *     identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-10-01 — The app sitemaps follow seo.announce_apps.
+ *   v1.2.0 — 2026-11-01 — /sitemap-datasets.xml lists the public data packages at their public page,
+ *     and the sitemap index names it (plan doc-mvwxcas3dom3, D1.4).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -28,6 +30,8 @@ import { appSeoIndexable } from '../services/app-seo.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { localAccountName } from '../utils/gaii.js';
+import { publicDatasetPages } from '../services/datapackage/catalogue-facts.js';
+import { escapeHtml } from '../utils/html-escape.js';
 
 /** Register `/sitemap.xml` and `/sitemap-index.xml` on the given router. */
 export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -100,6 +104,8 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
     // The people. One sitemap for every portfolio whose owner asked to be findable, listed here
     // rather than inline because it is one document per node rather than one per person.
     sitemaps.push(`${b}/sitemap-portfolios.xml`);
+    // The public data packages, one page each (services/datapackage/catalogue-facts.ts).
+    sitemaps.push(`${b}/sitemap-datasets.xml`);
 
     res.type('application/xml').send([
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -137,6 +143,22 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
       ...urls.map((u) => `  <url><loc>${u}</loc><lastmod>${now}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>`),
+      '</urlset>',
+    ].join('\n'));
+  });
+
+  /**
+   * The public data packages, each at its public page, with the day its newest version was published.
+   * A package is public because its owner published it so, which is the consent a search engine
+   * listing needs; a members, organism or private package and a withdrawn one are never here. Empty
+   * when node-wide discovery is off or the node shows its content to signed-in accounts only.
+   */
+  router.get('/sitemap-datasets.xml', apexOnly, async (_req, res) => {
+    const urls = await publicDatasetPages(config, storage);
+    res.type('application/xml').send([
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...urls.map((u) => `  <url><loc>${escapeHtml(u.loc)}</loc><lastmod>${u.lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.5</priority></url>`),
       '</urlset>',
     ].join('\n'));
   });
