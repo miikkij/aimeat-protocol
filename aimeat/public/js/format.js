@@ -8,9 +8,10 @@
  *
  *   THE FORMAT IS NOT THE LANGUAGE. The pill at the top of the page decides which words appear; it
  *   does not decide whether a date is 9/12/2026 or 12.9.2026, and it does not decide which clock
- *   the reader is looking at. Those two come from the profile, and when the profile says nothing
- *   they come from the browser — which is what every surface did before, so an account that never
- *   opened the settings sees no change at all. → /js/display-prefs.js, and the decision
+ *   the reader is looking at. Those two come from the profile. When the profile names no region,
+ *   the format follows the page's language (fi-FI, en-GB, es-ES), then the node's own language,
+ *   then the browser (Jouni, 2026-11-02); the clock with no zone set is the browser's.
+ *   → /js/display-prefs.js, and the decision
  *   "Kieli, esitysmuoto ja aikavyöhyke ovat kolme erillistä asetusta" (2026-09-12).
  *
  *   WHAT THIS REPLACED. `dt()` called `toLocaleString()` with no arguments, so a Finnish page
@@ -34,6 +35,9 @@
  *   morsels(625)                 → "625 morsels" — never a currency symbol
  *   priceAndPacing(offer, t)     → "Free · pacing 5 morsels" / "1,00 € · pacing 5 morsels"
  * @version-history
+ *   v2.9.0 — 2026-11-02 — A reader with no region of their own gets the format of the PAGE's
+ *     language before the node's and the browser's (Jouni, 2026-11-02). The reader's region still
+ *     beats it, so the three settings of 2026-09-12 stay separate for anyone who sets one.
  *   v2.8.0 — 2026-10-29 — A reader with no region of their own gets the format of the node's own
  *     language (site.default_locale) before the browser's: the reader's answer still beats both.
  *   v2.7.0 — 2026-10-11 — An item has two values (ruling "morseli on tahdistus, ei hinta"): an optional
@@ -80,13 +84,16 @@ import { swallowed } from '/js/swallowed.js';
 const NODE_REGION = { fi: 'fi-FI', es: 'es-ES', en: 'en-GB' };   // all three on a 24-hour clock (Jouni, 2026-10-30)
 
 /**
- * The tag to format with: the reader's own; else the format of the node's own language, when the
- * node names one (a node bought from the store showed "11:41 PM" on a Finnish page to a buyer
- * whose browser was English, UX review 2026-10-29); else undefined, which IS the browser default.
+ * The tag to format with: the reader's own; else the format of the page's language (a Finnish
+ * page showed "2,202" and "11/2/2026" to a reader whose browser was en-US, Jouni 2026-11-02);
+ * else the format of the node's own language, when the node names one (a node bought from the
+ * store showed "11:41 PM" on a Finnish page to a buyer whose browser was English, UX review
+ * 2026-10-29); else undefined, which IS the browser default.
  */
 function tag() {
+  const pageLang = (wordTag() || '').split('-')[0].toLowerCase();
   const nodeLang = typeof window !== 'undefined' ? /** @type {any} */ (window).__SITE?.defaultLocale : undefined;
-  return getRegion() || NODE_REGION[nodeLang] || undefined;
+  return getRegion() || NODE_REGION[pageLang] || NODE_REGION[nodeLang] || undefined;
 }
 
 /**

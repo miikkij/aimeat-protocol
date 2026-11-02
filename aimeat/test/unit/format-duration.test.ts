@@ -174,6 +174,17 @@ describe('a word is not a unit: which setting each formatter follows', () => {
         expect(relative(new Date(Date.now() - 3 * DAY))).toContain('ago');
         expect(num(1234567)).not.toContain(',');
     });
+
+    it('a reader with no region gets the format of the page language, not the browser\'s', () => {
+        /* Jouni, 2026-11-02: a Finnish page showed "2,202 rows" and "11/2/2026" to a reader whose
+           browser was en-US and whose profile named no region (WP10e browser check, B1). */
+        htmlEl.lang = 'fi';
+        setDisplayPrefs(null);
+        expect(num(1234567)).not.toContain(',');
+        expect(date('2026-09-13T12:00:00Z', { dateStyle: 'short' })).toContain('.');
+        htmlEl.lang = 'en';
+        expect(date('2026-09-13T12:00:00Z', { dateStyle: 'short' })).toMatch(/^13\//);
+    });
 });
 
 describe('ago: the phrase until the phrase stops helping', () => {
