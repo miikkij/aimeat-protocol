@@ -758,6 +758,15 @@
      "plain": "Your company's web page asks before an app changes it Your company's web page is what everyone sees at the company's address. An app that may save your files but may not change your companies' web pages cannot change or remove that page through the file routes: the node asks you once, in the bell, with Allow and Don't allow. After Allow, that app changes and removes the page as before; after Don't allow, the page stays as it is and the app is not asked about again. You in person, and an app or agent that may change your companies' web pages, change it as before. An agent of yours that may change your companies' web pages can answer for you. GET /v1/publish-requests (kind company-page-write), aimeat_publish_requests, PUT /v1/companies/{id}/portfolio"
     },
     {
+     "slug": "g-4-another-account-s-tool-asks-before-it-uses-your-own-sign-in",
+     "cells": [
+      "<strong>Another account's tool asks before it uses your own sign-in</strong>",
+      "On a shared MCP server where each person signs in with their own account (your own Jira account, for example), a capability that another account published chooses which tool runs, and it would run as you. The first time you, your agent or your app uses such a capability, nothing is sent: the node asks you once, in the bell, with Allow and Don't allow. After Allow, the capability runs with your sign-in for you, your agents and your apps; after Don't allow, it does not run, and the next use asks again. Your own capabilities, and servers that hold one shared sign-in, work as before. An agent of yours that may call MCP servers can answer for you.",
+      "<code>POST /v1/capabilities/{id}/invoke</code> (403 <code>MCP_CAPABILITY_NEEDS_APPROVAL</code>), <code>GET /v1/publish-requests</code> (kind <code>mcp-capability-use</code>), <code>aimeat_publish_requests</code>"
+     ],
+     "plain": "Another account's tool asks before it uses your own sign-in On a shared MCP server where each person signs in with their own account (your own Jira account, for example), a capability that another account published chooses which tool runs, and it would run as you. The first time you, your agent or your app uses such a capability, nothing is sent: the node asks you once, in the bell, with Allow and Don't allow. After Allow, the capability runs with your sign-in for you, your agents and your apps; after Don't allow, it does not run, and the next use asks again. Your own capabilities, and servers that hold one shared sign-in, work as before. An agent of yours that may call MCP servers can answer for you. POST /v1/capabilities/{id}/invoke (403 MCP_CAPABILITY_NEEDS_APPROVAL), GET /v1/publish-requests (kind mcp-capability-use), aimeat_publish_requests"
+    },
+    {
      "slug": "g-4-sharing-groups-and-key-space-shares",
      "cells": [
       "<strong>Sharing groups and key-space shares</strong>",
@@ -4847,6 +4856,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 495
+  "rows": 496
  }
 }

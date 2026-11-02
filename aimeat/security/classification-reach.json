@@ -2215,6 +2215,12 @@
       },
       "why": "Written 2026-11-01 (secaudit2026oct31w2 round 11), the node's own read: the service-owned record company-page-writers.<company id> that holds which writers the owner allowed to change a company's page through the file routes. Nothing of it is shown to anyone or sent to a model."
     },
+    "src/services/mcp-client/capability-consent.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-02 (secaudit2026nov02d round 13), the node's own read: the service-owned record mcp-capability-consents.<capability id> in the caller's account that holds which capabilities of other accounts the account holder allowed to run a remote MCP tool with their own sign-in. Nothing of it is shown to anyone or sent to a model."
+    },
     "src/services/living-pulse-spend.ts": {
       "reads": {
         "getMemory": 2

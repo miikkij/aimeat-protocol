@@ -61928,6 +61928,14 @@ paths:
         Who may invoke follows GET /v1/capabilities/{id}: a private capability, one with an unknown
         visibility word, and a draft, pending_review or rejected one are invoked only by the owner,
         the owner's agents and apps, and the operator. Everyone else gets 404 NOT_FOUND.
+
+
+        A capability over a tool of a remote MCP server where each person signs in with their own
+        account runs, for an account other than its publisher's, with the caller's own sign-in there.
+        That runs once the caller's account allowed this capability with one press: until then 403
+        MCP_CAPABILITY_NEEDS_APPROVAL, nothing is sent, and the message names the request (kind
+        `mcp-capability-use`, on GET /v1/publish-requests) and the address where the account holder
+        allows it.
       security:
         - BearerAuth: []
       parameters:
@@ -61952,6 +61960,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: MCP_CAPABILITY_NEEDS_APPROVAL (another account's capability over a server where each person signs in with their own account waits for the caller's account to allow it; the message names the request), MCP_CAPABILITY_NOT_YOURS, or another refusal the remote call gives.
         '404':
           description: NOT_FOUND (no such capability, or one this caller may not reach, such as another owner's private one or draft), or EXTENSION_NOT_FOUND (the extension or the action its ref names is not installed).
 
@@ -70951,7 +70961,9 @@ paths:
         Needs `connections:read-through` and `storage:write`. The file becomes a private file of the
         caller's owner, up to the node's per-file limit and within the account's quota, tagged
         `sharepoint` and `sharepoint-item:<item id>`. `key` defaults to
-        `sharepoint/<item id>/<file name>`.
+        `sharepoint/<item id>/<file name>`. A `key` a page origin serves asks what `POST /v1/storage`
+        asks: `company/<id>/index.html` needs the owner in person, `company:write`, or the owner's
+        one-press answer to the request this files (kind `company-page-write`).
       tags: [Connections]
       security:
         - BearerAuth: []
@@ -70979,7 +70991,9 @@ paths:
         '201':
           description: "{ stored: { key }, source }"
         '403':
-          description: SCOPE_DENIED, READ_AS_OWNER_REQUIRED, MISSING_PERMISSION or REFUSED_BY_PROVIDER.
+          description: >
+            SCOPE_DENIED, READ_AS_OWNER_REQUIRED, MISSING_PERMISSION or REFUSED_BY_PROVIDER; FORBIDDEN
+            for a company page key the caller may not change (the message names the waiting request).
         '404':
           description: No such connection of yours.
         '413':

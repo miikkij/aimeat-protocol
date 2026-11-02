@@ -6,6 +6,12 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.10.0 - 2026-11-02 - An `mcp` source of another account over a server where each person signs in
+ *     with their own account waits for the caller's account to allow it with one press (403
+ *     MCP_CAPABILITY_NEEDS_APPROVAL naming the request; services/mcp-client/capability-consent.ts).
+ *     The publisher chose the tool of a call made with the caller's own far-side account
+ *     (secaudit2026nov02d round 13, capability-invoke.ts:mcp-source:personal-sign-in-server-spends-
+ *     caller-credential). The caller's own capability and shared-credential servers are unchanged.
  *   v1.9.3 - 2026-10-27 - An `mcp` source matches the remote server's grants against
  *     `authority.principal` when the door names one: an app under a grant is narrowed by the grant its
  *     owner wrote for `app:{owner}/{file}`, as on the direct call route (secaudit2026oct26,
@@ -74,6 +80,8 @@ import { verifyJWT } from '../auth/jwt.js';
 import { callAuthority, withCurrentScopes } from '../auth/effective-scopes.js';
 import { resolvePat, PAT_PREFIX } from './access-token.js';
 import { ecosystemCallRefusal } from './eco-capability-approvals.js';
+import { personalSignInCapabilityRefusal } from './mcp-client/capability-consent.js';
+import { takesPersonalSignIn } from '../models/mcp-server-schemas.js';
 import { splitExtensionRef } from './capability-extension-ref.js';
 import { resolveExtensionForCall } from './component-versions.js';
 import { logger } from '../utils/logger.js';
@@ -348,6 +356,23 @@ export async function invokeCapability(
             new Error(`"${capability.name}" runs on an MCP server its publisher attached, and "${slug}" is not that server for you. Publish your own capability over your own server, or ask its publisher for one on a server you both reach.`),
             { statusCode: 403, code: 'MCP_CAPABILITY_NOT_YOURS' },
           );
+        }
+        // One row is one credential only where the row holds one. On a server where each person
+        // signs in with their own account, callRemoteTool presents the CALLER's sign-in, so the
+        // publisher would choose the tool of a call made as the caller at the far side. That runs
+        // once the caller's account allowed it with one press (services/mcp-client/capability-
+        // consent.ts; secaudit2026nov02d round 13). A shared-credential row is unchanged.
+        if (takesPersonalSignIn(server)) {
+          const principal = authority.principal ?? callerGhii;
+          const refused = await personalSignInCapabilityRefusal({ storage, config }, {
+            capability, publisherOwner, callerOwner, server, tool: toolName,
+            requester: {
+              principal,
+              kind: authority.ownerInPerson ? 'person' : principal.startsWith('eco:') ? 'app' : principal.includes('#') ? 'agent' : 'person',
+              sub: principal,
+            },
+          });
+          if (refused) throw Object.assign(new Error(refused.message), refused);
         }
       }
 

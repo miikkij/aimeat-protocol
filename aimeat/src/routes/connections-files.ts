@@ -21,6 +21,9 @@
  * @structure connectionFilesRouter(config, storage)
  * @usage app.use(connectionFilesRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-11-02 — /files/store hands its caller to the storage write, so the company page key
+ *     asks company:write or the owner's one press as POST /v1/storage does (secaudit2026nov02d round 13,
+ *     drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer).
  *   v1.0.0 — 2026-11-02 — Initial (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-).
  */
 import { Router } from 'express';
@@ -33,6 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { callerOf } from '../middleware/caller.js';
 import { requireEncryptionKey } from '../services/connections/credential.js';
 import { buildOutboundProviders } from '../services/connections/providers.js';
 import type { ConnectContext } from '../services/connections/oauth.js';
@@ -120,8 +124,11 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
       if (!opened) return;
       const { drive_id, item_id, key } = req.body as FileBody;
       // The file is the caller's owner's, as every file an agent or an app stores in that person's name.
+      // The caller goes with the write, as on POST /v1/storage, so a key a page origin serves asks
+      // what that route asks (secaudit2026nov02d round 13).
       const out = await storeDriveFile(opened.ctx, { storage, config, emitResourceUpdated, emitResourceListChanged },
-        resolve(req), opened.connectionId, { drive_id, item_id, key });
+        resolve(req), opened.connectionId, { drive_id, item_id, key },
+        { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) });
       if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
       res.status(201).json(success(config.nodeId, { stored: { key: out.key }, source: out.source },
         [{ description: 'Read the stored file', method: 'GET', url: `/v1/storage/${out.key.split('/').map(encodeURIComponent).join('/')}` }]));

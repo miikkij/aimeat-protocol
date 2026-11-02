@@ -34,6 +34,10 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-11-02 — Phase 5f: another owner's capability over a server each person signs in to waits for
+ *     the caller's one press before it runs on the caller's own sign-in; the caller's own capability
+ *     runs unasked, an allowed one runs for the caller's agent too, and Don't allow asks again later
+ *     (secaudit2026nov02d round 13, capability-invoke.ts:mcp-source:personal-sign-in-server-spends-caller-credential).
  *   2026-11-02 — Phase 5g: template atlassian on the owner's own server (oauth, the template's address
  *     kept against a sent url), on the node (per-user-oauth), refused when unknown, and over MCP.
  *   2026-11-02 — Phase 5f: a node server each person signs in to with their own account (auth
@@ -2216,6 +2220,81 @@ await test('another admitted owner is still refused: one person\'s sign-in is no
   });
   assert(called.status === 403 && called.body.error?.code === 'SIGN_IN_REQUIRED',
     `the other owner: ${called.status} ${JSON.stringify(called.body.error)}`);
+});
+
+// secaudit2026nov02d round 13, capability-invoke.ts:mcp-source:personal-sign-in-server-spends-caller-
+// credential. On a server where each person signs in with their own account, another owner's
+// capability chose the tool of a call made with the CALLER's own far-side account. It now waits for
+// the caller's one press; the caller's own capability and every shared-credential server are unchanged.
+/** A capability of `bearer`'s over `ref` (public unless named), answered with its id. */
+async function personalCapability(bearer: string, name: string, ref: string, visibility = 'public'): Promise<string> {
+  const made = await json('/v1/capabilities', {
+    method: 'POST', headers: { Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({
+      name, summary: 'Says who signed in, through the shared server.', visibility,
+      source: { type: 'mcp', ref }, status: 'active', callable: true, authRequired: 'registered', usage: 'No input.',
+    }),
+  });
+  assert(made.status === 201 || made.status === 200, `capability ${name}: ${made.status} ${JSON.stringify(made.body?.error)}`);
+  return (made.body.data.capability?.id ?? made.body.data.id) as string;
+}
+/** The caller's waiting questions of the kind this rule files. */
+async function capabilityUseAsks(bearer: string): Promise<any[]> {
+  const list = await json('/v1/publish-requests', { headers: { Authorization: `Bearer ${bearer}` } });
+  return ((list.body?.data?.requests ?? []) as any[]).filter((r) => r.kind === 'mcp-capability-use' && r.state === 'awaiting_owner');
+}
+let strangerPersonalCap = '';
+let personalAskId = '';
+
+await test('designed use: an owner\'s own capability over that server runs on their own sign-in with no question', async () => {
+  const own = await personalCapability(plain.token, `whoami-own-${Date.now()}`, 'teamjira/whoami', 'private');
+  const r = await json(`/v1/capabilities/${own}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(r.status === 200 && JSON.stringify(r.body.data).includes('signed-in'), `own capability: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  assert((await capabilityUseAsks(plain.token)).length === 0, 'the owner\'s own capability filed a question');
+});
+
+await test('attack: another owner\'s capability over that server does not run on the caller\'s own sign-in unasked', async () => {
+  strangerPersonalCap = await personalCapability(strangerToken, `whoami-borrowed-${Date.now()}`, 'teamjira/whoami');
+  const r = await json(`/v1/capabilities/${strangerPersonalCap}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(r.status === 403 && r.body.error?.code === 'MCP_CAPABILITY_NEEDS_APPROVAL',
+    `another owner's capability on the caller's sign-in: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  assert(!JSON.stringify(r.body).includes('signed-in'), 'the far side answered before the caller allowed it');
+});
+
+await test('the caller is asked once with one press, and every further try names the same question', async () => {
+  const asks = await capabilityUseAsks(plain.token);
+  assert(asks.length === 1, `waiting questions: ${JSON.stringify(asks.map((r) => [r.id, r.kind, r.state]))}`);
+  personalAskId = asks[0].id;
+  const again = await json(`/v1/capabilities/${strangerPersonalCap}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(again.status === 403 && String(again.body.error?.message).includes(personalAskId), `a second try: ${JSON.stringify(again.body.error)}`);
+  assert((await capabilityUseAsks(plain.token)).length === 1, 'a second try filed a second question');
+});
+
+await test('designed use: the caller allows it with one press, and it then runs on their own sign-in', async () => {
+  const d = await json(`/v1/publish-requests/${personalAskId}/decision`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ decision: 'approve' }) });
+  assert(d.status === 200 && d.body.data.request.state === 'approved', `decision: ${d.status} ${JSON.stringify(d.body.error ?? d.body.data?.request?.state)}`);
+  const r = await json(`/v1/capabilities/${strangerPersonalCap}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(r.status === 200 && JSON.stringify(r.body.data).includes('signed-in'), `after allowing: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+});
+
+await test('designed use: the caller\'s agent holding work:request and mcp:use runs the allowed capability too', async () => {
+  const agent = await agentWithScopes(plain, `mcpcapuse${Date.now().toString(36)}`, ['work:request', 'mcp:use']);
+  const r = await json(`/v1/capabilities/${strangerPersonalCap}/invoke`, { method: 'POST', headers: { Authorization: `Bearer ${agent.token}` }, body: JSON.stringify({ input: {} }) });
+  assert(r.status === 200 && JSON.stringify(r.body.data).includes('signed-in'), `the agent: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+});
+
+await test('Don\'t allow: nothing runs, and a later call asks again', async () => {
+  const other = await personalCapability(strangerToken, `whoami-declined-${Date.now()}`, 'teamjira/whoami');
+  const first = await json(`/v1/capabilities/${other}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(first.status === 403 && first.body.error?.code === 'MCP_CAPABILITY_NEEDS_APPROVAL', `first: ${first.status} ${first.body.error?.code}`);
+  const asked = (await capabilityUseAsks(plain.token))[0];
+  assert(asked, 'no question was filed');
+  const d = await json(`/v1/publish-requests/${asked.id}/decision`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ decision: 'decline' }) });
+  assert(d.status === 200 && d.body.data.request.state === 'declined', `decline: ${d.status} ${JSON.stringify(d.body.error)}`);
+  const later = await json(`/v1/capabilities/${other}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(later.status === 403 && later.body.error?.code === 'MCP_CAPABILITY_NEEDS_APPROVAL', `later: ${later.status} ${later.body.error?.code}`);
+  const again = await capabilityUseAsks(plain.token);
+  assert(again.length === 1 && again[0].id !== asked.id, `a new question: ${JSON.stringify(again.map((r) => r.id))}`);
 });
 
 await test('an owner the server does not admit cannot start a sign-in on it', async () => {

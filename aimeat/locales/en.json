@@ -11451,6 +11451,8 @@
   "notiftext.approval_living_ai_spend.body": "{writer} set up the living document \"{document}\". It updates itself with your AI, and you pay for it from your own key or your AI allowance. {writer} may not use your AI itself, so the update waits for you. If you allow it, the document updates itself on its schedule. If you do not, the AI does not update it and nothing is spent.",
   "notiftext.approval_company_page_write.title": "{who} asks to change the web page of your company {company}",
   "notiftext.approval_company_page_write.body": "{writer} tried to save a new web page for your company {company}. Everyone sees this page at the company's address. {writer} may save your files, but it may not change your companies' web pages. If you allow it, {writer} can change and remove this company's web page from now on. If you do not, the page stays as it is.",
+  "notiftext.approval_mcp_capability_use.title": "{who} asks to use your own sign-in at {server} for a tool from {publisher}",
+  "notiftext.approval_mcp_capability_use.body": "\"{capability}\" from {publisher} runs the tool {tool} on {server}. Everyone signs in to {server} with their own account, so the tool would act there as you, with your own account. If you allow it, \"{capability}\" runs with your sign-in when you, your agents or your apps use it. If you do not, it does not run and nothing is sent.",
   "notiftext.approval_refinery_definition.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
   "notiftext.approval_refinery_definition.body": "The mail refinery gets your email and saves the messages in a workspace. After the change, it reads the mailbox {mailbox} and saves each message in the workspace {workspace}. {who} may not make this change alone, so the change waits for your approval. If you do not allow it, nothing changes.",
   "notiftext.approval_refinery_definition_text.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
@@ -28240,6 +28242,17 @@
         "high": "The page stays as it is, and the app or agent is not asked about it again.",
         "tipLabel": "When to allow",
         "tip": "Allow if you use this app to make your company's web page. If you do not know why the app wants to change the page, do not allow it."
+      },
+      "approval_mcp_capability_use": {
+        "title": "Another account's tool asks to use your own sign-in",
+        "short": "A capability that another account published runs a tool on a server where you sign in with your own account.",
+        "what": "On some MCP servers each person signs in with their own account, for example their own Jira account. The account that published this capability chose which tool it runs there. When you use it, the tool acts as you, with your own account. That is why you are asked first.",
+        "lowLabel": "If you allow",
+        "low": "The capability runs its tool with your own sign-in when you, your agents or your apps use it.",
+        "highLabel": "If you do not allow",
+        "high": "The capability does not run, and nothing is sent. The next time it is used, you are asked again.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if you know the account that published it and you want its tool to work with your own account. If you do not know why it needs your sign-in, do not allow it."
       },
       "approval_schedule_instruction": {
         "title": "Someone changed a scheduled task",

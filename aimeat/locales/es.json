@@ -10901,6 +10901,8 @@
   "notiftext.approval_living_ai_spend.body": "{writer} creó el documento vivo «{document}». Se actualiza con tu IA, y tú lo pagas con tu propia clave o con tu saldo de IA. {writer} no puede usar tu IA por sí mismo, así que la actualización espera tu respuesta. Si lo permites, el documento se actualiza según su horario. Si no lo permites, la IA no lo actualiza y no se gasta nada.",
   "notiftext.approval_company_page_write.title": "{who} pide permiso para cambiar la página web de tu empresa {company}",
   "notiftext.approval_company_page_write.body": "{writer} intentó guardar una nueva página web para tu empresa {company}. Todos ven esta página en la dirección de la empresa. {writer} puede guardar tus archivos, pero no puede cambiar las páginas web de tus empresas. Si lo permites, {writer} puede cambiar y quitar la página web de esta empresa a partir de ahora. Si no lo permites, la página se queda como está.",
+  "notiftext.approval_mcp_capability_use.title": "{who} pide que una herramienta de {publisher} use tu propia sesión en {server}",
+  "notiftext.approval_mcp_capability_use.body": "«{capability}», de {publisher}, ejecuta la herramienta {tool} en {server}. En {server} cada persona inicia sesión con su propia cuenta, así que la herramienta actuaría allí como tú, con tu cuenta. Si lo permites, «{capability}» usa tu sesión cuando lo usas tú, uno de tus agentes o una de tus aplicaciones. Si no lo permites, no se ejecuta y no se envía nada.",
   "notiftext.approval_refinery_definition.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
   "notiftext.approval_refinery_definition.body": "El procesador de correo toma tu correo y guarda los mensajes en un espacio de trabajo. Después del cambio, lee el buzón {mailbox} y guarda cada mensaje en el espacio de trabajo {workspace}. {who} no puede hacer este cambio por su cuenta, así que el cambio espera tu aprobación. Si no lo permites, nada cambia.",
   "notiftext.approval_refinery_definition_text.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
@@ -26601,6 +26603,17 @@
         "high": "La página se queda como está, y no se vuelve a preguntar por esta aplicación o este agente.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si usas esta aplicación para hacer la página web de tu empresa. Si no sabes por qué la aplicación quiere cambiar la página, no lo permitas."
+      },
+      "approval_mcp_capability_use": {
+        "title": "Una herramienta de otra cuenta pide usar tu propia sesión",
+        "short": "Una capacidad que publicó otra cuenta ejecuta una herramienta en un servidor donde inicias sesión con tu propia cuenta.",
+        "what": "En algunos servidores MCP cada persona inicia sesión con su propia cuenta, por ejemplo su propia cuenta de Jira. La cuenta que publicó esta capacidad eligió qué herramienta ejecuta allí. Cuando la usas, la herramienta actúa como tú, con tu propia cuenta. Por eso se te pregunta antes.",
+        "lowLabel": "Si lo permites",
+        "low": "La capacidad ejecuta su herramienta con tu sesión cuando la usas tú, uno de tus agentes o una de tus aplicaciones.",
+        "highLabel": "Si no lo permites",
+        "high": "La capacidad no se ejecuta y no se envía nada. La próxima vez que se use, se te pregunta de nuevo.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si conoces la cuenta que la publicó y quieres que su herramienta funcione con tu propia cuenta. Si no sabes por qué necesita tu sesión, no lo permitas."
       },
       "approval_schedule_instruction": {
         "title": "Alguien cambió una programación",
