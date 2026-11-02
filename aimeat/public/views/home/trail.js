@@ -15,6 +15,9 @@
  *   CODE_PHRASE, FAMILY_PHRASE, ROUTINE, EVENT_PHRASE, Day, byDay
  * @usage routed at /v1/home?trail=1 by spa.html
  * @version-history
+ *   v1.4.2 — 2026-11-02 — A chat turn names no target (its target is the conversation's id), and a
+ *     random id with a hyphen or an underscore is no name either (crew72's real log: "kysyi chatissa:
+ *     jMsQjKj-CzR8").
  *   v1.4.1 — 2026-11-02 — On crew63's real log: a run collects one agent's calls even when other
  *     calls fall between them (one morning digest run had read as two lines), and a random token such
  *     as a chat's id is no target name (TOKEN_LIKE; "kysyi chatissa: 9goMmaTnszgd").
@@ -155,7 +158,7 @@ const ID_LIKE = /^[0-9a-f-]{8,}$|^[a-z]{1,8}[_-](?=[0-9a-z]*\d)[0-9a-z]{6,}$|\d{
  * A random token: ten or more letters and digits with no separator, mixing cases or with a digit
  * among letters ("9goMmaTnszgd", a chat's id; crew63's real log). A name has a separator or one case.
  */
-const TOKEN_LIKE = /^(?=[A-Za-z0-9]{10,}$)(?:(?=.*[a-z])(?=.+[A-Z])|(?=.*\d)(?=.*[A-Za-z])).*$/;
+const TOKEN_LIKE = /^(?=[A-Za-z0-9]{10,}$)(?:(?=.*[a-z])(?=.+[A-Z])|(?=.*\d)(?=.*[A-Za-z])).*$|^(?=[A-Za-z0-9_-]{10,}$)(?=.*[a-z][A-Z]).*$/;
 
 /**
  * What the row acted on, in words a person reads: the first part of the target that is not a machine
@@ -197,7 +200,9 @@ export function trailLine(entry, shownName) {
     : tr('home.trail.did.madeChange', 'made a change'));
   // An agent acting on its own task names itself as the target; saying it twice reads as a fault.
   const actor = who(entry, shownName);
-  const named = plainTarget(entry.target);
+  // A chat turn's target is always the conversation's id, never a name a person gave (crew72's real
+  // log: "kysyi chatissa: jMsQjKj-CzR8").
+  const named = phraseId === 'askedChat' ? '' : plainTarget(entry.target);
   const target = named && named !== actor && named !== entry.actorName ? named : '';
   const line = target
     ? fill(tr('home.trail.lineTarget', '{who} {what}: {target}'), { who: actor, what: phrase, target })
