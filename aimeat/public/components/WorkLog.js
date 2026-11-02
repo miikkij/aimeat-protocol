@@ -14,6 +14,8 @@
  * @structure WorkLog({ tools, ended }) · WorkLine({ tool, ended }) · stepKind(title) · workSummary(tools, ended)
  * @usage html`<${WorkLog} tools=${turn.tools} />`
  * @version-history
+ *   v2.2.0 — 2026-11-02 — A kind whose calls all failed leaves the summary line, and "One step did not go
+ *     through" shows only when nothing in the turn finished (crew62: it showed under a correct answer).
  *   v2.1.0 — 2026-10-31 — `ended`: a saved turn shows a call whose finished status never arrived with
  *     no running mark and no "starting" word (crew32 check turn: "Haen pohjan…" after the app was published).
  *   v2.0.0 — 2026-10-31 — Folded by default, with a summary in the person's words: one entry per kind
@@ -70,7 +72,10 @@ function kindWords(kind) {
 
 /**
  * The summary of a turn's calls: each kind once, in the order first seen, with whether one of them
- * finished, and whether a kind ended with none finished.
+ * finished. A kind whose calls all failed is left out of the line (the fold still lists them), and
+ * `stuck` is true only when no call of the turn finished at all: a step the agent got past is its
+ * own business, and "one step did not go through" under an answer that came was read as a failure
+ * the person had to act on (commercial's crew62 check, 2026-11-02).
  * @param {Array<{ title?: string, status?: string }>} tools
  * @returns {{ kinds: Array<{ kind: string, done: boolean, running: boolean }>, stuck: boolean }}
  */
@@ -89,9 +94,10 @@ export function workSummary(tools, ended = false) {
         byKind.set(kind, k);
     }
     const kinds = [...byKind.values()];
+    const failedOnly = (k) => k.failed && !k.done && !k.running;
     return {
-        kinds: kinds.map(({ kind, done, running }) => ({ kind, done, running })),
-        stuck: kinds.some((k) => k.failed && !k.done && !k.running),
+        kinds: kinds.filter((k) => !failedOnly(k)).map(({ kind, done, running }) => ({ kind, done, running })),
+        stuck: kinds.some(failedOnly) && !kinds.some((k) => k.done || k.running),
     };
 }
 
