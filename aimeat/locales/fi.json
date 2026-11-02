@@ -23503,7 +23503,14 @@
       "mcpAuthToken": "Sain siltä tunnisteen",
       "mcpAuthOauth": "Kirjaudun siihen",
       "mcpNoSignInNeeded": "Palvelin ei tarvinnut kirjautumista. Se on valmis.",
-      "mcpAuthFailed": "Kirjautumista ei saatu alkuun"
+      "mcpAuthFailed": "Kirjautumista ei saatu alkuun",
+      "mcpSignInOwn": "Kirjaudu omalla tililläsi",
+      "mcpPersonalNeedsSignIn": "jokainen kirjautuu omalla tilillään",
+      "mcpPersonalSignedIn": "kirjautunut omalla tililläsi",
+      "mcpPersonalStopped": "kirjautumisesi lakkasi toimimasta",
+      "mcpSignOut": "Kirjaudu ulos",
+      "mcpSignedOut": "Kirjauduit ulos. Palvelussa antamasi käyttöoikeus on yhä sinun peruutettavissasi siellä.",
+      "mcpSignOutFailed": "Uloskirjautuminen ei onnistunut"
     },
     "nodes": {
       "title": "Omat palvelimet",

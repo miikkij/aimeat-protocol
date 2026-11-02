@@ -12,6 +12,9 @@
  *   problem. Flattening a chosen server into the list with its real schemas is a later phase, opted
  *   into per server.
  * @version-history
+ *   2026-11-02 — aimeat_mcp_attach takes `auth` ('oauth', or 'per-user-oauth' on a group's server);
+ *     aimeat_mcp_authorize signs the caller in personally on a shared server that takes personal
+ *     sign-ins; aimeat_mcp_sign_out removes that sign-in.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-16 — aimeat_mcp_grant_set: a grant on a node-wide server narrows the caller's own agents and apps; GRANT_NOT_APPLICABLE is for another person's server; an expires value that is not a date is refused (QA audit F01b-02).
  *   2026-10-15 — aimeat_mcp_grant_set says a node-wide server answers GRANT_NOT_APPLICABLE (feature-list audit #12).
@@ -94,11 +97,12 @@ export const mcpProxyTools = [
             transport: { type: 'string', description: "How to speak to it: 'http' (the current transport, and the default) or 'sse' (the older one).", zod: z.enum(['http', 'sse']) },
             token: { type: 'string', description: 'A token or key the server needs. Held encrypted on this node and never given out again.' },
             header: { type: 'string', description: "Which header the token belongs in, when the server does not take a bearer (e.g. 'X-API-Key')." },
+            auth: { type: 'string', description: "How the server is signed in to, when it uses OAuth sign-in rather than a token. 'oauth': attach it now and sign in once afterwards with aimeat_mcp_authorize; that one sign-in is what everybody using the server spends. 'per-user-oauth', only with organism_id: each member signs in with their OWN account at the far side, so its own permissions and audit apply to each person, and the group holds no token at all. Use it for a team tool everybody already has an account on, such as Jira or Confluence. Leave it out for a server that takes a token, or none.", zod: z.enum(['oauth', 'per-user-oauth']) },
         },
     },
     {
         name: 'aimeat_mcp_authorize',
-        description: "Begin signing in to an attached MCP server that uses OAuth. Returns an address for a PERSON to open: they see exactly what is being asked for and approve it at the far side, and nothing here can approve it for them \u2014 fetching the address yourself does nothing. Hand it over, say in one sentence what it is for, and wait; the server then reports its tools and starts working. Use this for a server attached with auth 'oauth'; a server that takes a plain token needs no round at all. The address is this node's own confirmation page: the owner opens it signed in to this node, confirms, and goes on to the far side from there, so a sign-in in anybody else's browser saves nothing. Needs the mcp:manage permission.",
+        description: "Begin signing in to an attached MCP server that uses OAuth. Returns an address for a PERSON to open: they see exactly what is being asked for and approve it at the far side, and nothing here can approve it for them \u2014 fetching the address yourself does nothing. Hand it over, say in one sentence what it is for, and wait; the server then reports its tools and starts working. Use this for a server attached with auth 'oauth'; a server that takes a plain token needs no round at all. On a server the node or a group shares where each person signs in with their own account (aimeat_mcp_list shows personalSignIn on it), this signs in THE PERSON YOU ACT FOR, with their own account there, and anyone the server admits may do it; `personal` in the answer says so. The address is this node's own confirmation page: the owner opens it signed in to this node, confirms, and goes on to the far side from there, so a sign-in in anybody else's browser saves nothing. Needs the mcp:manage permission.",
         caller: 'agent',
         visibility: agentEverywhere,
         // Destructive, and the credential goes with it. Everything acting for this person loses those
@@ -114,6 +118,18 @@ export const mcpProxyTools = [
         input: {
             server: { type: 'string', required: true, description: 'Which server, by its short name.' },
             return_url: { type: 'string', description: 'A path on this node the browser lands on afterwards.' },
+        },
+    },
+    {
+        name: 'aimeat_mcp_sign_out',
+        description: "Sign the person you act for out of a shared MCP server where each person signs in with their own account (aimeat_mcp_list shows personalSignIn on it). Only their own sign-in goes: the server stays, and everybody else's sign-in on it keeps working. Their agents lose that server's tools until they sign in again. Access they granted at the far side is theirs to revoke there, which is worth mentioning when the point was to cut access off. A server without personal sign-ins answers NOT_PERSONAL; one they never signed in to answers NOT_SIGNED_IN. Needs the mcp:manage permission.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        // Destructive for this person (their sign-in is gone) and idempotent: a second call finds none.
+        annotations: { title: 'Sign Out of a Shared Server', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        scope: 'mcp:manage',
+        input: {
+            server: { type: 'string', required: true, description: 'Which server, by its short name or its id from aimeat_mcp_list.' },
         },
     },
     {

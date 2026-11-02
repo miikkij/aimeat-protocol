@@ -23,6 +23,7 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-02 — The mcp_user_credentials step erases the person's own sign-ins on shared MCP servers.
  *   2026-10-29 — The app_builder_records step erases the app plans too (services/app-plan.ts).
  *   2026-10-27 — The app_builder_records step erases the design specs and roadmaps of the person's apps,
  *     keyed by the reusable app id (secaudit2026oct26, app-builder-records-keyed-by-reusable-name-survive).
@@ -334,6 +335,13 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     await step('mcp_servers', async () => {
       const n = await storage.deleteMcpServersByOwner(ghii);
       return n ? `mcp_servers:${n}` : null;
+    }, deletionLog, storage);
+
+    // This person's own sign-ins on shared servers (auth per-user-oauth). The server stays, because
+    // it is the node's or the organism's; the token to this person's account at the far side goes.
+    await step('mcp_user_credentials', async () => {
+      const n = await storage.deleteMcpUserCredentialsByOwner(ghii);
+      return n ? `mcp_user_credentials:${n}` : null;
     }, deletionLog, storage);
 
     // The client registrations a person brought themselves (their own Entra app, their own X app),

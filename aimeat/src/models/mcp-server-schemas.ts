@@ -40,6 +40,8 @@
  *   - McpPrice / normalizeMcpPrice — what a call costs, in money only, and the one check every door uses
  * @usage import type { McpServerRecord } from '../models/mcp-server-schemas.js';
  * @version-history
+ *   v1.4.0 — 2026-11-02 — McpUserCredentialRecord: a person's own sign-in on a shared server whose auth
+ *     is per-user-oauth; PublicMcpServer says whether the server takes a personal sign-in.
  *   v1.3.0 — 2026-11-01 — mcpAuthModeOf: a deferred-credential attach is stored as 'oauth'.
  *   v1.2.0 — 2026-10-20 — McpServerCredential carries the issuing authorization server (oauthIssuer,
  *     oauthClient.issuer), the stamp the MCP SDK v2 puts on tokens and client registrations.
@@ -212,7 +214,11 @@ export interface McpServerCredential {
  * as `none`, the token the round later stored was never sent (mcp-client/invoke.ts resolveCredential
  * reads `none` as "no credential") and every call answered 401.
  */
-export function mcpAuthModeOf(input: { credential?: McpServerCredential; deferCredential?: boolean }): McpAuthMode {
+export function mcpAuthModeOf(input: {
+  credential?: McpServerCredential; deferCredential?: boolean; personalSignIn?: boolean;
+}): McpAuthMode {
+  // A shared server each person signs in to with their own account holds no credential of its own.
+  if (input.personalSignIn) return 'per-user-oauth';
   if (input.credential) return input.credential.shape === 'oauth2' ? 'oauth' : 'static';
   return input.deferCredential ? 'oauth' : 'none';
 }
@@ -310,6 +316,28 @@ export interface McpServerRecord {
 }
 
 /**
+ * One person's own sign-in on a shared server whose `auth` is `per-user-oauth`.
+ *
+ * The server row holds no credential in that mode: each person the server admits signs in with
+ * their own account at the far side, so the far side's own permissions and audit apply to them.
+ * `status` is per person on purpose. One person's dead token parks that person's row and nobody
+ * else's, because the server itself is still answering everyone who signed in.
+ */
+export interface McpUserCredentialRecord {
+  serverId: string;
+  /** The person whose account at the far side this is. An agent's call spends its owner's. */
+  ownerGhii: string;
+  /** Ciphertext `iv:tag:ct` of a JSON McpServerCredential. Never in any response. */
+  credential: string;
+  /** Null is valid: plenty of tokens do not expire. */
+  expiresAt: string | null;
+  status: 'active' | 'needs_reauth';
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * What any response is allowed to say about a server.
  *
  * NO URL, NO HEADERS, NO CREDENTIAL, NO OAUTH CLIENT. The URL is out for the same reason the
@@ -328,6 +356,12 @@ export interface PublicMcpServer {
   /** How many tools the far side offers. The names come from the tools call, not from a listing. */
   toolCount: number;
   lastOkAt: string | null;
+  /**
+   * Present only on a shared server whose auth is per-user-oauth: each person signs in with their
+   * own account. `signedIn` says whether THIS caller has, and `signInStatus` whether their sign-in
+   * still works; both are filled in by the listing that knows who is asking.
+   */
+  personalSignIn?: { signedIn: boolean; status: 'active' | 'needs_reauth' | null };
 }
 
 /** The projection, in one place, so no route can invent a wider one by accident. */
@@ -343,7 +377,13 @@ export function toPublicMcpServer(row: McpServerRecord): PublicMcpServer {
     exposure: row.exposure,
     toolCount: row.toolCache.length,
     lastOkAt: row.lastOkAt,
+    ...(row.auth === 'per-user-oauth' ? { personalSignIn: { signedIn: false, status: null } } : {}),
   };
+}
+
+/** Whether each person signs in to this server with their own account. */
+export function takesPersonalSignIn(row: Pick<McpServerRecord, 'auth' | 'ownership'>): boolean {
+  return row.auth === 'per-user-oauth' && row.ownership !== 'owner';
 }
 
 /** `^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$` — see McpServerRecord.slug. */

@@ -13,6 +13,8 @@
  * @structure mcpServerMethods — attach · read · patch · credential · tool cache · refresh claim
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-02 — A person's own sign-in on a shared server ("McpUserCredential",
+ *     migrations/0123_mcp_user_credentials.sql); deleting a server deletes its personal sign-ins.
  *   v1.1.0 — 2026-11-01 — updateMcpServerCredential writes the auth mode when given.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy. Schema: migrations/0076_mcp_servers.sql.
  */
@@ -22,9 +24,9 @@ import type { McpServerQuery, McpServerPatch } from '../../../repositories/mcp-s
 import type {
   McpServerRecord, McpServerStatus, McpOwnership, McpTransport,
   McpAuthMode, McpCallerIdentity, McpExposure, RemoteToolSnapshot,
-  McpAvailability, McpPrice,
+  McpAvailability, McpPrice, McpUserCredentialRecord,
 } from '../../../../models/mcp-server-schemas.js';
-import type { McpServer as McpServerRow, Json, DB } from '../db-types.js';
+import type { McpServer as McpServerRow, McpUserCredential as McpUserCredentialRow, Json, DB } from '../db-types.js';
 import { jsonb } from '../helpers.js';
 
 /**
@@ -242,7 +244,12 @@ export const mcpServerMethods = {
   },
 
   async deleteMcpServer(this: HasDb, id: string): Promise<void> {
-    await this.db.deleteFrom('McpServer').where('id', '=', id).execute();
+    // The personal sign-ins go with the server, in one transaction: a token for a server nobody can
+    // reach any more is a token nobody can see or remove.
+    await this.db.transaction().execute(async (trx) => {
+      await trx.deleteFrom('McpUserCredential').where('serverId', '=', id).execute();
+      await trx.deleteFrom('McpServer').where('id', '=', id).execute();
+    });
   },
 
   async deleteMcpServersByOwner(
@@ -252,4 +259,80 @@ export const mcpServerMethods = {
       .where('ownerGhii', '=', ownerGhii).executeTakeFirst();
     return Number(res.numDeletedRows ?? 0n);
   },
+
+  async getMcpUserCredential(
+    this: HasDb, serverId: string, ownerGhii: string,
+  ): Promise<McpUserCredentialRecord | undefined> {
+    const r = await this.db.selectFrom('McpUserCredential').selectAll()
+      .where('serverId', '=', serverId).where('ownerGhii', '=', ownerGhii).executeTakeFirst();
+    return r ? toMcpUserCredential(r) : undefined;
+  },
+
+  async listMcpUserCredentials(this: HasDb, ownerGhii: string): Promise<McpUserCredentialRecord[]> {
+    const rows = await this.db.selectFrom('McpUserCredential').selectAll()
+      .where('ownerGhii', '=', ownerGhii).orderBy('createdAt').execute();
+    return rows.map(toMcpUserCredential);
+  },
+
+  async putMcpUserCredential(
+    this: HasDb, serverId: string, ownerGhii: string, credential: string, expiresAt: string | null,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    await this.db.insertInto('McpUserCredential').values({
+      serverId, ownerGhii, credential, expiresAt, status: 'active', lastError: null, createdAt: now, updatedAt: now,
+    }).onConflict((oc) => oc.columns(['serverId', 'ownerGhii']).doUpdateSet({
+      credential, expiresAt, status: 'active', lastError: null, updatedAt: now,
+    })).execute();
+  },
+
+  async setMcpUserCredentialStatus(
+    this: HasDb, serverId: string, ownerGhii: string, status: 'active' | 'needs_reauth', error?: string | null,
+  ): Promise<void> {
+    await this.db.updateTable('McpUserCredential')
+      .set({ status, lastError: error ?? null, updatedAt: new Date().toISOString() })
+      .where('serverId', '=', serverId).where('ownerGhii', '=', ownerGhii).execute();
+  },
+
+  async claimMcpUserRefresh(
+    this: HasDb, serverId: string, ownerGhii: string, staleAfterMs: number,
+  ): Promise<boolean> {
+    const now = Date.now();
+    const staleBefore = new Date(now - staleAfterMs).toISOString();
+    // A conditional UPDATE, as claimMcpRefresh: exactly one concurrent caller sees a rowcount of 1.
+    const res = await this.db.updateTable('McpUserCredential')
+      .set({ refreshClaimedAt: new Date(now).toISOString() })
+      .where('serverId', '=', serverId).where('ownerGhii', '=', ownerGhii)
+      .where((eb) => eb.or([eb('refreshClaimedAt', 'is', null), eb('refreshClaimedAt', '<', staleBefore)]))
+      .executeTakeFirst();
+    return (res.numUpdatedRows ?? 0n) > 0n;
+  },
+
+  async releaseMcpUserRefresh(this: HasDb, serverId: string, ownerGhii: string): Promise<void> {
+    await this.db.updateTable('McpUserCredential').set({ refreshClaimedAt: null })
+      .where('serverId', '=', serverId).where('ownerGhii', '=', ownerGhii).execute();
+  },
+
+  async deleteMcpUserCredential(this: HasDb, serverId: string, ownerGhii: string): Promise<boolean> {
+    const res = await this.db.deleteFrom('McpUserCredential')
+      .where('serverId', '=', serverId).where('ownerGhii', '=', ownerGhii).executeTakeFirst();
+    return Number(res.numDeletedRows ?? 0n) > 0;
+  },
+
+  async deleteMcpUserCredentialsByOwner(this: HasDb, ownerGhii: string): Promise<number> {
+    const res = await this.db.deleteFrom('McpUserCredential').where('ownerGhii', '=', ownerGhii).executeTakeFirst();
+    return Number(res.numDeletedRows ?? 0n);
+  },
 };
+
+function toMcpUserCredential(r: Selectable<McpUserCredentialRow>): McpUserCredentialRecord {
+  return {
+    serverId: r.serverId,
+    ownerGhii: r.ownerGhii,
+    credential: r.credential,
+    expiresAt: r.expiresAt ?? null,
+    status: r.status === 'needs_reauth' ? 'needs_reauth' : 'active',
+    lastError: r.lastError ?? null,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}

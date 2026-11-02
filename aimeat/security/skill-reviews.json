@@ -372,7 +372,7 @@
       "digest": "sha256:110b77df9abf93ec33aacbf7"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -383,11 +383,11 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:1a94d6abd62d9433cb558256",
+      "digest": "sha256:6eb066c8e0e9dce456dea917",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/services/mcp-client/grants.ts",
@@ -395,7 +395,7 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:fdaa6bd5ac02571584d225d0"
+      "digest": "sha256:df56fadd7b24d98f05034e7a"
     },
     "node:aimeat-workflow-decisions": {
       "reviewedOn": "2026-10-27",
@@ -770,16 +770,16 @@
       "aimeat/src/services/memory-bin.ts": "9fa3d0c47be934d5",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
-      "aimeat/src/services/owner-erasure.ts": "c6d160d686be395a",
+      "aimeat/src/services/owner-erasure.ts": "bf2dbc341811d895",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
     },
     "node:aimeat-mcp-servers": {
-      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "095fdb4fbeb06409",
+      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "7f409acd49235519",
       "aimeat/src/services/mcp-client/grants.ts": "1652c22f0c53e827",
-      "aimeat/src/services/mcp-client/registry.ts": "518aaf36f74a6637",
-      "aimeat/src/services/mcp-client/invoke.ts": "2c19276ca1c8fdd1",
-      "aimeat/src/mcp/mcp-proxy.ts": "9b3ef4f1de84a597"
+      "aimeat/src/services/mcp-client/registry.ts": "23261551eeda798b",
+      "aimeat/src/services/mcp-client/invoke.ts": "666ff816b1baab9b",
+      "aimeat/src/mcp/mcp-proxy.ts": "0b44cc6aee747348"
     },
     "node:aimeat-workflow-decisions": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",

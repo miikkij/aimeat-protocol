@@ -25,15 +25,20 @@
  *   - setMcpServerToolCache — the cached tool list plus its hash
  *   - claimMcpRefresh / releaseMcpRefresh — the single-flight pair
  *   - deleteMcpServer / deleteMcpServersByOwner
+ *   - get/list/put/setStatus/claim/release/delete McpUserCredential — a person's own sign-in on a
+ *     shared server
  * @usage
  *   import type { McpServerRepository } from './repositories/mcp-server.repository.js';
  * @version-history
+ *   v1.2.0 — 2026-11-02 — A person's own sign-in on a shared server (McpUserCredential), and
+ *     deleteMcpServer removes those sign-ins with the server.
  *   v1.1.0 — 2026-11-01 — updateMcpServerCredential takes the auth mode, so a sign-in hangs an OAuth
  *     credential on a row that was attached as `none` and the token is then sent.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import type {
   McpServerRecord, McpServerStatus, McpOwnership, RemoteToolSnapshot, McpAuthMode,
+  McpUserCredentialRecord,
 } from '../../models/mcp-server-schemas.js';
 
 /** Narrowing for a listing. All fields optional; omitted means "any". */
@@ -129,4 +134,37 @@ export interface McpServerRepository {
    * that name the previous person's access to somebody's issue tracker.
    */
   deleteMcpServersByOwner(ownerGhii: string): Promise<number>;
+
+  // ── A person's own sign-in on a shared server (auth per-user-oauth) ──────────────────────────
+  //
+  // The same three contracts as above: no authorization here, ciphertext in and out, and the claim
+  // is the single-flight gate, per person. deleteMcpServer removes a server's personal sign-ins
+  // with it, so a detached server leaves no token behind.
+
+  getMcpUserCredential(serverId: string, ownerGhii: string): Promise<McpUserCredentialRecord | undefined>;
+
+  /** Every sign-in one person holds, for the listing that says which servers they signed in to. */
+  listMcpUserCredentials(ownerGhii: string): Promise<McpUserCredentialRecord[]>;
+
+  /**
+   * Store a person's credential after a sign-in or a renewal. Takes ciphertext. Inserts or replaces,
+   * and sets status back to `active` with no error, for the reason updateMcpServerCredential does.
+   */
+  putMcpUserCredential(
+    serverId: string, ownerGhii: string, credential: string, expiresAt: string | null,
+  ): Promise<void>;
+
+  /** Park one person's sign-in (`needs_reauth`) with a reason they can act on. */
+  setMcpUserCredentialStatus(
+    serverId: string, ownerGhii: string, status: 'active' | 'needs_reauth', error?: string | null,
+  ): Promise<void>;
+
+  claimMcpUserRefresh(serverId: string, ownerGhii: string, staleAfterMs: number): Promise<boolean>;
+  releaseMcpUserRefresh(serverId: string, ownerGhii: string): Promise<void>;
+
+  /** One person signs out of one server. True when there was a sign-in to remove. */
+  deleteMcpUserCredential(serverId: string, ownerGhii: string): Promise<boolean>;
+
+  /** Account erasure: every personal sign-in one person holds. Returns how many went. */
+  deleteMcpUserCredentialsByOwner(ownerGhii: string): Promise<number>;
 }

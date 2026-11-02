@@ -12,6 +12,8 @@
  * @structure mcpServerMethods — attach · read · patch · credential · tool cache · refresh claim
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-11-02 — A person's own sign-in on a shared server (mcp_user_credentials); deleting
+ *     a server deletes its personal sign-ins.
  *   v1.1.0 — 2026-11-01 — updateMcpServerCredential writes the auth mode when given.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
@@ -19,7 +21,7 @@ import type { McpServerQuery, McpServerPatch } from '../../../repositories/mcp-s
 import type {
   McpServerRecord, McpServerStatus, McpOwnership, McpTransport,
   McpAuthMode, McpCallerIdentity, McpExposure, RemoteToolSnapshot,
-  McpAvailability, McpPrice,
+  McpAvailability, McpPrice, McpUserCredentialRecord,
 } from '../../../../models/mcp-server-schemas.js';
 import type Database from 'better-sqlite3';
 
@@ -208,6 +210,9 @@ export const mcpServerMethods = {
   },
 
   async deleteMcpServer(this: HasDb, id: string): Promise<void> {
+    // The personal sign-ins go with the server: a token for a server nobody can reach any more is a
+    // token nobody can see or remove.
+    this.db.prepare('DELETE FROM mcp_user_credentials WHERE serverId = ?').run(id);
     this.db.prepare('DELETE FROM mcp_servers WHERE id = ?').run(id);
   },
 
@@ -215,4 +220,79 @@ export const mcpServerMethods = {
     const res = this.db.prepare('DELETE FROM mcp_servers WHERE ownerGhii = ?').run(ownerGhii);
     return res.changes;
   },
+
+  async getMcpUserCredential(
+    this: HasDb, serverId: string, ownerGhii: string,
+  ): Promise<McpUserCredentialRecord | undefined> {
+    const r = this.db.prepare('SELECT * FROM mcp_user_credentials WHERE serverId = ? AND ownerGhii = ?')
+      .get(serverId, ownerGhii) as Row | undefined;
+    return r ? toMcpUserCredential(r) : undefined;
+  },
+
+  async listMcpUserCredentials(this: HasDb, ownerGhii: string): Promise<McpUserCredentialRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM mcp_user_credentials WHERE ownerGhii = ? ORDER BY createdAt')
+      .all(ownerGhii) as Row[];
+    return rows.map(toMcpUserCredential);
+  },
+
+  async putMcpUserCredential(
+    this: HasDb, serverId: string, ownerGhii: string, credential: string, expiresAt: string | null,
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO mcp_user_credentials (serverId, ownerGhii, credential, expiresAt, status, lastError, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, 'active', NULL, ?, ?)
+      ON CONFLICT(serverId, ownerGhii) DO UPDATE SET
+        credential = excluded.credential, expiresAt = excluded.expiresAt,
+        status = 'active', lastError = NULL, updatedAt = excluded.updatedAt
+    `).run(serverId, ownerGhii, credential, expiresAt, now, now);
+  },
+
+  async setMcpUserCredentialStatus(
+    this: HasDb, serverId: string, ownerGhii: string, status: 'active' | 'needs_reauth', error?: string | null,
+  ): Promise<void> {
+    this.db.prepare(
+      'UPDATE mcp_user_credentials SET status = ?, lastError = ?, updatedAt = ? WHERE serverId = ? AND ownerGhii = ?',
+    ).run(status, error ?? null, new Date().toISOString(), serverId, ownerGhii);
+  },
+
+  async claimMcpUserRefresh(
+    this: HasDb, serverId: string, ownerGhii: string, staleAfterMs: number,
+  ): Promise<boolean> {
+    const now = Date.now();
+    // One conditional UPDATE, as claimMcpRefresh: `changes` is the answer.
+    const res = this.db.prepare(`
+      UPDATE mcp_user_credentials SET refreshClaimedAt = ?
+      WHERE serverId = ? AND ownerGhii = ? AND (refreshClaimedAt IS NULL OR refreshClaimedAt < ?)
+    `).run(new Date(now).toISOString(), serverId, ownerGhii, new Date(now - staleAfterMs).toISOString());
+    return res.changes > 0;
+  },
+
+  async releaseMcpUserRefresh(this: HasDb, serverId: string, ownerGhii: string): Promise<void> {
+    this.db.prepare('UPDATE mcp_user_credentials SET refreshClaimedAt = NULL WHERE serverId = ? AND ownerGhii = ?')
+      .run(serverId, ownerGhii);
+  },
+
+  async deleteMcpUserCredential(this: HasDb, serverId: string, ownerGhii: string): Promise<boolean> {
+    const res = this.db.prepare('DELETE FROM mcp_user_credentials WHERE serverId = ? AND ownerGhii = ?')
+      .run(serverId, ownerGhii);
+    return res.changes > 0;
+  },
+
+  async deleteMcpUserCredentialsByOwner(this: HasDb, ownerGhii: string): Promise<number> {
+    return this.db.prepare('DELETE FROM mcp_user_credentials WHERE ownerGhii = ?').run(ownerGhii).changes;
+  },
 };
+
+function toMcpUserCredential(r: Row): McpUserCredentialRecord {
+  return {
+    serverId: r.serverId as string,
+    ownerGhii: r.ownerGhii as string,
+    credential: r.credential as string,
+    expiresAt: (r.expiresAt as string | null) ?? null,
+    status: r.status === 'needs_reauth' ? 'needs_reauth' : 'active',
+    lastError: (r.lastError as string | null) ?? null,
+    createdAt: r.createdAt as string,
+    updatedAt: r.updatedAt as string,
+  };
+}

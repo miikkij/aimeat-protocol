@@ -1,6 +1,6 @@
 # 13 Apps, agents and endpoints
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit e825e47f6) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page covers the code that runs on behalf of people: apps published on the node, extensions and packages installed into it, the connector on a person's own computer, AI chats that connect over MCP, outside MCP servers the node calls, and the `aimeat-crewai` agent runtime. It is for the security officer and the workstation and network owners. Each section says what runs where, who approves it, and how to remove it.
 
@@ -143,6 +143,8 @@ sequenceDiagram
 |---|---|---|---|
 | A person's own server (an issue tracker, a wiki) | The person, or an agent with `mcp:manage`, which no wildcard carries | `mcp:read` lists, `mcp:use` calls; the node holds the credential and never returns the server's address or credential. `aimeat_mcp_grant_list` shows which agents and apps may use which servers and tools. | `aimeat/src/routes/mcp-servers.ts`, `aimeat/src/tool-catalog/definitions/mcp-proxy.ts` |
 | A node-wide server offered to every account | The operator | `aimeat_mcp_registry_list`, `aimeat_mcp_registry_set`: availability (all owners or an allowlist; an empty allowlist means nobody), on or off | `aimeat/src/tool-catalog/definitions/mcp-proxy.ts` |
+| A group's server | An owner or admin of the organism | Organism membership, or the workspace's roles when it is bound to one workspace | `aimeat/src/services/mcp-client/registry.ts` |
+| A node or group server where each person signs in with their own account (`auth: per-user-oauth`) | The operator (node server) or an organism owner or admin (group server) | The node holds no shared credential for it. Each admitted person signs in at the far side with their own account (OAuth, the round bound to their browser), so the far side's own permissions and audit apply per person. Each sign-in is stored sealed with `AIMEAT_ENCRYPTION_KEY` in its own row, removed by the person's sign-out, by detaching the server and by account erasure. A person who has not signed in is refused (`SIGN_IN_REQUIRED`); one person's failed renewal stops only that person. | `aimeat/src/services/mcp-client/personal-sign-in.ts`, `aimeat/src/services/mcp-client/invoke.ts`, `aimeat/src/services/owner-erasure.ts` |
 | A local `stdio` server (a program on the node's host) | The operator in person | Off by default (`AIMEAT_MCP_STDIO_ENABLED=false`); only commands named whole in `AIMEAT_MCP_STDIO_ALLOWED_COMMANDS` run; both settings need a restart | `aimeat/.env.example` |
 
 Outbound calls to remote servers go through the SSRF guard (`aimeat/src/services/mcp-client/transport.ts`).

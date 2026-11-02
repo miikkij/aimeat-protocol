@@ -25,6 +25,8 @@
  * @structure McpClientPool — acquire · invalidate · eraOf · closeAll · size
  * @usage const client = await pool.acquire(server, credential, identity);
  * @version-history
+ *   v1.4.0 — 2026-11-02 — invalidate takes an identity, so one person's sign-in on a shared server
+ *     drops that person's client only.
  *   v1.3.1 — 2026-10-21 — A failed version probe (SDK EraNegotiationFailed) is answered with one
  *     more connect on the 2025 handshake, instead of failing the call: a single reset socket during
  *     the probe made the server unreachable at once (incident mcp-client-invoke, 2026-10-21).
@@ -165,11 +167,16 @@ export class McpClientPool {
    * side answered 401 and the next call must re-handshake rather than reuse a session it has
    * already rejected.
    */
-  async invalidate(serverId: string): Promise<void> {
+  async invalidate(serverId: string, identity?: string): Promise<void> {
+    // With an identity, only that person's client goes: one person's new or dead sign-in on a shared
+    // server (per-user-oauth) is no reason to drop everybody else's session.
+    const match = (key: string): boolean => identity === undefined
+      ? key.startsWith(`${serverId}::`)
+      : key === this.key(serverId, identity);
     // An edited record or a replaced credential may reach a different server: ask its era again.
-    for (const key of this.priors.keys()) if (key.startsWith(`${serverId}::`)) this.priors.delete(key);
+    for (const key of this.priors.keys()) if (match(key)) this.priors.delete(key);
     for (const [key, entry] of this.entries) {
-      if (!key.startsWith(`${serverId}::`)) continue;
+      if (!match(key)) continue;
       this.entries.delete(key);
       // eslint-disable-next-line aimeat/no-silent-catch -- A close that fails is a socket the far side already dropped, which is the state we were asking for. The entry is out of the map before this runs, so there is nothing left to fix and nothing an operator could act on.
       await entry.client.close().catch(() => {});

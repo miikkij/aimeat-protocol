@@ -30,6 +30,11 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-11-02 — Personal sign-in on a shared server: aimeat_mcp_attach takes `auth` ('oauth' to sign in
+ *     afterwards, 'per-user-oauth' on a group's server so each member signs in with their own
+ *     account); aimeat_mcp_authorize starts the caller's own sign-in on such a server; the new
+ *     aimeat_mcp_sign_out removes it. aimeat_mcp_list, _tools, _call and the grant tools pass config,
+ *     so a group's server is found at all (it was missing from every one of them).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — aimeat_mcp_grant_set stores a grant on a node-wide server (the access check now reads
@@ -73,8 +78,9 @@ import {
 import { emitChange } from '../services/event-bus.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import {
-  toPublicMcpServer, type McpTransport, type McpServerCredential,
+  toPublicMcpServer, takesPersonalSignIn, type McpTransport, type McpServerCredential,
 } from '../models/mcp-server-schemas.js';
+import { signOutPersonal } from '../services/mcp-client/personal-sign-in.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -114,13 +120,13 @@ export function registerMcpProxyTools(
   mcp.registerTool('aimeat_mcp_list', { description: descriptionFor('aimeat_mcp_list'),
     inputSchema: zodShapeFor('aimeat_mcp_list'),
     annotations: annotationsFor('aimeat_mcp_list') },
-    async (): Promise<TextResult> => ok({ servers: await listUsableServers(storage, ownerGhii()) }));
+    async (): Promise<TextResult> => ok({ servers: await listUsableServers(storage, ownerGhii(), config) }));
 
   mcp.registerTool('aimeat_mcp_tools', { description: descriptionFor('aimeat_mcp_tools'),
     inputSchema: zodShapeFor('aimeat_mcp_tools'),
     annotations: annotationsFor('aimeat_mcp_tools') },
     async ({ server, refresh }): Promise<TextResult> => {
-      const row = await requireUsableServer(storage, ownerGhii(), server);
+      const row = await requireUsableServer(storage, ownerGhii(), server, config);
       if (!row) return notFound(server);
 
       // The cache is the normal answer. Asking the far side on every list would make this tool as
@@ -129,7 +135,8 @@ export function registerMcpProxyTools(
       if (!refresh && row.toolCache.length) {
         return ok({ server: row.slug, tools: row.toolCache, listed_at: row.lastListedAt });
       }
-      const listed = await listRemoteTools(storage, config, row);
+      // A server each person signs in to is asked with this person's own sign-in.
+      const listed = await listRemoteTools(storage, config, row, takesPersonalSignIn(row) ? ownerGhii() : 'node');
       if (!listed.ok) return fail(listed.message);
       return ok({ server: row.slug, tools: listed.tools, listed_at: new Date().toISOString() });
     });
@@ -138,7 +145,7 @@ export function registerMcpProxyTools(
     inputSchema: zodShapeFor('aimeat_mcp_call'),
     annotations: annotationsFor('aimeat_mcp_call') },
     async ({ server, tool, arguments: args }): Promise<TextResult> => {
-      const row = await requireUsableServer(storage, ownerGhii(), server);
+      const row = await requireUsableServer(storage, ownerGhii(), server, config);
       if (!row) return notFound(server);
 
       const result = await callRemoteTool({
@@ -166,10 +173,16 @@ export function registerMcpProxyTools(
   mcp.registerTool('aimeat_mcp_attach', { description: descriptionFor('aimeat_mcp_attach'),
     inputSchema: zodShapeFor('aimeat_mcp_attach'),
     annotations: annotationsFor('aimeat_mcp_attach') },
-    async ({ name, url, peer, organism_id: group, ws, title, description, transport, token, header }): Promise<TextResult> => {
+    async ({ name, url, peer, organism_id: group, ws, title, description, transport, token, header, auth }): Promise<TextResult> => {
       if (!url && !peer) {
         return fail('Give either the server address, or the id of a peer node as peer.');
       }
+      // Each member signing in with their own account belongs to a server many people share.
+      if (auth === 'per-user-oauth' && !group) {
+        return toolError('INVALID_INPUT', "auth 'per-user-oauth' is for a group's server (organism_id): on your own server you are the only one who signs in, so use auth 'oauth'.");
+      }
+      const signIn = auth === 'per-user-oauth' ? { personalSignIn: true as const }
+        : auth === 'oauth' ? { deferCredential: true as const } : {};
       const t: McpTransport = peer
         ? { kind: 'aimeat', peerNodeId: peer }
         : { kind: transport === 'sse' ? 'sse' : 'http', url: url as string };
@@ -194,6 +207,7 @@ export function registerMcpProxyTools(
           ...(description ? { description } : {}),
           transport: t,
           ...(credential ? { credential } : {}),
+          ...signIn,
         })
         : await attachMcpServer({
           storage, config,
@@ -204,12 +218,17 @@ export function registerMcpProxyTools(
           ...(description ? { description } : {}),
           transport: t,
           ...(credential ? { credential } : {}),
+          ...signIn,
         });
       if (!result.ok) return fail(result.message);
       return ok({
         server: result.server,
         tools: result.tools,
-        next: `Call them with aimeat_mcp_call, naming server "${result.server.slug}".`,
+        next: auth === 'per-user-oauth'
+          ? `Each member signs in with their own account: aimeat_mcp_authorize with server "${result.server.id}" gives the address for the person you act for.`
+          : auth === 'oauth'
+            ? `Sign in to it next: aimeat_mcp_authorize with server "${result.server.slug}" gives the address to hand over.`
+            : `Call them with aimeat_mcp_call, naming server "${result.server.slug}".`,
       });
     });
 
@@ -217,14 +236,19 @@ export function registerMcpProxyTools(
     inputSchema: zodShapeFor('aimeat_mcp_authorize'),
     annotations: annotationsFor('aimeat_mcp_authorize') },
     async ({ server, return_url }): Promise<TextResult> => {
-      // A sign-in writes the credential onto the row, so it is a change like the two tools below.
-      const row = await manageable(server);
+      // On a shared server each person signs in to, the sign-in is the person's own and asks the
+      // USE question, as POST /v1/mcp-servers/:id/authorize does.
+      const usable = await requireUsableServer(storage, ownerGhii(), server, config);
+      const personal = !!usable && takesPersonalSignIn(usable);
+      // Anywhere else a sign-in writes the credential onto the row, so it is a change like the two tools below.
+      const row = personal ? usable : await manageable(server);
       if (!row) return notManageable(server);
 
       const started = await startMcpOAuth({
         storage, config, server: row, ownerGhii: ownerGhii(),
         startedBy: getAgentGaii(),
         ...(return_url ? { returnUrl: return_url } : {}),
+        ...(personal ? { personal: true } : {}),
       });
       if (!started.ok) return fail(started.message);
       // An empty address means the far side needed nobody: a client already registered with a
@@ -238,9 +262,30 @@ export function registerMcpProxyTools(
         // owner signs in there and confirms it in their own browser (secrets audit 2026-10-09).
         authorize_url: started.approvalUrl,
         owner_confirms: true,
+        personal,
         next: 'Give this address to your owner and wait. They sign in to this node, confirm, and sign in at '
           + 'the server; nothing here can approve it for them, and fetching it yourself does nothing. '
+          + (personal ? 'They sign in with their OWN account there, which only they and their agents will use. ' : '')
           + 'Say in one sentence what it is for.',
+      });
+    });
+
+  mcp.registerTool('aimeat_mcp_sign_out', { description: descriptionFor('aimeat_mcp_sign_out'),
+    inputSchema: zodShapeFor('aimeat_mcp_sign_out'),
+    annotations: annotationsFor('aimeat_mcp_sign_out') },
+    async ({ server }): Promise<TextResult> => {
+      const row = await requireUsableServer(storage, ownerGhii(), server, config);
+      if (!row) return notFound(server);
+      if (!takesPersonalSignIn(row)) {
+        return toolError('NOT_PERSONAL', `Nobody signs in to "${row.slug}" with their own account, so there is nothing of yours to remove.`);
+      }
+      // The same service DELETE /v1/mcp-servers/:id/sign-in calls.
+      if (!(await signOutPersonal(storage, row, ownerGhii()))) {
+        return toolError('NOT_SIGNED_IN', `You are not signed in to "${row.slug}".`);
+      }
+      return ok({
+        signed_out: row.slug,
+        note: 'The sign-in stored here is gone. Access granted at the far side is still the person\'s to revoke there.',
       });
     });
 
@@ -325,7 +370,7 @@ export function registerMcpProxyTools(
     inputSchema: zodShapeFor('aimeat_mcp_grant_set'),
     annotations: annotationsFor('aimeat_mcp_grant_set') },
     async ({ server, grantee, tools, locked_input, call_cap, expires, read_only }): Promise<TextResult> => {
-      const row = await requireUsableServer(storage, ownerGhii(), server);
+      const row = await requireUsableServer(storage, ownerGhii(), server, config);
       if (!row) return notFound(server);
       // The REST twin's refusals: somebody else's personal server (feature-list audit #12), and an end
       // date that is not a date, which was stored as given and never ran out (QA audit F01b-02). On a
@@ -357,7 +402,7 @@ export function registerMcpProxyTools(
     inputSchema: zodShapeFor('aimeat_mcp_grant_revoke'),
     annotations: annotationsFor('aimeat_mcp_grant_revoke') },
     async ({ server, grantee }): Promise<TextResult> => {
-      const row = await requireUsableServer(storage, ownerGhii(), server);
+      const row = await requireUsableServer(storage, ownerGhii(), server, config);
       if (!row) return notFound(server);
       const removed = await removeMcpGrant(storage, ownerGhii(), row.slug, grantee);
       if (!removed) return fail(`There is no narrowing for "${grantee}" on "${row.slug}".`);

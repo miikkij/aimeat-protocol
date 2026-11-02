@@ -21397,7 +21397,14 @@
       "mcpAuthToken": "Me dio un token",
       "mcpAuthOauth": "Inicio sesión en él",
       "mcpNoSignInNeeded": "Ese servidor no necesitaba inicio de sesión. Ya está listo.",
-      "mcpAuthFailed": "No se ha podido iniciar el acceso"
+      "mcpAuthFailed": "No se ha podido iniciar el acceso",
+      "mcpSignInOwn": "Iniciar sesión con tu propia cuenta",
+      "mcpPersonalNeedsSignIn": "cada persona inicia sesión con su propia cuenta",
+      "mcpPersonalSignedIn": "sesión iniciada con tu propia cuenta",
+      "mcpPersonalStopped": "tu sesión dejó de funcionar",
+      "mcpSignOut": "Cerrar sesión",
+      "mcpSignedOut": "Has cerrado la sesión. El acceso que diste en el otro servicio sigue siendo tuyo y puedes revocarlo allí.",
+      "mcpSignOutFailed": "No se ha podido cerrar la sesión"
     },
     "nodes": {
       "title": "Tus propios servidores",

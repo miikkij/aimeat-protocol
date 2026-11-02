@@ -18,12 +18,15 @@
  *   expiry), services/mcp-client/registry.ts (node and group servers, availability),
  *   services/mcp-client/invoke.ts (refusal codes and statuses, the money price refusal),
  *   services/mcp-client/oauth.ts (the sign-in round), mcp/remote-tools.ts (flatten),
- *   services/mcp-client/stdio-policy.ts (stdio servers). A group server is not reachable through the
- *   MCP tools today (wish-a-group-s-attached-mcp-server-is-listed-but-cannot-be-called); the skill
- *   says so, and the line goes when that is fixed.
+ *   services/mcp-client/stdio-policy.ts (stdio servers), services/mcp-client/personal-sign-in.ts
+ *   (each person's own sign-in on a shared server).
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-11-02 — Section 1: aimeat_mcp_attach takes auth "oauth". Section 4: a group's server is
+ *     reached through the MCP tools by its id, and its OAuth sign-in finishes; a shared server where
+ *     each person signs in with their own account (auth per-user-oauth), aimeat_mcp_sign_out.
+ *     Section 5: SIGN_IN_REQUIRED.
  *   2026-11-01 — Section 1: a server attached with OAuth before 2026-11-01 whose calls are refused
  *     after a finished sign-in is repaired by signing in once more (services/mcp-client/oauth.ts).
  *   2026-10-16 — Section 3: a grant on a server the operator offers narrows the person's own agents and apps, and another person's grant there never touches them (QA audit F01b-02).
@@ -85,8 +88,8 @@ now, not later as a server that never answers. A name that already exists is ref
 duplicated. Addresses that resolve to private or internal networks are refused.
 
 **A server that uses OAuth sign-in** (the person signs in at the far side instead of handing over a
-token) is attached through \`POST /v1/mcp-servers\` with \`auth: "oauth"\`, or from the MCP page.
-\`aimeat_mcp_attach\` has no OAuth input today. Then:
+token) is attached with \`aimeat_mcp_attach\` \`auth: "oauth"\` (or \`POST /v1/mcp-servers\` with the
+same, or from the MCP page). Then:
 
 1. \`aimeat_mcp_authorize\` with the server's name. It returns an address on this node.
 2. Give the address to the person and say in one sentence what it is for. They open it signed in to
@@ -154,10 +157,17 @@ The person in their own session, on their own server, needs no grant.
   them on in the node's configuration and named the allowed commands.
 - **A group's server.** An owner or admin of an organism attaches a server for the group with
   \`organism_id\` (and \`ws\` to bind it to one workspace, where the workspace roles decide: a
-  contributor may call, a viewer only sees it). Today a group server is listed in
-  \`GET /v1/mcp-servers\` and reached through a published capability, but \`aimeat_mcp_list\`,
-  \`aimeat_mcp_tools\` and \`aimeat_mcp_call\` do not find it, and an OAuth sign-in for it cannot
-  finish. Say so rather than retrying.
+  contributor may call, a viewer only sees it). Name a group's server by its **id** from
+  \`aimeat_mcp_list\`; its short name finds it only where it is the person's own or the node's.
+- **Each person with their own account.** For a team tool everybody already has an account on
+  (Jira, Confluence, a company wiki), attach the group's server with \`auth: "per-user-oauth"\`; the
+  operator does the same for a node server with \`POST /v1/mcp-servers/node\`. The group then holds
+  no token: each member signs in with their OWN account at the far side, so its own permissions and
+  its audit trail apply to each person. \`aimeat_mcp_list\` shows \`personalSignIn\` on such a server,
+  with \`signedIn\` for the person you act for. Until they sign in, a call answers 403
+  \`SIGN_IN_REQUIRED\`: run \`aimeat_mcp_authorize\` with the server and hand the address to the
+  person (anyone the server admits may; the answer says \`personal: true\`). One person's expired
+  sign-in stops only that person. \`aimeat_mcp_sign_out\` removes their sign-in and nobody else's.
 - **Another AIMEAT node.** Attach with \`peer\` (the peer node's id) instead of \`url\`. The address is
   looked up on every call, so the link ends when the peering ends, and the peering must allow routing.
 
@@ -169,6 +179,7 @@ The person in their own session, on their own server, needs no grant.
 | 403, server switched off | the person or the operator switched it off | ask whether to switch it on (\`aimeat_mcp_update\` \`enabled: true\`) |
 | \`PRICE_UNSUPPORTED\` (402) | an operator's server with a price | tell the person; the operator decides |
 | needs a new sign-in | the OAuth sign-in expired or was withdrawn | \`aimeat_mcp_authorize\`, hand the address over |
+| \`SIGN_IN_REQUIRED\` (403) | a shared server where each person signs in with their own account, and this person has not, or their sign-in stopped working | \`aimeat_mcp_authorize\`, hand the address to that person |
 | 502 | the far server failed or did not answer in time | retry once later; then tell the person which server |
 | 503 \`NO_ENCRYPTION_KEY\`, \`PEER_UNKNOWN\`, \`PEER_NOT_ROUTABLE\` | the node's configuration or the peering | send it to the operator (\`support@operators\`) |
 | 508 | the call came back round through other nodes | the servers point at each other; tell the person |

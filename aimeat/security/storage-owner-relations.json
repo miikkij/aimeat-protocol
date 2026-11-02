@@ -80,6 +80,19 @@
       "verification": "source-reviewed",
       "decision": "existing-contract"
     },
+    "McpUserCredential.ownerGhii": {
+      "role": "ownership",
+      "current": "eraseOwner calls deleteMcpUserCredentialsByOwner (step mcp_user_credentials); deleteMcpServer removes a server's personal sign-ins with it.",
+      "reason": "Each row is one person's live sign-in to a shared server; it cannot pass to a new registrant of the same name, and the shared server itself is the node's or the organism's.",
+      "evidence": [
+        "src/services/owner-erasure.ts",
+        "src/storage/providers/postgres-kysely/methods/mcp-servers.ts",
+        "src/storage/providers/sqlite/methods/mcp-servers.ts"
+      ],
+      "test": "test/unit/mcp-personal-sign-in.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
     "McpServer.createdBy": {
       "role": "authorship",
       "current": "Kept, with the column rewritten to the erasure's pseudonym by the owner cascade on both providers (src/storage/erased-account-records.ts, action pseudonymise), so the next holder of the name reads none of it.",

@@ -25,6 +25,7 @@
  *   - Phase 5d: the node's own server — an ordinary owner uses it, and cannot change it on any door
  *   - Phase 5e: a borrowed server, a borrowed binding and a borrowed permission, on a far side of
  *     its own that records what it was asked to do
+ *   - Phase 5f: a node server each person signs in to with their own account
  *   - Phase 6: a local process, refused because this node does not run them
  *   - Phase 7: off and gone — disable stops it, detach removes it
  *
@@ -33,6 +34,10 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-11-02 — Phase 5f: a node server each person signs in to with their own account (auth
+ *     per-user-oauth): no token on the row, 403 SIGN_IN_REQUIRED before signing in, the call reaches
+ *     the far side after, another owner stays refused, an owner it does not admit gets 404 on
+ *     authorize, and signing out removes only that owner's sign-in.
  *   2026-11-01 — The OAuth far side serves an MCP endpoint that answers only the token it issued, and
  *     the confirmed sign-in lists its tools: a row attached as `none` kept the token and never sent it.
  *   2026-10-31 — Over https a sign-in round's cookie is one a same-site page cannot write: the binding
@@ -2143,6 +2148,117 @@ await test('the victim reaches their own server through their own tool, free and
     `the far side saw another credential: ${JSON.stringify(mine.map((c) => c.authorization))}`);
   assert(!victimCalls.some((c) => JSON.stringify(c.args).includes('attacker') || JSON.stringify(c.args).includes('borrowed')),
     `the far side ran something the attacker chose: ${JSON.stringify(victimCalls)}`);
+});
+
+// ─── Phase 5f: a node server each person signs in to with their own account ───
+// wish-henkil-kohtainen-kirjautuminen-jaettuun-mcp-palvelimeen. Until 2026-11-02 a shared server
+// held one credential and everyone it admitted spent it, so the far side saw one person.
+console.log('\nPhase 5f — A shared server, each person with their own sign-in');
+
+/** Start a sign-in as `token`'s browser does, and finish it the way the far side sends the browser back. */
+async function personalSignIn(server: string, token: string): Promise<{ started: any; finished: number }> {
+  const res = await fetch(`${BASE}/v1/mcp-servers/${server}/authorize`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...BROWSER_START, Authorization: `Bearer ${token}` }, body: '{}',
+  });
+  const started = await res.json() as any;
+  assert(res.status === 200, `authorize: ${res.status}: ${JSON.stringify(started)}`);
+  const back = await fetch(`${BASE}/v1/mcp-servers/callback?state=${encodeURIComponent(started.data.state)}&code=e2e-code`, {
+    redirect: 'manual', headers: { Cookie: roundCookie(res) },
+  });
+  await back.arrayBuffer();
+  return { started: started.data, finished: back.status };
+}
+
+let personalId = '';
+await test('the operator attaches a server everybody signs in to themselves; it holds no token', async () => {
+  const attached = await json('/v1/mcp-servers/node', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'teamjira', url: `${OAUTH_BASE}/mcp`, auth: 'per-user-oauth', availability: 'all-owners' }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}: ${JSON.stringify(attached.body)}`);
+  personalId = attached.body.data.server.id;
+  const row = await storedServer(personalId);
+  assert(row.auth === 'per-user-oauth' && !row.credential, `the row: auth ${row.auth}, credential ${row.credential ? 'set' : 'none'}`);
+});
+
+await test('an admitted owner who has not signed in is refused 403 SIGN_IN_REQUIRED, and the listing says so', async () => {
+  const called = await json('/v1/mcp-servers/teamjira/call', {
+    method: 'POST', headers: plainAuth(), body: JSON.stringify({ tool: 'whoami', arguments: {} }),
+  });
+  assert(called.status === 403 && called.body.error?.code === 'SIGN_IN_REQUIRED',
+    `before signing in: ${called.status} ${JSON.stringify(called.body.error)}`);
+  const listed = await json('/v1/mcp-servers', { headers: plainAuth() });
+  const entry = (listed.body.data.servers as any[]).find((s) => s.slug === 'teamjira');
+  assert(entry?.personalSignIn?.signedIn === false, `the listing: ${JSON.stringify(entry)}`);
+});
+
+await test('the owner signs in with their own account and the call then reaches the far side', async () => {
+  const { started, finished } = await personalSignIn('teamjira', plain.token);
+  assert(started.personal === true, `the answer did not say personal: ${JSON.stringify(started)}`);
+  assert(finished === 200, `the callback: ${finished}`);
+  const called = await json('/v1/mcp-servers/teamjira/call', {
+    method: 'POST', headers: plainAuth(), body: JSON.stringify({ tool: 'whoami', arguments: {} }),
+  });
+  assert(called.status === 200 && JSON.stringify(called.body.data.content).includes('signed-in'),
+    `after signing in: ${called.status} ${JSON.stringify(called.body.error ?? called.body.data)}`);
+  const row = await storedServer(personalId);
+  assert(!row.credential, 'the sign-in landed on the shared row');
+  const listed = await json('/v1/mcp-servers', { headers: plainAuth() });
+  const entry = (listed.body.data.servers as any[]).find((s) => s.slug === 'teamjira');
+  assert(entry?.personalSignIn?.signedIn === true && entry.personalSignIn.status === 'active', `the listing: ${JSON.stringify(entry)}`);
+});
+
+await test('another admitted owner is still refused: one person\'s sign-in is nobody else\'s', async () => {
+  const called = await json('/v1/mcp-servers/teamjira/call', {
+    method: 'POST', headers: strangerAuth(), body: JSON.stringify({ tool: 'whoami', arguments: {} }),
+  });
+  assert(called.status === 403 && called.body.error?.code === 'SIGN_IN_REQUIRED',
+    `the other owner: ${called.status} ${JSON.stringify(called.body.error)}`);
+});
+
+await test('an owner the server does not admit cannot start a sign-in on it', async () => {
+  const closed = await json('/v1/mcp-servers/node', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'closedjira', url: `${OAUTH_BASE}/mcp`, auth: 'per-user-oauth', availability: 'allowlist', allowlist: [] }),
+  });
+  assert(closed.status === 201, `attach: ${closed.status}`);
+  const authorized = await json('/v1/mcp-servers/closedjira/authorize', { method: 'POST', headers: plainAuth(), body: '{}' });
+  assert(authorized.status === 404, `expected 404, got ${authorized.status}`);
+  const gone = await json(`/v1/mcp-servers/node/${closed.body.data.server.id}`, { method: 'DELETE', headers: ownerAuth() });
+  assert(gone.status === 200, `clean up: ${gone.status}`);
+});
+
+await test('over MCP: an agent starts its owner\'s own sign-in, and aimeat_mcp_sign_out removes it', async () => {
+  const agent = await agentWithScopes(plain, 'mcppersonal', ['mcp:read', 'mcp:use', 'mcp:manage']);
+  const session = await openMcpSession(agent.token);
+  const started = await mcpTool(session, 'aimeat_mcp_authorize', { server: 'teamjira' });
+  assert(!started.isError && JSON.parse(started.text).personal === true && JSON.parse(started.text).owner_confirms === true,
+    `authorize over MCP: ${started.text}`);
+  const out = await mcpTool(session, 'aimeat_mcp_sign_out', { server: 'teamjira' });
+  assert(!out.isError && JSON.parse(out.text).signed_out === 'teamjira', `sign out over MCP: ${out.text}`);
+  const again = await mcpTool(session, 'aimeat_mcp_sign_out', { server: 'teamjira' });
+  assert(again.isError && again.text.startsWith('NOT_SIGNED_IN'), `second sign out over MCP: ${again.text}`);
+  const notPersonal = await mcpTool(session, 'aimeat_mcp_sign_out', { server: 'housewide' });
+  assert(notPersonal.isError && notPersonal.text.startsWith('NOT_PERSONAL'), `housewide over MCP: ${notPersonal.text}`);
+  // Signed in again in the browser, for the REST arm below.
+  const { finished } = await personalSignIn('teamjira', plain.token);
+  assert(finished === 200, `signing in again: ${finished}`);
+});
+
+await test('signing out removes that owner\'s sign-in only, and a second sign-out says there is none', async () => {
+  const out = await json('/v1/mcp-servers/teamjira/sign-in', { method: 'DELETE', headers: plainAuth() });
+  assert(out.status === 200 && out.body.data.signed_out === 'teamjira', `sign out: ${out.status} ${JSON.stringify(out.body)}`);
+  const again = await json('/v1/mcp-servers/teamjira/sign-in', { method: 'DELETE', headers: plainAuth() });
+  assert(again.status === 404 && again.body.error?.code === 'NOT_SIGNED_IN', `second sign out: ${again.status}`);
+  const called = await json('/v1/mcp-servers/teamjira/call', {
+    method: 'POST', headers: plainAuth(), body: JSON.stringify({ tool: 'whoami', arguments: {} }),
+  });
+  assert(called.status === 403, `after signing out: ${called.status}`);
+  // A server with one shared sign-in has nothing personal to remove.
+  const notPersonal = await json('/v1/mcp-servers/housewide/sign-in', { method: 'DELETE', headers: plainAuth() });
+  assert(notPersonal.status === 409 && notPersonal.body.error?.code === 'NOT_PERSONAL', `housewide: ${notPersonal.status}`);
+  const gone = await json(`/v1/mcp-servers/node/${personalId}`, { method: 'DELETE', headers: ownerAuth() });
+  assert(gone.status === 200, `clean up: ${gone.status}`);
 });
 
 // ─── Phase 6: a local process, which this node does not run ───

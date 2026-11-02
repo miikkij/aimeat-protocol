@@ -14,6 +14,7 @@
  *   That is deliberate: a person's UI holds the id it was handed and an agent says "jira", and
  *   making this door pick one would make the two doors disagree about what a valid call looks like.
  * @version-history
+ *   2026-11-02 — aimeat_mcp_attach forwards `auth`; aimeat_mcp_sign_out → DELETE /v1/mcp-servers/:id/sign-in.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -62,6 +63,7 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
                 ...(optionalString(input, 'transport') ? { transport: optionalString(input, 'transport') } : {}),
                 ...(optionalString(input, 'token') ? { token: optionalString(input, 'token') } : {}),
                 ...(optionalString(input, 'header') ? { header: optionalString(input, 'header') } : {}),
+                ...(optionalString(input, 'auth') ? { auth: optionalString(input, 'auth') } : {}),
             };
             const group = optionalString(input, 'organism_id');
             // Both paths are written out as LITERALS rather than picked with a ternary: the gate
@@ -84,6 +86,13 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
             {
                 ...(optionalString(input, 'return_url') ? { return_url: optionalString(input, 'return_url') } : {}),
             },
+        ),
+    },
+    {
+        // → DELETE /v1/mcp-servers/:id/sign-in — the caller's own sign-in on a shared server, nobody else's.
+        name: 'aimeat_mcp_sign_out',
+        handler: ({ client }, input) => client.delete(
+            `/v1/mcp-servers/${encodeURIComponent(requiredString(input, 'server'))}/sign-in`,
         ),
     },
     {

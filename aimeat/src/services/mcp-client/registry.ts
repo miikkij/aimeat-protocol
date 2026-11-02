@@ -28,6 +28,10 @@
  *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   2026-11-02 — attachNodeServer and attachOrganismServer take `personalSignIn`: the row is auth and
+ *     callerIdentity per-user-oauth, holds no credential, starts active and is not probed, since each
+ *     person signs in with their own account. updateMcpServerSettings and detachMcpServer moved to
+ *     registry-settings.ts (re-exported here).
  *   2026-11-01 — A server attached to sign in afterwards (deferCredential) is stored with auth 'oauth',
  *     not 'none', so the token the round stores is sent (models/mcp-server-schemas.ts mcpAuthModeOf).
  *   2026-10-15 — Comment: the node-wide door admits the operator in person and the operator's own agent holding operator:admin (feature-list audit 18).
@@ -64,6 +68,7 @@ import { sealServerRowSecrets } from './transport-secrets.js';
 import { listRemoteTools, type RemoteCallRefusal } from './invoke.js';
 import { selfAddressRefusal } from './hops.js';
 import { mcpClientPool } from './pool.js';
+import { withPersonalSignIn } from './personal-sign-in.js';
 import { recordAccountEvent } from '../account-events.js';
 import { organismOwners } from '../organism-ownership.js';
 import { listWorkspaceMemberRoles } from '../workspace-roles.js';
@@ -93,6 +98,8 @@ export interface AttachInput {
    * address was wrong when it was right. The round hangs the credential on this row.
    */
   deferCredential?: boolean;
+  /** A node or group server each person signs in to with their own account (auth per-user-oauth). */
+  personalSignIn?: boolean;
 }
 
 export type AttachResult =
@@ -323,7 +330,8 @@ export async function listUsableServers(
       if (await organismAdmits(storage, config, s, ownerGhii, false)) group.push(s);
     }
   }
-  return [...mine, ...offered, ...group].map(toPublicMcpServer);
+  // A shared server each person signs in to says whether this one has (personal-sign-in.ts).
+  return withPersonalSignIn(storage, ownerGhii, [...mine, ...offered, ...group].map(toPublicMcpServer));
 }
 
 /**
@@ -412,11 +420,11 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
     createdBy: input.createdBy,
     transport: input.transport,
     auth: mcpAuthModeOf(input),
-    credential: sealed,
-    credentialShape: input.credential?.shape ?? null,
+    credential: input.personalSignIn ? null : sealed,
+    credentialShape: input.personalSignIn ? null : input.credential?.shape ?? null,
     expiresAt: null,
     providerClientId: null,
-    callerIdentity: input.callerIdentity ?? 'node-credential',
+    callerIdentity: input.personalSignIn ? 'per-user-oauth' : input.callerIdentity ?? 'node-credential',
     exposure: input.exposure ?? 'gateway',
     toolCache: [],
     toolCacheHash: '',
@@ -428,7 +436,8 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
     price: priced.price,
     directory: { listed: false, visibility: 'private', tags: [] },
     enabled: true,
-    status: input.deferCredential ? 'needs_reauth' : 'active',
+    // A server each person signs in to is not waiting for anybody in particular: it is ready.
+    status: input.deferCredential && !input.personalSignIn ? 'needs_reauth' : 'active',
     lastOkAt: null,
     lastError: null,
     createdAt: now,
@@ -436,7 +445,8 @@ export async function attachNodeServer(input: Omit<AttachInput, 'ownerGhii'> & {
   };
 
   await storage.createMcpServer(sealServerRowSecrets(row, config));
-  if (input.deferCredential) {
+  // No probe without a credential: the first person's sign-in fills the tool list.
+  if (input.deferCredential || input.personalSignIn) {
     return { ok: true, server: toPublicMcpServer(row), tools: [] };
   }
 
@@ -621,11 +631,11 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
     createdBy: input.createdBy,
     transport: input.transport,
     auth: mcpAuthModeOf(input),
-    credential: sealed,
-    credentialShape: input.credential?.shape ?? null,
+    credential: input.personalSignIn ? null : sealed,
+    credentialShape: input.personalSignIn ? null : input.credential?.shape ?? null,
     expiresAt: null,
     providerClientId: null,
-    callerIdentity: input.callerIdentity ?? 'node-credential',
+    callerIdentity: input.personalSignIn ? 'per-user-oauth' : input.callerIdentity ?? 'node-credential',
     exposure: input.exposure ?? 'gateway',
     toolCache: [],
     toolCacheHash: '',
@@ -636,7 +646,7 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
     price: null,
     directory: { listed: false, visibility: 'private', tags: [] },
     enabled: true,
-    status: input.deferCredential ? 'needs_reauth' : 'active',
+    status: input.deferCredential && !input.personalSignIn ? 'needs_reauth' : 'active',
     lastOkAt: null,
     lastError: null,
     createdAt: now,
@@ -644,7 +654,7 @@ export async function attachOrganismServer(input: Omit<AttachInput, 'ownerGhii'>
   };
 
   await storage.createMcpServer(sealServerRowSecrets(row, config));
-  if (input.deferCredential) return { ok: true, server: toPublicMcpServer(row), tools: [] };
+  if (input.deferCredential || input.personalSignIn) return { ok: true, server: toPublicMcpServer(row), tools: [] };
 
   const probed = await listRemoteTools(storage, config, row);
   if (!probed.ok) return refusalFromProbe(storage, row.id, probed.code, probed.message);
@@ -753,47 +763,5 @@ export async function requireManageableServer(
   return null;
 }
 
-/** What either door may change after a server is attached. Not the slug and not the credential. */
-export interface McpServerSettings {
-  enabled?: boolean;
-  title?: string;
-  description?: string;
-  exposure?: McpExposure;
-}
-
-/**
- * Change a server's settings.
- *
- * ONE IMPLEMENTATION, TWO DOORS. The REST route and aimeat_mcp_update both call this, so the
- * pool invalidation and the change announcement cannot happen on one door and not the other — and
- * a tool that reached `storage.updateMcpServer` directly would be the second implementation this
- * project has fixed the same defect in three times.
- *
- * SWITCHING OFF STOPS IT, rather than marking it for later. A pooled client would keep answering
- * through a server the owner has just switched off, for as long as the idle sweeper takes to
- * notice, and "I turned it off and it kept working" is the worst possible answer to somebody
- * cutting an integration.
- */
-export async function updateMcpServerSettings(
-  storage: Storage, server: McpServerRecord, settings: McpServerSettings,
-): Promise<McpServerRecord> {
-  await storage.updateMcpServer(server.id, settings);
-  if (settings.enabled === false) await mcpClientPool.invalidate(server.id);
-  if (server.ownerGhii) emitChange('mcp-servers', server.ownerGhii);
-  return (await storage.getMcpServer(server.id)) ?? server;
-}
-
-/**
- * Detach a server.
- *
- * The pool is invalidated FIRST. A client left open would keep answering calls through a server the
- * owner has just removed, for as long as the idle sweeper takes to notice — and "I deleted it and
- * it kept working" is the worst possible answer to a person removing an integration.
- */
-export async function detachMcpServer(
-  storage: Storage, server: McpServerRecord,
-): Promise<void> {
-  await mcpClientPool.invalidate(server.id);
-  await storage.deleteMcpServer(server.id);
-  if (server.ownerGhii) emitChange('mcp-servers', server.ownerGhii);
-}
+// Changing and detaching moved to registry-settings.ts at the max-file-lines boundary.
+export { updateMcpServerSettings, detachMcpServer, type McpServerSettings } from './registry-settings.js';

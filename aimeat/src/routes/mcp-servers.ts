@@ -39,6 +39,11 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-11-02 — Personal sign-in on a shared server: POST /node and POST /organism take auth
+ *     'per-user-oauth'; POST /:id/authorize on such a server starts the caller's OWN sign-in for
+ *     anyone the server admits (`personal: true` in the answer); DELETE /:id/sign-in signs the caller
+ *     out; GET /:id/tools lists with the caller's own sign-in. The callback asks the registry again
+ *     whether the round's owner may still sign in there, so a group's server takes a sign-in at all.
  *   2026-10-31 — A sign-in round started in the owner's browser over https is bound with the `__Host-`
  *     cookie, and the callback reads both cookies and clears both (secaudit2026oct31w2 round 10, W2-19).
  *   2026-10-20 — The OAuth callback hands the authorization server's `iss` (RFC 9207) to finishMcpOAuth.
@@ -84,9 +89,10 @@ import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity, ownerGhiiOf, callerPrincipal } from '../utils/gaii.js';
 import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import {
-  toPublicMcpServer,
-  type McpTransport, type McpServerCredential,
+  toPublicMcpServer, takesPersonalSignIn,
+  type McpTransport, type McpServerCredential, type McpServerRecord,
 } from '../models/mcp-server-schemas.js';
+import { signOutPersonal } from '../services/mcp-client/personal-sign-in.js';
 import {
   attachMcpServer, listUsableServers, requireUsableServer, requireManageableServer, detachMcpServer,
   updateMcpServerSettings, attachNodeServer, listNodeServers, setNodeServerPolicy,
@@ -134,7 +140,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.get('/v1/mcp-servers/:id/tools', requireAuth(), requireAnyScope('mcp:read', 'mcp:use'),
     async (req: Request, res: Response) => {
-      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string, config);
       if (!server) return notFound(res);
 
       // The cache is the normal answer: asking the far side on every read would make this route as
@@ -144,7 +150,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
           server: server.slug, tools: server.toolCache, listed_at: server.lastListedAt, cached: true,
         }));
       }
-      const listed = await listRemoteTools(storage, config, server);
+      // A server each person signs in to is asked with this person's own sign-in.
+      const listed = await listRemoteTools(storage, config, server, takesPersonalSignIn(server) ? ownerOf(req) : 'node');
       if (!listed.ok) {
         return res.status(statusForRemoteRefusal(listed.code)).json(error(config.nodeId, listed.code, listed.message));
       }
@@ -157,7 +164,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.post('/v1/mcp-servers/:id/call', requireAuth(), requireScope('mcp:use'),
     async (req: Request, res: Response) => {
-      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string, config);
       if (!server) return notFound(res);
 
       const { tool, arguments: args } = (req.body ?? {}) as {
@@ -231,6 +238,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         transport: { kind: b.transport === 'sse' ? 'sse' : 'http', url },
         ...(credential ? { credential } : {}),
         ...(b.auth === 'oauth' ? { deferCredential: true as const } : {}),
+        // Each member signs in with their own account at the far side; the group holds no token.
+        ...(b.auth === 'per-user-oauth' ? { personalSignIn: true as const } : {}),
       });
 
       if (!result.ok) {
@@ -243,9 +252,10 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       return res.status(201).json(success(config.nodeId, {
         server: result.server,
         tools: result.tools,
-        note: b.ws
+        note: (b.ws
           ? 'Everyone who can contribute to that workspace can use it; viewers can see it is there.'
-          : 'Everyone in that group can use it.',
+          : 'Everyone in that group can use it.')
+          + (b.auth === 'per-user-oauth' ? ' Each of them signs in with their own account first (POST /v1/mcp-servers/{id}/authorize).' : ''),
       }));
     });
 
@@ -330,6 +340,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
           : { kind: b.transport === 'sse' ? 'sse' : 'http', url },
         ...(credential ? { credential } : {}),
         ...(b.auth === 'oauth' ? { deferCredential: true as const } : {}),
+        // Each owner it admits signs in with their own account at the far side; the node holds no token.
+        ...(b.auth === 'per-user-oauth' && !command ? { personalSignIn: true as const } : {}),
         ...(b.availability === 'all-owners' || b.availability === 'allowlist'
           ? { availability: b.availability } : {}),
         ...(Array.isArray(b.allowlist)
@@ -409,7 +421,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.put('/v1/mcp-servers/:id/grants', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string, config);
       if (!server) return notFound(res);
       // A grant on somebody else's personal server is refused, not stored. On a node-wide server the
       // grant is stored under this owner and narrows this owner's own agents and apps (QA audit F01b-02).
@@ -469,7 +481,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.delete('/v1/mcp-servers/:id/grants/:grantee', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string, config);
       if (!server) return notFound(res);
 
       const removed = await removeMcpGrant(
@@ -489,8 +501,12 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.post('/v1/mcp-servers/:id/authorize', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      // A sign-in writes the credential onto the row, so it is a change and asks the manage question.
-      const server = await manageable(req);
+      // On a shared server each person signs in to, the sign-in is the caller's own and lands on
+      // them, so it asks the USE question: everyone the server admits signs in for themselves.
+      const usable = await requireUsableServer(storage, ownerOf(req), req.params.id as string, config);
+      const personal = !!usable && takesPersonalSignIn(usable);
+      // Anywhere else a sign-in writes the credential onto the row, so it asks the manage question.
+      const server = personal ? usable : await manageable(req);
       if (!server) return notFound(res);
 
       const b = (req.body ?? {}) as Record<string, unknown>;
@@ -504,6 +520,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         startedBy: callerPrincipal(req.auth!, config.nodeId),
         ...(typeof b.return_url === 'string' ? { returnUrl: b.return_url } : {}),
         ...(inBrowser ? browserRoundBinding(req, res, MCP_CALLBACK_PATH) : {}),
+        ...(personal ? { personal: true } : {}),
       });
       if (!started.ok) {
         const status = started.code === 'NO_ENCRYPTION_KEY' ? 503
@@ -517,6 +534,30 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         state: started.state,
         needs_person: started.authorizeUrl !== '',
         owner_confirms: started.authorizeUrl !== '' && !inBrowser,
+        // The sign-in is this person's own account at the far side, not one the group shares.
+        personal,
+      }));
+    });
+
+  /**
+   * Sign out of a shared server each person signs in to. Only the caller's own sign-in goes; the
+   * server, and everybody else's sign-in on it, stay as they are.
+   */
+  router.delete('/v1/mcp-servers/:id/sign-in', requireAuth(), requireScope('mcp:manage'),
+    async (req: Request, res: Response) => {
+      const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string, config);
+      if (!server) return notFound(res);
+      if (!takesPersonalSignIn(server)) {
+        return res.status(409).json(error(config.nodeId, 'NOT_PERSONAL',
+          `Nobody signs in to "${server.slug}" with their own account, so there is nothing of yours to remove.`));
+      }
+      const removed = await signOutPersonal(storage, server, ownerOf(req));
+      if (!removed) {
+        return res.status(404).json(error(config.nodeId, 'NOT_SIGNED_IN', `You are not signed in to "${server.slug}".`));
+      }
+      return res.json(success(config.nodeId, {
+        signed_out: server.slug,
+        note: 'The sign-in stored here is gone. Access you granted at the far side is still yours to revoke there.',
       }));
     });
 
@@ -537,7 +578,17 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
     }
 
     const iss = typeof req.query.iss === 'string' ? req.query.iss : '';
-    const done = await finishMcpOAuth({ storage, config, state, code, iss, ...roundCookiesOf(req, state) });
+    const done = await finishMcpOAuth({
+      storage, config, state, code, iss, ...roundCookiesOf(req, state),
+      // Asked again at the callback with the registry's own tests: a membership that ended while
+      // the round was open must not still land a sign-in.
+      roundAdmits: async (server: McpServerRecord, ownerGhii: string, personal: boolean) => {
+        const found = personal
+          ? await requireUsableServer(storage, ownerGhii, server.id, config)
+          : await requireManageableServer(storage, ownerGhii, server.id, config);
+        return found?.id === server.id;
+      },
+    });
     if (!done.ok) {
       return res.status(done.code === 'BAD_STATE' ? 400 : done.code === 'NOT_THIS_BROWSER' ? 403 : 502)
         .json(error(config.nodeId, done.code, done.message));
@@ -546,7 +597,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
     // because invoke.ts already imports that service for the refresh, and calling back the
     // other way would be an import cycle. A failure is not fatal: the round DID succeed, and
     // the first aimeat_mcp_tools call fills the cache instead.
-    await listRemoteTools(storage, config, done.server);
+    await listRemoteTools(storage, config, done.server, done.personalFor ?? 'node');
 
     // A person is looking at this in a browser, so send them back where they came from rather than
     // leaving them on a JSON page. Only a path of our own, as safeRedirectPath reads one: anything
@@ -571,6 +622,11 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
           config.nodeId, 'BAD_REQUEST',
           'A server needs a short name and either an address or the id of a peer node.',
         ));
+      }
+      // Each member signing in with their own account belongs to a server many people share.
+      if (b.auth === 'per-user-oauth') {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          "auth 'per-user-oauth' is for a group's server (POST /v1/mcp-servers/organism) or the node's: on your own server you are the only one who signs in, so use auth 'oauth'."));
       }
 
       const transport: McpTransport = peer

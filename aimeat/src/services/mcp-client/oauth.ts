@@ -30,9 +30,15 @@
  *   THE CLIENT REGISTRATION IS SEALED WITH THE TOKENS, not stored beside them. A refresh needs the
  *   same client that minted the token, and putting it in the credential means one sealed document
  *   holds everything the renewal needs instead of two rows that can disagree.
- * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
+ * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · refreshPersonalMcpOAuth · renewOnce ·
+ *   McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   2026-11-02 — A personal round (`personal`) puts a person's own sign-in on a shared server whose
+ *     auth is per-user-oauth into mcp_user_credentials; refreshPersonalMcpOAuth renews it through the
+ *     same renewOnce as the server's own credential. finishMcpOAuth asks the route (`roundAdmits`)
+ *     whether the round's owner may still sign in there, so a group's server can take a sign-in at
+ *     all: until now the round compared the server's ownerGhii, null on a group's server, and failed.
  *   2026-11-01 — The authorization address carries ui_locales, the node's own language
  *     (site.default_locale), so the far side's sign-in page can speak the buyer's language.
  *   2026-11-01 — A finished round writes the row's auth mode as 'oauth' with the token. A row attached
@@ -62,7 +68,8 @@ import type {
 } from '@modelcontextprotocol/client';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
+import { takesPersonalSignIn } from '../../models/mcp-server-schemas.js';
+import type { McpServerRecord, McpServerCredential, McpUserCredentialRecord } from '../../models/mcp-server-schemas.js';
 import { sealMcpCredential, openMcpCredential, requireEncryptionKey } from './credential.js';
 import { guardedFetch } from './transport.js';
 import { mcpClientPool } from './pool.js';
@@ -99,6 +106,11 @@ interface RoundPayload {
    * on the callback, so the SDK verifies it exchanges the code at the same server (SEP-2352).
    */
   discovery?: OAuthDiscoveryState;
+  /**
+   * A person's own sign-in on a shared server (auth per-user-oauth): the credential lands on the
+   * round's owner in mcp_user_credentials, never on the server row everybody shares.
+   */
+  personal?: boolean;
 }
 
 /** The contexts a waiting round's two secrets are sealed to. */
@@ -229,6 +241,11 @@ export async function startMcpOAuth(input: {
   bindBrowser?: (state: string, ttlMs: number) => string;
   /** Which cookie bindBrowser set ('host' over https), stored with the binding. */
   bindCookie?: RoundBindCookie;
+  /**
+   * The round is `ownerGhii`'s own sign-in on a shared server whose auth is per-user-oauth. The
+   * caller has proved the server admits them; the credential lands on them, not on the row.
+   */
+  personal?: boolean;
 }): Promise<OAuthStart> {
   const { storage, config, server, ownerGhii } = input;
 
@@ -256,7 +273,7 @@ export async function startMcpOAuth(input: {
     if (result === 'AUTHORIZED') {
       // The far side needed nothing from a person — a pre-registered client with a grant already in
       // place. Seal what came back and say the round is done.
-      await sealAndStore(storage, config, server, provider);
+      await sealAndStore(storage, config, server, provider, input.personal ? ownerGhii : undefined);
       return { ok: true, authorizeUrl: '', approvalUrl: '', state };
     }
     if (!provider.captured.authorizationUrl) {
@@ -302,6 +319,7 @@ export async function startMcpOAuth(input: {
     ...(input.startedBy ? { startedBy: input.startedBy } : {}),
     ...(bind ? { bind, ...(input.bindCookie ? { bindCookie: input.bindCookie } : {}) } : {}),
     ...(provider.captured.discoveryState ? { discovery: provider.captured.discoveryState } : {}),
+    ...(input.personal ? { personal: true } : {}),
   };
 
   await storage.createVerificationNonce({
@@ -323,7 +341,8 @@ export async function startMcpOAuth(input: {
 }
 
 export type OAuthFinish =
-  | { ok: true; server: McpServerRecord; returnUrl: string }
+  /** `personalFor`: the person whose own sign-in this was, on a server that takes personal sign-ins. */
+  | { ok: true; server: McpServerRecord; returnUrl: string; personalFor?: string }
   | { ok: false; code: 'BAD_STATE' | 'NO_SERVER' | 'EXCHANGE_FAILED' | 'NOT_THIS_BROWSER'; message: string };
 
 /**
@@ -347,6 +366,13 @@ export async function finishMcpOAuth(input: {
   /** The `__Host-` round cookie it carried, and whether it came over https (RoundCookies). */
   hostBinding?: string;
   secure?: boolean;
+  /**
+   * Whether the round's owner may still put this sign-in on this server: manage it (a group's
+   * server, signed in once for the group) or, for a personal round, use it. Asked again here because
+   * membership can end in the fifteen minutes a round lives. The route answers it with the
+   * registry's own tests; without it only the server's own owner passes, as before.
+   */
+  roundAdmits?: (server: McpServerRecord, ownerGhii: string, personal: boolean) => Promise<boolean>;
 }): Promise<OAuthFinish> {
   const { storage, config } = input;
   const used = {
@@ -387,8 +413,14 @@ export async function finishMcpOAuth(input: {
   const clientInformation = clientJson ? JSON.parse(clientJson) as OAuthClientInformation : undefined;
 
   const server = await storage.getMcpServer(payload.serverId);
+  const personal = payload.personal === true;
   // A round started for one account cannot land on another's server even if the server row moved.
-  if (!server || server.ownerGhii !== round.owner) {
+  // A personal round lands only on a server that takes personal sign-ins, for a person it admits.
+  const admitted = !!server && (personal
+    ? takesPersonalSignIn(server) && !!input.roundAdmits && await input.roundAdmits(server, round.owner, true)
+    : server.ownerGhii === round.owner
+      || (!!input.roundAdmits && server.ownership !== 'owner' && await input.roundAdmits(server, round.owner, false)));
+  if (!server || !admitted) {
     return { ok: false, code: 'NO_SERVER', message: 'That server is no longer attached.' };
   }
 
@@ -420,7 +452,7 @@ export async function finishMcpOAuth(input: {
     };
   }
 
-  const stored = await sealAndStore(storage, config, server, provider);
+  const stored = await sealAndStore(storage, config, server, provider, personal ? round.owner : undefined);
   if (!stored) {
     return {
       ok: false,
@@ -428,7 +460,7 @@ export async function finishMcpOAuth(input: {
       message: `"${server.slug}" returned no token.`,
     };
   }
-  return { ok: true, server: stored, returnUrl: payload.returnUrl };
+  return { ok: true, server: stored, returnUrl: payload.returnUrl, ...(personal ? { personalFor: round.owner } : {}) };
 }
 
 /**
@@ -440,6 +472,8 @@ export async function finishMcpOAuth(input: {
  */
 async function sealAndStore(
   storage: Storage, config: AimeatConfig, server: McpServerRecord, provider: McpOAuthProvider,
+  /** Set for a person's own sign-in on a shared server: the credential lands on them, not the row. */
+  personalOwner?: string,
 ): Promise<McpServerRecord | null> {
   const tokens = provider.captured.tokens;
   const key = requireEncryptionKey(config);
@@ -467,6 +501,14 @@ async function sealAndStore(
   const expiresAt = typeof tokens.expires_in === 'number'
     ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
     : null;
+
+  if (personalOwner) {
+    // The server row is shared and keeps no credential in this mode. Only this person's pooled
+    // client goes: everybody else's session still holds a token that works.
+    await storage.putMcpUserCredential(server.id, personalOwner, sealMcpCredential(credential, key), expiresAt);
+    await mcpClientPool.invalidate(server.id, personalOwner);
+    return (await storage.getMcpServer(server.id)) ?? server;
+  }
 
   // 'oauth' with it: a row attached to sign in afterwards, or one stored before 2026-11-01 as
   // `none`, would otherwise hold the token and never send it (invoke.ts resolveCredential).
@@ -510,43 +552,91 @@ export async function refreshMcpOAuth(
   }
 
   try {
-    const opened = openMcpCredential(server.credential, config);
-    if (opened === 'no-key' || opened === null) return null;
+    const renewed = await renewOnce(config, server, server.credential);
+    if (renewed === 'unreadable') return null;
+    if (renewed === 'no-endpoint') return server;
+    if ('failed' in renewed) return await markRenewalFailed(storage, server, renewed.failed);
+    return await sealAndStore(storage, config, server, renewed.provider);
+  } finally {
+    await storage.releaseMcpRefresh(server.id);
+  }
+}
 
-    const endpoint = server.transport.kind === 'http' || server.transport.kind === 'sse'
-      ? server.transport.url
-      : null;
-    if (!endpoint) return server;
+/**
+ * One renewal of one sealed credential, shared by the server's own credential and a person's own
+ * sign-in on a shared server, so the two cannot renew differently. Writes nothing.
+ */
+async function renewOnce(
+  config: AimeatConfig, server: McpServerRecord, sealed: string,
+): Promise<'unreadable' | 'no-endpoint' | { failed: string } | { provider: McpOAuthProvider }> {
+  const opened = openMcpCredential(sealed, config);
+  if (opened === 'no-key' || opened === null) return 'unreadable';
 
-    const client = opened.oauthClient;
-    const provider = new McpOAuthProvider(config, {
-      state: '',
-      ...(client ? { clientInformation: client } : {}),
-      tokens: {
-        access_token: opened.accessToken,
-        token_type: 'Bearer',
-        ...(opened.refreshToken ? { refresh_token: opened.refreshToken } : {}),
-        ...(opened.oauthIssuer ? { issuer: opened.oauthIssuer } : {}),
-      },
-    });
+  const endpoint = server.transport.kind === 'http' || server.transport.kind === 'sse'
+    ? server.transport.url
+    : null;
+  if (!endpoint) return 'no-endpoint';
 
+  const client = opened.oauthClient;
+  const provider = new McpOAuthProvider(config, {
+    state: '',
+    ...(client ? { clientInformation: client } : {}),
+    tokens: {
+      access_token: opened.accessToken,
+      token_type: 'Bearer',
+      ...(opened.refreshToken ? { refresh_token: opened.refreshToken } : {}),
+      ...(opened.oauthIssuer ? { issuer: opened.oauthIssuer } : {}),
+    },
+  });
+
+  try {
     await auth(provider, { serverUrl: endpoint, fetchFn: guardedFetch });
-    // No new access token means the SDK could not renew and fell through to a new authorization
-    // round ('REDIRECT'): the refresh token was missing, refused, or the token endpoint failed. The
-    // SDK v2 also saves the OLD token back once, stamped with the issuer it now knows (SEP-2352), so
-    // a captured token is a renewal only when it is a different one.
-    const renewed = provider.captured.tokens;
-    if (!renewed || renewed.access_token === opened.accessToken) {
-      return await markRenewalFailed(storage, server, 'no new token was issued');
-    }
-    return await sealAndStore(storage, config, server, provider);
   } catch (err) {
     // The authorization server refused the refresh token (invalid_grant and the other OAuth errors
     // the SDK rethrows), or discovery failed. Either way this node holds no token it can renew, so
-    // the row says so now instead of after the far side answers 401 (feature-list audit #9).
-    return await markRenewalFailed(storage, server, describeUpstreamError(err));
+    // the caller says so now instead of after the far side answers 401 (feature-list audit #9).
+    return { failed: describeUpstreamError(err) };
+  }
+  // No new access token means the SDK could not renew and fell through to a new authorization
+  // round ('REDIRECT'): the refresh token was missing, refused, or the token endpoint failed. The
+  // SDK v2 also saves the OLD token back once, stamped with the issuer it now knows (SEP-2352), so
+  // a captured token is a renewal only when it is a different one.
+  const renewed = provider.captured.tokens;
+  if (!renewed || renewed.access_token === opened.accessToken) return { failed: 'no new token was issued' };
+  return { provider };
+}
+
+/**
+ * Renew a person's own sign-in on a shared server, single-flight per person.
+ *
+ * The same contract as refreshMcpOAuth, on mcp_user_credentials: the renewed credential, null when
+ * it cannot be opened, or 'renewal-failed' with that person's row (and only theirs) in needs_reauth.
+ */
+export async function refreshPersonalMcpOAuth(
+  storage: Storage, config: AimeatConfig, server: McpServerRecord, row: McpUserCredentialRecord,
+): Promise<McpUserCredentialRecord | null | 'renewal-failed'> {
+  const SKEW_MS = 5 * 60_000;
+  if (!row.expiresAt || new Date(row.expiresAt).getTime() - Date.now() > SKEW_MS) return row;
+
+  const won = await storage.claimMcpUserRefresh(server.id, row.ownerGhii, 60_000);
+  if (!won) {
+    await new Promise((r) => setTimeout(r, 2_000));
+    return (await storage.getMcpUserCredential(server.id, row.ownerGhii)) ?? row;
+  }
+  try {
+    const renewed = await renewOnce(config, server, row.credential);
+    if (renewed === 'unreadable') return null;
+    if (renewed === 'no-endpoint') return row;
+    if ('failed' in renewed) {
+      logger.warn('mcp-client: a personal sign-in could not be renewed', { server: server.slug, error: renewed.failed });
+      await storage.setMcpUserCredentialStatus(server.id, row.ownerGhii, 'needs_reauth', RENEWAL_FAILED_REASON);
+      await mcpClientPool.invalidate(server.id, row.ownerGhii);
+      return 'renewal-failed';
+    }
+    await sealAndStore(storage, config, server, renewed.provider, row.ownerGhii);
+    return (await storage.getMcpUserCredential(server.id, row.ownerGhii)) ?? null;
   } finally {
-    await storage.releaseMcpRefresh(server.id);
+    await storage.releaseMcpUserRefresh(server.id, row.ownerGhii);
   }
 }
 

@@ -5891,6 +5891,20 @@ components:
         lastOkAt:
           type: string
           nullable: true
+        personalSignIn:
+          type: object
+          description: >
+            Present only on a shared server where each person signs in with their own account (auth
+            per-user-oauth). signedIn says whether the CALLER has; status whether their sign-in still
+            works (needs_reauth means sign in again). A call before signing in answers 403
+            SIGN_IN_REQUIRED.
+          properties:
+            signedIn:
+              type: boolean
+            status:
+              type: string
+              enum: [active, needs_reauth]
+              nullable: true
     SharingGroup:
       type: object
       required: [id, name, ownerGaii, members, createdAt, updatedAt]
@@ -69381,7 +69395,8 @@ paths:
                     for. The server is attached parked in needs_reauth and the probe is skipped,
                     because a server awaiting a token refuses an anonymous tool list and the owner
                     would be told their address was wrong when it was right. POST …/authorize then
-                    starts the round.
+                    starts the round. per-user-oauth is refused here with 400 INVALID_INPUT: it is
+                    for a server many people share (the group's or the node's).
                 token:
                   type: string
                   description: Sealed with the node key. Never returned.
@@ -69448,6 +69463,16 @@ paths:
                 transport:
                   type: string
                   enum: [http, sse]
+                auth:
+                  type: string
+                  enum: [oauth, per-user-oauth]
+                  description: >
+                    oauth: attach it now and sign in once afterwards (POST …/authorize, an owner or
+                    admin of the group); every member spends that one sign-in. per-user-oauth: each
+                    member signs in with their OWN account at the far side (POST …/authorize, any
+                    member the server admits), so the far side's own permissions and audit apply to
+                    each person; the group holds no token, the server starts active and is not probed,
+                    and the first sign-in fills its tool list.
                 token:
                   type: string
                   description: Sealed with the node key. Never returned.
@@ -69535,7 +69560,11 @@ paths:
                   enum: [http, sse]
                 auth:
                   type: string
-                  enum: [oauth]
+                  enum: [oauth, per-user-oauth]
+                  description: >
+                    per-user-oauth: each owner the server admits signs in with their OWN account at
+                    the far side (POST …/authorize), and the node holds no token for it. Not for a
+                    command server.
                 token:
                   type: string
                   description: Sealed with the node key. Never returned.
@@ -69820,7 +69849,9 @@ paths:
         httpOnly SameSite=Lax cookie on the callback path and authorize_url is the far side's
         address; for any other caller authorize_url is the node's page /v1/oauth-round?state=…,
         owner_confirms is true, and the owner confirms there (POST /v1/oauth-rounds/{state}/approve).
-        An empty authorize_url means the far side needed nobody to sign in.
+        An empty authorize_url means the far side needed nobody to sign in. On a shared server whose
+        auth is per-user-oauth this is the CALLER's own sign-in: anyone the server admits may start
+        it, the credential lands on them alone, and the answer says personal true.
       tags: [MCP Servers]
       security:
         - BearerAuth: []
@@ -69851,6 +69882,30 @@ paths:
           description: The server could not be asked how to sign in.
         '503':
           description: This node has no encryption key, so it cannot hold the resulting token.
+  /v1/mcp-servers/{id}/sign-in:
+    delete:
+      operationId: signOutOfMcpServer
+      summary: Sign out of a shared MCP server you signed in to with your own account
+      description: >
+        Needs mcp:manage. Only on a node or group server whose auth is per-user-oauth. Removes the
+        caller's own sign-in and drops their pooled session; the server and everybody else's sign-in
+        on it stay. Access granted at the far side is still the person's to revoke there.
+      tags: [MCP Servers]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Signed out ({ signed_out, note })
+        '404':
+          description: No such server you can use (NOT_FOUND), or you were not signed in to it (NOT_SIGNED_IN).
+        '409':
+          description: NOT_PERSONAL — nobody signs in to this server with their own account.
   /v1/mcp-servers/callback:
     get:
       operationId: mcpServerCallback

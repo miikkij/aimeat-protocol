@@ -22767,7 +22767,14 @@
       "mcpAuthToken": "It gave me a token",
       "mcpAuthOauth": "I sign in to it",
       "mcpNoSignInNeeded": "That server needed no sign-in. It is ready.",
-      "mcpAuthFailed": "Could not start the sign-in"
+      "mcpAuthFailed": "Could not start the sign-in",
+      "mcpSignInOwn": "Sign in with your own account",
+      "mcpPersonalNeedsSignIn": "everyone signs in with their own account",
+      "mcpPersonalSignedIn": "signed in with your own account",
+      "mcpPersonalStopped": "your sign-in stopped working",
+      "mcpSignOut": "Sign out",
+      "mcpSignedOut": "Signed out. Access you granted at the far side is still yours to revoke there.",
+      "mcpSignOutFailed": "Could not sign out"
     },
     "nodes": {
       "title": "Your own servers",

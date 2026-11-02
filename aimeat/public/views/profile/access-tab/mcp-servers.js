@@ -21,6 +21,9 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
+ *   v1.12.0 — 2026-11-02 — A shared server each person signs in to (personalSignIn on the row) says
+ *     whether this person has signed in, offers "Sign in with your own account" until they have, and
+ *     "Sign out" after (DELETE /v1/mcp-servers/:id/sign-in).
  *   v1.11.2 — 2026-11-02 — "Connect to <host>" goes away once a server of that short name is attached:
  *     the list's rows carry `slug`, and the test read `name`, which they do not have, so the choice
  *     stayed beside the attached server (first-timer round on crew60).
@@ -268,11 +271,36 @@ export function McpServersSection({ showToast, inRow }) {
     );
   }, [confirm, load, showToast]);
 
+  /** Sign out of a shared server each person signs in to: only this person's sign-in goes. */
+  const signOut = useCallback(async (s) => {
+    setBusy(s.id);
+    try {
+      await apiDelete('/v1/mcp-servers/' + encodeURIComponent(s.id) + '/sign-in');
+      showToast(t('profile.access.mcpSignedOut')
+        || 'Signed out. Access you granted at the far side is still yours to revoke there.');
+      await load();
+    } catch (err) {
+      swallowed('mcp-servers-sign-out', err);
+      showToast(err?.message || t('profile.access.mcpSignOutFailed') || 'Could not sign out');
+    } finally {
+      setBusy('');
+    }
+  }, [load, showToast]);
+
   if (unavailable) return null;
+
+  /** A shared server each person signs in to, and whether this person's sign-in works now. */
+  const personal = (s) => s.personalSignIn || null;
+  const needsOwnSignIn = (s) => !!personal(s) && (!personal(s).signedIn || personal(s).status === 'needs_reauth');
 
   /** One line saying what is wrong, when something is. Never a colour on its own. */
   const statusNote = (s) => {
     if (!s.enabled) return t('profile.access.mcpOff') || 'switched off';
+    if (personal(s)) {
+      if (personal(s).signedIn && needsOwnSignIn(s)) return t('profile.access.mcpPersonalStopped') || 'your sign-in stopped working';
+      if (needsOwnSignIn(s)) return t('profile.access.mcpPersonalNeedsSignIn') || 'everyone signs in with their own account';
+      return t('profile.access.mcpPersonalSignedIn') || 'signed in with your own account';
+    }
     if (s.status === 'needs_reauth') return t('profile.access.mcpNeedsReauth') || 'needs connecting again';
     if (s.status === 'unreachable') return t('profile.access.mcpUnreachable') || 'not answering';
     return '';
@@ -295,9 +323,19 @@ export function McpServersSection({ showToast, inRow }) {
           <${Name} asKey meta=${`${s.slug ?? ''} · ${(t('profile.access.mcpToolCount') || '{n} tools')
             .replace('{n}', String(s.toolCount))}${statusNote(s) ? ' · ' + statusNote(s) : ''}`}>${s.title || s.slug}<//>
           <${Doors}>
-            ${s.status === 'needs_reauth' && html`
+            ${!personal(s) && s.status === 'needs_reauth' && html`
               <${Action} small row disabled=${busy === s.id} onClick=${() => authorize(s)}>
                 ${t('profile.access.mcpSignIn') || 'Sign in'}
+              <//>
+            `}
+            ${needsOwnSignIn(s) && html`
+              <${Action} small row disabled=${busy === s.id} onClick=${() => authorize(s)}>
+                ${t('profile.access.mcpSignInOwn') || 'Sign in with your own account'}
+              <//>
+            `}
+            ${personal(s) && personal(s).signedIn && html`
+              <${Action} small row disabled=${busy === s.id} onClick=${() => signOut(s)}>
+                ${t('profile.access.mcpSignOut') || 'Sign out'}
               <//>
             `}
             <${Action} small row expanded=${toolsFor === s.id} disabled=${busy === s.id} onClick=${() => showTools(s)}>

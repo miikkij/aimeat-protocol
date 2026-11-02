@@ -665,6 +665,20 @@ export interface McpServer {
   ws: string | null;
 }
 
+/** A person's own sign-in on a shared MCP server whose auth is per-user-oauth (migration 0123). */
+export interface McpUserCredential {
+  createdAt: string;
+  /** Ciphertext under the node key. Never in any response. */
+  credential: string;
+  expiresAt: string | null;
+  lastError: string | null;
+  ownerGhii: string;
+  refreshClaimedAt: string | null;
+  serverId: string;
+  status: Generated<string>;
+  updatedAt: string;
+}
+
 /** TARGET-057. One named errand over one connection, with the fixed parameters an app cannot alter. */
 export interface ConnectionDelegation {
   action: string;
@@ -2415,6 +2429,7 @@ export interface DB {
   WorkspaceRowRevision: WorkspaceRowRevision;
   SsoConnection: SsoConnection;
   McpServer: McpServer;
+  McpUserCredential: McpUserCredential;
   AiProvenance: AiProvenance;
   AiDecision: AiDecision;
   ContentLabel: ContentLabel;

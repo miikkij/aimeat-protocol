@@ -15,6 +15,9 @@
  *   round that "works" against a server which never checks the verifier proves nothing about the
  *   half that never travels.
  * @version-history
+ *   2026-11-02 — A personal sign-in on a shared server lands on the person and never on the row, is
+ *     refused when the server no longer admits them, and a refused renewal parks only their sign-in;
+ *     a group's governor can sign the group's server in once.
  *   2026-11-01 — The authorization address carries ui_locales from site.default_locale.
  *   2026-10-20 — On the SDK v2 client: the issuer stamp is sealed with the token and the client, the
  *     callback's iss is taken when it matches and refuses the exchange when it does not.
@@ -33,7 +36,9 @@ import type { AddressInfo } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
-import { startMcpOAuth, finishMcpOAuth, refreshMcpOAuth, RENEWAL_FAILED_REASON } from '../../src/services/mcp-client/oauth.js';
+import {
+  startMcpOAuth, finishMcpOAuth, refreshMcpOAuth, refreshPersonalMcpOAuth, RENEWAL_FAILED_REASON,
+} from '../../src/services/mcp-client/oauth.js';
 import { openMcpCredential, sealMcpCredential, requireEncryptionKey } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
 import { bindingHash } from '../../src/services/oauth-round-secrets.js';
@@ -424,6 +429,114 @@ describe('the renewal of an expiring token (feature-list audit #9)', () => {
     const stored = await storage.getMcpServer(row.id);
     expect(stored?.status).toBe('active');
     const opened = openMcpCredential(stored!.credential!, config);
+    if (!opened || opened === 'no-key') throw new Error('credential not readable');
+    expect(opened.accessToken).toBe('renewed-token');
+  });
+});
+
+describe('a personal sign-in on a shared server (auth per-user-oauth)', () => {
+  /** A node-wide server everybody signs in to with their own account. Holds no credential. */
+  function sharedRow(over: Partial<McpServerRecord> = {}): McpServerRecord {
+    return makeRow({
+      ownership: 'node', ownerGhii: null, auth: 'per-user-oauth', callerIdentity: 'per-user-oauth',
+      availability: 'all-owners', status: 'active', ...over,
+    });
+  }
+  const admitsAll = async (): Promise<boolean> => true;
+
+  async function signInAs(storage: SqliteStorage, row: McpServerRecord, person: string,
+    roundAdmits?: (s: McpServerRecord, o: string, personal: boolean) => Promise<boolean>) {
+    const started = await startMcpOAuth({ storage, config, server: row, ownerGhii: person, bindBrowser, personal: true });
+    if (!started.ok) throw new Error('start failed');
+    seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
+    return finishMcpOAuth({
+      storage, config, state: started.state, code: 'c', binding: BINDING,
+      ...(roundAdmits ? { roundAdmits } : {}),
+    });
+  }
+
+  it('lands the token on the person who signed in, and the shared row keeps none', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = sharedRow();
+    await storage.createMcpServer(row);
+
+    const done = await signInAs(storage, row, 'alice@test-node-001', admitsAll);
+    expect(done.ok).toBe(true);
+    if (!done.ok) return;
+    expect(done.personalFor).toBe('alice@test-node-001');
+
+    expect((await storage.getMcpServer(row.id))?.credential).toBeNull();
+    const mine = await storage.getMcpUserCredential(row.id, 'alice@test-node-001');
+    expect(mine?.status).toBe('active');
+    const opened = openMcpCredential(mine!.credential, config);
+    if (!opened || opened === 'no-key') throw new Error('credential not readable');
+    expect(opened.accessToken).toBe('first-token');
+    expect(opened.oauthClient?.client_id).toBe('client-abc');
+    // Nobody else got anything.
+    expect(await storage.getMcpUserCredential(row.id, 'bob@test-node-001')).toBeUndefined();
+  });
+
+  it('refuses a personal round the server no longer admits the person to, and stores nothing', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = sharedRow();
+    await storage.createMcpServer(row);
+    // Without the registry's answer, and with a "no" from it: membership can end while a round is open.
+    for (const admits of [undefined, async () => false]) {
+      const done = await signInAs(storage, row, 'mallory@test-node-001', admits);
+      expect(done.ok).toBe(false);
+      if (done.ok) return;
+      expect(done.code).toBe('NO_SERVER');
+    }
+    expect(await storage.getMcpUserCredential(row.id, 'mallory@test-node-001')).toBeUndefined();
+  });
+
+  it('refuses a personal round on a server that holds one shared sign-in', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = sharedRow({ auth: 'oauth', callerIdentity: 'node-credential' });
+    await storage.createMcpServer(row);
+    const done = await signInAs(storage, row, 'alice@test-node-001', admitsAll);
+    expect(done.ok).toBe(false);
+    expect(await storage.getMcpUserCredential(row.id, 'alice@test-node-001')).toBeUndefined();
+  });
+
+  it('lets a group\'s governor sign the group\'s server in once, which the ownerGhii test refused', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow({ ownership: 'organism', ownerGhii: null, organismId: 'org-1' });
+    await storage.createMcpServer(row);
+    const started = await startMcpOAuth({ storage, config, server: row, ownerGhii: 'alice@test-node-001', bindBrowser });
+    if (!started.ok) throw new Error('start failed');
+    seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
+    const done = await finishMcpOAuth({
+      storage, config, state: started.state, code: 'c', binding: BINDING,
+      roundAdmits: async (_s, owner, personal) => !personal && owner === 'alice@test-node-001',
+    });
+    expect(done.ok).toBe(true);
+    expect((await storage.getMcpServer(row.id))?.credential).toBeTruthy();
+  });
+
+  it('a refused renewal parks that person\'s sign-in only; the server and the others stay active', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = sharedRow();
+    await storage.createMcpServer(row);
+    const key = requireEncryptionKey(config)!;
+    const expired = new Date(Date.now() - 60_000).toISOString();
+    const seal = (refreshToken: string) => sealMcpCredential({
+      shape: 'oauth2', accessToken: 'old-token', refreshToken,
+      oauthClient: { client_id: 'client-abc', client_secret: 'secret-xyz' },
+    }, key);
+    await storage.putMcpUserCredential(row.id, 'alice@test-node-001', seal('dead-refresh'), expired);
+    await storage.putMcpUserCredential(row.id, 'bob@test-node-001', seal('refresh-me'), expired);
+
+    const alice = await refreshPersonalMcpOAuth(storage, config, row, (await storage.getMcpUserCredential(row.id, 'alice@test-node-001'))!);
+    expect(alice).toBe('renewal-failed');
+    expect((await storage.getMcpUserCredential(row.id, 'alice@test-node-001'))?.status).toBe('needs_reauth');
+    expect((await storage.getMcpServer(row.id))?.status).toBe('active');
+
+    const bob = await refreshPersonalMcpOAuth(storage, config, row, (await storage.getMcpUserCredential(row.id, 'bob@test-node-001'))!);
+    expect(bob).not.toBe('renewal-failed');
+    const bobRow = await storage.getMcpUserCredential(row.id, 'bob@test-node-001');
+    expect(bobRow?.status).toBe('active');
+    const opened = openMcpCredential(bobRow!.credential, config);
     if (!opened || opened === 'no-key') throw new Error('credential not readable');
     expect(opened.accessToken).toBe('renewed-token');
   });

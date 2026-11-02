@@ -19,6 +19,10 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   2026-11-02 — A server that takes personal sign-ins (auth per-user-oauth on a node or group server)
+ *     spends the caller's own sign-in from mcp_user_credentials and nothing shared; without one the
+ *     call is refused SIGN_IN_REQUIRED (403) with the way to sign in, and a 401 from the far side
+ *     parks that person's sign-in instead of the server.
  *   2026-10-20 — callTool takes the options as its second argument on the SDK v2 client; listTools() gathers every page (SDK v2 migration step 4a).
  *   2026-10-15 — A failed token renewal refuses the call with UPSTREAM_UNAUTHORIZED; refreshMcpOAuth
  *     has already parked the server in needs_reauth (feature-list audit #9).
@@ -58,7 +62,8 @@ import { mcpClientPool } from './pool.js';
 import { openMcpCredential } from './credential.js';
 import { resolveWireAddress, MCP_RESPONSE_MAX_BYTES } from './transport.js';
 import { ResponseTooLargeError } from '../../utils/read-capped.js';
-import { refreshMcpOAuth } from './oauth.js';
+import { refreshMcpOAuth, refreshPersonalMcpOAuth } from './oauth.js';
+import { takesPersonalSignIn } from '../../models/mcp-server-schemas.js';
 import { resolveMcpAccess, applyLockedInput } from './grants.js';
 import { recordUsageCall } from '../usage/usage-buffer.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
@@ -120,6 +125,11 @@ export type RemoteCallRefusal =
   | 'TOOL_LIST_TOO_LARGE'
   /** One answer passed what this node reads of one (MCP_RESPONSE_MAX_BYTES), so it was cut off. */
   | 'RESPONSE_TOO_LARGE'
+  /**
+   * The server takes a personal sign-in (auth per-user-oauth) and this person has not signed in, or
+   * their sign-in no longer works. Only they can fix it, with their own account at the far side.
+   */
+  | 'SIGN_IN_REQUIRED'
   | 'TOOL_FAILED';
 
 /**
@@ -145,6 +155,7 @@ export function statusForRemoteRefusal(code: RemoteCallRefusal): number {
       return 508;
     case 'NOT_GRANTED':
     case 'SERVER_DISABLED':
+    case 'SIGN_IN_REQUIRED':
       return 403;
     case 'PRICE_UNSUPPORTED':
       return 402;
@@ -223,7 +234,10 @@ export function toolCacheHash(tools: RemoteToolSnapshot[]): string {
  */
 async function resolveCredential(
   storage: Storage, config: AimeatConfig, server: McpServerRecord,
+  /** The person the call is for. Read only on a server that takes personal sign-ins. */
+  ownerGhii?: string,
 ): Promise<{ credential: McpServerCredential | null } | { refusal: RemoteCallResult }> {
+  if (takesPersonalSignIn(server)) return resolvePersonalCredential(storage, config, server, ownerGhii);
   if (server.auth === 'none' || !server.credential) return { credential: null };
 
   // Renew BEFORE the call rather than after a 401. A token that dies mid-flight costs a failed
@@ -283,6 +297,48 @@ async function resolveCredential(
 }
 
 /**
+ * The credential for a server that takes personal sign-ins: the one this person signed in with.
+ *
+ * NO FALLBACK TO ANYTHING SHARED. A person who has not signed in is refused with the way to sign
+ * in, rather than handed somebody else's account at the far side, which is the whole defect this
+ * mode exists to remove. A dead or unreadable sign-in parks that person's row only.
+ */
+async function resolvePersonalCredential(
+  storage: Storage, config: AimeatConfig, server: McpServerRecord, ownerGhii: string | undefined,
+): Promise<{ credential: McpServerCredential | null } | { refusal: RemoteCallResult }> {
+  const signIn = (why: string): { refusal: RemoteCallResult } => ({
+    refusal: {
+      ok: false,
+      code: 'SIGN_IN_REQUIRED',
+      message: `${why} Sign in to "${server.slug}" with your own account: aimeat_mcp_authorize with server "${server.slug}" `
+        + 'gives the address to open.',
+    },
+  });
+  const row = ownerGhii ? await storage.getMcpUserCredential(server.id, ownerGhii) : undefined;
+  if (!ownerGhii || !row) return signIn(`Everyone signs in to "${server.slug}" with their own account, and you have not yet.`);
+  if (row.status === 'needs_reauth') return signIn('Your sign-in no longer works.');
+
+  const fresh = await refreshPersonalMcpOAuth(storage, config, server, row);
+  if (fresh === 'renewal-failed') return signIn('Your sign-in could not be renewed.');
+  const opened = fresh ? openMcpCredential(fresh.credential, config) : null;
+  if (opened === 'no-key') {
+    return {
+      refusal: {
+        ok: false,
+        code: 'NO_ENCRYPTION_KEY',
+        message: 'This node has no encryption key configured, so it cannot open the stored '
+          + 'credential. Set AIMEAT_ENCRYPTION_KEY.',
+      },
+    };
+  }
+  if (!opened) {
+    await storage.setMcpUserCredentialStatus(server.id, ownerGhii, 'needs_reauth', 'The stored credential could not be opened.');
+    return signIn('Your stored sign-in cannot be read any more.');
+  }
+  return { credential: opened };
+}
+
+/**
  * A 401/403 from the far side means the credential is missing or dead, not that the address is wrong.
  *
  * THE STATUS FIRST, THE WORDS SECOND. The SDK's StreamableHTTPError and SseError carry the HTTP
@@ -313,7 +369,9 @@ export async function listRemoteTools(
   | { ok: true; tools: RemoteToolSnapshot[]; changed: boolean }
   | { ok: false; code: RemoteCallRefusal; message: string }
 > {
-  const resolved = await resolveCredential(storage, config, server);
+  // On a server that takes personal sign-ins the identity is the person whose sign-in lists them.
+  const person = identity === 'node' ? undefined : identity;
+  const resolved = await resolveCredential(storage, config, server, person);
   if ('refusal' in resolved) return resolved.refusal as { ok: false; code: RemoteCallRefusal; message: string };
 
   const wire = await resolveWireAddress(storage, server);
@@ -346,7 +404,7 @@ export async function listRemoteTools(
       return refuseToolList(storage, server, `"${server.slug}" answered its tool list with more than `
         + `${MCP_RESPONSE_MAX_BYTES / 1024 / 1024} MB at once, which is more than this node reads of one answer, so nothing was stored.`);
     }
-    return { ok: false, ...(await parkAndDescribe(storage, server, err)) };
+    return { ok: false, ...(await parkAndDescribe(storage, server, err, person)) };
   }
 }
 
@@ -398,6 +456,8 @@ function isResponseTooLarge(err: unknown): boolean {
  */
 async function parkAndDescribe(
   storage: Storage, server: McpServerRecord, err: unknown,
+  /** The person whose own sign-in the call spent, on a server that takes personal sign-ins. */
+  person?: string,
 ): Promise<{ code: RemoteCallRefusal; message: string }> {
   const raw = err instanceof Error ? err.message : String(err);
 
@@ -431,6 +491,16 @@ async function parkAndDescribe(
   // What is stored and logged from here on: no endpoint, no upstream body (upstream-error.ts). An
   // upstream that echoes the request's headers would otherwise put the Bearer in the log.
   const told = describeUpstreamError(err);
+  if (isUnauthorized(err) && person && takesPersonalSignIn(server)) {
+    // One person's account at the far side refused: their sign-in is parked, and the server, which
+    // everybody else still reaches with their own, stays as it is.
+    await storage.setMcpUserCredentialStatus(server.id, person, 'needs_reauth', told);
+    await mcpClientPool.invalidate(server.id, person);
+    return {
+      code: 'SIGN_IN_REQUIRED',
+      message: `"${server.slug}" did not accept your sign-in. Sign in again: aimeat_mcp_authorize with server "${server.slug}".`,
+    };
+  }
   if (isUnauthorized(err)) {
     await storage.setMcpServerStatus(server.id, 'needs_reauth', told);
     await mcpClientPool.invalidate(server.id);
@@ -516,14 +586,17 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
     return unpaid;
   }
 
-  const resolved = await resolveCredential(storage, config, server);
+  const personal = takesPersonalSignIn(server);
+  const resolved = await resolveCredential(storage, config, server, ownerGhii);
   if ('refusal' in resolved) {
     const refusal = resolved.refusal as { ok: false; code: RemoteCallRefusal; message: string };
     record('refused', refusal.code);
     return refusal;
   }
 
-  const identity = server.callerIdentity === 'per-user-oauth' ? ownerGhii : 'node';
+  // Whose pooled client: the person's own on a server that takes personal sign-ins, because two
+  // people's sessions there hold two different accounts at the far side.
+  const identity = personal || server.callerIdentity === 'per-user-oauth' ? ownerGhii : 'node';
 
   // A peer node is an address this node looks up rather than one somebody typed, and the peering
   // is re-read on every call so a demoted or ended relationship stops the calls with it.
@@ -546,7 +619,7 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
       // transport says the client then starts a new session, so the pooled client goes and the call
       // is made once more on a fresh one. Anything else, or a second failure, is described below.
       if (!isSessionGone(err)) throw err;
-      await mcpClientPool.invalidate(server.id);
+      await mcpClientPool.invalidate(server.id, personal ? identity : undefined);
       result = await callOnce();
     }
     await storage.touchMcpServerOk(server.id);
@@ -562,7 +635,7 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
       isError,
     };
   } catch (err) {
-    const described = await parkAndDescribe(storage, server, err);
+    const described = await parkAndDescribe(storage, server, err, personal ? ownerGhii : undefined);
     record('error', described.code);
     return { ok: false, ...described };
   }

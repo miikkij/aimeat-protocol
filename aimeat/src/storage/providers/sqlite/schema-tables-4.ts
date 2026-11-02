@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.16.0 — 2026-11-02 — Ends with applyMcpUserCredentialSchema: mcp_user_credentials, a person's own
+ *     sign-in on a shared MCP server. Mirrors Postgres 0123.
  *   v1.15.0 — 2026-10-25 — released_component_names: a bare extension or cortex name released by
  *     uninstall, and its holder (owner namespaces wish, secaudit2026oct22). Mirrors Postgres 0120.
  *   v1.14.0 — 2026-10-22 — Ends with applyWorkspaceRowRevisionSchema: workspace_rows.updatedBy and
@@ -35,6 +37,7 @@
  */
 import type Database from 'better-sqlite3';
 import { applyWorkspaceRowRevisionSchema } from './schema-workspace-row-revisions.js';
+import { applyMcpUserCredentialSchema } from './schema-mcp-user-credentials.js';
 
 export function applySchemaTables4(db: Database.Database): void {
   db.exec(`
@@ -777,4 +780,6 @@ export function applySchemaTables4(db: Database.Database): void {
   `);
   // workspace_rows.updatedBy and the row revisions table, after workspace_rows exists (Postgres 0113).
   applyWorkspaceRowRevisionSchema(db);
+  // Personal sign-in on a shared MCP server, after mcp_servers exists (Postgres 0123).
+  applyMcpUserCredentialSchema(db);
 }
