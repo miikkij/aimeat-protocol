@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-11-02 — 8d2: a `deliver` scope entry in a task no delivering schedule made does not make the
+ *     node deliver its result (secaudit2026nov02d round 13, DELIVERY_SCOPE:client-supplied-task-scope).
  *   2026-10-25 — 47: erasing an account removes the schedules its agents made, and a schedule older
  *     than the account that holds its name does not fire in it (secaudit2026oct22).
  *   2026-10-21 — 45 and 46 (capability-loss review): a narrowed maker's refusal tells the owner where to
@@ -397,6 +399,31 @@ await test('8d. deliver "owner": the finished task\'s result reaches the owner\'
     assert(!!notice, 'the owner got the result in the bell');
     assert(/\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\.\d{1,2}\.\d{4}/.test(notice.title), `the node's date in the heading: ${notice.title}`);
     assert(String(notice.body).startsWith('First item.') && !String(notice.body).includes('October'), `the model's heading is left out: ${notice.body}`);
+});
+
+// secaudit2026nov02d round 13 (DELIVERY_SCOPE:client-supplied-task-scope): the schedule's record decides
+// delivery. A task whose scope carries the same `deliver` entry but that no delivering schedule made is
+// not delivered by the node; the agent can still notify its owner itself.
+await test('8d2. a deliver entry written into a task\'s scope by hand does not make the node deliver its result', async () => {
+    const created = await json(`/v1/agents/${o1.agentName}/tasks`, {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({
+            title: 'HAND_DELIVER', description: 'no schedule asked for delivery', status: 'queued',
+            scope: [{ name: 'deliver', value: 'owner', type: 'text' }],
+            verification: { user_expects: 'x', technical_checks: [] },
+        }),
+    });
+    assert(created.status === 201, `create ${created.status}: ${JSON.stringify(created.body)}`);
+    const taskId = created.body.data.task?.id ?? created.body.data.id;
+    await json(`/v1/agents/${o1.agentName}/tasks/${taskId}/start`, { method: 'POST', headers: auth1 });
+    const done = await json(`/v1/agents/${o1.agentName}/tasks/${taskId}/complete`, {
+        method: 'POST', headers: auth1, body: JSON.stringify({ message: 'Hand-written result.' }),
+    });
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body)}`);
+    await sleep(1500);
+    const list = (await json('/v1/notifications', { headers: auth1 })).body?.data?.notifications ?? [];
+    const delivered = list.find((n: any) => typeof n.title === 'string' && n.title.startsWith('HAND_DELIVER – '));
+    assert(!delivered, `the node delivered a task no delivering schedule made: ${JSON.stringify(delivered)}`);
 });
 
 await test('8e. deliver is refused on another kind and with another value, and "none" takes it off', async () => {

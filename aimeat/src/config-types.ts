@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.27.1 — 2026-11-02 — emailReportsPerSenderDay (secaudit2026nov02d round 13).
  *   v1.27.0 — 2026-11-01 — DataspaceConfig mixed in (config-dataspace.ts; plan doc-mvwxcas3dom3, D8).
  *   v1.26.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION; plan doc-mvwxcas3dom3, D4.3).
  *   v1.25.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION; plan doc-mvwxcas3dom3, D7.1).
@@ -573,6 +574,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   smtpFrom: string;
   /** The Reply-To of a report an agent or an app mails its owner; null: replies go to the From. */
   smtpReplyTo: string | null;
+  /** Mails one agent or app may cause its owner in 24 hours (notification-create.ts mailOwnerFrom); 0: no limit. */
+  emailReportsPerSenderDay: number;
   smtpSecure: boolean;
   smtpRejectUnauthorized: boolean;
   emailConfirmationRequired: boolean;

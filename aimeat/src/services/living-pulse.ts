@@ -25,6 +25,8 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-11-02 — SECURITY: the retirement notice is mailed only to an address the owner confirmed
+ *     (owner-mail-address.ts; secaudit2026nov02d round 13).
  *   2026-10-31 — SECURITY: the model is called for a config only when its holder or latest writer may
  *     use the owner's AI (ai:use), or the owner allowed it with one press; otherwise the section waits
  *     (`derive-waiting`, status.ai_spend_request) and the owner is asked once (living-pulse-spend.ts).
@@ -78,6 +80,7 @@ import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 import { inheritSourceLabels, type SourceCopy } from './living-source-labels.js';
 import type { PushService } from './push.js';
+import { verifiedNotificationEmail } from './owner-mail-address.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
@@ -166,7 +169,8 @@ async function notifyStop(services: LivingNotify | undefined, storage: Storage, 
   } catch (err) { logger.warn('notifyStop: push best-effort', { error: String(err) }); }
   try {
     if (services.email?.enabled) {
-      const to = (await storage.getGHII(ownerGaii) as { notificationEmail?: string } | null)?.notificationEmail;
+      // Only an address the owner proved (owner-mail-address.ts); the reason can quote the charter's text.
+      const to = verifiedNotificationEmail(await storage.getGHII(ownerGaii));
       if (to) await services.email.sendNotification(to, 'Living document retired', body);
     }
   } catch (err) { logger.warn('to: email best-effort', { error: String(err) }); }

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Indexing, personal-node, site, consent, push, email, TOTP, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-11-02 — AIMEAT_EMAIL_REPORTS_PER_SENDER_DAY in the email section (secaudit2026nov02d round 13).
  *   v1.5.0 — 2026-11-01 — AIMEAT_DATA_INTERMEDIATION in the consent section (plan doc-mvwxcas3dom3, D7.1).
  *   v1.4.0 — 2026-10-31 — AIMEAT_SMTP_REPLY_TO in the email section.
  *   v1.3.1 — 2026-10-11 — The cookie categories are read through consentCategories(): the value could
@@ -237,6 +238,12 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'Reply-To of an agent\'s or app\'s report mail to its owner',
           value: config.smtpReplyTo ?? '(not set)',
           defaultVal: '(the From address)',
+        },
+        {
+          envVar: 'AIMEAT_EMAIL_REPORTS_PER_SENDER_DAY',
+          description: 'Mails one agent or app may cause its owner in a day (0: no limit)',
+          value: String(config.emailReportsPerSenderDay),
+          defaultVal: '10',
         },
         {
           envVar: 'AIMEAT_SMTP_SECURE',

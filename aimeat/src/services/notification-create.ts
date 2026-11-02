@@ -8,9 +8,13 @@
  *   agent its name, an owner session is the owner), and hands the record to notify(), which
  *   applies the owner's settings. Self-targeted only: the recipient is always the owner behind the
  *   caller's session; there is no surface for pushing at arbitrary owners.
- * @structure NotificationCreateError · createPrincipalNotification
+ * @structure NotificationCreateError · createPrincipalNotification · mailOwnerFrom
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.4.0 — 2026-11-02 — mailOwnerFrom is the one mail path for a principal's words to its owner: the
+ *     node's delivery of a scheduled task's result counts against the same per-sender daily limit, and
+ *     the limit is the setting email.reports_per_sender_day (default 10, 0 no limit). The verified
+ *     address comes from owner-mail-address.ts (secaudit2026nov02d round 13).
  *   v1.3.1 — 2026-10-31 — The report mail carries Reply-To from email.reply_to when it is set (Jouni, 20.14).
  *   v1.3.0 — 2026-10-31 — `email: true` also mails the notification to the owner's verified address,
  *     at most EMAIL_PER_DAY a sender, never when muted; `emailed` says what became of it. An agent
@@ -33,6 +37,7 @@ import { emitChange } from './event-bus.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
 import { getActiveEmailService } from './email.js';
 import { appendMailLog } from './notification-settings.js';
+import { verifiedNotificationEmail } from './owner-mail-address.js';
 import { logger } from '../utils/logger.js';
 
 export class NotificationCreateError extends Error {
@@ -52,16 +57,24 @@ export interface CreateNotificationInput { title?: unknown; body?: unknown; link
 export type NotificationEmailOutcome = 'sent' | 'not_asked' | 'no_address' | 'mail_off' | 'limit' | 'failed' | 'muted';
 
 /**
- * Mails to the owner one sender may cause in 24 hours. Held in this process: a restart starts the
- * count again, which costs at most one more day's worth; the owner's mute stops a sender for good.
+ * Mails to the owner one sender may cause in 24 hours, unless the operator set
+ * email.reports_per_sender_day (0: no limit). Held in this process: a restart starts the count
+ * again, which costs at most one more day's worth; the owner's mute stops a sender for good.
  */
 export const EMAIL_PER_DAY = 10;
 const emailsSent = new Map<string, number[]>();
 
-function underEmailLimit(key: string, now: number): boolean {
+function underEmailLimit(key: string, now: number, limit: number): boolean {
+  if (limit <= 0) return true;
   const recent = (emailsSent.get(key) ?? []).filter(at => now - at < 86_400_000);
   emailsSent.set(key, recent);
-  return recent.length < EMAIL_PER_DAY;
+  return recent.length < limit;
+}
+
+/** The per-sender daily mail limit in force: the setting, else EMAIL_PER_DAY. */
+function emailPerDay(config: AimeatConfig): number {
+  const v = config.emailReportsPerSenderDay;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : EMAIL_PER_DAY;
 }
 
 export async function createPrincipalNotification(
@@ -146,21 +159,35 @@ async function mailOwner(
   storage: Storage, config: AimeatConfig, ghii: string, sender: string,
   title: string, body: string | undefined, link: string | undefined,
 ): Promise<NotificationEmailOutcome> {
-  const email = getActiveEmailService();
-  if (!email?.enabled) return 'mail_off';
-  const owner = await storage.getGHII(ghii);
-  if (!owner?.notificationEmail || !owner.emailVerifiedAt) return 'no_address';
-  const now = Date.now();
-  const key = `${ghii} ${sender}`;
-  if (!underEmailLimit(key, now)) return 'limit';
   const url = link ? `${config.baseUrl.replace(/\/+$/, '')}${link}` : '';
   const text = [body?.trim(), url].filter(Boolean).join('\n\n');
+  return mailOwnerFrom(storage, config, ghii, sender, title, text || title);
+}
+
+/**
+ * Mail `text` under `subject` to the owner's verified address on behalf of `sender` (`kind:id`, the
+ * key the bell's sender settings use), within that sender's daily limit. The one path for a mail a
+ * principal's words reach the owner by: the agent's own notice above, and the node's delivery of a
+ * scheduled task's result (task-result-delivery.ts), so both count against the same limit. The caller
+ * has already honoured the owner's mute (notify() answered `muted`).
+ */
+export async function mailOwnerFrom(
+  storage: Storage, config: AimeatConfig, ghii: string, sender: string, subject: string, text: string,
+): Promise<NotificationEmailOutcome> {
+  const email = getActiveEmailService();
+  if (!email?.enabled) return 'mail_off';
+  const to = verifiedNotificationEmail(await storage.getGHII(ghii));
+  if (!to) return 'no_address';
+  const now = Date.now();
+  const key = `${ghii} ${sender}`;
+  if (!underEmailLimit(key, now, emailPerDay(config))) return 'limit';
   try {
     // A reply goes where somebody reads it (email.reply_to), not to the node's no-reply sender.
-    const ok = await email.sendNotification(owner.notificationEmail, title, text || title, { replyTo: config.smtpReplyTo });
+    const ok = await email.sendNotification(to, subject, text, { replyTo: config.smtpReplyTo });
     if (!ok) return 'failed';
+    // Counted only while a limit is in force (underEmailLimit made the entry).
     emailsSent.get(key)?.push(now);
-    await appendMailLog(storage, ghii, { kind: 'notification', subject: title });
+    await appendMailLog(storage, ghii, { kind: 'notification', subject });
     return 'sent';
   } catch (err) {
     logger.warn('notification email: not sent', { ghii, error: String(err) });

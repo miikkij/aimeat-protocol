@@ -4,8 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description The node hands a finished task's result to its owner itself, for a task made by an
  *   agent_task schedule that says `deliver: "owner"` (services/schedule-write.ts). The scheduler stamps
- *   that on the task as one scope entry (DELIVERY_SCOPE, services/scheduler-agent-task.ts), and the
- *   completion fan-out (services/agent-task-fanout.ts) calls deliverTaskResult().
+ *   that on the task as one scope entry (DELIVERY_SCOPE, services/scheduler-agent-task.ts) for the agent
+ *   to read, and the completion fan-out (services/agent-task-fanout.ts) calls deliverTaskResult(). The
+ *   decision is the schedule's own record (deliveringSchedule), never the scope entry: a task's scope
+ *   is written by its agent too.
+ *
+ *   AS THE AGENT. The bell entry names the agent as its sender, so the owner's settings for that agent
+ *   (mute included) apply, and the email goes through notification-create.ts mailOwnerFrom: only to a
+ *   verified address, within the same per-sender daily limit as the agent's own mailed notices.
  *
  *   WHY THE NODE AND NOT THE MODEL. The morning digest a store place offers on the first visit was to be
  *   sent by the agent with its notify tool. On the test lane (guestkoey3wfwk, crew63, 2.11) the model
@@ -20,21 +26,28 @@
  *   the node sends mail, the owner has one, and the deliverable's classification lets it leave the node
  *   (the same leave() check the automation report makes). A result with no words sends nothing.
  * @structure DELIVERY_SCOPE · deliveryScopeEntry(timezone) · withDeliver(kind, input, deliver) ·
- *   deliverTaskResult(storage, config, task, message)
+ *   deliveringSchedule(storage, task) · deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The schedule's record decides delivery, not the task's scope entry, which the
+ *     task's agent may write. The bell entry is the agent's (its mute applies), and the email goes only
+ *     to a verified address within the per-sender daily limit (mailOwnerFrom); an unverified address
+ *     gets no mail and the bell says where to confirm it (secaudit2026nov02d round 13,
+ *     DELIVERY_SCOPE:client-supplied-task-scope and deliverTaskResult:unverified-notification-email).
  *   v1.0.2 — 2026-11-02 — The bell's excerpt is plain text: the bell does not render Markdown, and it showed
  *     "**…**" and "*…" (c9's crew67 round); the email keeps the Markdown.
  *   v1.0.1 — 2026-11-02 — The heading's date in English is en-GB when the person set no region.
  *   v1.0.0 — 2026-11-02 — Initial. The agent's notify tool is taken out when a schedule asks for
  *     delivery (services/delivery-crew.ts).
  */
-import type { Storage, AgentTaskRecord, AgentTaskScope, MemoryRecord } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord, AgentTaskScope, MemoryRecord, ScheduledJobRecord } from '../storage/interface.js';
 import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 import type { AimeatConfig } from '../config.js';
 import { notify } from './notify.js';
 import { getActiveEmailService } from './email.js';
+import { mailOwnerFrom } from './notification-create.js';
+import { notificationEmailUnverified } from './owner-mail-address.js';
 import { displayPrefsFor, formatForPerson, type DisplayPrefs } from './display-prefs.js';
 import { logger } from '../utils/logger.js';
 
@@ -150,13 +163,39 @@ function withoutHeading(text: string): string {
   return lines.join('\n').trim();
 }
 
+/**
+ * The schedule that asked the node to deliver this task's result, or null. Read from the node's own
+ * records, never from the task's scope, which its agent may write (PATCH and the self-create door):
+ * the task must be one no principal's door made (every door records its creator in `createdBy`,
+ * services/agent-task-write.ts; the scheduler records none), its parent must be an agent_task
+ * schedule of the same agent and owner, and that schedule must say `deliver: "owner"` now.
+ */
+export async function deliveringSchedule(storage: Storage, task: AgentTaskRecord): Promise<ScheduledJobRecord | null> {
+  if (task.createdBy || !task.parentTaskId) return null;
+  const job = await storage.getScheduledJob(task.parentTaskId).catch((err: Error) => {
+    logger.warn(`[delivery] the schedule of task ${task.id} could not be read: ${err.message}`);
+    return null;
+  });
+  if (!job || job.type !== 'agent_task' || job.agentGaii !== task.agentGaii || job.ownerScope !== task.ownerGaii) return null;
+  const tmpl = (job.input as { taskTemplate?: { deliver?: unknown } } | undefined)?.taskTemplate;
+  return tmpl?.deliver === 'owner' ? job : null;
+}
+
+/** The line the bell adds when the result was not mailed because the address is not confirmed. */
+const UNVERIFIED_LINE: Record<string, string> = {
+  en: 'Not emailed: confirm your email address on the Email page of your profile.',
+  fi: 'Tätä ei lähetetty sähköpostilla: vahvista sähköpostiosoitteesi profiilisi Sähköposti-sivulla.',
+  es: 'No se envió por correo: confirma tu dirección en la página Correo de tu perfil.',
+};
+
 /** Hand a scheduled task's result to its owner, when its schedule said so. Never throws. */
 export async function deliverTaskResult(
   storage: Storage, config: AimeatConfig, task: AgentTaskRecord, message?: string,
 ): Promise<void> {
   try {
+    const job = await deliveringSchedule(storage, task);
+    if (!job) return;
     const entry = (task.scope ?? []).find((s) => s.name === DELIVERY_SCOPE && s.value === 'owner');
-    if (!entry) return;
     const result = await resultOf(storage, task, message);
     const body = withoutHeading(result.text).slice(0, MAX_BODY);
     const bellText = plainText(body);
@@ -171,15 +210,28 @@ export async function deliverTaskResult(
     });
     const locale = ghii?.locale || config.siteLinks?.defaultLocale || 'en';
     const prefs = await displayPrefsFor(storage, ownerGhii);
-    const heading = `${task.title} – ${dayOf(prefs, task.completedAt ?? task.createdAt, locale, zoneOf(entry))}`;
-
-    await notify(storage, ownerGhii, {
-      type: 'agent_result', title: heading,
-      body: bellText.length > BELL_EXCERPT ? `${bellText.slice(0, BELL_EXCERPT)}…` : bellText,
-      link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
-    });
-
+    const heading = `${task.title} – ${dayOf(prefs, task.completedAt ?? task.createdAt, locale, job.timezone ?? (entry ? zoneOf(entry) : undefined))}`;
     const mail = getActiveEmailService();
+    // The result is mailed only to an address the owner confirmed (owner-mail-address.ts). When the
+    // address is not confirmed, the bell says so and where to confirm it.
+    const unverified = !!mail?.enabled && notificationEmailUnverified(ghii);
+    const excerpt = bellText.length > BELL_EXCERPT ? `${bellText.slice(0, BELL_EXCERPT)}…` : bellText;
+
+    // The agent's result, sent as that agent (notification-create.ts names an agent the same way): the
+    // owner's settings for that agent apply, mute included, as they do to its own notices.
+    const agentName = task.agentGaii.includes('#') ? task.agentGaii.split('#')[0] : task.agentGaii;
+    const source = { kind: 'agent' as const, name: agentName, id: task.agentGaii };
+    const told = await notify(storage, ownerGhii, {
+      type: 'agent_result', title: heading,
+      body: unverified ? `${excerpt}\n\n${UNVERIFIED_LINE[locale] ?? UNVERIFIED_LINE.en}` : excerpt,
+      link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
+      source,
+    });
+    if (told.muted) {
+      logger.info(`[delivery] task ${task.id}: the owner muted ${agentName}, so neither the bell nor the email`);
+      return;
+    }
+
     if (!mail?.enabled || !ghii?.notificationEmail) {
       logger.info(`[delivery] task ${task.id}: in the bell only (${!mail?.enabled ? 'no mail on this node' : 'the owner has no notification address'})`);
       return;
@@ -188,8 +240,9 @@ export async function deliverTaskResult(
       logger.info(`[delivery] task ${task.id}: in the bell only (its classification keeps it inside the node)`);
       return;
     }
-    const sent = await mail.sendNotification(ghii.notificationEmail, heading, body);
-    if (!sent) logger.warn(`[delivery] task ${task.id}: the email was not sent`);
+    // The same path, address check and per-sender daily limit as the agent's own mailed notices.
+    const sent = await mailOwnerFrom(storage, config, ownerGhii, `${source.kind}:${source.id}`, heading, body);
+    if (sent !== 'sent') logger.info(`[delivery] task ${task.id}: the email was not sent (${sent})`);
   } catch (err) {
     // Never in the way of a completion: the result is on the task either way.
     logger.error('[delivery] delivering a task result failed', { taskId: task.id, error: String(err) });

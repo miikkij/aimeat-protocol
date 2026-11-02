@@ -8,6 +8,8 @@
  * @structure EMAIL_CONFIG_FIELDS
  * @usage import { EMAIL_CONFIG_FIELDS } from './config-schema-email.js';
  * @version-history
+ *   v1.2.0 — 2026-11-02 — email.reports_per_sender_day: the daily mail limit per agent or app, default 10,
+ *     0 no limit (secaudit2026nov02d round 13).
  *   v1.1.0 — 2026-10-31 — email.reply_to: the Reply-To of an agent's or app's report mail to its owner,
  *     a valid address or empty (Jouni, 2026-10-31 20.14).
  *   v1.0.0 — 2026-10-20 — Moved from config-schema.ts, unchanged.
@@ -26,6 +28,7 @@ export const EMAIL_CONFIG_FIELDS: ConfigFieldShape<keyof ReturnType<typeof smtpD
   { key: 'smtpPort', dotPath: 'email.smtp_port', envVar: 'AIMEAT_SMTP_PORT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 65535, immutable: false, description: 'SMTP server port', range: '1-65535' },
   { key: 'smtpFrom', dotPath: 'email.smtp_from', envVar: 'AIMEAT_SMTP_FROM', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'SMTP From address' },
   { key: 'smtpReplyTo', dotPath: 'email.reply_to', envVar: 'AIMEAT_SMTP_REPLY_TO', type: 'string', validate: v => v === null || v === '' || (typeof v === 'string' && isValidEmail(v)), immutable: false, description: 'Where a reply goes to a report an agent or an app mails its owner (Reply-To), such as a support address somebody reads. Empty: replies go to the From address. Other mail is unchanged' },
+  { key: 'emailReportsPerSenderDay', dotPath: 'email.reports_per_sender_day', envVar: 'AIMEAT_EMAIL_REPORTS_PER_SENDER_DAY', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10000, immutable: false, description: 'How many mails one agent or app may cause its owner in a day: the reports it mails and the results its delivering schedules send. Past the limit the mail is not sent, and the bell still gets each one. 0: no limit', range: '0-10000' },
   { key: 'smtpSecure', dotPath: 'email.smtp_secure', envVar: 'AIMEAT_SMTP_SECURE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Use implicit TLS (port 465). Set false for STARTTLS (port 587).' },
   { key: 'smtpRejectUnauthorized', dotPath: 'email.smtp_reject_unauthorized', envVar: 'AIMEAT_SMTP_REJECT_UNAUTHORIZED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Reject unauthorized TLS certificates. Set false for self-signed certs or STARTTLS.' },
 
