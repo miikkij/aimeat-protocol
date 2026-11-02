@@ -15,6 +15,9 @@
  *   CODE_PHRASE, FAMILY_PHRASE, ROUTINE, EVENT_PHRASE, Day, byDay
  * @usage routed at /v1/home?trail=1 by spa.html
  * @version-history
+ *   v1.4.1 — 2026-11-02 — On crew63's real log: a run collects one agent's calls even when other
+ *     calls fall between them (one morning digest run had read as two lines), and a random token such
+ *     as a chat's id is no target name (TOKEN_LIKE; "kysyi chatissa: 9goMmaTnszgd").
  *   v1.4.0 — 2026-11-02 — An agent's run is one line with how it ended and how many steps failed
  *     (foldRuns); agents by the name the person gave them; a row the log cannot name waits behind the
  *     tick with the reads (aimeat-protocol-4e's first-timer round on crew60).
@@ -148,6 +151,11 @@ function phraseOf(entry) {
  * never "news-digest"), anything with a long digit run, or a shortened one ending in "…".
  */
 const ID_LIKE = /^[0-9a-f-]{8,}$|^[a-z]{1,8}[_-](?=[0-9a-z]*\d)[0-9a-z]{6,}$|\d{4,}|…$/i;
+/**
+ * A random token: ten or more letters and digits with no separator, mixing cases or with a digit
+ * among letters ("9goMmaTnszgd", a chat's id; crew63's real log). A name has a separator or one case.
+ */
+const TOKEN_LIKE = /^(?=[A-Za-z0-9]{10,}$)(?:(?=.*[a-z])(?=.+[A-Z])|(?=.*\d)(?=.*[A-Za-z])).*$/;
 
 /**
  * What the row acted on, in words a person reads: the first part of the target that is not a machine
@@ -155,7 +163,7 @@ const ID_LIKE = /^[0-9a-f-]{8,}$|^[a-z]{1,8}[_-](?=[0-9a-z]*\d)[0-9a-z]{6,}$|\d{
  * row then goes without one.
  */
 export function plainTarget(raw) {
-  const parts = String(raw || '').trim().split('/').filter((p) => p && !ID_LIKE.test(p));
+  const parts = String(raw || '').trim().split('/').filter((p) => p && !ID_LIKE.test(p) && !TOKEN_LIKE.test(p));
   const name = (parts[0] || '').replace(/\.html$/i, '');
   if (!name || /[.:#@?=]/.test(name) || name.length > 48) return '';
   return name;
@@ -212,17 +220,24 @@ const RUN_GAP_MS = 15 * 60 * 1000;
  * @returns {Array<{ at: string, actorKind: string, text: string }>}
  */
 export function foldRuns(entries, quiet, shownName) {
-  const out = [];
-  let i = 0;
-  while (i < entries.length) {
-    const first = entries[i];
-    let j = i + 1;
-    if (first.actorKind === 'agent') {
-      while (j < entries.length && entries[j].actorKind === 'agent' && entries[j].actor === first.actor
-        && Math.abs(Date.parse(entries[j - 1].at) - Date.parse(entries[j].at)) <= RUN_GAP_MS) j++;
+  // A run collects one agent's calls within RUN_GAP_MS of each other even when other agents' or the
+  // chat's calls fall between them (crew63's real log: one morning digest run read as two lines).
+  const groups = [];
+  const open = new Map();
+  for (const e of entries) {
+    const run = e.actorKind === 'agent' ? open.get(e.actor) : null;
+    if (run && Math.abs(Date.parse(run.lastAt) - Date.parse(e.at)) <= RUN_GAP_MS) {
+      run.entries.push(e);
+      run.lastAt = e.at;
+      continue;
     }
-    const group = entries.slice(i, j);
-    i = j;
+    const group = { entries: [e], lastAt: e.at };
+    if (e.actorKind === 'agent') open.set(e.actor, group);
+    groups.push(group);
+  }
+  const out = [];
+  for (const { entries: group } of groups) {
+    const first = group[0];
     if (group.length === 1) {
       if (!quiet(first)) out.push({ at: first.at, actorKind: first.actorKind, text: trailLine(first, shownName) });
       continue;
