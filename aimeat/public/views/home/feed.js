@@ -8,9 +8,12 @@
  *   tell two different stories about the same account. Its FIRST row exists before the person has
  *   done anything — the account being created is a real event, and an empty feed on a brand-new
  *   account reads as broken.
- * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
+ * @structure HomeFeed({ items }) · FeedRow({ item }) · line · shownLine · isBookkeeping · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-11-02: On a node the store sold, a row names an agent as the person sees it, says a new agent
+ *     plainly ("Uusi agentti on käytössä: <nimi>") and leaves out the day's AI cost in dollars
+ *     (shownLine, isBookkeeping; the away card's rules, commercial's crew64 round). Other nodes as before.
  *   2026-11-01: dataspace_request, filed under access: a data space participant asks for a package and
  *     the agreement waits for the owner (plan doc-mvwxcas3dom3, D8.3).
  *   2026-10-29: agent_permissions_added, filed under access: one of your agents gave another new
@@ -69,6 +72,8 @@ import { t } from '/js/i18n.js';
 import { ago } from '/js/format.js';
 import { Timeline, TimelineRow } from '/components/Timeline.js';
 import { HelpTip } from '/components/HelpTip.js';
+import { customerNode } from '/js/site.js';
+import { useAgentNames } from './agent-names.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -297,6 +302,39 @@ export function line(item) {
   }
 }
 
+/** The events whose `data.agent` is an agent's short name (services/agent-task-fanout.ts and friends). */
+const AGENT_KINDS = new Set(['agent_task_done', 'agent_task_failed', 'agent_task_declined']);
+
+/**
+ * One row in a buyer's words, on a node the store sold: an agent by the name the person sees, a task
+ * title that only repeats that name left out, and a new agent said plainly instead of the remake-era
+ * "is home" (commercial's crew59 test of the away card, crew64 round of the feed: "morning-digest sai
+ * valmiiksi: Aamukatsaus", "morning-digest on kotona"). Elsewhere the row is line() as it was.
+ * @param {any} item
+ * @param {(short: string) => string} shownName
+ */
+export function shownLine(item, shownName) {
+  if (!customerNode()) return line(item);
+  const d = item.data || {};
+  if (item.kind === 'agent_connected') {
+    const name = shownName(d.name || d.agent || '');
+    return name ? tr('home.away.agentNew', 'A new agent is at work: {name}').replace('{name}', name) : '';
+  }
+  if (!AGENT_KINDS.has(item.kind)) return line(item);
+  const agent = shownName(d.agent || '');
+  const title = String(d.title || '').trim().toLowerCase() === agent.toLowerCase() ? '' : d.title;
+  return line({ ...item, data: { ...d, agent, title } });
+}
+
+/**
+ * A row that is bookkeeping, not news, for a buyer: the day's AI cost in dollars with an ISO date
+ * ("AI maksoi $0.0078 päivänä 2026-11-01."). The buyer's credit is shown in euros on the Home and the
+ * AI page; on other nodes the row stays.
+ */
+export function isBookkeeping(item) {
+  return customerNode() && item?.kind === 'ai_spend_daily';
+}
+
 /**
  * Which of six colours one event kind carries on the timeline. Categories, not kinds: a person
  * scanning the trunk asks "did my agents work, did anything break, did money move" — not which of
@@ -330,7 +368,8 @@ const CARD_ROWS = 6;
 
 /** One row. Shared by the card and the full view, so the two cannot drift in how they read. */
 export function FeedRow({ item }) {
-  const text = line(item);
+  const shownName = useAgentNames(customerNode());
+  const text = isBookkeeping(item) ? '' : shownLine(item, shownName);
   if (!text) return null;
   return html`
     <${TimelineRow} category=${kindCategory(item.kind)} live=${item.kind === 'agent_knocking'}
@@ -344,7 +383,7 @@ export function HomeFeed({ items, band }) {
   // with an invitation to go make an event instead of a list that ends three days ago.
   const newestAt = items.reduce((m, it) => Math.max(m, Date.parse(it.at) || 0), 0);
   const quiet = newestAt > 0 && (Date.now() - newestAt) > QUIET_AFTER_DAYS * 86400000;
-  const shown = items.filter(it => line(it));
+  const shown = items.filter(it => line(it) && !isBookkeeping(it));
   // The card is a glance, not an archive. The door to everything only appears when there IS more
   // than a glance: a "see all" under six rows offers a page that shows the same six.
   return html`
