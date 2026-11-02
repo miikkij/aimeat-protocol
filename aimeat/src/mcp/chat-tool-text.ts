@@ -83,7 +83,7 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
         description: 'Read a workspace. Without `ids`: its index (spaces, locked schemas, every item\'s id and title). Then with `ids:[…]`: the full items you need.',
     },
     aimeat_home_feed: {
-        description: 'What the person\'s home page shows: what has happened on their account, newest first. Read it when they ask what is on their home or what is new.',
+        description: 'What the person\'s home page shows: what has happened on their account, newest first. Read it when they ask what is on their home or what is new. Name an agent by `data.agent_shown_name` when a row has it.',
     },
     aimeat_discover: {
         description: 'Find what exists on this AIMEAT in one call: apps, memory, workspaces, knowledge, capabilities. `scope`: own (default), shared (the organisms the person belongs to) or public. `mode: "map"` gives counts first.',
