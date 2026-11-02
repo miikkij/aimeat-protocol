@@ -26329,7 +26329,7 @@ paths:
         '404': { description: No such listed offering }
         '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price), USE_YOUR_ACCOUNT, or PROVIDER_TAKES_NO_CARD (`com.stripe.checkout` asked and the provider has connected no Stripe account; nothing is kept, and the message names the other handlers this node offers, if any)' }
         '422': { description: 'UNKNOWN_PAYMENT_HANDLER, or Stripe refused to open the card page (its own code; the purchase is not kept)' }
-        '429': { description: TOO_MANY_PURCHASES }
+        '429': { description: 'TOO_MANY_PURCHASES (the provider took its 2000 purchases this month; an opening that expired unpaid is not counted), or TOO_MANY_OPENINGS (this address opened more purchases this hour without a party key than the setting consent.party_purchases_per_hour allows, default 20, 0 = no limit; a party buying again with its key is not counted; Retry-After says when)' }
         '502': { description: "The card payment provider failed on the seller's side or its own (the purchase is not kept)" }
   /v1/exchange/purchases/{id}/complete:
     post:
@@ -26342,7 +26342,12 @@ paths:
         endpoint, CSV addresses, HTTP Basic user and the key, the token endpoint). The key is in this
         answer only. Each data read is metered against the contract (402 PREPAID_ENDED when it is
         used up); the read log and the per-party rate limit are the named share's. A delivery that
-        fails after the payment refunds it and reopens the purchase.
+        fails after the payment undoes what it wrote (the contract as it was, a share it made ends, a
+        party it made is removed), asks the payment method to refund with the seller's payment
+        settings, and reopens the purchase. The refusal says the payment was refunded only when the
+        refund went through; otherwise it says the money was not returned and names the purchase id,
+        under which the seller has a record (`commerce.undelivered.<id>`) and the operator a message.
+        A refunded payment does not complete the purchase again (402 PAYMENT_REFUNDED).
       tags: [Commerce]
       security: [{}]
       parameters:
@@ -26357,7 +26362,7 @@ paths:
                 instrument: { type: string }
       responses:
         '200': { description: '`{ purchase, party, share, contract, connection, key_note?, say }`' }
-        '402': { description: The payment did not go through }
+        '402': { description: 'The payment did not go through, or PAYMENT_REFUNDED (this payment was refunded after a failed delivery; start a new purchase)' }
         '404': { description: No such purchase }
         '409': { description: 'ALREADY_COMPLETED or PURCHASE_BUSY' }
         '410': { description: PURCHASE_EXPIRED }

@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.28.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR; secaudit2026nov02d round 13).
  *   v1.27.0 — 2026-11-01 — DataspaceConfig mixed in (config-dataspace.ts; plan doc-mvwxcas3dom3, D8).
  *   v1.26.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION; plan doc-mvwxcas3dom3, D4.3).
  *   v1.25.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION; plan doc-mvwxcas3dom3, D7.1).
@@ -486,6 +487,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   shareMaxDays: number;
   /** Reads one outside party may make a minute before 429 (services/parties/read-gate.ts). */
   partyReadsPerMinute: number;
+  /** Purchases one address may open an hour without a party key (routes/exchange-party-buy.ts); 0 is no limit. */
+  partyPurchasesPerHour: number;
   /** Whether this node runs a data intermediation service and who provides it (services/data-intermediation/). */
   dataIntermediation: DataIntermediationMode;
   /** Whether an app's users may register as outside parties of its owner (services/app-parties/). */

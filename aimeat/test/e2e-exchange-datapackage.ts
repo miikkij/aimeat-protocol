@@ -25,6 +25,9 @@
  *     its promised run has passed (the pointer's time set back).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=exchange-datapackage
  * @version-history
+ *   v1.3.0 — 2026-11-02 — D5.4: openings without a party key count against the address's hourly
+ *     limit (consent.party_purchases_per_hour), a renewal with the key does not, 0 is no limit
+ *     (secaudit2026nov02d round 13).
  *   v1.2.0 — 2026-11-01 — D5.4: the card page of a provider with no Stripe account answers 409
  *     PROVIDER_TAKES_NO_CARD and keeps no purchase.
  *   v1.1.0 — 2026-11-01 — D6: the listing carries the package's freshness.
@@ -271,6 +274,26 @@ await test('D5.4 a party cannot buy an offering of another kind, nor one with no
     assert(r.status === 409 && codeOf(r) === 'NOT_SOLD_TO_PARTIES', `free: ${show(r)}`);
     const none = await call(`/v1/exchange/offerings/off-nosuch/buy`, { body: { party: { display_name: 'P', kind: 'program' } } });
     assert(none.status === 404, `no offering: ${show(none)}`);
+});
+
+await test('D5.4 openings without a party key count against the address\'s hourly limit; a party buying again with its key does not, and 0 is no limit', async () => {
+    const setLimit = (value: number) => call('/v1/admin/config', { token: OP.token, method: 'PUT', body: { changes: [{ path: 'consent.party_purchases_per_hour', value }] } });
+    const anonymous = () => call(`/v1/exchange/offerings/${monthOffering}/buy`, { body: { party: { display_name: 'Rate Buyer', kind: 'person', contact: 'rate@example.org' }, months: 1, handler: 'test.money' } });
+    try {
+        const set = await setLimit(1);
+        assert(set.status === 200, `the setting: ${show(set)}`);
+        await anonymous();
+        const over = await anonymous();
+        assert(over.status === 429 && codeOf(over) === 'TOO_MANY_OPENINGS', `past the limit: ${show(over)}`);
+        assert((over.body.error?.message ?? '').includes('consent.party_purchases_per_hour') && /party key/.test(over.body.error?.message ?? ''), `the refusal names the setting and the key: ${show(over)}`);
+        const renew = await call(`/v1/exchange/offerings/${monthOffering}/buy`, { basic: `${parties.month.user}:${parties.month.key}`, body: { months: 1, handler: 'test.money' } });
+        assert(renew.status === 201 && renew.body.data.purchase.renewal === true, `a party with its key is not counted: ${show(renew)}`);
+        assert((await setLimit(0)).status === 200, 'no limit');
+        const free = await anonymous();
+        assert(free.status === 201, `0 is no limit: ${show(free)}`);
+    } finally {
+        await setLimit(20);
+    }
 });
 
 console.log('\nD5.5 deliversData, ODPS');

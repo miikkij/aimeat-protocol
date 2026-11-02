@@ -15,6 +15,9 @@
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.4).
  *   v1.0.1 — 2026-11-01 — The signed-in refusal tests for a session, not its `sub` (check:identity-resolution).
+ *   v1.1.0 — 2026-11-02 — secaudit2026nov02d round 13: an opening without a party key counts against
+ *     the address's hourly limit (consent.party_purchases_per_hour, 0 = no limit); a party buying
+ *     again with its key is not counted.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -25,10 +28,17 @@ import { partyCredentialOf, verifyParty } from '../services/parties/verify.js';
 import { openPartyPurchase, completePartyPurchase, readPartyPurchase, purchaseView } from '../services/exchange-party-buy.js';
 import { validateBody } from '../models/schemas.js';
 import { PartyBuySchema, PartyPurchaseCompleteSchema } from '../models/exchange-datapackage-schemas.js';
+import { rateBuckets } from '../services/rate-buckets.js';
+import { ipRateKey } from '../middleware/rate-limit.js';
+
+const OPEN_WINDOW_MS = 60 * 60 * 1000;
 
 export function exchangePartyBuyRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
     const deps = { storage, config };
+    // Openings without a party key, counted per address and hour. Nobody pays to open one, so the
+    // count keeps one address from filling a provider's month with openings it never pays for.
+    const takeOpening = rateBuckets(OPEN_WINDOW_MS);
 
     router.post('/v1/exchange/offerings/:id/buy', validateBody(PartyBuySchema, config.nodeId), async (req: Request, res: Response) => {
         // A party buying again proves who it is; a credential that names no live party is refused.
@@ -44,6 +54,17 @@ export function exchangePartyBuyRouter(config: AimeatConfig, storage: Storage): 
                 'You are signed in to an account here. Accept the offering with your account instead: buying here is for someone with no account.',
                 undefined, { accept: { method: 'POST', url: '/v1/exchange/entitlements', body: { offering_id: req.params.id } } }));
             return;
+        }
+        const perHour = config.partyPurchasesPerHour;
+        if (!renewal && perHour > 0) {
+            const counted = takeOpening(ipRateKey(req.ip ?? req.socket.remoteAddress), perHour);
+            if (!counted.ok) {
+                res.setHeader('Retry-After', counted.retryAfterSec);
+                res.status(429).json(error(config.nodeId, 'TOO_MANY_OPENINGS',
+                    `This server takes ${perHour} purchases an hour from one address without a party key. Try again after ${new Date(counted.resetAt).toISOString()}, `
+                    + 'or buy again with your party key, which is not counted. The server\'s operator sets this number (consent.party_purchases_per_hour).'));
+                return;
+            }
         }
         const out = await openPartyPurchase(deps, req.params.id as string, (req.body ?? {}) as Record<string, unknown>, renewal);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }

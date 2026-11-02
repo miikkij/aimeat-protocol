@@ -15,6 +15,8 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.7.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR, 20, 0 = no limit):
+ *     purchases one address may open an hour without a party key (secaudit2026nov02d round 13).
  *   v1.6.0 — 2026-11-01 — The Dataspace Protocol provider's settings (config-dataspace.ts) are spread in
  *     here, beside the other settings of data leaving the node (plan doc-mvwxcas3dom3, D8).
  *   v1.5.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION: off, the default |
@@ -80,6 +82,9 @@ export function dataAccessDefaults() {
     shareMaxDays: positiveInt(process.env.AIMEAT_SHARE_MAX_DAYS, 365, 3650),
     // How many reads one outside party may make a minute; past it 429 (services/parties/read-gate.ts).
     partyReadsPerMinute: positiveInt(process.env.AIMEAT_PARTY_READS_PER_MINUTE, 60, 100_000),
+    // How many purchases one address may open an hour without a party key (routes/exchange-party-buy.ts).
+    // 0 is no limit; a party buying again with its key is not counted.
+    partyPurchasesPerHour: countOrDefault(process.env.AIMEAT_PARTY_PURCHASES_PER_HOUR, 20, 100_000),
     // Whether this node runs a data intermediation service (EU 2022/868), and who provides it
     // (services/data-intermediation/). report, the code default, refuses nothing.
     dataIntermediation: parseDataIntermediationMode(process.env.AIMEAT_DATA_INTERMEDIATION),
@@ -122,4 +127,10 @@ export function parseDataIntermediationMode(v: unknown): DataIntermediationMode 
 function positiveInt(raw: string | undefined, fallback: number, max: number): number {
   const n = Number.parseInt(raw ?? '', 10);
   return Number.isInteger(n) && n >= 1 && n <= max ? n : fallback;
+}
+
+/** A whole number from 0 (a limit's "no limit") to `max`, or the fallback for anything else. */
+function countOrDefault(raw: string | undefined, fallback: number, max: number): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  return Number.isInteger(n) && n >= 0 && n <= max ? n : fallback;
 }

@@ -15187,6 +15187,7 @@
     "cfg_consent_audit_retention_days": "Tarkistuslogin säilytys (pv)",
     "cfg_consent_share_max_days": "Ulkopuolisen osapuolen jaon pisin kesto (pv)",
     "cfg_consent_party_reads_per_minute": "Ulkopuolisen osapuolen lukukerrat minuutissa",
+    "cfg_consent_party_purchases_per_hour": "Yhdestä osoitteesta aloitetut ostot tunnissa",
     "cfg_consent_data_intermediation": "Datanvälityspalvelu (EU 2022/868)",
     "cfg_consent_party_self_registration": "Sovelluksiin rekisteröidytään ilman tiliä",
     "cfg_dataspace_enabled": "Datapaketit tarjolla data-avaruuksiin",
@@ -15406,6 +15407,7 @@
     "cfgDesc_dataspace_tck_mode": "Ajaa Dataspace Protocolin yhteensopivuustestit tätä palvelinta vastaan: lisää testien aineistot ja sopimukset ja käy läpi niiden tilanteet. Toimii vain testi- tai hiekkalaatikkopalvelimella, jonka osoite on paikallinen. Julkinen palvelin ei välitä tästä asetuksesta.",
     "cfgDesc_dataspace_max_processes_per_participant": "Kuinka monta avointa neuvottelua ja siirtoa yhdellä osallistujalla voi olla yhtä aikaa saman tilin kanssa. Tilillä voi olla niitä yhteensä 400. Raja estää yhtä osallistujaa viemästä ne kaikki ja sulkemasta muita ulos. Kun osallistuja on rajalla, palvelin kieltäytyy sen uusista pyynnöistä, kunnes se päättää jonkin. 0: osallistujalla ei ole omaa rajaa, vain tilin 400. Oletus on 100.",
     "cfgDesc_consent_share_max_days": "Kuinka pitkäksi aikaa omistaja voi jakaa datatuotteen nimetylle ulkopuoliselle osapuolelle.",
+    "cfgDesc_consent_party_purchases_per_hour": "Kuinka monta datapaketin ostoa yhdestä osoitteesta voi aloittaa tunnissa ilman tiliä tai osapuolen avainta. Kun raja täyttyy, palvelin torjuu seuraavat oston aloitukset tunnin loppuun asti. Ulkopuolinen osapuoli, joka ostaa uudelleen avaimellaan, ei kuluta rajaa. 0 tarkoittaa, ettei rajaa ole.",
     "dataOut": {
       "dspTitle": "Dataspace Protocol nyt",
       "dspState": "Tila",
