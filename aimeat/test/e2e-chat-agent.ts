@@ -36,6 +36,9 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   2026-11-02 -- A SILENT turn (no words, no tool call) is told and saved as chatTurn.noAnswer (crew60).
+ *     The streamed and saved answer of the app turn carries the node's "Your app is ready" line: the
+ *     two assertions predated chat-session.ts v1.16.0 (2026-10-31) and were red on main.
  *   2026-10-31 -- The session's token is called against the chat surface it names, and a session whose
  *     aimeat MCP server did not load ends the turn with CHAT_TOOLS_NOT_CONNECTED (v27 P2). Both were
  *     red on the code before: the first answered 401 "This token names no audience".
@@ -73,6 +76,8 @@ const BROKEN_PORT = PORT + 1;
 const NODE_ID = 'aimeat-local-001-dev';
 const PEER = pathToFileURL(resolvePath(process.cwd(), 'test/helpers/fake-goose-acp.ts')).href;
 const FIXTURES = resolvePath(process.cwd(), 'test/fixtures/file-text');
+/** The node's own line after a turn that published an app (locales/en.json chatTurn.appReady). */
+const APP_READY = 'Your app is ready. Open it here: https://apps.example.test/pong';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -320,7 +325,9 @@ async function run(): Promise<void> {
         // The words after a round of tool calls are a new paragraph (chat-session.ts v1.8.0): a model
         // asked to say what it is doing between its steps writes a sentence before each round, and
         // without the break the next one is glued to its full stop.
-        assert(said === 'Here is \n\nyour game.', `the chunks arrive in order, got ${JSON.stringify(said)}`);
+        // The fake turn publishes an app, and since chat-session.ts v1.16.0 (2026-10-31) the node adds
+        // the app's address in its own words after the model's; this line expected the model's alone.
+        assert(said === `Here is \n\nyour game.\n\n${APP_READY}`, `the chunks arrive in order, got ${JSON.stringify(said)}`);
 
         const done = events.at(-1)!;
         assert(done.kind === 'done', `the turn ends with a verdict, got ${done.kind}`);
@@ -426,7 +433,7 @@ async function run(): Promise<void> {
         assert(mine[0].text === 'build me a pong game', `the person's own words, got ${mine[0].text}`);
 
         const last = theirs.at(-1);
-        assert(last.text === 'Here is \n\nyour game.', `the answer as it was streamed, got ${JSON.stringify(last.text)}`);
+        assert(last.text === `Here is \n\nyour game.\n\n${APP_READY}`, `the answer as it was streamed, got ${JSON.stringify(last.text)}`);
         assert(last.model === 'fake/model-1', `the model the node chose, got ${last.model}`);
         // One entry, not two: the call arrives twice and only the first carries a title, so a log
         // keyed by title leaves every call reading "starting" whatever happened to it.
@@ -669,6 +676,18 @@ async function run(): Promise<void> {
         assert(last.kind === 'done', `the turn completes on a fresh process, got ${last.kind}: ${JSON.stringify(last)}`);
         assert(peerRequests('initialize').length === starts + 1,
             `exactly one more process was started, got ${peerRequests('initialize').length - starts}`);
+    });
+
+    await test('a turn that ends with no words and no tool call says so, and saves that, never a blank', async () => {
+        // crew60, 2026-11-02: a build request turn ended in six seconds with an empty text, and the
+        // page showed nothing under the question.
+        const events = await turn(threadId, { text: 'SILENT: answer nothing' });
+        const said = events.filter((e) => e.kind === 'text').map((e) => String(e.text)).join('');
+        assert(said.includes('No answer came this time'), `the person is told, got ${JSON.stringify(said)}`);
+        assert(events.at(-1)!.kind === 'done', `the turn still ends as done, got ${events.at(-1)!.kind}`);
+        const { body } = await json(`/v1/chat/threads/${encodeURIComponent(threadId)}`, authed());
+        const last = body.data.thread.turns.at(-1);
+        assert(last.role === 'agent' && String(last.text).includes('No answer came this time'), `the saved turn is not blank: ${JSON.stringify(last)}`);
     });
 
     // ── A session's MCP token lives as long as the session (secaudit2026oct26, goose-chat-config.

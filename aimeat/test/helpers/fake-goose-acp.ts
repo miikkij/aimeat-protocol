@@ -20,7 +20,7 @@
  *   test, where the entry is src/index.ts and this module does nothing at all.
  *
  *   WHAT THE TURN DOES IS DRIVEN BY THE PROMPT TEXT, so one peer serves every case: STALL waits to
- *   be cancelled, DIENOW dies mid-turn, LLMCALL makes one model call the way goose's OpenAI provider
+ *   be cancelled, DIENOW dies mid-turn, SILENT ends the turn with no words and no tool call, LLMCALL makes one model call the way goose's OpenAI provider
  *   does (POST <OPENAI_HOST>/<OPENAI_BASE_PATH>, `Authorization: Bearer <OPENAI_API_KEY>`) and answers
  *   with what came back. Everything else gets the full script.
  *
@@ -37,6 +37,7 @@
  *   NODE_OPTIONS="--import tsx --import file:///…/test/helpers/fake-goose-acp.ts"
  *   FAKE_GOOSE_LOG=<path to a JSONL file>
  * @version-history
+ *   v1.5.0 — 2026-11-02 — SILENT: a turn that ends with no words and no tool call (crew60's empty answer).
  *   v1.4.0 — 2026-10-31 — A file `<FAKE_GOOSE_LOG>.fail-aimeat` makes session/new report the aimeat
  *     MCP server as failed to load, for the chat's CHAT_TOOLS_NOT_CONNECTED refusal (v27 P2).
  *   v1.3.0 — 2026-10-02 — `session/cancel` is obeyed as the notification ACP defines and refused as a
@@ -200,6 +201,13 @@ async function runPeer(): Promise<void> {
                 return;
             }
             update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Here is what I found.' } });
+            send({ jsonrpc: '2.0', id: requestId, result: { stopReason: 'end_turn' } });
+            return;
+        }
+
+        // A model that ends its turn with no words and no tool call, as gpt-oss-120b did on crew60.
+        if (text.includes('SILENT')) {
+            record({ kind: 'silent', sessionId });
             send({ jsonrpc: '2.0', id: requestId, result: { stopReason: 'end_turn' } });
             return;
         }

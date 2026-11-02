@@ -25,6 +25,9 @@
  *   SpecRows
  * @usage html`<${BuildWithYou} />` (views/home/index.js, under the buyer's welcome)
  * @version-history
+ *   v1.1.3 — 2026-11-02 — The invitation step is true whether or not the person has accepted it (the place
+ *     cannot see that), and the follow link says "Open it on <host>" instead of the organism's name, which
+ *     ran past the edge at 390 px (first-timer round on crew60).
  *   v1.1.2 — 2026-11-01 — The invitation step says the aimeat.io account and links its Shared places
  *     page, unless the queue says the invitation went only to an email address (inviteEmail without
  *     inviteAccount).
@@ -254,12 +257,13 @@ function InvitedGuide({ request, queueOrigin }) {
         <${IndexStep}>
           ${byEmail
             ? fill(tr('home.buildWithYou.acceptTo', 'Accept the invitation in your email. It went to {email}.'), { email: request.inviteEmail })
-            : html`${fill(tr('home.buildWithYou.acceptAccount', 'Accept the invitation in your {host} account. It waits on the Shared places page.'), { host })}
+            : html`${fill(tr('home.buildWithYou.acceptAccount', 'The invitation went to your {host} account, on its Shared places page. Accept it there, if you have not done so yet.'), { host })}
               ${invitesHref && html`<${Actions}><${Action} small href=${invitesHref} newTab>${tr('home.buildWithYou.acceptAccountButton', 'Open the invitation')} →<//><//>`}`}
         <//>
         <${IndexStep}>
           ${fill(tr('home.buildWithYou.follow', 'Follow the work on {host}.'), { host })}
-          ${orgHref && html`<${Actions}><${Action} small href=${orgHref} newTab>${org?.name || host} →<//><//>`}
+          ${/* A short label: the organism's name is in the lead above, and as a link it ran past a phone's edge. */''}
+          ${orgHref && html`<${Actions}><${Action} small href=${orgHref} newTab>${fill(tr('home.buildWithYou.followButton', 'Open it on {host}'), { host })} →<//><//>`}
         <//>
         <${IndexStep}>
           ${fill(tr('home.buildWithYou.connectThere', 'Connect your AI to {host} too, the same way as here: open Connect your AI on {host}, pick your AI and follow the steps on the page. At the end you approve the connection.'), { host })}
