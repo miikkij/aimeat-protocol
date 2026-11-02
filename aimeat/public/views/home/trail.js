@@ -15,6 +15,9 @@
  *   CODE_PHRASE, FAMILY_PHRASE, ROUTINE, EVENT_PHRASE, Day, byDay
  * @usage routed at /v1/home?trail=1 by spa.html
  * @version-history
+ *   v1.4.0 — 2026-11-02 — An agent's run is one line with how it ended and how many steps failed
+ *     (foldRuns); agents by the name the person gave them; a row the log cannot name waits behind the
+ *     tick with the reads (aimeat-protocol-4e's first-timer round on crew60).
  *   v1.3.0 — 2026-11-02 — The Home's own record writes (home.visits, home.offers and the like, which
  *     the page makes while the person only looks) are routine; "Pidä tämä" on home.made-for-you stays
  *     in view as "kept the work made for them". Needs the record key as the target, which POST
@@ -31,7 +34,8 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t, getLocale } from '/js/i18n.js';
+import { t, tn, getLocale } from '/js/i18n.js';
+import { useAgentNames } from './away.js';
 import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { getSession } from '/js/services/auth.js';
@@ -161,9 +165,10 @@ export function plainTarget(raw) {
  * Who did it. Always a third person, never "you": the verb phrase is one form per language, and a
  * "Sinä julkaisi" would be wrong Finnish.
  */
-function who(entry) {
+function who(entry, shownName = (n) => n) {
   const name = String(entry.actorName || '').trim();
-  if (name) return name;
+  // An agent by the name the person gave it (the Agents page's), not its short name.
+  if (name) return entry.actorKind === 'agent' || entry.actorKind === 'ai' ? shownName(name) : name;
   if (entry.actorKind === 'operator') return tr('home.trail.operator', 'The operator');
   return String(entry.actor || tr('home.trail.someone', 'Someone'));
 }
@@ -174,7 +179,7 @@ function who(entry) {
  * every other row says "made a change" or "read data". A route or an id is never shown (commercial's
  * crew55 chain test). A failed action says so after the sentence.
  */
-export function trailLine(entry) {
+export function trailLine(entry, shownName) {
   const code = String(entry.code || '');
   const phraseId = phraseOf(entry);
   const keyed = phraseId ? tr(`home.trail.did.${phraseId}`, '') : '';
@@ -183,24 +188,68 @@ export function trailLine(entry) {
     ? tr('home.trail.did.readData', 'read data')
     : tr('home.trail.did.madeChange', 'made a change'));
   // An agent acting on its own task names itself as the target; saying it twice reads as a fault.
+  const actor = who(entry, shownName);
   const named = plainTarget(entry.target);
-  const target = named && named !== who(entry) ? named : '';
+  const target = named && named !== actor && named !== entry.actorName ? named : '';
   const line = target
-    ? fill(tr('home.trail.lineTarget', '{who} {what}: {target}'), { who: who(entry), what: phrase, target })
-    : fill(tr('home.trail.line', '{who} {what}'), { who: who(entry), what: phrase });
+    ? fill(tr('home.trail.lineTarget', '{who} {what}: {target}'), { who: actor, what: phrase, target })
+    : fill(tr('home.trail.line', '{who} {what}'), { who: actor, what: phrase });
   return entry.outcome === 'error' ? `${line} ${tr('home.trail.failed', '(did not succeed)')}` : line;
 }
 
-function byDay(entries) {
+/** Two calls of one agent this close together are one run of its work. */
+const RUN_GAP_MS = 15 * 60 * 1000;
+
+/**
+ * The rows to show, newest first. An agent's run (its calls one after another, each within RUN_GAP_MS
+ * of the next) is one line with how it ended: finished, not finished, or worked, with how many steps
+ * and how many of them failed (aimeat-protocol-4e's first-timer round on crew60: a morning digest run
+ * was about 25 rows). Outside a run, a row the log cannot name ("made a change", a read, housekeeping)
+ * is not shown; the tick shows every row as it is.
+ * @param {any[]} entries
+ * @param {(e: any) => boolean} quiet
+ * @param {(n: string) => string} shownName
+ * @returns {Array<{ at: string, actorKind: string, text: string }>}
+ */
+export function foldRuns(entries, quiet, shownName) {
+  const out = [];
+  let i = 0;
+  while (i < entries.length) {
+    const first = entries[i];
+    let j = i + 1;
+    if (first.actorKind === 'agent') {
+      while (j < entries.length && entries[j].actorKind === 'agent' && entries[j].actor === first.actor
+        && Math.abs(Date.parse(entries[j - 1].at) - Date.parse(entries[j].at)) <= RUN_GAP_MS) j++;
+    }
+    const group = entries.slice(i, j);
+    i = j;
+    if (group.length === 1) {
+      if (!quiet(first)) out.push({ at: first.at, actorKind: first.actorKind, text: trailLine(first, shownName) });
+      continue;
+    }
+    const phrases = group.map(phraseOf);
+    const failedSteps = group.filter((e) => e.outcome === 'error').length;
+    if (!group.some((e) => !quiet(e)) && !failedSteps) continue;
+    const kind = phrases.includes('finishedTask') ? 'finished' : phrases.includes('failedTask') ? 'failed' : 'worked';
+    const runWords = { finished: 'finished its work', failed: 'could not finish its work', worked: 'worked' };
+    const steps = tn('home.trail.run.steps', group.length);
+    let text = fill(tr(`home.trail.run.${kind}`, `{who} ${runWords[kind]} ({steps})`), { who: who(first, shownName), steps });
+    if (failedSteps) text += ` ${tn('home.trail.run.failedSteps', failedSteps)}`;
+    out.push({ at: first.at, actorKind: first.actorKind, text });
+  }
+  return out;
+}
+
+function byDay(items) {
   const groups = [];
   let current = null;
-  for (const entry of entries) {
-    const day = dayKey(new Date(entry.at));
+  for (const item of items) {
+    const day = dayKey(new Date(item.at));
     if (!current || current.day !== day) {
-      current = { day, entries: [] };
+      current = { day, items: [] };
       groups.push(current);
     }
-    current.entries.push(entry);
+    current.items.push(item);
   }
   return groups;
 }
@@ -215,9 +264,9 @@ function dayLabel(day) {
 function Day({ group }) {
   return html`
     <${DayGroup} title=${dayLabel(group.day)}>
-      ${group.entries.map((entry, i) => html`
-        <${TimelineRow} key=${i} category=${KIND_CATEGORY[entry.actorKind] || 'system'}
-          text=${trailLine(entry)} when=${ago(entry.at, { horizonDays: Infinity })} />`)}
+      ${group.items.map((item, i) => html`
+        <${TimelineRow} key=${i} category=${KIND_CATEGORY[item.actorKind] || 'system'}
+          text=${item.text} when=${ago(item.at, { horizonDays: Infinity })} />`)}
     <//>`;
 }
 
@@ -230,6 +279,7 @@ export default function HomeTrailView({ navigate }) {
   // An MCP tool that only reads (readOnly) is hidden until asked for: an AI reads far more often than
   // it changes anything, and the reads would bury what was done.
   const [showReads, setShowReads] = useState(false);
+  const shownName = useAgentNames(!!session);
 
   const load = useCallback(async () => {
     try {
@@ -280,10 +330,13 @@ export default function HomeTrailView({ navigate }) {
 
   if (!entries) return html`<${PageFrame} loading=${true}><${Spinner} /><//>`;
 
-  // Reads and housekeeping wait behind one tick: what was done to the place stays in view.
-  const quiet = (entry) => entry.readOnly || isRoutine(entry);
-  const shown = showReads ? entries : entries.filter((entry) => !quiet(entry));
-  const hasReads = entries.some(quiet);
+  // Reads, housekeeping and rows the log cannot name wait behind one tick, and an agent's run is one
+  // line: what was done to the place stays in view. The tick shows every row as it is.
+  const quiet = (entry) => entry.readOnly || isRoutine(entry) || !phraseOf(entry);
+  const shown = showReads
+    ? entries.map((entry) => ({ at: entry.at, actorKind: entry.actorKind, text: trailLine(entry, shownName) }))
+    : foldRuns(entries, quiet, shownName);
+  const hasReads = entries.some(quiet) || shown.length < entries.length;
 
   return html`
     <${PageFrame} width="narrow">

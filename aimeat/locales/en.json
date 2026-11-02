@@ -16189,6 +16189,15 @@
       "lineTarget": "{who} {what}: {target}",
       "failed": "(did not succeed)",
       "showReads": "Show reads and routine entries too",
+      "run": {
+        "finished": "{who} finished its work ({steps})",
+        "failed": "{who} could not finish its work ({steps})",
+        "worked": "{who} worked ({steps})",
+        "steps_one": "{n} step",
+        "steps": "{n} steps",
+        "failedSteps_one": "· {n} step did not succeed",
+        "failedSteps": "· {n} steps did not succeed"
+      },
       "did": {
         "sentRequest": "sent the build request",
         "checkedRequest": "checked the build request",

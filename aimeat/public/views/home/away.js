@@ -17,7 +17,7 @@
  *   without a card, and blocked storage only means no card.
  *
  *   ONLY ON A NODE THE STORE SOLD (site.js customerNode()), and only from the second visit.
- * @structure AwayCard() · internal: readVisit, noteVisit, AWAY_AFTER_MS, ROWS
+ * @structure AwayCard() · useAgentNames(on) · internal: readVisit, noteVisit, AWAY_AFTER_MS, ROWS
  * @usage html`<${AwayCard} />`
  * @version-history
  *   v1.1.0 — 2026-11-02 — An agent is named by the name the person sees (GET /v1/agents), a title that
@@ -79,6 +79,20 @@ function noteVisit(now = Date.now()) {
   return awaySince;
 }
 
+/**
+ * The names the person sees for their agents, by short name (GET /v1/agents, as the Agents page), and
+ * a function that gives the shown name for a short one. One key and one shape for every caller, since
+ * useShared caches by key. The activity log reads it too.
+ * @param {boolean} [on]
+ * @returns {(short: string) => string}
+ */
+export function useAgentNames(on = true) {
+  const owner = getSession()?.owner || '';
+  const { data: names } = useShared('agent-display-names', on && owner ? `/v1/agents?owner=${encodeURIComponent(owner)}` : null,
+    ['agents'], (d) => Object.fromEntries((d?.agents || d || []).map((a) => [a.name, a.display_name || a.displayName || a.name])));
+  return (short) => (names && names[short]) || short;
+}
+
 /** The events whose `data.agent` is an agent's short name (services/agent-task-fanout.ts and friends). */
 const AGENT_KINDS = new Set(['agent_task_done', 'agent_task_failed', 'agent_task_declined']);
 
@@ -109,13 +123,9 @@ export function AwayCard() {
   const { data: feed } = useShared('home-feed', since ? '/v1/home/feed' : null, ['home'], (d) => d?.items ?? []);
   const { data: notes } = useShared('notifications-unread', since ? '/v1/notifications?unread=1&limit=50' : null,
     ['notifications'], (d) => d?.notifications ?? []);
-  // The names the person sees for their agents, by short name (GET /v1/agents, as the Agents page).
-  const owner = getSession()?.owner || '';
-  const { data: names } = useShared('away-agent-names', since && owner ? `/v1/agents?owner=${encodeURIComponent(owner)}` : null,
-    ['agents'], (d) => Object.fromEntries((d?.agents || d || []).map((a) => [a.name, a.display_name || a.displayName || a.name])));
+  const shownName = useAgentNames(!!since);
   if (!since || !feed || !notes) return null;
 
-  const shownName = (short) => (names && names[short]) || short;
   const after = Date.parse(since);
   const rows = [
     ...feed.filter((it) => Date.parse(it.at) > after && it.kind !== 'agent_knocking')
