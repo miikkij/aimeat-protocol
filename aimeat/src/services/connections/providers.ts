@@ -23,6 +23,9 @@
  *   - findProvider(list, id) / listProviderMeta(list) — lookup + the safe public projection
  * @usage const providers = buildOutboundProviders(config);
  * @version-history
+ *   v1.7.0 — 2026-11-02 — SharePoint and OneDrive join from ./providers-files.ts as a read/write pair,
+ *     `microsoft-files` and `microsoft-files-write`, on the Outlook app registration; which sites the
+ *     app asks for is AIMEAT_CONNECT_MICROSOFT_FILES_SITES.
  *   v1.6.0 — 2026-10-15 — Facebook Page, Instagram and Reddit join from ./providers-social.ts, with
  *     four optional descriptor fields they need (scopeSeparator, authorizeParams, tokenHeaders,
  *     refreshSkewMs). `read-replies` and `publish-image` join the capability vocabulary: the first is
@@ -55,12 +58,14 @@
 
 import type { AimeatConfig } from '../../config.js';
 import { googleMail, googleMailSend, microsoftMail, microsoftMailSend, fakeMail } from './providers-mail.js';
+import { microsoftFiles, microsoftFilesWrite } from './providers-files.js';
 import { facebook, instagram, reddit } from './providers-social.js';
 
 // The descriptor types live in providers-types.ts since 2026-10-15; re-exported so every import
 // of them from this file keeps working.
 export type {
-  OutboundProviderId, AttachField, OAuthEndpoints, ProviderResource, OutboundProvider, OutboundProviderMeta,
+  OutboundProviderId, AttachField, OAuthEndpoints, ProviderResource, ProviderWriteResource, OutboundProvider,
+  OutboundProviderMeta,
 } from './providers-types.js';
 import type { OutboundProvider, OutboundProviderMeta } from './providers-types.js';
 
@@ -495,6 +500,9 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
     googleMailSend(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
     microsoftMail(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on),
     microsoftMailSend(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on),
+    // SharePoint and OneDrive: the same app registration as Outlook, a read/write pair of its own.
+    microsoftFiles(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on, config.connectMicrosoftFilesSites),
+    microsoftFilesWrite(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on, config.connectMicrosoftFilesSites),
     bluesky(on),
     facebook(config.connectFacebookClientId, config.connectFacebookClientSecret, on, config.connectFacebookConfigId),
     instagram(config.connectInstagramClientId, config.connectInstagramClientSecret, on),

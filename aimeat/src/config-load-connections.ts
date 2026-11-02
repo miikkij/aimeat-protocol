@@ -17,6 +17,7 @@
  * @structure loadConnectionsConfig()
  * @usage const config = { ...loadConnectionsConfig(), … };
  * @version-history
+ *   v1.1.0 — 2026-11-02 — AIMEAT_CONNECT_MICROSOFT_FILES_SITES (all | selected).
  *   v1.0.0 — 2026-09-16 — Extracted from config.ts (max-file-lines), with the two stdio settings as
  *     the block that pushed it over.
  */
@@ -36,6 +37,8 @@ export function loadConnectionsConfig(): ConnectionsConfig & McpProxyConfig {
     // GUID pins one directory. This is the tenant the NODE's own app is registered in; a principal
     // who brings their own single-tenant app supplies its tenant with the client credentials.
     connectMicrosoftTenant: process.env.AIMEAT_CONNECT_MICROSOFT_TENANT ?? 'common',
+    // Anything but 'selected' is 'all': a typo must not narrow the reach to nothing in silence.
+    connectMicrosoftFilesSites: process.env.AIMEAT_CONNECT_MICROSOFT_FILES_SITES === 'selected' ? 'selected' : 'all',
     connectLinkedinClientId: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_ID ?? '',
     connectLinkedinClientSecret: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET ?? '',
     connectXClientId: process.env.AIMEAT_CONNECT_X_CLIENT_ID ?? '',

@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-02 — registerConnectionFileTools (aimeat_files_browse, aimeat_files_get, aimeat_files_write).
  *   2026-10-31 — registerAiGenRulesTools (aimeat_ai_gen_rules, aimeat_ai_gen_rules_set).
  *   2026-10-27 — registerAppsTools receives the app a role-'app' bearer names, so a publish through an app's grant names that app (secaudit2026oct26).
  *   2026-10-25 — registerSecretHostAskTools: aimeat_secret_host_ask (secaudit2026oct22).
@@ -188,6 +189,7 @@ import { registerInvokeTool } from './invoke.js';
 import { registerToolLoader } from './tool-loader.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
+import { registerConnectionFileTools } from './connection-files.js';
 import { registerRefineryTools } from './refinery.js';
 import { registerContentTools } from './content.js';
 import { registerDocsignTools } from './docsign.js';
@@ -246,6 +248,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerOrganismsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
+    registerConnectionFileTools(mcp, storage, config, agentGaii, scopes, caller);
     registerRefineryTools(mcp, storage, config, agentGaii, scopes, caller);
     registerContentTools(mcp, storage, config, caller);
     registerDocsignTools(mcp, storage, config, caller);

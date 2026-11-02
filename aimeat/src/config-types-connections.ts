@@ -16,6 +16,7 @@
  *   provider, then the callback and the test-only stand-in.
  * @usage export interface AimeatConfig extends ConnectionsConfig { … }
  * @version-history
+ *   v1.1.0 — 2026-11-02 — connectMicrosoftFilesSites: which SharePoint sites the files pair reaches.
  *   v1.0.0 — 2026-08-26 — Extracted from config-types.ts (max-file-lines), with the Microsoft mail
  *     registration as the block that pushed it over.
  */
@@ -55,6 +56,13 @@ export interface ConnectionsConfig {
    * tenant alongside the client credentials; this is only the node's own.
    */
   connectMicrosoftTenant: string;
+  /**
+   * Which SharePoint sites the SharePoint and OneDrive connections may reach. 'all' asks Microsoft for
+   * Files and Sites .Read.All / .ReadWrite.All: a person reaches what they reach in SharePoint
+   * themselves. 'selected' asks for Sites.Selected: the consent grants nothing by itself, and a
+   * SharePoint administrator grants the app access site by site.
+   */
+  connectMicrosoftFilesSites: 'all' | 'selected';
 
   /** LinkedIn app client id. Consumer tier, self-serve: no product review to wait on. */
   connectLinkedinClientId: string;

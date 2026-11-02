@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-02 -- definitions/connection-files.ts: aimeat_files_browse, _get and _write (SharePoint and OneDrive).
  *   v1.x -- 2026-11-01 -- definitions/build-with-you.ts: aimeat_build_request_submit, _status and aimeat_trail_list.
  *   v1.x -- 2026-11-01 -- definitions/dataspace.ts: aimeat_dataspace (plan doc-mvwxcas3dom3, D8.3).
  *   v1.x -- 2026-11-01 -- definitions/datapackage-sell.ts: aimeat_datapackage_sell (plan doc-mvwxcas3dom3, D5.1).
@@ -98,6 +99,7 @@ import { designbookTools } from './definitions/designbook.js';
 import { uiLibraryTools } from './definitions/ui-library.js';
 import { themeTools } from './definitions/themes.js';
 import { connectionTools } from './definitions/connections.js';
+import { connectionFileTools } from './definitions/connection-files.js';
 import { refineryTools } from './definitions/refinery.js';
 import { contentTools } from './definitions/content.js';
 import { mcpProxyTools } from './definitions/mcp-proxy.js';
@@ -151,6 +153,7 @@ const CATALOG = [
     ...uiLibraryTools,
     ...themeTools,
     ...connectionTools,
+    ...connectionFileTools,
     ...refineryTools,
     ...contentTools,
     ...mcpProxyTools,

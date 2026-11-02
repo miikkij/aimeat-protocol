@@ -21339,6 +21339,8 @@
       "cxNoteFacebookBefore": "Esto conecta una página de Facebook, no tu perfil personal. Marca la página en la ventana de Facebook. Si gestionas varias páginas, escribe el nombre de la página en el campo antes de pulsar Conectar.",
       "cxNoteInstagramBefore": "Instagram necesita una cuenta profesional (de empresa o de creador). Cámbiala en la app de Instagram, en Configuración, Tipo de cuenta y herramientas. Para publicar hace falta una imagen JPEG o un vídeo: el texto solo no es una publicación allí. La conexión se renueva sola cada 60 días mientras la uses.",
       "cxNoteRedditBefore": "Reddit aprueba a mano las aplicaciones nuevas. Hasta que apruebe la aplicación, conectar termina con un error en Reddit. Lo que publiques va al subreddit que indiques al publicar.",
+      "cxNoteFilesBefore": "Tu IA lee SharePoint y OneDrive con tus propios permisos. En muchas empresas un administrador tiene que aprobar la aplicación la primera vez. Si Microsoft pide aprobación, envía la solicitud a tu equipo de TI.",
+      "cxNoteFilesWriteBefore": "Escribir es un permiso aparte. Conéctalo solo si tu IA puede guardar archivos y filas de listas en SharePoint por ti. No puede borrar ni compartir nada.",
       "cxPage": "nombre de la página (opcional)",
       "shTitle": "Espacios de claves compartidos",
       "shNone": "Todavía no has compartido nada con este grupo.",

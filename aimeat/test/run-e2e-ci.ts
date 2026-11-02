@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-02 -- e2e-files-connections.ts joins the list (not the guard tier): a connected SharePoint on an own node (:28285).
  *   2026-11-01 -- e2e-iam-parties.ts joins the list (not the guard tier): a person registered to an app as a member AIMEAT.iam reads (WP9d).
  *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
  *   2026-11-01 -- e2e-dataproduct-canvas.ts and e2e-data-share-visitor.ts join the list (not the guard tier): the canvas capabilities WP9c built (plan doc-mvwxcas3dom3, D9, D3).
@@ -675,6 +676,9 @@ const ALL_SUITES = [
     // LinkedIn, X and Bluesky inside the process: the mail providers address their upstreams with
     // module constants, so replacing globalThis.fetch is the only seam there is.
     'test/e2e-mail-connections.ts',
+    // A connected SharePoint on its own node (:28285), Graph answered in process: browse, a file as
+    // text and kept, uploads, folders and list rows, the token-free download and every refusal.
+    'test/e2e-files-connections.ts',
     // The one-time notice to owners whose apps held connections:use beside a readable mailbox, the
     // owner's own door that adds connections:read-through to one grant, and the word surviving a
     // refresh until the owner takes it away. Reaches the runner's database to run the migration.

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.21.0 -- 2026-11-02 -- connectionFileCliTools: aimeat_files_browse, _get, _write (SharePoint and OneDrive).
  *   v1.20.0 -- 2026-11-01 -- dataspaceCliTools: aimeat_dataspace (plan doc-mvwxcas3dom3, D8.3).
  *   v1.19.0 -- 2026-11-01 -- datapackageSellCliTools: aimeat_datapackage_sell (plan doc-mvwxcas3dom3, D5.1).
  *   v1.18.0 -- 2026-11-01 -- partyCliTools: aimeat_party (plan doc-mvwxcas3dom3, D2, D3.4).
@@ -58,6 +59,7 @@ import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { appManageCliTools } from './tool-call-defs-app-manage.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
+import { connectionFileCliTools } from './tool-call-defs-connection-files.js';
 import { refineryCliTools } from './tool-call-defs-refinery.js';
 import { contentCliTools } from './tool-call-defs-content.js';
 import { classificationCliTools } from './tool-call-defs-classification.js';
@@ -116,6 +118,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...appManageCliTools,
     ...exchangeTools,
     ...connectionCliTools,
+    ...connectionFileCliTools,
     ...refineryCliTools,
     ...contentCliTools,
     ...classificationCliTools,

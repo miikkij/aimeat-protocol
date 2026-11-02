@@ -21,6 +21,7 @@
  *   · clampLimit
  * @usage import { googleMail, microsoftMail } from './providers-mail.js';
  * @version-history
+ *   v1.3.0 — 2026-11-02 — microsoftEndpoints is exported, for the files pair (providers-files.ts).
  *   v1.2.0 — 2026-09-29 — gmailResources (the Gmail read resources, pure extraction from googleMail)
  *     and fakeMail, the sandbox's Gmail-shaped test mailbox on the same resources.
  *   v1.1.0 — 2026-09-28 — An Outlook message comes with its attachments' ids, names, types and sizes
@@ -393,8 +394,11 @@ export function microsoftMailSend(
   };
 }
 
-/** One place that builds Microsoft's three URLs, so the tenant cannot end up in two of them. */
-function microsoftEndpoints(tenant: string): OAuthEndpoints {
+/**
+ * One place that builds Microsoft's three URLs, so the tenant cannot end up in two of them. Exported
+ * for the files pair (providers-files.ts), which signs in through the same app registration.
+ */
+export function microsoftEndpoints(tenant: string): OAuthEndpoints {
   // A tenant reaches this from config or from a principal's own client row, so it is checked rather
   // than interpolated: it goes into a URL path, and anything outside this shape is either a typo or
   // an attempt to send a token somewhere else.

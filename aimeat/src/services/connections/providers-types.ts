@@ -9,6 +9,8 @@
  * @structure OutboundProviderId · AttachField · OAuthEndpoints · ProviderResource · OutboundProvider · OutboundProviderMeta
  * @usage import type { OutboundProvider } from './providers-types.js';
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The files pair (microsoft-files, microsoft-files-write) and
+ *     ProviderWriteResource, the write direction a provider declares (`writeResources`).
  *   v1.0.0 — 2026-10-15 — Moved from providers.ts unchanged.
  */
 
@@ -23,6 +25,8 @@ export type OutboundProviderId =
   // cannot be misused, leaked, or need explaining to a person who only wanted one of the two.
   | 'google-mail' | 'google-mail-send'
   | 'microsoft-mail' | 'microsoft-mail-send'
+  // Files come in a READ/WRITE pair for the same reason (providers-files.ts).
+  | 'microsoft-files' | 'microsoft-files-write'
   | 'fake' | 'fake-static' | 'fake-mail';
 
 /**
@@ -66,6 +70,25 @@ export interface ProviderResource {
   requiresScopes: string[];
   /** Build the URL from caller parameters. Throws with a plain sentence on a bad parameter. */
   url(params: Record<string, unknown>, instance: string | null): string;
+}
+
+/**
+ * One thing that may be WRITTEN to a connected account (services/connections/write.ts).
+ *
+ * The same direction as a read resource: the caller names it and supplies parameters, and this
+ * builds the URL, the method and the body, so a caller cannot send a sealed token anywhere this node
+ * did not mean it to go or ask for a verb the provider entry does not name.
+ */
+export interface ProviderWriteResource {
+  label: string;
+  requiresScopes: string[];
+  method: 'PUT' | 'POST' | 'PATCH';
+  /** Build the URL from caller parameters. Throws with a plain sentence on a bad parameter. */
+  url(params: Record<string, unknown>): string;
+  /** `bytes`: the request body is the file the caller supplied. A function builds a JSON body. */
+  body: 'bytes' | ((params: Record<string, unknown>) => unknown);
+  /** Extra headers from parameters, such as If-Match from an etag. Throws on a bad value. */
+  headers?(params: Record<string, unknown>): Record<string, string>;
 }
 
 export interface OutboundProvider {
@@ -159,6 +182,11 @@ export interface OutboundProvider {
    * every provider that existed before the read direction did.
    */
   resources?: Record<string, ProviderResource>;
+  /**
+   * What may be written to this connection, by name (services/connections/write.ts). Absent on every
+   * provider that only reads or publishes.
+   */
+  writeResources?: Record<string, ProviderWriteResource>;
   /**
    * The provider's own daily ceiling on publishes, when it has one that is shared rather than
    * per-user. YouTube's allowance is per Google PROJECT, so ten publishers on one shared channel

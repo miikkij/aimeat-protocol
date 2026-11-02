@@ -23445,6 +23445,8 @@
       "cxNoteFacebookBefore": "Tämä liittää Facebook-sivun, ei henkilökohtaista profiiliasi. Valitse sivu Facebookin ikkunassa. Jos hallitset useaa sivua, kirjoita sivun nimi kenttään ennen kuin painat Liitä.",
       "cxNoteInstagramBefore": "Instagram vaatii ammattilaistilin (yritys- tai sisällöntuottajatili). Vaihda tilin tyyppi Instagram-sovelluksessa kohdassa Asetukset, Tilin tyyppi ja työkalut. Julkaisuun tarvitaan JPEG-kuva tai video, sillä pelkkä teksti ei ole Instagramissa julkaisu. Liitos uusiutuu itse 60 päivän välein, kun käytät sitä.",
       "cxNoteRedditBefore": "Reddit hyväksyy uudet sovellukset käsin. Ennen kuin Reddit hyväksyy sovelluksen, liittäminen päättyy virheeseen Redditin sivulla. Julkaisu menee siihen subredditiin, jonka nimeät julkaistessa.",
+      "cxNoteFilesBefore": "Tekoälysi lukee SharePointia ja OneDriveä sinun omilla oikeuksillasi. Monessa yrityksessä ylläpitäjän pitää hyväksyä sovellus ensimmäisellä kerralla. Jos Microsoft pyytää hyväksyntää, lähetä pyyntö IT-tuelle.",
+      "cxNoteFilesWriteBefore": "Kirjoittaminen on oma lupansa. Liitä se vain, jos tekoälysi saa tallentaa tiedostoja ja listan rivejä SharePointiin puolestasi. Se ei voi poistaa eikä jakaa mitään.",
       "cxPage": "sivun nimi (valinnainen)",
       "shTitle": "Jaetut avainavaruudet",
       "shNone": "Tälle ryhmälle ei ole vielä jaettu mitään.",

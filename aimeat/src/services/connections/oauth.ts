@@ -27,6 +27,8 @@
  * @structure startAuthorization · completeAuthorization · resolveClient · fetchAccountIdentity
  * @usage import { startAuthorization, completeAuthorization } from './oauth.js';
  * @version-history
+ *   2026-11-02 — The files pair (microsoft-files, microsoft-files-write) learns its account from Graph's
+ *     /me, as Outlook does.
  *   v1.3.1 — 2026-10-31 — The round stores which cookie carries its binding (`bindCookie`), and the
  *     completion reads the `__Host-` cookie for a round bound over https (roundBindingHeld)
  *     (secaudit2026oct31w2 round 10, W2-19).
@@ -411,7 +413,8 @@ async function fetchAccountIdentity(
       const email = typeof j.email === 'string' ? j.email : sub;
       return { externalId: sub, accountLabel: email };
     }
-    if (provider.id === 'microsoft-mail' || provider.id === 'microsoft-mail-send') {
+    if (provider.id === 'microsoft-mail' || provider.id === 'microsoft-mail-send'
+      || provider.id === 'microsoft-files' || provider.id === 'microsoft-files-write') {
       const r = await safeFetch('https://graph.microsoft.com/v1.0/me', {
         headers: auth, signal: AbortSignal.timeout(15_000),
       });

@@ -15,6 +15,8 @@
  * @structure ConnectionsSection — GET /v1/connections + /providers + /clients, connect via a
  *   pop-up, revoke · OwnApp — one service's own-app credentials.
  * @version-history
+ *   v1.9.0 — 2026-11-02 — SharePoint and OneDrive (microsoft-files, microsoft-files-write) carry a note
+ *     each: an administrator may have to approve the app, and writing is a permission of its own.
  *   v1.8.0 — 2026-10-09 — "Accounts your agents connected": the owner sees each account an agent
  *     connected, named by its agent, and disconnects it (GET and DELETE /v1/connections/agents;
  *     secrets audit 2026-10-09, F2).
@@ -70,6 +72,8 @@ const NOTES = {
   facebook: ['cxNoteFacebookBefore'],
   instagram: ['cxNoteInstagramBefore'],
   reddit: ['cxNoteRedditBefore'],
+  'microsoft-files': ['cxNoteFilesBefore'],
+  'microsoft-files-write': ['cxNoteFilesWriteBefore'],
 };
 
 /** Providers whose one sign-in reaches several accounts, so the person names the one they mean. */

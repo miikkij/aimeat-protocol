@@ -9,6 +9,7 @@
  *   them in the same order.
  * @structure CONNECT_CLIENT_CONFIG_FIELDS
  * @version-history
+ *   v1.1.0 — 2026-11-02 — connectMicrosoftFilesSites (connections.microsoft_files_sites).
  *   v1.0.0 — 2026-10-15 — Moved from config-schema.ts when Facebook, Instagram and Reddit took it
  *     past 800 lines; the three new providers' rows arrived in the same change.
  */
@@ -23,6 +24,7 @@ export const CONNECT_CLIENT_CONFIG_FIELDS: ConfigFieldShape<keyof ConnectionsCon
   // Goes into the authorize and token URL PATHS, so a wrong value fails at Microsoft rather than
   // here. Validated to the same shape the route accepts from a user.
   { key: 'connectMicrosoftTenant', dotPath: 'connections.microsoft_tenant', envVar: 'AIMEAT_CONNECT_MICROSOFT_TENANT', type: 'string', validate: v => typeof v === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(v), immutable: false, description: 'Entra directory: common | organizations | consumers | a directory id' },
+  { key: 'connectMicrosoftFilesSites', dotPath: 'connections.microsoft_files_sites', envVar: 'AIMEAT_CONNECT_MICROSOFT_FILES_SITES', type: 'string', validate: v => v === 'all' || v === 'selected', immutable: false, description: 'SharePoint sites the files connections reach: all (what each person reaches) | selected (only sites an administrator granted)' },
   { key: 'connectLinkedinClientId', dotPath: 'connections.linkedin_client_id', envVar: 'AIMEAT_CONNECT_LINKEDIN_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'LinkedIn app client id' },
   { key: 'connectLinkedinClientSecret', dotPath: 'connections.linkedin_client_secret', envVar: 'AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'LinkedIn app secret (secret)', adminDisplay: 'configured' },
   { key: 'connectXClientId', dotPath: 'connections.x_client_id', envVar: 'AIMEAT_CONNECT_X_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'X app client id (pay-per-use: every post is a charge)' },

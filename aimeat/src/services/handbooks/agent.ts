@@ -13,6 +13,7 @@
  *   v1.59.0 -- 2026-11-01 -- Discover names aimeat_party "share" with `email` and "send_link": the one-time share link (WP9b).
  *   v1.58.0 -- 2026-11-01 -- Discover names aimeat_dataspace: the data space requests that wait for the person (plan doc-mvwxcas3dom3, D8).
  *   v1.57.0 -- 2026-11-01 -- Discover: a data product and its share are one proposal, and the follow-ups name their tools (WP9a).
+ *   v1.57.0 -- 2026-11-02 -- SharePoint and OneDrive: aimeat_files_browse, aimeat_files_get, aimeat_files_write.
  *   v1.56.0 -- 2026-11-01 -- Discover names aimeat_datapackage_sell: a package sold on EXCHANGE (plan doc-mvwxcas3dom3, D5).
  *   v1.56.0 -- 2026-11-01 -- Discover names a run on a source change, aimeat_dataproduct "describe" and a share by `recipient` (WP9c).
  *   v1.55.0 -- 2026-11-01 -- Discover names aimeat_party "share": a package shared by name with an outside party (plan doc-mvwxcas3dom3, D3.4).
@@ -426,6 +427,17 @@ what you published through your own connected accounts, newest first, with where
 its latest numbers, and \`aimeat_connection_replies { attempt_id }\` reads what people answered to one of
 them from the provider now (nothing is stored, and on X every read costs money), so call it only when
 someone asks and tell them what matters rather than pasting every reply.
+
+**SharePoint and OneDrive — the company's documents.** A connection to \`microsoft-files\` reads and one
+to \`microsoft-files-write\` writes (\`aimeat_connection_start\` gives the sign-in address for the
+person; their administrator may have to approve the app the first time). \`aimeat_files_browse\` finds
+things (\`what\`: sites, drives, children, item, search, changes, lists, list_items) ·
+\`aimeat_files_get { as: "text" }\` reads a Word, Excel, PDF or text file, \`as: "store"\` keeps it as the
+person's file, and the answer says where it came from (its address, eTag and last change) ·
+\`aimeat_files_write\` uploads a file (from a stored file or text), replaces one (pass the eTag you
+read), makes a folder or adds or changes a list row. Say what you will write and where before you do
+it: other people use that library. A copy goes stale when the library changes: \`what: "changes"\` with
+the last token says what did.
 
 **Mail refinery — a mailbox into records.** A refinery definition (the owner's memory record
 \`<prefix>.config\`: a mailbox from \`aimeat_connection_list\`, an organism workspace, a start date, the

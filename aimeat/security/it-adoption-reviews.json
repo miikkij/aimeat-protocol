@@ -31,9 +31,10 @@
         "aimeat/deploy/aimeat.service",
         "aimeat/Dockerfile",
         "aimeat/src/services/ai/openrouter-region.ts",
-        "docs/operations/production-deployment.md"
+        "docs/operations/production-deployment.md",
+        "aimeat/src/services/connections/providers-files.ts"
       ],
-      "digest": "sha256:0310ac52e4f7a8a6991d632f"
+      "digest": "sha256:4f78a4de2eecd0c88cad2035"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -59,13 +60,14 @@
       "digest": "sha256:fa6a63db5cc5988e9245a456"
     },
     "05-data-protection.md": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/services/classification/defaults.ts",
         "aimeat/src/services/classification/levels.ts",
-        "docs/data-classification.md"
+        "docs/data-classification.md",
+        "aimeat/src/services/connections/drive-files.ts"
       ],
-      "digest": "sha256:e0be7243b200c549a19b3536"
+      "digest": "sha256:1fd5fd7554ba14736eba34fb"
     },
     "06-ai-and-models.md": {
       "reviewedOn": "2026-11-01",
@@ -267,7 +269,8 @@
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "d2a16dcfe98bf7f5",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
-      "docs/operations/production-deployment.md": "f36fca30fbc34332"
+      "docs/operations/production-deployment.md": "f36fca30fbc34332",
+      "aimeat/src/services/connections/providers-files.ts": "4ddd1d446861778d"
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
@@ -287,7 +290,8 @@
     "05-data-protection.md": {
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
-      "docs/data-classification.md": "31bca57ac51f0be3"
+      "docs/data-classification.md": "31bca57ac51f0be3",
+      "aimeat/src/services/connections/drive-files.ts": "062833964370c140"
     },
     "06-ai-and-models.md": {
       "aimeat/src/services/ai/adapters/index.ts": "b0c3e188f7fb76a1",

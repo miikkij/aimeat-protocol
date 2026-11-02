@@ -70810,6 +70810,155 @@ paths:
           description: "With `store: true`, the attachment is not a file (an attached message or a link)."
         '502':
           description: The provider could not be reached, or could not answer.
+  /v1/connections/{id}/files/text:
+    post:
+      operationId: readConnectedFileAsText
+      summary: One file of a connected SharePoint or OneDrive, as text
+      description: >
+        Needs `connections:read-through` (and, for an agent reading its owner's account,
+        `connections:read-as-owner`). A Word document, a spreadsheet or a PDF is read by the node's own
+        readers; plain text comes as it is (the first 200 kB); anything else is 415
+        NOT_READABLE_AS_TEXT. The node reads the item's details with the token and downloads the bytes
+        from the pre-authenticated address SharePoint gives, with no token. The answer's `source` names
+        the item's SharePoint address, eTag and last change.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [drive_id, item_id]
+              properties:
+                drive_id:
+                  type: string
+                item_id:
+                  type: string
+      responses:
+        '200':
+          description: "{ text, note?, source: { drive_id, item_id, name, web_url, etag, last_modified, size, mime_type } }"
+        '403':
+          description: SCOPE_DENIED, READ_AS_OWNER_REQUIRED, MISSING_PERMISSION or REFUSED_BY_PROVIDER.
+        '404':
+          description: No such connection of yours.
+        '413':
+          description: The file is larger than the node's per-file limit.
+        '415':
+          description: NOT_READABLE_AS_TEXT — store it instead.
+        '422':
+          description: NOT_A_FILE — the item is a folder.
+        '502':
+          description: SharePoint could not be reached, or the download failed.
+  /v1/connections/{id}/files/store:
+    post:
+      operationId: storeConnectedFile
+      summary: Keep one file of a connected SharePoint or OneDrive as a private file
+      description: >
+        Needs `connections:read-through` and `storage:write`. The file becomes a private file of the
+        caller's owner, up to the node's per-file limit and within the account's quota, tagged
+        `sharepoint` and `sharepoint-item:<item id>`. `key` defaults to
+        `sharepoint/<item id>/<file name>`.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [drive_id, item_id]
+              properties:
+                drive_id:
+                  type: string
+                item_id:
+                  type: string
+                key:
+                  type: string
+      responses:
+        '201':
+          description: "{ stored: { key }, source }"
+        '403':
+          description: SCOPE_DENIED, READ_AS_OWNER_REQUIRED, MISSING_PERMISSION or REFUSED_BY_PROVIDER.
+        '404':
+          description: No such connection of yours.
+        '413':
+          description: Larger than the per-file limit, or the storage quota is full.
+        '422':
+          description: NOT_A_FILE — the item is a folder.
+        '502':
+          description: SharePoint could not be reached, or the download failed.
+  /v1/connections/{id}/write/{resource}:
+    post:
+      operationId: writeToConnection
+      summary: Write to a connected account (a SharePoint file, folder or list row)
+      description: >
+        Needs `connections:use`; an agent writes through its owner's account on that word, as it sends
+        through the owner's mailbox. The provider declares what may be written and the node builds the
+        URL, the method and the body; the caller supplies parameters. SharePoint and OneDrive
+        (`microsoft-files-write`) offer `upload` (drive_id, parent_id, filename, conflict rename |
+        replace | fail), `replace` (drive_id, item_id, etag), `folder` (drive_id, parent_id, name),
+        `list_item` (site_id, list_id, fields) and `list_item_update` (site_id, list_id, item_id,
+        fields, etag). A file's content is `from_key`, one of the caller's stored files (refused with
+        403 CLASSIFIED when its classification may not leave the node), or `text` with an optional
+        `mime_type`. Nothing here deletes or shares.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: resource
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              properties:
+                from_key:
+                  type: string
+                text:
+                  type: string
+                mime_type:
+                  type: string
+      responses:
+        '201':
+          description: "{ provider, resource, data } — data is the provider's answer (the new item or row)."
+        '400':
+          description: NO_SUCH_RESOURCE, BAD_PARAMETERS or NO_CONTENT.
+        '403':
+          description: SCOPE_DENIED, MISSING_PERMISSION, REFUSED_BY_PROVIDER or CLASSIFIED.
+        '404':
+          description: No such connection of yours, NO_SUCH_FILE, or NOT_FOUND_AT_PROVIDER.
+        '409':
+          description: CHANGED_SINCE_READ (the etag no longer matches) or NAME_TAKEN (conflict fail).
+        '413':
+          description: TOO_LARGE.
+        '502':
+          description: The provider could not be reached or could not take the write; nothing was written.
   /v1/connections/attempts/{id}/metrics:
     get:
       operationId: listPublishMetrics

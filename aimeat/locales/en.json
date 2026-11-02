@@ -22709,6 +22709,8 @@
       "cxNoteFacebookBefore": "This connects a Facebook Page, not your personal profile. Tick the page in the Facebook window. If you manage several pages, write the page's name in the field before you press Connect.",
       "cxNoteInstagramBefore": "Instagram needs a professional account (business or creator). Switch it in the Instagram app under Settings, Account type and tools. A post needs a JPEG picture or a video: text alone is not a post there. The connection renews itself every 60 days while you use it.",
       "cxNoteRedditBefore": "Reddit approves new apps by hand. Until it approves the app, connecting ends with an error at Reddit. A post goes to the subreddit you name when you publish.",
+      "cxNoteFilesBefore": "Your AI reads SharePoint and OneDrive with your own rights there. In many companies an administrator has to approve the app the first time. If Microsoft asks for approval, send the request to your IT.",
+      "cxNoteFilesWriteBefore": "Writing is a separate permission. Connect it only if your AI may save files and list rows to SharePoint for you. It cannot delete or share anything.",
       "cxPage": "page name (optional)",
       "shTitle": "Shared key spaces",
       "shNone": "Nothing shared with this group yet.",

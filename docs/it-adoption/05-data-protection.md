@@ -1,6 +1,6 @@
 # 05 Data protection
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 09a8bb4e2) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is for the DPO, the security officer and the database administrator. It answers: which data the node keeps, where it keeps it, whether it is personal data, how long it stays and how it is deleted; what the node encrypts itself and what it leaves to the operator; how data classification works and how to set it for an organisation; what the GDPR export and the account deletion do; and which data leaves the operator's own systems.
 
@@ -127,6 +127,7 @@ Everything in the inventory lives in the operator's database and, when configure
 | Federation | records a person shares with another node, signed | when the operator federates and a person shares | yes | [Federation](../operations/federation.md) | `aimeat/src/services/classification/egress.ts` |
 | Email | notifications, invitations, mail a person or agent sends | on events | yes: needs `AIMEAT_SMTP_HOST` | [Bookkeeping and email](../operations/bookkeeping.md) | `aimeat/.env.example` |
 | Connected outside accounts (Gmail, Outlook) | mail read and sent on the person's behalf | when a person connects one | yes | [Connecting an outside account](../connecting-an-outside-account.md) | `aimeat/src/services/connections/credential.ts` |
+| Connected SharePoint and OneDrive | files and list rows read and written on the person's behalf; a file kept on the node is a private file of theirs, tagged with the SharePoint item it came from | when a person connects one, and for each file they or their AI keep | yes | [Connecting an outside account](../connecting-an-outside-account.md) | `aimeat/src/services/connections/drive-files.ts`, `aimeat/src/services/connections/write.ts` |
 | Outside file stores | file bytes | when configured | yes | `AIMEAT_FILE_STORE_S3_BUCKET`, `AIMEAT_FILE_STORE_AZURE_ACCOUNT` | `aimeat/src/storage/blob/file-store-wrap.ts` |
 | Webhooks, extensions, apps opened to the internet | what each one is built to send | when a person or operator sets one up | yes | [13 Apps, agents and endpoints](13-apps-agents-endpoints.md) | `aimeat/src/utils/url-validator.ts` |
 

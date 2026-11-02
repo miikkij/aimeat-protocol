@@ -1,10 +1,12 @@
 <!--
 @file connecting-an-outside-account.md
-@description Outbound connections: how a person attaches their own Gmail, Outlook, LinkedIn, X,
-  Mastodon, Bluesky or YouTube account to this node, what the node can then do with it, and what it
-  deliberately cannot. Covers the read direction, the send direction, bring-your-own application,
-  the Google alias path, and Microsoft's three differences.
+@description Outbound connections: how a person attaches their own Gmail, Outlook, SharePoint and
+  OneDrive, LinkedIn, X, Mastodon, Bluesky or YouTube account to this node, what the node can then do
+  with it, and what it deliberately cannot. Covers the read direction, the send direction, the write
+  direction, bring-your-own application, the Google alias path, and Microsoft's three differences.
 @version-history
+  2026-11-02 — SharePoint and OneDrive: the microsoft-files read/write pair, the token-free download,
+    the write route and Sites.Selected.
   2026-09-26 — The agents' button is the owner's one tap, POST /v1/agents/{name}/read-through.
   2026-09-26 — An unverified alias is refused naming only the alias asked for; the one-time notice
     names the owner's agents too, and an agent refused the read door is told the way.
@@ -47,6 +49,8 @@ The full list, from `GET /v1/connections/providers`:
 | `google-mail-send` | sends through that Gmail | `send-mail` |
 | `microsoft-mail` | reads Outlook / Exchange Online | `read-mail` |
 | `microsoft-mail-send` | sends through it | `send-mail` |
+| `microsoft-files` | reads SharePoint and OneDrive: sites, libraries, files, lists | `read-files` |
+| `microsoft-files-write` | writes there too: files, folders, list rows | `read-files`, `write-files` |
 | `linkedin`, `x`, `mastodon`, `bluesky`, `youtube` | publishing | `publish` |
 
 Every entry says whether **this node** holds an application for it. When it does not, somebody who
@@ -201,6 +205,49 @@ Each one is silent if it is missed.
 `/me/sendMail` needs only `Mail.Send`, takes the MIME as a base64 string, and leaves the message in
 the person's own Sent Items. A custom header on Graph must begin with `x-`; that is why the AI
 disclosure header is `X-AI-Disclosure` and not something tidier.
+
+## SharePoint and OneDrive
+
+A company's documents, read and written by the person's own AI. The same Entra app as Outlook signs
+in, so an operator who has Outlook set up adds two Graph permissions and nothing else; no Microsoft
+365 Copilot licence is needed. Microsoft's own SharePoint MCP server is not used: it is a Copilot
+Studio preview that Microsoft says not to use in new projects, and its successor needs a Copilot
+licence for every user.
+
+**Two providers, read and write**, for the reason mail has two. `microsoft-files` asks for
+`Files.Read.All` and `Sites.Read.All`; `microsoft-files-write` for `Files.ReadWrite.All` and
+`Sites.ReadWrite.All`. Both add `User.Read` and `offline_access`. The person reaches what they reach in
+SharePoint themselves. Nothing either can do deletes or shares.
+
+**Named sites only.** With `AIMEAT_CONNECT_MICROSOFT_FILES_SITES=selected` both ask for
+`Sites.Selected` instead. That consent grants nothing by itself: a SharePoint administrator grants the
+app each site it may reach (`POST /sites/{site-id}/permissions`). This is the setting for a company that
+wants the reach written down site by site.
+
+**Browsing** is the ordinary read route, `POST /v1/connections/:id/read/:resource`, with the resources
+`sites` (`query`), `site` (`site_id`, or `hostname` and `path`), `drives` (a site's libraries; no
+`site_id` is the person's OneDrive), `children`, `item`, `search`, `changes` (Graph's delta: the first
+call answers everything and a `deltaLink` whose `token` the caller keeps), `lists` and `list_items`.
+Every id that goes into a path is pattern-checked, so an id that tries to walk elsewhere is a 400 and
+Graph never hears of it.
+
+**One file** is `POST /v1/connections/:id/files/text` (a Word, Excel, PDF or text file as text) or
+`/files/store` (kept as a private file, tagged `sharepoint` and `sharepoint-item:<id>`; needs
+`storage:write`). The node reads the item with the token and downloads the bytes from the
+pre-authenticated address Graph gives, **with no token**: the token is spent on Graph and nowhere else.
+Every answer carries `source`: the file's address in SharePoint, its eTag and its last change. A kept
+copy does not update itself; `changes` with the last token says when it went stale.
+
+**Writing** is `POST /v1/connections/:id/write/:resource` with `connections:use`, the word that
+publishes and sends: `upload` (a new file into a folder; `conflict` rename, replace or fail),
+`replace` (an existing file; pass the `etag` you read and a change made in between is a 409
+`CHANGED_SINCE_READ`), `folder`, `list_item` and `list_item_update`. A file's content is `from_key`,
+one of the caller's stored files, or `text`. A stored file whose classification may not leave the
+node is refused with 403 `CLASSIFIED` and nothing is sent, the same gate a publish has.
+
+**An agent** reads its owner's SharePoint on `connections:read-as-owner` and writes through it on
+`connections:use`, exactly as with the owner's mailbox. From chat: `aimeat_files_browse`,
+`aimeat_files_get` (`as: "text"` or `"store"`) and `aimeat_files_write`.
 
 ## Saying a machine wrote it
 

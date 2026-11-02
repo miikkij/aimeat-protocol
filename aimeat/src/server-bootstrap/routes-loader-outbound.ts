@@ -8,6 +8,8 @@
  *   is unchanged.
  * @structure mountOutboundRouters(app, config, storage)
  * @version-history
+ *   v1.5.0 — 2026-11-02 — Mounts connectionFilesRouter after connectionsRouter: a connected SharePoint's
+ *     file as text, stored, and the write route (routes/connections-files.ts).
  *   v1.4.0 — 2026-10-20 — Mounts contentRouter after the refinery: the content class pipeline, which
  *     shares the refinery's class packs (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.3.0 — 2026-10-15 — Mounts connectionsRepliesRouter: the replies to a published item, and the
@@ -27,12 +29,14 @@ import { mcpServersRouter } from '../routes/mcp-servers.js';
 import { oauthRoundsRouter } from '../routes/oauth-rounds.js';
 import { connectionsAgentsRouter } from '../routes/connections-agents.js';
 import { connectionsRepliesRouter } from '../routes/connections-replies.js';
+import { connectionFilesRouter } from '../routes/connections-files.js';
 import { contentRouter } from '../routes/content.js';
 
 export function mountOutboundRouters(app: express.Express, config: AimeatConfig, storage: Storage): void {
   app.use(connectionsAgentsRouter(config, storage)); // the owner sees and revokes their agents' connections
   app.use(connectionsRepliesRouter(config, storage)); // replies to a published item; media a provider fetches
   app.use(connectionsRouter(config, storage));  // TARGET-057: outbound connections + delegations
+  app.use(connectionFilesRouter(config, storage)); // a connected SharePoint: a file as text, stored, written
   app.use(refineryRouter(config, storage));     // the refinery: a mail pipeline run on the node
   app.use(contentRouter(config, storage));      // content classes: facts, descriptions, classes, OWL
   app.use(mcpServersRouter(config, storage));   // the remote MCP servers this node connects OUT to
