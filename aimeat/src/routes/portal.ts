@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-02 — On a node the store sold, a browser asking for /v1/connect (any language) is sent to
+ *     /v1/profile?tab=mcp, the buyer's own connect guide; an AI asking for markdown still gets the page.
  *   2026-11-01 — /v1/dataset/:owner/:name, the public dataset page, with the package's schema.org
  *     Dataset in the head (WP9b).
  *   2026-11-01 — The operator's place on the privacy and terms pages comes from
@@ -751,11 +753,22 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // Connect / MCP attach page — standalone static HTML. Public-facing docs
   // required by the Anthropic Connectors Directory (3+ example prompts +
   // attach instructions for major MCP-aware clients).
-  router.get('/v1/connect', toLanguagePath('/v1/connect'), serveStaticPage('connect.html', '/v1/connect'));
+  // On a node the store sold (site.purchase_plan), a browser goes to the buyer's own guide in the SPA,
+  // which speaks the page's language and offers no sign-up: this page is the public developer and
+  // directory page, in English, with "Free account… Sign up" (aimeat-protocol-4e's first-timer round
+  // on crew60, 2026-11-02). An AI asking for markdown still gets the page.
+  const toBuyerGuide: RequestHandler = (req, res, next) => {
+    if ((config.siteLinks?.purchasePlan ?? '').trim() && !prefersMarkdown(req)) {
+      res.redirect(302, '/v1/profile?tab=mcp');
+      return;
+    }
+    next();
+  };
+  router.get('/v1/connect', toBuyerGuide, toLanguagePath('/v1/connect'), serveStaticPage('connect.html', '/v1/connect'));
   for (const l of nonEnglish) {
     router.get(`/v1/privacy/${l}`, serveStaticPage(`privacy.${l}.html`));
     router.get(`/v1/terms/${l}`, serveStaticPage(`terms.${l}.html`));
-    router.get(`/v1/connect/${l}`, serveStaticPage(`connect.${l}.html`));
+    router.get(`/v1/connect/${l}`, toBuyerGuide, serveStaticPage(`connect.${l}.html`));
   }
 
   // Encrypted chat example app — standalone HTML (not SPA)
