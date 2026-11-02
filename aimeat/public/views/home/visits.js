@@ -7,14 +7,32 @@
  *   the third). A visit is an opening of the home at least VISIT_GAP_MS after the last one counted,
  *   so moving between pages, or a reload, is the same visit. Kept in the person's own memory record
  *   `home.visits` { count, last }, private; the "while you were away" card keeps its own `home.visit`.
- * @structure useHomeVisit(signedIn) · VISIT_GAP_MS
+ * @structure useHomeVisit(signedIn) · VISIT_GAP_MS · OFFERS_KEY · OFFERS_PATH · patchOffers(patch)
  * @usage const visit = useHomeVisit(!!session);   // null until read, then 1, 2, 3, …
  * @version-history
+ *   v1.1.0 — 2026-11-02 — patchOffers(): the one writer of `home.offers`, the home's record of its offers
+ *     and the person's answers, shared by morning-digest.js and made-for-you.js.
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { invalidateShared } from '/views/surface/shared-read.js';
+
+/** The home's offers and the person's answers to them: one private record, read through useShared('home-offers'). */
+export const OFFERS_KEY = 'home.offers';
+export const OFFERS_PATH = `/v1/memory/${OFFERS_KEY}?soft=1`;
+
+/** Merge `patch` into `home.offers`, keeping what else it holds, and tell the readers. Bookkeeping: the trail files it as routine. */
+export async function patchOffers(patch) {
+  const read = await api(OFFERS_PATH);
+  const cur = read?.data?.value && typeof read.data.value === 'object' ? read.data.value : {};
+  await api('/v1/memory', {
+    method: 'POST',
+    body: JSON.stringify({ key: OFFERS_KEY, value: { ...cur, ...patch }, visibility: 'private' }),
+  });
+  await invalidateShared('home-offers', OFFERS_PATH);
+}
 
 const KEY = 'home.visits';
 /** Four hours: a morning and an afternoon are two visits, a reload is not. */

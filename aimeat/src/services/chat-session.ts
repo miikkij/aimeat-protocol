@@ -32,6 +32,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.17.0 -- 2026-11-02 -- A turn that ended with no words, no tool call and no card writes
+ *     chatTurn.noAnswer, shown and saved, instead of an empty answer the page showed as nothing (crew60).
  *   v1.16.0 -- 2026-10-31 -- A turn that published an app ends at its limit without the answer phase,
  *     and its words always carry the app's address (chatTurn.appReady), taken from the publish call's
  *     own answer. On crew34 the model published, read the person's data until the time ran out, and
@@ -99,7 +101,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from './goose-acp.js';
 import {
-    TURN_LIMITS, TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, appReadyText, publishedAppUrl,
+    TURN_LIMITS, TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, noAnswerText, appReadyText, publishedAppUrl,
     type GuardReason, type NodeUpdate, type ProgressStep,
 } from './chat-turn-guard.js';
 import { DEFAULT_LOCALE, createT, type Locale } from '../i18n.js';
@@ -625,6 +627,16 @@ export async function* runChatTurn(
         if (publishedApp && end?.kind !== 'error' && !signal?.aborted && !answer.includes(publishedApp)) {
             const words = `${paragraphBreak(answer)}${appReadyText(locale, publishedApp)}`;
             answer += words;
+            yield { kind: 'text', text: words };
+        }
+        // A turn that ended with no words and no tool call is not an answer: the model returned
+        // nothing. The person reads that, and it is saved, instead of a blank under their question
+        // (crew60, 2026-11-02: a build request turn ended in six seconds with an empty text). An
+        // error says its own words, and a turn the person stopped needs none.
+        if (end?.kind !== 'error' && !signal?.aborted && !withoutToolMarkers(answer).trim() && !tools.size && !cards.size) {
+            const words = noAnswerText(locale);
+            answer += words;
+            logger.warn(`[chat] ${gaii}: the turn ended with no words and no tool call`);
             yield { kind: 'text', text: words };
         }
         if (end) yield end;

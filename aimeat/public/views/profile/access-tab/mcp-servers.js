@@ -21,6 +21,9 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
+ *   v1.11.2 — 2026-11-02 — "Connect to <host>" goes away once a server of that short name is attached:
+ *     the list's rows carry `slug`, and the test read `name`, which they do not have, so the choice
+ *     stayed beside the attached server (first-timer round on crew60).
  *   v1.11.1 — 2026-11-01 — The sign-in round returns to /v1/profile?tab=access&section=ac-mcp; the
  *     old '/spa.html#access' showed the place's start page. On a node the store sold the empty list
  *     says "no connections to other services yet" (mcpEmptyPlace), without the word MCP.
@@ -314,7 +317,7 @@ export function McpServersSection({ showToast, inRow }) {
     <//>
 
     <${Actions}>
-      ${builders && !addOpen && !servers.some(s => s.name === builders.name) && html`
+      ${builders && !addOpen && !servers.some(s => s.slug === builders.name) && html`
         <${Action} small onClick=${() => { setDraft({ ...EMPTY_DRAFT, ...builders }); setAddOpen(true); }}>
           ${(t('profile.access.mcpConnectBuilders') || 'Connect to {host}').replace('{host}', builders.title)}
         <//>`}
