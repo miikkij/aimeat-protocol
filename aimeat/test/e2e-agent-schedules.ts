@@ -409,6 +409,30 @@ await test('8e. deliver is refused on another kind and with another value, and "
     assert(off.body.data.schedule.input.taskTemplate.title === 'SCHED_DELIVER', 'the rest of the template stays');
 });
 
+await test('8f. A delivering schedule takes notify out of its agent\'s live definition, as a new revision', async () => {
+    // crew64, 2.11: a digest made before the template dropped notify called it, was refused for
+    // notifications:send, and the runtime failed the run, so the node's delivery never came.
+    const bot = await registerAgent(o1.ownerName, o1.ownerToken, `digestbot${Date.now() % 100000}`);
+    const botAuth = { Authorization: `Bearer ${bot.token}` };
+    const key = `crews.registry.${bot.agentName}`;
+    const seeded = await json('/v1/memory', {
+        method: 'POST', headers: botAuth,
+        body: JSON.stringify({ key, visibility: 'owner', value: {
+            version: 1, revision: 1, agent_name: bot.agentName,
+            doc: { agent_name: bot.agentName, agents: [{ name: 'editor', tools: ['news', 'notify'] }], tasks: [] },
+        } }),
+    });
+    assert(seeded.status === 200 || seeded.status === 201, `seed ${seeded.status}: ${JSON.stringify(seeded.body)}`);
+    const created = await json(`/v1/agents/${bot.agentName}/schedules`, {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({ kind: 'agent_task', cron: '0 7 * * *', display_name: 'Digest', task_template: { title: 'D' }, deliver: 'owner' }),
+    });
+    assert(created.status === 201, `create ${created.status}: ${JSON.stringify(created.body)}`);
+    const live = (await json(`/v1/memory/${key}`, { headers: botAuth })).body?.data?.value;
+    assert(JSON.stringify(live?.doc?.agents?.[0]?.tools) === '["news"]', `notify is gone: ${JSON.stringify(live?.doc?.agents)}`);
+    assert(live?.revision === 2, `a new revision, got ${live?.revision}`);
+});
+
 console.log('\nPhase 4 -- max_runs constraint auto-disable');
 
 await test('9. Create agent_task schedule with max_runs=1', async () => {

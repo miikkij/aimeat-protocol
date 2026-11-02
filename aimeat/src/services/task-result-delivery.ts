@@ -23,7 +23,8 @@
  *   deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
- *   v1.0.0 — 2026-11-02 — Initial.
+ *   v1.0.0 — 2026-11-02 — Initial. The agent's notify tool is taken out when a schedule asks for
+ *     delivery (services/delivery-crew.ts).
  */
 import type { Storage, AgentTaskRecord, AgentTaskScope, MemoryRecord } from '../storage/interface.js';
 import { systemReader } from './classification/reader.js';

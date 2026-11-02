@@ -96,7 +96,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentTaskScope, AgentRecord } from '../storage/interface.js';
+import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentRecord } from '../storage/interface.js';
 import { buildGAII, isGEAI, isSameOwner } from '../utils/gaii.js';
 import { memoryWriteVisibilitySchema } from '../utils/visibility-words.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
@@ -115,6 +115,8 @@ import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
 import { withDeliver } from './task-result-delivery.js';
+import { dropNotifyOfAgent } from './delivery-crew.js';
+import { agentTaskInput } from './schedule-agent-task-input.js';
 import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
 import { checkDataproductScheduleInput } from './dataproduct/schedule-input.js';
 
@@ -527,29 +529,12 @@ export async function createScheduleRecord(
         if (!agentName || !agentGaii) {
             return { ok: false, status: 400, code: 'AGENT_REQUIRED', message: 'agent_name is required for agent_task schedules' };
         }
-        // Accept either nested task_template.{title,description} or flat
-        // task_title / task_description (mirrors the MCP tool's flat fields).
-        const tmpl = body.task_template as Record<string, unknown> | undefined;
-        const title = (tmpl && typeof tmpl.title === 'string' ? tmpl.title : '')
-            || (typeof body.task_title === 'string' ? body.task_title : '');
-        if (!title) return { ok: false, status: 400, code: 'INVALID_TASK_TEMPLATE', message: 'task_template.title (or task_title) is required for agent_task schedules' };
-        const v = (tmpl?.verification ?? {}) as { user_expects?: string; technical_checks?: string[] };
-        const flatDesc = typeof body.task_description === 'string' ? body.task_description : '';
-        base.input = {
-            taskTemplate: {
-                title,
-                description: typeof tmpl?.description === 'string' ? tmpl.description : flatDesc,
-                scope: Array.isArray(tmpl?.scope) ? (tmpl!.scope as AgentTaskScope[]) : [],
-                rules: Array.isArray(tmpl?.rules) ? tmpl!.rules : [],
-                verification: {
-                    userExpects: typeof v.user_expects === 'string' ? v.user_expects : '',
-                    technicalChecks: Array.isArray(v.technical_checks) ? v.technical_checks : [],
-                },
-                resources: tmpl?.resources,
-                // The node hands each finished task's result to the owner (services/task-result-delivery.ts).
-                ...(body.deliver === 'owner' ? { deliver: 'owner' } : {}),
-            },
-        };
+        // The task each fire queues (services/schedule-agent-task-input.ts).
+        const built = agentTaskInput(body);
+        if (!built.ok) return { ok: false, status: 400, code: 'INVALID_TASK_TEMPLATE', message: built.message };
+        base.input = built.input;
+        // The node delivers this schedule's results, so the agent's own notify tool goes (services/delivery-crew.ts).
+        if (body.deliver === 'owner') await dropNotifyOfAgent({ storage, config }, agentGaii, owner);
     } else if (kind === 'eco-capability') {
         // Invoke a connected ecosystem app's capability over the connect-tunnel on each fire. The
         // app must be connected under this owner and must have declared the capability at approval;
@@ -705,6 +690,7 @@ export async function updateScheduleRecord(
         const next = withDeliver(job.type, updates.input ?? job.input, patch.deliver);
         if (!next.ok) return { ok: false, status: 400, code: 'INVALID_INPUT', message: next.message };
         updates.input = next.input;
+        if (patch.deliver === 'owner') await dropNotifyOfAgent({ storage, config }, job.agentGaii, job.ownerScope ?? ownerScope);
     }
 
     // A new instruction to an ai schedule that reads with more reach than its editor has waits for the
