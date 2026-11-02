@@ -1,6 +1,6 @@
 # 16 Known limitations
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
 
 Every known limitation of AIMEAT in one place, for the IT, security and data protection staff deciding whether to run it. Each row says what the limitation is, what follows from it, what the organisation can do about it, and where it is recorded. A limitation that has a setting is listed with that setting; "off by default" means the protection exists and the organisation must turn it on. The pages of this package carry their own `## Limits`; those the tables do not already carry are in the section "From the other pages" below.
 
@@ -36,12 +36,11 @@ Every known limitation of AIMEAT in one place, for the IT, security and data pro
 
 | Limitation | Consequence | What the organisation can do | Source |
 |---|---|---|---|
-| Two-step sign-in (TOTP) is supported but cannot be required for operators or any other account | An account with only a password is accepted | Turn it on for operators by procedure; prefer IdP sign-in with the IdP's own MFA policy | `aimeat/src/services/security-overview.ts` |
+| Two-step sign-in is required for nobody, and password sign-in is on for everyone, until the operator sets `AIMEAT_TWO_STEP_REQUIRED` and `AIMEAT_PASSWORD_SIGN_IN` | A node started from defaults accepts an account with only a password | Set `AIMEAT_TWO_STEP_REQUIRED=operators` (or `everyone`) and `AIMEAT_PASSWORD_SIGN_IN=operators` ([09 Hardening guide](09-hardening-guide.md)); prefer IdP sign-in with the IdP's own MFA policy | `aimeat/src/config-types-account-security.ts`, `aimeat/src/services/sign-in-policy.ts` |
 | Google sign-in has no tenant or domain gate | Under registration mode `oauth`, any Google account can create an account | Keep `AIMEAT_GOOGLE_OAUTH_ENABLED` off on an organisation node | [organisation node sign-in, section 6](../organisation-node-sign-in.md#6-what-the-gate-does-not-cover) |
 | Guests in the organisation's Entra tenant carry its tenant id and pass the allowlist | Anyone the Entra admins invite as a guest can sign in | Decide guest policy in Entra | [organisation node sign-in, section 6](../organisation-node-sign-in.md#6-what-the-gate-does-not-cover) |
-| Under `oauth` and `invite`, any member can mint an invitation, and the invited person gets a password account from any tenant or none | Members can bring in outsiders | Use organism roles to limit who invites | [organisation node sign-in, section 6](../organisation-node-sign-in.md#6-what-the-gate-does-not-cover) |
+| Under `oauth` and `invite`, any member can mint an invitation, and the invited person gets an account from any tenant or none (with a password while `AIMEAT_PASSWORD_SIGN_IN` is `on`) | Members can bring in outsiders | Use organism roles to limit who invites | [organisation node sign-in, section 6](../organisation-node-sign-in.md#6-what-the-gate-does-not-cover) |
 | The sign-in dialog shows the registration form under every mode; the endpoint behind it refuses | People see a form that does not work | Tell users | [organisation node sign-in, section 6](../organisation-node-sign-in.md#6-what-the-gate-does-not-cover) |
-| The first operator can be created with the admin password alone, without the setup code, until an operator exists | Whoever holds the admin password at first start can become the operator | Protect the admin password and the `admin-setup-secret` file; create the operator at once | `aimeat/src/routes/admin.ts` |
 | A passkey is bound to the node's domain, and the RP ID is immutable at runtime | A domain change invalidates every passkey | Fix the domain before the first passkey | `aimeat/src/services/config-schema.ts` |
 
 ## Data protection and data lifecycle
@@ -90,8 +89,8 @@ carry are below, grouped by topic, each with the page that explains it.
 
 ### Identity and sign-in ([04](04-identity-access.md), [03](03-shared-responsibility.md), [00](00-go-live-checklist.md))
 
-- Password sign-in cannot be turned off. `AIMEAT_REGISTRATION_MODE=oauth` stops new password accounts, but an existing account with a password still signs in with it, an invitation still creates a password account, and the emailed sign-in link has no node-wide switch.
-- After the first linked OIDC or SAML sign-in the node asks no TOTP code: on that path, MFA is the identity provider's. Passkey sign-in skips TOTP by design.
+- The emailed sign-in link has no node-wide switch; `AIMEAT_PASSWORD_SIGN_IN=off` turns off the password, not the link.
+- After the first linked OIDC or SAML sign-in the node asks no TOTP code, and such a sign-in satisfies required two-step sign-in: on that path, MFA is the identity provider's. Passkey sign-in skips TOTP by design.
 - SAML has no Single Logout, no signed AuthnRequests and no encrypted assertions. SCIM provisions Users only, no Groups, so roles and organism membership are not mapped from directory groups.
 - The password rule is fixed in code and not checked against breached-password lists.
 - A personal access token has no expiry unless its owner sets one, and may carry full owner or operator access. Agent and ecosystem app tokens last 90 days by default.
@@ -168,7 +167,7 @@ carry are below, grouped by topic, each with the page that explains it.
 ### Backup, updates and releases ([11](11-backup-recovery.md), [12](12-updates-releases.md))
 
 - The node has no backup scheduler; the schedule, encryption and off-site copy are the operator's. With a bucket file store, turn on object versioning: after a restore of an older database, objects written after that backup are no longer named and the daily sweep can remove them.
-- The node never re-encrypts its stored secrets. Adding `AIMEAT_ENCRYPTION_KEY` to a node that ran on `AIMEAT_TOTP_ENCRYPTION_KEY` (as `aimeat init` sets up) leaves the AI provider keys, MCP server credentials, connected accounts and payment keys stored before then unreadable; only two-step sign-in secrets and secret Config settings read with both keys (`aimeat/src/services/encryption.ts`).
+- The node never re-encrypts its stored secrets. After `AIMEAT_ENCRYPTION_KEY` is added to a node that ran on `AIMEAT_TOTP_ENCRYPTION_KEY` (as `aimeat init` sets up), the secrets stored before open only while the TOTP key stays set (`aimeat/src/services/encryption.ts`).
 - Restoring a newer backup onto an older node version is not supported. Losing `AIMEAT_ENCRYPTION_KEY` makes every stored secret unreadable; losing both the key passphrase and the key file stops the node from starting as the same node.
 - No restore-time figure at production size exists, and PostgreSQL WAL archiving and standby replication are not covered by the guides or tests.
 - The SBOM is not attached to a release. The upgrade test covers one step, from the previous release to the new build. The repository describes no process for publishing security advisories or CVE identifiers. No Docker image is published.

@@ -19,6 +19,8 @@
  * @usage app.use(ghiiRouter(config, storage, emailService)) from server.ts
  *
  * @version-history
+ *   2026-11-02 — POST /v1/ghii/login/two-step/start and /finish (ghii/login-two-step.ts): the enrolment of
+ *     a required two-step sign-in (services/sign-in-policy.ts).
  *   2026-10-25 — GET and PUT /v1/ghii/me/secret-host-ask (ghii/secret-host-ask.ts; secaudit2026oct22).
  *   v1.3.0 — 2026-09-09 — The registration limiter keys by IP only; a bearer token no longer buys
  *     its own bucket on the public sign-up door.
@@ -37,6 +39,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import type { PeerInfo } from '../services/federation.js';
 import { registerRegisterLoginRoutes } from './ghii/register-login.js';
 import { registerAttachEmailRoute } from './ghii/attach-email.js';
+import { registerLoginTwoStepRoutes } from './ghii/login-two-step.js';
 import { registerWebVerifyRoutes } from './ghii/web-verify.js';
 import { registerRecoveryRoutes } from './ghii/recovery.js';
 import { registerProfileRoutes } from './ghii/profile.js';
@@ -54,6 +57,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
 
     registerRegisterLoginRoutes(router, config, storage, emailService, peers, registrationLimit);
     registerAttachEmailRoute(router, config, storage, emailService);
+    registerLoginTwoStepRoutes(router, config, storage);
     registerWebVerifyRoutes(router, config, storage, emailService, onDirectoryChange, registrationLimit);
     registerRecoveryRoutes(router, config, storage, emailService);
     registerSecretHostAskRoutes(router, config, storage);

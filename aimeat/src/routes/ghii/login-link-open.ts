@@ -19,6 +19,9 @@
  *   POST /v1/ghii/magic-link/second-factor opens the session when the code is right
  *   (login-link-second-factor.ts).
  * @version-history
+ *   v1.4.0 — 2026-11-02 — On an account the required two-step policy covers and that has no TOTP, the
+ *     link opens no session: a setup token and the front page's enrolment step,
+ *     `?auth_step=two_step_setup#two_step=<token>` (login-two-step.ts; IT review).
  *   v1.3.0 — 2026-10-09 — An account with two-step sign-in gets no session from the link alone: a
  *     ticket and the code view instead (secaudit 2026-10-09, S1).
  *   v1.2.0 — 2026-10-05 — The return address is checked after the redeem, against the account it
@@ -35,6 +38,8 @@ import { AccountDisabledError } from '../../auth/jwt.js';
 import { establishForGhii } from '../../services/external-login.js';
 import { loginReturnTarget, redeemLoginLink } from '../../services/login-link.js';
 import { startLinkSecondFactor, registerLoginLinkSecondFactorRoute } from './login-link-second-factor.js';
+import { twoStepCovers } from '../../services/sign-in-policy.js';
+import { twoStepSetupRedirect } from './login-two-step.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 
@@ -57,6 +62,13 @@ export function registerLoginLinkOpenRoute(router: Router, config: AimeatConfig,
             // spent either way; the ticket carries the sign-in to the code (secaudit 2026-10-09, S1).
             if (result.ghii.totpEnabled && result.ghii.totpSecret) {
                 await startLinkSecondFactor(storage, config, req, res, result.ghii, back);
+                return;
+            }
+            // Required two-step sign-in (services/sign-in-policy.ts): a link on a covered account
+            // without TOTP opens no session; the front page's enrolment step takes over
+            // (login-two-step.ts). The link is spent either way.
+            if (twoStepCovers(config, await storage.getOwner(result.ghii.ownerName))) {
+                await twoStepSetupRedirect(storage, config, res, result.ghii, back);
                 return;
             }
             await establishForGhii(storage, config, req, res, result.ghii);

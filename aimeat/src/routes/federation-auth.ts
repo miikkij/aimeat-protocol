@@ -14,6 +14,10 @@
  *   through services/password-check.ts, with the same per-account lock as the sign-in route, and an
  *   account with two-step sign-in needs its code here too.
  * @version-history
+ *   v1.6.0 -- 2026-11-02 -- The sign-in policy (services/sign-in-policy.ts): with password sign-in off
+ *     the verify answers 403 PASSWORD_SIGN_IN_OFF before the consent or the password is read; under
+ *     `operators` a non-operator gets the same answer after the password. A covered account with no
+ *     TOTP gets 403 TWO_STEP_SETUP_REQUIRED instead of an attestation (IT review).
  *   v1.5.0 -- 2026-10-22 -- The consent predicate and the link's sign-in ceiling moved, unchanged, to
  *     services/federation-auth-consent.ts, which POST /v1/federation/memory/list and POST
  *     /v1/federation/replicate now read too (secaudit 2026-10 wave 3, v70 and v71).
@@ -54,6 +58,8 @@ import { sign, verify } from '../auth/keypair.js';
 import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../services/signed-node-request.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
+import { passwordSignInRefusal, passwordWayInRefusal, twoStepCovers, TWO_STEP_SETUP_REQUIRED } from '../services/sign-in-policy.js';
+import { twoStepArmed } from '../services/passkeys.js';
 
 /** Moved to services/federation-auth-consent.ts (v1.5.0); exported here too for its existing importers. */
 export { authConsentEnded } from '../services/federation-auth-consent.js';
@@ -129,6 +135,11 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             })) ?? signedMessageRefusal(requesting_node, timestamp, signature);
             if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
+            // Password sign-in policy (services/sign-in-policy.ts): with it off, this node vouches for
+            // no password, before the person's consent or password is read.
+            const passwordOff = passwordSignInRefusal(config);
+            if (passwordOff) { res.status(passwordOff.status).json(error(config.nodeId, passwordOff.code, passwordOff.message)); return; }
+
             // One answer for a missing consent, a missing account and a wrong password: the caller
             // learns whether the password is right only together with a consent that lets it ask.
             const failed = () => res.status(401).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED',
@@ -180,6 +191,10 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
                 res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
                 return;
             }
+            // `operators`: the role is read only after the password was right, and a non-operator gets
+            // the answer `off` gives.
+            const notForThisAccount = passwordWayInRefusal(config, ownerRecord);
+            if (notForThisAccount) { res.status(notForThisAccount.status).json(error(config.nodeId, notForThisAccount.code, notForThisAccount.message)); return; }
 
             // --- The second factor, for an account with two-step sign-in ---
             // The requesting node passes on the code the person typed there. Without one the answer is
@@ -187,6 +202,13 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             const second = await checkSecondFactor(storage, config, ghiiRecord, { totp_code, backup_code });
             if (!second.ok) {
                 res.status(second.status).json(error(config.nodeId, second.code, second.message));
+                return;
+            }
+            // Required two-step sign-in: a covered account with no code app gets no attestation on
+            // its password alone. The enrolment happens here, on the home node, at its own sign-in.
+            if (!twoStepArmed(ghiiRecord) && twoStepCovers(config, ownerRecord)) {
+                res.status(403).json(error(config.nodeId, TWO_STEP_SETUP_REQUIRED,
+                    'Your home server requires two-step sign-in for this account. Sign in there once to set it up, then sign in here again.'));
                 return;
             }
 

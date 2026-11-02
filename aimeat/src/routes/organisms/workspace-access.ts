@@ -6,6 +6,8 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-02 — A code key answers 403 PASSWORD_SIGN_IN_OFF when the password sign-in policy refuses
+ *     a new password (services/sign-in-policy.ts; IT review): its code is the account's password.
  *   2026-10-27 — A code-key account reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-27 — fromLoopback is read through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   v1.17.1 — 2026-10-23 — A code-key account passes whether the request came in on a loopback socket (fromLoopback), for the setup code of a node without an operator (secaudit2026oct22).
@@ -104,6 +106,7 @@ import type { OrganismHelpers } from './shared.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { newPasswordRefusal } from '../../services/sign-in-policy.js';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -565,6 +568,10 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (!cleanEmail || !isValidEmail(cleanEmail)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid "email" is required')); return; }
     if (!code || typeof code !== 'string' || code.length < 8) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A "code" (min 8 chars) is required')); return; }
+    // A code key's code is the new account's password: refused with the password sign-in policy off
+    // or for operators only (services/sign-in-policy.ts). The guest account is never an operator.
+    const noPassword = newPasswordRefusal(config, false);
+    if (noPassword) { res.status(noPassword.status).json(error(config.nodeId, noPassword.code, noPassword.message)); return; }
     let uname = typeof username === 'string' ? username.trim().toLowerCase() : '';
     if (uname.includes('@')) uname = uname.split('@')[0];
     const nameErr = validateOwnerName(uname);

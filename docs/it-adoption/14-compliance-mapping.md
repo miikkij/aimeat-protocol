@@ -1,6 +1,6 @@
 # 14 Compliance mapping
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is for the DPO, the compliance officer and the auditor. It maps GDPR, the EU AI Act, ISO/IEC 27001:2022 Annex A and NIS2 Article 21 to what the AIMEAT node does, and says what stays with the organisation. AIMEAT is not certified, and the repository holds no external audit or attestation. "Yes" below means the node has the mechanism; it never means the organisation is compliant by running it. The node's own compliance features say the same: every risk or framework verdict is served with a not-legal-advice note (`aimeat/src/data/compliance-questionnaire.ts`).
 
@@ -65,8 +65,8 @@ Controls the node touches ([ISO/IEC 27001:2022](https://www.iso.org/standard/270
 | 5.17 Authentication information | yes | scrypt passwords (`aimeat/src/services/password.ts`), TOTP secrets and keys encrypted, tokens stored as hashes | password policy at the identity provider |
 | 5.23 Information security for cloud services | partial | processors register lists AI providers, mail and hosting (`aimeat/src/services/compliance-processing.ts`) | select and contract cloud and model providers |
 | 5.34 Privacy and protection of PII | partial | export, erasure, registers, classification ([05 Data protection](05-data-protection.md)) | privacy programme |
-| 8.2 Privileged access rights | partial | operator role. An AI credential cannot turn the classification switch off or from `all` to `owner`. An operator's agent holding `operator:admin` can change every other setting, including ones that weaken protection (`aimeat/src/services/config-admin-view.ts`, `aimeat_admin_config_set`). Each setting change writes the operator trail, without values (`aimeat/src/routes/admin-config.ts`) | who holds the operator role, review |
-| 8.5 Secure authentication | partial | passkeys, TOTP, OIDC and SAML sign-in, SCIM (`aimeat/src/services/passkeys.ts`, `aimeat/src/services/totp.ts`, `aimeat/src/services/saml-sp.ts`, [Organisation node sign-in](../organisation-node-sign-in.md)); no setting makes TOTP mandatory ([07 Security](07-security.md)) | enforce MFA at the identity provider |
+| 8.2 Privileged access rights | partial | operator role. An AI credential cannot turn the classification switch off or from `all` to `owner`, and cannot weaken `auth.two_step_required` or `auth.password_sign_in` (403 `PERSON_REQUIRED`). An operator's agent holding `operator:admin` can change every other setting, including ones that weaken protection (`aimeat/src/services/config-admin-view.ts`, `aimeat_admin_config_set`). Each setting change writes the operator trail, without values (`aimeat/src/routes/admin-config.ts`) | who holds the operator role, review |
+| 8.5 Secure authentication | yes, once set | passkeys, TOTP, OIDC and SAML sign-in, SCIM (`aimeat/src/services/passkeys.ts`, `aimeat/src/services/totp.ts`, `aimeat/src/services/saml-sp.ts`, [Organisation node sign-in](../organisation-node-sign-in.md)); two-step sign-in can be required for operators or everyone (`AIMEAT_TWO_STEP_REQUIRED`, default `off`) and password sign-in limited to operators or turned off (`AIMEAT_PASSWORD_SIGN_IN`) (`aimeat/src/services/sign-in-policy.ts`). On an IdP sign-in the MFA is the IdP's, and the node does not check it ([04 Identity and access](04-identity-access.md)) | set both settings; enforce MFA at the identity provider |
 | 8.8 Technical vulnerabilities | partial | `.github/SECURITY.md`, dependency review and vulnerability scan workflows (`.github/workflows/vulnerability-scan.yml`, `.github/workflows/dependency-review.yml`) | patch the node, its host and dependencies ([12 Updates and releases](12-updates-releases.md)) |
 | 8.9 Configuration management | partial | settings schema, start-up posture check that warns on unsafe settings (`aimeat/src/config-posture.ts`), settings changes in the operator trail without values | keep `.env` under change control |
 | 8.12 Data leakage prevention | partial | classification exits, AI provider allowlist and type list, egress guard on server-side fetches ([06 AI and models](06-ai-and-models.md)) | network egress control |
@@ -94,7 +94,7 @@ Directive (EU) 2022/2555, Article 21(2) ([EUR-Lex](https://eur-lex.europa.eu/eli
 | (g) cyber hygiene and training | no | none in the node | training |
 | (h) cryptography and encryption | partial | AES-256-GCM for secrets, Ed25519 signatures | TLS, disk and database encryption |
 | (i) human resources security, access control, asset management | partial | roles, scopes, SCIM deprovisioning ([Organisation node sign-in](../organisation-node-sign-in.md)) | joiner, mover and leaver process |
-| (j) multi-factor authentication, secured communications, emergency communications | partial | TOTP and passkeys, SSO; no mandatory MFA setting | enforce MFA at the identity provider; emergency channels |
+| (j) multi-factor authentication, secured communications, emergency communications | partial | TOTP and passkeys, SSO; MFA can be required on the node itself (`AIMEAT_TWO_STEP_REQUIRED`, default `off`; `aimeat/src/services/sign-in-policy.ts`). Nothing in the node covers emergency communications | set `AIMEAT_TWO_STEP_REQUIRED`; enforce MFA at the identity provider; emergency channels |
 
 ## What the operator fills in at adoption
 
@@ -118,7 +118,7 @@ Directive (EU) 2022/2555, Article 21(2) ([EUR-Lex](https://eur-lex.europa.eu/eli
 - Restriction of processing (Art. 18) is limited to an operator disabling the whole account.
 - Nothing in the node covers AI literacy (AI Act Art. 4) or staff training (NIS2 21(2)(g)).
 - The node makes no backups, so ISO 8.13 and NIS2 21(2)(c) are entirely the organisation's.
-- No setting makes multi-factor authentication mandatory on the node itself.
+- Multi-factor authentication on the node itself is mandatory only once `AIMEAT_TWO_STEP_REQUIRED` is set; the default is `off`. On an IdP sign-in the node relies on the IdP's MFA and does not check it (`aimeat/src/services/sign-in-policy.ts`).
 - Memory records, workspace content, messages and files are not encrypted at rest by the node.
 - The processors list the node derives names the node's own AI providers (one per OpenRouter region), people's own OpenRouter keys, the SMTP host and the hosting provider; it does not name the decision provider (System 1) or an outside file store, which the operator adds by hand (`aimeat/src/services/compliance-derived.ts`).
 

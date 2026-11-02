@@ -30,11 +30,16 @@
  *   agent forwards through the tunnel answers but does not make its owner the operator, a registration
  *   it forwards is asked for the code, and a sign-in on the node's own machine still does.
  *
- *   It runs its own five nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 28533
- *   (public, setup), 28535 (public, registration), 28536 (public, no operator), 28534 (loopback) and
- *   28537 (loopback, tunnel on, no operator).
+ *   On a public node whose first operator is made with the admin password (POST /v1/admin/setup/register):
+ *   the password alone is refused (SETUP_CODE_REQUIRED) and creates nothing, a wrong code is refused,
+ *   the password with the code makes the operator, and the route then answers 410.
+ *
+ *   It runs its own six nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 28533
+ *   (public, setup), 28538 (public, admin-password setup), 28535 (public, registration), 28536 (public,
+ *   no operator), 28534 (loopback) and 28537 (loopback, tunnel on, no operator).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-code
  * @version-history
+ *   2026-11-02 -- A node on 28538: POST /v1/admin/setup/register asks for the setup code (Jouni, 2026-11-02).
  *   2026-10-28 — The tunnel node moves to 28537 with the suite's other ports (main's move out of the claims range).
  *   2026-10-27 — A node on 40537: a sign-in or registration forwarded through the connector tunnel is
  *     not the node's own machine for the setup code (secaudit2026oct26).
@@ -69,6 +74,7 @@ const LOOPBACK_PORT = 28534;
 const REGISTER_PORT = 28535;
 const NO_OPERATOR_PORT = 28536;
 const TUNNEL_PORT = 28537;
+const ADMIN_REGISTER_PORT = 28538;
 const STAMP = Date.now().toString(36).slice(-6);
 // A fixed digit: STAMP is base36 and is sometimes letters only, and the password rule asks for a number.
 const PASSWORD = `Setup-Code-${STAMP}-Pw7!`;
@@ -135,6 +141,7 @@ let reg: OwnNode | null = null;
 let noop: OwnNode | null = null;
 let loop: OwnNode | null = null;
 let tun: OwnNode | null = null;
+let adm: OwnNode | null = null;
 
 // POST /v1/setup/init writes an .env into the package root when none is there. A placeholder is
 // written first and removed afterwards, unless the developer already had one, which is not touched
@@ -195,6 +202,51 @@ try {
     });
     await stopNode(pub);
     pub = null;
+
+    console.log('\nA node with a public base URL, its first operator made with the admin password');
+    // POST /v1/admin/setup/register asked only for the admin password, so whoever held it before the
+    // operator existed took the role without the code (IT adoption review; Jouni, 2026-11-02).
+    adm = await startNode(ADMIN_REGISTER_PORT, 'https://adminsetup.example', { AIMEAT_SECURITY_PROFILE: 'public', AIMEAT_LOG_LEVEL: 'warn' });
+    const anode = adm;
+    const acode = /Setup code: ([0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4})/.exec(anode.log)?.[1] ?? '';
+    const adminRegister = (name: string, setupCode?: string) => json(anode, '/v1/admin/setup/register', {
+        method: 'POST',
+        headers: { 'X-Admin-Password': `Setup-Admin-${STAMP}-Pw!` },
+        body: JSON.stringify({ name, password: PASSWORD, ...(setupCode !== undefined ? { setupCode } : {}) }),
+    });
+
+    await test('the admin password alone does not make the first operator: SETUP_CODE_REQUIRED, and no owner', async () => {
+        assert(acode, 'no "Setup code:" line in the start log');
+        const r = await adminRegister(`admnocode${STAMP}`);
+        assert(r.status === 403, `expected 403, got ${r.status} ${short(r.body)}`);
+        assert(r.body.error?.code === 'SETUP_CODE_REQUIRED', `code: ${short(r.body)}`);
+        const s = await json(anode, '/v1/setup/status');
+        assert(s.body.data.needsSetup === true, 'an owner was created without the code');
+    });
+
+    await test('the admin password with a wrong code is refused', async () => {
+        const wrong = (acode[0] === 'A' ? 'B' : 'A') + acode.slice(1);
+        const r = await adminRegister(`admwrong${STAMP}`, wrong);
+        assert(r.status === 403 && r.body.error?.code === 'SETUP_CODE_INVALID', `expected SETUP_CODE_INVALID, got ${r.status} ${short(r.body)}`);
+    });
+
+    await test('the admin password with the code makes the first operator, and the route then closes', async () => {
+        const r = await adminRegister(`admfirst${STAMP}`, acode);
+        assert(r.status === 200 && r.body.ok === true, `expected 200, got ${r.status} ${short(r.body)}`);
+        assert(r.body.owner.roles.includes('operator'), `roles: ${short(r.body.owner.roles)}`);
+        const again = await adminRegister(`admsecond${STAMP}`, acode);
+        assert(again.status === 410 && again.body.error?.code === 'SETUP_CLOSED', `expected 410 SETUP_CLOSED, got ${again.status} ${short(again.body)}`);
+    });
+
+    await test('a wrong admin password is refused before the code is read', async () => {
+        const r = await json(anode, '/v1/admin/setup/register', {
+            method: 'POST', headers: { 'X-Admin-Password': 'not-the-password' },
+            body: JSON.stringify({ name: `admbadpw${STAMP}`, password: PASSWORD, setupCode: acode }),
+        });
+        assert(r.status === 401, `expected 401, got ${r.status} ${short(r.body)}`);
+    });
+    await stopNode(adm);
+    adm = null;
 
     console.log('\nA node with a public base URL, its first account made by registration');
     // The shipped registration limit is five a minute per address; this node takes seven.
@@ -421,6 +473,7 @@ try {
     });
 } finally {
     await stopNode(pub);
+    await stopNode(adm);
     await stopNode(reg);
     await stopNode(noop);
     await stopNode(loop);

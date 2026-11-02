@@ -24,6 +24,9 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-11-02 — Accepting with a new account and a password answers 403 PASSWORD_SIGN_IN_OFF when the
+ *     password sign-in policy refuses a new password (services/sign-in-policy.ts; IT review); the
+ *     invitation stays unspent.
  *   2026-10-31 — Both routes take the invitation's id as well as its token (invitationFor): the
  *     in-app notice links by id, and an id opens the invitation only for the invited person signed
  *     in in person, never for a signed-out accept (secaudit2026oct31w2 round 10, R-f-2026sec-07-d7).
@@ -75,7 +78,8 @@ import { emitChange } from '../services/event-bus.js';
 import { notify } from '../services/notify.js';
 import { hashPassword } from '../services/password.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
-import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, registrationRefusal } from '../services/owner-provisioning.js';
+import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, registrationRefusal, createdAccountIsOperator } from '../services/owner-provisioning.js';
+import { newPasswordRefusal } from '../services/sign-in-policy.js';
 import { establishOwnerSession } from '../services/owner-session.js';
 import { hashInviteToken, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget } from '../services/invitations.js';
 import { appInviteMeta, type AppInviteMeta } from '../services/app-invite-link.js';
@@ -271,6 +275,12 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       const nameErr = validateOwnerName(username);
       if (nameErr) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameErr)); return; }
       if (!password || typeof password !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required')); return; }
+      // The password sign-in policy (services/sign-in-policy.ts): with it off, or for operators only,
+      // the account this form makes gets no password. The invite is NOT consumed.
+      if (config.passwordSignIn !== 'on') {
+        const noPassword = newPasswordRefusal(config, await createdAccountIsOperator(storage));
+        if (noPassword) { res.status(noPassword.status).json(error(config.nodeId, noPassword.code, noPassword.message)); return; }
+      }
       const pwErr = validatePasswordStrength(password);
       if (pwErr) { res.status(400).json(error(config.nodeId, 'WEAK_PASSWORD', pwErr)); return; }
       if (await storage.getOwner(username)) { res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`)); return; }

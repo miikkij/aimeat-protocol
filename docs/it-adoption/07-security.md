@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -51,7 +51,7 @@ The same code runs a single-user laptop node and a multi-user public node. The d
 | Registration | `AIMEAT_REGISTRATION_MODE` | `open`: anyone may create an account | **no** for an organisation node. Set `oauth`, `invite` or `closed` | `aimeat/src/config.ts`, [Organisation node sign-in](../organisation-node-sign-in.md) |
 | Who sees content | `AIMEAT_CONTENT_ACCESS` | `open`: public content is served to anyone | decide it. `signed-in` serves nothing to people without an account here | `aimeat/.env.example` |
 | Consent layer | `AIMEAT_CONSENT_ENABLED` | on (off only when set to `false`) | yes | `aimeat/src/config-data-access.ts` |
-| First operator | setup code | a one-time code is printed in the start log while the node has no operator; every self-registration and IdP route that would create the first operator asks for it unless the request comes from loopback on a loopback base URL. The exception is `POST /v1/admin/setup/register`, which asks for the admin password instead, until an operator exists (`aimeat/src/routes/admin.ts`) | yes | `aimeat/src/services/setup-code.ts` |
+| First operator | setup code | a one-time code is printed in the start log while the node has no operator; every route that would create the first operator asks for it unless the request comes from loopback on a loopback base URL: the setup wizard, self-registration, an identity provider's first sign-in, and `POST /v1/admin/setup/register`, which asks for the admin password and the code (`aimeat/src/routes/admin/setup-register.ts`) | yes | `aimeat/src/services/setup-code.ts` |
 | Setup wizard addresses | `AIMEAT_SETUP_ALLOWED_IPS` | empty, no address restriction | the setup code is the control; this is an extra | `aimeat/.env.example` |
 | Admin setup after first operator | `AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR` | off: the setup route answers 410 once an operator exists | yes | `aimeat/.env.example` |
 | SSRF guard | `AIMEAT_ALLOW_PRIVATE_EGRESS` | RFC 1918, link-local, CGNAT and cloud metadata addresses are always blocked; loopback is blocked on `public`, allowed on `local` | yes on `public` | `aimeat/src/utils/url-validator.ts`, `aimeat/.env.example` |
@@ -64,11 +64,13 @@ The same code runs a single-user laptop node and a multi-user public node. The d
 | Extension install | `AIMEAT_EXT_INSTALL_ROLE` | `owner`: every account holder | **no** on a shared node. Set `operator` | `aimeat/src/config.ts` |
 | Default agent scopes | `AIMEAT_DEFAULT_AGENT_SCOPES` | read, write and delete-to-bin of memory, catalogue, organism and agent read, send messages, store files. Powerful scopes (`ai:use`, `task:write`, `memory:purge`, `agent:delete`) are never in the default | decide it. A public node is advised to run a minimal list | `aimeat/src/config.ts`, `aimeat/src/config-posture.ts`, [Security DNA](../coding-guidelines/security-development-dna.md) section 3 |
 | Storage backend | `AIMEAT_STORAGE` | `memory`: data is lost at restart | **no**. Set `postgres-kysely` or `sqlite` | `aimeat/src/config.ts`, `aimeat/.env.example` |
-| Secret encryption key | `AIMEAT_ENCRYPTION_KEY` | unset. The node falls back to `AIMEAT_TOTP_ENCRYPTION_KEY`; with neither, features that store a secret answer 503 and store nothing | set it before the first start. `aimeat init` generates only the TOTP key, and adding the data key later to such a node leaves secrets stored before then unreadable ([11 Backup and recovery](11-backup-recovery.md)) | `aimeat/.env.example`, `aimeat/src/services/encryption.ts` |
+| Secret encryption key | `AIMEAT_ENCRYPTION_KEY` | unset. The node falls back to `AIMEAT_TOTP_ENCRYPTION_KEY`; with neither, features that store a secret answer 503 and store nothing | set it before the first start. `aimeat init` generates only the TOTP key; adding the data key later is safe while the TOTP key stays set, because secrets stored before still open with it ([11 Backup and recovery](11-backup-recovery.md)) | `aimeat/.env.example`, `aimeat/src/services/encryption.ts` |
 | HSTS | (none) | `max-age=31536000; includeSubDomains` when `AIMEAT_BASE_URL` starts with `https://` | yes | `aimeat/src/server-bootstrap/static-files.ts` |
 | Refusal log | `AIMEAT_AUTH_LOG_PATH` | on, file data/auth-failures.log under the working directory | yes | `aimeat/src/config-security.ts` |
 | Sign-in tarpit | `AIMEAT_LOGIN_TARPIT_ENABLED` | on | yes | `aimeat/.env.example` |
-| Two-step sign-in (TOTP) | `AIMEAT_TOTP_ENABLED` | available; each person turns it on | partly. No setting makes it mandatory | `aimeat/src/config-types-account-security.ts` |
+| Two-step sign-in (TOTP) | `AIMEAT_TOTP_ENABLED` | available; each person turns it on | yes, to offer it | `aimeat/src/config-types-account-security.ts` |
+| Required two-step sign-in | `AIMEAT_TWO_STEP_REQUIRED` | `off`: required for nobody | **no** on an organisation node. Set `operators`, or `everyone` | `aimeat/src/services/sign-in-policy.ts` |
+| Password sign-in | `AIMEAT_PASSWORD_SIGN_IN` | `on`: every account may use a password | decide it. With an IdP, `operators` keeps the password as the operators' way in when the IdP fails | `aimeat/src/services/sign-in-policy.ts` |
 | AI provenance | (none) | recorded; a `public` node refuses to switch it off | yes | `aimeat/src/config-posture.ts`, [AI transparency](../ai-transparency.md) |
 | Version check | `AIMEAT_UPDATE_CHECK` | on: the node asks npm for a newer version when an operator opens a page | decide it. It sends nothing about the node | `aimeat/.env.example` |
 
@@ -80,6 +82,7 @@ The same code runs a single-user laptop node and a multi-user public node. The d
 |---|---|---|
 | People | Password (`POST /v1/ghii/login`), passkey (`AIMEAT_PASSKEY_ENABLED`, `AIMEAT_PASSKEY_RP_ID`), or an identity provider: Entra ID, Google or Casdoor over OIDC, or SAML through an SSO connection | [Organisation node sign-in](../organisation-node-sign-in.md), `aimeat/.env.example` |
 | Second factor | TOTP with backup codes; wrong codes pause sign-in (`429 TOTP_LOCKED`) | [Security practices](../coding-guidelines/security.md) |
+| Sign-in policy | `AIMEAT_TWO_STEP_REQUIRED` requires two-step sign-in for operators or everyone: a covered account without TOTP gets no session from a password or an emailed link and enrols first; a passkey or an IdP sign-in satisfies it. `AIMEAT_PASSWORD_SIGN_IN` limits password sign-in to operators or turns it off (403 `PASSWORD_SIGN_IN_OFF`). An AI credential may tighten either setting, not weaken it (403 `PERSON_REQUIRED`) | `aimeat/src/services/sign-in-policy.ts`, `aimeat/src/services/config-admin-view.ts`, [04 Identity and access](04-identity-access.md) |
 | Owner sessions | A short access token (`AIMEAT_ACCESS_TTL`, 900 s) and a rotating httpOnly refresh cookie, `__Host-aimeat_rt` on https, idle limit `AIMEAT_REFRESH_IDLE_DAYS` (30), absolute limit `AIMEAT_REFRESH_ABSOLUTE_DAYS` (90) | `aimeat/.env.example`, `aimeat/src/services/owner-session.ts` |
 | Tokens | Every access JWT the node issues is EdDSA, signed with the node's Ed25519 key (`jose`); personal access tokens, SCIM tokens and refresh tokens are opaque random values stored as SHA-256 hashes. Agent tokens last `AIMEAT_AGENT_JWT_TTL` (90 days), ecosystem app tokens `AIMEAT_ECO_JWT_TTL` (90 days), a person's access token `AIMEAT_ACCESS_TTL` (900 s), other node-issued JWTs `AIMEAT_JWT_TTL` (3600 s). A token with no `scopes` claim can do nothing. Revocation is stored per node and survives a restart | [Security practices](../coding-guidelines/security.md) |
 | Agents | Device authorization (RFC 8628): the owner approves the agent and picks its scopes | [Identity model](../coding-guidelines/identity-model.md) |
@@ -180,8 +183,9 @@ What the repository records, without numbers it does not state:
 
 ## Limits
 
-- No setting makes two-step sign-in (TOTP or passkey) mandatory for all accounts or for operators; each person turns it on.
-- No setting turns password sign-in off. `AIMEAT_REGISTRATION_MODE=oauth` stops new password accounts, but an existing account with a password can still sign in with it, and an invitation still creates an account with a password.
+- Two-step sign-in is required for nobody and password sign-in is on for everyone until the operator sets `AIMEAT_TWO_STEP_REQUIRED` and `AIMEAT_PASSWORD_SIGN_IN` (`aimeat/src/config-types-account-security.ts`).
+- A passkey or an IdP sign-in satisfies required two-step sign-in without the node's TOTP code, by design; the node does not check the IdP's MFA (`aimeat/src/services/sign-in-policy.ts`).
+- The emailed sign-in link has no node-wide switch; `AIMEAT_PASSWORD_SIGN_IN=off` leaves it on (`aimeat/src/services/login-link.ts`, `aimeat/src/services/sign-in-policy.ts`).
 - The startup self-check only warns. A `public` node with no `AIMEAT_ENCRYPTION_KEY`, `*` CORS or an empty AI provider allowlist still starts.
 - `aimeat validate` does not read the security profile, so it does not report the posture warnings that the start log reports.
 - The shipped default agent scopes include memory write and delete-to-bin, message sending and file storage. The Security DNA advises a minimal list on a public node; the operator must set it.
@@ -198,5 +202,4 @@ What the repository records, without numbers it does not state:
 
 ## Open questions
 
-- OPEN: Should an organisation node be able to turn password sign-in off entirely when SSO is on? (the maintainer)
 - OPEN: What is the date and scope of the most recent outside penetration test, if any? The repository records internal audits and probe sessions only. (the maintainer)
