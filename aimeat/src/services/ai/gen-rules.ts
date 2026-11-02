@@ -31,6 +31,8 @@
  *   - resolveGenRules() — which rules a call or an arrival meets, and why
  *   - directiveText() — the instruction appended to a prompt
  * @version-history
+ *   v1.1.0 — 2026-11-02 — An owner's exception may name an ecosystem app, `eco:<name>`, now that its
+ *     calls are the owner's app and no longer the owner in person (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-31 — Initial: people-artistic.
  */
 import type { AiGenRuleMark, AiMediaKind } from '../../models/ai-provenance-schemas.js';
@@ -107,7 +109,7 @@ export function parseNodeGenRules(raw: string | undefined): { modes: Record<stri
 /** One exemption the owner made: this rule is not given to this app's or this agent's calls. */
 export interface GenRuleException {
   rule: string;
-  /** An app's address, `<owner>/<file>.html`. */
+  /** An app's address, `<owner>/<file>.html`, or an ecosystem app's `eco:<name>`. */
   app?: string;
   /** An agent of the owner's, by its bare name. */
   agent?: string;
@@ -126,6 +128,8 @@ export const EMPTY_OWNER_GEN_RULES: OwnerGenRules = { rules: {}, exceptions: [] 
 const MAX_EXCEPTIONS = 100;
 const REASON_MAX = 300;
 const APP_ADDRESS = /^[a-z0-9][a-z0-9._-]{0,99}\/[a-z0-9][a-z0-9._-]{0,150}\.html$/i;
+/** An ecosystem app of the owner's, by the name its AI calls carry (agent-ai-keys.ts aiPayerOf). */
+const ECO_APP = /^eco:[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const AGENT_NAME = /^[a-z0-9][a-z0-9._-]{0,99}$/i;
 
 /** Read a stored record leniently: what does not parse is left out, never thrown over. */
@@ -173,8 +177,8 @@ export function normaliseOwnerGenRules(input: unknown): { record: OwnerGenRules 
         const agent = typeof e.agent === 'string' ? e.agent.trim() : undefined;
         const reason = typeof e.reason === 'string' ? e.reason.trim() : '';
         if (!genRuleById(rule)) problems.push({ field: `${f}.rule`, message: 'is not a rule' });
-        if (!!app === !!agent) problems.push({ field: f, message: 'names exactly one of app (<owner>/<file>.html) or agent (its name)' });
-        if (app && !APP_ADDRESS.test(app)) problems.push({ field: `${f}.app`, message: 'is <owner>/<file>.html' });
+        if (!!app === !!agent) problems.push({ field: f, message: 'names exactly one of app (<owner>/<file>.html, or eco:<name> for an ecosystem app) or agent (its name)' });
+        if (app && !APP_ADDRESS.test(app) && !ECO_APP.test(app)) problems.push({ field: `${f}.app`, message: 'is <owner>/<file>.html, or eco:<name> for an ecosystem app' });
         if (agent && !AGENT_NAME.test(agent)) problems.push({ field: `${f}.agent`, message: 'is the agent\'s name' });
         if (!reason || reason.length > REASON_MAX) problems.push({ field: `${f}.reason`, message: `is required, at most ${REASON_MAX} characters` });
         exceptions.push({ rule, ...(app ? { app } : {}), ...(agent ? { agent } : {}), reason });
@@ -194,7 +198,7 @@ export function normaliseOwnerGenRules(input: unknown): { record: OwnerGenRules 
 export interface GenRuleCaller {
   /** The owner in person: the only caller whose own bypass counts. */
   ownerInPerson: boolean;
-  /** The app the call came through, `<owner>/<file>.html`. */
+  /** The app the call came through, `<owner>/<file>.html`, or an ecosystem app's `eco:<name>`. */
   app?: string;
   /** The owner's agent that made the call, by bare name. */
   agent?: string;
@@ -257,7 +261,9 @@ export function resolveGenRules(input: {
       const rule = genRuleById(id);
       if (!rule) return { marks: [], given: [], refused: { rule: id, message: `There is no generation rule "${id}".` } };
       if (!caller.ownerInPerson) {
-        return { marks: [], given: [], refused: { rule: id, message: `Only the owner in person may bypass "${id}" for one call. An agent or an app asks the owner for an exception instead (aimeat_ai_gen_rules_set).` } };
+        // The exception names this caller as the owner would write it, so the ask can be acted on.
+        const whom = caller.agent ? ` for agent "${caller.agent}"` : caller.app ? ` for app "${caller.app}"` : '';
+        return { marks: [], given: [], refused: { rule: id, message: `Only the owner in person may bypass "${id}" for one call. An agent or an app asks the owner for an exception${whom} instead (aimeat_ai_gen_rules_set).` } };
       }
       if (ruleStanding(rule, nodeModes, owner).required) {
         return { marks: [], given: [], refused: { rule: id, message: `The node requires "${id}", so no call bypasses it.` } };

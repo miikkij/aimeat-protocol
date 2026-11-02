@@ -21,6 +21,8 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.13.0 -- 2026-11-02 -- `storeIn`: an ecosystem app's picture stays in its own namespace while its
+ *     owner pays for it (secaudit2026nov02d round 13).
  *   v2.12.0 -- 2026-10-31 -- The generation rules (services/ai/gen-rules.ts): the directives of the
  *     rules in force for the owner, the app and the agent go after the prompt; `genRulesBypass` lifts
  *     a rule for one picture, the owner in person only, refused 403 GEN_RULE_BYPASS_REFUSED before
@@ -112,6 +114,9 @@ export interface GenerateForOwnerOptions {
   size?: string;
   /** Storage key to write to. Defaults to `ai-images/<timestamp>-<random>.<ext>`. */
   storageKey?: string;
+  /** The namespace the picture is stored in when it is not the payer's: an ecosystem app's picture
+   *  stays in its own `eco:` namespace while its owner pays (agent-ai-keys.ts aiPayerOf). */
+  storeIn?: string;
   /** Make the stored image publicly readable. Needed when a model has to fetch it back by URL. */
   publicVisibility?: boolean;
   /**
@@ -211,7 +216,7 @@ async function publicPictureRequester(
   const ask = publishAskOf({ storage, config }, opts.publishGate.caller, opts.publishGate.app);
   if (ask.kind === 'allowed') return null;
   if (ask.kind === 'ask') return ask.requester;
-  const existing = opts.storageKey ? await storage.getStorageFileMeta(gaii, opts.storageKey) : null;
+  const existing = opts.storageKey ? await storage.getStorageFileMeta(opts.storeIn ?? gaii, opts.storageKey) : null;
   if (existing?.visibility === 'public') return null;
   throw new AiCompletionError(ask.code, ask.status, ask.message);
 }
@@ -312,18 +317,20 @@ export async function generateForOwner(
 
   const key = opts.storageKey
     || `ai-images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extensionFor(result.mime)}`;
+  // Where the picture lives: the payer's storage, or the caller's own namespace when that differs.
+  const holder = opts.storeIn ?? gaii;
   // The publish gate, as an upload of these bytes meets it (services/storage-file-write.ts): a raise to
   // public by a caller the owner is asked about stores the picture private and files a request once it
   // exists. Keeping a public file at this key public asks nothing (fileRaiseAsk).
   const raise = requester
-    ? await fileRaiseAsk({ storage, config }, gaii, key, 'public', { requester })
+    ? await fileRaiseAsk({ storage, config }, holder, key, 'public', { requester })
     : { kind: 'none' as const };
   const asked = raise.kind === 'ask' ? raise.requester : null;
   const visibility = opts.publicVisibility && !asked ? 'public' as const : 'private' as const;
   const createdAt = new Date().toISOString();
   const file = await storage.createStorageFile({
     key,
-    ownerGaii: gaii,
+    ownerGaii: holder,
     visibility,
     mimeType: result.mime,
     size: result.data.length,
@@ -347,7 +354,7 @@ export async function generateForOwner(
   // The stored picture names its record, which is minted only at settlement, after the store. A
   // public picture then makes its record resolvable by anyone (the PUBLICLY_LINKED storage clause).
   if (settled.provenance) {
-    await storage.setStorageFileProvenance(gaii, key, settled.provenance.id).catch((err: unknown) =>
+    await storage.setStorageFileProvenance(holder, key, settled.provenance.id).catch((err: unknown) =>
       logger.warn(`[image] the picture was stored without its provenance link: ${String(err)}`, { key }));
   }
   // The request the publish gate asked for, now that the picture it names exists. It names the bytes
@@ -365,7 +372,7 @@ export async function generateForOwner(
     // A picture that waits for the owner's approval answers the public address the approval opens,
     // so a record or a page that keeps it loads it once approved; until then it answers only those
     // who may read the owner's private files.
-    fetchUrl: imageFetchUrl(filed?.ok || pending ? 'public' : visibility, gaii, key),
+    fetchUrl: imageFetchUrl(filed?.ok || pending ? 'public' : visibility, holder, key),
     mime: result.mime,
     sizeBytes: result.data.length,
     createdAt,

@@ -21,6 +21,8 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key, viewer?)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.10.0 -- 2026-11-02 -- An ecosystem app's job is paid by its owner (aiPayerOf); its picture stays
+ *     in the app's own namespace (secaudit2026nov02d round 13).
  *   v1.9.0 -- 2026-10-22 -- A transcription's audio is held to the job's viewer (starter.ts
  *     jobReadViewer), at the start and on the bytes: an agent that does not read as the owner, or
  *     an extension's code narrowed to its writer, is refused the owner's private audio with
@@ -122,7 +124,7 @@ export async function runJobOp(
     signal: AbortSignal,
 ): Promise<JobOpOutcome> {
     const { storage, config } = deps;
-    const { payer, agent } = aiPayerOf(job.owner);
+    const { payer, agent, ecoApp } = aiPayerOf(job.owner);
     // Who the call runs as: the app or agent that started the job, under the owner's rules for it.
     const who = jobCaller(job);
     const common = {
@@ -151,6 +153,8 @@ export async function runJobOp(
             // the run is the node's own work and is not counted again.
             limit: 'exempt',
             prompt,
+            // An ecosystem app's picture stays in its own namespace beside its job; its owner pays.
+            ...(ecoApp ? { storeIn: job.owner } : {}),
             ...(job.size ? { size: job.size } : {}),
             // A public result record that pointed at a private picture would answer 401 to every
             // reader it was made public for, so the picture follows the record's visibility.

@@ -19,6 +19,8 @@
  *   const who = aiCallerFromCredential(req.auth!, resolveIdentity(req.auth!, config.nodeId));
  *   await completeForOwner(storage, config, payer, { ...who, prompt });
  * @version-history
+ *   v1.1.0 — 2026-11-02 — An ecosystem app's credential is the app `eco:<app>`, not the owner
+ *     (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AI-3).
  */
 import type { CallerClass } from './policy.js';
@@ -39,7 +41,8 @@ export const OWNER_CALLER: AiCallerContext = Object.freeze({ caller: 'owner' as 
 
 /**
  * The caller a verified credential is. An app grant is the app it names; an agent's identity is that
- * agent (the node chat's own agent is 'chat'); anything else is the owner. `principal` is the
+ * agent (the node chat's own agent is 'chat'); an ecosystem app's is the app `eco:<app>`; anything
+ * else is the owner. `principal` is the
  * identity the credential resolved to (resolveIdentity, or the agent's GAII on the MCP surface).
  */
 export function aiCallerFromCredential(
@@ -47,7 +50,11 @@ export function aiCallerFromCredential(
   principal: string,
 ): AiCallerContext {
   if (cred.roles.includes('app') && cred.app) return { caller: 'app', verifiedApp: cred.app };
-  const { agent } = aiPayerOf(principal);
+  const { agent, ecoApp } = aiPayerOf(principal);
+  // An ecosystem app is the owner's app `eco:<app>`, never the owner in person: the owner's rules
+  // for apps apply to it and a generation rule bypass is not its to ask (services/ai/gen-rules.ts).
+  // It fell through to 'owner' until 2026-11-02 (secaudit2026nov02d round 13).
+  if (ecoApp) return { caller: 'app', verifiedApp: ecoApp };
   // The node chat's own agent is the chat, as routes/ai-policy.ts aiCallerOf has it: the chat's
   // policy switch applies, not an agent's.
   if (agent === CHAT_AGENT_NAME) return { caller: 'chat' };

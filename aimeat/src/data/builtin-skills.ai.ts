@@ -9,6 +9,8 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-02 — aimeat-gen-rules: an exception may name an ecosystem app, eco:<name>; configure-routing:
+ *     an ecosystem app's spend is the owner's, under eco:<name> (secaudit2026nov02d round 13).
  *   2026-11-01 — configure-routing: the node's AI region choice (`openrouter_region.mode`).
  *   2026-10-31 — aimeat-gen-rules: the generation rules for AI pictures and videos; ai-transparency
  *     names `rules_followed`.
@@ -253,7 +255,8 @@ AI group); \`GET /v1/ai/recommended\` shows them.
   the token. The API key can never be read or changed through it. The model policy works the same
   way through \`aimeat_ai_policy_set\`.
 - When spend looks wrong, correlate \`/v1/ai/usage/history\` with schedules (\`aimeat_schedule_list\`)
-  before blaming a model.
+  before blaming a model. An ecosystem app the owner approved with ai:use spends from the owner's
+  budget and shows there under \`eco:<name>\`.
 `,
 };
 
@@ -376,7 +379,7 @@ directive you put into the prompt.
 token. Tell the owner what changes in their words ("people in pictures only as drawings, for all
 your apps"), then call again with the same \`gen_rules\` and \`confirm_token\` (ten minutes, one use).
 \`gen_rules\` is \`{ rules?: { "people-artistic": true | false | null }, exceptions?: [{ rule, app:
-"<owner>/<file>.html" | agent: "<name>", reason }] }\`; \`null\` gives the choice back to the node,
+"<owner>/<file>.html" (or an ecosystem app's "eco:<name>") | agent: "<name>", reason }] }\`; \`null\` gives the choice back to the node,
 and a given \`exceptions\` replaces the list. The owner also switches them on the AI settings page.
 
 ## Refusals

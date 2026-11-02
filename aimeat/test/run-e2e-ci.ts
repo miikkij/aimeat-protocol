@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-02 -- e2e-ai-ecosystem-caller.ts joins the list (not the guard tier): an ecosystem app's AI calls, on its own node (:29397) (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-files-connections.ts joins the list (not the guard tier): a connected SharePoint on an own node (:28285).
  *   2026-11-01 -- e2e-iam-parties.ts joins the list (not the guard tier): a person registered to an app as a member AIMEAT.iam reads (WP9d).
  *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
@@ -1757,6 +1758,9 @@ const ALL_SUITES = [
     // The generation rules (people only in an artistic style): node, owner, exception, the owner's
     // one-picture bypass, an agent's refused bypass, and the rules in every picture's record.
     'test/e2e-ai-gen-rules.ts',
+    // An ecosystem app's AI calls: the owner's app under the owner's rules, paid by the owner
+    // (secaudit2026nov02d round 13).
+    'test/e2e-ai-ecosystem-caller.ts',
     'test/e2e-mcp-mail-connection-tools.ts',
     'test/e2e-mcp-proxy-tools.ts',
     'test/e2e-mcp-owner-only-parity.ts',

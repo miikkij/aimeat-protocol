@@ -33,6 +33,7 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-11-02 -- aimeat-paying-for-the-ai: an ecosystem app's AI is paid from its owner's account (secaudit2026nov02d round 13).
  *   2026-11-01 -- aimeat-paying-for-the-ai: no free model on a node set up for the EU only (ai.region_mode eu-only).
  *   2026-10-27 -- aimeat-paying-for-the-ai: a node-key call is priced by everything it sends, a model
  *     with no catalogue price runs one call at a time on what is left, and empty attempts are counted (secaudit2026oct26).
@@ -545,6 +546,8 @@ first, a daily cap can sit beside it, and no key is ever shown to the agent: for
 its own calls on the owner's computer, the owner gives the NAME of the environment variable instead.
 Whatever key pays, an agent's call is paid from its OWNER's account: it counts against the owner's
 daily budget and allowance, under the agent's name, and the three steps above are then the owner's.
+An ecosystem app the owner approved with ai:use is paid the same way: from the owner's account,
+under the owner's settings, and named \`eco:<name>\` in the owner's usage.
 
 **Pictures and transcripts follow the same order with one difference.** The node's key pays for an
 image or a transcription only when the operator has named a node default model for it. Without one,

@@ -11,6 +11,8 @@
  *       a run from before is its saver.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-caller-context.test.ts
  * @version-history
+ *   2026-11-02 — An ecosystem app is the owner's app eco:<app>, paid by the owner; the generation
+ *     rules refuse its bypass and take an exception by that name (secaudit2026nov02d round 13).
  *   2026-10-25 — The stub answers getOwner (no account), which scheduleActor now asks (secaudit2026oct22).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AI-2 and AI-3).
  */
@@ -18,6 +20,8 @@ import { describe, it, expect } from 'vitest';
 import { aiCallerFromCredential, aiCallerOfPrincipal } from '../../src/services/ai/caller-context.js';
 import { scheduleActor } from '../../src/services/schedule-actor.js';
 import { aiCallerForStart, workflowAiCaller } from '../../src/services/workflow/ai-caller.js';
+import { aiPayerOf, aiAskerOf } from '../../src/services/agent-ai-keys.js';
+import { normaliseOwnerGenRules, resolveGenRules, type OwnerGenRules } from '../../src/services/ai/gen-rules.js';
 
 const NODE = 'node-t';
 const OWNER = `alice@${NODE}`;
@@ -45,6 +49,30 @@ describe('a credential names its caller one way', () => {
     expect(aiCallerFromCredential({ roles: ['agent'] }, `chat#alice@${NODE}`)).toEqual({ caller: 'chat' });
     expect(aiCallerFromCredential({ roles: ['owner'] }, OWNER)).toEqual({ caller: 'owner' });
     expect(aiCallerOfPrincipal(AGENT).caller).toBe('agent');
+  });
+  it('an ecosystem app is the owner\'s app eco:<app>, paid by its owner, and named as who asked (secaudit2026nov02d round 13)', () => {
+    const geai = `eco:shop#alice@${NODE}`;
+    expect(aiCallerFromCredential({ roles: ['ecosystem'] }, geai)).toEqual({ caller: 'app', verifiedApp: 'eco:shop' });
+    expect(aiCallerOfPrincipal(geai)).toEqual({ caller: 'app', verifiedApp: 'eco:shop' });
+    expect(aiPayerOf(geai)).toEqual({ payer: OWNER, ecoApp: 'eco:shop' });
+    expect(aiAskerOf(OWNER, { app: 'eco:shop' })).toBe(geai);
+    // A hosted app's address and no app at all leave the payer as who asked; an agent stays first.
+    expect(aiAskerOf(OWNER, { app: 'alice/x.html' })).toBe(OWNER);
+    expect(aiAskerOf(OWNER, {})).toBe(OWNER);
+    expect(aiAskerOf(OWNER, { agent: 'bot', app: 'eco:shop' })).toBe(AGENT);
+  });
+  it('the generation rules: an ecosystem app\'s bypass is refused, and the owner may exempt it by eco:<app>', () => {
+    const owner = normaliseOwnerGenRules({ rules: { 'people-artistic': true }, exceptions: [] });
+    expect('record' in owner).toBe(true);
+    const rec = (owner as { record: OwnerGenRules }).record;
+    const caller = { ownerInPerson: false, app: 'eco:shop' };
+    const refused = resolveGenRules({ medium: 'image', nodeModes: {}, owner: rec, caller, bypass: { rules: ['people-artistic'], reason: 'x' } });
+    expect(refused.refused?.message).toContain('for app "eco:shop"');
+    const ex = normaliseOwnerGenRules({ rules: { 'people-artistic': true }, exceptions: [{ rule: 'people-artistic', app: 'eco:shop', reason: 'sketches' }] });
+    expect('record' in ex).toBe(true);
+    const lifted = resolveGenRules({ medium: 'image', nodeModes: {}, owner: (ex as { record: OwnerGenRules }).record, caller });
+    expect(lifted.marks[0]?.state).toBe('bypassed');
+    expect('problems' in normaliseOwnerGenRules({ exceptions: [{ rule: 'people-artistic', app: 'eco:', reason: 'x' }] })).toBe(true);
   });
 });
 
