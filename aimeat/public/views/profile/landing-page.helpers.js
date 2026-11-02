@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Time, tab-navigation, and number/byte format helpers. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-11-01 — openTabAt(href): a link inside the profile opens the tab at its item; the
+ *     history keeps `product` and `party` of an address that already names the tab (WP10e B2).
  *   v1.2.0 — 2026-10-14 — The mount reflection keeps `section` too (a link into a page's section).
  *   v1.1.0 — 2026-10-02 — syncTabHistory's mount reflection keeps `open` and `test`, so a link into a
  *     tab still names its target when the tab loads after the address was rewritten.
@@ -37,6 +39,22 @@ export function fmtClock(s) {
 export function openProfileTab(tabId) {
   window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
 }
+
+/**
+ * Open a profile tab at one of its items from inside the profile: the address takes the link's own
+ * query (?tab=offers&product=…), then the tab opens and reads it as a deep link does. The profile reads
+ * ?tab= only on mount, so a plain link changed the address and not the view.
+ */
+export function openTabAt(href) {
+  try {
+    const url = new URL(href, window.location.origin);
+    const tabId = url.searchParams.get('tab');
+    if (!tabId) return false;
+    history.pushState({ aimeatTab: tabId }, '', url.pathname + url.search);
+    openProfileTab(tabId);
+    return true;
+  } catch (err) { swallowed('landing-page.helpers: openTabAt', err); return false; }
+}
 export function gotoWorkspace(orgId, wsId, wsTab) {
   try {
     sessionStorage.setItem('aimeat.ws.openId', orgId);
@@ -69,10 +87,14 @@ export function gotoOrganismsList() {
 export function syncTabHistory(tabId, replace) {
   try {
     const q = new URLSearchParams(tabId ? { tab: tabId } : {});
-    if (replace) {
-      const here = new URLSearchParams(window.location.search);
-      for (const k of ['open', 'test', 'section']) if (here.get(k)) q.set(k, here.get(k));
+    const here = new URLSearchParams(window.location.search);
+    // A link inside the profile that already put this tab and its own item in the address (openTabAt:
+    // ?tab=offers&product=…, ?tab=dataWallet&party=…) keeps them, and adds no second history entry.
+    const arrived = !!tabId && here.get('tab') === tabId;
+    if (replace || arrived) {
+      for (const k of ['open', 'test', 'section', 'product', 'party']) if (here.get(k)) q.set(k, here.get(k));
     }
+    if (arrived) replace = true;
     const qs = q.toString();
     const path = qs ? `/v1/profile?${qs}` : '/v1/profile';
     const state = { aimeatTab: tabId || null };

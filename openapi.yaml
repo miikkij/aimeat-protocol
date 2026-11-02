@@ -6747,6 +6747,25 @@ components:
             unit: { type: string, enum: [versions, months], default: versions }
         visibility: { type: string, description: 'private (the default), members, organism:<id> or public' }
         confirm_personal_public: { type: boolean }
+        attribution:
+          type: string
+          description: Who to credit and how, in the maker's words (CC BY asks for it). The public dataset page shows it under the licence; ODPS and the descriptor carry it.
+        i18n:
+          type: object
+          description: >
+            The title, description and attribution per language, keyed by a two-letter ISO 639-1 code
+            (at most 12). Every field is optional; a reader whose language is missing gets the base
+            `title` and `description`. The descriptor carries it as `aimeat.i18n`, DCAT states
+            `dct:title` and `dct:description` once per language with `@language`, and ODPS keys
+            `details` by the same codes. The description, base or per language, may be Markdown.
+          additionalProperties:
+            type: object
+            additionalProperties: false
+            properties:
+              title: { type: string }
+              description: { type: string }
+              attribution: { type: string }
+          example: { fi: { title: Lääkkeiden saatavuus, description: Lääkkeiden saatavuushäiriöt taulukkona. }, en: { title: Medicine availability } }
 
     Schedule:
       type: object
@@ -28501,6 +28520,12 @@ paths:
         version). The answer adds `retention_policy` (`{ keep, unit }` or null) and
         `read_window_days`. A version a live named share pins is never removed by the retention
         policy. Anyone else gets the list without these fields.
+
+        `rowCount` and `bytes` are the sums over the version's resources, and `resources` their
+        count. `producer` names the producer kind, and a data product build lists its `sources`
+        (`id`, `kind`), so a page can say the version's note in its own language. When a run brings
+        the package back to bytes it had earlier, that return is a row of its own, at the time of the
+        return, with `returnedFrom` naming the version it left; the newest row is the current one.
       tags: [Data Packages]
       security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:

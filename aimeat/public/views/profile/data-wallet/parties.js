@@ -13,6 +13,8 @@
  * @structure useParties · secParties · partyCount
  * @usage const parties = useParties({ confirm, toast }); … ${secParties(ctx, '02')}
  * @version-history
+ *   v1.2.0 — 2026-11-01 — "What they get" names the product by its title, and a purchase's share by
+ *     the page's words (WP10e B4, B14).
  *   v1.1.0 — 2026-11-01 — A refusal in the page's language (data-model.js errText; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a).
  */
@@ -22,6 +24,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { ago, date as fmtDate, num } from '/js/format.js';
 import { d as p, errText } from '../offers/data-model.js';
+import { purposeWords } from '../offers/data-words.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import * as dp from '/js/services/dataproducts.js';
@@ -45,10 +48,15 @@ export function useParties({ confirm, toast, federated }) {
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  const [titles, setTitles] = useState({});   // package name → the product's title, for "What they get"
   const load = useCallback(async () => {
     if (federated) return;
-    try { const r = await dp.listParties(); setList(r?.parties || []); }
-    catch (err) { swallowed('data-wallet: parties', err); setList([]); }
+    try {
+      const [r, products] = await Promise.all([dp.listParties(),
+        dp.listProducts().catch((err) => { swallowed('data-wallet: product titles', err); return null; })]);
+      setList(r?.parties || []);
+      if (products?.products) setTitles(Object.fromEntries(products.products.map((x) => [x.name, x.title || x.name])));
+    } catch (err) { swallowed('data-wallet: parties', err); setList([]); }
   }, [federated]);
   const loadReads = useCallback(async (name) => {
     try { const r = await dp.partyReads(name, 12); setReads((s) => ({ ...s, [name]: r?.reads || [] })); }
@@ -97,7 +105,7 @@ export function useParties({ confirm, toast, federated }) {
     return out;
   }, p('party.created'));
 
-  return { list, openName, reads, fresh, form, setForm, busy, toggle, stop, remove, replaceKey, deleteKey, endShare, create, load };
+  return { list, titles, openName, reads, fresh, form, setForm, busy, toggle, stop, remove, replaceKey, deleteKey, endShare, create, load };
 }
 
 /** The section's count for the rail. */
@@ -136,8 +144,8 @@ function partyPanel(pt, party) {
     <${Label} block>${p('party.gets')}<//>
     <${List} cols="name-who-doors" dense empty=${p('party.noShares')} rows=${live} render=${(s) => html`
       <${Row} key=${s.id}>
-        <${Name} meta=${p('party.read')}>${s.package}<//>
-        <${Who}>${[s.purpose, s.expires ? p('product.until', { date: fmtDate(s.expires) }) : null].filter(Boolean).join(' · ')}<//>
+        <${Name} meta=${p('party.read')}>${pt.titles?.[s.package] || s.package}<//>
+        <${Who}>${[purposeWords(s), s.expires ? p('product.until', { date: fmtDate(s.expires) }) : null].filter(Boolean).join(' · ')}<//>
         <${Doors}><${Action} small row tone="danger" disabled=${pt.busy} onClick=${() => pt.endShare(party, s)}>${p('product.revoke')}<//><//>
       <//>`} />
     <${Label} block>${p('party.reads')}<//>

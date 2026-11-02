@@ -12,6 +12,8 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-11-01 — SESSION_HINT_COOKIE, set and cleared with the refresh cookie, so a signed-out
+ *     visitor's page asks no refresh at boot (WP10e B15).
  *   2026-11-02 — A refresh of an account the required two-step policy covers, with no TOTP, passkey or
  *     identity provider link, ends the session and answers 403 TWO_STEP_SETUP_REQUIRED
  *     (services/sign-in-policy.ts; IT review).
@@ -63,6 +65,12 @@ export const REFRESH_COOKIE = '__Host-aimeat_rt';
 /** The name before 2026-10-25, Path=/v1/auth. A plain-http node keeps it (a `__Host-` cookie needs
  *  Secure); an https node reads it only until auth.refresh_cookie_legacy_until. */
 export const LEGACY_REFRESH_COOKIE = 'aimeat_rt';
+/**
+ * A cookie the page may read that says this browser was given a refresh cookie: `1`, no secret, set and
+ * cleared with the refresh cookie. The auth library asks /v1/auth/refresh at boot with no stored session
+ * only when it is there (sdk-libs/auth/session.js). Grants nothing: a forged one costs one refused refresh.
+ */
+export const SESSION_HINT_COOKIE = 'aimeat_session_hint';
 const COOKIE_PATH = '/';
 const LEGACY_COOKIE_PATH = '/v1/auth';
 const DAY_MS = 86_400_000;
@@ -165,6 +173,9 @@ function newRefreshToken(req: Request): string {
  *  cleared in the same answer, so a browser moves to the new name on its next refresh. */
 export function setRefreshCookie(req: Request, res: Response, config: AimeatConfig, token: string): void {
   const maxAge = config.refreshAbsoluteDays * DAY_MS;
+  // The hint beside it: no secret, readable by the page, so a browser that holds no refresh cookie
+  // asks no refresh at boot (a signed-out visitor's page logged a 401 on every load).
+  res.cookie(SESSION_HINT_COOKIE, '1', { httpOnly: false, secure: cookieSecure(req), sameSite: 'lax', path: '/', maxAge });
   if (!cookieSecure(req)) {
     res.cookie(LEGACY_REFRESH_COOKIE, token, { httpOnly: true, secure: false, sameSite: 'strict', path: LEGACY_COOKIE_PATH, maxAge });
     return;
@@ -180,6 +191,7 @@ export function clearRefreshCookie(req: Request, res: Response): void {
   const secure = cookieSecure(req);
   if (secure) res.clearCookie(REFRESH_COOKIE, { httpOnly: true, secure: true, sameSite: 'strict', path: COOKIE_PATH });
   res.clearCookie(LEGACY_REFRESH_COOKIE, { httpOnly: true, secure, sameSite: 'strict', path: LEGACY_COOKIE_PATH });
+  res.clearCookie(SESSION_HINT_COOKIE, { httpOnly: false, secure, sameSite: 'lax', path: '/' });
 }
 
 /**

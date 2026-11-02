@@ -10,6 +10,7 @@
  *   Drawn by components/FigureStrip.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.7.1 — 2026-11-01 — A figure's line wraps instead of ending in an ellipsis (WP10e B17).
  *   v1.7.0 — 2026-10-18 — og-strip--stacked (FigureStrip `stacked`): the number, its word and its line
  *     on three rows the figures share, at every width; under 1100px every strip but the free one is drawn
  *     so (a short word stood beside its number and a long one under it, and the lines did not line up).
@@ -52,7 +53,9 @@
 /* "Of how many": the part of a figure after the slash, smaller and grey (formerly knowledge-poster.css .kp-of). */
 .og-strip b .og-strip-of { font-size: 1.1rem; color: var(--text-dim); }
 .og-strip span { font-weight: 800; font-size: .9rem; }
-.og-strip small { flex-basis: 100%; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The line under a figure wraps rather than cutting its last words to an ellipsis ("päivitetty 23
+   minuuttia sitt…" on the data product page, WP10e). */
+.og-strip small { flex-basis: 100%; min-width: 0; font-family: var(--font-mono); font-size: .72rem; color: var(--text-dim); overflow-wrap: anywhere; }
 /* A number in coral, at the figure's size: the one to look at. A figure not there yet, in grey. A long
    word (an address) in a smaller cut that breaks where it must. */
 .og-strip b.og-strip-notice { color: var(--accent); }

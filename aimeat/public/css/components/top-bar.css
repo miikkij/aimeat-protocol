@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.7.1 — 2026-11-01 — The short sign-in form and the phone rule now reach every node's signed-out
+ *     bar, not only a store-sold one (WP10e B7); the rules are unchanged.
  *   v1.7.0 — 2026-11-01 — A store-sold place's sign-in button keeps one line and shows its short form
  *     under 420px (.topnav-sign-full / .topnav-sign-short, Jouni 1.11 13.50); under 640px its light/dark
  *     and palette controls leave that bar, so the button stays inside the screen.
@@ -421,7 +423,8 @@
 /* Beside it the light/dark and palette controls pushed it 20px past the edge at 390px and 40px at
    360px (measured 2026-11-01), so on a phone they leave this bar; the light/dark switch alone does
    not fit at 360px either. A signed-out visitor here is the owner on the way in, and the look follows
-   the device until the sign-in. Other nodes' signed-out bars keep the controls. */
+   the device until the sign-in. Every node's signed-out pill carries the short form since 2026-11-01
+   (spa.html mountAuth): "Kirjaudu / Rekisteröidy" with the controls ran to 510px at 390 (WP10e B7). */
 @media (max-width: 640px) {
   .aimeat-auth-out:has(.topnav-sign-short) .aimeat-ctl { display: none !important; }
 }

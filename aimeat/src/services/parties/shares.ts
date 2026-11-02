@@ -41,6 +41,8 @@
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.4.2 — 2026-11-01 — The connection file's password and client_secret are the key itself when the
+ *     file carries it, else "<key>"; they said "the key above" in English (WP10e B4).
  *   v1.4.1 — 2026-11-01 — Share creation and descriptorFor take the package's version and withdrawal
  *     from the service's record (trustedPackageOf), not the latest.json pointer (WP9e, incident ...-mvxozs2r).
  *   v1.4.0 — 2026-11-01 — A share to a person on another AIMEAT node (`visitor`, normalizeVisitorShare,
@@ -364,9 +366,11 @@ export async function connectionFileOf(
         share: share.id,
         resources: (descriptor?.resources ?? []).map(r => ({ name: r.name, csvUrl: csvUrl(r.name), odataEntitySet: edmName(r.name) })),
         authentication: {
-            basic: { user, password: key ? 'the key above' : 'the party key' },
+            // The key itself where the file was made with it, so a program reads the file as it is; a
+            // placeholder that reads the same in every language otherwise.
+            basic: { user, password: key ?? '<key>' },
             token_endpoint: `${base}/v1/parties/token`,
-            token_request: { grant_type: 'client_credentials', client_id: user, client_secret: key ? 'the key above' : 'the party key' },
+            token_request: { grant_type: 'client_credentials', client_id: user, client_secret: key ?? '<key>' },
         },
         ...(meta.termsRequired && !meta.termsAcceptedAt ? { terms_accept_url: `${base}/v1/parties/me/shares/${enc(share.id)}/accept` } : {}),
     };

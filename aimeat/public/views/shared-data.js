@@ -20,6 +20,10 @@
  * @structure SharedData (default) · call · partyFetch · fileOf
  * @usage routed at /v1/shared-data?invite=<code> by spa.html
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The title and description are the reader's language and the description is
+ *     Markdown; step 1 shows the licence (its deed, what it allows, who to credit) where it said there
+ *     are no terms; "Change the key" asks first; a used link offers the change of key with the key
+ *     itself (shared-data-rotate.js), so the page's "change it here at any time" holds (WP10e A1-A3, B12).
  *   v1.0.1 — 2026-11-01 — A share with no purpose shows terms of its own (recipient.termsNoPurpose), not a
  *     purpose placeholder inside the purpose sentence (WP10d).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b).
@@ -41,8 +45,12 @@ import { Mark, Code } from '/components/Mark.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Beside } from '/components/Layout.js';
 import { AskPage } from '/components/AskPage.js';
+import { Markdown } from '/components/Markdown.js';
 import { d, scheduleWords, scheduleOf } from './profile/offers/data-model.js';
+import { wordsOf, licenceOf, shortLicence } from './profile/offers/data-words.js';
+import { LicenceNote } from './profile/offers/data-licence.js';
 import { ConnectSteps } from './profile/offers/data-connect.js';
+import { RotateByKey } from './shared-data-rotate.js';
 
 const r = (key, vars) => d('recipient.' + key, vars);
 
@@ -70,6 +78,19 @@ async function call(path, { body, token, method } = {}) {
 /** A call as the party, with the token the redemption gave (or a new one from the key). */
 const partyFetch = (path, token, body) => call(path, { token, body: body ?? {} });
 
+/** The connection file with a new key: at the top and where the sign-in and the token request name it. */
+function withKey(connection, key) {
+  const auth = connection?.authentication || {};
+  return {
+    ...connection, key,
+    authentication: {
+      ...auth,
+      ...(auth.basic ? { basic: { ...auth.basic, password: key } } : {}),
+      ...(auth.token_request ? { token_request: { ...auth.token_request, client_secret: key } } : {}),
+    },
+  };
+}
+
 /** The connection file as the person downloads it. */
 const fileOf = (connection) => JSON.stringify(connection, null, 2);
 
@@ -91,6 +112,7 @@ export default function SharedData() {
   const [ended, setEnded] = useState(false);
   const [rotated, setRotated] = useState(false);
   const [asking, setAsking] = useState(false);  // "I no longer need this" pressed once, waiting for the yes
+  const [askingRotate, setAskingRotate] = useState(false);  // "Change the key" pressed once, waiting for the yes
 
   useEffect(() => {
     if (!code) return;
@@ -106,12 +128,17 @@ export default function SharedData() {
   if (failed) {
     return html`<${AskPage} tag=${html`<${Mark} tone="coral">${r('tag')}<//>`} title=${r('refusedTitle')}>
       <${Note} kind="lead">${refusalWords(failed)}<//>
+      ${failed === 'INVITE_USED' ? html`<${RotateByKey} />` : null}
     <//>`;
   }
   if (!view) return html`<${PageFrame} loading><${Note} kind="loading" /><//>`;
 
   const share = view.share || {};
   const pkg = view.package || {};
+  // The words in the reader's language, and the licence as a reader sees it.
+  const words = wordsOf(pkg);
+  const licence = licenceOf({ licenses: pkg.licence ? [{ name: pkg.licence, ...(pkg.licence_url ? { path: pkg.licence_url } : {}) }] : [] });
+  const licenceName = licence ? shortLicence(licence) : r('noLicence');
   const termsNeeded = !!view.terms;
   const until = share.expires ? fmtDate(share.expires) : r('untilEnd');
   const fresh = pkg.freshness;
@@ -138,13 +165,13 @@ export default function SharedData() {
 
   /** A new key: the one in use stops working at once, and a new token is asked with the new key. */
   const rotate = async () => {
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setAskingRotate(false);
     try {
       const out = await partyFetch('/v1/parties/me/keys/rotate', got.token);
       const tok = await call('/v1/parties/token', { body: { grant_type: 'client_credentials', client_id: got.basicUser, client_secret: out.key } });
       const connection = await call(`/v1/parties/me/shares/${encodeURIComponent(share.id)}/connection`, { token: tok.access_token })
         .catch((err) => { swallowed('shared-data: connection after rotation', err); return null; });
-      setGot({ ...got, key: out.key, token: tok.access_token, connection: { ...(connection?.connection || got.connection), key: out.key } });
+      setGot({ ...got, key: out.key, token: tok.access_token, connection: withKey(connection?.connection || got.connection, out.key) });
       setRotated(true);
     } catch (err) { setError(err.message); }
     setBusy(false);
@@ -164,7 +191,7 @@ export default function SharedData() {
 
   if (ended) {
     return html`<${AskPage} tag=${html`<${Mark} tone="coral">${r('tag')}<//>`} title=${r('endedTitle')}>
-      <${Note} kind="lead">${r('ended', { owner: view.owner_name, title: pkg.title })}<//>
+      <${Note} kind="lead">${r('ended', { owner: view.owner_name, title: words.title || pkg.title })}<//>
     <//>`;
   }
 
@@ -183,11 +210,11 @@ export default function SharedData() {
   return html`<${PageFrame}>
     <${SettingsPage} name="shared-data"
       label=${r('label', { owner: view.owner_name })}
-      title=${pkg.title}
+      title=${words.title || pkg.title}
       marks=${[{ label: r('noAccount') }]}
       desc=${share.purpose ? r('lead', { until, purpose: share.purpose }) : r('leadNoPurpose', { until })}
       strip=${strip}>
-      ${pkg.description ? html`<${Note}>${pkg.description}<//>` : null}
+      ${words.description ? html`<${Markdown} text=${words.description} />` : null}
       <${Box} tone="raised">
         <${PageSection} step first num="1" title=${r('step1')}>
           ${got && view.terms_accepted
@@ -195,9 +222,11 @@ export default function SharedData() {
             : termsNeeded
             ? html`<${Check} checked=${accepted || !!got} disabled=${!!got} onChange=${setAccepted}>
                 ${share.purpose
-                    ? r('terms', { purpose: share.purpose, licence: pkg.licence || r('noLicence'), owner: view.owner_name })
-                    : r('termsNoPurpose', { licence: pkg.licence || r('noLicence'), owner: view.owner_name })}<//>`
+                    ? r('terms', { purpose: share.purpose, licence: licenceName, owner: view.owner_name })
+                    : r('termsNoPurpose', { licence: licenceName, owner: view.owner_name })}<//>`
+            : licence ? null
             : html`<${Note}>${got ? r('termsNone') : r('termsNoneYet')}<//>`}
+          ${licence ? html`<${LicenceNote} licence=${licence} attribution=${words.attribution} />` : null}
           ${got ? null : html`<${Actions}>
             <${Loud} control disabled=${busy || (termsNeeded && !accepted)} onClick=${redeem}>${termsNeeded ? r('acceptAndShow') : r('show')}<//>
           <//>`}
@@ -218,11 +247,16 @@ export default function SharedData() {
       <//>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       <${Beside} side=${html`<${Actions}>
-          <${Action} disabled=${!got || busy} onClick=${rotate}>${r('rotate')}<//>
-          <${Action} disabled=${!got || busy} expanded=${asking} onClick=${() => setAsking(!asking)}>${r('decline')}<//>
+          <${Action} disabled=${!got || busy} expanded=${askingRotate} onClick=${() => { setAskingRotate(!askingRotate); setAsking(false); }}>${r('rotate')}<//>
+          <${Action} disabled=${!got || busy} expanded=${asking} onClick=${() => { setAsking(!asking); setAskingRotate(false); }}>${r('decline')}<//>
         <//>`} above="section">
         <${Note} kind="aside" size="small">${got ? r('rotateWhy') : r('rotateLater')}<//>
       <//>
+      ${askingRotate ? html`<${Box} tone="attention" doors=${html`
+          <${Loud} control danger disabled=${busy} onClick=${rotate}>${r('rotateYes')}<//>
+          <${Action} onClick=${() => setAskingRotate(false)}>${r('rotateNo')}<//>`}>
+        <${Note}>${r('rotateConfirm')}<//>
+      <//>` : null}
       ${asking ? html`<${Box} tone="attention" doors=${html`
           <${Loud} control danger disabled=${busy} onClick=${decline}>${r('declineYes')}<//>
           <${Action} onClick=${() => setAsking(false)}>${r('declineNo')}<//>`}>

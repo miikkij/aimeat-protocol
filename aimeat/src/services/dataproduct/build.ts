@@ -20,6 +20,7 @@
  * @structure BuildContext · prepareBuild · previewProduct · runProduct
  * @usage const out = await runProduct({ deps, caller }, definition);
  * @version-history
+ *   v1.3.0 — 2026-11-01 — A definition's `attribution` and `i18n` go into the version (WP10e A2, A3).
  *   v1.2.0 — 2026-11-01 — A version a source change built records the producer schedule on-change (WP9c).
  *   v1.1.0 — 2026-11-01 — A definition's `retention` is the version's retention policy (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
@@ -86,7 +87,8 @@ export async function prepareBuild(ctx: BuildContext, def: DataProductDefinition
     if (tooWide) {
         refusal = new DataProductError('AUDIENCE_WIDER_THAN_SOURCE',
             `The product's audience "${def.visibility}" is wider than source ${tooWide.id} allows ("${tooWide.audience}", from ${tooWide.provenance.address}). `
-            + `The widest audience these sources allow is "${allowed}". Choose that or narrower, or widen the source first.`, 409, tooWide.id);
+            + `The widest audience these sources allow is "${allowed}". Choose that or narrower, or widen the source first.`, 409, tooWide.id,
+            { allowed, source_kind: tooWide.provenance.kind, source_audience: tooWide.audience });
     } else if (def.visibility === 'public' && combined.personalIncluded.length && !def.confirmPersonalPublic) {
         refusal = new DataProductError(PERSONAL_DATA_PUBLIC,
             `The columns ${combined.personalIncluded.join(', ')} are data the data map marks personal, and the product would be public. `
@@ -110,6 +112,8 @@ export async function prepareBuild(ctx: BuildContext, def: DataProductDefinition
             ...(combined.transformations.length ? { transformations: combined.transformations } : {}),
             ...(lineage.length ? { lineage } : {}),
             ...(def.license ? { license: def.license } : {}),
+            ...(def.attribution ? { attribution: def.attribution } : {}),
+            ...(def.i18n ? { i18n: def.i18n } : {}),
             sourcesFetchedAt: fetchedAt,
         },
         ...(def.confirmPersonalPublic ? { confirmPersonalPublic: true } : {}),

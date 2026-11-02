@@ -13,6 +13,8 @@
  * @structure DataOutStatus · reg
  * @usage html`<${DataOutStatus} />` (config-tab.js SECTION_ACTIONS.data_out)
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The installation's id, read-only with a copy action, as the board's
+ *     "Installation id" (WP10e B16).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b).
  */
 import { h } from 'preact';
@@ -22,6 +24,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { getNodeId } from '/js/services/auth.js';
 import { date as fmtDate, num } from '/js/format.js';
 import { Stack } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -85,6 +88,9 @@ export function DataOutStatus() {
       <${SubHeading} rule>${w('dspTitle')}<//>
       ${dsp ? html`<${Facts} rows=${[
         { k: w('dspState'), v: html`<${Mark} kind="status" tone=${dsp.enabled ? 'fine' : 'off'}>${dsp.enabled ? w('on') : w('off')}<//>`, sub: dsp.enabled ? w('dspOnSub') : w('dspOffSub') },
+        // The installation's own id (the node id every GHII ends in), read-only: the board's
+        // "Installation id"; the id a data space knows this server by is the participant row below.
+        getNodeId() && { k: w('installId'), v: getNodeId(), mono: true, sub: w('installIdSub'), action: html`<${Action} small soft copy=${getNodeId()}>${w('copy')}<//>` },
         { k: w('dspParticipant'), v: dsp.participant_id, mono: true },
         { k: w('dspBase'), v: dsp.protocol?.base, mono: true, sub: w('dspVersion', { v: dsp.protocol?.version || '' }) },
         { k: w('dspVersionEndpoint'), v: dsp.protocol?.version_endpoint, mono: true },

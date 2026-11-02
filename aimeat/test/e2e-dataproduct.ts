@@ -20,6 +20,11 @@
  *   file, and cannot read, run or delete A's definition; an agent without memory:write is refused; an
  *   agent with the words defines and previews over MCP.
  * @version-history
+ *   v1.2.0 — 2026-11-01 — WP10e: the words per language, the licence and the attribution reach the
+ *     version, DCAT (language-tagged, the EU licence IRI), ODPS and schema.org; a malformed i18n is
+ *     refused; the public dataset page answers 404 for no package; the history sums every table and
+ *     records a return to earlier bytes; MCP define takes the new fields (each fails on the code before
+ *     it: i18n was an unknown field, the page answered 200, the history had no return row).
  *   v1.1.0 — 2026-11-01 — D9.6: the list's package, freshness, shares, reads, next run, source label and
  *     intermediation mode; retention keeps the newest versions; the parties list's share cap and
  *     dataspace flag (WP9a; the assertions fail on the code before it: retention was an unknown field).
@@ -438,6 +443,90 @@ await test('X4 MCP: aimeat_dataproduct defines and previews as the agent, and re
     const rs = await openSession(BASE, reader.token);
     const denied = await callTool(rs, 'aimeat_dataproduct', { action: 'run', name: N('mcp') });
     assert(denied.isError && /SCOPE_DENIED/.test(denied.text), `run without the words: ${denied.text.slice(0, 300)}`);
+});
+
+// ── WP10e: the words per language, the licence and attribution, the history of returns ──
+
+const WORDS = {
+    title: 'Population by town', description: 'Towns and people.\n\n## Columns\n\n- **town**: the name',
+    license: 'CC-BY-4.0', attribution: 'Source: the sandbox towns',
+    i18n: { fi: { title: 'Väkiluku kunnittain', description: 'Kunnat ja asukkaat.', attribution: 'Lähde: hiekkalaatikon kunnat' }, en: { title: 'Population by town' } },
+};
+
+await test('W1 define carries the words per language, the licence and the attribution into the version, DCAT, ODPS and schema.org', async () => {
+    assert((await putMemory(A.token, 'dpr.open', [{ town: 'Oulu', n: 1 }, { town: 'Kemi', n: 2 }], 'public')).status === 201, 'public memory');
+    const d = await define(A.token, N('words'), { sources: [{ kind: 'memory', key: 'dpr.open' }], visibility: 'public', ...WORDS });
+    assert(d.status === 201 && d.body.data.definition.i18n?.fi?.title === 'Väkiluku kunnittain' && d.body.data.definition.attribution === WORDS.attribution, `define: ${show(d)}`);
+    const r = await run(A.token, N('words'));
+    assert(r.status === 201, `run: ${show(r)}`);
+    const desc = await descriptorOf(A.token, A.name, N('words'));
+    assert(desc?.aimeat?.i18n?.fi?.description === 'Kunnat ja asukkaat.' && desc.aimeat.attribution === WORDS.attribution, `descriptor words: ${JSON.stringify(desc?.aimeat)}`);
+    const lic = desc?.licenses?.[0];
+    assert(lic?.name === 'CC-BY-4.0' && lic.path === 'https://creativecommons.org/licenses/by/4.0/' && /Attribution 4\.0/.test(lic.title ?? ''), `licence: ${JSON.stringify(lic)}`);
+    const ttl = await call('/v1/catalogue/dcat?format=ttl');
+    const block = ttl.text.slice(ttl.text.indexOf(`/v1/datapackages/${A.name}/${N('words')}>`));
+    assert(block.includes('"Väkiluku kunnittain"@fi') && block.includes('"Population by town"@en'), `DCAT titles per language: ${block.slice(0, 600)}`);
+    assert(block.includes('<http://publications.europa.eu/resource/authority/licence/CC_BY_4_0>'), `DCAT licence IRI: ${block.slice(0, 900)}`);
+    const jsonld = await call('/v1/catalogue/dcat');
+    const node = (jsonld.body['@graph'] as Body[]).find(n => String(n['@id']).endsWith(`/${A.name}/${N('words')}`));
+    assert(JSON.stringify(node?.['dct:title']).includes('"@language":"fi"'), `JSON-LD language tag: ${JSON.stringify(node?.['dct:title'])}`);
+    const odps = await call(`/v1/datapackages/${A.name}/${N('words')}/odps?format=json`, { token: A.token });
+    const product = odps.body.data?.odps?.product;
+    assert(product?.details?.fi?.name === 'Väkiluku kunnittain' && product?.details?.en?.name === 'Population by town', `ODPS details per language: ${odps.text.slice(0, 600)}`);
+    assert(/creativecommons\.org\/licenses\/by\/4\.0/.test(product?.license?.scope?.definition ?? '') && /Attribution: Source: the sandbox towns/.test(product?.license?.scope?.definition ?? ''), `ODPS licence: ${JSON.stringify(product?.license)}`);
+    const so = await call(`/v1/datapackages/${A.name}/${N('words')}?format=schemaorg`);
+    assert((so.body.data ?? so.body).license === 'https://creativecommons.org/licenses/by/4.0/', `schema.org licence: ${so.text.slice(0, 400)}`);
+});
+
+await test('W2 a malformed i18n is refused before anything is stored: a three-letter code, an unknown field, a non-text value', async () => {
+    for (const [i18n, what] of [[{ fin: { title: 'x' } }, 'code'], [{ fi: { name: 'x' } }, 'field'], [{ fi: { title: 5 } }, 'value']] as const) {
+        const r = await define(A.token, N('badwords'), { sources: [{ kind: 'memory', key: 'dpr.open' }], i18n });
+        assert(r.status === 400, `${what}: ${show(r)}`);
+    }
+    assert((await call(`/v1/dataproducts/${N('badwords')}`, { token: A.token })).status === 404, 'nothing stored');
+});
+
+await test('W3 the public dataset page answers 200 for a public package and 404, with the page body, for none', async () => {
+    const ok = await fetch(`${BASE}/v1/dataset/${A.name}/${N('words')}`);
+    assert(ok.status === 200 && (await ok.text()).includes('Population by town'), `the public page: ${ok.status}`);
+    const miss = await fetch(`${BASE}/v1/dataset/${A.name}/no-such-${stamp}`);
+    const body = await miss.text();
+    assert(miss.status === 404 && body.includes('<html') && miss.headers.get('x-robots-tag')?.includes('noindex'), `a missing package: ${miss.status} ${miss.headers.get('x-robots-tag')}`);
+    const priv = await fetch(`${BASE}/v1/dataset/${A.name}/${N('mem')}`);
+    assert(priv.status === 404, `a private package's page: ${priv.status}`);
+});
+
+await test('W4 the history sums the rows and bytes of every table, and a return to earlier bytes is the newest row and the current one', async () => {
+    assert((await putMemory(A.token, 'dpr.ret', [{ k: 'a', n: 1 }])).status === 201, 'memory');
+    assert((await putMemory(A.token, 'dpr.ret2', [{ k: 'b', n: 2 }, { k: 'c', n: 3 }])).status === 201, 'memory 2');
+    const d = await define(A.token, N('ret'), { sources: [{ kind: 'memory', key: 'dpr.ret' }, { kind: 'memory', key: 'dpr.ret2' }], combine: { mode: 'tables' } });
+    assert(d.status === 201, `define: ${show(d)}`);
+    const v1 = await run(A.token, N('ret'));
+    assert(v1.status === 201, `v1: ${show(v1)}`);
+    const first = (await call(`/v1/datapackages/${A.name}/${N('ret')}/versions`, { token: A.token })).body.data.versions as Body[];
+    assert(first[0].rowCount === 3 && first[0].resources === 2 && first[0].producer === 'dataproduct' && first[0].sources?.length === 2, `sums: ${JSON.stringify(first[0])}`);
+    assert((await putMemory(A.token, 'dpr.ret', [{ k: 'a', n: 9 }])).status === 200, 'change');
+    const v2 = await run(A.token, N('ret'));
+    assert(v2.status === 201 && v2.body.data.content_hash !== v1.body.data.content_hash, `v2: ${show(v2)}`);
+    // The same rows as the version that stands: no new version and no row of a return.
+    const same = await run(A.token, N('ret'));
+    assert(same.body.data.unchanged === true, `unchanged: ${show(same)}`);
+    let list = (await call(`/v1/datapackages/${A.name}/${N('ret')}/versions`, { token: A.token })).body.data.versions as Body[];
+    assert(list.length === 2 && !list.some(v => v.returnedFrom), `no return row for the same bytes: ${JSON.stringify(list.map(v => [v.contentHash.slice(7, 15), v.current, v.returnedFrom]))}`);
+    assert((await putMemory(A.token, 'dpr.ret', [{ k: 'a', n: 1 }])).status === 200, 'back');
+    const back = await run(A.token, N('ret'));
+    assert(back.body.data.content_hash === v1.body.data.content_hash && back.body.data.unchanged === true, `back to v1 bytes: ${show(back)}`);
+    list = (await call(`/v1/datapackages/${A.name}/${N('ret')}/versions`, { token: A.token })).body.data.versions as Body[];
+    assert(list.length === 3 && list[0].contentHash === v1.body.data.content_hash && list[0].current === true
+        && list[0].returnedFrom === v2.body.data.content_hash && list.filter(v => v.current).length === 1, `the return is the newest, current row: ${JSON.stringify(list.map(v => [v.contentHash.slice(7, 15), v.current, v.returnedFrom?.slice(7, 15)]))}`);
+});
+
+await test('W5 MCP: aimeat_dataproduct define takes i18n and attribution', async () => {
+    const agent = await makeAgent(BASE, A, ['storage:read', 'storage:write', 'memory:read', 'memory:write']);
+    const s = await openSession(BASE, agent.token);
+    const def = await callTool(s, 'aimeat_dataproduct', { action: 'define', name: N('mcpwords'), sources: [{ kind: 'memory', key: 'dpr.pop' }],
+        attribution: 'Credit me', i18n: { fi: { title: 'Suomeksi' } } });
+    assert(!def.isError && def.data?.definition?.i18n?.fi?.title === 'Suomeksi' && def.data.definition.attribution === 'Credit me', `define: ${def.text.slice(0, 300)}`);
 });
 
 console.log(`\n=== Data products: ${passed} passed, ${failed} failed ===\n`);

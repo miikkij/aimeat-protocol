@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-01 — /v1/dataset/:owner/:name answers 404 (same page body) when no public package is
+ *     there, not 200 with noindex (WP10e C1).
  *   2026-11-02 — On a node the store sold, a browser asking for /v1/connect (any language) is sent to
  *     /v1/profile?tab=mcp, the buyer's own connect guide; an AI asking for markdown still gets the page.
  *   2026-11-01 — /v1/dataset/:owner/:name, the public dataset page, with the package's schema.org
@@ -580,9 +582,15 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/dataset/:owner/:name', async (req, res) => {
     const spaPath = resolvePublicFile('spa.html');
     if (!spaPath) { res.redirect(302, '/spa.html'); return; }
+    let failed = false;
     const page = await datasetPageOf({ storage, config }, String(req.params.owner ?? ''), String(req.params.name ?? ''))
-      .catch((err: unknown) => { logger.warn('portal: the dataset page head could not be read', { error: String(err) }); return null; });
-    if (!page) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      .catch((err: unknown) => { failed = true; logger.warn('portal: the dataset page head could not be read', { error: String(err) }); return null; });
+    // No public package at this address: the same page (it shows the 404 the API answers), with the
+    // status a crawler reads as "no such page" rather than a soft 404. A read that failed is not a miss.
+    if (!page) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      if (!failed) res.status(404);
+    }
     serveSpa(res, spaPath, config, undefined, page ?? undefined);
   });
 

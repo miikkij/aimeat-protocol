@@ -31,11 +31,14 @@
  *   const graph = buildDcatGraph({ config, facts: page, total, page: 1, pageSize: 100, format: 'jsonld' });
  *   res.type('application/ld+json').send(JSON.stringify(dcatToJsonLd(graph)));
  * @version-history
+ *   v1.2.0 — 2026-11-01 — dct:title and dct:description once per language the package carries, with
+ *     @language tags; dct:license is the EU licence vocabulary IRI for CC BY 4.0 and CC0 (WP10e A2, A3).
  *   v1.1.0 — 2026-11-01 — The producer schedule `on-change` is the frequency IRREG (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.3).
  */
 import type { AimeatConfig } from '../../config.js';
 import { datasetLinks, type DatasetFacts } from './catalogue-facts.js';
+import { licenceVocabularyIri } from './licences.js';
 
 export const DCAT_PAGE_SIZE = 100;
 export const DCAT_MAX_PAGE_SIZE = 500;
@@ -60,7 +63,7 @@ const TABULAR_DATA_PACKAGE = 'https://specs.frictionlessdata.io/tabular-data-pac
 /** A value of one property: an IRI, a literal (typed or plain), or a nested node. */
 export type RdfValue =
   | { iri: string }
-  | { lit: string; dt?: string }
+  | { lit: string; dt?: string; lang?: string }
   | RdfNode;
 
 /** One node: an IRI subject (`id`) or a blank node, its types, and its properties in order. */
@@ -72,6 +75,18 @@ export interface RdfNode {
 
 const iri = (v: string): RdfValue => ({ iri: v });
 const lit = (v: string, dt?: string): RdfValue => (dt ? { lit: v, dt } : { lit: v });
+/** A plain literal in one language (rdf:langString). */
+const langLit = (v: string, lang: string): RdfValue => ({ lit: v, lang });
+
+/**
+ * One property per language: each language of `i18n` that states the field as a tagged literal, and
+ * the base value untagged unless one of the tagged ones already says the same words.
+ */
+function perLanguage(prop: string, base: string, i18n: DatasetFacts['i18n'], field: 'title' | 'description'): Array<[string, RdfValue]> {
+  const tagged = Object.entries(i18n ?? {}).filter(([, w]) => !!w[field]).map(([lang, w]) => [prop, langLit(w[field]!, lang)] as [string, RdfValue]);
+  const same = Object.values(i18n ?? {}).some(w => w[field] === base);
+  return same ? tagged : [[prop, lit(base)], ...tagged];
+}
 const isNode = (v: RdfValue): v is RdfNode => 'types' in v;
 
 /**
@@ -121,17 +136,21 @@ function agentIri(base: string, owner: string): string {
   return `${base}/#account-${encodeURIComponent(owner)}`;
 }
 
-/** dct:license: an IRI when the package names one, else a licence document with the text as its label. */
+/**
+ * dct:license: the EU licence vocabulary IRI for a licence this node knows (CC BY 4.0, CC0), the
+ * address when the package names one, else a licence document with the text as its label.
+ */
 function licenseValue(license: string): RdfValue {
-  if (/^https?:\/\/\S+$/.test(license)) return iri(license);
+  const known = licenceVocabularyIri(license);
+  if (known) return iri(known);
   return { types: ['dct:LicenseDocument'], props: [['rdfs:label', lit(license)]] };
 }
 
 function datasetNode(base: string, f: DatasetFacts): RdfNode {
   const links = datasetLinks(base, f);
   const props: Array<[string, RdfValue]> = [
-    ['dct:title', lit(f.title)],
-    ['dct:description', lit(datasetDescriptionOf(f))],
+    ...perLanguage('dct:title', f.title, f.i18n, 'title'),
+    ...perLanguage('dct:description', datasetDescriptionOf(f), f.i18n, 'description'),
     ['dct:identifier', lit(f.packageId)],
     ['dct:publisher', {
       id: agentIri(base, f.owner), types: ['foaf:Agent'],
@@ -240,6 +259,7 @@ export function buildDcatGraph(input: DcatInput): RdfNode[] {
 function jsonValue(v: RdfValue): unknown {
   if (isNode(v)) return jsonNode(v);
   if ('iri' in v) return { '@id': v.iri };
+  if (v.lang) return { '@value': v.lit, '@language': v.lang };
   return v.dt ? { '@value': v.lit, '@type': v.dt } : v.lit;
 }
 
@@ -283,6 +303,7 @@ function turtleTerm(v: RdfValue, indent: string, named: RdfNode[]): string {
     return '[\n' + turtleBody(v, indent + '    ', named) + `\n${indent}]`;
   }
   if ('iri' in v) return turtleIri(v.iri);
+  if (v.lang) return `${turtleString(v.lit)}@${v.lang}`;
   return v.dt ? `${turtleString(v.lit)}^^${v.dt}` : turtleString(v.lit);
 }
 

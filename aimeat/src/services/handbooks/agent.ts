@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.61.0 -- 2026-11-01 -- Discover: a data product's Markdown description, `i18n`, licence and
+ *     `attribution`, and that define replaces the whole definition (WP10e).
  *   v1.60.0 -- 2026-11-02 -- aimeat_home_feed: what the person's home lists, read before answering about it.
  *   v1.59.0 -- 2026-11-01 -- Discover names aimeat_party "share" with `email` and "send_link": the one-time share link (WP9b).
  *   v1.58.0 -- 2026-11-01 -- Discover names aimeat_dataspace: the data space requests that wait for the person (plan doc-mvwxcas3dom3, D8).
@@ -356,7 +358,11 @@ its entry carries the row count, when it was last published and the addresses to
 that refreshes itself from the person's own material (workspace records, an app's publishable data, a
 record, an extension action, a CSV or Excel file, another package), use \`aimeat_dataproduct\`:
 \`define\` with sources and a schedule (a cron, or \`{ on: "change" }\` to run when a source changes),
-\`preview\`, then \`run\`; \`describe\` drafts its description with the owner's AI. To give one package to
+\`preview\`, then \`run\`; \`describe\` drafts its description with the owner's AI. The description may be
+Markdown; \`i18n\` { fi: { title, description, attribution }, en: {...} } gives each reader their own
+language, \`license\` (CC-BY-4.0, CC0-1.0 or proprietary) becomes a link to its deed and \`attribution\`
+says who to credit. \`define\` replaces the whole definition, so \`get\` it first, change the fields and
+\`run\` to publish the change. To give one package to
 a person with an AIMEAT account on another server, \`aimeat_party\` \`share\` takes \`recipient:
 "name@their-server"\` in place of a name and makes no key. To give one package to someone with no
 account here (a Power BI, a partner's program, a person), use \`aimeat_party\` action \`share\` with a

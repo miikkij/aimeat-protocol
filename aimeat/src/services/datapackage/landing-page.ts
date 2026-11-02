@@ -17,6 +17,8 @@
  * @structure schemaOrgOfOpened · datasetPageOf
  * @usage const page = await datasetPageOf({ storage, config }, owner, name);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The meta description is the first paragraph of the Markdown description as
+ *     plain text (plainLead; WP10e A1).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b). schemaOrgOfOpened moved here unchanged from
  *     routes/datapackages.ts, which calls it, so the route and the page head build one object.
  */
@@ -51,6 +53,22 @@ export async function schemaOrgOfOpened(deps: Deps, opened: Opened): Promise<Rec
 
 const OWNER_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 
+/**
+ * The first paragraph of a Markdown description as plain text, for the page's meta description: the
+ * heading marks, list marks, emphasis and link syntax go, the link text stays.
+ */
+export function plainLead(md: string): string {
+    const paragraphs = md.replace(/\r\n?/g, '\n').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    const first = paragraphs.find(p => !/^#{1,6}\s/.test(p) || p.split('\n').length > 1) ?? paragraphs[0] ?? '';
+    return first
+        .replace(/^#{1,6}\s+/gm, '')
+        .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, '')
+        .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+        .replace(/[*_`]+/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
 /** The head of the public dataset page of `owner`/`name`, or null when no reader without an account may open it. */
 export async function datasetPageOf(deps: Deps, owner: string, name: string): Promise<PublicPage | null> {
     if (signedInOnly(deps.config) || !OWNER_RE.test(owner) || !PACKAGE_NAME_RE.test(name)) return null;
@@ -59,8 +77,9 @@ export async function datasetPageOf(deps: Deps, owner: string, name: string): Pr
     const jsonLd = await schemaOrgOfOpened(deps, opened);
     const d = opened.descriptor;
     const title = d.title || d.name;
-    const description = (d.description && d.description.length >= 50 ? d.description
-        : `${title}: a data table by ${owner}, to open in Excel, Power BI, DuckDB, Python or your own AI. ${d.description ?? ''}`).trim().slice(0, 300);
+    const lead = plainLead(d.description ?? '');
+    const description = (lead.length >= 50 ? lead
+        : `${title}: a data table by ${owner}, to open in Excel, Power BI, DuckDB, Python or your own AI. ${lead}`).trim().slice(0, 300);
     return {
         path: `/v1/dataset/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`,
         title: `${title} · ${deps.config.seoSiteName || 'AIMEAT'}`,

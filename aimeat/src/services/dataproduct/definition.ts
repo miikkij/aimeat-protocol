@@ -30,13 +30,15 @@
  *   const out = normaliseDefinition(name, body);
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.3.0 — 2026-11-01 — `attribution` (who to credit) and `i18n` { <lang>: { title?, description?,
+ *     attribution? } }, the words per language a build carries into the package (WP10e A2, A3).
  *   v1.2.0 — 2026-11-01 — `schedule: { on: 'change' }`: run when a source changes (WP9c); refused with
  *     NO_CHANGE_SIGNAL for a product with an extension source. `runAs`, the maker a change run acts as.
  *   v1.1.0 — 2026-11-01 — `retention` { keep, unit }: how many earlier versions a run keeps (the
  *     package's retention policy); sourceLabel, a source in a few words for a list row (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
-import type { FieldType } from '../datapackage/contract.js';
+import type { FieldType, PackageI18n } from '../datapackage/contract.js';
 import { validateName } from '../datapackage/contract.js';
 import { parseAudience } from '../audience.js';
 
@@ -144,6 +146,10 @@ export interface DataProductDefinition {
     description?: string;
     keywords?: string[];
     license?: string;
+    /** Who to credit and how (CC BY asks for it), in the maker's words. */
+    attribution?: string;
+    /** The title, description and attribution per language (ISO 639-1); a reader falls back to the base fields. */
+    i18n?: PackageI18n;
     sources: SourceSpec[];
     combine: CombineSpec;
     columns?: ColumnMapping[];
@@ -167,7 +173,9 @@ export interface DataProductDefinition {
 
 /** A refusal with a stable code, an HTTP status and a sentence that names what to change. */
 export class DataProductError extends Error {
-    constructor(readonly code: string, message: string, readonly status = 400, readonly source?: string) {
+    constructor(readonly code: string, message: string, readonly status = 400, readonly source?: string,
+        /** Facts a page says the refusal with in its own language (the widest audience the sources allow). */
+        readonly details?: Record<string, unknown>) {
         super(message);
     }
 }
@@ -293,6 +301,8 @@ export function normaliseDefinition(name: string, raw: Record<string, unknown>):
     if (!parseAudience(visibility)) return bad('visibility is private (the default), members, organism:<id> or public.');
 
     const keywords = Array.isArray(raw.keywords) ? raw.keywords.filter((k): k is string => typeof k === 'string' && !!k.trim()).map(k => k.trim()).slice(0, 20) : undefined;
+    const i18n = normaliseI18n(raw.i18n);
+    if (typeof i18n === 'string') return bad(i18n);
     return {
         ok: true,
         definition: {
@@ -301,6 +311,8 @@ export function normaliseDefinition(name: string, raw: Record<string, unknown>):
             ...(str(raw.description) ? { description: str(raw.description) } : {}),
             ...(keywords?.length ? { keywords } : {}),
             ...(str(raw.license) ? { license: str(raw.license) } : {}),
+            ...(str(raw.attribution) ? { attribution: str(raw.attribution) } : {}),
+            ...(i18n ? { i18n } : {}),
             ...(columns ? { columns } : {}),
             ...(filter !== undefined ? { filter } : {}),
             ...(schedule !== undefined ? { schedule } : {}),
@@ -308,6 +320,38 @@ export function normaliseDefinition(name: string, raw: Record<string, unknown>):
             ...(raw.confirm_personal_public === true || raw.confirmPersonalPublic === true ? { confirmPersonalPublic: true } : {}),
         },
     };
+}
+
+/** Languages a definition may carry words in: ISO 639-1 codes, at most this many. */
+export const I18N_LANG_RE = /^[a-z]{2}$/;
+export const I18N_MAX_LANGS = 12;
+const I18N_FIELDS = ['title', 'description', 'attribution'] as const;
+
+/**
+ * `i18n` { fi: { title?, description?, attribution? }, en: {...} }: the words per language. Answers the
+ * normalised map, undefined when absent or empty, or a sentence naming what is wrong.
+ */
+export function normaliseI18n(v: unknown): PackageI18n | undefined | string {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== 'object' || Array.isArray(v)) return 'i18n is { <language code>: { title?, description?, attribution? } }, e.g. { "fi": { "title": "..." } }.';
+    const out: PackageI18n = {};
+    const entries = Object.entries(v as Record<string, unknown>);
+    if (entries.length > I18N_MAX_LANGS) return `i18n carries at most ${I18N_MAX_LANGS} languages.`;
+    for (const [lang, words] of entries) {
+        if (!I18N_LANG_RE.test(lang)) return `i18n key "${lang}" must be a two-letter language code (fi, en, es).`;
+        if (!words || typeof words !== 'object' || Array.isArray(words)) return `i18n.${lang} is { title?, description?, attribution? }.`;
+        const w = words as Record<string, unknown>;
+        const unknown = Object.keys(w).filter(k => !(I18N_FIELDS as readonly string[]).includes(k));
+        if (unknown.length) return `i18n.${lang} takes title, description and attribution, not ${unknown.join(', ')}.`;
+        const kept: Record<string, string> = {};
+        for (const f of I18N_FIELDS) {
+            if (w[f] !== undefined && typeof w[f] !== 'string') return `i18n.${lang}.${f} must be text.`;
+            const s = str(w[f]);
+            if (s) kept[f] = s;
+        }
+        if (Object.keys(kept).length) out[lang] = kept;
+    }
+    return Object.keys(out).length ? out : undefined;
 }
 
 function validSourceColumns(v: unknown): boolean {

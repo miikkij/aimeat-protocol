@@ -1546,6 +1546,12 @@
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.7), the node's own read: the publishing app's data map (apps.{appId}.datamap, public by design), read to decide whether a public publish asks the owner first. Nothing read is answered beyond the map rows' own what and holds, which the map publishes."
     },
+    "src/services/datapackage/version-returns.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP10e C2), the node's own read: the service-owned record datapkg-returns.<name> that only publishPackage writes, the content hashes and times of a package's returns to earlier bytes. listVersions reads it after openPackage decided the reader may read the package, and adds a row only for a version the reader's own list already holds; nothing of a person's content is in it."
+    },
     "src/services/datapackage/withdraw.ts": {
       "reads": {
         "listStorageFiles": 1,

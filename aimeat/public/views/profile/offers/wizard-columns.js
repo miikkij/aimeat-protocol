@@ -13,6 +13,9 @@
  * @structure columnsFromProbe · stepColumns · stepPreview
  * @usage const cols = columnsFromProbe(probe, sources, previous);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — Step 3 takes the title, description and attribution per language (a tab per
+ *     language; the page's own edits the base fields) and the attribution; the description field is the
+ *     widest column of step 2, and the preview rows keep one line each (WP10e A2, A3, B8, B11).
  *   v1.1.0 — 2026-11-01 — Step 2 is a table as on the canvas (DataTable form stack: goes out, source
  *     field, name out, type, description, the personal mark; one block per column on a phone), its
  *     descriptions and types filled from the source's schema by the node. Step 3 says that the owner's AI
@@ -34,7 +37,9 @@ import { Note } from '/components/Note.js';
 import { Section } from '/components/Section.js';
 import { DataTable } from '/components/DataTable.js';
 import { Action, Actions } from '/components/Action.js';
+import { Tabs } from '/components/Tabs.js';
 import { d, bytesWord, errText } from './data-model.js';
+import { pageLang } from './data-words.js';
 
 const TYPES = ['string', 'integer', 'number', 'boolean', 'date', 'datetime', 'any'];
 const OPS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains'];
@@ -73,7 +78,7 @@ export function stepColumns(s) {
   const f = draft.filter;
   return html`
     <${Section} id="wz-columns" title=${d('cols.title')} count=${d('cols.count', { n: outNames.length, of: draft.columns.length })} first=${true}>
-      <${DataTable} form stack
+      <${DataTable} form stack grow=${4}
         headers=${[d('cols.include'), d('cols.sourceField'), d('wizard.colOut'), d('wizard.colType'), d('wizard.colDesc'), d('cols.note')]}
         rows=${draft.columns.map((c, i) => {
           const field = `${c.source}.${c.from}`;
@@ -134,8 +139,22 @@ function aiNote(s) {
     ${ai.provenance ? html`<${AiLabel} variant="inline" record=${ai.provenance.record} recordUrl=${ai.provenance.record_url} />` : null}`;
 }
 
+/** The languages a product's words are written in on step 3: the page's own first, then the others. */
+const LANGS = ['fi', 'en', 'es'];
+
 export function stepPreview(s) {
   const { draft, setDraft, preview, busy } = s;
+  // The page's language edits the base fields; another language edits its own words (draft.i18n).
+  const base = LANGS.includes(pageLang()) ? pageLang() : 'en';
+  const langs = [base, ...LANGS.filter((l) => l !== base)];
+  const lang = langs.includes(s.wordsLang) ? s.wordsLang : base;
+  const setLang = (l) => s.setWordsLang(l);
+  const w = lang === base
+    ? { title: draft.title, description: draft.description, attribution: draft.attribution }
+    : { title: '', description: '', attribution: '', ...(draft.i18n?.[lang] || {}) };
+  const setWords = (patch) => (lang === base
+    ? setDraft(patch)
+    : setDraft((cur) => ({ i18n: { ...cur.i18n, [lang]: { ...(cur.i18n?.[lang] || {}), ...patch } } })));
   const resources = preview?.resources || [];
   const rows = resources.reduce((n, r) => n + (r.row_count || 0), 0);
   const cols = resources.reduce((n, r) => n + (r.schema?.fields?.length || 0), 0);
@@ -146,20 +165,24 @@ export function stepPreview(s) {
       ${resources.map((r) => {
         const head = (r.schema?.fields || []).map((x) => x.name);
         return html`<${Box} key=${r.name} flush name=${resources.length > 1 ? r.name : null}>
-          <${DataTable} scroll headers=${head} rows=${(r.rows || []).slice(0, PREVIEW_ROWS).map((row) => head.map((k) => (row[k] === null || row[k] === undefined ? '' : String(row[k]))))} />
+          <${DataTable} scroll nowrap headers=${head} rows=${(r.rows || []).slice(0, PREVIEW_ROWS).map((row) => head.map((k) => (row[k] === null || row[k] === undefined ? '' : String(row[k]))))} />
         <//>`;
       })}
       <${Note} kind="meta" mono>${d('preview.sizeLine', { rows: num(rows), cols: num(cols), size: bytesWord(size) })}<//>
       ${checks(preview, draft).map(([ok, words], i) => html`<${Note} key=${i} kind="state" tone=${ok ? 'fine' : 'danger'}>${ok ? '✓' : '✗'} ${words}<//>`)}
     <//>
     <${Section} id="wz-about" title=${d('preview.aboutTitle')}>
+      <${Tabs} tone="filter" label=${d('preview.langLabel')} value=${lang} onSelect=${setLang}
+        items=${langs.map((l) => ({ value: l, label: d('preview.lang.' + l), title: l === base ? d('preview.langBase') : undefined }))} />
       <${Fields} cols=${2}>
-        <${TextField} label=${d('preview.name')} value=${draft.title} onInput=${(v) => setDraft({ title: v })} />
-        <${TextField} label=${d('preview.slug')} hint=${d('preview.slugHint')} code value=${draft.name}
-          onInput=${(v) => setDraft({ name: v.toLowerCase().replace(/[^a-z0-9-]/g, ''), nameTouched: true })} />
-        <${TextArea} label=${d('preview.desc')} wide rows=${5} value=${draft.description} onInput=${(v) => setDraft({ description: v })} />
-        <${TextField} label=${d('preview.keywords')} wide hint=${d('preview.keywordsHint')} value=${draft.keywords} onInput=${(v) => setDraft({ keywords: v })} />
+        <${TextField} label=${d('preview.name')} value=${w.title} onInput=${(v) => setWords({ title: v })} />
+        ${lang === base ? html`<${TextField} label=${d('preview.slug')} hint=${d('preview.slugHint')} code value=${draft.name}
+          onInput=${(v) => setDraft({ name: v.toLowerCase().replace(/[^a-z0-9-]/g, ''), nameTouched: true })} />` : null}
+        <${TextArea} label=${d('preview.desc')} hint=${d('preview.descHint')} wide rows=${6} value=${w.description} onInput=${(v) => setWords({ description: v })} />
+        <${TextField} label=${d('preview.attribution')} hint=${d('preview.attributionHint')} wide value=${w.attribution} onInput=${(v) => setWords({ attribution: v })} />
+        ${lang === base ? html`<${TextField} label=${d('preview.keywords')} wide hint=${d('preview.keywordsHint')} value=${draft.keywords} onInput=${(v) => setDraft({ keywords: v })} />` : null}
       <//>
+      ${lang === base ? null : html`<${Note} kind="aside" size="small">${d('preview.langOther', { lang: d('preview.lang.' + lang) })}<//>`}
       ${aiNote(s)}
       <${Actions}>
         <${Action} small disabled=${busy} onClick=${() => s.tryPreview()}>${d('preview.rebuild')}<//>

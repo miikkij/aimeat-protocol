@@ -22,6 +22,9 @@
  *     earlier version (through `uv run`; counted as SKIPPED when uv is not on this machine).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=party-invite
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The preview carries the licence's deed, the attribution and the words per
+ *     language; the connection file's password is the key; a used link's recipient changes the key with
+ *     the key itself (WP10e A2, A3, B4, B12).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b). Every case fails on the code before it: the routes did not exist.
  */
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
@@ -110,7 +113,8 @@ async function codeIn(to: string): Promise<{ code: string; subject: string; text
 }
 const rows = (n: number, label: string) => Array.from({ length: n }, (_, i) => ({ id: i + 1, label: `${label}-${i + 1}`, amount: i + 1 }));
 const publish = (name: string, n: number, label: string) => call('/v1/datapackages', {
-    token: A.token, body: { name, title: 'Kuntien budjettisignaalit', changes: label, visibility: 'private', resources: [{ name: 'items', rows: rows(n, label) }] },
+    token: A.token, body: { name, title: 'Kuntien budjettisignaalit', changes: label, visibility: 'private', resources: [{ name: 'items', rows: rows(n, label) }],
+        provenance: { license: 'CC-BY-4.0', attribution: 'Source: Kunta', i18n: { en: { title: 'Municipal budget signals', attribution: 'Source: the municipality' } } } },
 });
 const share = (body: Body, token = A.token) => call('/v1/parties/share', { token, body: { package: PKG, purpose: 'Raportointi', days: 30, ...body } });
 
@@ -164,6 +168,9 @@ async function run(): Promise<void> {
         assert(p.status === 200 && p.body.data.owner === A.name && p.body.data.package.title === 'Kuntien budjettisignaalit'
             && p.body.data.share.purpose === 'Raportointi' && p.body.data.terms && p.body.data.party.display_name === 'Matti Virtanen', `preview: ${show(p)}`);
         assert(!('key' in p.body.data), 'no key in the preview');
+        // WP10e A2, A3: the licence's deed, who to credit and the words per language reach the recipient page.
+        assert(p.body.data.package.licence === 'CC-BY-4.0' && p.body.data.package.licence_url === 'https://creativecommons.org/licenses/by/4.0/'
+            && p.body.data.package.attribution === 'Source: Kunta' && p.body.data.package.i18n?.en?.title === 'Municipal budget signals', `licence and words: ${JSON.stringify(p.body.data.package)}`);
         const no = await call('/v1/parties/invites/redeem', { body: { code } });
         assert(no.status === 400 && codeOf(no) === 'TERMS_NOT_ACCEPTED', `without terms: ${show(no)}`);
         assert((await call('/v1/parties/invites/preview', { body: { code } })).status === 200, 'the link still works');
@@ -174,6 +181,9 @@ async function run(): Promise<void> {
         const r = await call('/v1/parties/invites/redeem', { body: { code, accept_terms: true } });
         assert(r.status === 200 && r.body.data.key && r.body.data.key !== ownerKey && r.body.data.access_token?.startsWith('aimeat_party_')
             && r.body.data.connection?.key === r.body.data.key && r.body.data.terms_accepted, `redeem: ${show(r)}`);
+        // WP10e B4: the file's sign-in carries the key itself, not English words in its place.
+        const auth = r.body.data.connection.authentication;
+        assert(auth?.basic?.password === r.body.data.key && auth?.token_request?.client_secret === r.body.data.key, `the file's password: ${JSON.stringify(auth)}`);
         assert((r.body.data.retired_key_ids as string[]).length === 1, `the owner's key is retired: ${JSON.stringify(r.body.data.retired_key_ids)}`);
         newKey = r.body.data.key;
         partyToken = r.body.data.access_token;
@@ -185,6 +195,25 @@ async function run(): Promise<void> {
         assert(page.status === 200 && page.body.data.rows.length === 5, `the new key reads rows: ${show(page)}`);
         const me = await call('/v1/parties/me', { token: partyToken });
         assert(me.status === 200 && (me.body.data.shares as Body[]).some(s => s.id === shareId && s.terms_accepted_at), `the token reads me: ${show(me)}`);
+    });
+
+    // WP10e B12: after the link is used, the recipient page changes the key with the key itself, as
+    // shared-data-rotate.js does: a token from the user and the key, then the rotation with it.
+    await test('A used link still lets the recipient change the key with the user and the key; a wrong key is refused', async () => {
+        const wrong = await call('/v1/parties/token', { body: { grant_type: 'client_credentials', client_id: `${A.name}/matti`, client_secret: 'not-the-key-at-all' } });
+        assert(wrong.status === 401, `a wrong key: ${show(wrong)}`);
+        const tok = await call('/v1/parties/token', { body: { grant_type: 'client_credentials', client_id: `${A.name}/matti`, client_secret: newKey } });
+        const access = tok.body.access_token ?? tok.body.data?.access_token;
+        assert(tok.status === 200 && access, `token from the key: ${show(tok)}`);
+        const rot = await call('/v1/parties/me/keys/rotate', { token: access, body: {} });
+        assert(rot.status === 200 && rot.body.data.key && rot.body.data.key !== newKey, `rotate: ${show(rot)}`);
+        const old = await call(`/v1/odata/${A.name}/${PKG}`, { basic: `${A.name}/matti:${newKey}` });
+        assert(old.status === 401, `the old key after the change: ${show(old)}`);
+        newKey = rot.body.data.key;
+        const fresh = await call(`/v1/odata/${A.name}/${PKG}`, { basic: `${A.name}/matti:${newKey}` });
+        assert(fresh.status === 200, `the new key: ${show(fresh)}`);
+        const t2 = await call('/v1/parties/token', { body: { grant_type: 'client_credentials', client_id: `${A.name}/matti`, client_secret: newKey } });
+        partyToken = t2.body.access_token ?? t2.body.data?.access_token ?? partyToken;
     });
 
     await test('A used code is refused: 410 INVITE_USED on the preview and on a second redemption', async () => {

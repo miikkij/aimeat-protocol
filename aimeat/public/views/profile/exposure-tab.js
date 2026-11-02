@@ -39,6 +39,7 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.5.1 — 2026-11-01 — The heading and the sentence about asking one's own AI as on the board (WP10e B16).
  *   v1.5.0 — 2026-11-01 — How to close an item, a title the node words and the notes in the page's
  *     language, from the report's `close`, `title_parts` and `note_codes` (exposure/words.js; WP9c).
  *   v1.4.0 — 2026-11-01 — LEVELS gains `named`, outside the widest-first order a cap reads; the strip
@@ -384,7 +385,7 @@ export default function ExposureTab({ showToast }) {
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.exposure')]}
       title=${x('title')}
-      desc=${x('intro')}
+      desc=${`${x('intro')} ${x('introAi')}`}
       strip=${report ? html`<${Strip} report=${report} />` : html`<${FigureStrip} lead stacked loading=${4} />`}
       after=${html`<${ConfirmUI} />`}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}

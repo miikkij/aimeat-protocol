@@ -8,6 +8,8 @@
  *   Drawn by components/Choice.js; a page never writes these.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-11-01 — What follows a boxed group stands 1rem clear of it, and a box's line under its
+ *     name reads at the box's size, not under the 11px floor (WP10e B13, B17).
  *   v1.1.0 — 2026-10-29 — .choice-pic, a boxed answer's picture over its name.
  *   v1.0.0 — 2026-09-26 — Initial. The boxed grid has the values of .agp-choices, .sc-choices and
  *     .cal-opts (.7rem apart; two columns under 1100px, one under 700px); a boxed answer with its
@@ -18,6 +20,12 @@
 .choice--cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .choice--cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .choice--cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* What follows a boxed group, or a field of answer tabs, stands clear of it: the chosen box's shadow
+   (4px) covered the next field's label, which sat 0px under the group (WP10e B13). */
+/* A grid of fields keeps its own gaps (a field beside the group must not drop), so the rule reaches a
+   group that stands loose in a section or in a plain column of fields. */
+:not(.og-fields) > .choice--boxed + *,
+:is(:not(.og-fields), .og-fields--plain) > .og-field:has(> .choice--boxed, > .tab-row) + * { margin-top: 1rem; }
 
 /* A boxed answer's picture (an option's `pic`): over the name, the box's full width. */
 .choice-pic { display: block; margin-bottom: .6rem; }
@@ -25,7 +33,8 @@
 /* A boxed answer with its radio dot: the dot level with the name, the line under the name. */
 .choice-dot { display: flex; gap: .6rem; align-items: flex-start; }
 .choice-dot input { margin: .2rem 0 0; }
-.choice-dot small { display: block; }
+/* The line under the name reads at the box's own size: <small> alone made it 10.67px, under the 11px floor. */
+.choice-dot small { display: block; font-size: inherit; }
 
 @media (max-width: 1100px) {
   .choice--cols-3, .choice--cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -26,6 +26,7 @@
  *   IntermediationSection (default) · IntermediationPrint
  * @usage html`<${IntermediationSection} di=${report.data_intermediation} switchPage=${switchPage} onChanged=${reload} onMessage=${msg} />`
  * @version-history
+ *   v1.0.2 — 2026-11-01 — A recital is cited in the page's language, on screen and in the printout (WP10e B4).
  *   v1.0.1 — 2026-11-01 — The three parts open with SubHeading rule (the board's coral labels), and the
  *     notification record stands in a Box with its door (lead's browser review).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b, board Admin-Compliance; plan doc-mvwxcas3dom3, D7).
@@ -58,6 +59,11 @@ const D = (key, vars) => t('admin.compliance.di.' + key, vars);
 const DOr = (key, fallback, vars) => tOr('admin.compliance.di.' + key, fallback, vars);
 const DOC = '/v1/compliance/docs/intermediation';
 const day = (iso) => (iso ? fmtDate(iso) : D('notYet'));
+/** A reference into the regulation in the page's language: "2022/868 johdanto-osan kappale 28"; an article as cited. */
+const refWords = (r) => {
+  const m = /^recital (\d+)$/.exec(String(r?.ref || ''));
+  return `${r?.act || ''} ${m ? D('recital', { n: m[1] }) : r?.ref || ''}`.trim();
+};
 
 /** The four figures of the board: data offerings, outside buyers, open organisms, open apps that sell. */
 export function figuresOf(di) {
@@ -227,7 +233,7 @@ export default function IntermediationSection({ di, switchPage, onChanged, onMes
           return html`<${Row} key=${f.id} rail=${decided ? undefined : 'warn'} fine=${decided === 'accepted'}>
             <${Name} desc=${words.why || undefined}>${words.title}<//>
             <${Desc} sub=${words.proposal || undefined}>
-              <${Marks}>${(f.regulation || []).map((r) => html`<${Code} key=${r.ref}>${r.act} ${r.ref}<//>`)}<//>
+              <${Marks}>${(f.regulation || []).map((r) => html`<${Code} key=${r.ref}>${refWords(r)}<//>`)}<//>
             <//>
             <${Cell}>${decided
               ? html`<${Mark} kind="status" tone=${decided === 'accepted' ? 'fine' : 'off'}>${D('mark.' + decided)}<//>`
@@ -288,7 +294,7 @@ export function IntermediationPrint({ di }) {
     ${shown.length === 0 ? html`<${Note} kind="quiet">${D('proposalsNone')}<//>` : html`
       <${PrintTable} head=${[D('print.finding'), D('print.regulation'), D('print.decision')]} rows=${shown.map((f) => {
         const words = findingText(f, mode);
-        return [[words.title, words.why, words.proposal].filter(Boolean).join(' '), (f.regulation || []).map((r) => `${r.act} ${r.ref}`).join(', '), decision(f)];
+        return [[words.title, words.why, words.proposal].filter(Boolean).join(' '), (f.regulation || []).map(refWords).join(', '), decision(f)];
       })} />`}
     <${Note} kind="quiet">${D('art12Title')}<//>
     <${PrintTable} head=${[D('col.point'), D('col.requirement'), D('col.evidence'), D('col.state')]}

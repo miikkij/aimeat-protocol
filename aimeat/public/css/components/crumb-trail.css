@@ -8,6 +8,8 @@
  *   that draws the kit writes them. Corners, frames, shadows and letter case read the shape tokens.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The path wraps, and a long step breaks inside itself, instead of running past
+ *     a phone's screen (WP10e B6).
  *   v1.3.1 — 2026-09-27 — The inline word's literal corner 0 goes (nothing under it draws a corner, so
  *     AIMEAT is unchanged). check:shape-tokens.
  *   v1.3.0 — 2026-09-27 — .og-crumb-link--file (Action tone 'file'): the old app catalogue's
@@ -20,7 +22,10 @@
  *   v1.0.0 — 2026-09-25 — Moved out of views/organism.css (UI consolidation phase 5, a move).
  */
 
-.og-crumb { display: flex; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
+/* A path longer than the screen wraps, and a long last step breaks inside itself: on a phone a data
+   product's name ran 15 to 60px past the page and was cut (WP10e B6). */
+.og-crumb { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--text-dim); }
+.og-crumb > * { min-width: 0; overflow-wrap: anywhere; }
 .og-crumb-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; color: var(--accent); }
 .og-crumb-link:hover { color: var(--text); }
 /* The dashed word (Action tone 'dashed', appcat): a door inside running text, a dashed coral line

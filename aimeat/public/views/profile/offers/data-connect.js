@@ -25,6 +25,7 @@
  *        html`<${ConnectSteps} owner=${owner} name=${name} pkg=${pkg} cred=${{ user, key }} />`
  *        html`<${ConnectSteps} owner=${owner} name=${name} pkg=${pkg} variant="public" title=${title} />`
  * @version-history
+ *   v1.1.1 — 2026-11-01 — The steps of the chosen tool stand in a TabPanel (role tabpanel; WP10e B17).
  *   v1.1.0 — 2026-11-01 — The steps and the code follow the Power-BI-Excel board (DuckDB's BEARER_TOKEN
  *     secret, the Frictionless descriptor's relative path, pandas paging); `cred` fills in the
  *     recipient's own name and key, and `variant` 'public' draws the public page's four tabs (WP9b).
@@ -35,7 +36,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { Facts } from '/components/Facts.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { StepList } from '/components/StepList.js';
 import { Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -123,10 +124,10 @@ export function ConnectSteps({ owner, name, pkg, visibility, cred, variant, titl
     ${pub ? null : html`<${Note}>${open ? d('connect.openPublic') : cred ? d('connect.openYours') : d('connect.openPrivate')}<//>`}
     <${Tabs} kind="view" label=${d('connect.toolLabel')} value=${tool} onSelect=${setTool}
       items=${tools.map((tl) => ({ value: tl, label: d('connect.tool.' + tl) }))} />
-    <${Box} tone="tabbed">
+    <${Box} tone="tabbed"><${TabPanel} value=${tool} label=${d('connect.tool.' + tool)}>
       <${StepList} steps=${steps[tool]} />
       ${code ? html`<${Code} block scroll>${code}<//>` : null}
       ${tool === 'office' || tool === 'excel' || tool === 'powerbi' ? html`<${Code} block scroll>${a.odata}<//>` : null}
       <${Note}>${after}<//>
-    <//>`;
+    <//><//>`;
 }

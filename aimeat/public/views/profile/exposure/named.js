@@ -14,6 +14,8 @@
  * @structure secNamedShares · secParties · secProducts · NAMED_KINDS
  * @usage ${secNamedShares({ items, num, busy, onRevoke })}
  * @version-history
+ *   v1.1.0 — 2026-11-01 — "Manage" and "Change" open the Data Wallet party and the product in the
+ *     profile (they changed the address only, WP10e B2).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a).
  */
 import { h } from 'preact';
@@ -27,9 +29,16 @@ import { List, Row, Name, Cell, Doors } from '/components/List.js';
 import { Action } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
+import { openTabAt } from '../landing-page.helpers.js';
 
 const x = (key, vars) => (vars && 'n' in vars ? tn(`exposure.${key}`, vars.n, vars) : t(`exposure.${key}`, vars));
 const enc = encodeURIComponent;
+
+/** A press on a link to another profile tab opens that tab here (a plain link changed only the address). */
+const inProfile = (e) => {
+  const href = e.currentTarget?.getAttribute?.('href');
+  if (href && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button !== 1 && openTabAt(href)) e.preventDefault();
+};
 
 /** The kinds these sections draw, which the list of everything else then leaves out. */
 export const NAMED_KINDS = ['named_share', 'outside_party', 'datapackage'];
@@ -60,7 +69,7 @@ export function secParties({ items, num }) {
           <${Name} meta=${x('named.noAccount')}>${p.display_name}<//>
           <${Cell}>${x('named.sharesKeys', { shares: p.shares, keys: p.keys })}<//>
           <${Cell} meta>${p.key_last_used_at ? x('named.keyUsed', { when: ago(p.key_last_used_at) }) : x('named.keyNotUsed')}<//>
-          <${Doors}><${Action} small row href=${`/v1/profile?tab=dataWallet&party=${enc(p.name)}`}>${x('named.manage')}<//><//>
+          <${Doors}><${Action} small row href=${`/v1/profile?tab=dataWallet&party=${enc(p.name)}`} onClick=${inProfile}>${x('named.manage')}<//><//>
         <//>`;
       }} />
   <//>`;
@@ -83,8 +92,8 @@ export function secProducts({ packages, products, items, num }) {
           <${Cell}><${Marks}><${Mark} tone=${level === 'public' ? 'sun' : level === 'private' ? 'dim' : undefined}>${x('named.level.' + level)}<//>${n ? html`<${Mark}>${x('named.plusShares', { n })}<//>` : null}<//><//>
           <${Cell} meta>${level === 'private' ? (n ? x('named.privateShared') : x('named.privateAlone')) : x('named.who.' + level)}<//>
           <${Doors}>${isProduct.has(p.name)
-            ? html`<${Action} small row href=${`/v1/profile?tab=offers&product=${enc(p.name)}`}>${x('named.change')}<//>`
-            : html`<${Action} small row href="/v1/profile?tab=memory">${x('named.change')}<//>`}<//>
+            ? html`<${Action} small row href=${`/v1/profile?tab=offers&product=${enc(p.name)}`} onClick=${inProfile}>${x('named.change')}<//>`
+            : html`<${Action} small row href="/v1/profile?tab=memory" onClick=${inProfile}>${x('named.change')}<//>`}<//>
         <//>`;
       }} />
     <${Note} kind="hint">${x('named.productsNote')}<//>

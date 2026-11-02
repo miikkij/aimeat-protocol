@@ -11,6 +11,8 @@
  * @structure secData · dataPage · dataRows
  * @usage import { secData, dataPage } from './data-list.js';
  * @version-history
+ *   v1.0.1 — 2026-11-01 — The cover's "Out of date · n" stands whenever there are products, as on the
+ *     board, 0 included (WP10e B16).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a, plan doc-mvwxcas3dom3 D9.7, D6.1, D3).
  */
 import { h } from 'preact';
@@ -31,8 +33,15 @@ const openProduct = (ctx, p) => ctx.pickView({ kind: 'product', name: p.name });
 const newProduct = (ctx) => ctx.pickView({ kind: 'wizard' });
 
 /** The source line under a product's name: "kaiku-signals › search · 180 rows · 2 versions". */
-function sourceLine(p) {
-  const src = (p.sources || []).map((s) => s.label || s.kind).join(' + ');
+function sourceLine(p, products = []) {
+  // Another data product of the owner is named by its title, not its address name and table.
+  const titleOf = (s) => {
+    if (s.kind !== 'datapackage' || !s.label) return s.label || s.kind;
+    const name = s.label.split(' › ')[0].split('/').pop();
+    const other = products.find((x) => x.name === name);
+    return other?.title || s.label;
+  };
+  const src = (p.sources || []).map(titleOf).join(' + ');
   const rows = p.last_run?.rows;
   return [src, typeof rows === 'number' ? d('list.rows', { n: num(rows) }) : null].filter(Boolean).join(' · ');
 }
@@ -45,7 +54,7 @@ export function dataRows(ctx, list) {
       const state = stateOf(p);
       const vis = p.package?.visibility || p.visibility;
       return html`<${Row} key=${p.name} faded=${!!p.package?.withdrawn}>
-        <${Name} clip=${2} onOpen=${() => openProduct(ctx, p)} meta=${sourceLine(p)}
+        <${Name} clip=${2} onOpen=${() => openProduct(ctx, p)} meta=${sourceLine(p, ctx.data.products || [])}
           warn=${p.last_run && p.last_run.ok === false}>${productTitle(p)}<//>
         <${Desc}><${Mark} kind="status" tone=${p.package?.withdrawn ? 'off' : freshTone(state)}>${p.package?.withdrawn ? d('list.withdrawn') : freshWord(state)}<//><//>
         <${Desc}><${Marks}>${audienceWord(vis, ctx.data.orgNames)}${p.shares ? html`<${Mark} tone="sun">${d('list.sharesN', { n: p.shares })}<//>` : null}<//><//>
@@ -62,7 +71,7 @@ export function secData(ctx) {
   const doors = html`
     <${Action} small onClick=${() => newProduct(ctx)}>${d('list.new')}<//>
     ${products.length ? html`<${Action} tone="more" onClick=${() => ctx.pickView({ kind: 'page', id: 'data' })}>${d('list.allN', { n: products.length })}<//>` : null}
-    ${old ? html`<${Action} small soft onClick=${() => ctx.pickView({ kind: 'page', id: 'data', filter: 'old' })}>${d('list.oldN', { n: old })}<//>` : null}`;
+    ${products.length ? html`<${Action} small soft onClick=${() => ctx.pickView({ kind: 'page', id: 'data', filter: 'old' })}>${d('list.oldN', { n: old })}<//>` : null}`;
   return html`<${Section} id="op-data" num="06" title=${d('list.title')} count=${d('list.sub', { n: products.length })} doors=${doors}>
     ${ctx.data.products === null ? html`<${Note} kind="loading" />`
       : products.length ? dataRows(ctx, products.slice(0, COVER_ROWS))

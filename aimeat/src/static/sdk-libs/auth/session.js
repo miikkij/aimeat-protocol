@@ -12,6 +12,8 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.8.1 — 2026-11-01 — A boot with no stored session restores from the cookie only when the node's
+ *     hint cookie is there, so a signed-out visitor's page asks no refresh (WP10e B15).
  *   v1.8.0 — 2026-11-02 — auth.adoptLoginAnswer(data): the session of a finished two-step enrolment.
  *   v1.7.1 — 2026-10-16 — Every caught error leaves a trace (QA audit F6-03). session.fetch's comment
  *     states its contract (ok:false is a refusal, never an empty result); a non-JSON refresh answer
@@ -61,6 +63,7 @@ import { passkeySupported, passkeySignIn, passkeyAdd } from './passkey.js';
 import { api, authApi, sessionHeaders } from './http.js';
 import { onLoginWhileOpen } from './on-login.js';
 import { parentAuth } from './app-frame.js';
+import { hasSessionHint } from './session-hint.js';
 
 // The app-origin helpers moved to ./app-origin.js on 2026-09-04 (pure extraction, 800-line ceiling).
 // Re-exported from here because pill.js and the SDK's consumers import them from './session.js'.
@@ -451,8 +454,10 @@ async function sessionFromLogin(data) {
  */
 async function restoreStoredSession(username) {
   const stored = load('session');
-  // No local metadata — but an httpOnly refresh cookie may exist. Restore from the cookie alone.
-  if (!stored) return await restoreSessionFromCookie();
+  // No local metadata — but an httpOnly refresh cookie may exist. Restore from the cookie alone, when
+  // the node's hint cookie says this browser was given one; a visitor who never signed in asks nothing,
+  // so the page logs no refused refresh (services/owner-session.ts SESSION_HINT_COOKIE).
+  if (!stored) return hasSessionHint() ? await restoreSessionFromCookie() : null;
   if (username && stored.owner !== username) return null;
 
   // SECURITY: Run one-time migration from localStorage to IndexedDB

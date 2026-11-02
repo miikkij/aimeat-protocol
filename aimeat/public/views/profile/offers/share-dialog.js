@@ -20,6 +20,9 @@
  * @structure ShareDialog · partyNameOf · VisitorRead · LinkResult · SHARE_HOWS · isAccount
  * @usage html`<${ShareDialog} open=${o} onClose=${close} product=${{ name, title }} versions=${versions} onShared=${reload} />`
  * @version-history
+ *   v1.3.0 — 2026-11-01 — LinkResult shows the link with a copy action when it was mailed too (the owner
+ *     always gets it back); Cancel is as tall as the button beside it; one version choice per version
+ *     (WP10e B5, B17).
  *   v1.2.0 — 2026-11-01 — LinkResult: the e-mailed one-time link sent, or shown to pass on, and that the
  *     key in the file stops working when the recipient opens it (WP9b).
  *   v1.1.0 — 2026-11-01 — "From another AIMEAT" (a share to a person's own account on another node, the
@@ -83,8 +86,8 @@ export function LinkResult({ link, email }) {
     <${Note} kind="aside" size="small">${link.sent
       ? d('share.linkSent', { email: link.to || email, date: link.expires_at ? fmtDate(link.expires_at) : '' })
       : d('share.linkManual', { email: link.to || email })}<//>
-    ${link.sent ? null : html`<${Code} block scroll>${link.link}<//>
-      <${Actions}><${Action} small copy=${link.link}>${d('share.copyLink')}<//><//>`}
+    ${link.link ? html`<${Code} block scroll>${link.link}<//>
+      <${Actions}><${Action} small copy=${link.link}>${d('share.copyLink')}<//><//>` : null}
     <${Note} kind="quiet">${d('share.linkKey')}<//>`;
 }
 
@@ -147,14 +150,16 @@ export function ShareDialog({ open, onClose, product, versions = [], showToast, 
   const close = () => { setWho(''); setEmail(''); setAccount(''); setPurpose(''); setPin(''); setDone(null); onClose(); };
   const footer = done
     ? html`<${Loud} control onClick=${close}>${d('share.close')}<//>`
-    : html`<${Action} onClick=${close}>${d('share.cancel')}<//>
+    : html`<${Action} control onClick=${close}>${d('share.cancel')}<//>
         <${Loud} control disabled=${!ready || busy} onClick=${share}>${!visitor && email.trim() ? d('share.submitSend') : d('share.submit')}<//>`;
   const hows = [
     ...SHARE_HOWS.map(([value, key]) => ({ value, label: d('share.' + key), hint: d('share.' + key + 'Hint') })),
     limits.dataspace ? { value: 'dataspace', label: d('share.howDataspace'), hint: d('share.howDataspaceHint') } : null,
   ].filter(Boolean);
   const versionOptions = [['', d('share.versionLatest')],
-    ...versions.map((v) => [v.contentHash, d('share.versionOnly', { n: versionNumber(versions, v.contentHash), hash: shortHash(v.contentHash) })])];
+    // One choice per version: a return to earlier bytes lists them twice, and the newest row names them.
+    ...versions.filter((v, i) => versions.findIndex((x) => x.contentHash === v.contentHash) === i)
+      .map((v) => [v.contentHash, d('share.versionOnly', { n: versionNumber(versions, v), hash: shortHash(v.contentHash) })])];
 
   return html`<${Modal} open=${open} onClose=${close} size="md" title=${done ? d('share.doneTitle') : d('share.title')} titleRef=${product?.title || product?.name} footer=${footer}>
     ${done ? html`

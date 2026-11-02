@@ -42,6 +42,8 @@
  *   v1.0.0 — 2026-09-12 — Initial, with the profile's region and timezone fields.
  *   v1.1.0 — 2026-11-02 — The same read carries the account's language (`locale`) to the listeners,
  *     so the page can speak it after sign-in without a second request (spa.html, i18n.js).
+ *   v1.2.0 — 2026-11-01 — Signed out, nothing is read: a visitor's page logged a 401 for /v1/ghii/me
+ *     on every load (WP10e B15).
  */
 // apiGet, not a bare fetch. This SPA signs in with a JWT held in localStorage and attaches it per
 // request; a plain `fetch` with `credentials: 'same-origin'` sends no credential at all and gets a
@@ -50,6 +52,13 @@
 // Safe against a cycle: api.js reaches auth.js and neither reaches format.js.
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { hasSession } from '/js/services/auth.js';
+
+/** Is a session open? */
+function signedIn() {
+  try { return hasSession(); }
+  catch (err) { swallowed('display-prefs: session', err); return false; }
+}
 
 /** Null means "follow the browser", which is a real answer and not a missing one. */
 let region = null;
@@ -97,6 +106,9 @@ function announce(changed) {
  */
 export function loadDisplayPrefs() {
   if (inflight) return inflight;
+  // Signed out: nothing to read, and asking would log a refused request on every visitor's page. A
+  // sign-in later sends aimeat-auth-change, which calls this again (spa.html).
+  if (!signedIn()) return Promise.resolve({ region, timezone });
   inflight = apiGet('/v1/ghii/me')
     .then(body => {
       const d = body?.data;

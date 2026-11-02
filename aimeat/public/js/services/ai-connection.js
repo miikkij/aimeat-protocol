@@ -55,6 +55,8 @@
  *     async () => (await apiGet('/v1/openrouter/settings')).data,
  *     async () => (await readConnection()).settings);
  * @version-history
+ *   v1.1.1 — 2026-11-01 — The 410 the legacy routes answered is remembered for the tab's session, so a
+ *     4.x node is asked once per tab, not on every page load (WP10e B15); a 3.x node is asked as before.
  *   v1.1.0 — 2026-10-13 — legacyOr(): the screens call the legacy routes first and take the provider
  *     path only on a 410, so a 3.x node behaves exactly as before. On the provider path a connection is
  *     in use as the old setting was: its capabilities with a model join the pool, an OpenRouter one
@@ -71,8 +73,17 @@ import { swallowed } from '/js/swallowed.js';
 
 /* ── The switch ─────────────────────────────────────────────────────────────────────────────── */
 
-/** True once a legacy route answered 410 GONE in this page load: the node has none of them. */
-let legacyRoutesGone = false;
+/**
+ * True once a legacy route answered 410 GONE: the node has none of them. Kept for the tab's session
+ * (sessionStorage is per origin, so per node), so a 4.x node is asked once per tab and not on every page
+ * load, which logged a 410 on every profile load (WP10e B15). A 3.x node never answers 410, so it is
+ * asked exactly as before.
+ */
+const GONE_KEY = 'aimeat-ai-legacy-gone';
+let legacyRoutesGone = (() => {
+  try { return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(GONE_KEY) === '1'; }
+  catch (err) { swallowed('ai-connection: no session storage', err); return false; }
+})();
 
 /** Whether a failed request (js/api.js puts the status on the error) was a 410 GONE. */
 export const isGone = (err) => !!err && err.status === 410;
@@ -95,6 +106,7 @@ export async function legacyOr(legacyCall, providerCall) {
     } catch (err) {
       if (!isGone(err)) throw err;
       legacyRoutesGone = true;
+      try { sessionStorage.setItem(GONE_KEY, '1'); } catch (e) { swallowed('ai-connection: no session storage', e); }
     }
   }
   return providerCall();

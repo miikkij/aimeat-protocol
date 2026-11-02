@@ -37,6 +37,8 @@
  *   (`runAs`, the fields a schedule record keeps of its maker) and tells ./on-change.ts, which runs it
  *   after a change as that maker, asked again at each run (services/schedule-actor.ts).
  * @version-history
+ *   v1.2.1 — 2026-11-01 — A refusal carries its facts as `details` (the widest audience the sources
+ *     allow), so a page says it in its own language (WP10e B9).
  *   v1.2.0 — 2026-11-01 — `schedule: { on: 'change' }` (WP9c): define keeps `runAs` and registers the
  *     product with the change runner; delete unregisters it. A clock schedule is removed for it. get
  *     answers `next_change_run_at` and `visitor_shares`, the live shares to people on other AIMEAT nodes.
@@ -83,8 +85,10 @@ export type DataProductAnswer<T> = { ok: true; data: T } | { ok: false; status: 
 const READ_WORDS = ['storage:read'] as const;
 const WRITE_WORDS = ['storage:write', 'memory:write'] as const;
 
-function refusal(e: unknown): { ok: false; status: number; code: string; message: string; source?: string } {
-    if (e instanceof DataProductError) return { ok: false, status: e.status, code: e.code, message: e.message, ...(e.source ? { source: e.source } : {}) };
+function refusal(e: unknown): { ok: false; status: number; code: string; message: string; source?: string; details?: Record<string, unknown> } {
+    if (e instanceof DataProductError) {
+        return { ok: false, status: e.status, code: e.code, message: e.message, ...(e.source ? { source: e.source } : {}), ...(e.details ? { details: e.details } : {}) };
+    }
     throw e;
 }
 

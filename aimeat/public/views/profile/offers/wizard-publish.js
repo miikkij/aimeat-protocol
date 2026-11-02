@@ -37,7 +37,7 @@ import { List, Row, Name, Who, Doors } from '/components/List.js';
 import { Mark, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Action, Actions, Loud } from '/components/Action.js';
-import { d, scheduleWords, cronFor, shareSentence, keyNote } from './data-model.js';
+import { d, scheduleWords, cronFor, shareSentence, keyNote, audienceWord } from './data-model.js';
 import { SellFields } from './sell-dialog.js';
 import { partyNameOf, VisitorRead, LinkResult, SHARE_HOWS, isAccount } from './share-dialog.js';
 import { ConnectSteps } from './data-connect.js';
@@ -133,10 +133,25 @@ function ShareQueue({ draft, setDraft, maxDays = 365 }) {
     <${Note}>${d('who.noAccount')}<//>`;
 }
 
+/** How wide an audience is: private, one organism, every account, everyone. */
+export const audienceRank = (v) => (v === 'public' ? 3 : v === 'members' ? 2 : String(v || '').startsWith('organism') ? 1 : 0);
+
+/**
+ * The source that keeps the draft's audience narrower than chosen, from the step 3 trial build: null
+ * when the chosen audience fits (the node refuses a wider one with AUDIENCE_WIDER_THAN_SOURCE at publish).
+ */
+export function audienceLimit(draft, preview) {
+  const allowed = preview?.allowed_audience;
+  if (!allowed || audienceRank(draft.visibility) <= audienceRank(allowed)) return null;
+  const src = (preview.sources || []).find((x) => audienceRank(x.audience) === audienceRank(allowed));
+  return { allowed, source: src ? `${src.id} (${d('kindShort.' + src.kind)})` : '' };
+}
+
 export function stepWho(s) {
   const { draft, setDraft, choices, ctx } = s;
   const orgs = choices?.organisms || [];
   const orgName = orgs.find((o) => o.value === draft.organism)?.label;
+  const limit = audienceLimit(draft, s.preview);
   const audiences = [
     { value: 'private', label: d('audience.private'), hint: d('who.privateHint') },
     { value: 'organism', label: orgName ? d('audience.organismOf', { name: orgName }) : d('who.organism'), hint: d('who.organismHint'), disabled: !orgs.length },
@@ -153,7 +168,8 @@ export function stepWho(s) {
         <${Select} label=${d('who.licence')} value=${draft.license} placeholder=${d('who.licencePick')}
           options=${LICENCES.map(([value, key]) => [value, d('licence.' + key)])} onChange=${(v) => setDraft({ license: v })} />
       <//>
-      ${draft.visibility === 'public' ? html`<${Note} kind="aside" size="small" tone="irreversible">${d('who.publicNote')}<//>` : null}
+      ${limit ? html`<${Note} kind="message" error>${d('who.tooWide', { source: limit.source, allowed: audienceWord(limit.allowed, Object.fromEntries(orgs.map((o) => [o.value, o.label]))) })}<//>` : null}
+      ${draft.visibility === 'public' && !limit ? html`<${Note} kind="aside" size="small" tone="irreversible">${d('who.publicNote')}<//>` : null}
     <//>
     <${Section} id="wz-shares" title=${d('who.sharesTitle')} count=${String(draft.shares.length)}>
       <${ShareQueue} draft=${draft} setDraft=${setDraft} />

@@ -30,6 +30,8 @@
  * @structure INVITE_TTL_DAYS · inviteLinkOf · sendShareLink · shareAndSend · previewInvite · redeemInvite
  * @usage const out = await sendShareLink(ctx, 'matti', { share, email, locale });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The page's package carries the licence's deed (`licence_url`), the
+ *     attribution and the words per language (`i18n`) (WP10e A2, A3).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b).
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -42,6 +44,8 @@ import { getActiveEmailService } from '../email.js';
 import { logger } from '../../utils/logger.js';
 import { EMAIL_RE } from '../datapackage/share-notices.js';
 import { packageFreshness } from '../datapackage/freshness-read.js';
+import { licenceUrlOf } from '../datapackage/licences.js';
+import type { PackageI18n } from '../datapackage/contract.js';
 import { MAX_KEYS_PER_PARTY, PARTY_MANAGE_SCOPE, PARTY_TOKEN_TTL_SECONDS, partyRefOf, type PartyInvite, type PartyRecord } from './contract.js';
 import { newPartyKey, newPartyKeyId } from './keys.js';
 import { changeParty, findParty, readParties } from './store.js';
@@ -238,12 +242,17 @@ async function inviteView(deps: Deps, found: { owner: string; ownerGhii: string;
     const d = await descriptorFor(deps.storage, ownerGhii, pkg, meta.pinnedVersion);
     const f = await packageFreshness(deps, ownerGhii, pkg);
     const licence = d?.licenses?.[0]?.name ?? (d?.aimeat as { license?: string } | undefined)?.license ?? null;
+    const a = (d?.aimeat ?? {}) as { attribution?: string; i18n?: PackageI18n };
     return {
         owner, owner_name: await ownerNameOf(deps.storage, owner),
         party: { name: party.name, display_name: party.displayName, kind: party.kind, party_ref: partyRefOf(owner, party.name, deps.config.nodeId) },
         share: shareView(share),
         package: {
             name: pkg, title: d?.title || pkg, description: d?.description ?? null, licence,
+            // The licence's deed, who to credit, and the words per language the page shows.
+            licence_url: d?.licenses?.[0]?.path ?? (licence ? licenceUrlOf(licence) ?? null : null),
+            attribution: a.attribution ?? null,
+            ...(a.i18n ? { i18n: a.i18n } : {}),
             resources: (d?.resources ?? []).map(r => ({ name: r.name, rows: r.rowCount, fields: r.schema.fields.length })),
             freshness: f ? { state: f.state, schedule: f.promise?.cron ?? null, timezone: f.promise?.timezone ?? null, on_change: f.trigger === 'change', last_success_at: f.last_success_at } : null,
         },

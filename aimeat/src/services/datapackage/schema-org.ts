@@ -14,12 +14,14 @@
  * @structure schemaOrgDataset
  * @usage const doc = schemaOrgDataset({ baseUrl, siteName, ownerName, descriptor, descriptorUrl, audience, landingUrl });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — `license` is the licence deed's URL for a licence this node knows (WP10e A3).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.4).
  */
 import { bare, type Descriptor } from './contract.js';
 import { csvUrlOf } from './catalogue-facts.js';
 import { datasetDescriptionOf } from './dcat.js';
 import { licenseOf } from './version-audience.js';
+import { licenceUrlOf } from './licences.js';
 
 export interface SchemaOrgInput {
   baseUrl: string;
@@ -40,7 +42,8 @@ export interface SchemaOrgInput {
 export function schemaOrgDataset(input: SchemaOrgInput): Record<string, unknown> {
   const { descriptor: d, descriptorUrl, ownerName } = input;
   const base = input.baseUrl.replace(/\/+$/, '');
-  const license = licenseOf(d);
+  // schema.org `license` is a URL or a CreativeWork: the deed for a licence this node knows.
+  const license = licenceUrlOf(licenseOf(d)) ?? licenseOf(d);
   const keywords = [...new Set(['data-package', d.name, ...d.resources.map(r => r.name)])];
   return {
     '@context': 'https://schema.org',

@@ -11,6 +11,7 @@
  *   answer, moves to `__Host-aimeat_rt`; plain http keeps the old name; the `__Host-` cookie refreshes.
  * @usage pnpm exec vitest run test/unit/legacy-refresh-cookie-planted.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-01 — The recorder keeps the refresh cookies only, not the session hint beside them (WP10e B15).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -23,6 +24,7 @@ import { generateKeyPair } from '../../src/auth/keypair.js';
 import { initNodeKeys } from '../../src/auth/jwt.js';
 import {
   establishOwnerSession, refreshOwnerSession, readRefreshCookie, hashToken, REFRESH_COOKIE, LEGACY_REFRESH_COOKIE,
+  SESSION_HINT_COOKIE,
 } from '../../src/services/owner-session.js';
 
 const DAY = 86_400_000;
@@ -40,7 +42,8 @@ function req(cookie: string, https = true): Request {
 function recorder() {
   const set: Array<{ name: string; value: string }> = [];
   const res = {
-    cookie(name: string, value: string) { set.push({ name, value }); return res; },
+    // The refresh cookies only: the readable session hint beside them carries no token (WP10e B15).
+    cookie(name: string, value: string) { if (name !== SESSION_HINT_COOKIE) set.push({ name, value }); return res; },
     clearCookie() { return res; },
   };
   return { res: res as unknown as Response, set };

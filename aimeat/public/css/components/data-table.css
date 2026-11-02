@@ -7,6 +7,9 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.4.0 — 2026-11-01 — .data-table-grow (one column takes the free room) and .data-table--nowrap
+ *     (cells keep one line); a stacked cell counts its padding inside its width, so a phone row no
+ *     longer runs past the page (WP10e B8, B11).
  *   v1.3.0 — 2026-11-01 — .data-table--form (cells that hold controls) and .data-table--stack (one block
  *     per row at 560px and narrower, each cell labelled with its head); additive (WP9c).
  *   v1.2.0 — 2026-09-28 — .data-table-wrap: a table wider than the page scrolls sideways instead of
@@ -73,6 +76,10 @@
 .data-table--form tr:hover td { background: none; }
 .data-table--form td > .og-input, .data-table--form td > .select-field { box-sizing: border-box; width: 100%; min-width: 6rem; }
 .data-table--form td > .check { margin: 0; }
+/* The column that takes the room the others leave (DataTable grow): a description field. */
+.data-table-grow { width: 45%; }
+/* Cells that keep one line (DataTable nowrap): a preview of rows, which scrolls sideways in its box. */
+.data-table--nowrap th, .data-table--nowrap td { white-space: nowrap; }
 
 /* The stacking table (DataTable stack): on a phone each row is one block and each cell carries its
    column head as a label (data-label), in the listing's label face (listing.css list--labels). */
@@ -80,7 +87,8 @@
   .data-table--stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .data-table--stack, .data-table--stack tbody, .data-table--stack tr, .data-table--stack td { display: block; width: 100%; }
   .data-table--stack tr { padding: 6px 0; border-bottom: 1px solid var(--border); }
-  .data-table--stack td { padding: 4px 10px; border-bottom: 0; }
+  .data-table--stack td { box-sizing: border-box; padding: 4px 10px; border-bottom: 0; }
+  .data-table--stack .data-table-grow { width: 100%; }
   .data-table--stack td:empty { display: none; }
   .data-table--stack td[data-label]::before {
     content: attr(data-label); display: block; margin-bottom: 2px;

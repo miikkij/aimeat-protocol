@@ -28,6 +28,9 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — WP10e: `licenses[]` names the deed and the licence's name (./licences.ts); a version's
+ *     row count and bytes in the history are the sum over its resources, not the first one's; a publish
+ *     that points the package back at bytes it had earlier records that return (./version-returns.ts).
  *   2026-11-01 — The personal-data guard reads the confirmation the service recorded on the audience
  *     record, not the pointer's (WP9e, plan D1.7).
  *   2026-11-01 — openPackage, and a publish of the same bytes after a withdrawal, take the withdrawal
@@ -104,6 +107,8 @@ import {
     publicUrl, resourceKey, resourcePath, validateName, RESOURCE_NAME_RE,
 } from './contract.js';
 import { inferSchema, toCsv, fromCsv, validateRows, type ValidationIssue } from './table.js';
+import { frictionlessLicence } from './licences.js';
+import { recordVersionReturn, readVersionReturns } from './version-returns.js';
 import { linkSourceImages } from './images.js';
 import { checkAudienceWrite } from '../audience-write.js';
 import {
@@ -301,7 +306,7 @@ export async function publishPackage(
         ...(input.title ? { title: input.title } : {}),
         ...(input.description ? { description: input.description } : {}),
         ...(input.keywords?.length ? { keywords: input.keywords } : {}),
-        ...(input.provenance?.license ? { licenses: [{ name: input.provenance.license }] } : {}),
+        ...(input.provenance?.license ? { licenses: [frictionlessLicence(input.provenance.license)] } : {}),
         created: now,
         aimeat: {
             packageId: packageId(ownerName, input.name),
@@ -388,6 +393,11 @@ export async function publishPackage(
             ...(personalPublicConfirmed ? { personalPublicConfirmed } : {}),
         });
         if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
+        // Bytes the package had earlier, and it stood on other bytes a moment ago: the history gets a
+        // row for the return, so its newest row is the version the package stands on (./version-returns.ts).
+        if (previous?.contentHash && bare(previous.contentHash) !== bare(contentHash)) {
+            await recordVersionReturn(storage, ownerGhii, input.name, contentHash, previous.contentHash);
+        }
         // The run succeeded, so the package's freshness moved: the owner's open pages re-read (D6).
         emitChange(DATAPACKAGES_DOMAIN, ownerGhii);
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
@@ -657,10 +667,20 @@ export interface VersionEntry {
     current: boolean;
     /** The mandatory explanation. It is the reason a history is readable rather than a list of hashes. */
     changes: string;
+    /** Rows and bytes over every resource of the version. */
     rowCount: number;
     bytes: number;
+    /** How many resources (tables) the version has. */
+    resources: number;
     descriptorUrl: string;
     supersedes?: string;
+    /** The producer kind, and for a data product build its sources, so a page can say the version's
+     *  note in its own language from facts rather than show the English `changes`. */
+    producer?: string;
+    sources?: Array<{ id: string; kind: string }>;
+    /** Present on a row that records the package coming back to these bytes (./version-returns.ts):
+     *  the version it left. The row's `at` is when it came back. */
+    returnedFrom?: string;
 }
 
 /**
@@ -706,19 +726,43 @@ export async function listVersions(
             throw new Error(`datapackage "${name}": the descriptor at ${f.key} is not readable JSON, so the `
                 + 'version history cannot be listed honestly', { cause: err });
         }
-        const resource = descriptor.resources?.[0];
+        const resources = descriptor.resources ?? [];
+        const a = descriptor.aimeat;
         out.push({
-            contentHash: descriptor.aimeat.contentHash,
+            contentHash: a.contentHash,
             at: f.createdAt,
-            current: bare(descriptor.aimeat.contentHash) === bare(currentHash),
-            changes: descriptor.aimeat.changes,
-            rowCount: resource?.rowCount ?? 0,
-            bytes: resource?.bytes ?? 0,
+            current: false,
+            changes: a.changes,
+            rowCount: resources.reduce((n, r) => n + (r.rowCount ?? 0), 0),
+            bytes: resources.reduce((n, r) => n + (r.bytes ?? 0), 0),
+            resources: resources.length,
             descriptorUrl: publicUrl(deps.config.baseUrl, ownerGhii, f.key),
-            ...(descriptor.aimeat.supersedes ? { supersedes: descriptor.aimeat.supersedes } : {}),
+            ...(a.supersedes ? { supersedes: a.supersedes } : {}),
+            ...(a.producer?.kind ? { producer: a.producer.kind } : {}),
+            ...(a.producer?.kind === 'dataproduct' && a.sources?.length
+                ? { sources: a.sources.map(s => ({ id: String(s.id ?? ''), kind: String(s.kind ?? '') })) } : {}),
         });
     }
-    return out.sort((a, b) => b.at.localeCompare(a.at));
+    // A return to earlier bytes is a row of its own, at the time it came back (./version-returns.ts).
+    const listed = new Map(out.map(v => [bare(v.contentHash), v]));
+    for (const r of await readVersionReturns(deps.storage, ownerGhii, name)) {
+        const same = listed.get(bare(r.contentHash));
+        if (same) out.push({ ...same, at: r.at, ...(r.from ? { returnedFrom: r.from } : {}) });
+    }
+    out.sort((x, y) => y.at.localeCompare(x.at));
+    // A return made before returns were recorded: the package stands on bytes older than its newest
+    // version, and the pointer moved after that version landed. The pointer's time is the return's.
+    const standing = out.find(v => bare(v.contentHash) === bare(currentHash));
+    const newest = out[0];
+    if (standing && newest && standing !== newest && bare(newest.contentHash) !== bare(currentHash)
+        && pointer?.updatedAt && pointer.updatedAt > newest.at) {
+        out.unshift({ ...standing, at: pointer.updatedAt, returnedFrom: newest.contentHash });
+    }
+    // The newest row of the version the package stands on is the current one; an earlier row of the
+    // same bytes is history.
+    const cur = out.find(v => bare(v.contentHash) === bare(currentHash));
+    if (cur) cur.current = true;
+    return out;
 }
 
 /** `pkg:{owner}/{name}` or `pkg:{owner}/{name}@sha256:…`, or the bare `{name}` of your own. */

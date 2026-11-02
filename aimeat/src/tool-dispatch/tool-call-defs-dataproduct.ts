@@ -6,6 +6,7 @@
  *   MCP: a thin proxy over /v1/dataproducts, one REST call per action, so the words, the source checks
  *   and the publish are the node's answer here too. Nothing in this file decides anything.
  * @version-history
+ *   v1.3.0 — 2026-11-01 — `attribution` and `i18n` pass through to define and a draft preview (WP10e).
  *   v1.2.0 — 2026-11-01 — action "describe" → POST /v1/dataproducts/{name}/describe, with `lang` (WP9c).
  *   v1.1.0 — 2026-11-01 — `retention` passes through to define and a draft preview (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
@@ -14,7 +15,7 @@ import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.j
 import { requiredString } from './tool-call-helpers.js';
 
 /** The definition fields PUT /v1/dataproducts/{name} and a draft preview read from the body. */
-const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'sources', 'combine', 'columns', 'filter', 'schedule', 'retention', 'visibility', 'confirm_personal_public'] as const;
+const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'attribution', 'i18n', 'sources', 'combine', 'columns', 'filter', 'schedule', 'retention', 'visibility', 'confirm_personal_public'] as const;
 
 export const dataProductCliTools: ConnectCliToolDefinition[] = [
     {

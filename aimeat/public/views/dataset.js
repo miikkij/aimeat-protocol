@@ -14,9 +14,15 @@
  *   package nobody without an account may read answers 404 here as there; the shell gave its head
  *   (title, description, the schema.org Dataset) only for a public one (routes/portal.ts).
  *   Made of the component kit: it passes data and never a class.
- * @structure Dataset (default) · open · producerWords · bytesWords
+ * @structure Dataset (default) · open · producerWords · bytesWords · leadOf
  * @usage routed at /v1/dataset/<owner>/<name> by spa.html
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The description is Markdown (its first paragraph is the head, the whole under
+ *     "About this data"); the title, description and attribution are the reader's language; a Licence
+ *     section names the licence as a link to its deed, what it lets a reader do and who to credit; the
+ *     version notes and transformations are said in the page's language; the newest version is the
+ *     newest row; "Ask for access" is gone from an open package, and the maker is not asked to message
+ *     themselves (WP10e A1-A4, B3, B4).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b).
  */
 import { h } from 'preact';
@@ -34,7 +40,11 @@ import { Note } from '/components/Note.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Beside, Stack } from '/components/Layout.js';
 import { AskPage } from '/components/AskPage.js';
+import { Markdown } from '/components/Markdown.js';
+import { getOwner } from '/js/services/auth.js';
 import { d, freshWord, versionNumber } from './profile/offers/data-model.js';
+import { wordsOf, licenceOf, versionNote, transformWords, shortLicence } from './profile/offers/data-words.js';
+import { LicenceNote } from './profile/offers/data-licence.js';
 import { ConnectSteps } from './profile/offers/data-connect.js';
 import { ColumnsTab } from './profile/offers/data-product.js';
 
@@ -81,36 +91,44 @@ export default function Dataset() {
   const resources = desc.resources || [];
   const rows = resources.reduce((n, r) => n + (r.rowCount || 0), 0);
   const bytes = resources.reduce((n, r) => n + (r.bytes || 0), 0);
-  const title = desc.title || desc.name || name;
+  // The words in the reader's language, the base ones where a language is missing.
+  const words = wordsOf(desc);
+  const title = words.title || desc.name || name;
   const fresh = pkg.freshness;
-  const licence = desc.licenses?.[0]?.name || a.license || '';
+  const licence = licenceOf(desc);
   // The maker's account on this node, from the descriptor's permanent address (/v1/pub/<owner>@<node>/…).
   const pub = /\/v1\/pub\/([^/]+)\//.exec(pkg.descriptor_url || '');
   const ghii = pub ? decodeURIComponent(pub[1]) : owner;
   const ask = `/v1/profile?tab=messages&to=${encodeURIComponent(ghii)}&subject=${encodeURIComponent(p('askSubject', { title }))}`;
+  // The maker reading their own page is not offered a message to themselves.
+  const isMaker = getOwner() === owner;
   const current = versions.find((v) => v.current) || versions[0];
   const sources = a.sources || [];
   const transformations = a.transformations || [];
+  const lead = leadOf(words.description);
+  // The head shows the first paragraph; "About this data" the rest, so nothing is said twice.
+  const rest = restOf(words.description);
+  const more = !!rest;
 
   const strip = html`<${FigureStrip} items=${[
     { key: 'maker', n: owner, label: p('maker'), sub: producerWords(a.producer) },
     { key: 'fresh', n: fresh ? freshWord(fresh.state) : p('noFresh'), label: p('freshness'), tone: fresh && ['late', 'stale'].includes(fresh.state) ? 'notice' : undefined,
       sub: fresh?.last_success_at ? p('updated', { date: fmtDate(fresh.last_success_at) }) : '' },
     { key: 'size', n: p('rows', { n: num(rows) }), label: p('size'), sub: bytes ? p('csvSize', { size: bytesWords(bytes) }) : '' },
-    { key: 'licence', n: licence || p('noLicence'), label: p('licence'), sub: p('licenceSub') },
+    { key: 'licence', n: licence ? shortLicence(licence) : p('noLicence'), label: p('licence'), sub: licence ? p('licenceSub') : '' },
   ]} />`;
 
   const side = html`<${Stack} gap="large">
     <${Actions}><${Loud} href="#dataset-use">${p('openExcel')}<//><//>
     <${Box} name=${p('howMade')}>
       <${Note}>${p('howMadeText', { producer: producerWords(a.producer) || p('producer.manual'), sources: sources.length, changes: transformations.length, versions: versions.length })}<//>
-      ${transformations.slice(0, 3).map((tr, i) => html`<${Note} key=${i} kind="quiet">${tr.what}<//>`)}
+      ${transformations.slice(0, 3).map((tr, i) => html`<${Note} key=${i} kind="quiet">${transformWords(tr.what)}<//>`)}
       <${Actions}><${Action} small href=${pkg.descriptor_url} newTab>${p('provenance')}<//><//>
     <//>
-    <${Box} name=${p('needMore')}>
-      <${Note}>${p('needMoreText')}<//>
-      <${Actions}><${Action} small href=${ask}>${p('askAccess')}<//><//>
-    <//>
+    ${isMaker ? null : html`<${Box} name=${p('askMaker')}>
+      <${Note}>${p('askMakerText')}<//>
+      <${Actions}><${Action} small href=${ask}>${p('askMakerDo')}<//><//>
+    <//>`}
     <${Box} name=${p('machine')}>
       <${Actions}>
         <${Action} small tone="file" href=${pkg.descriptor_url} newTab>datapackage.json<//>
@@ -122,19 +140,45 @@ export default function Dataset() {
 
   return html`<${PageFrame}>
     <${SettingsPage} name="dataset" crumb=${[p('catalogue'), title]}
-      title=${title} desc=${desc.description || p('noDescription')} strip=${strip}>
+      title=${title} desc=${lead || p('noDescription')} strip=${strip}>
       <${Beside} side=${side}>
-        <${Section} first id="dataset-use" title=${p('use')}>
+        ${more ? html`<${Section} first id="dataset-about" title=${p('about')}>
+          <${Markdown} text=${rest} />
+        <//>` : null}
+        <${Section} first=${!more} id="dataset-use" title=${p('use')}>
           <${ConnectSteps} owner=${owner} name=${name} pkg=${pkg} variant="public" title=${title} />
+        <//>
+        <${Section} id="dataset-licence" title=${p('licence')}>
+          <${LicenceNote} licence=${licence} attribution=${words.attribution} />
         <//>
         <${Section} id="dataset-columns" title=${p('columns')}>
           <${ColumnsTab} descriptor=${desc} head=${[p('colName'), p('colType'), p('colDesc')]} />
         <//>
         <${Section} id="dataset-versions" title=${p('versions')}>
-          ${versions.length ? html`<${Note}>${p('versionsText', { n: versionNumber(versions, current?.contentHash), date: current?.at ? fmtDate(current.at) : '' })}<//>` : null}
-          ${versions.slice(0, 5).map((v) => html`<${Note} key=${v.contentHash} kind="quiet">${p('versionLine', { n: versionNumber(versions, v.contentHash), date: v.at ? fmtDate(v.at) : '', changes: v.changes || '' })}<//>`)}
+          ${current ? html`<${Note}>${p('versionsText', { n: versionNumber(versions, current), date: current.at ? fmtDate(current.at) : '' })}<//>` : null}
+          ${versions.slice(0, 5).map((v, i) => html`<${Note} key=${v.contentHash + i} kind="quiet">${p('versionLine', { n: versionNumber(versions, v), date: v.at ? fmtDate(v.at) : '', changes: versionNote(v, versions) })}<//>`)}
         <//>
       <//>
     <//>
   <//>`;
 }
+
+/** The paragraphs of a Markdown text. */
+const paragraphsOf = (md) => String(md || '').replace(/\r\n?/g, '\n').split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+/** The index of the paragraph the head shows: the first that is not a heading. */
+const leadIndex = (parts) => Math.max(0, parts.findIndex((s) => !/^#{1,6}\s/.test(s)));
+
+/** The Markdown after the head's paragraph, or '' when the description is that paragraph alone. */
+function restOf(md) {
+  const parts = paragraphsOf(md);
+  const i = leadIndex(parts);
+  return [...parts.slice(0, i), ...parts.slice(i + 1)].join('\n\n');
+}
+
+/** The first paragraph of a Markdown description as plain words, for the page head. */
+function leadOf(md) {
+  const parts = paragraphsOf(md);
+  const first = parts[leadIndex(parts)] || '';
+  return first.replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[*_`]+/g, '').replace(/\s+/g, ' ').trim();
+}
+

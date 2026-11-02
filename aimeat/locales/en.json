@@ -4350,6 +4350,7 @@
           "save": "Save", "cancel": "Cancel", "saved": "The notification is recorded.", "failed": "The notification was not saved."
         },
         "notYet": "not yet",
+        "recital": "recital {n}",
         "aside": "This is a reading of the regulation, not a legal opinion. The notification is made before the intermediation starts, and no licence is needed. In Finland, Traficom confirms a notification on request within a week. This section is also in the Compliance printout.",
         "print": { "mode": "Mode", "finding": "Finding", "regulation": "Regulation", "decision": "Decision" }
       },
@@ -5418,6 +5419,21 @@
     },
     "day": { "0": "Sunday", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday" },
     "kind": { "records": "Workspace records", "app": "App data", "memory": "Agent or workflow result", "extension": "Extension action", "file": "File", "datapackage": "Another data product" },
+    "kindShort": { "records": "records", "app": "app data", "memory": "memory", "extension": "extension", "file": "file", "datapackage": "data product" },
+    "note": {
+      "built": "Built from {sources}: {rows} {tables}.",
+      "rows": "{n} rows", "rows_one": "{n} row",
+      "tables": "in {n} tables", "tables_one": "in one table",
+      "returned": "Back to the rows of version {version}."
+    },
+    "transform": {
+      "renamed": "renamed {from} to {to}",
+      "kept": "kept the rows where {column} {op} {value}",
+      "opIn": "is one of",
+      "personalOut": "left out {column}, which the data map marks personal",
+      "union": "the rows of {ids} in one table",
+      "join": "joined {right} to {left} on {key}"
+    },
     "combine": {
       "title": "How {ids} are combined",
       "tables": "As their own tables", "tablesHint": "The package holds one table per source. Power BI sees each one, and you can join them there.",
@@ -5513,7 +5529,16 @@
       "download": "Download the connection file", "instructions": "Instructions: Power BI, Excel, DuckDB",
       "rotate": "Change the key", "decline": "I no longer need this",
       "rotateWhy": "If the key gets into the wrong hands, change it here. The old key stops working at once.",
-      "rotateLater": "When you have the key, you can change it here at any time.",
+      "rotateLater": "When you have the key, you can change it here at any time. After you leave this page, open the link again and change it with the user and the key from your connection file.",
+      "rotateConfirm": "Change the key? The key you have now stops working at once, also in your programs. Put the new key into them.",
+      "rotateYes": "Change the key",
+      "rotateNo": "Keep the key",
+      "byKeyTitle": "Change the key",
+      "byKeyLead": "Do you have the key already? Give the user and the key from your connection file, and you get a new key. The old key stops working at once.",
+      "byKeyUser": "User",
+      "byKeyKey": "Key",
+      "byKeyWrong": "The user or the key is not right. Check them in your connection file.",
+      "byKeyAfter": "The key is shown only now. Put it into your programs and your connection file in place of the old key.",
       "declineConfirm": "End the share? Your key stops working at once, and {owner} sees that you ended it. Copies you already downloaded stay with you.",
       "declineYes": "End the share", "declineNo": "Keep it",
       "endedTitle": "The share has ended", "ended": "You ended the share of \"{title}\". {owner} sees that you no longer need it.",
@@ -5530,7 +5555,9 @@
     "dataset": {
       "catalogue": "Data catalogue", "noDescription": "A data table you can open in Excel, Power BI or your own code.",
       "maker": "Made by", "freshness": "Freshness", "noFresh": "Not stated", "updated": "last updated {date}",
-      "size": "Size", "rows": "{n} rows", "rows_one": "{n} row", "csvSize": "CSV, {size}", "licence": "Licence", "noLicence": "Not given", "licenceSub": "the terms of use",
+      "size": "Size", "rows": "{n} rows", "rows_one": "{n} row", "csvSize": "CSV, {size}", "licence": "Licence", "noLicence": "Not given", "licenceSub": "the licence terms below",
+      "about": "About this data", "attribution": "Credit the source like this", "noLicenceText": "The maker gave no licence. Ask the maker before you use the data.",
+      "askMaker": "Questions?", "askMakerText": "Ask the maker about the data, or ask for more frequent updates.", "askMakerDo": "Write to the maker",
       "producer": {
         "extension": "collected by the extension {ref}", "workflow": "made by the workflow {ref}", "agent": "made by an agent",
         "app": "made by the app {ref}", "dataproduct": "built as a data product", "manual": "published by hand"
@@ -5547,7 +5574,8 @@
       "failed": "The dataset could not be read. Try again in a moment."
     },
     "origin": {
-      "sources": "Sources", "combine": "Combined", "transformations": "What was changed", "lineage": "Built from", "license": "Licence", "noLicense": "No licence given", "producedBy": "Made by", "hash": "Content hash"
+      "sources": "Sources", "combine": "Combined", "transformations": "What was changed", "lineage": "Built from", "license": "Licence", "noLicense": "No licence given", "producedBy": "Made by", "hash": "Content hash",
+      "description": "Description", "attribution": "Credit the source like this"
     },
     "share": {
       "title": "Share by name", "doneTitle": "Shared", "who": "Who", "whoPlaceholder": "Matti", "whoHint": "Their name in your list: {name}",
@@ -5577,7 +5605,8 @@
       "theRecipient": "The recipient",
       "cancel": "Cancel", "submit": "Share", "submitSend": "Share and send the link", "close": "Done",
       "done": "Shared.", "failed": "The share was not made. Try again.",
-      "linkSent": "The link went to {email}. It works once, until {date}.",
+      "linkSent": "The link went to {email}. It works once, until {date}. You can also copy it here.",
+      "bought": "bought on EXCHANGE, on the terms of its listing",
       "linkManual": "This server sends no mail now, so the link did not go to {email}. Give them this link yourself. It works once.",
       "linkFailed": "The link was not sent to {email}. Give them the connection file yourself.",
       "copyLink": "Copy the link",
@@ -5629,6 +5658,14 @@
     "wizard": {
       "label": "New data product", "stepsLabel": "Steps", "back": "Back", "cancel": "Cancel", "working": "Working…", "failed": "That did not work. Read the message and try again.",
       "needName": "Give the product an address name in step 3.", "publish": "Publish",
+      "why": {
+        "sources": "Add a source and fill in its fields first.",
+        "columns": "Choose at least one column that goes out.",
+        "name": "Give the product a name first.",
+        "invalid": "Some rows do not fit their column types. See the checks above.",
+        "audience": "Choose a narrower audience first: a source does not allow this one.",
+        "organism": "Choose the organism whose members may use it."
+      },
       "next": { "columns": "Next: columns", "preview": "Next: preview", "schedule": "Next: updates", "who": "Next: who may use it" },
       "colOut": "Name out", "colType": "Type", "colDesc": "Description",
       "sources": { "tab": "Sources", "title": "Where does the data come from?", "lead": "A data product can have several sources. Each one can be its own table in the package, or the sources combine into one table. You see only the sources you, your agents and your apps can read." },
@@ -5669,6 +5706,11 @@
       "personalNone": "No personal data goes out.", "personalIn": "Personal data goes out.",
       "aboutTitle": "Name and description", "name": "Name", "slug": "Address name", "slugHint": "Lowercase letters, digits and dashes. It becomes part of every address.",
       "desc": "Description", "keywords": "Keywords", "keywordsHint": "Separated by commas", "rebuild": "Build the preview again",
+      "descHint": "Headings, lists and links work: # Heading, - item, [text](address). An empty line starts a new paragraph.",
+      "attribution": "How to credit the source", "attributionHint": "Who a reader names when they use the data, e.g. \"Source: Finnish Medicines Agency Fimea\". The licence page shows it.",
+      "langLabel": "The language of these words", "lang": { "fi": "Suomi", "en": "English", "es": "Español" },
+      "langBase": "The base words, which a reader of any other language gets too",
+      "langOther": "Words in {lang}. A reader whose language is {lang} gets these; a field left empty shows the base words.",
       "odpsTitle": "The description machines read (ODPS 4.1, excerpt)", "noOdps": "The sheet shows once the preview passes its checks."
     },
     "sched": {
@@ -5694,6 +5736,7 @@
       "membersHint": "Every account of this server. No outside parties and no visitors from another server.",
       "publicHint": "Anyone, also search engines and the EU's data portals. Copies already downloaded cannot be called back.",
       "publicNote": "A public product cannot be made private for the copies already downloaded.",
+      "tooWide": "Source {source} allows at most \"{allowed}\". Choose that or a narrower audience, or widen who may read the source first.",
       "licence": "Licence", "licencePick": "Choose a licence",
       "sharesTitle": "Named shares", "newShare": "Add a share", "addShare": "Add", "noShares": "No named shares yet.",
       "noAccount": "The recipient needs no AIMEAT account. Each share is made when you publish, and its key is shown once on the next page.",
@@ -5706,7 +5749,7 @@
       "PARTY_STOPPED": "This party is stopped. Resume it in the Data Wallet first.",
       "VERSION_NOT_FOUND": "That version is no longer kept. Choose another one.",
       "NO_CHANGE_SIGNAL": "An extension source has no change the server can see. Choose a schedule in step 4.",
-      "AUDIENCE_WIDER_THAN_SOURCE": "Who may use it is wider than a source allows. Choose a narrower audience in step 5.",
+      "AUDIENCE_WIDER_THAN_SOURCE": "Source {source} allows at most \"{allowed}\". Choose that or a narrower audience under \"Who may use it\", or widen who may read the source first.",
       "PERSONAL_DATA_PUBLIC": "A public data product cannot carry personal data. Leave the personal columns out in step 2, or choose another audience.",
       "SOURCE_FAILED": "Source {source} could not be read. Try the sources again.",
       "SCOPE_DENIED": "You do not have the permission this needs.",
@@ -5714,15 +5757,28 @@
       "UNION_COLUMNS_MISMATCH": "The sources do not have the same columns, so they cannot be one table. Choose their own tables or a key.",
       "JOIN_DUPLICATE_KEY": "The key is not unique in a source. Choose another key column."
     },
-    "licence": { "ccBy": "CC BY 4.0", "cc0": "CC0", "contract": "Only on the terms of a contract" },
+    "licence": {
+      "ccBy": "CC BY 4.0", "cc0": "CC0", "contract": "Only on the terms of a contract",
+      "name": {
+        "ccBy": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+        "cc0": "CC0 1.0 Universal (CC0)",
+        "contract": "Only on the terms of a contract with the maker"
+      },
+      "rule": {
+        "ccBy": "You may copy, share and change this data for any purpose, also commercially. Credit the source, link to the licence and say what you changed.",
+        "cc0": "The maker has given up their rights: you may use this data for any purpose without asking and without crediting the source.",
+        "contract": "You may use this data only on the terms of a contract with the maker. Ask the maker."
+      }
+    },
     "done": {
       "addresses": "Addresses", "noPackage": "The package could not be read just now. Open the data product to see its addresses.",
       "shares": "Shares made", "showInOffers": "Open the data product", "tryTool": "Try with an outside tool", "shareMore": "Share with someone else"
     }
   },
   "exposure": {
-    "title": "What others can see of yours",
+    "title": "What of yours shows outside",
     "intro": "Everything of yours that someone outside can read: anyone at all, anyone with a link, every account signed in here, or the members of one shared place. Close what should not be open.",
+    "introAi": "Your own AI reads the same list when you ask it \"who reads my data\".",
     "loading": "Reading what others can see…",
     "loadFailed": "The list could not be read just now. Try again in a moment.",
     "level": {
@@ -14602,6 +14658,12 @@
     "cfgDesc_consent_data_intermediation": "Whether this server passes data between others as a service. \"Report only\" changes nothing: it shows what it finds on the Compliance page.",
     "cfgDesc_consent_party_self_registration": "Whether an app may let people register without an account on this server. Always off on a server that shows its content to signed-in accounts only.",
     "cfgDesc_dataspace_enabled": "Opens this server to the connectors of EU data spaces. The trusted issuers are set one data space at a time.",
+    "cfgDesc_dataspace_auth": "How a participant proves who it is, separated by commas. dcp: a signed token from its did:web identity, the way real data spaces work. static: a shared token you give each participant, for a test lab. The default is dcp.",
+    "cfgDesc_dataspace_trusted_issuers": "The credential issuers each data space trusts: <data space>=<issuer DID>,<issuer DID>, and a semicolon between data spaces. A participant then shows a membership credential from one of them. Empty (the default): a participant that proves its DID is enough.",
+    "cfgDesc_dataspace_static_tokens_configured": "Whether shared tokens for the static method are set. They are given as <participant id>=<token>, a semicolon between participants, in the environment or the config file; the value is secret and not shown. Only for a test lab or the conformance test kit.",
+    "cfgDesc_dataspace_callback_origins": "Private addresses where a participant's callback may be, separated by commas, such as http://10.0.0.5:8083. Every other callback must be a public https address. Empty by default.",
+    "cfgDesc_dataspace_participant_id": "This server's participant id in a data space. Empty (the default): did:web of this server's public address, whose document is at /.well-known/did.json.",
+    "cfgDesc_dataspace_tck_mode": "Runs the Dataspace Protocol conformance test kit against this server: it adds the test kit's datasets and agreements and plays its scenarios. Works only on a test or sandbox server with a loopback address; a public server ignores it.",
     "cfgDesc_consent_share_max_days": "How long an owner may share a data product with a named outside party.",
     "dataOut": {
       "dspTitle": "Dataspace Protocol now",
@@ -14652,7 +14714,10 @@
       "dcatFeed": "Address",
       "dcatSub": "Public data products as a machine-readable list that avoindata.fi and data.europa.eu can read. It has no switch: a data product is on it while it is public.",
       "open": "Open",
-      "aside": "A server that aimeat init sets up starts with \"No intermediation\". Keep a public server on \"Report only\" until you have checked its activity and made the notification to the authority."
+      "aside": "A server that aimeat init sets up starts with \"No intermediation\". Keep a public server on \"Report only\" until you have checked its activity and made the notification to the authority.",
+      "installId": "Installation id",
+      "installIdSub": "the name of this installation, the end of every account address here; it cannot be changed",
+      "copy": "Copy"
     },
     "cfgGroup_ai": "AI: keys, models and the allowance",
     "cfgGroup_decide": "Decision model (TypeSafe)",

@@ -24,6 +24,7 @@
  * @usage
  *   const facts = (await allDatasetFacts(storage)).filter(f => f.audience === 'public');
  * @version-history
+ *   v1.2.0 — 2026-11-01 — DatasetFacts.i18n: the title and description per language (WP10e A2).
  *   v1.1.0 — 2026-11-01 — datasetLandingUrl names the public dataset page /v1/dataset/{owner}/{name}
  *     (board Julkinen-sivu); it named the public knowledge viewer, which shows no data package (WP9b).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.1, D1.3, D1.4).
@@ -63,6 +64,8 @@ export interface DatasetFacts {
   name: string;
   title: string;
   description?: string;
+  /** The title and description per language (ISO 639-1), beside the base ones. */
+  i18n?: Record<string, { title?: string; description?: string }>;
   keywords: string[];
   license?: string;
   /** The producer's cron schedule, when a schedule produces it. */
@@ -87,6 +90,7 @@ interface DatapackageBlock {
   title?: unknown;
   description?: unknown;
   license?: unknown;
+  i18n?: unknown;
   schedule?: unknown;
   producerKind?: unknown;
   resources?: Array<{ name?: unknown; rowCount?: unknown; fields?: unknown; bytes?: unknown; title?: unknown }>;
@@ -94,6 +98,18 @@ interface DatapackageBlock {
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v : undefined);
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+/** The manifest's per-language title and description, kept to two-letter codes and text values. */
+function i18nOf(v: unknown): Record<string, { title?: string; description?: string }> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out: Record<string, { title?: string; description?: string }> = {};
+  for (const [lang, w] of Object.entries(v as Record<string, unknown>)) {
+    if (!/^[a-z]{2}$/.test(lang) || !w || typeof w !== 'object') continue;
+    const t = str((w as Record<string, unknown>).title); const d = str((w as Record<string, unknown>).description);
+    if (t || d) out[lang] = { ...(t ? { title: t } : {}), ...(d ? { description: d } : {}) };
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 /** True for the catalogue manifest a data package publish writes (and not for a knowledge package). */
 export function isDataPackageManifest(rec: { key: string; tags?: readonly string[] }): boolean {
@@ -128,6 +144,7 @@ export function datasetFactsOf(rec: Pick<MemoryRecord, 'key' | 'ownerGaii' | 'va
     name: str(block?.name) ?? name,
     title: str(block?.title) ?? str(v?.name) ?? name,
     ...(str(block?.description) ? { description: str(block?.description) } : {}),
+    ...(i18nOf(block?.i18n) ? { i18n: i18nOf(block?.i18n) } : {}),
     keywords: [...new Set(keywords)],
     ...(str(block?.license) ? { license: str(block?.license) } : {}),
     ...(str(block?.schedule) ? { schedule: str(block?.schedule) } : {}),

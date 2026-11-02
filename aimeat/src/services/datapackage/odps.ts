@@ -34,6 +34,9 @@
  * @structure descriptorToOdps · odpsVisibilityOf
  * @usage const doc = descriptorToOdps({ descriptor, ownerGhii, baseUrl, resourceUrls, audience });
  * @version-history
+ *   v1.4.0 -- 2026-11-01 -- `details` carries one block per language the package states its title and
+ *     description in; the licence's definition names the licence, its deed and the attribution, and
+ *     x-aimeat.license states them as fields (WP10e A2, A3).
  *   v1.3.1 -- 2026-11-01 -- The pricingPlans comment says the sheet's reader fills it from a listing (plan D5.1).
  *   v1.3.0 -- 2026-11-01 -- The SLA cadence is the freshness promise (a data product's schedule wins over
  *     the producer's), and x-aimeat.freshness states the package's state now (plan doc-mvwxcas3dom3, D6.1).
@@ -49,6 +52,7 @@ import { stringify as yamlStringify } from 'yaml';
 import { ODPS_VERSION, ODPS_SCHEMA_URL_YAML } from '../exchange-odps.js';
 import { bare, type Descriptor } from './contract.js';
 import { freshnessBrief, type Freshness } from './freshness.js';
+import { licenceFacts, licenceUrlOf } from './licences.js';
 
 /**
  * A cron expression as an ODPS `updateFrequency` objective.
@@ -211,14 +215,29 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
         }
         : null;
 
+    // ODPS keys `details` by language: the package's own words per language take that language's block,
+    // and a field a language does not state keeps the base value.
+    const allDetails: Record<string, Record<string, unknown>> = { [lang]: details };
+    for (const [l, w] of Object.entries(a.i18n ?? {})) {
+        if (!/^[a-z]{2}$/.test(l) || (!w.title && !w.description)) continue;
+        allDetails[l] = { ...(allDetails[l] ?? details), ...(w.title ? { name: w.title } : {}), ...(w.description ? { description: w.description } : {}) };
+    }
+    const licence = a.license ? licenceFacts(a.license) : null;
+    const licenceUrl = a.license ? licenceUrlOf(a.license) : undefined;
+
     return {
         schema: ODPS_SCHEMA_URL_YAML,
         version: ODPS_VERSION,
         product: {
-            details: { [lang]: details },
+            details: allDetails,
             dataAccess,
             ...(input.pricingPlans ? { pricingPlans: input.pricingPlans } : {}),
-            ...(a.license ? { license: { scope: { definition: a.license } } } : {}),
+            // ODPS License `scope.definition` is one text: the licence's name and deed, and who to credit.
+            ...(a.license ? { license: { scope: { definition: [
+                licence ? licence.names.en : a.license,
+                licenceUrl && licenceUrl !== a.license ? `(${licenceUrl})` : '',
+                a.attribution ? `Attribution: ${a.attribution}` : '',
+            ].filter(Boolean).join(' ') } } } : {}),
             ...(input.dataHolder ? { dataHolder: input.dataHolder } : {}),
             ...(sla ? { SLA: sla } : {}),
             // Everything the closed enums cannot hold, stated rather than bent into a near-fit.
@@ -240,6 +259,9 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
                     fields: r.schema.fields.map(f => ({ name: f.name, type: f.type })),
                 })),
                 columns,
+                // The licence id, its deed and the attribution as fields, beside the one text above.
+                ...(a.license ? { license: { id: a.license, ...(licenceUrl ? { url: licenceUrl } : {}),
+                    ...(a.attribution ? { attribution: a.attribution } : {}) } } : {}),
                 ...(a.legalBasis ? { legalBasis: a.legalBasis } : {}),
                 ...(a.consentStatus ? { consentStatus: a.consentStatus } : {}),
                 ...(a.retention ? { retention: a.retention } : {}),

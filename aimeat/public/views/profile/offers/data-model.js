@@ -12,6 +12,8 @@
  *   shareSentence · keyNote
  * @usage import { d, freshWord, scheduleWords } from './data-model.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — versionNumber takes a row as well as a hash (a return to earlier bytes lists
+ *     them twice); the clock is "6.00", not "06.00" (WP10e B1, B3).
  *   v1.1.0 — 2026-11-01 — "When the source changes" in words; errText, shareSentence and keyNote say a
  *     refusal and a share's sentences in the page's language from the answer's code and facts (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a: the data products of the Offers page).
@@ -43,8 +45,8 @@ export function audienceWord(visibility, orgNames = {}) {
 }
 
 const pad = (n) => String(n).padStart(2, '0');
-/** "06:00" in the reader's clock for the hour and minute a cron names. */
-const clockOf = (h, m) => fmtTime(new Date(2026, 0, 5, Number(h), Number(m)), { hour: '2-digit', minute: '2-digit' });
+/** "6.00" (fi) or "06:00" (en-GB) in the reader's clock for the hour and minute a cron names. */
+const clockOf = (h, m) => fmtTime(new Date(2026, 0, 5, Number(h), Number(m)), { hour: 'numeric', minute: '2-digit' });
 
 /**
  * The schedule a cron names, as the wizard makes it: daily "M H * * *", weekly "M H * * D" (D 0-6,
@@ -83,13 +85,17 @@ export function cronFor({ freq, day, time }) {
   return `${m} ${hour} ${Math.min(28, Math.max(1, Number(day) || 1))} * *`;
 }
 
-/** The next run in the reader's format: "Mon 2.11. 06:00". */
-export const nextRunWords = (iso) => (iso ? fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'numeric' }) + ' ' + fmtTime(iso, { hour: '2-digit', minute: '2-digit' }) : '');
+/** The next run in the reader's format: "ma 3.11. 6.00". */
+export const nextRunWords = (iso) => (iso ? fmtDate(iso, { weekday: 'short', day: 'numeric', month: 'numeric' }) + ' ' + fmtTime(iso, { hour: 'numeric', minute: '2-digit' }) : '');
 
-/** The number of a version: the oldest kept is 1. */
-export function versionNumber(versions, hash) {
+/**
+ * The number of a row of the history (newest first): the oldest kept is 1. `which` is the row itself,
+ * or a content hash, which names its newest row: a package that came back to earlier bytes lists them
+ * twice, and the newest row is the one it stands on.
+ */
+export function versionNumber(versions, which) {
   const list = versions || [];
-  const i = list.findIndex((v) => v.contentHash === hash);
+  const i = typeof which === 'object' && which ? list.indexOf(which) : list.findIndex((v) => v.contentHash === which);
   return i < 0 ? list.length : list.length - i;
 }
 
@@ -101,7 +107,8 @@ export function versionNumber(versions, hash) {
 export function errText(err, fallbackKey) {
   const code = err?.code || err?.response?.error?.code;
   const key = code ? `dataout.err.${code}` : '';
-  const words = key ? t(key, { source: err?.response?.error?.details?.source || '', ...(err?.response?.error?.details || {}) }) : '';
+  const details = err?.response?.error?.details || {};
+  const words = key ? t(key, { source: details.source || '', ...details, ...(details.allowed ? { allowed: audienceWord(details.allowed) } : {}) }) : '';
   if (words && words !== key) return words;
   return err?.message || d(fallbackKey);
 }

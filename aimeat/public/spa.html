@@ -2132,11 +2132,17 @@
               // Its dialog has no "Create account" tab either: others come in by invitation (v31 K24).
               // The button carries a short form for a phone, which top-bar.css shows under 420px
               // ("Kirjaudu", Jouni 1.11 13.50). Both are locale strings, inserted as the button's HTML.
+              // Every other node's pill carries the same short form: "Kirjaudu / Rekisteröidy" and the
+              // look controls ran 120px past a 390px screen (WP10e B7), so on a phone it shows the
+              // short form and the look follows the device until the sign-in, as on a store-sold node.
               ...(customerNode() ? {
                 buttonText: '<span class="topnav-sign-full">' + t('siteStart.signInPill') + '</span>'
                   + '<span class="topnav-sign-short">' + t('siteStart.signInPillShort') + '</span>',
                 signInOnly: true,
-              } : {}),
+              } : {
+                buttonText: '<span class="topnav-sign-full">' + t('modal.signInBtn') + '</span>'
+                  + '<span class="topnav-sign-short">' + t('siteStart.signInPillShort') + '</span>',
+              }),
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               i18n: authI18n(),

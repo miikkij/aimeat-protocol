@@ -12,6 +12,10 @@
  * @structure ProductPage · SharesTab · VersionsTab · ColumnsTab · OriginTab
  * @usage html`<${ProductPage} ctx=${ctx} name=${name} />`
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The version notes and the transformations in the page's language; a return to
+ *     earlier bytes is its own row and the newest row is the current version; the Origin tab shows the
+ *     description (Markdown), the licence as a link to its deed and the attribution; the title is the
+ *     reader's language; the tab's body is a tab panel (WP10e A1-A3, B3, B4, B14, B17).
  *   v1.1.1 — 2026-11-01 — ColumnsTab is exported for the public dataset page (WP9b).
  *   v1.1.0 — 2026-11-01 — A product that runs when its source changes says so, with the run after a seen
  *     change; the shares to people on other AIMEAT nodes are readers too; refusals in the page's
@@ -26,7 +30,7 @@ import { num, ago, date as fmtDate } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
 import * as dp from '/js/services/dataproducts.js';
 import { FigureStrip } from '/components/FigureStrip.js';
-import { Tabs } from '/components/Tabs.js';
+import { Tabs, TabPanel } from '/components/Tabs.js';
 import { Box } from '/components/Box.js';
 import { List, Row, Name, Desc, Who, Num, When, Cell, Doors, Group } from '/components/List.js';
 import { Facts, FactLine } from '/components/Facts.js';
@@ -36,7 +40,9 @@ import { renderPage } from './frame.js';
 import { ConnectSteps } from './data-connect.js';
 import { ShareDialog } from './share-dialog.js';
 import { SellDialog } from './sell-dialog.js';
+import { Markdown } from '/components/Markdown.js';
 import { d, freshWord, scheduleWords, nextRunWords, versionNumber, productTitle, shortHash, audienceWord, errText } from './data-model.js';
+import { wordsOf, licenceOf, versionNote, transformWords, purposeWords } from './data-words.js';
 
 const TABS = ['shares', 'versions', 'columns', 'connect', 'origin'];
 
@@ -57,7 +63,7 @@ function SharesTab({ shares, onRevoke, busy }) {
     rows=${[...shares, { owner: true }]} render=${(s) => (s.owner
       ? html`<${Row} key="owner"><${Name} meta=${d('product.owner')}>${d('product.youAndAgents')}<//><${Who} /><${Doors} /><//>`
       : html`<${Row} key=${s.id}>
-        <${Name} meta=${[d('party.kind.' + s.party.kind), s.party.kind === 'visitor' ? s.recipient : '', s.purpose].filter(Boolean).join(' · ')}>${s.party.display_name}<//>
+        <${Name} meta=${[d('party.kind.' + s.party.kind), s.party.kind === 'visitor' ? s.recipient : '', purposeWords(s)].filter(Boolean).join(' · ')}>${s.party.display_name}<//>
         <${Who} sub=${s.last_read_at ? d('product.lastRead', { when: ago(s.last_read_at) }) : d('product.notRead')}>${d('product.until', { date: fmtDate(s.expires) })}<//>
         <${Doors}><${Action} small row tone="danger" disabled=${busy} onClick=${() => onRevoke(s)}>${d('product.revoke')}<//><//>
       <//>`)} />
@@ -72,9 +78,9 @@ function VersionsTab({ versions, retention }) {
       const sub = [use.pinned_by_shares?.length ? d('product.pinnedN', { n: use.pinned_by_shares.length }) : null,
         use.party_reads_30d ? d('product.reads30', { n: num(use.party_reads_30d) }) : null,
         use.removed_next ? d('product.removedNext') : null].filter(Boolean).join(' · ');
-      return html`<${Row} key=${v.contentHash} selected=${v.current}>
-        <${Name} meta=${shortHash(v.contentHash)} warn=${!!use.removed_next} tag=${v.current ? d('product.current') : null}>${d('product.versionN', { n: versionNumber(versions, v.contentHash) })}<//>
-        <${Desc} sub=${sub || undefined} lines=${2}>${v.changes}<//>
+      return html`<${Row} key=${v.contentHash + v.at} selected=${v.current}>
+        <${Name} meta=${shortHash(v.contentHash)} warn=${!!use.removed_next} tag=${v.current ? d('product.current') : null}>${d('product.versionN', { n: versionNumber(versions, v) })}<//>
+        <${Desc} sub=${sub || undefined} lines=${2}>${versionNote(v, versions)}<//>
         <${Num}>${num(v.rowCount)}<//>
         <${When}>${ago(v.at)}<//>
         <${Doors}><${Action} small row href=${v.descriptorUrl} newTab>${d('product.descriptor')}<//><//>
@@ -103,12 +109,16 @@ export function ColumnsTab({ descriptor, head }) {
 function OriginTab({ def, descriptor }) {
   const a = descriptor?.aimeat || {};
   const sources = a.sources || def?.sources || [];
+  const licence = licenceOf(descriptor);
+  const words = wordsOf(descriptor || def);
   return html`<${Facts} wide rows=${[
+    words.description && { k: d('origin.description'), v: html`<${Markdown} small text=${words.description} />` },
     { k: d('origin.sources'), v: sources.map((s) => html`<${FactLine} key=${s.id} sub=${s.address}>${s.id} · ${d('kind.' + s.kind)}${s.title ? ` · ${s.title}` : ''}<//>`) },
     def?.combine && { k: d('origin.combine'), v: d('combine.' + def.combine.mode) },
-    (a.transformations || []).length && { k: d('origin.transformations'), v: a.transformations.map((tr, i) => html`<${FactLine} key=${i}>${tr.what}<//>`) },
+    (a.transformations || []).length && { k: d('origin.transformations'), v: a.transformations.map((tr, i) => html`<${FactLine} key=${i}>${transformWords(tr.what)}<//>`) },
     (a.lineage || []).length && { k: d('origin.lineage'), v: a.lineage.join(', '), mono: true },
-    { k: d('origin.license'), v: a.license || descriptor?.licenses?.[0]?.name || d('origin.noLicense'), missing: !a.license },
+    { k: d('origin.license'), v: licence ? (licence.url ? html`<${Action} tone="link" href=${licence.url} newTab>${licence.name}<//>` : licence.name) : d('origin.noLicense'), missing: !licence },
+    words.attribution && { k: d('origin.attribution'), v: words.attribution },
     a.producedBy && { k: d('origin.producedBy'), v: a.producedBy.gaii, mono: true, sub: ago(a.producedBy.at) },
     a.contentHash && { k: d('origin.hash'), v: a.contentHash, mono: true },
   ]} />`;
@@ -151,7 +161,7 @@ export function ProductPage({ ctx, name, tab: initialTab, share: openShare }) {
   const fresh = pkg?.freshness;
   const current = versions.find((v) => v.current);
   const rows = (pkg?.descriptor?.resources || []).reduce((n, r) => n + (r.rowCount || 0), 0);
-  const title = productTitle({ title: def.title, name });
+  const title = productTitle({ title: wordsOf(def).title, name });
   const reads7 = shares.reduce((n, s) => n + (s.reads_7d || 0), 0);
 
   const run = async () => {
@@ -174,7 +184,7 @@ export function ProductPage({ ctx, name, tab: initialTab, share: openShare }) {
   }, { danger: true, title: d('product.revoke'), confirmLabel: d('product.revoke') });
 
   const line = [
-    current ? d('product.versionN', { n: versionNumber(versions, current.contentHash) }) : d('product.notPublished'),
+    current ? d('product.versionN', { n: versionNumber(versions, current) }) : d('product.notPublished'),
     scheduleWords(schedule || def.schedule),
     schedule?.next_run_at ? d('product.nextRun', { when: nextRunWords(schedule.next_run_at) })
       : nextChange ? d('product.nextChangeRun', { when: nextRunWords(nextChange) }) : null,
@@ -218,6 +228,6 @@ export function ProductPage({ ctx, name, tab: initialTab, share: openShare }) {
       ${fresh && ['late', 'stale'].includes(fresh.state) ? html`<${Note} kind="aside" size="small">${d('fresh.why.' + fresh.state)}<//>` : null}
       <${Tabs} kind="view" label=${d('product.tabsLabel')} value=${tab} onSelect=${setTab}
         items=${TABS.map((tb) => ({ value: tb, label: d('product.tab.' + tb), count: tb === 'shares' ? shares.length : tb === 'versions' ? versions.length : undefined }))} />
-      <${Box} tone="tabbed">${body}<//>`,
+      <${Box} tone="tabbed"><${TabPanel} value=${tab} label=${d('product.tab.' + tab)}>${body}<//><//>`,
   });
 }

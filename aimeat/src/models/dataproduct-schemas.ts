@@ -11,6 +11,7 @@
  *   DataProductBodySchema · DataProductRunBodySchema
  * @usage router.put('/v1/dataproducts/:name', ..., validateBody(DataProductBodySchema, config.nodeId), handler)
  * @version-history
+ *   v1.3.0 — 2026-11-01 — `attribution` and `i18n` (DataProductWordsSchema, DataProductI18nSchema; WP10e).
  *   v1.2.0 — 2026-11-01 — `schedule.on: "change"` (WP9c); the describe body (DataProductDescribeBodySchema).
  *   v1.1.0 — 2026-11-01 — `retention` { keep, unit } (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
@@ -55,11 +56,23 @@ export const DataProductRetentionSchema = z.object({ keep: z.number().int().min(
 
 export const DataProductVisibilitySchema = z.string().regex(/^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$/).max(INPUT_LIMITS.id);
 
+/** The words of a product in one language. */
+export const DataProductWordsSchema = z.object({
+    title: z.string().max(INPUT_LIMITS.title).optional(),
+    description: z.string().max(INPUT_LIMITS.description).optional(),
+    attribution: z.string().max(INPUT_LIMITS.line).optional(),
+}).strict();
+
+/** The words per language, keyed by a two-letter ISO 639-1 code (definition.ts caps the count). */
+export const DataProductI18nSchema = z.record(z.string().max(2).regex(/^[a-z]{2}$/), DataProductWordsSchema);
+
 export const DataProductBodySchema = z.object({
     title: z.string().max(INPUT_LIMITS.title).optional(),
     description: z.string().max(INPUT_LIMITS.description).optional(),
     keywords: z.array(name).max(20).optional(),
     license: name.optional(),
+    attribution: z.string().max(INPUT_LIMITS.line).optional(),
+    i18n: DataProductI18nSchema.optional(),
     sources: z.array(DataProductSourceSchema).min(1).max(10).optional(),
     combine: DataProductCombineSchema.optional(),
     columns: DataProductColumnsSchema.optional(),

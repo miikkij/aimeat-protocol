@@ -34,6 +34,9 @@
  * @usage
  *   import { buildDescriptor, contentHashOf, descriptorKey } from './contract.js';
  * @version-history
+ *   v1.7.0 -- 2026-11-01 -- AimeatBlock.attribution and AimeatBlock.i18n (title, description and
+ *     attribution per language), both inside the content hash; `licenses[]` carries the deed as `path`
+ *     and the name as `title` (./licences.ts; WP10e A2, A3).
  *   v1.6.0 -- 2026-11-01 -- LatestPointer.exchange: the package's EXCHANGE sale terms, the source its
  *     listing is projected from, kept on every later pointer (services/exchange-datapackage.ts; plan D5.1).
  *   v1.5.0 -- 2026-11-01 -- DATAPACKAGES_DOMAIN, the live change a publish and a withdrawal emit to the
@@ -81,6 +84,11 @@ export interface ResourceInput {
     description?: string;
 }
 
+/** The words of a package in one language. Every field is optional: a reader falls back to the base field. */
+export interface PackageWords { title?: string; description?: string; attribution?: string }
+/** The words of a package per language, keyed by an ISO 639-1 code (fi, en, es ...). */
+export type PackageI18n = Record<string, PackageWords>;
+
 /** The AIMEAT extension block — one root key, so a Frictionless reader that knows nothing about this
  *  node still parses the descriptor and simply carries an object it does not interpret. */
 export interface AimeatBlock {
@@ -109,6 +117,11 @@ export interface AimeatBlock {
     license?: string;
     supersedes?: string;
     retentionPolicy?: { keep: number; unit: 'versions' | 'months' };
+    /** Who to credit and how, in the maker's words (CC BY asks for it). Inside the content hash. */
+    attribution?: string;
+    /** The title, description and attribution per language (ISO 639-1), beside the base fields that
+     *  every reader falls back to. Inside the content hash; absent on every version before 2026-11-02. */
+    i18n?: PackageI18n;
     /**
      * The addressable `aimeat.provenance/v1` record for THIS version, when one was minted — an agent
      * publishing is model-touched output and TARGET-058 says that gets declared rather than inferred.
@@ -145,7 +158,9 @@ export interface Descriptor {
     description?: string;
     /** Frictionless `keywords`. Inside the content hash; absent on every version before 2026-11-01. */
     keywords?: string[];
-    licenses?: Array<{ name: string; path?: string }>;
+    /** Frictionless `licenses`: the id as `name`, the deed as `path` and its English name as `title`
+     *  when ./licences.ts knows the id (versions from 2026-11-02 on; earlier ones carry `name` only). */
+    licenses?: Array<{ name: string; path?: string; title?: string }>;
     created: string;
     aimeat: AimeatBlock;
 }
@@ -160,7 +175,7 @@ export interface PublishInput {
     keywords?: string[];
     producer?: Partial<AimeatBlock['producer']>;
     parameters?: Record<string, unknown>;
-    provenance?: Pick<AimeatBlock, 'sources' | 'lineage' | 'transformations' | 'legalBasis' | 'consentStatus' | 'retention' | 'license' | 'supersedes' | 'sourcesFetchedAt'>;
+    provenance?: Pick<AimeatBlock, 'sources' | 'lineage' | 'transformations' | 'legalBasis' | 'consentStatus' | 'retention' | 'license' | 'supersedes' | 'sourcesFetchedAt' | 'attribution' | 'i18n'>;
     retentionPolicy?: AimeatBlock['retentionPolicy'];
     /** What the caller said about how this was made (TARGET-058). Threaded to provenanceForWrite. */
     declaredProvenance?: unknown;
@@ -283,6 +298,10 @@ export function contentHashOf(descriptor: Omit<Descriptor, 'aimeat'> & { aimeat:
             retention: a.retention,
             license: a.license,
             retentionPolicy: a.retentionPolicy,
+            // Absent before 2026-11-02, so no earlier hash moves: the words a package carries per
+            // language and who to credit are part of what the version says.
+            attribution: a.attribution,
+            i18n: a.i18n,
         },
     };
     return 'sha256:' + createHash('sha256').update(stableStringify(canonical)).digest('hex');

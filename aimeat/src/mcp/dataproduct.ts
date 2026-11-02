@@ -13,6 +13,7 @@
  * @structure registerDataProductTool(mcp, config, storage, caller)
  * @usage registerDataProductTool(mcp, config, storage, caller);   // from registerCoreDataPackageTools
  * @version-history
+ *   v1.3.0 — 2026-11-01 — define and a draft preview take `attribution` and `i18n` (WP10e).
  *   v1.2.0 — 2026-11-01 — action "describe": a description draft by the owner's own AI (WP9c).
  *   v1.1.0 — 2026-11-01 — define and a draft preview take `retention` (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
@@ -32,7 +33,7 @@ import {
 } from '../services/dataproduct/service.js';
 import { describeProduct } from '../services/dataproduct/describe.js';
 
-const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'sources', 'combine', 'columns', 'filter', 'schedule', 'retention', 'visibility', 'confirm_personal_public'] as const;
+const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'attribution', 'i18n', 'sources', 'combine', 'columns', 'filter', 'schedule', 'retention', 'visibility', 'confirm_personal_public'] as const;
 
 export function registerDataProductTool(
     mcp: McpServer, config: AimeatConfig, storage: Storage,

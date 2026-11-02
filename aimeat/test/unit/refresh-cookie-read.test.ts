@@ -8,6 +8,8 @@
  *   host-locked, so a same-site app origin could write a Domain cookie of the same name that the apex
  *   read first (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  * @version-history
+ *   2026-11-01 — The session hint cookie is set and cleared with the refresh cookie, readable by the
+ *     page and holding no token (WP10e B15).
  *   2026-10-25 — https nodes: `__Host-aimeat_rt` with Path=/ and Secure; the old name inside the window
  *     only, never as a PAT, never as a duplicate; settleRefreshCookieWindowAtStart.
  *   2026-10-25 — Initial.
@@ -16,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import type { Request, Response } from 'express';
 import {
   readRefreshCookie, setRefreshCookie, clearRefreshCookie, legacyRefreshCookieAccepted,
-  settleRefreshCookieWindowAtStart, REFRESH_COOKIE, LEGACY_REFRESH_COOKIE,
+  settleRefreshCookieWindowAtStart, REFRESH_COOKIE, LEGACY_REFRESH_COOKIE, SESSION_HINT_COOKIE,
 } from '../../src/services/owner-session.js';
 import type { AimeatConfig } from '../../src/config.js';
 
@@ -88,25 +90,41 @@ describe('setRefreshCookie / clearRefreshCookie', () => {
   it('on https sets __Host-aimeat_rt with Path=/ and Secure, and clears the old name the browser sent', () => {
     const r = recorder();
     setRefreshCookie(withCookie('aimeat_rt=old', true), r.res, cfg, 'tok');
-    expect(r.set).toHaveLength(1);
-    expect(r.set[0].name).toBe(REFRESH_COOKIE);
+    const rt = r.set.filter(c => c.name !== SESSION_HINT_COOKIE);
+    expect(rt).toHaveLength(1);
+    expect(rt[0].name).toBe(REFRESH_COOKIE);
     expect(REFRESH_COOKIE).toBe('__Host-aimeat_rt');
-    expect(r.set[0].opts).toMatchObject({ path: '/', secure: true, httpOnly: true, sameSite: 'strict' });
-    expect(r.set[0].opts.domain).toBeUndefined();
+    expect(rt[0].opts).toMatchObject({ path: '/', secure: true, httpOnly: true, sameSite: 'strict' });
+    expect(rt[0].opts.domain).toBeUndefined();
     expect(r.cleared.map(c => [c.name, c.opts.path])).toEqual([[LEGACY_REFRESH_COOKIE, '/v1/auth']]);
   });
 
   it('on plain http keeps aimeat_rt with Path=/v1/auth', () => {
     const r = recorder();
     setRefreshCookie(withCookie(undefined), r.res, cfg, 'tok');
-    expect(r.set.map(c => [c.name, c.opts.path, c.opts.secure])).toEqual([[LEGACY_REFRESH_COOKIE, '/v1/auth', false]]);
+    expect(r.set.filter(c => c.name !== SESSION_HINT_COOKIE).map(c => [c.name, c.opts.path, c.opts.secure])).toEqual([[LEGACY_REFRESH_COOKIE, '/v1/auth', false]]);
     expect(r.cleared).toHaveLength(0);
   });
 
   it('clear on https ends both names', () => {
     const r = recorder();
     clearRefreshCookie(withCookie(undefined, true), r.res);
-    expect(r.cleared.map(c => c.name).sort()).toEqual([REFRESH_COOKIE, LEGACY_REFRESH_COOKIE].sort());
+    expect(r.cleared.map(c => c.name).filter(n => n !== SESSION_HINT_COOKIE).sort()).toEqual([REFRESH_COOKIE, LEGACY_REFRESH_COOKIE].sort());
+  });
+
+  // WP10e B15: the readable hint the auth library asks before a cookie-only restore. No secret, set and
+  // cleared with the refresh cookie, readable by the page (not httpOnly), on the whole site.
+  it('sets and clears the session hint with the refresh cookie, readable by the page, holding no token', () => {
+    for (const secure of [true, false]) {
+      const r = recorder();
+      setRefreshCookie(withCookie(undefined, secure), r.res, cfg, 'tok');
+      const hint = r.set.find(c => c.name === SESSION_HINT_COOKIE);
+      expect(hint?.value).toBe('1');
+      expect(hint?.opts).toMatchObject({ path: '/', httpOnly: false, secure, sameSite: 'lax' });
+      const c = recorder();
+      clearRefreshCookie(withCookie(undefined, secure), c.res);
+      expect(c.cleared.map(x => x.name)).toContain(SESSION_HINT_COOKIE);
+    }
   });
 });
 

@@ -16,6 +16,8 @@
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.7.0 — 2026-11-01 — The catalogue manifest carries the title and description per language
+ *     (i18nTitles), which DCAT states as language-tagged literals (WP10e A2).
  *   v1.6.3 — 2026-11-01 — readPointer takes the storage alone, as the freshness read without the config needs (plan D6).
  *   v1.6.2 — 2026-11-01 — writeLatest records the confirmation of a public package from personal data on
  *     the audience record, and carries the recorded one forward, not the earlier pointer's (WP9e, D1.7).
@@ -196,6 +198,8 @@ export async function upsertCatalogueEntry(
             ...(descriptor.title ? { title: descriptor.title } : {}),
             ...(descriptor.description ? { description: descriptor.description } : {}),
             ...(licenseOf(descriptor) ? { license: licenseOf(descriptor) } : {}),
+            // The title and description per language, for DCAT's language-tagged literals.
+            ...(i18nTitles(descriptor) ? { i18n: i18nTitles(descriptor) } : {}),
             ...(descriptor.aimeat.producer?.schedule ? { schedule: descriptor.aimeat.producer.schedule } : {}),
             producerKind: descriptor.aimeat.producer?.kind,
             resources: descriptor.resources.map(r => ({
@@ -235,6 +239,15 @@ export async function upsertCatalogueEntry(
     // A public version landed (a new one, or the package raised to public): its public page goes to
     // IndexNow, under the node's SEO switches (./announce.ts). In the background; it never fails this.
     if (visibility === 'public') announcePublicDataset(deps, descriptor.aimeat.packageId);
+}
+
+/** The title and description per language a version carries, without the attribution; undefined when none. */
+export function i18nTitles(descriptor: Descriptor): Record<string, { title?: string; description?: string }> | undefined {
+    const out: Record<string, { title?: string; description?: string }> = {};
+    for (const [lang, w] of Object.entries(descriptor.aimeat.i18n ?? {})) {
+        if (w?.title || w?.description) out[lang] = { ...(w.title ? { title: w.title } : {}), ...(w.description ? { description: w.description } : {}) };
+    }
+    return Object.keys(out).length ? out : undefined;
 }
 
 /** The licence a version names: the provenance block's, else the descriptor's first licence. */

@@ -2979,6 +2979,17 @@
     }
   }
 
+  // src/static/sdk-libs/auth/session-hint.js
+  function hasSessionHint() {
+    try {
+      return typeof document !== "undefined" && /(?:^|;\s*)aimeat_session_hint=1(?:;|$)/.test(document.cookie || "");
+    } catch (e) {
+      console.warn("[aimeat-auth] The cookie could not be read:", e && /** @type {Error} */
+      e.message);
+      return true;
+    }
+  }
+
   // src/static/sdk-libs/auth/session.js
   var currentSession = null;
   var refreshTimer = null;
@@ -3295,7 +3306,7 @@
   }
   async function restoreStoredSession(username) {
     const stored = load("session");
-    if (!stored) return await restoreSessionFromCookie();
+    if (!stored) return hasSessionHint() ? await restoreSessionFromCookie() : null;
     if (username && stored.owner !== username) return null;
     await migrateKeysToIndexedDB();
     if (stored.gaii) {
