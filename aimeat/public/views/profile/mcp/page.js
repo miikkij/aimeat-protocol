@@ -10,6 +10,8 @@
  * @structure renderPage · secRows · secSuggest
  * @usage import { renderPage } from './mcp/page.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-02 -- Connected is Home's rule: the proof, or an AI of the person's own that spoke over
+ *     MCP; the place's chat and the basic agents are not listed (crew64 first-timer round, 2.11).
  *   v2.1.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt names this server's MCP address, its button opens the connect steps) and the title's question mark, concept.connect (guidance part B).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip, the connected
@@ -62,21 +64,26 @@ import { secInstructions } from './instructions.js';
 
 export function renderPage(ctx) {
   const rows = ctx.rows;
-  const proven = !!ctx.proof?.passed;
+  // Connected means what Home's "Connect your AI" means (journey-state.ts): the proof prompt passed,
+  // or an AI of the person's own has spoken over MCP. The rows hold only those (frame.js buildRows),
+  // so an agent row is enough; before, a real connection read "not verified yet" beside Home's tick.
+  const outside = rows.find((r) => r.kind === 'agent') || null;
+  const proven = !!ctx.proof?.passed || !!outside;
+  const provenAt = ctx.proof?.passed ? ctx.proof.at : outside?.since;
   const latest = rows[0] || null;
   const on = ctx.proactive ? ctx.proactive.enabled !== false : true;
   const p = ctx.proactive;
 
   const strip = html`<${FigureStrip} items=${[
     { key: 'ais', n: rows.length, label: m('stripAis'), sub: rows.length ? rows.slice(0, 4).map((r) => r.tool).join(', ') : m('stripNone') },
-    { key: 'proof', n: proven ? m('stripProven') : m('stripNotYet'), tone: 'coral', label: proven ? m('stripProofOk') : m('stripProofPending'), sub: proven ? m('stripProvenSub', { date: day(ctx.proof.at) }) : m('stripNotYetSub') },
+    { key: 'proof', n: proven ? m('stripProven') : m('stripNotYet'), tone: 'coral', label: proven ? m('stripProofOk') : m('stripProofPending'), sub: proven ? m('stripProvenSub', { date: day(provenAt) }) : m('stripNotYetSub') },
     { key: 'last', n: latest ? rel(latest.when) : '–', label: m('stripLast'), sub: latest ? `${latest.tool} · ${latest.name}` : m('stripLastNone') },
     { key: 'suggest', n: on ? m('on') : m('off'), tone: 'coral', label: m('stripSuggest'), sub: p?.available_here === false ? m('stripSuggestOperator') : p?.set_by === 'ai' ? m('stripSuggestByAi') : p?.set_by === 'person' ? m('stripSuggestByYou') : m('stripSuggestDefault') },
   ]} />`;
 
   const marks = [
     rows.length ? { label: m('chipCount', { n: rows.length }) } : { label: m('chipNone'), tone: 'coral' },
-    proven ? { label: m('chipProven', { date: day(ctx.proof.at) }), tone: 'sun' } : { label: m('chipUnproven'), tone: 'coral' },
+    proven ? { label: m('chipProven', { date: day(provenAt) }), tone: 'sun' } : { label: m('chipUnproven'), tone: 'coral' },
     { label: on ? m('chipSuggestOn') : m('chipSuggestOff') },
   ];
 
@@ -88,7 +95,7 @@ export function renderPage(ctx) {
   return html`
     <${SettingsPage} name="mcp" crumb=${crumb()} title=${t('profile.tabs.mcp')} sub=${m('titleSub')} help="concept.connect" marks=${marks}
       desc=${`${m('desc')} ${proven ? m('descProven') : m('descNew')}`} actions=${actions} strip=${strip}
-      start=${html`<${PageStart} id="mcp" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${ctx.proof ? proven : null}
+      start=${html`<${PageStart} id="mcp" vars=${{ url: getNodeUrl() + '/v1/mcp' }} done=${ctx.proof || outside ? proven : null}
         action=${{ onClick: () => { if (proven) ctx.setFold('guide', true); scrollToSection('mcp-connect'); } }} />`}
       railTitle=${m('railTitle')}
       sections=${[
@@ -100,7 +107,7 @@ export function renderPage(ctx) {
       pagesLabel=${m('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${secRows(ctx, rows)}
-      ${secConnect(ctx, proven)}
+      ${secConnect(ctx, proven, provenAt)}
       ${secInstructions(ctx)}
       ${secSuggest(ctx, on)}
     <//>`;

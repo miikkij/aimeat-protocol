@@ -62,6 +62,16 @@ export function mayWord(agent) {
 }
 
 /**
+ * The place's own chat ("chat") and the basic agents every account starts with (tag crew.basic) call
+ * MCP from the start: the node talking to itself, never an AI the person connected. The same rule as
+ * the server's isOutsideMcpAgent (src/services/journey-state.ts, node-resident-agent.ts), which ticks
+ * Home's "Connect your AI", so the page and Home count the same AIs.
+ */
+export function isNodeResident(a) {
+  return !!a && (a.name === 'chat' || String(a.gaii || '').startsWith('chat#') || (Array.isArray(a.tags) && a.tags.includes('crew.basic')));
+}
+
+/**
  * The rows the page lists. One per agent that has spoken over MCP (`mcp_last_seen` is set by the
  * MCP door alone), newest first; then the older per-tool session rows whose agent has not yet
  * earned its own row — either it has not connected since the per-agent mark shipped, or it has
@@ -71,12 +81,13 @@ export function mayWord(agent) {
 export function buildRows(agents, instances) {
   const byGaii = new Map((agents || []).map((a) => [a.gaii, a]));
   const agentRows = (agents || [])
-    .filter((a) => a.mcp_last_seen)
+    .filter((a) => a.mcp_last_seen && !isNodeResident(a))
     .map((a) => ({ kind: 'agent', id: a.gaii, agent: a, name: a.name, tool: toolLabel(a.mcp_client), when: a.mcp_last_seen, since: a.created_at }));
   const covered = new Set(agentRows.map((r) => r.id));
   const toolRows = (instances || [])
     .filter((ci) => String(ci.id || '').startsWith('mcp-') || String(ci.app_name || '').startsWith('mcp-'))
     .filter((ci) => !ci.agent_gaii || !covered.has(ci.agent_gaii))
+    .filter((ci) => !isNodeResident(byGaii.get(ci.agent_gaii) || { gaii: ci.agent_gaii }))
     .map((ci) => {
       const agent = ci.agent_gaii ? byGaii.get(ci.agent_gaii) || null : null;
       return { kind: 'tool', id: ci.id, agent, name: agent ? agent.name : (ci.agent_gaii ? ci.agent_gaii.split('#')[0] : ''), tool: toolLabel(ci.platform), when: ci.last_seen, since: ci.created_at, gone: !!ci.agent_gaii && !agent };
