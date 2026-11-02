@@ -30,6 +30,7 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.8.2 — 2026-11-02 — aimeat_files_write joins AI_PROVENANCE_REVIEWED_WITHOUT (the person's own SharePoint).
  *   v1.8.1 — 2026-10-21 — aimeat_dm_group_create joins AI_PROVENANCE_REQUIRED (group chat).
  *   v1.8.0 — 2026-10-16 — Assertion 8, label views (lib/check-ai-label-views.ts): every view that shows
  *     content a record describes draws AiLabel, and the routes that decide or carry the label still do.
@@ -326,6 +327,13 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // owner in person or the principal of their AI), which is the provenance an instruction needs; what
   // the agents then produce is written through aimeat_task_complete, which carries ai_provenance.
   'aimeat_goal_set',
+  // DECIDED, 2026-11-02 (the session that built the SharePoint connection; the developer reviews it
+  // with the build). The free text is a file's content, a file or folder name and a list row's fields,
+  // written to the person's OWN SharePoint or OneDrive through their own account; this node keeps none
+  // of it. A provenance record describes content this node stores or publishes, and here the node is a
+  // pipe to the person's own system, where Microsoft records the author (the signed-in account). A
+  // file kept on this node first carries its own provenance from the door that stored it.
+  'aimeat_files_write',
   // DECIDED, 2026-10-09 (the session that built document signing; the developer reviews it with the
   // build). The free text is a signing request's title and a short note to its parties: a label for
   // the document, which the request names by its hash and never stores. The provenance a signature

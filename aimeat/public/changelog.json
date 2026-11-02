@@ -4,6 +4,75 @@
     {
       "date": "2026-11-02",
       "kind": "feature",
+      "id": "2026-11-02-jira-and-confluence-ready-made",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Jira and Confluence, ready-made",
+        "fi": "Jira ja Confluence valmiina"
+      },
+      "summary": {
+        "en": "Connect Atlassian Cloud with one button or by asking your AI. There is no address to type.",
+        "fi": "Liitä Atlassian Cloud yhdellä napilla tai pyytämällä tekoälyltä. Osoitetta ei tarvitse kirjoittaa."
+      },
+      "body": {
+        "en": "Press \"Connect Atlassian (Jira, Confluence)\" on the MCP servers part of the Access page, or ask your AI to attach Atlassian. The node knows the address and the sign-in. On a group's or the node's server each person signs in with their own Atlassian account, so Atlassian's own permissions apply. Atlassian Cloud only.",
+        "fi": "Paina Pääsy-sivun MCP-palvelimien kohdassa \"Liitä Atlassian (Jira, Confluence)\" tai pyydä tekoälyäsi liittämään Atlassian. Node tietää osoitteen ja kirjautumistavan. Ryhmän tai noden palvelimelle jokainen kirjautuu omalla Atlassian-tilillään, joten Atlassianin omat oikeudet pätevät. Vain Atlassian Cloud."
+      }
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "feature",
+      "id": "2026-11-02-sharepoint-and-onedrive-from-your-ai",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "SharePoint and OneDrive from your AI",
+        "fi": "SharePoint ja OneDrive tekoälylläsi"
+      },
+      "summary": {
+        "en": "Your AI reads, keeps and writes files and list rows in SharePoint and OneDrive.",
+        "fi": "Tekoälysi lukee, tallentaa ja kirjoittaa tiedostoja ja listan rivejä SharePointissa ja OneDrivessä."
+      },
+      "body": {
+        "en": "Connect SharePoint and OneDrive on the Access page. Your AI finds sites, folders, files and lists, reads a Word, Excel or PDF file as text, keeps a copy as your own file and says where it came from. With the writing permission, which you connect separately, it saves files, makes folders and adds list rows. It sees only what you see there, and it cannot delete or share anything. No extra Microsoft licence is needed.",
+        "fi": "Liitä SharePoint ja OneDrive Pääsy-sivulla. Tekoälysi löytää sivustot, kansiot, tiedostot ja listat, lukee Word-, Excel- tai PDF-tiedoston tekstinä, tallentaa kopion omaksi tiedostoksesi ja kertoo, mistä se tuli. Kirjoitusluvalla, jonka liität erikseen, se tallentaa tiedostoja, tekee kansioita ja lisää listan rivejä. Se näkee vain sen, minkä sinäkin näet, eikä se voi poistaa tai jakaa mitään. Lisälisenssiä Microsoftilta ei tarvita."
+      }
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "feature",
+      "id": "2026-11-02-shared-mcp-servers-everyone-signs-in-with-their-own-account",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Shared MCP servers: everyone signs in with their own account",
+        "fi": "Jaettu MCP-palvelin: jokainen kirjautuu omalla tilillään"
+      },
+      "summary": {
+        "en": "On a server the node or a group shares, each person signs in with their own account.",
+        "fi": "Noden tai ryhmän jakamalle palvelimelle jokainen kirjautuu omalla tilillään."
+      },
+      "body": {
+        "en": "A server the node or a group offers can now hold no shared sign-in: each person signs in once with their own account at the service, so its own permissions and audit trail apply to each person. The Access page shows whether you have signed in, with buttons to sign in and sign out, and your AI does the same. A group's server is now also reachable from your AI.",
+        "fi": "Noden tai ryhmän tarjoama palvelin voi nyt olla ilman yhteistä kirjautumista: jokainen kirjautuu kerran omalla tilillään palveluun, jolloin palvelun omat oikeudet ja lokit koskevat kutakin erikseen. Pääsy-sivu näyttää, oletko kirjautunut, ja siinä on painikkeet kirjautumiseen ja uloskirjautumiseen. Tekoälysi osaa saman. Ryhmän palvelin toimii nyt myös tekoälysi kautta."
+      }
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "feature",
       "id": "2026-11-02-your-ai-sees-what-happens-on-your-home",
       "highlight": false,
       "audience": [

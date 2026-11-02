@@ -1357,6 +1357,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The stored file passes reader.leave (external) before a publish attempt opens."
     },
+    "src/services/connections/write.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-11-02 (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-), checked: loadStoredBytes reads the caller's own stored file and passes it through reader.leave (external, to the connection) before a byte is sent, the order publish-run.ts keeps; a refused file answers CLASSIFIED and nothing is written."
+    },
     "src/services/connector-registry.ts": {
       "reads": {
         "getMemory": 2

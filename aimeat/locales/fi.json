@@ -13897,6 +13897,7 @@
     "cfg_connections_google_client_id": "Google-sovelluksen tunnus",
     "cfg_connections_microsoft_client_id": "Microsoft-sovelluksen tunnus",
     "cfg_connections_microsoft_tenant": "Entra-hakemisto",
+    "cfg_connections_microsoft_files_sites": "SharePoint-sivustot, joihin tiedostoyhteydet ulottuvat",
     "cfg_connections_linkedin_client_id": "LinkedIn-sovelluksen tunnus",
     "cfg_connections_x_client_id": "X-sovelluksen tunnus",
     "cfg_connections_facebook_client_id": "Facebook-sovelluksen (Meta) tunnus",

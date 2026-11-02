@@ -12280,6 +12280,7 @@
     "cfg_connections_google_client_id": "Id de la aplicación de Google",
     "cfg_connections_microsoft_client_id": "Id de la aplicación de Microsoft",
     "cfg_connections_microsoft_tenant": "Directorio de Entra",
+    "cfg_connections_microsoft_files_sites": "Sitios de SharePoint a los que llegan las conexiones de archivos",
     "cfg_connections_linkedin_client_id": "Id de la aplicación de LinkedIn",
     "cfg_connections_x_client_id": "Id de la aplicación de X",
     "cfg_connections_facebook_client_id": "Id de la aplicación de Facebook (Meta)",

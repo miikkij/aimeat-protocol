@@ -25,6 +25,9 @@
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -45,13 +48,33 @@ import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 /** The most text a write may carry inline; anything larger is a stored file (from_key). */
 const MAX_INLINE_TEXT = 4 * 1024 * 1024;
 
+/** One file of a library, by its library and its item. */
+const FileBody = z.object({
+  drive_id: z.string().max(INPUT_LIMITS.id),
+  item_id: z.string().max(INPUT_LIMITS.id),
+  key: z.string().max(INPUT_LIMITS.key).optional(),
+});
+type FileBody = z.infer<typeof FileBody>;
+
+/**
+ * A write: the content (a stored file or text) and the parameters the provider entry reads. The
+ * entry checks every parameter it puts into a path or a body, so the rest passes through bounded.
+ */
+const WriteBody = z.object({
+  from_key: z.string().max(INPUT_LIMITS.key).optional(),
+  text: z.string().max(MAX_INLINE_TEXT).optional(),
+  mime_type: z.string().max(INPUT_LIMITS.name).optional(),
+  filename: z.string().max(INPUT_LIMITS.name).optional(),
+}).catchall(z.unknown());
+type WriteBody = z.infer<typeof WriteBody>;
+
+const validated = <T>(req: Request): T => (req as Request & { validated: T }).validated;
+
 export function connectionFilesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const providers = buildOutboundProviders(config);
   const resolve = (req: Request): string => resolveIdentity(req.auth!, config.nodeId);
   const ownerOf = (req: Request): string => `${req.auth!.owner}@${config.nodeId}`;
-  const bodyOf = (req: Request): Record<string, unknown> =>
-    (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) ? req.body as Record<string, unknown> : {};
 
   /** The service context and the connection, or the answer that refused them. */
   async function open(req: Request, res: Response, purpose: 'name' | 'read'): Promise<{ ctx: ConnectContext; connectionId: string } | null> {
@@ -83,33 +106,33 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
   }
 
   router.post('/v1/connections/:id/files/text', requireAuth(), explainReadThrough, requireScope('connections:read-through'),
-    async (req: Request, res: Response) => {
+    validateBody(FileBody, config.nodeId), async (req: Request, res: Response) => {
       const opened = await open(req, res, 'read');
       if (!opened) return;
-      const b = bodyOf(req);
-      const out = await driveFileText(opened.ctx, opened.connectionId, { drive_id: b.drive_id, item_id: b.item_id });
+      const { drive_id, item_id } = validated<FileBody>(req);
+      const out = await driveFileText(opened.ctx, opened.connectionId, { drive_id, item_id });
       if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
       res.json(success(config.nodeId, { text: out.text, ...(out.note ? { note: out.note } : {}), source: out.source }));
     });
 
   router.post('/v1/connections/:id/files/store', requireAuth(), explainReadThrough, requireScope('connections:read-through'),
-    requireScope('storage:write'), async (req: Request, res: Response) => {
+    requireScope('storage:write'), validateBody(FileBody, config.nodeId), async (req: Request, res: Response) => {
       const opened = await open(req, res, 'read');
       if (!opened) return;
-      const b = bodyOf(req);
+      const { drive_id, item_id, key } = validated<FileBody>(req);
       // The file is the caller's owner's, as every file an agent or an app stores in that person's name.
       const out = await storeDriveFile(opened.ctx, { storage, config, emitResourceUpdated, emitResourceListChanged },
-        resolve(req), opened.connectionId, { drive_id: b.drive_id, item_id: b.item_id, key: b.key });
+        resolve(req), opened.connectionId, { drive_id, item_id, key });
       if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
       res.status(201).json(success(config.nodeId, { stored: { key: out.key }, source: out.source },
         [{ description: 'Read the stored file', method: 'GET', url: `/v1/storage/${out.key.split('/').map(encodeURIComponent).join('/')}` }]));
     });
 
   router.post('/v1/connections/:id/write/:resource', requireAuth(), requireScope('connections:use'),
-    async (req: Request, res: Response) => {
+    validateBody(WriteBody, config.nodeId), async (req: Request, res: Response) => {
       const opened = await open(req, res, 'name');
       if (!opened) return;
-      const b = bodyOf(req);
+      const b: Record<string, unknown> = { ...validated<WriteBody>(req) };
 
       // The bytes of a file write: a stored file of the caller's (after the classification gate), or
       // text given inline. Neither for a folder or a list row, whose body the provider entry builds.
@@ -122,7 +145,7 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
         if (typeof b.filename !== 'string' || !b.filename) b.filename = loaded.name;
       } else if (typeof b.text === 'string') {
         if (Buffer.byteLength(b.text, 'utf8') > MAX_INLINE_TEXT) {
-          return res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'That is more text than one call carries. Store it as a file first and name it with from_key.'));
+          return res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'That is more text than one call carries. Store it as a file first, then write that file.', 413, { field: 'from_key' }));
         }
         const mime = typeof b.mime_type === 'string' && /^[a-z]+\/[A-Za-z0-9.+-]{1,100}$/.test(b.mime_type) ? b.mime_type : 'text/plain; charset=utf-8';
         payload = { bytes: Buffer.from(b.text, 'utf8'), mimeType: mime };

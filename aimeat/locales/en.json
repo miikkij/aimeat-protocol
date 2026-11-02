@@ -13161,6 +13161,7 @@
     "cfg_connections_google_client_id": "Google app id",
     "cfg_connections_microsoft_client_id": "Microsoft app id",
     "cfg_connections_microsoft_tenant": "Entra directory",
+    "cfg_connections_microsoft_files_sites": "SharePoint sites the files connections reach",
     "cfg_connections_linkedin_client_id": "LinkedIn app id",
     "cfg_connections_x_client_id": "X app id",
     "cfg_connections_facebook_client_id": "Facebook (Meta) app id",

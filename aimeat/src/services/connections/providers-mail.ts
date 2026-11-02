@@ -17,18 +17,20 @@
  *   `access_type=offline` as a parameter (so these providers set `offlineAccess: false` WITH the
  *   scope in the list — YouTube's trap, exactly inverted); and the identity comes from Graph's
  *   `/me`, which needs `User.Read`.
- * @structure googleMail / googleMailSend / microsoftMail / microsoftMailSend · microsoftEndpoints
+ * @structure googleMail / googleMailSend / microsoftMail / microsoftMailSend (microsoftEndpoints: providers-microsoft.ts)
  *   · clampLimit
  * @usage import { googleMail, microsoftMail } from './providers-mail.js';
  * @version-history
- *   v1.3.0 — 2026-11-02 — microsoftEndpoints is exported, for the files pair (providers-files.ts).
+ *   v1.3.0 — 2026-11-02 — microsoftEndpoints moved to providers-microsoft.ts unchanged, for the files
+ *     pair (providers-files.ts), which signs in through the same app registration.
  *   v1.2.0 — 2026-09-29 — gmailResources (the Gmail read resources, pure extraction from googleMail)
  *     and fakeMail, the sandbox's Gmail-shaped test mailbox on the same resources.
  *   v1.1.0 — 2026-09-28 — An Outlook message comes with its attachments' ids, names, types and sizes
  *     ($expand, no bytes), so an attachment can be fetched or stored at all.
  *   v1.0.0 — 2026-08-26 — Extracted from providers.ts.
  */
-import type { OutboundProvider, OAuthEndpoints } from './providers.js';
+import type { OutboundProvider } from './providers.js';
+import { microsoftEndpoints } from './providers-microsoft.js';
 
 /**
  * Gmail, read-only.
@@ -391,26 +393,6 @@ export function microsoftMailSend(
     sharedDailyLimit: null,
     attachFields: null,
     endpoints: (_instance, forTenant) => microsoftEndpoints(forTenant || tenant),
-  };
-}
-
-/**
- * One place that builds Microsoft's three URLs, so the tenant cannot end up in two of them. Exported
- * for the files pair (providers-files.ts), which signs in through the same app registration.
- */
-export function microsoftEndpoints(tenant: string): OAuthEndpoints {
-  // A tenant reaches this from config or from a principal's own client row, so it is checked rather
-  // than interpolated: it goes into a URL path, and anything outside this shape is either a typo or
-  // an attempt to send a token somewhere else.
-  const safe = /^[A-Za-z0-9-]{1,64}$/.test(tenant) ? tenant : 'common';
-  const base = `https://login.microsoftonline.com/${safe}/oauth2/v2.0`;
-  return {
-    authorize: `${base}/authorize`,
-    token: `${base}/token`,
-    // Microsoft's logout endpoint ends a SESSION; it does not retire a refresh token the way
-    // Google's revoke does. Null is the honest value: revoking is local, and the person removes the
-    // app's consent from their Microsoft account page if they want it gone at both ends.
-    revoke: null,
   };
 }
 

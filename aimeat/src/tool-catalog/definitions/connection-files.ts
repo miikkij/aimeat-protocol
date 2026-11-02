@@ -82,7 +82,7 @@ export const connectionFileTools = [
             etag: { type: 'string', description: "With replace or list_item_update: the eTag you read, so a change made in between is refused." },
             site_id: { type: 'string', description: "With list_item or list_item_update: the site." },
             list_id: { type: 'string', description: "With list_item or list_item_update: the list." },
-            fields: { type: 'object', description: "With list_item or list_item_update: {internal column name: text, number, true or false}.", zod: z.record(z.string().max(INPUT_LIMITS.id), z.union([z.string(), z.number(), z.boolean(), z.null()])) },
+            fields: { type: 'object', description: "With list_item or list_item_update: {internal column name: text, number, true or false}.", zod: z.record(z.string().max(INPUT_LIMITS.id), z.union([z.string().max(INPUT_LIMITS.text), z.number(), z.boolean(), z.null()])) },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

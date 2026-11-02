@@ -31,7 +31,7 @@
  *   v1.0.0 — 2026-11-02 — Initial (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-).
  */
 import type { OutboundProvider, ProviderResource, ProviderWriteResource } from './providers-types.js';
-import { microsoftEndpoints } from './providers-mail.js';
+import { microsoftEndpoints } from './providers-microsoft.js';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 

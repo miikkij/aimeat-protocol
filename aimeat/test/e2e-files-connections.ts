@@ -269,6 +269,20 @@ try {
     assert(fields.status === 400 && fields.data.error.code === 'BAD_PARAMETERS', `fields: ${fields.status}`);
     assert(seen.length === before, 'a refused write still reached Graph');
   });
+  await test('each route refuses an agent without its word: 403 on text, store and write', async () => {
+    // Reads the owner's library (read-through, read-as-owner) but may neither keep a file nor write.
+    const looker = await makeAgent(BASE, owner, ['connections:read', 'connections:read-through', 'connections:read-as-owner']);
+    const text = await api(`/v1/connections/${readConn}/files/text`, { method: 'POST', bearer: looker.token, body: { drive_id: DRIVE, item_id: FILE } });
+    assert(text.status === 200, `the looker reads: ${text.status}`);
+    const store = await api(`/v1/connections/${readConn}/files/store`, { method: 'POST', bearer: looker.token, body: { drive_id: DRIVE, item_id: FILE } });
+    assert(store.status === 403 && store.data.error.code === 'SCOPE_DENIED', `store without storage:write: ${store.status} ${store.data?.error?.code}`);
+    const write = await api(`/v1/connections/${writeConn}/write/folder`, { method: 'POST', bearer: looker.token, body: { drive_id: DRIVE, name: 'x' } });
+    assert(write.status === 403 && write.data.error.code === 'SCOPE_DENIED', `write without connections:use: ${write.status} ${write.data?.error?.code}`);
+    // Uses connections but may not read what is in them: the text route refuses it.
+    const sender = await makeAgent(BASE, owner, ['connections:read', 'connections:use']);
+    const noRead = await api(`/v1/connections/${readConn}/files/text`, { method: 'POST', bearer: sender.token, body: { drive_id: DRIVE, item_id: FILE } });
+    assert(noRead.status === 403, `text without read-through: ${noRead.status} ${noRead.data?.error?.code}`);
+  });
   await test('another owner reaches neither connection: the same 404 as none', async () => {
     const r = await api(`/v1/connections/${readConn}/files/text`, { bearer: other.token, body: { drive_id: DRIVE, item_id: FILE } });
     assert(r.status === 404, `read: ${r.status}`);
