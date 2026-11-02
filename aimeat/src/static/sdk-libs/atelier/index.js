@@ -57,6 +57,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.68.1 — 2026-11-02 — The shell's phone bar ends in a Menu entry that opens every page of a
+ *     side-navigation app in a sheet, and the side column scrolls when taller than the window
+ *     (shell.js, shell-parts.js).
  *   v0.68.0 — 2026-10-30 — ornamentSet(set, targets, opts) and ORNAMENT_SET_IDS: eleven ornament sets
  *     (modern, futuristic, cyberpunk, vibrant, emotional, dramatic, symmetrical, chaotic, velocity,
  *     art-deco, crystal), five figures each: frame, rule, bar, bullets, strip
