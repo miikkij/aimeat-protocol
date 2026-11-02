@@ -23507,6 +23507,7 @@
       "mcpNoSignInNeeded": "Palvelin ei tarvinnut kirjautumista. Se on valmis.",
       "mcpAuthFailed": "Kirjautumista ei saatu alkuun",
       "mcpSignInOwn": "Kirjaudu omalla tililläsi",
+      "mcpConnectAtlassian": "Liitä Atlassian (Jira, Confluence)",
       "mcpPersonalNeedsSignIn": "jokainen kirjautuu omalla tilillään",
       "mcpPersonalSignedIn": "kirjautunut omalla tililläsi",
       "mcpPersonalStopped": "kirjautumisesi lakkasi toimimasta",

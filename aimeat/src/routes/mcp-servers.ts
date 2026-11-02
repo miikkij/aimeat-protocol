@@ -93,6 +93,7 @@ import {
   type McpTransport, type McpServerCredential, type McpServerRecord,
 } from '../models/mcp-server-schemas.js';
 import { signOutPersonal } from '../services/mcp-client/personal-sign-in.js';
+import { applyMcpTemplate } from '../models/mcp-server-templates.js';
 import {
   attachMcpServer, listUsableServers, requireUsableServer, requireManageableServer, detachMcpServer,
   updateMcpServerSettings, attachNodeServer, listNodeServers, setNodeServerPolicy,
@@ -203,7 +204,10 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.post('/v1/mcp-servers/organism', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      const b = (req.body ?? {}) as Record<string, unknown>;
+      // A ready-made server (`template`) fills the address and the sign-in (models/mcp-server-templates.ts).
+      const applied = applyMcpTemplate((req.body ?? {}) as Record<string, unknown>, 'organism');
+      if (!applied.ok) return res.status(400).json(error(config.nodeId, 'UNKNOWN_TEMPLATE', applied.message));
+      const b = applied.body;
       const organismId = typeof b.organism_id === 'string' ? b.organism_id : '';
       const name = typeof b.name === 'string' ? b.name : '';
       const url = typeof b.url === 'string' ? b.url : '';
@@ -283,7 +287,9 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.post('/v1/mcp-servers/node', requireAuth(), requireOperatorPrincipal(storage, OPERATOR_ADMIN_SCOPE),
     async (req: Request, res: Response) => {
-      const b = (req.body ?? {}) as Record<string, unknown>;
+      const applied = applyMcpTemplate((req.body ?? {}) as Record<string, unknown>, 'node');
+      if (!applied.ok) return res.status(400).json(error(config.nodeId, 'UNKNOWN_TEMPLATE', applied.message));
+      const b = applied.body;
       const name = typeof b.name === 'string' ? b.name : '';
       const url = typeof b.url === 'string' ? b.url : '';
       // A LOCAL PROCESS, and this is the only door in the system that can write one. It stands
@@ -611,7 +617,9 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
 
   router.post('/v1/mcp-servers', requireAuth(), requireScope('mcp:manage'),
     async (req: Request, res: Response) => {
-      const b = (req.body ?? {}) as Record<string, unknown>;
+      const applied = applyMcpTemplate((req.body ?? {}) as Record<string, unknown>, 'owner');
+      if (!applied.ok) return res.status(400).json(error(config.nodeId, 'UNKNOWN_TEMPLATE', applied.message));
+      const b = applied.body;
       const name = typeof b.name === 'string' ? b.name : '';
       const url = typeof b.url === 'string' ? b.url : '';
       // A peer AIMEAT node is named, not addressed: the address is looked up on every call, so a

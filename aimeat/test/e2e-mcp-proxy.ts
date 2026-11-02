@@ -34,6 +34,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-11-02 — Phase 5g: template atlassian on the owner's own server (oauth, the template's address
+ *     kept against a sent url), on the node (per-user-oauth), refused when unknown, and over MCP.
  *   2026-11-02 — Phase 5f: a node server each person signs in to with their own account (auth
  *     per-user-oauth): no token on the row, 403 SIGN_IN_REQUIRED before signing in, the call reaches
  *     the far side after, another owner stays refused, an owner it does not admit gets 404 on
@@ -2259,6 +2261,50 @@ await test('signing out removes that owner\'s sign-in only, and a second sign-ou
   assert(notPersonal.status === 409 && notPersonal.body.error?.code === 'NOT_PERSONAL', `housewide: ${notPersonal.status}`);
   const gone = await json(`/v1/mcp-servers/node/${personalId}`, { method: 'DELETE', headers: ownerAuth() });
   assert(gone.status === 200, `clean up: ${gone.status}`);
+});
+
+// ─── Phase 5g: a ready-made server ───
+// wish-jira-ja-confluence-valmiina-atlassian-pohja-ja-oauth-liitos-. No network: a template server is
+// attached to sign in afterwards, so nothing is probed until somebody signs in.
+console.log('\nPhase 5g — A ready-made server (template)');
+
+await test('template atlassian: the owner\'s own signs in once, at Atlassian\'s address, under its own name', async () => {
+  const r = await json('/v1/mcp-servers', { method: 'POST', headers: plainAuth(), body: JSON.stringify({ template: 'atlassian' }) });
+  assert(r.status === 201 && r.body.data.server.slug === 'atlassian', `attach: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  const row = await storedServer(r.body.data.server.id);
+  const transport = typeof row.transport === 'string' ? JSON.parse(row.transport) : row.transport;
+  assert(transport.url === 'https://mcp.atlassian.com/v1/mcp/authv2' && row.auth === 'oauth', `row: ${row.auth} ${JSON.stringify(transport)}`);
+  // An address sent beside a template does not replace it.
+  const steer = await json('/v1/mcp-servers', { method: 'POST', headers: plainAuth(), body: JSON.stringify({ template: 'atlassian', name: 'atl2', url: 'https://evil.example/mcp' }) });
+  assert(steer.status === 201, `attach atl2: ${steer.status}`);
+  const steered = await storedServer(steer.body.data.server.id);
+  const t2 = typeof steered.transport === 'string' ? JSON.parse(steered.transport) : steered.transport;
+  assert(t2.url === 'https://mcp.atlassian.com/v1/mcp/authv2', `the template's address was replaced: ${t2.url}`);
+  for (const id of [r.body.data.server.id, steer.body.data.server.id]) {
+    const gone = await json(`/v1/mcp-servers/${id}`, { method: 'DELETE', headers: plainAuth() });
+    assert(gone.status === 200, `clean up: ${gone.status}`);
+  }
+});
+
+await test('template atlassian on the node: each owner signs in with their own account', async () => {
+  const r = await json('/v1/mcp-servers/node', { method: 'POST', headers: ownerAuth(), body: JSON.stringify({ template: 'atlassian', name: 'nodeatlassian', availability: 'all-owners' }) });
+  assert(r.status === 201 && r.body.data.server.personalSignIn?.signedIn === false, `attach: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  const row = await storedServer(r.body.data.server.id);
+  assert(row.auth === 'per-user-oauth' && !row.credential, `row: ${row.auth}`);
+  const gone = await json(`/v1/mcp-servers/node/${r.body.data.server.id}`, { method: 'DELETE', headers: ownerAuth() });
+  assert(gone.status === 200, `clean up: ${gone.status}`);
+});
+
+await test('an unknown template is refused on REST and over MCP; aimeat_mcp_attach takes the template', async () => {
+  const r = await json('/v1/mcp-servers', { method: 'POST', headers: plainAuth(), body: JSON.stringify({ template: 'nope' }) });
+  assert(r.status === 400 && r.body.error?.code === 'UNKNOWN_TEMPLATE', `unknown: ${r.status} ${r.body.error?.code}`);
+  const agent = await agentWithScopes(plain, 'mcptemplate', ['mcp:read', 'mcp:manage']);
+  const session = await openMcpSession(agent.token);
+  const made = await mcpTool(session, 'aimeat_mcp_attach', { template: 'atlassian' });
+  assert(!made.isError && JSON.parse(made.text).server.slug === 'atlassian', `attach over MCP: ${made.text}`);
+  assert(JSON.parse(made.text).next.includes('aimeat_mcp_authorize'), `next: ${made.text}`);
+  const gone = await mcpTool(session, 'aimeat_mcp_detach', { server: 'atlassian' });
+  assert(!gone.isError, `detach: ${gone.text}`);
 });
 
 // ─── Phase 6: a local process, which this node does not run ───

@@ -22771,6 +22771,7 @@
       "mcpNoSignInNeeded": "That server needed no sign-in. It is ready.",
       "mcpAuthFailed": "Could not start the sign-in",
       "mcpSignInOwn": "Sign in with your own account",
+      "mcpConnectAtlassian": "Connect Atlassian (Jira, Confluence)",
       "mcpPersonalNeedsSignIn": "everyone signs in with their own account",
       "mcpPersonalSignedIn": "signed in with your own account",
       "mcpPersonalStopped": "your sign-in stopped working",

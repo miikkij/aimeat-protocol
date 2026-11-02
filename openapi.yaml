@@ -69364,11 +69364,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
               properties:
+                template:
+                  type: string
+                  enum: [atlassian]
+                  description: >
+                    A ready-made server: the node fills the address, the transport and auth oauth
+                    (models/mcp-server-templates.ts); name, title and description default to the
+                    template's. The address cannot be replaced. An unknown name is 400 UNKNOWN_TEMPLATE.
                 name:
                   type: string
-                  description: The short name used instead of the address. Lowercase, digits, dashes.
+                  description: The short name used instead of the address. Lowercase, digits, dashes. Required without template.
                 url:
                   type: string
                   description: The server address. Give this or peer.
@@ -69443,8 +69449,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name, url, organism_id]
+              required: [organism_id]
               properties:
+                template:
+                  type: string
+                  enum: [atlassian]
+                  description: >
+                    A ready-made server instead of name and url: the address is the template's, and
+                    auth is per-user-oauth (each member signs in with their own account) unless oauth
+                    is sent.
                 organism_id:
                   type: string
                 ws:
@@ -69532,8 +69545,13 @@ paths:
           application/json:
             schema:
               type: object
-              required: [name]
               properties:
+                template:
+                  type: string
+                  enum: [atlassian]
+                  description: >
+                    A ready-made server instead of name and url: the address is the template's, and
+                    auth is per-user-oauth (each owner signs in with their own account) unless oauth is sent.
                 name:
                   type: string
                 url:

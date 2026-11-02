@@ -395,7 +395,7 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:df56fadd7b24d98f05034e7a"
+      "digest": "sha256:5ccd6685d6c0d8af335879a2"
     },
     "node:aimeat-workflow-decisions": {
       "reviewedOn": "2026-10-27",
@@ -775,11 +775,11 @@
       "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
     },
     "node:aimeat-mcp-servers": {
-      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "7f409acd49235519",
+      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",
       "aimeat/src/services/mcp-client/grants.ts": "1652c22f0c53e827",
       "aimeat/src/services/mcp-client/registry.ts": "23261551eeda798b",
       "aimeat/src/services/mcp-client/invoke.ts": "666ff816b1baab9b",
-      "aimeat/src/mcp/mcp-proxy.ts": "0b44cc6aee747348"
+      "aimeat/src/mcp/mcp-proxy.ts": "dbb12f157c0a73d5"
     },
     "node:aimeat-workflow-decisions": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",

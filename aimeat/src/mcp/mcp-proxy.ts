@@ -81,6 +81,7 @@ import {
   toPublicMcpServer, takesPersonalSignIn, type McpTransport, type McpServerCredential,
 } from '../models/mcp-server-schemas.js';
 import { signOutPersonal } from '../services/mcp-client/personal-sign-in.js';
+import { applyMcpTemplate } from '../models/mcp-server-templates.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -173,7 +174,15 @@ export function registerMcpProxyTools(
   mcp.registerTool('aimeat_mcp_attach', { description: descriptionFor('aimeat_mcp_attach'),
     inputSchema: zodShapeFor('aimeat_mcp_attach'),
     annotations: annotationsFor('aimeat_mcp_attach') },
-    async ({ name, url, peer, organism_id: group, ws, title, description, transport, token, header, auth }): Promise<TextResult> => {
+    async (input): Promise<TextResult> => {
+      const group = input.organism_id;
+      const ws = input.ws;
+      // A ready-made server (`template`) fills the address and the sign-in, as on the REST doors.
+      const applied = applyMcpTemplate({ ...input }, group ? 'organism' : 'owner');
+      if (!applied.ok) return toolError('UNKNOWN_TEMPLATE', applied.message);
+      const a = applied.body as typeof input;
+      const { name, url, peer, title, description, transport, token, header, auth } = a;
+      if (!name) return toolError('INVALID_INPUT', 'Give the server a short name, or name a template.');
       if (!url && !peer) {
         return fail('Give either the server address, or the id of a peer node as peer.');
       }

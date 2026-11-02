@@ -87,8 +87,9 @@ export const mcpProxyTools = [
         annotations: { title: 'Attach an MCP Server', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         scope: 'mcp:manage',
         input: {
-            name: { type: 'string', required: true, description: "A short name used instead of the address, e.g. 'jira'. Lowercase letters, digits and dashes." },
-            url: { type: 'string', description: 'The server address, https. Give this or peer.' },
+            template: { type: 'string', description: "A ready-made server instead of an address: 'atlassian' attaches Atlassian Cloud's own MCP server (Jira, Confluence, Compass) with its address and OAuth sign-in filled in, under the name 'atlassian' unless you give another. On a group's server each member then signs in with their own Atlassian account (per-user-oauth); on the person's own, they sign in once. Then aimeat_mcp_authorize gives the address to sign in.", zod: z.enum(['atlassian']) },
+            name: { type: 'string', description: "A short name used instead of the address, e.g. 'jira'. Lowercase letters, digits and dashes. Required unless template names one." },
+            url: { type: 'string', description: 'The server address, https. Give this, peer or template.' },
             peer: { type: 'string', description: "The id of a peer AIMEAT node, instead of url. Its address is looked up on every call, so the link follows the peering rather than outliving it, and the peering must carry routing (member or genesis)." },
             organism_id: { type: 'string', description: "Attach it to a GROUP instead of to this person, so the group's members reach it without anybody handing out a token. Only an owner or an admin of the group may; using what is attached needs only membership." },
             ws: { type: 'string', description: "With organism_id, bind it to ONE workspace inside that group. Then the workspace's own roles decide: a contributor may call it, a viewer only sees it is there, and a member of the group with no role in that workspace reaches nothing." },

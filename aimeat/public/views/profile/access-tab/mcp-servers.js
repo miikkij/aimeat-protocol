@@ -21,6 +21,9 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
+ *   v1.13.0 — 2026-11-02 — "Connect Atlassian (Jira, Confluence)": attaches the ready-made server by its
+ *     template name (POST /v1/mcp-servers { template }) and goes straight on to the sign-in. Shown until
+ *     a server called atlassian is attached.
  *   v1.12.0 — 2026-11-02 — A shared server each person signs in to (personalSignIn on the row) says
  *     whether this person has signed in, offers "Sign in with your own account" until they have, and
  *     "Sign out" after (DELETE /v1/mcp-servers/:id/sign-in).
@@ -217,6 +220,24 @@ export function McpServersSection({ showToast, inRow }) {
     }
   }, [authorize, draft, load, showToast]);
 
+  /**
+   * A ready-made server: the node fills the address and the sign-in from its own list
+   * (models/mcp-server-templates.ts), so the page sends the template's name and never an address.
+   */
+  const attachTemplate = useCallback(async (template) => {
+    setBusy('attach');
+    try {
+      const res = await api('/v1/mcp-servers', { method: 'POST', body: JSON.stringify({ template }), retries: 0 });
+      await load();
+      await authorize({ id: res?.data?.server?.id, slug: res?.data?.server?.slug });
+    } catch (err) {
+      swallowed('mcp-servers-template', err);
+      showToast(err?.message || t('profile.access.mcpAttachFailed') || 'Could not attach that server');
+    } finally {
+      setBusy('');
+    }
+  }, [authorize, load, showToast]);
+
   const toggle = useCallback(async (s) => {
     setBusy(s.id);
     try {
@@ -355,6 +376,10 @@ export function McpServersSection({ showToast, inRow }) {
     <//>
 
     <${Actions}>
+      ${!addOpen && !servers.some(s => s.slug === 'atlassian') && html`
+        <${Action} small disabled=${busy === 'attach'} onClick=${() => attachTemplate('atlassian')}>
+          ${t('profile.access.mcpConnectAtlassian') || 'Connect Atlassian (Jira, Confluence)'}
+        <//>`}
       ${builders && !addOpen && !servers.some(s => s.slug === builders.name) && html`
         <${Action} small onClick=${() => { setDraft({ ...EMPTY_DRAFT, ...builders }); setAddOpen(true); }}>
           ${(t('profile.access.mcpConnectBuilders') || 'Connect to {host}').replace('{host}', builders.title)}

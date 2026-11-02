@@ -23,6 +23,7 @@
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-11-02 — Section 1: a ready-made server, template "atlassian" (models/mcp-server-templates.ts).
  *   2026-11-02 — Section 1: aimeat_mcp_attach takes auth "oauth". Section 4: a group's server is
  *     reached through the MCP tools by its id, and its OAuth sign-in finishes; a shared server where
  *     each person signs in with their own account (auth per-user-oauth), aimeat_mcp_sign_out.
@@ -86,6 +87,11 @@ Three permissions decide who may do what:
 The node checks the address before it saves anything, so a wrong address or a wrong token is reported
 now, not later as a server that never answers. A name that already exists is refused rather than
 duplicated. Addresses that resolve to private or internal networks are refused.
+
+**A ready-made server** needs no address: \`aimeat_mcp_attach\` \`template: "atlassian"\` attaches
+Atlassian Cloud's own MCP server (Jira, Confluence, Compass) with its address and OAuth sign-in, under
+the name \`atlassian\`. The MCP page has the same as one button. Atlassian Server and Data Center are not
+covered; their own MCP servers, where they exist, are attached by address.
 
 **A server that uses OAuth sign-in** (the person signs in at the far side instead of handing over a
 token) is attached with \`aimeat_mcp_attach\` \`auth: "oauth"\` (or \`POST /v1/mcp-servers\` with the
@@ -161,7 +167,8 @@ The person in their own session, on their own server, needs no grant.
   \`aimeat_mcp_list\`; its short name finds it only where it is the person's own or the node's.
 - **Each person with their own account.** For a team tool everybody already has an account on
   (Jira, Confluence, a company wiki), attach the group's server with \`auth: "per-user-oauth"\`; the
-  operator does the same for a node server with \`POST /v1/mcp-servers/node\`. The group then holds
+  operator does the same for a node server with \`POST /v1/mcp-servers/node\`. \`template: "atlassian"\`
+  on a group's or the node's server chooses this by itself. The group then holds
   no token: each member signs in with their OWN account at the far side, so its own permissions and
   its audit trail apply to each person. \`aimeat_mcp_list\` shows \`personalSignIn\` on such a server,
   with \`signedIn\` for the person you act for. Until they sign in, a call answers 403

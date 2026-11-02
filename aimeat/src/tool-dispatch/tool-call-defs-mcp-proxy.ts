@@ -14,6 +14,7 @@
  *   That is deliberate: a person's UI holds the id it was handed and an agent says "jira", and
  *   making this door pick one would make the two doors disagree about what a valid call looks like.
  * @version-history
+ *   2026-11-02 — aimeat_mcp_attach forwards `template` (name optional with one).
  *   2026-11-02 — aimeat_mcp_attach forwards `auth`; aimeat_mcp_sign_out → DELETE /v1/mcp-servers/:id/sign-in.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
@@ -55,7 +56,9 @@ export const mcpProxyCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_mcp_attach',
         handler: ({ client }, input) => {
             const body = {
-                name: requiredString(input, 'name'),
+                // A template names its own server, so the name is optional with one (the route fills it).
+                ...(optionalString(input, 'name') ? { name: optionalString(input, 'name') } : {}),
+                ...(optionalString(input, 'template') ? { template: optionalString(input, 'template') } : {}),
                 ...(optionalString(input, 'url') ? { url: optionalString(input, 'url') } : {}),
                 ...(optionalString(input, 'peer') ? { peer: optionalString(input, 'peer') } : {}),
                 ...(optionalString(input, 'title') ? { title: optionalString(input, 'title') } : {}),

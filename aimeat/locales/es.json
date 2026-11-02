@@ -21401,6 +21401,7 @@
       "mcpNoSignInNeeded": "Ese servidor no necesitaba inicio de sesión. Ya está listo.",
       "mcpAuthFailed": "No se ha podido iniciar el acceso",
       "mcpSignInOwn": "Iniciar sesión con tu propia cuenta",
+      "mcpConnectAtlassian": "Conectar Atlassian (Jira, Confluence)",
       "mcpPersonalNeedsSignIn": "cada persona inicia sesión con su propia cuenta",
       "mcpPersonalSignedIn": "sesión iniciada con tu propia cuenta",
       "mcpPersonalStopped": "tu sesión dejó de funcionar",
