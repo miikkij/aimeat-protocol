@@ -23,6 +23,7 @@
  *   deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
+ *   v1.0.1 — 2026-11-02 — The heading's date in English is en-GB when the person set no region.
  *   v1.0.0 — 2026-11-02 — Initial. The agent's notify tool is taken out when a schedule asks for
  *     delivery (services/delivery-crew.ts).
  */
@@ -73,11 +74,13 @@ function zoneOf(entry: AgentTaskScope): string | undefined {
 
 /**
  * The day the task ran ("2.11.2026"), the way this person writes dates (services/display-prefs.ts),
- * on their own clock, else the schedule's, else the language of their place.
+ * on their own clock, else the schedule's, else the language of their place. English without a region
+ * of its own is en-GB (2/11/2026), as the SPA writes it: Intl's bare 'en' is the US 11/2/2026, which an
+ * EU reader takes for 11 February (c9's crew67 round, 2.11). A region the person chose still wins.
  */
 function dayOf(prefs: DisplayPrefs, iso: string, locale: string, timezone?: string): string {
   return formatForPerson(
-    { ...prefs, region: prefs.region ?? locale, timezone: prefs.timezone ?? timezone ?? null },
+    { ...prefs, region: prefs.region ?? (locale === 'en' ? 'en-GB' : locale), timezone: prefs.timezone ?? timezone ?? null },
     iso, { day: 'numeric', month: 'numeric', year: 'numeric' },
   );
 }
