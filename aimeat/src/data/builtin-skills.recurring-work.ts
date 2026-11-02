@@ -32,7 +32,8 @@
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
  *   2026-11-02 — Section 5: an agent_task schedule's `deliver: "owner"`, the node hands the result to the
- *     owner when the person was promised it (services/task-result-delivery.ts).
+ *     owner when the person was promised it (services/task-result-delivery.ts), and the target agent's
+ *     notify tool goes out of its definition (services/delivery-crew.ts).
  *   2026-11-01 — Sections 4 and 5: `kind: "dataproduct"`, one data product build each fire, made with the
  *     definition's own schedule (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-27 — Section 5: a sibling's new instruction to an ai schedule that reads more than the
@@ -243,7 +244,9 @@ sees every schedule and can pause or delete any of them.
 owner itself, into their bell and by email when they have a notification address, under a heading
 with the date the node writes. Do not leave that promise to the agent's notify tool: a model can
 forget the call, and it can get the date wrong. \`aimeat_schedule_update\` with \`deliver: "owner"\`
-adds it to a schedule that has none, and \`"none"\` takes it off.
+adds it to a schedule that has none, and \`"none"\` takes it off. Setting it also takes the notify
+tool out of the target agent's crew definition, as a new revision the owner can restore: a model
+that still called notify would send the result twice, or have the call refused and fail the run.
 
 It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you and your owner's other
 agents made and the ones that target you (\`detail: true\` adds each one's prompt); with
