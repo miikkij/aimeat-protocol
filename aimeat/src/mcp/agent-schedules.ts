@@ -18,6 +18,7 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-02 — aimeat_schedule_create and aimeat_schedule_update forward `deliver` (services/task-result-delivery.ts).
  *   2026-10-27 — aimeat_schedule_update answers `approval_request` when the agent's new instruction to a
  *     sibling's ai schedule waits for the owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
  *   2026-10-25 — aimeat_schedule_list without workflow:read lists the schedules the agent may manage
@@ -138,6 +139,7 @@ export function registerAgentScheduleTools(
         output_key: a.output_key,
         task_title: a.task_title,
         task_description: a.task_description,
+        deliver: a.deliver,
         extension_name: a.extension_name,
         action_id: a.action_id,
         input: a.input,
@@ -198,6 +200,7 @@ export function registerAgentScheduleTools(
         timezone: a.timezone,
         display_name: a.display_name,
         prompt: a.prompt,
+        deliver: a.deliver,
       });
       if (!out.ok) return err(`${out.code}: ${out.message}`);
       return text({

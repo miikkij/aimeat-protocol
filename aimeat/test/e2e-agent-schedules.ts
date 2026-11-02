@@ -363,6 +363,52 @@ await test('8c. An archived occurrence does NOT block a manual run', async () =>
     assert(body.data.outcome === 'created', `archived must not block; expected created, got ${body.data.outcome}`);
 });
 
+console.log('\nPhase 3b -- deliver: the node hands a finished task\'s result to the owner');
+
+// The morning digest's model sent nothing and wrote October on crew63 (2.11): with deliver "owner" the
+// node puts the result in the owner's bell itself, under its own heading and date.
+let deliverScheduleId = '';
+await test('8d. deliver "owner": the finished task\'s result reaches the owner\'s bell under the node\'s heading', async () => {
+    const created = await json(`/v1/agents/${o1.agentName}/schedules`, {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({
+            kind: 'agent_task', cron: '0 7 * * *', timezone: 'Europe/Helsinki', display_name: 'Digest',
+            task_template: { title: 'SCHED_DELIVER', description: 'make the digest' }, deliver: 'owner',
+        }),
+    });
+    assert(created.status === 201, `create ${created.status}: ${JSON.stringify(created.body)}`);
+    deliverScheduleId = created.body.data.schedule.id;
+    assert(created.body.data.schedule.input.taskTemplate.deliver === 'owner', 'the template keeps deliver');
+    const fired = await json(`/v1/schedules/${deliverScheduleId}/trigger`, { method: 'POST', headers: auth1 });
+    const taskId = fired.body.data.task_id;
+    assert(typeof taskId === 'string', `trigger: ${JSON.stringify(fired.body)}`);
+    await json(`/v1/agents/${o1.agentName}/tasks/${taskId}/start`, { method: 'POST', headers: auth1 });
+    const done = await json(`/v1/agents/${o1.agentName}/tasks/${taskId}/complete`, {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({ message: '**Digest of 2 October**\n\nFirst item.\nhttps://example.com/a' }),
+    });
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body)}`);
+    let notice: any = null;
+    for (let i = 0; i < 20 && !notice; i++) {
+        const list = (await json('/v1/notifications', { headers: auth1 })).body?.data?.notifications ?? [];
+        notice = list.find((n: any) => typeof n.title === 'string' && n.title.startsWith('SCHED_DELIVER – '));
+        if (!notice) await new Promise((r) => setTimeout(r, 250));
+    }
+    assert(!!notice, 'the owner got the result in the bell');
+    assert(/\d{1,2}\/\d{1,2}\/\d{4}|\d{1,2}\.\d{1,2}\.\d{4}/.test(notice.title), `the node's date in the heading: ${notice.title}`);
+    assert(String(notice.body).startsWith('First item.') && !String(notice.body).includes('October'), `the model's heading is left out: ${notice.body}`);
+});
+
+await test('8e. deliver is refused on another kind and with another value, and "none" takes it off', async () => {
+    const bad = await json(`/v1/schedules/${aiScheduleId}`, { method: 'PATCH', headers: auth1, body: JSON.stringify({ deliver: 'owner' }) });
+    assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `ai schedule: ${bad.status} ${JSON.stringify(bad.body)}`);
+    const odd = await json(`/v1/schedules/${deliverScheduleId}`, { method: 'PATCH', headers: auth1, body: JSON.stringify({ deliver: 'everyone' }) });
+    assert(odd.status === 400, `another value: ${odd.status}`);
+    const off = await json(`/v1/schedules/${deliverScheduleId}`, { method: 'PATCH', headers: auth1, body: JSON.stringify({ deliver: 'none' }) });
+    assert(off.status === 200 && off.body.data.schedule.input.taskTemplate.deliver === undefined, `none: ${JSON.stringify(off.body.data?.schedule?.input)}`);
+    assert(off.body.data.schedule.input.taskTemplate.title === 'SCHED_DELIVER', 'the rest of the template stays');
+});
+
 console.log('\nPhase 4 -- max_runs constraint auto-disable');
 
 await test('9. Create agent_task schedule with max_runs=1', async () => {
