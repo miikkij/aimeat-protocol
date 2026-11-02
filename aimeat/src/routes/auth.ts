@@ -10,6 +10,7 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-11-02 — An agent's token and refresh on a store place carry the place's default words (services/place-agent-scopes.ts).
  *   2026-10-27 — DELETE /v1/auth/sessions tells the person which of their Full and operator access tokens still act as them (services/owner-tokens-kept-notice.ts; secaudit2026oct26).
  *   2026-10-25 — The refresh, revoke and session routes read the refresh cookie by the node's config, so an
  *     https node reads `__Host-aimeat_rt` and the old name only inside its window (secaudit2026oct22,
@@ -117,6 +118,7 @@ import { ecosystemRefreshDecision, ECO_REAPPROVAL_SECONDS } from '../services/ec
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 import { getStats } from '../services/stats.js';
+import { widenForPlace } from '../services/place-agent-scopes.js';
 
 // In-memory challenge store
 const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
@@ -298,7 +300,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         owner: agentOwner,
         node: config.nodeId,
         roles,
-        scopes: agent.defaultScopes,
+        // On a store place the agent has the place's tools by default, written to its record first
+        // (services/place-agent-scopes.ts; Jouni 2.11 07.42). Elsewhere: its record as it is.
+        scopes: await widenForPlace(storage, config, agent),
       }, config.jwtTtlSeconds, sessionId);
 
       await storage.createSession({
@@ -558,7 +562,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // requireRole('owner'/'operator') after one refresh (those gates check role,
       // not scope) — an intra-owner privilege escalation / scope collapse.
       freshRoles = ['agent'];
-      freshScopes = agent.defaultScopes;
+      // The store place's default, as at the token above (services/place-agent-scopes.ts).
+      freshScopes = await widenForPlace(storage, config, agent);
     } else if (req.auth!.roles.includes('ecosystem')) {
       // The same rule as the agent branch, for the principal class it forgot. `else` handed the
       // OWNER's roles to anything that was not an agent, and an ecosystem app is not an agent: one
