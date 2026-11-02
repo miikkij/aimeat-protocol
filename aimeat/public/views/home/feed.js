@@ -8,9 +8,11 @@
  *   tell two different stories about the same account. Its FIRST row exists before the person has
  *   done anything — the account being created is a real event, and an empty feed on a brand-new
  *   account reads as broken.
- * @structure HomeFeed({ items }) · FeedRow({ item }) · line · shownLine · isBookkeeping · when
+ * @structure HomeFeed({ items }) · FeedRow({ item }) · line · shownLine · shownAmount · isBookkeeping · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-11-02: On a node the store sold, an amount or a day the server wrote as text is shown in the
+ *     place's own format ("12,50 €", "1.11.2026"), through money() and date() (CoS 04.12).
  *   2026-11-02: On a node the store sold, a row names an agent as the person sees it, says a new agent
  *     plainly ("Uusi agentti on käytössä: <nimi>") and leaves out the day's AI cost in dollars
  *     (shownLine, isBookkeeping; the away card's rules, commercial's crew64 round). Other nodes as before.
@@ -69,7 +71,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { ago } from '/js/format.js';
+import { ago, money, date } from '/js/format.js';
 import { Timeline, TimelineRow } from '/components/Timeline.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { customerNode } from '/js/site.js';
@@ -315,7 +317,15 @@ const AGENT_KINDS = new Set(['agent_task_done', 'agent_task_failed', 'agent_task
  */
 export function shownLine(item, shownName) {
   if (!customerNode()) return line(item);
-  const d = item.data || {};
+  const raw = item.data || {};
+  // The server writes an amount and a day as text ("12.50 EUR", "$0.0078", "2026-11-01"); a buyer
+  // reads them in the place's own format, as every other figure on the Home (CoS 04.12, via commercial).
+  const d = {
+    ...raw,
+    ...(typeof raw.amount === 'string' ? { amount: shownAmount(raw.amount) } : {}),
+    ...(typeof raw.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.day) ? { day: date(raw.day) } : {}),
+  };
+  item = { ...item, data: d };
   if (item.kind === 'agent_connected') {
     const name = shownName(d.name || d.agent || '');
     return name ? tr('home.away.agentNew', 'A new agent is at work: {name}').replace('{name}', name) : '';
@@ -324,6 +334,20 @@ export function shownLine(item, shownName) {
   const agent = shownName(d.agent || '');
   const title = String(d.title || '').trim().toLowerCase() === agent.toLowerCase() ? '' : d.title;
   return line({ ...item, data: { ...d, agent, title } });
+}
+
+/**
+ * An amount the server wrote as text, in the reader's own number format: "12.50 EUR" and "$0.0078"
+ * become money() in their currency; anything else stays as written.
+ * @param {string} text
+ */
+export function shownAmount(text) {
+  const s = String(text).trim();
+  const dollar = /^\$\s?(\d+(?:\.\d+)?)$/.exec(s);
+  if (dollar) return money(Number(dollar[1]), 'USD');
+  const coded = /^(\d+(?:\.\d+)?)\s*([A-Z]{3})$/.exec(s);
+  if (coded) return money(Number(coded[1]), coded[2]);
+  return s;
 }
 
 /**
