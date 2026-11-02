@@ -34,7 +34,7 @@
         "docs/operations/production-deployment.md",
         "aimeat/src/services/connections/providers-files.ts"
       ],
-      "digest": "sha256:4f78a4de2eecd0c88cad2035"
+      "digest": "sha256:bb838670e0031d31abe453f2"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -270,7 +270,7 @@
       "aimeat/Dockerfile": "d2a16dcfe98bf7f5",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
       "docs/operations/production-deployment.md": "f36fca30fbc34332",
-      "aimeat/src/services/connections/providers-files.ts": "4ddd1d446861778d"
+      "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0"
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
