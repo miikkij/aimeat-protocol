@@ -274,7 +274,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [core-util-is](https://github.com/isaacs/core-util-is#readme) | 1.0.3 | MIT |
 | [crc-32](https://sheetjs.com/) | 1.2.2 | Apache-2.0 |
 | [crc32-stream](https://github.com/archiverjs/node-crc32-stream) | 7.0.1 | MIT |
-| [croner](https://croner.56k.guru) | 10.0.1 | MIT |
+| [croner](https://croner.56k.guru) | 11.0.0 | MIT |
 | [cross-spawn](https://github.com/moxystudio/node-cross-spawn) | 7.0.6 | MIT |
 | [crypt](https://github.com/pvorb/node-crypt#readme) | 0.0.2 | BSD-3-Clause |
 | [css-tree](https://github.com/csstree/csstree#readme) | 3.2.1 | MIT |
@@ -4417,7 +4417,7 @@ Apache License
    limitations under the License.
 ```
 
-### croner 10.0.1
+### croner 11.0.0
 
 ```text
 The MIT License (MIT)
