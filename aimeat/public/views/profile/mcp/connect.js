@@ -71,7 +71,7 @@ import { customerNode } from '/js/site.js';
  */
 const guide = () => html`<${SetupGuide} poster asideInstall facts stepRows lead=${false} />`;
 
-export function secConnect(ctx, proven) {
+export function secConnect(ctx, proven, provenAt) {
   // A buyer's guide shows the chat AIs first, so a count of every tool would not match the tabs.
   const toolCount = Array.isArray(ctx.tools) && !customerNode() ? ctx.tools.length : null;
   return html`
@@ -83,7 +83,7 @@ export function secConnect(ctx, proven) {
           <${Section} fold clip id="mcp-guide" num="·" title=${m('guideFold')} sub=${m('guideFoldSub')} open=${ctx.folds.guide} onToggle=${() => ctx.setFold('guide', !ctx.folds.guide)}>
             ${guide()}
           <//>
-          <${Section} fold clip id="mcp-proof" num="·" title=${m('proofFold')} sub=${m('proofFoldSub', { date: day(ctx.proof?.at) })} open=${ctx.folds.proof} onToggle=${() => ctx.setFold('proof', !ctx.folds.proof)}>
+          <${Section} fold clip id="mcp-proof" num="·" title=${m('proofFold')} sub=${m('proofFoldSub', { date: day(provenAt ?? ctx.proof?.at) })} open=${ctx.folds.proof} onToggle=${() => ctx.setFold('proof', !ctx.folds.proof)}>
             ${proofBlock(ctx, true)}
           <//>
         <//>` : html`
