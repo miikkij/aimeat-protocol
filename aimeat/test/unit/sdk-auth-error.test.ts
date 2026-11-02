@@ -5,6 +5,7 @@
  *   code off the address, so a reload does not repeat it, and gives the sentence the sign-in dialog
  *   shows; a value that is not a code in our shape is shown as the general message, never echoed.
  * @version-history
+ *   2026-11-02 — readAuthStep() knows two_step_setup, and readTwoStepToken() reads its fragment.
  *   2026-10-24 — SECOND_FACTOR_EXPIRED says to sign in again, for every way the code step starts (secaudit2026oct22).
  *   v1.1.0 — 2026-10-09 — readAuthStep() and SECOND_FACTOR_EXPIRED (secaudit 2026-10-09, S1).
  *   v1.0.0 — 2026-09-29 — Initial.
@@ -65,6 +66,20 @@ describe('the refused sign-in on the front page', () => {
         at('https://node.test/?auth_step=second_factor&lang=fi');
         expect(readAuthStep()).toBe('second_factor');
         expect(replaced).toBe('/?lang=fi');
+    });
+
+    // Required two-step sign-in (2026-11-02): an emailed link on an account the operator's policy
+    // covers comes back as `?auth_step=two_step_setup#two_step=<token>`.
+    it('reads the two-step setup step and its token, and takes both off the address', async () => {
+        const { readAuthStep, readTwoStepToken } = await lib();
+        const token = 'a'.repeat(21) + '_' + 'B'.repeat(21);
+        at(`https://node.test/?auth_step=two_step_setup&lang=fi#two_step=${token}`);
+        expect(readAuthStep()).toBe('two_step_setup');
+        at(`https://node.test/?lang=fi#two_step=${token}`);
+        expect(readTwoStepToken()).toBe(token);
+        expect(replaced).toBe('/?lang=fi');
+        at('https://node.test/#two_step=%3Cscript%3E');
+        expect(readTwoStepToken()).toBeNull();
     });
 
     it('answers null for no step and for a step it does not know', async () => {

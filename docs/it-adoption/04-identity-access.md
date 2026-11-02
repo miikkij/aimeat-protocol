@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit e9b9813d5) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -19,9 +19,9 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 
 | Method | Default | Settings | What IT decides | Source |
 |---|---|---|---|---|
-| Password | On | `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5), `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15), `AIMEAT_LOGIN_RATE_LIMIT_MAX` | Whether people sign in locally at all, or only through the IdP. | `aimeat/src/utils/password-validation.ts`, `aimeat/src/services/password.ts` |
+| Password | On for everyone (`AIMEAT_PASSWORD_SIGN_IN=on`) | `AIMEAT_PASSWORD_SIGN_IN` (`on`, `operators`, `off`), `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5), `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15), `AIMEAT_LOGIN_RATE_LIMIT_MAX` | Whether people sign in locally at all: `operators` keeps the password for operator accounts only, `off` for nobody (see below). | `aimeat/src/utils/password-validation.ts`, `aimeat/src/services/password.ts`, `aimeat/src/services/sign-in-policy.ts` |
 | Passkey (WebAuthn) | On | `AIMEAT_PASSKEY_ENABLED`, `AIMEAT_PASSKEY_RP_ID`, `AIMEAT_PASSKEY_EXTRA_ORIGINS` | The domain, before the first passkey (see below). | `aimeat/src/routes/passkeys.ts`, `aimeat/src/config-types-account-security.ts` |
-| Two-step sign-in (TOTP) | Available, armed by each person | `AIMEAT_TOTP_ENABLED`, `AIMEAT_TOTP_MAX_FAILED` (5), `AIMEAT_TOTP_LOCKOUT_SECONDS` (300), `AIMEAT_TOTP_BACKUP_CODE_COUNT` (10) | Policy for who must arm it; the node does not force it. | `aimeat/src/config-types-account-security.ts` |
+| Two-step sign-in (TOTP) | Available, armed by each person; required for nobody (`AIMEAT_TWO_STEP_REQUIRED=off`) | `AIMEAT_TWO_STEP_REQUIRED` (`off`, `operators`, `everyone`), `AIMEAT_TOTP_ENABLED`, `AIMEAT_TOTP_MAX_FAILED` (5), `AIMEAT_TOTP_LOCKOUT_SECONDS` (300), `AIMEAT_TOTP_BACKUP_CODE_COUNT` (10) | Who must use it: operator accounts or every account (see below). | `aimeat/src/config-types-account-security.ts`, `aimeat/src/services/sign-in-policy.ts` |
 | Sign-in link by email | Per account: on once the person has proved an address through email verification or attach-email, off for accounts created by SCIM, SAML or OIDC; no node-wide switch | Rate limit 5 requests per IP address per 10 minutes | Whether email delivery is configured. | `aimeat/src/services/login-link.ts`, `aimeat/src/routes/ghii/web-verify.ts`, `aimeat/src/routes/ghii/login-link-second-factor.ts` |
 | Microsoft Entra ID (OIDC) | Off | `AIMEAT_ENTRA_OAUTH_ENABLED`, `AIMEAT_ENTRA_OAUTH_TENANT`, `AIMEAT_ENTRA_ALLOWED_TENANTS`, `AIMEAT_ENTRA_LINK_DOMAINS` | Tenants allowed, domains whose addresses count as verified. | `aimeat/src/services/oidc-providers.ts` |
 | Google (OIDC) | Off | `AIMEAT_GOOGLE_OAUTH_ENABLED` and client settings | Whether any Google account may sign in (there is no domain gate). | `aimeat/src/services/oidc-providers.ts` |
@@ -42,7 +42,7 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 
 - An invalid value stops the node from starting, because the default is not a safe fallback (`aimeat/.env.example`).
 - An operator can change the mode at runtime with `PUT /v1/admin/config` and `registration.mode` ([Organisation node sign-in](../organisation-node-sign-in.md), section 4).
-- Under `oauth` and `invite`, any member can create an invitation, and the invited person gets an account with a password ([Organisation node sign-in](../organisation-node-sign-in.md), section 6).
+- Under `oauth` and `invite`, any member can create an invitation, and the invited person gets an account with a password ([Organisation node sign-in](../organisation-node-sign-in.md), section 6), unless `AIMEAT_PASSWORD_SIGN_IN` is `operators` or `off`: then an invitation that sets a password is refused (403 `PASSWORD_SIGN_IN_OFF`, `aimeat/src/routes/invite-accept.ts`).
 - For an organisation node: `oauth` plus the Entra tenant allowlist, or `invite` when every person is named by hand. Pair it with `AIMEAT_CONTENT_ACCESS=signed-in` so that a visitor without an account sees nothing ([Organisation node sign-in](../organisation-node-sign-in.md), section 6b).
 
 ## Organisation sign-in: OIDC, SAML and SCIM
@@ -134,9 +134,36 @@ flowchart LR
 - The secret is encrypted with `AIMEAT_ENCRYPTION_KEY` (or `AIMEAT_TOTP_ENCRYPTION_KEY`); with neither, nobody can arm TOTP (`aimeat/.env.example`).
 - **Recovery.** A person removes their own factor with a current code or a backup code. An operator can remove another person's factor without a code (`DELETE /v1/admin/owners/:name/totp`, `aimeat_admin_totp_reset`); the password still stands, the person gets an account event naming the operator, and the node logs a warning. An operator cannot reset their own factor: another operator or a backup code does it (`aimeat/src/services/totp-recovery.ts`).
 
+## Requiring two-step sign-in, limiting password sign-in
+
+Two settings decide the sign-in policy. Both can be changed while the node runs: on the admin Config page, with `PUT /v1/admin/config` or with `aimeat_admin_config_set` (`aimeat/.env.example`, `aimeat/src/services/config-schema-access.ts`).
+
+| Setting | Values | What it does | Source |
+|---|---|---|---|
+| `AIMEAT_TWO_STEP_REQUIRED` (Config `auth.two_step_required`) | `off` (default), `operators`, `everyone` | Who must use two-step sign-in: nobody, accounts with the operator role, or every account | `aimeat/src/services/sign-in-policy.ts` |
+| `AIMEAT_PASSWORD_SIGN_IN` (Config `auth.password_sign_in`) | `on` (default), `operators`, `off` | Who may sign in with a password: everyone, operator accounts only, or nobody | `aimeat/src/services/sign-in-policy.ts` |
+
+**Required two-step sign-in.**
+
+- A covered account without TOTP that signs in with a password or an emailed link gets no session. The password route answers 403 `TWO_STEP_SETUP_REQUIRED` with a setup token; the emailed link opens the enrolment step of the sign-in dialog. The token lasts 10 minutes, is bound to one account and works once; only its SHA-256 hash is stored (`aimeat/src/services/two-step-setup.ts`).
+- The person enrols at `POST /v1/ghii/login/two-step/start` and `POST /v1/ghii/login/two-step/finish`. Finish checks the first code, arms TOTP, gives the backup codes once and signs the person in (`aimeat/src/routes/ghii/login-two-step.ts`).
+- A passkey sign-in and an identity provider sign-in (OIDC or SAML) satisfy the rule; on those paths the factor is the device or the identity provider's MFA (`aimeat/src/services/sign-in-policy.ts`).
+- A session refresh of a covered account with no TOTP, no passkey and no identity provider link is refused, so the person signs in again and enrols (`aimeat/src/services/owner-session.ts`).
+- Agents, ecosystem apps and visitors from another node are not covered (`aimeat/src/services/sign-in-policy.ts`). When this node is the home node of a federated sign-in, it refuses a covered account without TOTP (`aimeat/src/routes/federation-auth.ts`).
+- The rule needs TOTP on: a save that leaves it required while `AIMEAT_TOTP_ENABLED` is false is refused with 409 `TWO_STEP_NEEDS_TOTP`, whichever of the two settings the save changes. Set that way from the environment, the node starts and logs a `SECURITY` warning (`aimeat/src/services/config-admin-view.ts`, `aimeat/src/index-start.ts`).
+
+**Password sign-in.**
+
+- `off` refuses with 403 `PASSWORD_SIGN_IN_OFF` every local password sign-in, password registration, invitation with a password, organism code key, password reset and password change. The sign-in dialog then shows no password form (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/routes/ghii/recovery.ts`, `aimeat/src/static/sdk-libs/auth/modal.js`).
+- `operators` keeps the password for operator accounts, as the way in when the other methods fail. The node checks the password first and the role after, and a non-operator gets the same `PASSWORD_SIGN_IN_OFF`, so the answer does not tell the role (`aimeat/src/services/sign-in-policy.ts`).
+- The first operator still gets a password, through the setup wizard or `POST /v1/admin/setup/register` (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/routes/admin/setup-register.ts`).
+- Saving `off` is refused with 409 `OPERATOR_LOCKOUT` while no operator account has a passkey or an identity provider link. Set that way from the environment, the node starts and logs a `SECURITY` warning (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/index-start.ts`).
+
+**Who changes them.** A change that weakens either setting is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set` (`aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`).
+
 ## First-run setup
 
-- While the node has no operator, it prints a one-time setup code in its start log. Every self-registration and IdP route that would create the first operator asks for it, unless the base URL is loopback and the request comes from this machine with no forwarding header (`aimeat/src/services/setup-code.ts`). The exception is `POST /v1/admin/setup/register`, which asks for the admin password instead, until an operator exists (`aimeat/src/routes/admin.ts`): keep that password as secret as the data key.
+- While the node has no operator, it prints a one-time setup code in its start log. Every route that would create the first operator asks for it, unless the base URL is loopback and the request comes from this machine with no forwarding header (`aimeat/src/services/setup-code.ts`): the setup wizard, self-registration, an identity provider's first sign-in, and `POST /v1/admin/setup/register`, which asks for the admin password and the code (`aimeat/src/routes/admin/setup-register.ts`).
 - The code has 60 bits of randomness; only its SHA-256 digest is kept in memory; it is used once; a restart issues a new one while the node still has no operator (`aimeat/src/services/setup-code.ts`).
 - `AIMEAT_SETUP_ALLOWED_IPS` can also limit the setup to named addresses (`aimeat/.env.example`).
 - The admin setup page `/v1/admin/setup` is opened with `AIMEAT_ADMIN_PASSWORD`, or with a random secret the node writes to a file (mode 0600) while it has no owner and deletes after. It answers 410 once an operator exists, unless `AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=true`, which is for test nodes only (`aimeat/.env.example`).
@@ -217,16 +244,16 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 
 - The first operator is created through the setup code flow above. An operator gives the operator role to another account and takes it back (`POST /v1/admin/roles/grant`, `POST /v1/admin/roles/revoke`); the last operator and the operator themselves cannot be revoked, and each change is recorded (`aimeat/src/routes/admin-monitoring.ts`).
 - An agent of an operator account acts as operator only for the exact words the operator ticks for it, such as `operator:admin` (`aimeat/src/services/operator-principal.ts`). An agent holding `operator:admin` passes every operator REST route and MCP admin tool, by design (`aimeat/src/auth/operator-gate.ts`).
-- Turn on TOTP or a passkey for every operator account ([Deployment checklist](../security/deployment-checklist.md)); the node does not enforce it.
+- Turn on TOTP or a passkey for every operator account ([Deployment checklist](../security/deployment-checklist.md)), and set `AIMEAT_TWO_STEP_REQUIRED=operators` so that the node enforces it (`aimeat/src/services/sign-in-policy.ts`).
 
 ## Limits
 
-- The node cannot require a second factor. There is no setting that forces TOTP or a passkey on every account, or on operator accounts.
-- After the first linked OIDC or SAML sign-in, the node asks no TOTP code; MFA on that path is the identity provider's.
+- Two-step sign-in is required for nobody until `AIMEAT_TWO_STEP_REQUIRED` is set; the default is `off` (`aimeat/src/config-types-account-security.ts`).
+- After the first linked OIDC or SAML sign-in, the node asks no TOTP code, and such a sign-in satisfies a required two-step rule; MFA on that path is the identity provider's, and the node does not check it.
 - Passkey sign-in skips TOTP by design: the device is the factor.
-- No code path was found that limits an account the directory manages to its SSO connection. Such an account gets no emailed sign-in link unless the person later attaches and verifies an address, but it can get a password through the reset flow, because its directory-vouched address is recorded as verified. The emailed sign-in link has no node-wide switch.
+- No code path was found that limits one account the directory manages to its SSO connection while others keep a password. Such an account gets no emailed sign-in link unless the person later attaches and verifies an address, but it can get a password through the reset flow while `AIMEAT_PASSWORD_SIGN_IN` is `on`, because its directory-vouched address is recorded as verified. `operators` or `off` refuses that reset node-wide for non-operators (`aimeat/src/routes/ghii/recovery.ts`). The emailed sign-in link has no node-wide switch.
 - Google sign-in has no domain gate: when it is on, any Google account can sign in, and under `open` or `oauth` mode it creates an account.
-- Under `oauth` and `invite`, every member can create invitations, and invited people get password accounts from any tenant or none.
+- Under `oauth` and `invite`, every member can create invitations, and invited people get password accounts from any tenant or none, unless `AIMEAT_PASSWORD_SIGN_IN` is `operators` or `off`.
 - SAML: no Single Logout, no signed AuthnRequests, no encrypted assertions.
 - SCIM: Users only, no Groups; roles and organism membership are not mapped from directory groups.
 - Password strength is fixed in code (at least 8 characters, upper case, lower case, a digit, a list of 20 common passwords refused); it cannot be configured and is not checked against breached-password lists.
@@ -241,7 +268,7 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 
 ## Open questions
 
-- OPEN: Is there a supported way to make an SSO-managed account sign in only through its identity provider (no password, no emailed sign-in link)? The maintainer named in `.github/SECURITY.md` can answer.
+- OPEN: Is there a supported way to stop an SSO-managed account from signing in with an emailed sign-in link, so that it signs in only through its identity provider? `AIMEAT_PASSWORD_SIGN_IN` covers the password; the link has no switch. The maintainer named in `.github/SECURITY.md` can answer.
 - OPEN: What is the supported recovery when the only operator of a node loses both the TOTP device and the backup codes? The maintainer can answer.
 - OPEN: Which scopes does a new agent created on the MCP OAuth consent page start with when the owner keeps the preselected choice: `AIMEAT_DEFAULT_AGENT_SCOPES` or another set? The maintainer can answer; `aimeat/public/oauth-consent.html` holds the page.
 - OPEN: Can an organisation's IdP group membership be mapped to organism membership or to the operator role in any way other than one organism per SSO connection? The maintainer can answer.

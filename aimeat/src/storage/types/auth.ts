@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Auth, OAuth, device/eco authorization, consent, and identity-verification record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-11-02 — VerificationNonceRecord type `two_step_setup`: the setup token of a required
+ *     two-step enrolment (services/two-step-setup.ts).
  *   v1.3.0 — 2026-10-12 — ConsentRecord.scope is the reach `local` | `federation` | `auth`
  *     (utils/consent-reach.ts, Core 2026-11 AUTHZ-18); `private` and `dmz` are read as `local`.
  *   v1.2.0 — 2026-10-09 — VerificationNonceRecord type `login_second_factor`: the ticket an emailed
@@ -270,9 +272,10 @@ export interface VerificationNonceRecord {
   id: string;
   owner: string;
   /** `mcp_connect` is a remote MCP server's OAuth round; `connect` is an outbound ACCOUNT's.
-   *  `login_second_factor` is a spent sign-in link waiting for the account's TOTP code. */
+   *  `login_second_factor` is a spent sign-in link waiting for the account's TOTP code.
+   *  `two_step_setup` is a checked sign-in waiting for a required two-step enrolment (services/two-step-setup.ts). */
   type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'saml_login' | 'connect' | 'mcp_connect'
-    | 'login_second_factor';
+    | 'login_second_factor' | 'two_step_setup';
   state: string;
   /** OIDC nonce for the login types; the PKCE code_verifier for `connect`. */
   nonce: string;

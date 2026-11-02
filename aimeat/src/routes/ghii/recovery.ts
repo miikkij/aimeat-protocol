@@ -6,6 +6,10 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-02 — The password sign-in policy (services/sign-in-policy.ts): with it off,
+ *     /password/reset-request and /password/reset answer 403 PASSWORD_SIGN_IN_OFF before anything is
+ *     read; under `operators` the reset refuses a non-operator after the code and before it is spent.
+ *     /password/change refuses a new password the same way (IT review).
  *   2026-10-27 — A password reset or change tells the person which of their Full and operator access
  *     tokens still act as them (services/owner-tokens-kept-notice.ts; secaudit2026oct26,
  *     owner-level-pat-session-survives-reset).
@@ -72,6 +76,8 @@ import { sixDigitCode } from '../../utils/one-time-code.js';
 import { endPersonSessionsAfterPasswordChange } from '../../services/owner-session.js';
 import { recoveryAddressIs, provenRecoveryAddress, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
 import { tellOwnerTokensKept } from '../../services/owner-tokens-kept-notice.js';
+import { passwordSignInRefusal, newPasswordRefusal } from '../../services/sign-in-policy.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
 
 /**
  * Replace the owner's Ed25519 signing key and hand the new private half to nobody. The key signs in
@@ -267,6 +273,15 @@ export function registerRecoveryRoutes(
     router.post('/v1/ghii/password/reset-request', rateLimit({ max: 3, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
         const rawUsername = (req.body ?? {}).username;
 
+        // Password sign-in off (services/sign-in-policy.ts): no reset code is mailed, because the
+        // password it would set signs nobody in. Under `operators` the code goes out as before and the
+        // reset below refuses a non-operator after the code, so this answer tells no role.
+        const passwordOff = passwordSignInRefusal(config);
+        if (passwordOff) {
+            res.status(passwordOff.status).json(error(config.nodeId, passwordOff.code, passwordOff.message));
+            return;
+        }
+
         if (!rawUsername || typeof rawUsername !== 'string') {
             // Always return same response to not reveal if account exists
             res.json(success(config.nodeId, {
@@ -344,6 +359,13 @@ export function registerRecoveryRoutes(
     router.post('/v1/ghii/password/reset', rateLimit({ max: 3, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
         const { username: rawUsername, code, newPassword } = req.body ?? {};
 
+        // Password sign-in off: no password is set (services/sign-in-policy.ts).
+        const passwordOff = passwordSignInRefusal(config);
+        if (passwordOff) {
+            res.status(passwordOff.status).json(error(config.nodeId, passwordOff.code, passwordOff.message));
+            return;
+        }
+
         if (!rawUsername || typeof rawUsername !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
             return;
@@ -399,6 +421,14 @@ export function registerRecoveryRoutes(
             return;
         }
 
+        // `operators`: only an operator account gets a new password. Asked after the code, so only
+        // the holder of the account's mailbox learns the answer, and before the code is spent.
+        const notForThisAccount = newPasswordRefusal(config, isOperatorAccount(await storage.getOwner(username)));
+        if (notForThisAccount) {
+            res.status(notForThisAccount.status).json(error(config.nodeId, notForThisAccount.code, notForThisAccount.message));
+            return;
+        }
+
         // Code valid: spend it first, in one conditional write, so of two requests with the right code
         // only one sets a password.
         if (!(await storage.spendEmailVerification(record.id, new Date().toISOString()))) {
@@ -444,6 +474,15 @@ export function registerRecoveryRoutes(
 
         if (!new_password || typeof new_password !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'new_password is required'));
+            return;
+        }
+
+        // The password sign-in policy (services/sign-in-policy.ts): a new password is refused with
+        // password sign-in off, and under `operators` for an account without the operator role. The
+        // person is signed in, so the answer tells them nothing they could not read on their account.
+        const noNewPassword = newPasswordRefusal(config, isOperatorAccount(await storage.getOwner(ownerName)));
+        if (noNewPassword) {
+            res.status(noNewPassword.status).json(error(config.nodeId, noNewPassword.code, noNewPassword.message));
             return;
         }
 

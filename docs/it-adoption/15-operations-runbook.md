@@ -1,6 +1,6 @@
 # 15 Operations runbook
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
 
 How an AIMEAT node is installed, configured and run day to day, what to do when a common symptom appears, and who is responsible for what. It is for the operator (the account with the node's admin role, `docs/coding-guidelines/identity-model.md`) and for the IT and security staff behind that account. The order of first-time steps is on [00 Go-live checklist](00-go-live-checklist.md); this page is what comes after, plus the short install sequence.
 
@@ -33,7 +33,7 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 | `AIMEAT_CONTENT_ACCESS` | `open` | `signed-in` for an internal node | `aimeat/.env.example` |
 | `AIMEAT_PUBLISH_GATE` | `off` (code default; `aimeat init` writes `agents-and-apps`) | `agents-and-apps`: an agent or app asks the owner before it makes anything public | `aimeat/.env.example` |
 | `AIMEAT_SEO_INDEXING` | `on` | `off` for an internal node | `aimeat/src/middleware/robots-header.ts` |
-| `AIMEAT_ENCRYPTION_KEY` | none. The node then uses `AIMEAT_TOTP_ENCRYPTION_KEY`, which `aimeat init` generates. With neither, the features that store a secret answer 503 | 64 hex characters, kept in the secrets store, never changed. On a node installed with `aimeat init`, `AIMEAT_TOTP_ENCRYPTION_KEY` is the data key; keep and back up that one too. Set `AIMEAT_ENCRYPTION_KEY` before the first start: added later, it becomes the data key, nothing is re-encrypted, and stored AI provider keys, MCP server credentials, outside-account connections and payment provider keys stop working until entered again ([11 Backup and recovery](11-backup-recovery.md#what-must-be-backed-up)) | `aimeat/.env.example`, `aimeat/src/services/encryption.ts` |
+| `AIMEAT_ENCRYPTION_KEY` | none. The node then uses `AIMEAT_TOTP_ENCRYPTION_KEY`, which `aimeat init` generates. With neither, the features that store a secret answer 503 | 64 hex characters, kept in the secrets store, never changed. On a node installed with `aimeat init`, `AIMEAT_TOTP_ENCRYPTION_KEY` is the data key; keep and back up that one too. Added later, `AIMEAT_ENCRYPTION_KEY` becomes the data key for new secrets, and the ones stored before keep opening with the TOTP key, so keep that key set too ([11 Backup and recovery](11-backup-recovery.md#what-must-be-backed-up)) | `aimeat/.env.example`, `aimeat/src/services/encryption.ts` |
 | `AIMEAT_KEY_PASSPHRASE` | none | Set; kept with the data key | `aimeat/.env.example` |
 | `AIMEAT_ADMIN_PASSWORD` | generated per start, written to `admin-setup-secret` while no owner exists | Set a long random value, or leave unset and protect the file | `aimeat/.env.example` |
 | `AIMEAT_TRUST_PROXY` | loopback trusted when the base URL is not localhost | A hop count (`1`) or the proxy's subnet; not `true` unless the outer proxy overwrites forwarded headers | [production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
@@ -44,6 +44,8 @@ Every setting is in `aimeat/.env.example` and in the [configuration reference](.
 | `AIMEAT_ENTRA_ALLOWED_TENANTS` | empty | The organisation's tenant GUID and approved partners | [organisation node sign-in](../organisation-node-sign-in.md#4-configure-the-node) |
 | `AIMEAT_GOOGLE_OAUTH_ENABLED` | `false` | Keep off on an organisation node: no domain gate | [organisation node sign-in, section 6](../organisation-node-sign-in.md#6-what-the-gate-does-not-cover) |
 | `AIMEAT_SSO_ENABLED` | `false` | On when SAML or SCIM is used | [organisation node sign-in, section 7](../organisation-node-sign-in.md#7-saml-and-scim-the-organisations-own-identity-provider-br-04) |
+| `AIMEAT_TWO_STEP_REQUIRED` | `off` (required for nobody) | `operators`, or `everyone` when local accounts must also have two-step sign-in; keep `AIMEAT_TOTP_ENABLED` on | `aimeat/src/services/sign-in-policy.ts` |
+| `AIMEAT_PASSWORD_SIGN_IN` | `on` (every account) | `operators` with an IdP; `off` only when every operator has a passkey or an IdP link | `aimeat/src/services/sign-in-policy.ts` |
 | `AIMEAT_AI_PROVIDER_ALLOWLIST` | empty (any host) | The provider hosts in use, for example `openrouter.ai` | `aimeat/src/config-posture.ts` |
 | `AIMEAT_AI_OPENROUTER_REGION`, `AIMEAT_AI_OPENROUTER_REGION_FALLBACK` | `any`, `us` | The region the DPO approved, and fallback `off` if no other region is acceptable | [where AI calls are processed](../operations/openrouter-region.md#the-four-settings) |
 | `AIMEAT_EXT_INSTALL_ROLE` | `owner` (any account installs extensions) | `operator` | `aimeat/src/config-posture.ts` |

@@ -10,6 +10,9 @@
  * @structure HEART_SVG, RULE_MARKS (the dialog's two marks) · MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.6.0 — 2026-11-02 — The two-step enrolment step's QR code, key and backup-code list (.aimeat-ts-*).
+ *     The QR stands on white whatever the theme, because an authenticator app reads dark on light.
+ *     The key wraps between its groups of four (overflow-wrap only when one group cannot fit).
  *   v1.5.0 — 2026-11-01 — The node's address in the crumb is shown whole and wraps when long, not cut
  *     with an ellipsis (Jouni's review of v33, K24).
  *   v1.4.0 — 2026-10-31 — HEART_SVG and RULE_MARKS moved here from modal.js unchanged (pure extraction,
@@ -150,4 +153,10 @@ export var MODAL_CSS = [
   '.aimeat-why-row:last-child{border-bottom:0}',
   '.aimeat-why-row.strong{font-weight:600}',
   '.aimeat-why-num{font:400 12px/1.45 ' + mono + ';color:' + accent + '}',
+  /* The two-step enrolment step (modal-two-step.js): the QR on paper with a quiet zone, the key in the
+     mono face so a hand-typed copy is legible, and the backup codes as a two-column list. */
+  '.aimeat-ts-qr{display:block;width:180px;height:180px;margin:0 0 12px;padding:8px;background:#fff;border:2px solid ' + ink + '}',
+  '.aimeat-ts-secret{font:400 12.5px/1.45 ' + mono + ';color:' + ink + ';overflow-wrap:anywhere}',
+  '.aimeat-ts-codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:0 0 16px;padding:0;list-style:none;',
+    'font:400 14px/1.45 ' + mono + ';color:' + ink + '}',
 ].join('');

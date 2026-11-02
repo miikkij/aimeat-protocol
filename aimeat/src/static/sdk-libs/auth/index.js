@@ -10,6 +10,8 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.8.0 — 2026-11-02 — `?auth_step=two_step_setup#two_step=<token>` opens the sign-in dialog on the
+ *     two-step enrolment step (required two-step sign-in); the bundle version moves.
  *   v1.7.0 — 2026-10-09 — `?auth_step=second_factor` opens the sign-in dialog on its code view: an
  *     emailed link on an account with two-step sign-in (secaudit 2026-10-09, S1); the bundle version moves.
  *   v1.6.1 — 2026-10-01 — <html lang> names the stored language at load (aimeatRestoreLang), beside
@@ -42,7 +44,7 @@
  */
 import { auth, refreshOnFocus } from './session.js';
 import { maybeShowGoogleSignup } from './signup.js';
-import { readAuthError, readAuthStep } from './auth-error.js';
+import { readAuthError, readAuthStep, readTwoStepToken } from './auth-error.js';
 import { showLoginModal } from './modal.js';
 import { currentModalLang, loadModalI18n } from './i18n.js';
 import { attach } from '../_core/namespace.js';
@@ -64,9 +66,17 @@ function maybeShowAuthError() {
   // An emailed sign-in link on an account with two-step sign-in (?auth_step=second_factor): the
   // dialog opens on its code view. The dictionary is loaded first, because the dialog does not
   // redraw in a new language while a step is open (modal.js busyOrAway).
-  if (readAuthStep() === 'second_factor') {
+  var step = readAuthStep();
+  if (step === 'second_factor') {
     loadModalI18n(currentModalLang()).then(function (i18n) {
       showLoginModal({ i18n: i18n || {}, secondFactorLink: true }, function () {});
+    });
+  }
+  // The operator requires two-step sign-in and the link's account has no app yet: the enrolment step.
+  var setupToken = step === 'two_step_setup' ? readTwoStepToken() : null;
+  if (setupToken) {
+    loadModalI18n(currentModalLang()).then(function (i18n) {
+      showLoginModal({ i18n: i18n || {}, twoStepSetup: setupToken }, function () {});
     });
   }
 }
@@ -108,4 +118,4 @@ if (typeof document !== 'undefined' && document.readyState === 'loading' && docu
 }
 
 const ns = attach('auth', auth);
-ns.version = '2026-10-09-001';
+ns.version = '2026-11-02-001';

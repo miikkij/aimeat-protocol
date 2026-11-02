@@ -17,6 +17,8 @@
  * @structure completeOwnerLogin(config, storage, req, res, args) -> writes the response itself
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
+ *   2026-11-02 — args.extra: fields the calling route adds to the answer (the backup codes of a
+ *     required two-step enrolment, routes/ghii/login-two-step.ts).
  *   2026-10-27 — The self-heal claim reads fromNodeMachine(req): a sign-in the node replays onto loopback for a remote agent (the connector tunnel) is not this machine's own (secaudit2026oct26).
  *   2026-10-27 — The self-heal claim reads requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — The self-heal claim reads the request's socket address: a loopback base URL waives the
@@ -54,9 +56,9 @@ export async function completeOwnerLogin(
   storage: Storage,
   req: Request,
   res: Response,
-  args: { ghiiRecord: GHIIRecord; loginName: string; wantsOwnerKey: boolean },
+  args: { ghiiRecord: GHIIRecord; loginName: string; wantsOwnerKey: boolean; extra?: Record<string, unknown> },
 ): Promise<void> {
-  const { ghiiRecord, loginName, wantsOwnerKey } = args;
+  const { ghiiRecord, loginName, wantsOwnerKey, extra } = args;
   // Deactivated account (BR-04): refused AFTER the password check on purpose — answering
   // before it would tell anyone who types a username whether the account is disabled.
   // Refused BEFORE the login-count write and the session, so nothing records a "login".
@@ -176,6 +178,8 @@ export async function completeOwnerLogin(
       // First-login durable credentials for a provisioned-code account (also emailed). Lets the
       // entry surface show the exact username + password the login form accepts. Absent otherwise.
       ...(keyCredentials ? { key_credentials: keyCredentials } : {}),
+      // What the route that ended here adds: the backup codes of a two-step enrolment (login-two-step.ts).
+      ...(extra ?? {}),
   }, [
       { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
       { description: 'Upload an app', method: 'POST', url: '/v1/apps' },

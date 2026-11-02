@@ -6,6 +6,8 @@
  *   (Login + Register tabs) served by the admin setup routes. Extracted from
  *   src/routes/admin.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 -- 2026-11-02 -- The Register tab asks for the one-time setup code from the start log and sends
+ *     it as setupCode; POST /v1/admin/setup/register asks for it on a node without an operator.
  *   v1.1.0 — 2026-10-23 — The account-key sign-in form is gone (removed from the node in 4.0.0); the
  *     Register tab asks for a password and signs the new operator in with it on /v1/ghii/login
  *     (secaudit2026oct22; Jouni, 2026-10-23). The page opens on the tab the route fills in as
@@ -163,6 +165,9 @@ a:hover{text-decoration:underline}
   <label>Password</label>
   <input type="password" id="regPassword" placeholder="Set a login password" autocomplete="new-password"/>
   <p class="pw-hint">You sign in with your username and this password.</p>
+  <label>Setup code</label>
+  <input type="text" id="regSetupCode" placeholder="XXXX-XXXX-XXXX" autocomplete="off"/>
+  <p class="pw-hint">The one-time code in the node's start log, on the line that starts with "Setup code". Not needed when you open this page on the node's own machine at a localhost address.</p>
   <button class="btn-primary" id="btnRegister">Create Account</button>
   <div id="regResult" class="hidden"></div>
   <div id="regKeys" class="hidden">
@@ -257,7 +262,8 @@ async function doRegister(){
   if(!name||!password){show('regResult','Owner name and password are required','result-err');return;}
   document.getElementById('btnRegister').disabled=true;
   try{
-    const body={name:name,display_name:dname||undefined,password:password};
+    const setupCode=document.getElementById('regSetupCode').value.trim();
+    const body={name:name,display_name:dname||undefined,password:password,setupCode:setupCode||undefined};
     const r=await api('POST','/v1/admin/setup/register',body);
     if(!r.ok){show('regResult',esc((r.error&&r.error.message)||r.error||'Registration failed'),'result-err');document.getElementById('btnRegister').disabled=false;return;}
     regOwner=r.owner.name;regPass=password;

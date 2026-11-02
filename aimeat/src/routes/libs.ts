@@ -9,6 +9,7 @@
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
  * v2.16.0 - 2026-11-01 - Serves aimeat-parties.js, which answered 404 since D4 shipped it (WP9d).
+ * v2.16.0 - 2026-11-02 - The aimeat-auth prelude carries the sign-in policy (passwordSignIn, twoStepRequired), which the sign-in dialog reads.
  * v2.15.0 - 2026-10-31 - The aimeat-auth prelude says whether the sign-in dialog opens on the emailed link (linkFirst, a store-bought node; v28 #7).
  * v2.14.0 - 2026-10-05 - Serves aimeat-validate.js (input checked against a JSON Schema, messages per field).
  * v2.13.0 - 2026-09-29 - Serves aimeat-labels.js (content classification, TARGET-082 V5).
@@ -288,6 +289,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
       // A node bought from the store (site.purchase_plan): its buyer has no password and was promised
       // none, so the sign-in dialog opens on the emailed link (v28 #7).
       linkFirst: !!(config.siteLinks.purchasePlan ?? '').trim(),
+      // The operator's sign-in policy (services/sign-in-policy.ts): with password sign-in off the
+      // dialog shows no password form, with `operators` it shows it as the operators' way in; and
+      // whether a sign-in may stop at the two-step enrolment step.
+      passwordSignIn: config.passwordSignIn,
+      twoStepRequired: config.twoStepRequired,
     })};
 `;
     sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));
