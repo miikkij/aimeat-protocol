@@ -23,10 +23,12 @@
  *   visibility rules or a way to take a row back. Making it public is a separate decision and a
  *   separate piece of work.
  * @structure readHomeFeed(storage, config, owner, opts) → FeedItem[] ·
- *   homeFeedAnswer(storage, config, owner, reader) → { items, total, note? }
+ *   homeFeedAnswer(storage, config, owner, reader) → { items, total, note? } ·
+ *   homeFeedAsShown(storage, config, owner, answer) → the same, as the home shows it
  * @usage
  *   import { readHomeFeed, homeFeedAnswer } from '../services/home-feed.js';
  * @version-history
+ *   v2.3.0 — 2026-11-02 — homeFeedAnswer gives the rows as the home shows them (homeFeedAsShown): an agent's shown name in `agent_shown_name`, no row saying a node-resident agent (the chat, a basic agent) joined or left, and no AI cost row on a sold node, which the home already hid.
  *   v2.2.0 — 2026-11-02 — homeFeedAnswer: the answer GET /v1/home/feed and aimeat_home_feed both give, with the live knocking row.
  *   v2.1.0 — 2026-10-22 — readHomeFeed takes the reader and projects each recorded row for them (services/account-event-view.ts): a task row's title and decline reason only for the owner in person, an app grant holding task:read and the task's own agent; every other reader keeps the row and its `withheld` fields are named (secaudit 2026-10, v89).
  *   v2.0.0 — 2026-08-17 — The derived path is gone. Every row but the live one comes from
@@ -41,6 +43,7 @@ import { logger } from '../utils/logger.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { readAccountEvents, recordAccountEvent } from './account-events.js';
 import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from './account-event-view.js';
+import { isNodeResidentAgent } from './node-resident-agent.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
@@ -123,7 +126,42 @@ export async function homeFeedAnswer(
     const pending = await storage.listPendingDeviceAuthByOwner(owner);
     const items = await readHomeFeed(storage, config, owner, { pendingAgents: pending.length, reader });
     const withheld = items.some(i => !!i.withheld);
-    return { items, total: items.length, ...(withheld ? { note: TASK_CONTENT_NOTE } : {}) };
+    return homeFeedAsShown(storage, config, owner, { items, total: items.length, ...(withheld ? { note: TASK_CONTENT_NOTE } : {}) });
+}
+
+/**
+ * The feed as the person's own home shows it, which homeFeedAnswer gives the page and an AI that
+ * answers them (aimeat_home_feed) alike. A row
+ * that names an agent gets `agent_shown_name`, the name the Agents page shows ("Aamukatsaus" for
+ * morning-digest). A row saying that an agent the node runs itself (the chat, a basic agent) joined or
+ * left is left out. On a node the store sold, the day's AI cost row is left out, as the home leaves it
+ * out for a buyer (public/views/home/feed.js isBookkeeping). On crew71 the chat answered from the raw
+ * rows: '"morning-digest" -agentti' and '0,0078 $ kulunut' (commercial-88, 2.11).
+ */
+/** The rows that say an agent joined or left. */
+const MEMBERSHIP_KINDS: ReadonlySet<string> = new Set(['agent_connected', 'agent_removed']);
+
+export async function homeFeedAsShown(
+    storage: Storage, config: AimeatConfig, owner: string, answer: { items: FeedItem[]; total: number; note?: string },
+): Promise<{ items: FeedItem[]; total: number; note?: string }> {
+    const sold = !!(config.siteLinks?.purchasePlan ?? '').trim();
+    const agents = await storage.getAgentsByOwner(owner).catch((err: Error) => {
+        logger.warn('home-feed: the agents could not be read for their shown names', { owner, error: err.message });
+        return [];
+    });
+    const shown = new Map(agents.map(a => [a.name, a.displayName?.trim() || a.name]));
+    // The agents the node runs itself (the chat, the basic agents) did not join: the person never
+    // connected them, and no other page lists them as joined (crew71: "concierge" among the connected).
+    const resident = new Set(agents.filter(isNodeResidentAgent).map(a => a.name));
+    const items = answer.items
+        .filter(i => !(sold && i.kind === 'ai_spend_daily'))
+        .filter(i => !(MEMBERSHIP_KINDS.has(i.kind) && resident.has(i.data?.name ?? i.data?.agent ?? '')))
+        .map(i => {
+            const short = i.data?.agent || i.data?.name;
+            const name = short ? shown.get(short) : undefined;
+            return name && name !== short ? { ...i, data: { ...i.data, agent_shown_name: name } } : i;
+        });
+    return { ...answer, items, total: items.length };
 }
 
 /** Which marker becomes which row, for an account that predates the recorded feed. */

@@ -635,7 +635,7 @@ async function run(): Promise<void> {
         };
         await turn(clockThread, { text: 'mitä kello on', lang: 'fi', timezone: 'Europe/Helsinki' });
         const local = firstNote();
-        assert(local.includes('(time zone Europe/Helsinki)') && local.includes('never UTC'), `the note names the zone: ${local.slice(local.indexOf('[A note'), local.indexOf('[A note') + 300)}`);
+        assert(local.includes('(time zone Europe/Helsinki)') && local.includes('never UTC') && local.includes('Times in tool answers are UTC'), `the note names the zone: ${local.slice(local.indexOf('[A note'), local.indexOf('[A note') + 300)}`);
         const year = String(new Date().getUTCFullYear());
         assert(local.includes(`It is now `) && local.includes(year), 'the note carries the date');
         await turn(clockThread, { text: 'mitä kello on', lang: 'fi', timezone: 'Not/AZone' });

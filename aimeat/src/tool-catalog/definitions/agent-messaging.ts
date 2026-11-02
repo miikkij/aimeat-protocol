@@ -225,7 +225,7 @@ export const agentMessagingTools = [
     {
         // GET /v1/home/feed, through the same service (services/home-feed.ts).
         name: 'aimeat_home_feed',
-        description: 'What the person\'s home page lists as having happened on their account, newest first: agents connecting or waiting for approval, agent work done or failed, apps published, organisms joined, installs, payments and the like. Each row has a stable `kind`, its time, a `link` to the page it opens and `data` with the names in it. Use it when the person asks what their home shows, what has happened lately or what is new, and answer from the rows in their words; an empty list means nothing has happened yet, not that the page is broken.',
+        description: 'What the person\'s home page lists as having happened on their account, newest first: agents connecting or waiting for approval, agent work done or failed, apps published, organisms joined, installs, payments and the like. Each row has a stable `kind`, its time, a `link` to the page it opens and `data` with the names in it; name an agent by `data.agent_shown_name` when the row has it, as the home does. Use it when the person asks what their home shows, what has happened lately or what is new, and answer from the rows in their words; an empty list means nothing has happened yet, not that the page is broken.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Home Feed', readOnlyHint: true },
