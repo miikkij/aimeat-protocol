@@ -542,13 +542,17 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     const r = await json('/v1/content/inspect', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ source: src, stages: ['profile'] }) });
     assert(r.status === 200 && r.body.data.ran.includes('profile'), `profile ${r.status} ${JSON.stringify(r.body?.data?.skipped ?? r.body?.error)}`);
     const p = r.body.data.facts.profile;
-    assert(p && p.prompt === 'profile-4' && p.sections.length === 3 && typeof p.model === 'string' && p.model, `profile ${JSON.stringify(p)}`);
+    // The decision service is on in this node, so the decision model labels and the text model writes.
+    assert(p && p.labels === 'decide' && p.labelModel === 'sandbox-jev' && p.decisionIds?.length === 1, `labelled by the decision model ${JSON.stringify(p && { labels: p.labels, labelModel: p.labelModel, decisionIds: p.decisionIds })}`);
+    assert(p.prompt === 'profile-text-1' && p.sections.length === 3 && typeof p.model === 'string' && p.model, `profile ${JSON.stringify(p)}`);
     assert(JSON.stringify(p.sections.map((x: any) => x[3])) === '["+","~","?"]', `marks ${JSON.stringify(p.sections)}`);
     assert(p.topics.length === 2 && Math.abs(p.topics.reduce((a: number, t: any) => a + t.share, 0) - 1) < 0.01, `topics ${JSON.stringify(p.topics)}`);
     assert(typeof p.detailKey === 'string' && p.detailKey.startsWith('contentclass-profile/'), `detailKey ${p.detailKey}`);
     // The owner chose no fingerprint model: the node's default (content_class.profile_model) is asked.
-    const asked = mail.seen.chat.filter((c: any) => JSON.stringify(c).includes('You profile a document')).pop() as any;
+    const asked = mail.seen.chat.filter((c: any) => JSON.stringify(c).includes('You write the headings, one-sentence claims and topics')).pop() as any;
     assert(JSON.stringify(asked ?? {}).includes('~deepseek/deepseek-pro-latest'), `the profile asked ${JSON.stringify(asked)?.slice(0, 200)}`);
+    const labelAsk = mail.seen.decide.filter((d: any) => Object.keys(d.questions ?? {}).some((k) => k === 's1_mark')).pop() as any;
+    assert(labelAsk && Object.keys(labelAsk.questions).length === 27, `the decision model was asked nine questions a section ${labelAsk ? Object.keys(labelAsk.questions).length : 'none'}`);
     // The facts answer carries the tag; with_profile adds the sections with their headings and claims.
     const f = await json(`${factsPath('notes.report.heat', 'memory')}&with_profile=true`, { headers: auth(D.token) });
     assert(f.status === 200, `facts ${f.status}`);
@@ -571,7 +575,7 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     const agent = await connectAgent(D, `ccprofmcp${Date.now()}`, ['*']);
     await json('/v1/memory', { method: 'POST', headers: auth(agent), body: JSON.stringify({ key: 'notes.mcp.heat', value: doc, visibility: 'private' }) });
     const insp = await mcpCall(agent, 'aimeat_content_inspect', { kind: 'memory', key: 'notes.mcp.heat', stages: ['profile'] });
-    assert(!insp?.result?.isError && toolText(insp).includes('profile-4'), `inspect over MCP ${toolText(insp).slice(0, 200)}`);
+    assert(!insp?.result?.isError && toolText(insp).includes('profile-text-1'), `inspect over MCP ${toolText(insp).slice(0, 200)}`);
     const viaMcp = await mcpCall(agent, 'aimeat_content_facts', { kind: 'memory', key: 'notes.mcp.heat', with_profile: true });
     const body = JSON.parse(toolText(viaMcp) || '{}');
     assert(!viaMcp?.result?.isError && body.fingerprint?.lines?.length === 5 && body.profile_sections?.length === 3, `facts over MCP ${toolText(viaMcp).slice(0, 300)}`);

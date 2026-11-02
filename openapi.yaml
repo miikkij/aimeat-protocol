@@ -5638,7 +5638,10 @@ components:
           properties:
             v: { type: integer }
             prompt: { type: string, description: The version of the instruction that made it. }
-            model: { type: string }
+            model: { type: string, description: 'The text model: all of it, or with labels decide the headings, claims and topics.' }
+            labels: { type: string, enum: [model, decide], description: 'Who marked the sections: the text model, or the decision model (content_class.profile_labels). Seals made the two ways are not compared.' }
+            labelModel: { type: string, description: With labels decide, the decision model. }
+            decisionIds: { type: array, items: { type: string }, description: With labels decide, its decision records. }
             provenanceId: { type: string }
             at: { type: string, format: date-time }
             kind: { type: string, description: What the item is, in its own language. }

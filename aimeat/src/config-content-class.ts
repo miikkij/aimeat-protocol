@@ -26,7 +26,8 @@
  * @version-history
  *   v1.3.0 — 2026-11-02 — contentClassProfileModel (content_class.profile_model): the fingerprint's
  *     model when the owner names none, DeepSeek V4 Pro by default (wish-aineiston-sormenj-lki-
- *     millaista-aineisto-on-yhdell-silm-ykse).
+ *     millaista-aineisto-on-yhdell-silm-ykse); contentClassProfileLabels (content_class.profile_labels),
+ *     the decision model labelling the sections when it can.
  *   v1.2.0 — 2026-11-01 — mediaReadSeconds and mediaReadMemoryMb (secaudit2026oct31w2 round 12, the
  *     exifr and c2pa-ts readers).
  *   v1.1.0 — 2026-10-29 — pdfTextSeconds and pdfTextMemoryMb (secaudit2026oct26 round 8c, memory-b-09).
@@ -67,6 +68,12 @@ export interface ContentClassConfig {
    * model and defaults. The default is the model the instruction was measured on and chosen for.
    */
   contentClassProfileModel: string;
+  /**
+   * Who labels the fingerprint's sections: 'auto' (the decision model when the decision service is
+   * on, and the text model writes only headings, claims and topics; services/content/profile-labels.ts)
+   * or 'model' (the text model does all of it).
+   */
+  contentClassProfileLabels: 'auto' | 'model';
 }
 
 /** A whole number 0 or above from the environment, else `fallback`. */
@@ -108,5 +115,6 @@ export function contentClassDefaults(): ContentClassConfig {
     mediaReadSeconds: wholeOrDefault(process.env.AIMEAT_MEDIA_READ_SECONDS, 30),
     mediaReadMemoryMb: wholeOrDefault(process.env.AIMEAT_MEDIA_READ_MEMORY_MB, 512),
     contentClassProfileModel: modelId(process.env.AIMEAT_CONTENT_PROFILE_MODEL, DEFAULT_PROFILE_MODEL),
+    contentClassProfileLabels: process.env.AIMEAT_CONTENT_PROFILE_LABELS === 'model' ? 'model' : 'auto',
   };
 }
