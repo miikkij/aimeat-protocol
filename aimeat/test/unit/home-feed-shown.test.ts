@@ -10,10 +10,12 @@
  */
 import { describe, it, expect } from 'vitest';
 import { homeFeedAsShown, type FeedItem } from '../../src/services/home-feed.js';
+import { notePersonZone } from '../../src/services/person-zone.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 const storage = {
+    getGHIIByOwner: async () => null,
     getAgentsByOwner: async () => [
         { name: 'morning-digest', displayName: 'Aamukatsaus' },
         { name: 'plain', displayName: '' },
@@ -35,6 +37,22 @@ describe('homeFeedAsShown', () => {
         const out = await homeFeedAsShown(storage, config(''), 'alice', { items: rows, total: 3 });
         expect(out.items[0].data).toEqual({ agent: 'morning-digest', title: 'Aamukatsaus', agent_shown_name: 'Aamukatsaus' });
         expect(out.items[1].data).toEqual({ name: 'plain' });
+    });
+
+    it('on a sold node, the short name gives way to the shown name in every field', async () => {
+        const out = await homeFeedAsShown(storage, config('solo'), 'alice', { items: rows, total: 3 });
+        expect(out.items[0].data).toEqual({ agent_shown_name: 'Aamukatsaus', agent: 'Aamukatsaus', title: 'Aamukatsaus' });
+        expect(JSON.stringify(out)).not.toContain('morning-digest');
+    });
+
+    it('gives each row its time on the clock the person\'s browser last sent, and none before it sent one', async () => {
+        const before = await homeFeedAsShown(storage, config(''), 'bob', { items: rows, total: 3 });
+        expect(before.items[0].at_local).toBeUndefined();
+        notePersonZone('bob', 'Europe/Helsinki');
+        notePersonZone('bob', 'Not/AZone');
+        const fi = await homeFeedAsShown(storage, { siteLinks: { purchasePlan: '', defaultLocale: 'fi' } } as unknown as AimeatConfig, 'bob', { items: rows, total: 3 });
+        // 05:00 UTC is 7.00 in Helsinki in November, written as Finnish writes it.
+        expect(fi.items[0].at_local).toBe('2.11. klo 7.00');
     });
 
     it('leaves out that an agent the node runs itself joined, and keeps its work', async () => {

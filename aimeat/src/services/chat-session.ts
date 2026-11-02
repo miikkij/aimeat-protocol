@@ -33,7 +33,8 @@
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
  *   v1.19.0 -- 2026-11-02 -- The turn note carries the person's local date and time (clockLine): their
- *     own time zone, else `opts.timezone`, the one their browser sent with the turn (crew68).
+ *     own time zone, else `opts.timezone`, the one their browser sent with the turn (crew68), which is
+ *     also remembered for the home feed's local times (services/person-zone.ts).
  *   v1.18.0 -- 2026-11-02 -- A turn that ends with no words, no tool call and no card is asked once more
  *     in the same session; only an empty second answer writes chatTurn.noAnswer (the Chief of Staff,
  *     2.11 02.20).
@@ -123,6 +124,7 @@ import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js
 import { pdfReadLimits } from './file-text/pdf-bounded.js';
 import { systemReader } from './classification/reader.js';
 import { displayPrefsFor } from './display-prefs.js';
+import { notePersonZone } from './person-zone.js';
 import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
@@ -449,6 +451,8 @@ export async function* runChatTurn(
     ].join('\n\n');
     // The person's local date and time for the turn note: the model's own clock is UTC (crew68).
     const clock = clockLine(await displayPrefsFor(storage, gaii), opts.timezone, locale, now);
+    // The same zone for what the node writes for this person's chat, such as the home feed's local times.
+    notePersonZone(ownerName, opts.timezone);
 
     await appendTurn(storage, gaii, threadId, {
         role: 'user', text, at: now,
