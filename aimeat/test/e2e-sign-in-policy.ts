@@ -27,11 +27,14 @@
  *     single use; a made-up token is refused; the token is bound to its account whatever the body
  *     names; an account with TOTP armed signs in with its code as before; the refresh of a covered
  *     session with no TOTP, passkey or provider link is refused and ends it, and an armed account's
- *     refresh works.
+ *     refresh works. The app-grant silent bridge reads the session the same way: it mints no app
+ *     grant from the covered session the refresh ends (login_required, reason two_step_setup_required),
+ *     and gives the enrolled account and, with the policy off, every account their own app's grant.
  *   - Back at the defaults, the account that never enrolled signs in with its password again.
  *   The setup token's expiry is proven in test/unit/sign-in-policy.test.ts, which can move time.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=sign-in-policy
  * @version-history
+ *   2026-11-02 — The silent app bridge under the required two-step policy (secaudit2026nov02d round 13).
  *   v1.1.0 — 2026-11-02 — Two-step required and totp.enabled false are refused together (TWO_STEP_NEEDS_TOTP).
  *   v1.0.0 — 2026-11-02 — Initial (IT review: required two-step sign-in, password sign-in off).
  */
@@ -81,6 +84,11 @@ function refreshCookie(setCookie: string[]): string {
         if (/^(__Host-)?aimeat_rt=./.test(pair)) return pair;
     }
     return '';
+}
+/** The silent app bridge as the apex bridge page calls it: the refresh cookie, the app by name. */
+async function silentBridge(cookie: string, app: string): Promise<Record<string, any>> {
+    const r = await json(`/v1/auth/app-grant-silent?app=${encodeURIComponent(app)}`, { headers: { Cookie: cookie } });
+    return r.body?.data ?? {};
 }
 const subOf = (token: string) => JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')).sub as string;
 
@@ -295,6 +303,22 @@ async function main() {
             assert(!!aliceCookie, `a refresh cookie: ${JSON.stringify(r.setCookie)}`);
         });
 
+        // The silent app bridge (GET /v1/auth/app-grant-silent) reads the same cookie session as the
+        // refresh, so the policy applies there too (secaudit2026nov02d round 13).
+        let aliceBridgeCookie = '';
+        await test('setup: alice and the operator publish an app each; with the policy off alice\'s session signs in to hers through the silent bridge', async () => {
+            for (const [who, file] of [[alice, 'polalice-app.html'], [op, 'polop-app.html']] as const) {
+                const html = Buffer.from('<!DOCTYPE html><html><head></head><body>app</body></html>', 'utf8').toString('base64');
+                const p = await post('/v1/apps', { filename: file, content: html, name: file, description: 'd', category: 'utility' }, auth(who.token));
+                assert(p.status === 201, `publish ${file}: ${p.status} ${JSON.stringify(p.body?.error)}`);
+            }
+            const r = await post('/v1/ghii/login', { username: alice.name, password: alice.password });
+            aliceBridgeCookie = refreshCookie(r.setCookie);
+            assert(!!aliceBridgeCookie, `a second refresh cookie: ${JSON.stringify(r.setCookie)}`);
+            const s = await silentBridge(aliceBridgeCookie, `${alice.name}/polalice-app.html`);
+            assert(s.ok === true && typeof s.access_token === 'string', `the bridge with the policy off: ${JSON.stringify(s)}`);
+        });
+
         let opSetupToken = '';
         await test('TWO-STEP operators: an uncovered account signs in as before; the operator without TOTP gets a setup token, no session', async () => {
             const set = await setPolicy(opSession, [{ path: 'auth.two_step_required', value: 'operators' }]);
@@ -363,6 +387,13 @@ async function main() {
             assert(again.body?.error?.code === 'TWO_STEP_SETUP_REQUIRED', `alice untouched: ${JSON.stringify(again.body?.error)}`);
         });
 
+        await test('DENIAL: the silent app bridge mints no app grant from a covered session with no TOTP, passkey or provider link', async () => {
+            const s = await silentBridge(aliceBridgeCookie, `${alice.name}/polalice-app.html`);
+            assert(s.ok === false && !s.access_token && !s.refresh_token, `no app grant: ${JSON.stringify(s)}`);
+            assert(s.error === 'login_required' && s.reason === 'two_step_setup_required', `login_required, reason two_step_setup_required: ${JSON.stringify(s)}`);
+            assert(s.app === `${alice.name}/polalice-app.html`, `the answer names the app, so the SDK opens the visible sign-in: ${JSON.stringify(s)}`);
+        });
+
         await test('DENIAL: the refresh of a covered session with no TOTP, passkey or provider link is refused and ends it', async () => {
             const r = await json('/v1/auth/refresh', { method: 'POST', headers: { Cookie: aliceCookie, 'X-AIMEAT-Refresh': '1' } });
             assert(r.status === 403 && r.body?.error?.code === 'TWO_STEP_SETUP_REQUIRED', `refresh: ${r.status} ${JSON.stringify(r.body?.error)}`);
@@ -379,12 +410,26 @@ async function main() {
             assert(r.status === 200 && typeof r.body?.data?.token === 'string', `refresh: ${r.status} ${JSON.stringify(r.body?.error)}`);
         });
 
+        await test('an enrolled account\'s session still signs in to its own app through the silent bridge under the policy', async () => {
+            const s = await post('/v1/ghii/login', { username: op.name, password: op.password, backup_code: opBackup.pop() });
+            assert(s.status === 200, `op sign-in: ${s.status} ${JSON.stringify(s.body?.error)}`);
+            const b = await silentBridge(refreshCookie(s.setCookie), `${op.name}/polop-app.html`);
+            assert(b.ok === true && typeof b.access_token === 'string' && b.own === true, `the bridge: ${JSON.stringify(b)}`);
+        });
+
         // ── Back at the defaults ──
         await test('DEFAULTS again: with both settings back, the account that never enrolled signs in with its password', async () => {
             const r = await setPolicy(opSession, [{ path: 'auth.two_step_required', value: 'off' }]);
             assert(r.status === 200, `off: ${r.status} ${JSON.stringify(r.body?.error)}`);
             const a = await ownerSignIn(BASE, alice.name, alice.password);
             assert(a.status === 200 && typeof a.body?.data?.token === 'string', `alice: ${a.status} ${JSON.stringify(a.body?.error)}`);
+        });
+
+        await test('DEFAULTS again: alice\'s new session signs in to her app through the silent bridge as before', async () => {
+            const r = await post('/v1/ghii/login', { username: alice.name, password: alice.password });
+            assert(r.status === 200, `alice: ${r.status}`);
+            const s = await silentBridge(refreshCookie(r.setCookie), `${alice.name}/polalice-app.html`);
+            assert(s.ok === true && typeof s.access_token === 'string', `the bridge: ${JSON.stringify(s)}`);
         });
 
         // ── The sign-in lockout (auth.sign_in_lockout): off unless the operator turns it on (Jouni, 2026-11-02 08.02) ──
