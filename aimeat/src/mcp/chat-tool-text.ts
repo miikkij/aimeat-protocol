@@ -18,6 +18,7 @@
  * @structure CHAT_TOOL_TEXT · listedForChat(json, params) · shortenChatTools(mcp, names)
  * @usage in createMcpServer, for role 'chat', after keepOnly(): shortenChatTools(mcp, toolsForSurface('chat'))
  * @version-history
+ *   v1.1.0 — 2026-11-02 — aimeat_home_feed, a start tool since crew70.
  *   v1.0.0 — 2026-10-31 — Initial (v31 K63).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -80,6 +81,9 @@ export const CHAT_TOOL_TEXT: Record<string, ChatToolText> = {
     },
     aimeat_workspace_read: {
         description: 'Read a workspace. Without `ids`: its index (spaces, locked schemas, every item\'s id and title). Then with `ids:[…]`: the full items you need.',
+    },
+    aimeat_home_feed: {
+        description: 'What the person\'s home page shows: what has happened on their account, newest first. Read it when they ask what is on their home or what is new. Name an agent by `data.agent_shown_name` and give a time as `at_local` when a row has them.',
     },
     aimeat_discover: {
         description: 'Find what exists on this AIMEAT in one call: apps, memory, workspaces, knowledge, capabilities. `scope`: own (default), shared (the organisms the person belongs to) or public. `mode: "map"` gives counts first.',

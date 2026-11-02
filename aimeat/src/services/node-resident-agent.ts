@@ -10,20 +10,28 @@
  * @structure isNodeResidentAgent(agent) · hasHelloMcpProof(storage, nodeId, owner)
  * @usage import { isNodeResidentAgent, hasHelloMcpProof } from './node-resident-agent.js';
  * @version-history
+ *   v1.1.0 — 2026-11-02 — A basic agent is known by its name too (basicAgentByName), since the runtime
+ *     rewrites the tags (aimeat-protocol-bb, crew71's concierge).
  *   v1.0.0 — 2026-11-01 — Initial: either signal had ticked "connect your AI" on a place where no
  *     outside AI was connected (aimeat-commercial-1c, test lane).
  */
 import type { Storage } from '../storage/interface.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
+import { basicAgentByName } from '../data/basic-agents.js';
 import { getOwnerScopeMemory } from './owner-memory.js';
 import { HELLO_MCP_KEY } from './hello-mcp.js';
 
 /** The tag of the basic agents created with the account (data/basic-agents.ts). */
 const BASIC_AGENT_TAG = 'crew.basic';
 
-/** The place's own chat (services/chat-agent.ts) or a basic agent. */
+/**
+ * The place's own chat (services/chat-agent.ts) or a basic agent, by its name in data/basic-agents.ts
+ * or by its tag. By name as well, because the agents' runtime rewrites the tags: on crew71 the concierge
+ * of guestkoey3wfwk carried ["concierge","chat","vision","web-search",…] and no crew.basic (aimeat-protocol-bb).
+ */
 export function isNodeResidentAgent(agent: { name: string; tags?: readonly string[] | null }): boolean {
-    return agent.name === CHAT_AGENT_NAME || (Array.isArray(agent.tags) && agent.tags.includes(BASIC_AGENT_TAG));
+    return agent.name === CHAT_AGENT_NAME || !!basicAgentByName(agent.name)
+        || (Array.isArray(agent.tags) && agent.tags.includes(BASIC_AGENT_TAG));
 }
 
 /**

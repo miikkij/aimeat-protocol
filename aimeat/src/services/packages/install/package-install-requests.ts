@@ -31,6 +31,7 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
+ *   v1.5.1 — 2026-11-02 — The approval's account event is awaited before the answer (CI's flaky R9).
  *   v1.5.0 — 2026-10-17 — "No longer available to this account" asks package-read.ts packageVisibleTo,
  *     so a 'members' or 'organism:<id>' package the owner may install stays available (plan V3.7).
  *   v1.4.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -373,7 +374,10 @@ export async function decideInstallRequest(
         const done = await perform(deps, decider.owner, ownerGhii, request);
         if (!done.ok) return done;
         const settled = await settleInstallRequest(deps, ownerGhii, request, 'approved', { by, outcome: done.outcome });
-        void recordAccountEvent(storage, {
+        // Awaited, so the answer that says it is installed comes after the person's feed says so too
+        // (it never throws). Unawaited, a read right after the approval missed it now and then:
+        // e2e-package-install-requests R9 failed on CI's PostgreSQL lane on 2.11.
+        await recordAccountEvent(storage, {
             ownerGhii, kind: 'package_installed', actorGaii: by, subject: request.id, link: '/v1/profile?tab=packages',
             data: { name: request.package.name, act: request.act, who: requesterName(request.requested_by) },
         }, deps.config);

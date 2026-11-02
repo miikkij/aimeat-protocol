@@ -624,6 +624,25 @@ async function run(): Promise<void> {
         assert(saved.text === said, `the record keeps the words and no progress line, got ${JSON.stringify(saved.text)}`);
     });
 
+    // FAILED FIRST: crew68 answered "Kello on 02:42 UTC" at 04.42 Finnish time, because the turn
+    // carried no time at all and the model read its own UTC clock.
+    await test('the turn note gives the person\'s local time in the zone their browser sent, and UTC when the zone is unknown', async () => {
+        const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title: 'clock' }) }));
+        const clockThread = created.body.data.thread.id as string;
+        const firstNote = () => {
+            const p = peerRequests('session/prompt').at(-1)!;
+            return (p.params.prompt as any[]).map((b) => b.text ?? '').join('\n');
+        };
+        await turn(clockThread, { text: 'mitä kello on', lang: 'fi', timezone: 'Europe/Helsinki' });
+        const local = firstNote();
+        assert(local.includes('(time zone Europe/Helsinki)') && local.includes('never UTC') && local.includes('write a time as this line writes it'), `the note names the zone: ${local.slice(local.indexOf('[A note'), local.indexOf('[A note') + 300)}`);
+        const year = String(new Date().getUTCFullYear());
+        assert(local.includes(`It is now `) && local.includes(year), 'the note carries the date');
+        await turn(clockThread, { text: 'mitä kello on', lang: 'fi', timezone: 'Not/AZone' });
+        const unknown = firstNote();
+        assert(unknown.includes('time zone is not known') && unknown.includes('UTC') && !unknown.includes('Not/AZone'), 'an unknown zone is ignored and the time is UTC');
+    });
+
     await test('a turn that does not answer even when asked is ended by the node, in the person\'s language', async () => {
         const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title: 'loop all' }) }));
         const loopThread = created.body.data.thread.id as string;

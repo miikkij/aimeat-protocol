@@ -17,6 +17,8 @@
  *   import * as chat from '/js/services/chat.js';
  *   for await (const u of chat.streamTurn(threadId, 'build me pong')) { … }
  * @version-history
+ *   v1.7.0 — 2026-11-02 — streamTurn sends the browser's time zone, so the chat's turn note carries the
+ *     person's local time (crew68 answered "02:42 UTC" at 04.42 Finnish time).
  *   v1.6.0 — 2026-11-02 — stopTurn(): Stop is POST /v1/chat/threads/:id/stop; a closed stream no longer
  *     ends a turn on the node (routes/chat.ts v1.13.0).
  *   v1.5.0 — 2026-10-31 — streamTurn ends the turn with CONNECTION_LOST, in the page's language, when
@@ -33,6 +35,7 @@
 import { api, apiGet } from '/js/api.js';
 import { authHeaders, getNodeUrl } from '/js/services/auth.js';
 import { getLocale, t } from '/js/i18n.js';
+import { resolvedTimeZone } from '/js/display-prefs.js';
 
 const enc = encodeURIComponent;
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -98,6 +101,8 @@ export async function* streamTurn(id, text, signal, attachments = [], starter) {
         body: JSON.stringify({
             text,
             lang: getLocale(),
+            // The browser's time zone, so the chat answers in the person's local time (routes/chat.ts).
+            timezone: resolvedTimeZone(),
             ...(attachments.length ? { attachments } : {}),
             ...(starter ? { starter } : {}),
         }),
