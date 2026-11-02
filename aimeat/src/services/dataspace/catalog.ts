@@ -22,6 +22,8 @@
  *   CATALOG_PAGE
  * @usage const list = await visibleDatasets(deps, participant); res.json(catalogJson(config, list));
  * @version-history
+ *   v1.0.3 — 2026-11-02 — An open offer also needs the service's recorded audience to be public, beside the
+ *     public listing (secaudit2026nov02d round 13).
  *   v1.0.2 — 2026-11-02 — A share offer carries the share's pinned version, so the agreement's share keeps
  *     it (secaudit2026nov02d round 13).
  *   v1.0.1 — 2026-11-01 — A package's existence, withdrawal and usage terms come from the service's
@@ -111,7 +113,9 @@ async function offersOf(deps: Deps, src: OfferSources, ownerGhii: string, name: 
     if (!pkg?.trusted.current || pkg.trusted.withdrawnAt) return { offers: [] };
     const usage = (await saleTermsOf(deps.storage, deps.config.nodeId, ownerGhii, name, pkg.pointer))?.usageTerms ?? null;
     const offers: OfferEntry[] = [];
-    if (src.publicKeys.has(`${owner}/${name}`) && await src.openAllowed(owner)) {
+    // Open only when the service recorded the package public (undefined reads as public, as before the
+    // boot step), whatever the catalogue listing holds.
+    if (src.publicKeys.has(`${owner}/${name}`) && (pkg.trusted.visibility ?? 'public') === 'public' && await src.openAllowed(owner)) {
         offers.push({ kind: 'open', offer: offerOf(offerIdOf(owner, name, 'open'), { usage }) });
     }
     const party = await src.partyOf(ownerGhii);

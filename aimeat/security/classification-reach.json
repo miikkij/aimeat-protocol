@@ -1594,11 +1594,12 @@
     },
     "src/services/datapackage/audience-record.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 4,
+        "getMemoryByKeysAnyOwner": 1,
         "listStorageFilesForOwners": 1,
         "getStorageFile": 2
       },
-      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned audience record and the boot step's record, and in the once-only boot step every namespace's file list and data package pointers, to record each package's audience. 2026-11-01 (WP9e): the pointer-state boot step's record (pointerStateInForce), and trustedPackageOf reads a package's pointer to answer the record's facts beside it; the pointer's display fields go to a caller who already decided on the record, and no rows are read. Nothing else read is returned to a caller."
+      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned audience record and the boot step's record, and in the once-only boot step every namespace's file list and data package pointers, to record each package's audience. 2026-11-01 (WP9e): the pointer-state boot step's record (pointerStateInForce), and trustedPackageOf reads a package's pointer to answer the record's facts beside it; the pointer's display fields go to a caller who already decided on the record, and no rows are read. 2026-11-02 (secaudit2026nov02d round 13): recordedAudiencesOf reads the service-owned audience records of the catalogue's packages in bulk (getMemoryByKeysAnyOwner, or getMemory per package on a backend without it) and answers only each package's audience and withdrawal to the catalogue listing, whose public readers then pass the classification reader. Nothing else read is returned to a caller."
     },
     "src/services/datapackage/sale-terms-record.ts": {
       "reads": {

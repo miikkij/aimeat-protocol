@@ -19,11 +19,20 @@
  *   derived from the descriptor address, which is how Frictionless resolves it too.
  *
  *   WITHDRAWN PACKAGES are not here: a withdrawal removes the catalogue entry (./withdraw.ts).
+ *
+ *   ONLY WHAT THE SERVICE WROTE. A manifest is an ordinary memory record, so any principal with
+ *   memory:write can store one under `packages/` with the data-package tag. A listing takes a manifest
+ *   only from the namespace of the account its package id names and at the key the service derives
+ *   from that id (writtenByService), and takes the audience and the withdrawal from the service's
+ *   audience record (./audience-record.ts recordedAudiencesOf), never from the manifest's sharing block.
  * @structure catalogueKeyRoot · DatasetFacts · datasetFactsOf · allDatasetFacts · invalidateDatasetFacts · datasetLinks ·
  *   csvUrlOf · isDataPackageManifest · publicDatasetFacts · publicDatasetPages · datapackageListing · DATASET_FACTS_CACHE_KEY
  * @usage
  *   const facts = (await allDatasetFacts(storage)).filter(f => f.audience === 'public');
  * @version-history
+ *   v1.3.0 — 2026-11-02 — A manifest counts only in the namespace and at the key the service writes it,
+ *     and the audience and withdrawal come from the service's audience record (secaudit2026nov02d round 13,
+ *     datapackage:catalogue-facts:trusts-writable-manifest-owner-and-audience).
  *   v1.2.0 — 2026-11-01 — DatasetFacts.i18n: the title and description per language (WP10e A2).
  *   v1.1.0 — 2026-11-01 — datasetLandingUrl names the public dataset page /v1/dataset/{owner}/{name}
  *     (board Julkinen-sivu); it named the public knowledge viewer, which shows no data package (WP9b).
@@ -37,6 +46,8 @@ import type { AimeatConfig } from '../../config.js';
 import { signedInOnly } from '../../config-visibility.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
+import { currentNodeId, localAccountName } from '../../utils/gaii.js';
+import { recordedAudiencesOf } from './audience-record.js';
 
 /** One resource of a dataset, as its catalogue entry states it. */
 export interface DatasetResourceFacts {
@@ -121,7 +132,25 @@ export function csvUrlOf(descriptorUrl: string, resource: string): string {
   return descriptorUrl.replace(/datapackage\.json$/, '') + `data/${encodeURIComponent(resource)}.csv`;
 }
 
-/** The facts of one stored manifest, or null when it is not a readable data package manifest. */
+/**
+ * True when the record sits where the service writes the manifest of `packageId`: in the namespace of
+ * the account the id names (on this node, when the node id is known) and at the key catalogueKeyRoot
+ * derives from the id (./version-audience.ts upsertCatalogueEntry). A record anywhere else was not
+ * written by the service, whatever its value says.
+ */
+function writtenByService(rec: Pick<MemoryRecord, 'key' | 'ownerGaii'>, packageId: string, owner: string): boolean {
+  if (rec.key !== `${catalogueKeyRoot(packageId)}/manifest`) return false;
+  const node = currentNodeId();
+  if (node) return rec.ownerGaii === `${owner}@${node}`;
+  // No node id known (a unit run): an account's namespace, never an agent's, of that account name.
+  return !rec.ownerGaii.includes('#') && rec.ownerGaii.includes('@') && localAccountName(rec.ownerGaii) === owner;
+}
+
+/**
+ * The facts of one stored manifest, or null when it is not a readable data package manifest or the
+ * service did not write it (writtenByService). The audience here is the manifest's; allDatasetFacts
+ * replaces it with the one the service recorded.
+ */
 export function datasetFactsOf(rec: Pick<MemoryRecord, 'key' | 'ownerGaii' | 'value' | 'tags' | 'createdAt' | 'updatedAt'>): DatasetFacts | null {
   if (!isDataPackageManifest(rec)) return null;
   const v = rec.value as { name?: unknown; tags?: unknown; created?: unknown; updated?: unknown; x_aimeat_datapackage?: DatapackageBlock } | null;
@@ -132,6 +161,7 @@ export function datasetFactsOf(rec: Pick<MemoryRecord, 'key' | 'ownerGaii' | 'va
   const m = packageId ? /^pkg:([^/]+)\/(.+)$/.exec(packageId) : null;
   if (!packageId || !m || !contentHash || !descriptorUrl) return null;
   const [, owner, name] = m;
+  if (!writtenByService(rec, packageId, owner)) return null;
   const audience = packageAudienceOf(v);
   const keywords = (Array.isArray(v?.tags) ? v!.tags as unknown[] : [])
     .filter((t): t is string => typeof t === 'string' && t !== 'data-package' && t !== 'frictionless');
@@ -141,7 +171,8 @@ export function datasetFactsOf(rec: Pick<MemoryRecord, 'key' | 'ownerGaii' | 'va
     packageId,
     owner,
     ownerGhii: rec.ownerGaii,
-    name: str(block?.name) ?? name,
+    // The name the package id states, which is the name the service records the audience under.
+    name,
     title: str(block?.title) ?? str(v?.name) ?? name,
     ...(str(block?.description) ? { description: str(block?.description) } : {}),
     ...(i18nOf(block?.i18n) ? { i18n: i18nOf(block?.i18n) } : {}),
@@ -212,11 +243,21 @@ export async function allDatasetFacts(storage: Storage): Promise<DatasetFacts[]>
       }
     }
     const wanted = new Set(found.map(f => `${f.ownerGaii}|${f.key}`));
-    const out: DatasetFacts[] = [];
+    const listed: DatasetFacts[] = [];
     for (const rec of records) {
       if (!wanted.has(`${rec.ownerGaii}|${rec.key}`)) continue;
       const facts = datasetFactsOf(rec);
-      if (facts) out.push(facts);
+      if (facts) listed.push(facts);
+    }
+    // The audience and the withdrawal are the service's record (./audience-record.ts), not the
+    // manifest's sharing block, which a principal with memory:write in the owner's namespace rewrites.
+    const nodeId = currentNodeId() ?? listed[0]?.ownerGhii.slice(listed[0].ownerGhii.lastIndexOf('@') + 1);
+    const recorded = nodeId && listed.length ? await recordedAudiencesOf(storage, nodeId, listed) : null;
+    const out: DatasetFacts[] = [];
+    for (const f of listed) {
+      const r = recorded?.get(`${f.ownerGhii}|${f.name}`);
+      if (r?.withdrawnAt) continue;
+      out.push(r ? { ...f, audience: r.visibility === 'owner' ? 'private' : r.visibility } : f);
     }
     return out.sort((a, b) => b.modified.localeCompare(a.modified));
   }, ['domain:memory', 'domain:files', 'domain:catalogue']);

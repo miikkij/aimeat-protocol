@@ -9,7 +9,9 @@
  *   records    The workspace read aimeat_workspace_read runs (services/workspace-tool-ops.ts
  *              readWorkspaceOp): membership, the organism's agent rule and the classification reader.
  *              Each PUBLISHED record of the space is a row; a draft is not data yet. The space's locked
- *              JSON Schema gives the column types. The product's audience is at most the organism.
+ *              JSON Schema gives the column types. The product's audience is at most the organism, and
+ *              private when the workspace admits only some members and the caller does not decide who
+ *              reads it (recordsAudienceCap).
  *   app        The owner's own app: the records under `key_prefix` that a row of the app's data map
  *              marks `publishable: true`. A row without that mark is not offered, and a row that marks
  *              its data personal makes every column of it personal.
@@ -17,16 +19,21 @@
  *              owner's own records through the owner-scope view (an agent reads a private record of its
  *              owner only with memory:read-as-owner); another account's record through authorizeRead,
  *              the guard GET /v1/pub uses.
- * @structure readRecordsSource · readAppSource · readMemorySource · familyMatches · descriptionsOfJson
+ * @structure recordsAudienceCap · readRecordsSource · readAppSource · readMemorySource · familyMatches · descriptionsOfJson
  * @usage const src = await readMemorySource(call);
  * @version-history
+ *   v1.2.0 — 2026-11-02 — A records source's audience is the organism only when the caller decides the
+ *     workspace's readers or the workspace admits every member; private otherwise (secaudit2026nov02d
+ *     round 13, dataproduct:records-source:audience-capped-at-organism-not-workspace).
  *   v1.1.0 — 2026-11-01 — A records space's locked schema describes its columns (descriptionsOfJson; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.1).
  */
 import type { MemoryRecord } from '../../storage/interface.js';
 import type { FieldType } from '../datapackage/contract.js';
 import { readWorkspaceOp } from '../workspace-tool-ops.js';
-import { workspaceCallerOf } from '../workspace-ops-caller.js';
+import { workspaceCallerOf, type WorkspaceOpsCaller } from '../workspace-ops-caller.js';
+import { readWorkspaceMetaRecord } from '../workspace-meta.js';
+import { isSameOwner } from '../../utils/gaii.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
@@ -64,6 +71,25 @@ export function descriptionsOfJson(properties: Record<string, unknown> | undefin
     return out;
 }
 
+/**
+ * The widest audience a product built from workspace `ws` of `organismId` may have, for this caller.
+ * The organism, when the caller decides who reads the workspace (an organism creator or admin, or the
+ * workspace's creator and that person's agents) or when the workspace admits every member of the
+ * organism (its manifest is organism, members or public). Private otherwise: a viewer or contributor
+ * of a restricted workspace builds a product its readers alone may read.
+ */
+async function recordsAudienceCap(call: SourceCall, wsCaller: WorkspaceOpsCaller, organismId: string, ws: string): Promise<string> {
+    const { storage, config } = call.deps;
+    const organism = `organism:${organismId}`;
+    const membership = await storage.getMembership(organismId, wsCaller.ownerName);
+    if (membership?.status === 'active' && (membership.role === 'creator' || membership.role === 'admin')) return organism;
+    const manRec = await readWorkspaceMetaRecord(storage, organismId, ws, 'meta.manifest', config.nodeId);
+    if (!manRec) return 'private';
+    if (manRec.ownerGaii === wsCaller.ownerGhii || isSameOwner(manRec.ownerGaii, wsCaller.ownerGhii)) return organism;
+    const v = manRec.visibility as string | undefined;
+    return v === 'public' || v === 'members' || v === organism ? organism : 'private';
+}
+
 /** A workspace records space: each published record is a row. */
 export async function readRecordsSource(call: SourceCall): Promise<ResolvedSource> {
     const { deps, caller, spec } = call;
@@ -97,7 +123,7 @@ export async function readRecordsSource(call: SourceCall): Promise<ResolvedSourc
     for (const [name, p] of Object.entries(schema?.properties ?? {})) { types[name] = fieldTypeOfJson(p); order.push(name); }
     const table = tableOf(spec.id, shapeRows(rows, spec.columns), types, new Set(), spec.columns ? [] : order);
     return {
-        ...table, descriptions: descriptionsOfJson(schema?.properties), audience: `organism:${organismId}`, fetchedAt: now(),
+        ...table, descriptions: descriptionsOfJson(schema?.properties), audience: await recordsAudienceCap(call, wsCaller, organismId, ws), fetchedAt: now(),
         provenance: { kind: 'records', address: `organism:${organismId}/${ws}/${ot.name}`, title: `${ot.name} records` },
     };
 }

@@ -14,6 +14,8 @@
  * @version-history
  *   2026-11-02 -- e2e-dsp-agreements.ts joins the list (not the guard tier): what a Dataspace agreement grants and books, and the process room (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-ai-ecosystem-caller.ts joins the list (not the guard tier): an ecosystem app's AI calls, on its own node (:29397) (secaudit2026nov02d round 13).
+ *   2026-11-02 -- e2e-dataproduct-records-audience.ts joins the list (not the guard tier): a data product's records source allows the audience its workspace admits (secaudit2026nov02d round 13).
+ *   2026-11-02 -- e2e-datapackage-catalogue-forgery.ts joins the list (not the guard tier): the public data package catalogues trust only the service's manifest and audience record (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-files-connections.ts joins the list (not the guard tier): a connected SharePoint on an own node (:28285).
  *   2026-11-01 -- e2e-iam-parties.ts joins the list (not the guard tier): a person registered to an app as a member AIMEAT.iam reads (WP9d).
  *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
@@ -1287,6 +1289,8 @@ const ALL_SUITES = [
     'test/e2e-dataproduct.ts',
     // The canvas capabilities WP9a lacked: a run when a source changes, the AI description draft, the column descriptions from the source (WP9c).
     'test/e2e-dataproduct-canvas.ts',
+    // A records source allows the audience its workspace admits, not the whole organism (secaudit2026nov02d round 13).
+    'test/e2e-dataproduct-records-audience.ts',
     // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
     'test/e2e-party.ts',
     // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
@@ -1326,6 +1330,9 @@ const ALL_SUITES = [
     // The rest of the package reads decide on the service's record too: the withdrawal, a share, a data
     // product source, the EXCHANGE sale terms and the Dataspace catalogue (WP9e).
     'test/e2e-datapackage-pointer-forgery.ts',
+    // The public catalogues list a data package from the service's manifest and audience record, not
+    // from any memory record shaped like a manifest (secaudit2026nov02d round 13).
+    'test/e2e-datapackage-catalogue-forgery.ts',
     'test/e2e-publish-gate-shared.ts',
     // The same gate on apps (listing, open_to, access code, first publish, fork), the welcome page and a company's front page (V4).
     'test/e2e-publish-gate-apps.ts',

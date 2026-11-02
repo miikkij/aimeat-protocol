@@ -20,6 +20,7 @@
  *   v1.1.0 — 2026-10-01 — The app sitemaps follow seo.announce_apps.
  *   v1.2.0 — 2026-11-01 — /sitemap-datasets.xml lists the public data packages at their public page,
  *     and the sitemap index names it (plan doc-mvwxcas3dom3, D1.4).
+ *   v1.2.1 — 2026-11-02 — A dataset's lastmod is escaped like its loc (secaudit2026nov02d round 13).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -158,7 +159,7 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
     res.type('application/xml').send([
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...urls.map((u) => `  <url><loc>${escapeHtml(u.loc)}</loc><lastmod>${u.lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.5</priority></url>`),
+      ...urls.map((u) => `  <url><loc>${escapeHtml(u.loc)}</loc><lastmod>${escapeHtml(u.lastmod)}</lastmod><changefreq>weekly</changefreq><priority>0.5</priority></url>`),
       '</urlset>',
     ].join('\n'));
   });
