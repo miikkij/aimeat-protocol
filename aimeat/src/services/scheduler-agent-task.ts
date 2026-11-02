@@ -12,8 +12,7 @@
  * @usage import { runAgentTaskJob, materialiseAgentTask } from './scheduler-agent-task.js';
  * @version-history
  *   v1.4.0 — 2026-11-02 — A template with deliver: "owner" gives the task the delivery scope entry, and
- *     the node then hands the result to the owner on completion (services/task-result-delivery.ts).
- *   v1.3.1 — 2026-10-28 — Both paths decide on the agent record as it is: the node no longer narrows
+ *     the node then hands the result to the owner on completion (services/task-result-delivery.ts). *   v1.3.1 — 2026-10-28 — Both paths decide on the agent record as it is: the node no longer narrows
  *     an agent holding `*` by itself (Jouni, 2026-10-28).
  *   v1.3.0 — 2026-10-25 — materialiseAgentTask takes `workTrackingCode` and `startedBy`: an agent goal's
  *     taken work becomes a task through the same wake path (services/goals/, session cc-jouni-goals).

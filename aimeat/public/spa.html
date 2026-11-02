@@ -1745,6 +1745,18 @@
       // Home. Messages has no lit state: it opens a tab of /v1/profile, whose address keeps no tab.
       const onAgentPage = currentPath === '/v1/home' && /[?&](agents|agent|new-agent|computers|machines|goal|new-goal)=/.test(location.search);
 
+      // The tab names the page in the page's language: the static <title> is English, and Home, Chat
+      // and Settings set none of their own (a Finnish buyer's tab read "AI Memory Exchange and Action
+      // Transfer", crew64, 2.11). Pages that title themselves (App Catalog, the portals) are left alone.
+      useEffect(() => {
+        const pageWord = { '/v1/home': 'nav.home', '/v1/chat': 'nav.chat', '/v1/profile': 'nav.profile' }[currentPath];
+        if (!pageWord) return;
+        // nav.chat has no entry in the locale files; the menu shows "Chat" in every language too.
+        const word = t(pageWord);
+        const label = word && word !== pageWord ? word : (currentPath === '/v1/chat' ? 'Chat' : '');
+        document.title = label ? `${label} — AIMEAT` : 'AIMEAT';
+      }, [currentPath, locale]);
+
       // The brand goes to ONE place per session state: signed in, the home; signed out, the front
       // page. It used to go to the front page for everyone and leave a per-tab flag behind so the
       // front page would not forward the person straight back, and the flag never cleared, so the
