@@ -152,6 +152,11 @@ const KNOWN: Record<string, string> = {
     + 'tool\'s act is the settlement (POST, exchange:beneficiary). The catalog entry takes the write word on purpose and says '
     + 'why (definitions/commerce.ts). On the connector, an agent that holds exchange:beneficiary and not wallet:read is refused '
     + 'the quote by the route; on the node MCP the tool quotes for it.',
+  // 2026-11-02 (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-).
+  aimeat_files_get: 'TWO ROUTES, DECIDED: as \'text\' it reads (POST /v1/connections/:id/files/text, connections:read-through, '
+    + 'the word the tool asks); as \'store\' it also writes a file (POST .../files/store, storage:write besides). The node MCP tool '
+    + 'refuses store with SCOPE_DENIED naming storage:write before any call, as aimeat_mail_read does for an attachment, and the '
+    + 'route asks the same word on the connector and the dispatch.',
   // The 30 UNREVIEWED pairs were triaged on 2026-10-06 (secaudit 2026-10 follow-up, A4): the tools
   // ask the words their route asks. aimeat_skill_list left this list in Part B: its first call is now
   // the binding filter on GET /v1/skills, which asks no word, and only view=linked calls
