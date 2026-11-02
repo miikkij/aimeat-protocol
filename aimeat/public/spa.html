@@ -1077,7 +1077,7 @@
     import { h, render, Component } from 'preact';
     import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
     import htm from 'htm';
-    import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
+    import { loadTranslations, t, getLocale, switchLocale, onLocaleChange, applyAccountLocale } from '/js/i18n.js';
     // Side-effect import, and EARLY on purpose: the browser fires `beforeinstallprompt` once,
     // shortly after load, and the module must be listening before views lazy-load.
     import '/js/install-prompt.js';
@@ -1089,7 +1089,7 @@
     // fetch after the first paint, and until they do every formatter follows the browser — which
     // is exactly what it did before these settings existed. Awaiting it would put a network round
     // trip in front of every date on the screen.
-    import { loadDisplayPrefs } from '/js/display-prefs.js';
+    import { loadDisplayPrefs, onPrefsChange } from '/js/display-prefs.js';
     import { initThemeSystem, setTheme } from '/js/theme.js';
     import { siteLink, signInFirst, signedInOnly, customerNode, devLinksShown } from '/js/site.js';
     import { getSession } from '/js/services/auth.js';
@@ -2024,6 +2024,9 @@
       // auth library is what puts it there. Called before this line it answered 401 on every load
       // — indistinguishable from a signed-out reader, so every date silently kept the browser's
       // format. Never awaited: it resolves after the first paint and the page repaints itself.
+      // The same read carries the account's language: a signed-in person reads the page in it, not in
+      // the browser's, unless the address names one or they picked one here (i18n.js applyAccountLocale).
+      onPrefsChange(({ locale }) => { void applyAccountLocale(locale); });
       loadDisplayPrefs();
       window.addEventListener('aimeat-auth-change', () => { loadDisplayPrefs(); });
 
