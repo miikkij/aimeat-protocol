@@ -678,10 +678,23 @@ async function run(): Promise<void> {
             `exactly one more process was started, got ${peerRequests('initialize').length - starts}`);
     });
 
-    await test('a turn that ends with no words and no tool call says so, and saves that, never a blank', async () => {
+    await test('a model silent on the first ask is asked once more, and its second answer is the one shown and saved', async () => {
+        const asked = peerRequests('session/prompt').length;
+        const events = await turn(threadId, { text: 'SILENTONCE: answer on the second ask' });
+        const said = events.filter((e) => e.kind === 'text').map((e) => String(e.text)).join('');
+        assert(said === 'The second ask answered.', `the second answer alone, got ${JSON.stringify(said)}`);
+        assert(peerRequests('session/prompt').length === asked + 2, `asked exactly twice, got ${peerRequests('session/prompt').length - asked}`);
+        const { body } = await json(`/v1/chat/threads/${encodeURIComponent(threadId)}`, authed());
+        const last = body.data.thread.turns.at(-1);
+        assert(last.role === 'agent' && last.text === 'The second ask answered.', `the saved turn: ${JSON.stringify(last)}`);
+    });
+
+    await test('a turn that ends with no words and no tool call twice says so, and saves that, never a blank', async () => {
         // crew60, 2026-11-02: a build request turn ended in six seconds with an empty text, and the
         // page showed nothing under the question.
+        const asked = peerRequests('session/prompt').length;
         const events = await turn(threadId, { text: 'SILENT: answer nothing' });
+        assert(peerRequests('session/prompt').length === asked + 2, `asked once more before giving up, got ${peerRequests('session/prompt').length - asked}`);
         const said = events.filter((e) => e.kind === 'text').map((e) => String(e.text)).join('');
         assert(said.includes('No answer came this time'), `the person is told, got ${JSON.stringify(said)}`);
         assert(events.at(-1)!.kind === 'done', `the turn still ends as done, got ${events.at(-1)!.kind}`);
