@@ -20,6 +20,8 @@
  * @structure AwayCard() · useAgentNames(on) · internal: readVisit, noteVisit, AWAY_AFTER_MS, ROWS
  * @usage html`<${AwayCard} />`
  * @version-history
+ *   v1.1.1 — 2026-11-02 — The day's AI cost (ai_spend_daily) is left out: bookkeeping in dollars, not
+ *     news (commercial's crew61 test).
  *   v1.1.0 — 2026-11-02 — An agent is named by the name the person sees (GET /v1/agents), a title that
  *     repeats it is left out, and a new agent reads "Uusi agentti on käytössä: <nimi>" instead of the
  *     feed's "on kotona" (commercial's crew59 test).
@@ -93,6 +95,13 @@ export function useAgentNames(on = true) {
   return (short) => (names && names[short]) || short;
 }
 
+/**
+ * Feed rows that are bookkeeping, not news for a person coming back: the day's AI cost in dollars
+ * with an ISO date (commercial's crew61 test: "AI maksoi $0.0078 päivänä 2026-11-01." was the first
+ * line). The feed's history keeps them.
+ */
+const NOT_NEWS = new Set(['ai_spend_daily', 'agent_knocking']);
+
 /** The events whose `data.agent` is an agent's short name (services/agent-task-fanout.ts and friends). */
 const AGENT_KINDS = new Set(['agent_task_done', 'agent_task_failed', 'agent_task_declined']);
 
@@ -128,7 +137,7 @@ export function AwayCard() {
 
   const after = Date.parse(since);
   const rows = [
-    ...feed.filter((it) => Date.parse(it.at) > after && it.kind !== 'agent_knocking')
+    ...feed.filter((it) => Date.parse(it.at) > after && !NOT_NEWS.has(it.kind))
       .map((it) => ({ at: it.at, category: kindCategory(it.kind), href: it.link, text: awayLine(it, shownName) }))
       .filter((r) => r.text),
     ...notes.filter((n) => Date.parse(n.createdAt) > after && titleOf(n))
