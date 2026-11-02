@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-02 — aimeat_home_feed: what the person's home lists as having happened (GET /v1/home/feed), on all three surfaces.
  *   2026-10-31 — aimeat_overview: the account's overview (GET /v1/overview), on all three surfaces.
  *   2026-10-31 — aimeat_agent_propose takes `schedule` (v31 K47); aimeat_notify takes `email` (v31 K46).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -220,6 +221,21 @@ export const agentMessagingTools = [
             focus: { type: 'string', description: 'An item id from an earlier answer (agent:<name>, app:<filename>, organism:<id>, workspace:<org>/<ws>, machine:<id>, chat:<client>, tools:<filename>, offer:<agent>/<id>).', zod: z.string().max(300).optional() },
             limit: { type: 'number', description: 'The busiest n items of each lane, 1 to 50. Default 10 when focus is not given.', zod: z.number().int().min(1).max(50).optional() },
         },
+    },
+    {
+        // GET /v1/home/feed, through the same service (services/home-feed.ts).
+        name: 'aimeat_home_feed',
+        description: 'What the person\'s home page lists as having happened on their account, newest first: agents connecting or waiting for approval, agent work done or failed, apps published, organisms joined, installs, payments and the like. Each row has a stable `kind`, its time, a `link` to the page it opens and `data` with the names in it; name an agent by `data.agent_shown_name` when the row has it, as the home does, and give a row\'s time as its `at_local` when it has one (the person\'s own clock; `at` is UTC). Use it when the person asks what their home shows, what has happened lately or what is new, and answer from the rows in their words; an empty list means nothing has happened yet, not that the page is broken.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Home Feed', readOnlyHint: true },
+        // The word GET /v1/home/feed asks: the rows derive from the owner's own records.
+        scope: 'memory:read',
+        // A start tool of the node's chat: switched off, the test model spent its turn looking for it
+        // and stopped before answering "what is on my home" (crew70 on guestkoey3wfwk, 2.11).
+        surfaces: ['agent', 'service', 'chat'],
+        // No input: the newest hundred rows, the answer GET /v1/home/feed gives the page.
+        input: {},
     },
     {
         // Connector-only convenience (not on the node MCP): the loopback serve daemon / a no-LLM crew

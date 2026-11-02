@@ -4,6 +4,7 @@
  *   role allowlists are catalog-valid, every catalog tool is placed (or explicitly excluded), and the
  *   purpose boundaries hold (e.g. agent has no marketplace tools, appdev is build-only).
  * @version-history
+ *   v1.2.0 -- 2026-11-02 -- The chat starts with aimeat_home_feed; at most 23 start tools.
  *   v1.1.0 -- 2026-10-02 -- The chat surface: small, carries the finder, registers what full does;
  *     its CHAT_ONLY finder is the one tool full does not carry.
  *   v1.0.0 -- 2026-05-30 -- MCP audit v2 S1
@@ -133,10 +134,12 @@ describe('v2 MCP surfaces', () => {
         // 22 since 2026-10-31: the app template and the publish joined, because goose refuses a
         // switched-off tool called by name and a buyer's "build me an app" ran out of its turn
         // looking for them (v31 K35). The token cost is cut in the descriptions instead (K63).
-        expect(MCP_SURFACES.chat.length).toBeLessThanOrEqual(22);
+        // 23 since 2026-11-02: aimeat_home_feed, which a test model asked "what is on my home" spent
+        // its turn looking for (crew70 on guestkoey3wfwk); it takes no input and one sentence.
+        expect(MCP_SURFACES.chat.length).toBeLessThanOrEqual(23);
         for (const name of ['aimeat_tools_find', 'aimeat_invoke', 'aimeat_handbook_get', 'aimeat_discover',
             'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_agent_propose', 'aimeat_memory_write',
-            'aimeat_app_template_get', 'aimeat_app_publish']) {
+            'aimeat_app_template_get', 'aimeat_app_publish', 'aimeat_home_feed']) {
             expect(chat.has(name), name).toBe(true);
         }
         const registered = toolsRegisteredOn('chat');

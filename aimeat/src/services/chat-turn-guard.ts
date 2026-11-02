@@ -26,12 +26,23 @@
  *   - TURN_LIMITS — the numbers
  *   - NodeUpdate — the events the node adds to the stream: progress and guard
  *   - stepForTool(title) — which progress line a tool call earns
- *   - turnNote() / wrapUpPrompt(reason) — what the node tells the model
+ *   - turnNote(clock) / wrapUpPrompt(reason) — what the node tells the model
+ *   - clockLine(prefs, pageZone, locale, iso) — the line with the person's local date and time
  *   - TurnWatch — counts one phase of a turn and says when its limit is reached
  *   - withTicks(updates, everyMs) — the update stream with a clock in it, so a limit fires in silence
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
+ *   v1.4.2 — 2026-11-02 — The sentence asking the model to convert tool answers' UTC times is gone: on
+ *     crew72 it labelled UTC numbers as local without converting them. The home feed gives each row its
+ *     local time itself (services/home-feed.ts `at_local`), and the model copies it.
+ *   v1.4.1 — 2026-11-02 — The clock line says times in tool answers are UTC and go to the person in their
+ *     zone, written as the line writes them (c9's crew71 round: "01:55 UTC" from the home feed, and
+ *     "5:55 AM" in Spanish, which writes 24-hour time).
+ *   v1.4.0 — 2026-11-02 — turnNote(clock) adds one line with the person's local date and time and
+ *     their time zone (clockLine). On crew68 "Mitä kello on nyt?" was answered "Kello on 02:42 UTC" at
+ *     04.42 Finnish time: the turn carried no time at all, and the model read its own UTC clock
+ *     (commercial-88; the CoS ruled it a functional fix, 2.11 05.20). One added line; the rest unchanged.
  *   v1.3.0 — 2026-11-02 — noAnswerText(): the line for a turn that ended with no words and no work
  *     (crew60: a build request turn ended in six seconds with an empty answer, and the page showed nothing).
  *   v1.2.9 — 2026-11-01 — A refused build request is told to the person, never replaced by a proposal of
@@ -72,6 +83,7 @@
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { createT, type Locale } from '../i18n.js';
+import { formatForPerson, isValidTimeZone, type DisplayPrefs } from './display-prefs.js';
 
 /** The limits of one chat turn. */
 export const TURN_LIMITS = {
@@ -119,9 +131,10 @@ export function stepForTool(title: string): ProgressStep | null {
  * The note appended to every prompt the chat sends. The person's words stay as they wrote them in
  * the conversation record; only the model sees this.
  */
-export function turnNote(): string {
+export function turnNote(clock?: string): string {
     return [
         '[A note from this node, not from the person]',
+        ...(clock ? [clock] : []),
         'Write one short sentence to the person before your first tool call, and one between steps, so they see what you are doing while you work. Write these sentences in the person\'s language too, never in English when they wrote in another.',
         'Keep this turn to about a minute and a few rounds of tool calls. After that the node asks you to answer with what you have.',
         'Speak to the person in plain words in their language: say "shared place" for an organism and "workspace" for a workspace, call the person by their name, and never write an identity such as name@node-id, a key or an id to them.',
@@ -132,6 +145,19 @@ export function turnNote(): string {
         'When aimeat_app_publish has answered, the app is done: give them its `url` in your next words and end the turn. Their own data is not part of building it, so do not read it after the publish.',
         'The person is signed in here, and an app of their own signs them in by itself when they open it, so never ask them to sign in.',
     ].join('\n');
+}
+
+/**
+ * The turn note's line with the person's local date and time. The zone is the one the person chose
+ * in their settings, else the one their browser sent with the turn; with neither, the time is UTC and
+ * the line says so. Written in the person's own date format (services/display-prefs.ts).
+ */
+export function clockLine(prefs: DisplayPrefs, pageZone: unknown, locale: Locale, iso: string): string {
+    const zone = prefs.timezone ?? (isValidTimeZone(pageZone) ? pageZone : null);
+    const at = formatForPerson({ ...prefs, region: prefs.region ?? locale, timezone: zone }, iso, { dateStyle: 'full', timeStyle: 'short' });
+    return zone
+        ? `It is now ${at} where the person is (time zone ${zone}). Use this local time when they ask the time or the date, never UTC, and write a time as this line writes it.`
+        : `It is now ${at}; the person's own time zone is not known, so say that a time you give is UTC.`;
 }
 
 /** What the node asks when the main phase ran out. */
