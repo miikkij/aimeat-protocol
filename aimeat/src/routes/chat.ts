@@ -15,6 +15,9 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.13.0 — 2026-11-02 — A closed stream no longer ends the turn: it runs to its end and is saved, so a
+ *     person who reloads or opens another page mid-thought comes back to the answer (c9's finding on
+ *     crew64). Stop is POST /v1/chat/threads/:id/stop. Reverses v1.2.0's "a closed stream aborts".
  *   v1.12.0 — 2026-11-01 — On a place bought from the store that runs on the store's AI key, a turn opens
  *     the place's one "build it with you" offer (services/build-with-you.ts). GET /v1/chat/threads/:id
  *     answers `running` while a turn of it is answered, and a turn's end sends the `chat` live domain,
@@ -75,6 +78,8 @@ import { logger } from '../utils/logger.js';
 
 /** The conversations with a turn being answered now, as `<owner identity>:<thread id>`. One process holds a turn. */
 const running = new Set<string>();
+/** How each running turn is stopped: the person's Stop (POST …/stop), never a closed stream. */
+const stoppers = new Map<string, AbortController>();
 import { LOCALES, detectLocale, toLocale, type Locale } from '../i18n.js';
 
 export function chatRouter(config: AimeatConfig, storage: Storage): Router {
@@ -211,6 +216,20 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(success(config.nodeId, { reset: true }));
     });
 
+    // POST /v1/chat/threads/:id/stop — the person's Stop: the running turn is told to end, and what
+    // it said so far is saved. Leaving the page does not stop a turn; this does.
+    router.post('/v1/chat/threads/:id/stop', requireAuth(), requireRole('owner'), async (req, res) => {
+        const gaii = identity(req);
+        const id = req.params.id as string;
+        if (!await readThread(storage, gaii, id)) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such conversation.'));
+            return;
+        }
+        const stopper = stoppers.get(`${gaii}:${id}`);
+        stopper?.abort();
+        res.json(success(config.nodeId, { stopped: !!stopper }));
+    });
+
     // POST /v1/chat/threads/:id/turn — say something, and watch what happens.
     //
     // Server-sent events rather than one response: a turn takes minutes when the agent is building
@@ -275,27 +294,27 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         // that is thinking. Comments carry no data and the client ignores them.
         const keepalive = setInterval(() => { res.write(':keepalive\n\n'); flush(); }, 15_000);
 
-        // A disconnect ends the TURN, not just the stream. Without this the node stops listening
-        // and goose keeps working on an answer that has nowhere to go, billed to the node's key.
-        // On Express 5 the REQUEST emits `close` once, the moment its body has been read, which is
-        // before this handler's awaits return; a listener attached here to `req` waits for an
-        // event that has already happened, and the person leaving is never seen. The RESPONSE's
-        // `close` is the one that fires when the connection goes. Measured 2026-09-08 by
-        // e2e-chat-agent: the agent kept answering for the whole turn after the socket was gone.
+        // A disconnect ends the STREAM, not the turn. The person who reloads, or opens another page
+        // while the agent thinks, comes back to the answer: the turn runs to its end within its own
+        // limits (services/chat-turn-guard.ts) and is saved, and the page reads it back (c9's
+        // finding on crew64, 2.11: a question left mid-thought had no answer, no notice and no log
+        // row after a reload). Until then a closed stream aborted the turn, so leaving cost the
+        // answer. Stop is the person saying so: POST /v1/chat/threads/:id/stop aborts the turn.
+        // The RESPONSE's `close` is the one that fires when the connection goes (on Express 5 the
+        // request's fires as soon as its body is read).
         const abort = new AbortController();
         let finished = false;
         res.on('close', () => {
             finished = true;
             clearInterval(keepalive);
-            abort.abort();
         });
 
         const turnKey = `${identity(req)}:${threadId}`;
         running.add(turnKey);
+        stoppers.set(turnKey, abort);
         try {
             for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, attachmentKeys, { locale })) {
-                if (finished) break;
-                send(update);
+                if (!finished) send(update);
             }
         } catch (err) {
             logger.warn(`[chat] turn failed: ${(err as Error).message}`);
@@ -304,6 +323,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             clearInterval(keepalive);
             if (!finished) res.end();
             running.delete(turnKey);
+            if (stoppers.get(turnKey) === abort) stoppers.delete(turnKey);
             // The turn is over and saved: a chat page opened while it ran, in another tab or after
             // the person went to another page and came back, reads the conversation again.
             emitChange('chat', identity(req));

@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-11-02: Stop tells the node to end the turn (chat.stopTurn) before it lets go of the stream; a
+ *     reload or another page mid-thought no longer costs the answer (routes/chat.ts v1.13.0).
  *   2026-11-01: The page opens the live stream, and a conversation whose turn still runs elsewhere shows
  *     the work and reads itself again when the turn ends; the text helpers moved to ./chat-text.js (crew51).
  *   2026-11-01: New opens an empty screen and the conversation is created with its first message;
@@ -173,6 +175,8 @@ export default function ChatView() {
     const exitHref = '/v1/home';
 
     const abortRef = useRef(null);
+    /** The conversation the running turn is in, for Stop. */
+    const turnThreadRef = useRef(null);
     const bottomRef = useRef(null);
     const lastAskRef = useRef('');
     /**
@@ -372,6 +376,7 @@ export default function ChatView() {
 
         const controller = new AbortController();
         abortRef.current = controller;
+        turnThreadRef.current = target.id;
 
         let answer = '';
         const tools = new Map();
@@ -452,7 +457,13 @@ export default function ChatView() {
         send(text);
     }, [send]);
 
-    const stop = useCallback(() => { abortRef.current?.abort(); }, []);
+    // Stop tells the node to end the turn (POST …/stop), then lets go of the stream. Leaving the page
+    // does not end a turn: the node finishes and saves it, and the page reads it back.
+    const stop = useCallback(() => {
+        const id = turnThreadRef.current;
+        if (id) chat.stopTurn(id).catch((err) => swallowed('chat: stop', err));
+        abortRef.current?.abort();
+    }, []);
 
     /** This device, not this browser's name: is it the one you carry? */
     const onDesktop = typeof window !== 'undefined'
