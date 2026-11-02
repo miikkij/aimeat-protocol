@@ -31,6 +31,8 @@
  *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.9.0 — 2026-11-02 — scheduleFor passes `deliver: "owner"` when the choice asks for it: the node then
+ *     hands each run's result to the person itself (the morning digest, home/morning-digest.js).
  *   v1.8.0 — 2026-10-13 — An agent that watches a workspace where a space is written only through
  *     an app's tool gets "app_tools" (definitionFor), and scopesFor reads the permissions from that
  *     same definition (agent-draft-known.js withToolOnlySpaces).
@@ -367,6 +369,8 @@ export function scheduleFor(name, draft, choice) {
     display_name: draft.displayName || name,
     task_title: draft.displayName || name,
     task_description: draft.purpose,
+    // 'owner': the node hands each run's result to the person itself (services/task-result-delivery.ts).
+    ...(choice.deliver === 'owner' ? { deliver: 'owner' } : {}),
   });
 }
 

@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-02 — aimeat_schedule_create and aimeat_schedule_update take `deliver` for an agent_task schedule.
  *   2026-10-28 — aimeat_agent_scope_narrow: the node never narrows by itself; call it only on the person's word.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-18 — aimeat_agent_scope_narrow says the node narrows a ready `*` agent by itself at its next task.
@@ -101,6 +102,7 @@ export const schedulesTasksMemoryTools = [
             input: { type: 'object', description: 'refinery: { prefix }, the definition to run. extension: the action\'s own parameters, passed on every fire. Without this the action runs on its built-in defaults, which is rarely what a clock is for: the AI Music Charts radar searched the same thirty terms every night for six days and added nothing, while the same action given a wider term list found sixty-three tracks it had never seen.' },
             instance_id: { type: 'string', description: 'extension: run the action on one named instance of the extension rather than the default one.' },
             task_description: { type: 'string', description: 'agent_task: the instruction for each created task.' },
+            deliver: { type: 'string', enum: ['owner'], description: 'agent_task: "owner" makes the node hand each finished task\x27s result to the owner itself (the bell, and email when the owner has a notification address), with the date written by the node. Use it when the person was promised the result, so it does not depend on the agent calling a tool.' },
             model: { type: 'string', description: '' },
             system_prompt: { type: 'string', description: '' },
             target_agent: { type: 'string', description: 'agent_task only: target agent name (defaults to yourself; must be same owner).' },
@@ -134,6 +136,7 @@ export const schedulesTasksMemoryTools = [
             timezone: { type: 'string', description: 'New IANA timezone.' },
             display_name: { type: 'string', description: 'New label.' },
             prompt: { type: 'string', description: 'New prompt: an ai schedule\x27s instruction, or the description of the task an agent_task schedule creates.' },
+            deliver: { type: 'string', enum: ['owner', 'none'], description: 'agent_task only: "owner" makes the node hand each finished task\x27s result to the owner; "none" leaves it to the agent.' },
         },
     },
     {

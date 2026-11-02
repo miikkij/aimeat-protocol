@@ -50,14 +50,14 @@
       "digest": "sha256:4730794dc7914fef305e5e55"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:5cd5ed7558b7edcb1c0fde3e"
+      "digest": "sha256:621fa169bea2b4199bf6111a"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-30",
@@ -444,14 +444,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:0d80c540f151f64fd7fe6f45"
+      "digest": "sha256:a6e8c33ca48f6c56a17b6022"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -669,7 +669,7 @@
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
-      "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
+      "aimeat/src/mcp/agent-schedules.ts": "e765a5170e850f1e",
       "aimeat/src/services/scheduler.ts": "b228800f4b2c4643",
       "aimeat/src/services/ai/route-plan.ts": "3972a5cb00aab986"
     },
@@ -708,9 +708,9 @@
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "4d2c13ef4ace9e0e",
-      "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
+      "aimeat/src/mcp/agent-schedules.ts": "e765a5170e850f1e",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "168debe4df9511ba",
-      "aimeat/src/services/schedule-write.ts": "8f52d2068d62fe41"
+      "aimeat/src/services/schedule-write.ts": "d627474b468b3c15"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
