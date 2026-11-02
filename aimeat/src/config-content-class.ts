@@ -24,6 +24,10 @@
  *   import { contentClassDefaults } from './config-content-class.js';
  *   const config = { ...contentClassDefaults(), ... };
  * @version-history
+ *   v1.3.0 — 2026-11-02 — contentClassProfileModel (content_class.profile_model): the fingerprint's
+ *     model when the owner names none, DeepSeek V4 Pro by default (wish-aineiston-sormenj-lki-
+ *     millaista-aineisto-on-yhdell-silm-ykse); contentClassProfileLabels (content_class.profile_labels),
+ *     the decision model labelling the sections when it can.
  *   v1.2.0 — 2026-11-01 — mediaReadSeconds and mediaReadMemoryMb (secaudit2026oct31w2 round 12, the
  *     exifr and c2pa-ts readers).
  *   v1.1.0 — 2026-10-29 — pdfTextSeconds and pdfTextMemoryMb (secaudit2026oct26 round 8c, memory-b-09).
@@ -58,6 +62,18 @@ export interface ContentClassConfig {
   mediaReadSeconds: number;
   /** The memory limit, in MB, for the same read. 0 is no limit. */
   mediaReadMemoryMb: number;
+  /**
+   * The model the fingerprint (the profile stage, services/content/profile.ts) runs on when the
+   * owner named none of their own (contentclass.settings models.profile). Empty: the owner's text
+   * model and defaults. The default is the model the instruction was measured on and chosen for.
+   */
+  contentClassProfileModel: string;
+  /**
+   * Who labels the fingerprint's sections: 'auto' (the decision model when the decision service is
+   * on, and the text model writes only headings, claims and topics; services/content/profile-labels.ts)
+   * or 'model' (the text model does all of it).
+   */
+  contentClassProfileLabels: 'auto' | 'model';
 }
 
 /** A whole number 0 or above from the environment, else `fallback`. */
@@ -76,6 +92,16 @@ function programPath(v: unknown, name: string): string {
   return typeof v === 'string' && v.trim() && v.length <= 1024 && !/[\r\n\0]/.test(v) ? v.trim() : name;
 }
 
+/** The fingerprint's model unless the operator names another (measured 2026-11-02, Jouni's choice). */
+export const DEFAULT_PROFILE_MODEL = '~deepseek/deepseek-pro-latest';
+
+/** A model id as configured (an empty value is kept: it means the owner's own models), else the default. */
+function modelId(v: unknown, fallback: string): string {
+  if (typeof v !== 'string') return fallback;
+  const s = v.trim();
+  return s.length <= 200 && !/[\s\0]/.test(s) ? s : fallback;
+}
+
 /** The content class settings, from the environment. */
 export function contentClassDefaults(): ContentClassConfig {
   return {
@@ -88,5 +114,7 @@ export function contentClassDefaults(): ContentClassConfig {
     // Far above what a real picture's or video's metadata takes (media-read-bounded.ts DEFAULT_MEDIA_READ_*).
     mediaReadSeconds: wholeOrDefault(process.env.AIMEAT_MEDIA_READ_SECONDS, 30),
     mediaReadMemoryMb: wholeOrDefault(process.env.AIMEAT_MEDIA_READ_MEMORY_MB, 512),
+    contentClassProfileModel: modelId(process.env.AIMEAT_CONTENT_PROFILE_MODEL, DEFAULT_PROFILE_MODEL),
+    contentClassProfileLabels: process.env.AIMEAT_CONTENT_PROFILE_LABELS === 'model' ? 'model' : 'auto',
   };
 }

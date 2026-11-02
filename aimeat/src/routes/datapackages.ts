@@ -28,6 +28,7 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window, or ?format=csv the whole resource
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.12.0 -- 2026-11-02 -- GET /v1/datapackages/shared: the owner's "Data you share" (WP11).
  *   v1.11.0 -- 2026-11-01 -- The schema.org Dataset of ?format=schemaorg is built by
  *     services/datapackage/landing-page.ts schemaOrgOfOpened, which the public dataset page's head
  *     reads too, and names the page /v1/dataset/{owner}/{name} (WP9b).
@@ -108,6 +109,7 @@ import { schemaOrgOfOpened } from '../services/datapackage/landing-page.js';
 import { ODPS_VERSION } from '../services/exchange-odps.js';
 import { packageFreshness } from '../services/datapackage/freshness-read.js';
 import { versionsInUse } from '../services/datapackage/versions-in-use.js';
+import { sharedDataForCaller } from '../services/datapackage/shared-data.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
  *  OPTIONAL on the wire — an app that hands over rows and nothing else is asking for a proposal — so
@@ -289,6 +291,22 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             // type and send it as a DECLARED schema on the real publish.
             schemas,
         }));
+    });
+
+    /**
+     * The owner's "Data you share" (services/datapackage/shared-data.ts sharedDataOf, which
+     * aimeat_dataproduct action "shared" answers too): each package with its audience, shares, sale,
+     * freshness and reads in 30 days, the shares to people and who reads. It names the owner's parties,
+     * so the person and their own agent read it; an app, an ecosystem app and a visitor are refused.
+     * One path segment, so it never meets GET /v1/datapackages/:owner/:name.
+     */
+    router.get('/v1/datapackages/shared', requireAuth(), requireScope('storage:read'), async (req, res) => {
+        const out = await sharedDataForCaller(store, callerOf(req, config.nodeId, storage));
+        if (!out.ok) { deny403(req, res, out.code, out.message); return; }
+        res.json(success(config.nodeId, out.data as unknown as Record<string, unknown>, [
+            { description: 'Stop one share', method: 'DELETE', url: '/v1/consent/{id}' },
+            { description: 'Run a data product now', method: 'POST', url: '/v1/dataproducts/{name}/run' },
+        ]));
     });
 
     /** Every package the caller owns, newest version each, with any recorded failure. */

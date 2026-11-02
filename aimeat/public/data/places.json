@@ -195,6 +195,11 @@
           { "id": "wal-rails", "num": "04", "labelKey": "walpage.secRails" },
           { "id": "wal-roads", "num": "05", "labelKey": "walpage.secRoads" }
         ] },
+        { "id": "sharedData", "labelKey": "profile.tabs.sharedData", "sections": [
+          { "id": "sd-products", "num": "01", "labelKey": "dataout.list.title" },
+          { "id": "sd-people", "num": "02", "labelKey": "sharedData.people.title" },
+          { "id": "sd-readers", "num": "03", "labelKey": "sharedData.readers.title" }
+        ] },
         { "id": "dataWallet", "labelKey": "profile.tabs.dataWallet", "sections": [
           { "id": "dw-targets", "num": "01", "labelKey": "dwpage.secTargets" },
           { "id": "dw-trail", "num": "02", "labelKey": "dwpage.secTrail" },
@@ -220,8 +225,9 @@
         ] },
         { "id": "exposure", "labelKey": "profile.tabs.exposure", "sections": [
           { "id": "ex-conflicts", "num": "01", "labelKey": "exposure.cls.conflictsTitle" },
-          { "id": "ex-items", "num": "02", "labelKey": "exposure.itemsTitle" },
-          { "id": "ex-notes", "num": "03", "labelKey": "exposure.notesTitle" }
+          { "id": "ex-data", "num": "02", "labelKey": "exposure.data.title" },
+          { "id": "ex-items", "num": "03", "labelKey": "exposure.itemsTitle" },
+          { "id": "ex-notes", "num": "04", "labelKey": "exposure.notesTitle" }
         ] },
         { "id": "agreements", "labelKey": "profile.tabs.agreements" }
       ] },

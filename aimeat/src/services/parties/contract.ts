@@ -24,6 +24,8 @@
  *   MAX_PARTIES · MAX_KEYS_PER_PARTY · isPartyRef · PARTY_TOKEN_ROUTES · takesPartyToken
  * @usage const ref = partyRefOf('alice', 'matti', config.nodeId);   // party:alice/matti@node
  * @version-history
+ *   v1.6.0 — 2026-11-02 — PARTY_TOKEN_ROUTES takes GET /v1/catalogue/knowledge: the library's reach
+ *     "party" lists what the party's shares give (WP11).
  *   v1.5.0 — 2026-11-01 — PARTY_TOKEN_ROUTES takes GET /v1/apps/{owner}/{filename}/members/me and
  *     POST /v1/ext/{extension}/{action}: an app party reads its roster standing and calls the member
  *     check of its own app's IAM extension (WP9d).
@@ -167,6 +169,8 @@ export const PARTY_TOKEN_ROUTES: ReadonlyArray<{ methods: readonly string[]; pat
     // (services/app-parties/iam-gate.ts); the instance form and the literal <owner>/<name>/<action>
     // form are not listed and stay 401.
     { methods: ['POST'], path: /^\/v1\/ext\/[^/]+\/[^/]+\/?$/ },
+    // The library's reach "party": what the party's shares give (routes/catalogue-library.ts, WP11).
+    { methods: ['GET'], path: /^\/v1\/catalogue\/knowledge\/?$/ },
 ];
 
 /** Does this endpoint take a party token? */

@@ -147,7 +147,11 @@ the weak one?".
 No profile yet: the profile step is off (ask before running it, as for every model step:
 \`aimeat_content_inspect { kind, key, stages: ["profile"] }\`, or the setting for everything that
 arrives, \`aimeat_content_settings { patch: { stages: { profile: true } } }\`; the Data Wallet page
-does not show this switch yet, so it is changed from chat). A profile is the model's reading and can be wrong; it says which model made it. The marks
+does not show this switch yet, so it is changed from chat). When the node's decision model is on, it
+marks the sections and the fingerprint model writes only the headings, claims and topics
+(\`profile.labels: "decide"\`, and the tag's last line names both); otherwise the fingerprint model
+does all of it. The fingerprint model is DeepSeek V4 Pro unless the operator chose another;
+\`models.profile\` in the settings picks the person's own. A profile is the model's reading and can be wrong; it says which model made it. The marks
 judge what the text shows, not whether its claims are true.
 
 ## When something is wrong: correct it

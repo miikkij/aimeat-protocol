@@ -132,6 +132,14 @@ export const PARTS = {
     fork: "One element, one number: build it yourself and call countUp(node, from, to).",
     file: "hero.js",
   },
+  "fingerprint": {
+    parts: ["root","head","title","meta","sealBox","seal","barcodeBox","barcode","stripe","topicBand","trust","trustLegend","tag","grids","gridCard","gridName","gridPick","grid","bubble","leaning","gridLeaning","card","tip","extra","empty"],
+    slots: ["title()","meta()","extra()"],
+    variants: ["dense","plain"],
+    tokens: ["--ak-fp-F","--ak-fp-A","--ak-fp-M","--ak-fp-O","--ak-fp-P","--ak-fp-K","--ak-fp-x","--ak-fp-zone","--ak-fp-dim"],
+    fork: "Copy fingerprint-draw.js's functions and .ak-fp* out of fingerprint.css and draw the profile yourself; you keep the drawing and give up the topic highlight across the parts, the seal focus, the hover card and the words in three languages.",
+    file: "fingerprint.js",
+  },
   "form": {
     parts: ["root","field","label","input","req","hint","error","range","readout","alert","gate","bar","submit","cancel"],
     slots: [],

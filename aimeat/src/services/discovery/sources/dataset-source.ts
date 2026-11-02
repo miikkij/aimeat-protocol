@@ -27,6 +27,9 @@
  * @structure createDatasetSource(storage, config) → DiscoverySource · DATASET_SOURCE_ID
  * @usage registry.register(createDatasetSource(storage, config));
  * @version-history
+ *   v1.2.0 — 2026-11-02 — The candidates are services/datapackage/visible.ts visiblePackages, the one
+ *     function every listing of data packages calls: the audience is the service's record, not the
+ *     manifest's, and a visitor's named shares count as shared (WP11).
  *   v1.1.0 — 2026-11-01 — An entry carries `freshness` against its producer's promise, for the kept
  *     entries only (services/datapackage/freshness.ts; plan doc-mvwxcas3dom3, D6.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.1).
@@ -34,10 +37,9 @@
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit, CanonicalVisibility } from '../types.js';
-import { allDatasetFacts, datasetLinks, type DatasetFacts } from '../../datapackage/catalogue-facts.js';
-import { datapackageReadable } from '../../datapackage/audience.js';
+import { datasetLinks, type DatasetFacts } from '../../datapackage/catalogue-facts.js';
+import { visiblePackages, viewerOf } from '../../datapackage/visible.js';
 import { readPointer } from '../../datapackage/version-audience.js';
-import { memoryTarget } from '../../classification/labels.js';
 import type { LatestPointer } from '../../datapackage/contract.js';
 import { packageFreshness } from '../../datapackage/freshness-read.js';
 import { freshnessBrief, type Freshness } from '../../datapackage/freshness.js';
@@ -79,18 +81,12 @@ export function createDatasetSource(storage: Storage, config: AimeatConfig): Dis
       if (ctx.scope !== 'public' && !own) return [];
       const reader = ctx.readerAuth;
 
-      const inScope = (await allDatasetFacts(storage)).filter(f => {
-        if (!matches(f, ctx.filters.q)) return false;
-        if (ctx.scope === 'own') return f.ownerGhii === own;
-        if (ctx.scope === 'shared') return f.ownerGhii !== own && (f.audience === 'members' || f.audience.startsWith('organism:'));
-        return f.audience === 'public';
-      });
-      // The rule the descriptor read asks, for each candidate. A public package admits anyone.
-      const readable: DatasetFacts[] = [];
-      for (const f of inScope) {
-        if (f.audience === 'public' || await datapackageReadable(storage, f.ownerGhii, f.audience, reader ?? null)) readable.push(f);
-      }
-      const shown = await ctx.reader.show(readable, f => memoryTarget(f.ownerGhii, f.manifestKey));
+      // The one function that decides what a listing of data packages names (the library, the owner's
+      // shared data and the operator's list call it too): the recorded audience, the read's own rule
+      // with the caller's roles and scopes, and the classification reader.
+      const viewer = viewerOf(config, reader ?? null);
+      const visible = await visiblePackages(deps, viewer, ctx.scope === 'own' ? 'own' : ctx.scope === 'shared' ? 'shared' : 'public');
+      const shown = visible.map(v => ({ ...v.facts, audience: v.audience })).filter(f => matches(f, ctx.filters.q));
       const page = shown.slice(0, limit);
       const hits = await Promise.all(page.map(async (facts): Promise<DatasetHit> => {
         const pointer = await readPointer(deps, facts.ownerGhii, facts.name);

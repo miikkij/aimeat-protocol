@@ -2486,13 +2486,13 @@
     };
     gl.uniform1f(u.peak, peak);
     gl.clearColor(0, 0, 0, 0);
-    function colour(where, c) {
+    function colour2(where, c) {
       gl.uniform3f(where, c[0] / 255, c[1] / 255, c[2] / 255);
     }
     function setPalette(p) {
-      colour(u.c0, p.accent);
-      colour(u.c1, p.spectrum2);
-      colour(u.c2, p.spectrum3);
+      colour2(u.c0, p.accent);
+      colour2(u.c1, p.spectrum2);
+      colour2(u.c2, p.spectrum3);
     }
     setPalette(palette2);
     return {
@@ -6542,9 +6542,9 @@
       const name = svg("text", { x: CX, y: y + STEP_H / 2 + 5, class: "ak-chart__funnellabel", "text-anchor": "middle" });
       name.textContent = `${s.label} · ${fmtTick(s.value)}`;
       node.appendChild(name);
-      const pct = svg("text", { x: W7 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
-      pct.textContent = Math.round(s.value / first * 100) + " %";
-      node.appendChild(pct);
+      const pct2 = svg("text", { x: W7 - 10, y: y + STEP_H / 2 + 5, class: "ak-chart__funnelpct", "text-anchor": "end" });
+      pct2.textContent = Math.round(s.value / first * 100) + " %";
+      node.appendChild(pct2);
     });
     ctx.root.appendChild(node);
   }
@@ -7347,10 +7347,10 @@
       } else {
         const barW = bars.length ? (slot2 - groupPad * 2) / bars.length : 0;
         bars.forEach((s, bi) => {
-          const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+          const colour2 = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
           s.values.slice(0, labels.length).forEach((v, i) => {
             const rect = barRect(along(i) + groupPad + bi * barW + 1, cross(0), cross(v), Math.max(barW - 2, 1), radius);
-            rect.setAttribute("style", `fill:${colour}`);
+            rect.setAttribute("style", `fill:${colour2}`);
             decorateBar(rect, i);
             node.appendChild(rect);
             node.appendChild(sheenOver(rect));
@@ -7380,12 +7380,12 @@
       }
       for (const s of lines) {
         if (horizontal) continue;
-        const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
+        const colour2 = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
         const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
-        const line2 = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
+        const line2 = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour2}` });
         node.appendChild(line2);
         const last = pts[pts.length - 1];
-        node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
+        node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour2}` }));
       }
       root.appendChild(node);
       legendFor(series);
@@ -7451,17 +7451,17 @@
     function noteBubble(node, note, labels, along, slot2) {
       const i = labels.indexOf(note.label);
       if (i < 0 || !note.text) return;
-      const bubble = el("div", { class: "ak-chart__note" }, [
+      const bubble2 = el("div", { class: "ak-chart__note" }, [
         el("span", { class: "ak-chart__note-label", text: String(note.label) }),
         el("span", { text: String(note.text) })
       ]);
-      root.appendChild(bubble);
+      root.appendChild(bubble2);
       requestAnimationFrame(() => {
         const box = node.getBoundingClientRect();
         const rootBox = root.getBoundingClientRect();
         const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
-        bubble.style.left = `${Math.max(8, Math.min(rootBox.width - bubble.offsetWidth - 8, px - bubble.offsetWidth / 2))}px`;
-        bubble.style.top = `${box.top - rootBox.top + 4}px`;
+        bubble2.style.left = `${Math.max(8, Math.min(rootBox.width - bubble2.offsetWidth - 8, px - bubble2.offsetWidth / 2))}px`;
+        bubble2.style.top = `${box.top - rootBox.top + 4}px`;
       });
     }
     render(spec.data);
@@ -8615,8 +8615,8 @@
     } else {
       notice.textContent = t("aideNotice");
     }
-    if (s.intro) bubble("assistant", s.intro, null);
-    function bubble(who, text, provenance) {
+    if (s.intro) bubble2("assistant", s.intro, null);
+    function bubble2(who, text, provenance) {
       const b = el("div", { class: "ak-aide__msg ak-aide__msg--" + who }, [
         el("p", { class: "ak-aide__text", text })
       ]);
@@ -8664,20 +8664,20 @@
       const text = input.value.trim();
       if (!text) return;
       if (!aiNs || typeof aiNs.completeJson !== "function") {
-        bubble("assistant", t("aideNoAi"), null);
+        bubble2("assistant", t("aideNoAi"), null);
         return;
       }
       const available = await aiNs.isAvailable().catch(function() {
         return false;
       });
       if (!available) {
-        bubble("assistant", t("aideNoAi"), null);
+        bubble2("assistant", t("aideNoAi"), null);
         return;
       }
       input.value = "";
-      bubble("user", text, null);
+      bubble2("user", text, null);
       history.push({ who: "user", text });
-      const thinking = bubble("assistant", "…", null);
+      const thinking = bubble2("assistant", "…", null);
       const prompt2 = [
         'You are the in-app aide of "' + (s.appName || document.title || "this app") + '" on the AIMEAT platform.',
         "You may ONLY act through the declared actions below, and only propose one when the person asked to DO something.",
@@ -8704,14 +8704,14 @@
         thinking.remove();
         const code = err && /** @type {any} */
         err.code;
-        bubble("assistant", code === "SPEND_CANCELLED" ? t("cancel") + "." : t("aideFailed"), null);
+        bubble2("assistant", code === "SPEND_CANCELLED" ? t("cancel") + "." : t("aideFailed"), null);
         return;
       }
       thinking.remove();
       const body = out && out.data ? out.data : out;
       const answer = body && body.parsed ? body.parsed : body;
       const reply = answer && typeof answer.reply === "string" ? answer.reply : t("aideFailed");
-      const b = bubble("assistant", reply, body && body.provenance || out && out.provenance || null);
+      const b = bubble2("assistant", reply, body && body.provenance || out && out.provenance || null);
       history.push({ who: "assistant", text: reply });
       if (answer && answer.action && answer.action.id) offerAction(answer.action, b);
       if (answer && answer.panel) renderPanel(answer.panel, b);
@@ -9400,7 +9400,7 @@
       const rad = Math.PI + Math.PI * Math.max(0, Math.min(1, frac));
       return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
     }
-    function arcPath(fromFrac, toFrac, radius) {
+    function arcPath2(fromFrac, toFrac, radius) {
       const [x1, y1] = pointAt(fromFrac, radius);
       const [x2, y2] = pointAt(toFrac, radius);
       return "M " + x1.toFixed(1) + " " + y1.toFixed(1) + " A " + radius + " " + radius + " 0 0 1 " + x2.toFixed(1) + " " + y2.toFixed(1);
@@ -9430,8 +9430,8 @@
       if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf2(bands[bands.length - 1].tone);
       root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
       const node = svg4("svg", { viewBox: "0 0 240 132", class: "ak-gauge__svg", "aria-hidden": "true" });
-      node.appendChild(svg4("path", { d: arcPath(0, 1, R2), class: "ak-gauge__track" }));
-      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R2), class: "ak-gauge__value ak-gauge__value--" + tone });
+      node.appendChild(svg4("path", { d: arcPath2(0, 1, R2), class: "ak-gauge__track" }));
+      const value = svg4("path", { d: arcPath2(0, Math.max(frac, 5e-3), R2), class: "ak-gauge__value ak-gauge__value--" + tone });
       node.appendChild(value);
       for (const band of bands.slice(0, -1)) {
         const f2 = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
@@ -10854,8 +10854,8 @@
       const lo = num2("min", 0);
       const hi = num2("max", 100);
       const v = parseFloat(input.value);
-      const pct = hi > lo && isFinite(v) ? (v - lo) / (hi - lo) * 100 : 0;
-      input.style.setProperty("--ak-range-fill", Math.max(0, Math.min(100, pct)).toFixed(2) + "%");
+      const pct2 = hi > lo && isFinite(v) ? (v - lo) / (hi - lo) * 100 : 0;
+      input.style.setProperty("--ak-range-fill", Math.max(0, Math.min(100, pct2)).toFixed(2) + "%");
     }
     function draw(x) {
       stretch = x;
@@ -19754,12 +19754,12 @@ Known schemas:
       handle2
     ].filter(Boolean));
     if (s.target) resolve(s.target).appendChild(root);
-    let pct = typeof s.value === "number" ? s.value : 50;
+    let pct2 = typeof s.value === "number" ? s.value : 50;
     function set(v) {
-      pct = Math.max(0, Math.min(Number(v) || 0, 100));
-      root.style.setProperty("--ak-compare", pct + "%");
-      handle2.setAttribute("aria-valuenow", String(Math.round(pct)));
-      if (s.onChange) s.onChange(pct);
+      pct2 = Math.max(0, Math.min(Number(v) || 0, 100));
+      root.style.setProperty("--ak-compare", pct2 + "%");
+      handle2.setAttribute("aria-valuenow", String(Math.round(pct2)));
+      if (s.onChange) s.onChange(pct2);
     }
     let dragging = false;
     function at3(e) {
@@ -19783,14 +19783,14 @@ Known schemas:
     handle2.addEventListener("keydown", function(e) {
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        set(pct - 5);
+        set(pct2 - 5);
       }
       if (e.key === "ArrowRight") {
         e.preventDefault();
-        set(pct + 5);
+        set(pct2 + 5);
       }
     });
-    set(pct);
+    set(pct2);
     return { el: root, set, destroy() {
       if (root.parentNode) root.parentNode.removeChild(root);
     } };
@@ -22502,13 +22502,13 @@ Known schemas:
     ].filter(Boolean)));
     const p = d.progress;
     if (p && p.total > 0) {
-      const pct = Math.round(Math.max(0, Math.min(p.value / p.total, 1)) * 100);
+      const pct2 = Math.round(Math.max(0, Math.min(p.value / p.total, 1)) * 100);
       root.appendChild(el("div", { class: "ak-crt__foot" }, [
         el("span", {}, "TRACKING " + p.value + " / " + p.total),
         el(
           "span",
           { class: "ak-crt__track", "aria-hidden": "true" },
-          [el("span", { class: "ak-crt__track-fill", style: "width:" + pct + "%" })]
+          [el("span", { class: "ak-crt__track-fill", style: "width:" + pct2 + "%" })]
         ),
         d.note ? el("span", {}, d.note) : null
       ].filter(Boolean)));
@@ -22831,7 +22831,7 @@ Known schemas:
       }, 0);
       opts.forEach(function(o) {
         const share = typeof o.share === "number" ? o.share : total > 0 ? (o.count || 0) / total : 0;
-        const pct = Math.round(Math.max(0, Math.min(share, 1)) * 100);
+        const pct2 = Math.round(Math.max(0, Math.min(share, 1)) * 100);
         root.appendChild(el("button", {
           type: "button",
           class: "ak-poll__opt",
@@ -22840,8 +22840,8 @@ Known schemas:
             s.onPick(o);
           } } : void 0
         }, [
-          el("span", { class: "ak-poll__fill", style: "--ak-share:" + pct + "%" }),
-          el("span", { class: "ak-poll__row" }, [el("span", {}, String(o.label || o.id)), el("span", { class: "ak-poll__share" }, pct + "%")])
+          el("span", { class: "ak-poll__fill", style: "--ak-share:" + pct2 + "%" }),
+          el("span", { class: "ak-poll__row" }, [el("span", {}, String(o.label || o.id)), el("span", { class: "ak-poll__share" }, pct2 + "%")])
         ]));
       });
       enter(root);
@@ -23147,7 +23147,7 @@ Known schemas:
         el("time", { class: "ak-thread__time", datetime: m.at || null }, timeLabelOf(m.at)),
         word ? el("span", { class: "ak-thread__status ak-thread__status--" + m.status }, word) : null
       ].filter(Boolean));
-      const bubble = el("div", { class: "ak-thread__bubble" }, [
+      const bubble2 = el("div", { class: "ak-thread__bubble" }, [
         m.mine ? null : el("div", { class: "ak-thread__who" }, who),
         el("p", { class: "ak-thread__text" }, String(m.text == null ? "" : m.text)),
         meta
@@ -23157,7 +23157,7 @@ Known schemas:
         "data-ak-msg": String(m.id)
       }, [
         el("span", { class: "ak-thread__avatar", "aria-hidden": "true", title: who }, initialsOf(who)),
-        bubble
+        bubble2
       ]);
     }
     function render(list3) {
@@ -26374,8 +26374,8 @@ Known schemas:
     for (const [x, y, sx, sy] of [[0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1]]) {
       corner(d.group(d.svg, { transform: "translate(" + R(x) + " " + R(y) + ") scale(" + R(sx * k * 100) / 100 + " " + R(sy * k * 100) / 100 + ")" }));
     }
-    const mid = (tf, len, gain, s0) => {
-      const g = d.group(d.svg, { transform: tf });
+    const mid = (tf2, len, gain, s0) => {
+      const g = d.group(d.svg, { transform: tf2 });
       for (const sx of [1, -1]) {
         const s = turtle(sx * 4, 24, sx > 0 ? 0.35 : PI - 0.35, len, (u) => sx * (-0.02 + gain * u * u * u));
         d.stroke(g, s.d, "ln", 1.4, s.len, s0, 1.6);
@@ -26458,8 +26458,8 @@ Known schemas:
       { dx: -14, h: UP - 0.12, L: 430, t0: 0.8, k: (u) => -4e-3 * Math.cos(TAU5 * u + 0.6) - 0.02 * Math.pow(u, 6), flower: "cup", lv: [[0.25, -1, 30], [0.5, 1, 22]] },
       { dx: 4, h: UP + 0.02, L: 300, t0: 1, k: (u) => 6e-3 * Math.cos(TAU5 * 0.8 * u + 1) + 0.025 * Math.pow(u, 6), flower: "bud", lv: [[0.35, 1, 24]] }
     ];
-    for (const tf of ["translate(0 0)", "translate(" + R(2 * (x0 + w / 2)) + " 0) scale(-1 1)"]) {
-      const g = d.group(d.svg, { transform: tf });
+    for (const tf2 of ["translate(0 0)", "translate(" + R(2 * (x0 + w / 2)) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf2 });
       [[-0.38, 110], [-0.16, 88], [0.22, 96]].forEach(([a, s], i) => d.leaf(g, sx - 4 * k, ground, UP + a, s * k, 0.3 + i * 0.12, 0.13));
       for (const st of stems) {
         const dur = 2.6;
@@ -26506,8 +26506,8 @@ Known schemas:
     const y1 = pad.y + h;
     const a = Math.min(12 * u, h * 0.22);
     const tails = d.group(d.svg);
-    for (const tf of ["translate(0 0)", "translate(" + R(2 * cx) + " 0) scale(-1 1)"]) {
-      const g = d.group(tails, { transform: tf });
+    for (const tf2 of ["translate(0 0)", "translate(" + R(2 * cx) + " 0) scale(-1 1)"]) {
+      const g = d.group(tails, { transform: tf2 });
       const top = y0 + a + 20 * u;
       const bot = y1 + a + 22 * u;
       const inner = x1 - 14 * u;
@@ -26711,8 +26711,8 @@ Known schemas:
     if (!d) return;
     const k = h / 44;
     const cxc = pad.x + w / 2;
-    for (const tf of ["translate(0 0)", "translate(" + R(2 * cxc) + " 0) scale(-1 1)"]) {
-      const g = d.group(d.svg, { transform: tf });
+    for (const tf2 of ["translate(0 0)", "translate(" + R(2 * cxc) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf2 });
       const bx = pad.x - 12 * k;
       const top = pad.y + 2;
       const bot = pad.y + h - 2;
@@ -29648,9 +29648,824 @@ Known schemas:
     };
   }
 
+  // src/static/sdk-libs/atelier/fingerprint-i18n.js
+  var STRINGS11 = {
+    en: {
+      "genre.F": "Fact",
+      "genre.A": "Analysis",
+      "genre.M": "Opinion",
+      "genre.O": "Instruction",
+      "genre.P": "Decision or plan",
+      "genre.K": "Narrative",
+      "mark.+": "source given",
+      "mark.~": "a person or meeting stands behind it",
+      "mark.?": "no grounds",
+      "mark.x": "contradicted or replaced",
+      "axis.fakta.lo": "Opinion",
+      "axis.fakta.hi": "Fact",
+      "axis.fakta.short": "Fact",
+      "axis.konkr.lo": "Abstract",
+      "axis.konkr.hi": "Concrete",
+      "axis.konkr.short": "Concrete",
+      "axis.aika.lo": "Past",
+      "axis.aika.hi": "Future",
+      "axis.aika.short": "Future",
+      "axis.toim.lo": "Describes",
+      "axis.toim.hi": "Directs action",
+      "axis.toim.short": "Action",
+      "axis.yks.lo": "Overview",
+      "axis.yks.hi": "Detail",
+      "axis.yks.short": "Detail",
+      "axis.varm.lo": "Guess",
+      "axis.varm.hi": "Certain",
+      "axis.varm.short": "Certain",
+      "zone.konkr|fakta.0": "Principles and theory",
+      "zone.konkr|fakta.1": "Measured fact",
+      "zone.konkr|fakta.2": "Views and visions",
+      "zone.konkr|fakta.3": "Examples and experience",
+      "zone.aika|toim.0": "Lessons and fixes",
+      "zone.aika|toim.1": "Plans and tasks",
+      "zone.aika|toim.2": "History and reporting",
+      "zone.aika|toim.3": "Forecast and vision",
+      "zone.yks|varm.0": "Settled overview",
+      "zone.yks|varm.1": "Precise knowledge",
+      "zone.yks|varm.2": "General estimate",
+      "zone.yks|varm.3": "Seeming precision",
+      "grid.konkr|fakta": "What it is",
+      "grid.aika|toim": "Where it points",
+      "grid.yks|varm": "How precise, how certain",
+      "grid.own": "Your own view",
+      "zoneJoin": "{a} and {b}",
+      "barcode": "Sections",
+      "trust": "Can it be trusted",
+      "leaning": "Leaning",
+      "topics": "Topics",
+      "kind": "Kind",
+      "profiledBy": "Profiled by {model} on {date}",
+      "truncated": "from the first {n} characters",
+      "words": "{n} words",
+      "certainty": "certainty {p} %",
+      "topic": "Topic: {name}",
+      "share": "share {p} %",
+      "sectionsOf": "Sections: {list}",
+      "x": "X",
+      "y": "Y",
+      "seal": "Fingerprint",
+      "empty": "This item has no fingerprint yet.",
+      "emptyHint": "It is made when the profile step is on."
+    },
+    fi: {
+      "genre.F": "Fakta",
+      "genre.A": "Analyysi",
+      "genre.M": "Mielipide",
+      "genre.O": "Ohje",
+      "genre.P": "Päätös tai suunnitelma",
+      "genre.K": "Kertomus",
+      "mark.+": "lähde mukana",
+      "mark.~": "ihminen tai kokous takana",
+      "mark.?": "ei perustetta",
+      "mark.x": "ristiriidassa tai kumottu",
+      "axis.fakta.lo": "Mielipide",
+      "axis.fakta.hi": "Fakta",
+      "axis.fakta.short": "Fakta",
+      "axis.konkr.lo": "Abstrakti",
+      "axis.konkr.hi": "Konkreettinen",
+      "axis.konkr.short": "Konkr.",
+      "axis.aika.lo": "Mennyt",
+      "axis.aika.hi": "Tuleva",
+      "axis.aika.short": "Tuleva",
+      "axis.toim.lo": "Kuvaileva",
+      "axis.toim.hi": "Ohjaa toimintaan",
+      "axis.toim.short": "Toiminta",
+      "axis.yks.lo": "Yleiskuva",
+      "axis.yks.hi": "Yksityiskohta",
+      "axis.yks.short": "Tarkkuus",
+      "axis.varm.lo": "Arvaus",
+      "axis.varm.hi": "Varma",
+      "axis.varm.short": "Varmuus",
+      "zone.konkr|fakta.0": "Periaatteet ja teoria",
+      "zone.konkr|fakta.1": "Mitattu tieto",
+      "zone.konkr|fakta.2": "Näkemykset ja visiot",
+      "zone.konkr|fakta.3": "Esimerkit ja kokemukset",
+      "zone.aika|toim.0": "Opit ja korjaukset",
+      "zone.aika|toim.1": "Suunnitelma ja tehtävät",
+      "zone.aika|toim.2": "Historia ja raportointi",
+      "zone.aika|toim.3": "Ennuste ja visio",
+      "zone.yks|varm.0": "Vakiintunut yleiskuva",
+      "zone.yks|varm.1": "Tarkka tieto",
+      "zone.yks|varm.2": "Yleinen arvio",
+      "zone.yks|varm.3": "Näennäinen tarkkuus",
+      "grid.konkr|fakta": "Mitä se on",
+      "grid.aika|toim": "Mihin se suuntaa",
+      "grid.yks|varm": "Kuinka tarkka, kuinka varma",
+      "grid.own": "Oma nelikenttä",
+      "zoneJoin": "{a} ja {b}",
+      "barcode": "Osiot",
+      "trust": "Voiko luottaa",
+      "leaning": "Painopiste",
+      "topics": "Aiheet",
+      "kind": "Laji",
+      "profiledBy": "Profiloinut {model}, {date}",
+      "truncated": "luettu ensimmäiset {n} merkkiä",
+      "words": "{n} sanaa",
+      "certainty": "varmuus {p} %",
+      "topic": "Aihe: {name}",
+      "share": "osuus {p} %",
+      "sectionsOf": "Osiot: {list}",
+      "x": "X",
+      "y": "Y",
+      "seal": "Sormenjälki",
+      "empty": "Tällä aineistolla ei ole vielä sormenjälkeä.",
+      "emptyHint": "Sormenjälki tehdään, kun profiilivaihe on päällä."
+    },
+    es: {
+      "genre.F": "Hecho",
+      "genre.A": "Análisis",
+      "genre.M": "Opinión",
+      "genre.O": "Instrucción",
+      "genre.P": "Decisión o plan",
+      "genre.K": "Relato",
+      "mark.+": "fuente indicada",
+      "mark.~": "lo respalda una persona o una reunión",
+      "mark.?": "sin fundamento",
+      "mark.x": "contradicho o sustituido",
+      "axis.fakta.lo": "Opinión",
+      "axis.fakta.hi": "Hecho",
+      "axis.fakta.short": "Hecho",
+      "axis.konkr.lo": "Abstracto",
+      "axis.konkr.hi": "Concreto",
+      "axis.konkr.short": "Concreto",
+      "axis.aika.lo": "Pasado",
+      "axis.aika.hi": "Futuro",
+      "axis.aika.short": "Futuro",
+      "axis.toim.lo": "Describe",
+      "axis.toim.hi": "Orienta a la acción",
+      "axis.toim.short": "Acción",
+      "axis.yks.lo": "Visión general",
+      "axis.yks.hi": "Detalle",
+      "axis.yks.short": "Detalle",
+      "axis.varm.lo": "Suposición",
+      "axis.varm.hi": "Seguro",
+      "axis.varm.short": "Seguridad",
+      "zone.konkr|fakta.0": "Principios y teoría",
+      "zone.konkr|fakta.1": "Datos medidos",
+      "zone.konkr|fakta.2": "Opiniones y visiones",
+      "zone.konkr|fakta.3": "Ejemplos y experiencias",
+      "zone.aika|toim.0": "Lecciones y correcciones",
+      "zone.aika|toim.1": "Planes y tareas",
+      "zone.aika|toim.2": "Historia e informes",
+      "zone.aika|toim.3": "Previsión y visión",
+      "zone.yks|varm.0": "Visión consolidada",
+      "zone.yks|varm.1": "Conocimiento preciso",
+      "zone.yks|varm.2": "Estimación general",
+      "zone.yks|varm.3": "Precisión aparente",
+      "grid.konkr|fakta": "Qué es",
+      "grid.aika|toim": "Hacia dónde apunta",
+      "grid.yks|varm": "Cuán preciso, cuán seguro",
+      "grid.own": "Vista propia",
+      "zoneJoin": "{a} y {b}",
+      "barcode": "Secciones",
+      "trust": "¿Es fiable?",
+      "leaning": "Orientación",
+      "topics": "Temas",
+      "kind": "Tipo",
+      "profiledBy": "Perfilado por {model} el {date}",
+      "truncated": "de los primeros {n} caracteres",
+      "words": "{n} palabras",
+      "certainty": "seguridad {p} %",
+      "topic": "Tema: {name}",
+      "share": "proporción {p} %",
+      "sectionsOf": "Secciones: {list}",
+      "x": "X",
+      "y": "Y",
+      "seal": "Huella",
+      "empty": "Este elemento aún no tiene huella.",
+      "emptyHint": "Se crea cuando el paso de perfil está activado."
+    }
+  };
+  var FINGERPRINT_KEYS = {
+    en: Object.keys(STRINGS11.en),
+    fi: Object.keys(STRINGS11.fi),
+    es: Object.keys(STRINGS11.es)
+  };
+  function tf(key, vars) {
+    const hosted = i18n.t("fingerprint." + key, vars);
+    if (hosted !== "fingerprint." + key) return hosted;
+    const lang2 = i18n.lang();
+    const table2 = (
+      /** @type {Record<string, string>} */
+      STRINGS11[
+        /** @type {'en'|'fi'|'es'} */
+        lang2
+      ] || STRINGS11.en
+    );
+    const text = table2[key] || /** @type {Record<string, string>} */
+    STRINGS11.en[key] || key;
+    if (!vars) return text;
+    return text.replace(/\{(\w+)\}/g, function(whole, name) {
+      return vars[name] == null ? whole : String(vars[name]);
+    });
+  }
+
+  // src/static/sdk-libs/atelier/fingerprint-draw.js
+  var GENRES = ["F", "A", "M", "O", "P", "K"];
+  var MARKS = ["+", "~", "?", "x"];
+  var AXES = ["fakta", "konkr", "toim", "aika", "yks", "varm"];
+  var DEFAULT_GRIDS = [["konkr", "fakta"], ["aika", "toim"], ["yks", "varm"]];
+  var SQUARE = { F: "🟦", A: "🟩", M: "🟧", O: "🟨", P: "🟥", K: "🟪" };
+  var colour = (g) => "--fp-c: var(--ak-fp-" + (GENRES.indexOf(g) >= 0 ? g : "F") + ")";
+  var pct = (v) => Math.round(v * 100);
+  function normalize(data) {
+    const p = data && data.profile;
+    if (!p || !Array.isArray(p.sections) || !p.sections.length) return null;
+    const detail = Array.isArray(data.sections) ? data.sections : [];
+    const topics = (Array.isArray(p.topics) ? p.topics : []).map(function(t2) {
+      return { name: String(t2.name || ""), share: Number(t2.share) || 0, genre: t2.genre, mark: t2.mark, axes: t2.axes || {} };
+    });
+    if (!topics.length) topics.push({ name: "", share: 1, genre: "F", mark: "?", axes: {} });
+    const rows = p.sections.map(function(r, i) {
+      const d = detail[i] || {};
+      return {
+        i,
+        n: d.n || i + 1,
+        g: GENRES.indexOf(r[0]) >= 0 ? r[0] : "F",
+        w: Math.max(1, Number(r[1]) || 1),
+        c: Math.max(0, Math.min(1, Number(r[2]) || 0)),
+        m: MARKS.indexOf(r[3]) >= 0 ? r[3] : "?",
+        ti: Math.max(0, Math.min(topics.length - 1, Number(r[4]) || 0)),
+        heading: d.heading ? String(d.heading) : "",
+        claim: d.claim ? String(d.claim) : ""
+      };
+    });
+    return {
+      title: data.title ? String(data.title) : "",
+      kind: String(p.kind || ""),
+      model: String(p.model || ""),
+      at: String(p.at || ""),
+      truncatedAt: p.truncatedAt || 0,
+      age: Number(data.age) || 0,
+      topics,
+      rows,
+      axes: p.axes || {},
+      total: rows.reduce(function(a, r) {
+        return a + r.w;
+      }, 0) || 1
+    };
+  }
+  function genreShares(P) {
+    const o = {};
+    P.rows.forEach(function(r) {
+      o[r.g] = (o[r.g] || 0) + r.w / P.total;
+    });
+    return GENRES.filter(function(g) {
+      return o[g];
+    }).map(function(g) {
+      return (
+        /** @type {[string, number]} */
+        [g, o[g]]
+      );
+    }).sort(function(a, b) {
+      return b[1] - a[1];
+    });
+  }
+  function markShares(P) {
+    const o = {};
+    P.rows.forEach(function(r) {
+      o[r.m] = (o[r.m] || 0) + r.w / P.total;
+    });
+    return MARKS.filter(function(m) {
+      return o[m];
+    }).map(function(m) {
+      return (
+        /** @type {[string, number]} */
+        [m, o[m]]
+      );
+    });
+  }
+  var axisOf = (axes, k) => Math.max(-1, Math.min(1, Number(axes && axes[k]) || 0));
+  function zoneName(xk, yk, x, y) {
+    const i = (y >= 0 ? 0 : 2) + (x >= 0 ? 1 : 0);
+    const named = tf("zone." + xk + "|" + yk + "." + i);
+    if (named.indexOf("zone.") !== 0) return named;
+    return tf("zoneJoin", { a: tf("axis." + yk + (y >= 0 ? ".hi" : ".lo")), b: tf("axis." + xk + (x >= 0 ? ".hi" : ".lo")).toLowerCase() });
+  }
+  function arcPath(cx, cy, r1, r2, a0, a1) {
+    const p = function(r, a) {
+      return [(cx + r * Math.sin(a)).toFixed(2), (cy - r * Math.cos(a)).toFixed(2)];
+    };
+    const lg = a1 - a0 > Math.PI ? 1 : 0;
+    const s = p(r2, a0), e = p(r2, a1), e2 = p(r1, a1), s2 = p(r1, a0);
+    return "M" + s[0] + " " + s[1] + "A" + r2 + " " + r2 + " 0 " + lg + " 1 " + e[0] + " " + e[1] + "L" + e2[0] + " " + e2[1] + "A" + r1 + " " + r1 + " 0 " + lg + " 0 " + s2[0] + " " + s2[1] + "Z";
+  }
+  function sealSvg(P, size, o) {
+    const opt = o || {};
+    const pad = opt.labels ? 54 : 1, c = size / 2 + pad, R2 = size / 2, ring2 = Math.max(4, size * 0.11);
+    const rIn = R2 - ring2 - Math.max(2, size * 0.03);
+    const W7 = size + 2 * pad;
+    const root = svg("svg", { viewBox: "0 0 " + W7 + " " + W7, width: W7, class: "ak-fp__seal", "data-ak-part": "seal", role: "img", "aria-label": tf("seal") });
+    let a = 0;
+    genreShares(P).forEach(function(gs) {
+      const a1 = Math.min(a + gs[1] * 2 * Math.PI, a + 2 * Math.PI - 1e-3);
+      const dim = opt.focus && gs[0] !== opt.focus.g;
+      root.appendChild(svg("path", { d: arcPath(c, c, R2 - ring2, R2, a, a1), class: "ak-fp__arc" + (dim ? " ak-fp--dim" : ""), style: colour(gs[0]) }));
+      a = a1;
+    });
+    const ang = function(i) {
+      return i * 2 * Math.PI / AXES.length;
+    };
+    const pt = function(i, r) {
+      return [c + r * Math.sin(ang(i)), c - r * Math.cos(ang(i))];
+    };
+    const poly2 = function(axes) {
+      return AXES.map(function(k, i) {
+        return pt(i, rIn * (0.14 + 0.86 * (axisOf(axes, k) + 1) / 2)).map(function(n) {
+          return n.toFixed(1);
+        }).join(",");
+      }).join(" ");
+    };
+    if (size >= 100) {
+      [0.5, 1].forEach(function(f2) {
+        root.appendChild(svg("polygon", { class: "ak-fp__guide", points: AXES.map(function(_, i) {
+          return pt(i, rIn * f2).map(function(n) {
+            return n.toFixed(1);
+          }).join(",");
+        }).join(" ") }));
+      });
+    }
+    const dom = genreShares(P)[0][0];
+    if (opt.focus) {
+      const t2 = P.topics[opt.focus.ti] || P.topics[0];
+      root.appendChild(svg("polygon", { class: "ak-fp__poly ak-fp__poly--whole", points: poly2(P.axes) }));
+      root.appendChild(svg("polygon", { class: "ak-fp__poly", points: poly2(t2.axes), style: colour(opt.focus.g) }));
+    } else {
+      root.appendChild(svg("polygon", { class: "ak-fp__poly", points: poly2(P.axes), style: colour(dom) }));
+    }
+    if (opt.labels) {
+      AXES.forEach(function(k, i) {
+        const xy = pt(i, R2 + 14);
+        const anc = Math.abs(xy[0] - c) < 4 ? "middle" : xy[0] > c ? "start" : "end";
+        const tx = svg("text", { x: xy[0].toFixed(1), y: (xy[1] + 4).toFixed(1), "text-anchor": anc, class: "ak-fp__spoke" });
+        tx.textContent = tf("axis." + k + ".short");
+        root.appendChild(tx);
+      });
+    }
+    return (
+      /** @type {SVGSVGElement} */
+      root
+    );
+  }
+  function sectionTip(P, r) {
+    const t2 = P.topics[r.ti];
+    const facts = (t2 && t2.name ? tf("topic", { name: t2.name }) + " · " : "") + tf("genre." + r.g) + " · " + r.m + " " + tf("mark." + r.m) + " · " + tf("certainty", { p: pct(r.c) });
+    return r.heading ? [r.heading, r.claim, facts].filter(Boolean) : [tf("words", { n: r.w }), facts];
+  }
+  function barcodeSvg(P, o) {
+    const opt = o || {};
+    const W7 = opt.W || 600, H4 = opt.H || 56, full = opt.full !== false, marks = opt.marks !== false;
+    const gap = 2, usable = W7 - gap * (P.rows.length - 1);
+    const symH = marks ? full ? 18 : 14 : 0, topicY = H4 + symH + 6;
+    const root = svg("svg", { viewBox: "0 0 " + W7 + " " + (H4 + symH + (full ? 30 : 0)), class: "ak-fp__barcode", "data-ak-part": "barcode", role: "img", "aria-label": tf("barcode") });
+    const groups = [];
+    let x = 0;
+    P.rows.forEach(function(r) {
+      const w = r.w / P.total * usable, h = H4 * (0.28 + 0.72 * r.c);
+      root.appendChild(svg("rect", {
+        x: x.toFixed(1),
+        y: (H4 - h).toFixed(1),
+        width: w.toFixed(1),
+        height: h.toFixed(1),
+        rx: 2,
+        class: "ak-fp__stripe",
+        style: colour(r.g),
+        "data-ak-part": "stripe",
+        "data-topic": r.ti,
+        "data-g": r.g,
+        "data-i": r.i
+      }));
+      if (marks && w >= 6) {
+        const tx = svg("text", { x: (x + w / 2).toFixed(1), y: H4 + symH - 4, "text-anchor": "middle", class: "ak-fp__mark" + (full ? "" : " ak-fp__mark--small"), "data-m": r.m, "data-topic": r.ti });
+        tx.textContent = r.m;
+        root.appendChild(tx);
+      }
+      const last = groups[groups.length - 1];
+      if (last && last.ti === r.ti) last.x1 = x + w;
+      else groups.push({ ti: r.ti, x0: x, x1: x + w });
+      x += w + gap;
+    });
+    if (full) {
+      groups.forEach(function(gr) {
+        const t2 = P.topics[gr.ti];
+        const room = Math.floor((gr.x1 - gr.x0) / 5.8);
+        const name = t2.name.length <= room ? t2.name : room >= 4 ? t2.name.slice(0, room - 1) + "…" : "";
+        const g = svg("g", { "data-topic": gr.ti, "data-ak-part": "topicBand", class: "ak-fp__band" });
+        g.appendChild(svg("rect", { x: gr.x0.toFixed(1), y: topicY, width: (gr.x1 - gr.x0).toFixed(1), height: 4, rx: 2, class: "ak-fp__band-bar" }));
+        g.appendChild(svg("rect", { x: gr.x0.toFixed(1), y: topicY - 4, width: (gr.x1 - gr.x0).toFixed(1), height: 26, class: "ak-fp__hit" }));
+        const tx = svg("text", { x: (gr.x0 + 1).toFixed(1), y: topicY + 17, class: "ak-fp__band-name" });
+        tx.textContent = name;
+        g.appendChild(tx);
+        root.appendChild(g);
+      });
+    }
+    return (
+      /** @type {SVGSVGElement} */
+      root
+    );
+  }
+  function trustBar(P) {
+    const W7 = 600, H4 = 22, sh = markShares(P), gap = 2, usable = W7 - gap * (sh.length - 1);
+    const s = svg("svg", { viewBox: "0 0 " + W7 + " " + H4, class: "ak-fp__trustbar", role: "img", "aria-label": tf("trust") });
+    let x = 0;
+    sh.forEach(function(ms) {
+      const w = ms[1] * usable;
+      s.appendChild(svg("rect", { x: x.toFixed(1), y: 0, width: w.toFixed(1), height: H4, rx: 3, class: "ak-fp__trust", "data-m": ms[0] }));
+      x += w + gap;
+    });
+    const legend = el(
+      "div",
+      { class: "ak-fp__legend", "data-ak-part": "trustLegend" },
+      sh.map(function(ms) {
+        return el("span", null, [el("b", { class: "ak-fp__glyph", "data-m": ms[0], text: ms[0] }), " " + tf("mark." + ms[0]) + " " + pct(ms[1]) + " %"]);
+      })
+    );
+    return el("div", { class: "ak-fp__trustwrap", "data-ak-part": "trust" }, [s, legend]);
+  }
+  function bubble(t2, cx, cy, r) {
+    const g = svg("g", {});
+    const hollow = t2.mark === "?";
+    g.appendChild(svg("circle", { cx: cx.toFixed(1), cy: cy.toFixed(1), r: (hollow ? r - 1 : r).toFixed(1), class: "ak-fp__bubble" + (hollow ? " ak-fp__bubble--hollow" : "") + (t2.mark === "x" ? " ak-fp__bubble--x" : ""), style: colour(t2.genre) }));
+    const fs = Math.max(11, Math.min(20, r * 1.15));
+    const tx = svg("text", { x: cx.toFixed(1), y: (cy + fs * 0.36).toFixed(1), "text-anchor": "middle", class: "ak-fp__bubble-mark" + (hollow ? " ak-fp__bubble-mark--hollow" : ""), "font-size": fs.toFixed(1) });
+    tx.textContent = t2.mark;
+    g.appendChild(tx);
+    return g;
+  }
+  function gridSvg(P, xk, yk) {
+    const W7 = 300, H4 = W7 + 30, x0 = 28, x1 = W7 - 4, y0 = 24, y1 = H4 - 44, cxm = (x0 + x1) / 2, cym = (y0 + y1) / 2;
+    const X = function(v) {
+      return cxm + v * 0.44 * (x1 - x0);
+    };
+    const Y = function(v) {
+      return cym - v * 0.44 * (y1 - y0);
+    };
+    const root = svg("svg", { viewBox: "0 0 " + W7 + " " + H4, class: "ak-fp__grid", "data-ak-part": "grid", role: "img", "aria-label": tf("axis." + xk + ".hi") + " · " + tf("axis." + yk + ".hi") });
+    root.appendChild(svg("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0, rx: 8, class: "ak-fp__zone" }));
+    root.appendChild(svg("line", { x1: cxm, y1: y0, x2: cxm, y2: y1, class: "ak-fp__cross" }));
+    root.appendChild(svg("line", { x1: x0, y1: cym, x2: x1, y2: cym, class: "ak-fp__cross" }));
+    const text = function(x, y, s, cls, attrs) {
+      const tx = svg("text", Object.assign({ x, y, class: cls }, attrs || {}));
+      tx.textContent = s;
+      root.appendChild(tx);
+      return tx;
+    };
+    text(x0 + 2, y0 - 8, "↖ " + zoneName(xk, yk, -1, 1), "ak-fp__zone-name");
+    text(x1 - 2, y0 - 8, zoneName(xk, yk, 1, 1) + " ↗", "ak-fp__zone-name", { "text-anchor": "end" });
+    text(x0 + 2, y1 + 15, "↙ " + zoneName(xk, yk, -1, -1), "ak-fp__zone-name");
+    text(x1 - 2, y1 + 15, zoneName(xk, yk, 1, -1) + " ↘", "ak-fp__zone-name", { "text-anchor": "end" });
+    text(x0, H4 - 6, "← " + tf("axis." + xk + ".lo"), "ak-fp__axis");
+    text(x1, H4 - 6, tf("axis." + xk + ".hi") + " →", "ak-fp__axis", { "text-anchor": "end" });
+    text(14, y1, "← " + tf("axis." + yk + ".lo"), "ak-fp__axis", { transform: "rotate(-90 14 " + y1 + ")" });
+    text(14, y0, tf("axis." + yk + ".hi") + " →", "ak-fp__axis", { transform: "rotate(-90 14 " + y0 + ")", "text-anchor": "end" });
+    const order = P.topics.map(function(t2, i) {
+      return i;
+    }).sort(function(a, b) {
+      return P.topics[b].share - P.topics[a].share;
+    });
+    order.forEach(function(i) {
+      const t2 = P.topics[i];
+      const g = bubble(t2, X(axisOf(t2.axes, xk)), Y(axisOf(t2.axes, yk)), 5 + 24 * Math.sqrt(t2.share));
+      g.setAttribute("data-topic", String(i));
+      g.setAttribute("data-ak-part", "bubble");
+      root.appendChild(g);
+    });
+    const mx = X(axisOf(P.axes, xk)), my = Y(axisOf(P.axes, yk));
+    root.appendChild(svg("path", { d: "M" + (mx - 6) + " " + my + "H" + (mx + 6) + "M" + mx + " " + (my - 6) + "V" + (my + 6), class: "ak-fp__centre", "data-ak-part": "leaning" }));
+    const labs = P.topics.map(function(t2, i) {
+      const cx = X(axisOf(t2.axes, xk)), cy = Y(axisOf(t2.axes, yk)), r = 5 + 24 * Math.sqrt(t2.share), w = t2.name.length * 6.3;
+      const right = cx + r + 4 + w <= x1 + 2;
+      const x = right ? cx + r + 4 : cx - r - 4;
+      return { i, name: t2.name, x, y: cy + 4, anchor: right ? "start" : "end", a: right ? x : x - w, b: right ? x + w : x };
+    }).sort(function(p, q) {
+      return p.y - q.y;
+    });
+    for (let pass = 0; pass < 4; pass++) {
+      for (let i = 0; i < labs.length; i++) {
+        for (let j = i + 1; j < labs.length; j++) {
+          const p = labs[i], q = labs[j];
+          if (p.b > q.a && q.b > p.a && Math.abs(q.y - p.y) < 14) q.y = p.y + 14;
+        }
+      }
+    }
+    labs.forEach(function(l) {
+      text(l.x.toFixed(1), l.y.toFixed(1), l.name, "ak-fp__tlabel", { "text-anchor": l.anchor, "data-topic": l.i });
+    });
+    return (
+      /** @type {SVGSVGElement} */
+      root
+    );
+  }
+  function sealCard(P) {
+    const genres = el("div", { class: "ak-fp__card-genres" }, genreShares(P).map(function(gs) {
+      return el("span", { class: "ak-fp__chip" }, [el("i", { class: "ak-fp__swatch", style: colour(gs[0]) }), tf("genre." + gs[0]) + " " + pct(gs[1]) + " %"]);
+    }));
+    const axes = el("div", { class: "ak-fp__card-axes" }, AXES.map(function(k) {
+      const v = axisOf(P.axes, k);
+      return el("div", { class: "ak-fp__slider" }, [
+        el("span", { class: "ak-fp__slider-lo", text: tf("axis." + k + ".lo") }),
+        el("span", { class: "ak-fp__slider-track" }, el("i", { class: "ak-fp__slider-dot", vars: { "--fp-at": ((v + 1) / 2 * 100).toFixed(0) + "%" } })),
+        el("span", { class: "ak-fp__slider-hi", text: tf("axis." + k + ".hi") })
+      ]);
+    }));
+    return el("div", { class: "ak-fp__card", "data-ak-part": "card" }, [
+      el("div", { class: "ak-fp__card-seal" }, sealSvg(P, 120, { labels: true })),
+      el("div", { class: "ak-fp__card-body" }, [el("b", { text: P.title || P.kind }), genres, axes])
+    ]);
+  }
+  function tagLines(P) {
+    const squares = P.rows.map(function(r) {
+      return SQUARE[r.g].repeat(Math.max(1, Math.round(r.w / P.total * 18)));
+    }).join("");
+    const genres = genreShares(P).slice(0, 3).map(function(gs) {
+      return tf("genre." + gs[0]) + " " + pct(gs[1]) + " %";
+    }).join(", ");
+    const topics = P.topics.slice().sort(function(a, b) {
+      return b.share - a.share;
+    }).map(function(t2) {
+      return t2.name + " " + t2.mark;
+    }).join(", ");
+    const trust = markShares(P).map(function(ms) {
+      return ms[0] + " " + pct(ms[1]) + " %";
+    }).join("  ");
+    const leaning = DEFAULT_GRIDS.map(function(xy) {
+      return zoneName(xy[0], xy[1], axisOf(P.axes, xy[0]), axisOf(P.axes, xy[1]));
+    }).join(" · ");
+    const by = P.model ? tf("profiledBy", { model: P.model, date: P.at.slice(0, 10) }) + (P.truncatedAt ? ", " + tf("truncated", { n: P.truncatedAt }) : "") : "";
+    return [squares, (P.kind ? P.kind + ": " : "") + genres, tf("topics") + ": " + topics, tf("trust") + ": " + trust, tf("leaning") + ": " + leaning, by].filter(Boolean);
+  }
+
+  // src/static/sdk-libs/atelier/fingerprint.js
+  var VARIANTS3 = ["dense", "plain"];
+  var VIEWS = ["panel", "row", "seal", "barcode"];
+  var FINGERPRINT_SAMPLE = {
+    title: "Kaukolämmön hintatutkimus 2026",
+    profile: {
+      v: 1,
+      prompt: "profile-4",
+      model: "deepseek/deepseek-pro-latest",
+      at: "2026-11-02T12:00:00.000Z",
+      kind: "tutkimusraportti",
+      topics: [
+        { name: "Hintakehitys", share: 0.37, genre: "F", mark: "+", axes: { fakta: 0.9, konkr: 0.8, aika: -0.6, toim: -0.6, yks: 0.8, varm: 0.85 } },
+        { name: "Kilpailutilanne", share: 0.47, genre: "A", mark: "+", axes: { fakta: 0.6, konkr: 0.4, aika: -0.1, toim: -0.3, yks: 0.2, varm: 0.6 } },
+        { name: "Kuluttajien kokemus", share: 0.06, genre: "K", mark: "~", axes: { fakta: 0.1, konkr: 0.8, aika: -0.3, toim: -0.4, yks: 0.5, varm: 0.4 } },
+        { name: "Suositukset", share: 0.1, genre: "P", mark: "~", axes: { fakta: -0.1, konkr: 0.2, aika: 0.7, toim: 0.8, yks: -0.4, varm: 0.3 } }
+      ],
+      sections: [
+        ["F", 200, 0.9, "+", 0],
+        ["F", 150, 0.9, "+", 0],
+        ["A", 220, 0.8, "+", 1],
+        ["F", 180, 0.9, "+", 0],
+        ["A", 250, 0.75, "+", 1],
+        ["K", 80, 0.7, "~", 2],
+        ["A", 200, 0.7, "+", 1],
+        ["M", 90, 0.5, "~", 3],
+        ["P", 60, 0.6, "~", 3]
+      ],
+      axes: { fakta: 0.62, konkr: 0.57, aika: -0.17, toim: -0.25, yks: 0.38, varm: 0.68 }
+    },
+    sections: [
+      { n: 1, heading: "Hinnat 2015–2026", claim: "Keskihinta nousi 38 % kymmenessä vuodessa." },
+      { n: 2, heading: "Alueelliset erot", claim: "Kallein kunta maksaa kaksi kertaa halvimman hinnan." },
+      { n: 3, heading: "Markkinan rakenne", claim: "Neljässä kunnassa viidestä on vain yksi toimittaja." },
+      { n: 4, heading: "Hinnan osat", claim: "Perusmaksun osuus kasvoi 22 prosentista 31 prosenttiin." },
+      { n: 5, heading: "Kilpailun vaikutus", claim: "Kahden toimittajan alueilla hinta on 12 % alempi." },
+      { n: 6, heading: "Asukkaiden kertomuksia", claim: "Kolme kotitaloutta kertoo, että lasku yllätti." },
+      { n: 7, heading: "Vertailu Ruotsiin", claim: "Ruotsissa hintavalvonta hillitsi nousua." },
+      { n: 8, heading: "Tutkijoiden näkemys", claim: "Hinnoittelun pitäisi olla avoimempaa." },
+      { n: 9, heading: "Suositukset", claim: "Hintavalvonta ja julkinen hintavertailu." }
+    ]
+  };
+  function fingerprint(spec) {
+    const s = spec || {};
+    const root = el("div", { class: "ak-root ak-fp", "data-ak-part": "root" });
+    applyVariant(root, s, VARIANTS3);
+    if (s.target) resolve(s.target).appendChild(root);
+    let data = s.sample === true ? FINGERPRINT_SAMPLE : s.data || null;
+    let view = VIEWS.indexOf(String(s.view)) >= 0 ? String(s.view) : "panel";
+    let grids = (s.grids && s.grids.length ? s.grids : DEFAULT_GRIDS).map(function(g) {
+      return [g[0], g[1]];
+    });
+    let P = null;
+    let lit = "";
+    let emptyCard = null;
+    let destroyed = false;
+    const tip = el("div", { class: "ak-fp__tip", "data-ak-part": "tip", role: "tooltip", hidden: true });
+    function sealSize() {
+      return view === "panel" ? 130 : view === "row" ? 48 : 56;
+    }
+    function drawSeal(box, focus) {
+      clear(box);
+      box.appendChild(sealSvg(P, sealSize(), { labels: view === "panel", focus }));
+    }
+    function gridCard(i) {
+      const xy = grids[i];
+      const key = xy[0] + "|" + xy[1];
+      const named = tf("grid." + key);
+      const pick = function(axis) {
+        const sel = (
+          /** @type {HTMLSelectElement} */
+          el(
+            "select",
+            { class: "ak-fp__select", "data-ak-part": "gridPick", "aria-label": tf(axis === 0 ? "x" : "y") },
+            AXES.map(function(k) {
+              return el("option", { value: k, selected: k === xy[axis], text: tf("axis." + k + ".lo") + " ↔ " + tf("axis." + k + ".hi") });
+            })
+          )
+        );
+        sel.addEventListener("change", function() {
+          xy[axis] = sel.value;
+          if (xy[0] === xy[1]) xy[1 - axis] = AXES.filter(function(k) {
+            return k !== sel.value;
+          })[0];
+          render();
+        });
+        return el("label", { class: "ak-fp__pick" }, [el("span", { text: tf(axis === 0 ? "x" : "y") }), sel]);
+      };
+      const ax = function(k) {
+        return Math.max(-1, Math.min(1, Number(P.axes[k]) || 0));
+      };
+      return el("div", { class: "ak-fp__gridcard", "data-ak-part": "gridCard" }, [
+        el("div", { class: "ak-fp__gridname", "data-ak-part": "gridName", text: named.indexOf("grid.") === 0 ? tf("grid.own") : named }),
+        el("div", { class: "ak-fp__picks" }, [pick(0), pick(1)]),
+        gridSvg(P, xy[0], xy[1]),
+        el(
+          "div",
+          { class: "ak-fp__gridleaning", "data-ak-part": "gridLeaning" },
+          [tf("leaning") + ": ", el("b", { text: zoneName(xy[0], xy[1], ax(xy[0]), ax(xy[1])) })]
+        )
+      ]);
+    }
+    function head(withMeta) {
+      const h = el("div", { class: "ak-fp__head", "data-ak-part": "head" });
+      slotInto(h, s, "title", P.title || null, { tag: "div", cls: "ak-fp__title" });
+      if (withMeta) {
+        const own = [P.kind, s.meta].filter(Boolean).join(" · ");
+        slotInto(h, s, "meta", own || null, { tag: "div", cls: "ak-fp__meta" });
+      }
+      return h;
+    }
+    function render() {
+      if (emptyCard) {
+        emptyCard.destroy();
+        emptyCard = null;
+      }
+      clear(root);
+      lit = "";
+      P = normalize(data);
+      root.setAttribute("data-ak-view", view);
+      root.removeAttribute("data-ak-age");
+      if (!P) {
+        const e = s.empty || {};
+        emptyCard = emptyState({ target: root, tone: "quiet", title: e.title || tf("empty"), hint: e.hint || tf("emptyHint") });
+        emptyCard.el.setAttribute("data-ak-part", "empty");
+        return;
+      }
+      if (s.fade === "age" && P.age > 180) root.setAttribute("data-ak-age", P.age > 365 ? "old" : "mid");
+      if (view === "seal") {
+        const box = el("div", { class: "ak-fp__sealbox", "data-ak-part": "sealBox" });
+        drawSeal(box, null);
+        root.appendChild(box);
+      } else if (view === "barcode") {
+        root.appendChild(el("div", { class: "ak-fp__barcodebox", "data-ak-part": "barcodeBox" }, barcodeSvg(P, { full: true })));
+      } else if (view === "row") {
+        const box = el("div", { class: "ak-fp__sealbox", "data-ak-part": "sealBox" });
+        drawSeal(box, null);
+        root.appendChild(box);
+        root.appendChild(head(true));
+        root.appendChild(el("div", { class: "ak-fp__barcodebox", "data-ak-part": "barcodeBox" }, barcodeSvg(P, { W: 300, H: 28, full: false })));
+      } else {
+        root.appendChild(head(true));
+        const box = el("div", { class: "ak-fp__sealbox", "data-ak-part": "sealBox" });
+        drawSeal(box, null);
+        const side = el("div", { class: "ak-fp__side" }, [
+          el("div", { class: "ak-fp__label", text: tf("barcode") }),
+          el("div", { class: "ak-fp__barcodebox", "data-ak-part": "barcodeBox" }, barcodeSvg(P, { full: true, H: 64 })),
+          el("div", { class: "ak-fp__label", text: tf("trust") }),
+          trustBar(P)
+        ]);
+        root.appendChild(el("div", { class: "ak-fp__top" }, [box, side]));
+        root.appendChild(el("pre", { class: "ak-fp__tag", "data-ak-part": "tag", text: tagLines(P).join("\n") }));
+        root.appendChild(el("div", { class: "ak-fp__grids", "data-ak-part": "grids" }, grids.map(function(_, i) {
+          return gridCard(i);
+        })));
+      }
+      slotInto(root, s, "extra", null, { tag: "div", cls: "ak-fp__extra" });
+      root.appendChild(tip);
+    }
+    function light(ti2, g) {
+      const key = ti2 == null ? "" : ti2 + "|" + g;
+      if (key === lit) return;
+      lit = key;
+      root.querySelectorAll("[data-topic]").forEach(function(n) {
+        n.classList.toggle("ak-fp--dim", ti2 != null && n.getAttribute("data-topic") !== String(ti2));
+      });
+      root.querySelectorAll('[data-ak-part="sealBox"]').forEach(function(box) {
+        drawSeal(
+          /** @type {HTMLElement} */
+          box,
+          ti2 == null ? null : { ti: ti2, g }
+        );
+      });
+    }
+    function showTip(ev, lines, card) {
+      clear(tip);
+      if (card) tip.appendChild(card);
+      else lines.forEach(function(l, i) {
+        tip.appendChild(el(i === 0 ? "b" : "div", { text: l }));
+      });
+      tip.hidden = false;
+      tip.classList.toggle("ak-fp__tip--card", !!card);
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      const x = Math.max(8, Math.min(ev.clientX + 14, window.innerWidth - w - 8));
+      const y = ev.clientY + 14 + h > window.innerHeight - 8 ? Math.max(8, ev.clientY - h - 10) : ev.clientY + 14;
+      tip.style.left = x + "px";
+      tip.style.top = y + "px";
+    }
+    function onMove(ev) {
+      if (!P) return;
+      const target = (
+        /** @type {Element} */
+        ev.target
+      );
+      const seal = target.closest && target.closest(".ak-fp__seal");
+      const topicEl = target.closest && target.closest("[data-topic]");
+      if (topicEl && root.contains(topicEl)) {
+        const ti2 = Number(topicEl.getAttribute("data-topic"));
+        const t2 = P.topics[ti2];
+        light(ti2, topicEl.getAttribute("data-g") || t2 && t2.genre || "F");
+        if (topicEl.hasAttribute("data-i")) {
+          showTip(ev, sectionTip(P, P.rows[Number(topicEl.getAttribute("data-i"))]));
+        } else if (t2) {
+          const of = P.rows.filter(function(r) {
+            return r.ti === ti2;
+          }).map(function(r) {
+            return r.heading || String(r.n);
+          });
+          showTip(ev, [t2.name, tf("genre." + t2.genre) + " · " + t2.mark + " " + tf("mark." + t2.mark) + " · " + tf("share", { p: Math.round(t2.share * 100) }), tf("sectionsOf", { list: of.join(", ") })]);
+        }
+        return;
+      }
+      light(null, "");
+      if (seal && root.contains(seal) && view !== "barcode") {
+        showTip(ev, [], sealCard(P));
+        return;
+      }
+      tip.hidden = true;
+    }
+    function onLeave() {
+      light(null, "");
+      tip.hidden = true;
+    }
+    function onClick(ev) {
+      const t2 = (
+        /** @type {Element} */
+        ev.target
+      );
+      const stripe = t2.closest && t2.closest("[data-i]");
+      if (!stripe || !P || !s.onSection) return;
+      const r = P.rows[Number(stripe.getAttribute("data-i"))];
+      if (r) s.onSection(r.n);
+    }
+    root.addEventListener("pointermove", onMove);
+    root.addEventListener("pointerleave", onLeave);
+    root.addEventListener("click", onClick);
+    if (reducedMotion()) root.setAttribute("data-ak-still", "");
+    if (s.onSection) root.setAttribute("data-ak-clickable", "");
+    render();
+    return {
+      el: root,
+      set: function(patch) {
+        if (destroyed || !patch) return;
+        if ("data" in patch) data = patch.data || null;
+        if (patch.view && VIEWS.indexOf(patch.view) >= 0) view = patch.view;
+        if (patch.grids && patch.grids.length) grids = patch.grids.map(function(g) {
+          return [g[0], g[1]];
+        });
+        render();
+      },
+      destroy: function() {
+        destroyed = true;
+        root.removeEventListener("pointermove", onMove);
+        root.removeEventListener("pointerleave", onLeave);
+        root.removeEventListener("click", onClick);
+        if (emptyCard) emptyCard.destroy();
+        root.remove();
+      }
+    };
+  }
+
   // src/static/sdk-libs/atelier/request-panel.js
-  var VARIANTS3 = ["compact"];
-  var MARKS = { pending: "·", running: "→", done: "✓", failed: "✗" };
+  var VARIANTS4 = ["compact"];
+  var MARKS2 = { pending: "·", running: "→", done: "✓", failed: "✗" };
   var STATES = ["pending", "running", "done", "failed"];
   function samplePlan() {
     const plan2 = {
@@ -29678,7 +30493,7 @@ Known schemas:
     const sample = spec.sample === true;
     const parts = spec.parts || {};
     const root = el("div", { class: "ak-root ak-request", "data-ak-part": "root" });
-    applyVariant(root, spec, VARIANTS3);
+    applyVariant(root, spec, VARIANTS4);
     if (spec.target) resolve(spec.target).appendChild(root);
     let plan2 = sample ? samplePlan() : spec.plan || null;
     let destroyed = false;
@@ -29782,7 +30597,7 @@ Known schemas:
           planHost.appendChild(row);
           return;
         }
-        row.appendChild(el("span", { class: "ak-request__mark", "data-ak-part": "mark", "aria-hidden": "true", text: MARKS[state] }));
+        row.appendChild(el("span", { class: "ak-request__mark", "data-ak-part": "mark", "aria-hidden": "true", text: MARKS2[state] }));
         row.appendChild(el("span", { class: "ak-request__text", text: step.text || "" }));
         planHost.appendChild(row);
       });
@@ -29850,7 +30665,7 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/shelf.js
-  var VARIANTS4 = ["dense", "plain"];
+  var VARIANTS5 = ["dense", "plain"];
   function sampleItems() {
     return [
       { id: "l1", tab: "library", title: "RSVP form", sub: "four fields, posts without an account", kind: "form" },
@@ -29878,7 +30693,7 @@ Known schemas:
     const sample = spec.sample === true;
     const parts = spec.parts || {};
     const root = el("div", { class: "ak-root ak-shelf", "data-ak-part": "root" });
-    applyVariant(root, spec, VARIANTS4);
+    applyVariant(root, spec, VARIANTS5);
     if (spec.target) resolve(spec.target).appendChild(root);
     const tabList = spec.tabs || [{ id: "library", label: tb("shelf.library") }, { id: "made", label: tb("shelf.made") }];
     const actions = spec.actions || [{ id: "use", label: tb("shelf.use"), kind: "primary" }, { id: "board", label: tb("shelf.board"), kind: "ghost" }];
@@ -33442,6 +34257,14 @@ Known schemas:
       fork: "One element, one number: build it yourself and call countUp(node, from, to).",
       file: "hero.js"
     },
+    "fingerprint": {
+      parts: ["root", "head", "title", "meta", "sealBox", "seal", "barcodeBox", "barcode", "stripe", "topicBand", "trust", "trustLegend", "tag", "grids", "gridCard", "gridName", "gridPick", "grid", "bubble", "leaning", "gridLeaning", "card", "tip", "extra", "empty"],
+      slots: ["title()", "meta()", "extra()"],
+      variants: ["dense", "plain"],
+      tokens: ["--ak-fp-F", "--ak-fp-A", "--ak-fp-M", "--ak-fp-O", "--ak-fp-P", "--ak-fp-K", "--ak-fp-x", "--ak-fp-zone", "--ak-fp-dim"],
+      fork: "Copy fingerprint-draw.js's functions and .ak-fp* out of fingerprint.css and draw the profile yourself; you keep the drawing and give up the topic highlight across the parts, the seal focus, the hover card and the words in three languages.",
+      file: "fingerprint.js"
+    },
     "form": {
       parts: ["root", "field", "label", "input", "req", "hint", "error", "range", "readout", "alert", "gate", "bar", "submit", "cancel"],
       slots: [],
@@ -33771,7 +34594,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.68.1",
+    version: "0.69.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -33904,6 +34727,10 @@ Known schemas:
     // ── An app's own manual from its header: contents, chapters from the app and the page, a
     //    search, every word per language, and the place a chapter names marked in the app ──
     handbook,
+    // ── The fingerprint: what kind of material an item is and what it rests on (seal, barcode,
+    //    trust bar, quadrant views), from the node's content profile; FINGERPRINT_SAMPLE is a real one ──
+    fingerprint,
+    FINGERPRINT_SAMPLE,
     // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
     intakeForm,
     intakeAdmin,

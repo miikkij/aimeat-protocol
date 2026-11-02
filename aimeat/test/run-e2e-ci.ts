@@ -16,6 +16,7 @@
  *   2026-11-02 -- e2e-ai-ecosystem-caller.ts joins the list (not the guard tier): an ecosystem app's AI calls, on its own node (:29397) (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-dataproduct-records-audience.ts joins the list (not the guard tier): a data product's records source allows the audience its workspace admits (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-datapackage-catalogue-forgery.ts joins the list (not the guard tier): the public data package catalogues trust only the service's manifest and audience record (secaudit2026nov02d round 13).
+ *   2026-11-02 -- e2e-shared-data-library.ts joins the list (not the guard tier): the library by reach, the shared data view, the operator's list (WP11).
  *   2026-11-02 -- e2e-files-connections.ts joins the list (not the guard tier): a connected SharePoint on an own node (:28285).
  *   2026-11-01 -- e2e-iam-parties.ts joins the list (not the guard tier): a person registered to an app as a member AIMEAT.iam reads (WP9d).
  *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
@@ -1297,6 +1298,8 @@ const ALL_SUITES = [
     'test/e2e-data-share.ts',
     // A named share to a person on another AIMEAT node: exactly that visitor reads, a namesake never (WP9c).
     'test/e2e-data-share-visitor.ts',
+    // Shared data in one place: the library by reach, the owner's shared data view, the operator's list (WP11).
+    'test/e2e-shared-data-library.ts',
     // The lifecycle: freshness against the promise, one stale notice per spell, versions in use, retention spares a pin, live events (plan doc-mvwxcas3dom3, D6).
     'test/e2e-data-lifecycle.ts',
     // Data intermediation: the setting's four modes, the notification record, section 12's findings and Article 12 rows (plan doc-mvwxcas3dom3, D7).

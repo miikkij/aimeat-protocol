@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.69.0 — 2026-11-02 — fingerprint.css: the fingerprint (seal, barcode, trust bar, quadrant views,
+ *     hover card); --ak-fp-F/A/M/O/P/K, --ak-fp-x, --ak-fp-zone and --ak-fp-dim are its own
+ *     (wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse).
  *   v0.68.1 — 2026-11-02 — No change in this file. The kit's shell gives a phone a Menu entry that
  *     opens every page of a side-navigation app, and the side column scrolls when it is taller than
  *     the window (aimeat-atelier/workbench.css v0.3.2); the version moves with it.
@@ -426,6 +429,7 @@
 @import url('./aimeat-atelier/island.css');
 @import url('./aimeat-atelier/margins.css');
 @import url('./aimeat-atelier/ornaments.css');
+@import url('./aimeat-atelier/fingerprint.css');
 /* LAST on purpose: the generated look blocks (tokens + structure recipes) override the parts. */
 @import url('./aimeat-atelier/looks.css');
 

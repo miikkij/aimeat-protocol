@@ -9,6 +9,10 @@
  * @structure catalogueRouter(config, storage, directoryService?) — GET /v1/catalogue,
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
+ *   2026-11-02 — GET /v1/catalogue/knowledge is the library of knowledge AND data by the reader's reach:
+ *     `reach` public (the default, unchanged for every existing caller), shared, own or party
+ *     (routes/catalogue-library.ts); `kind`, `q`, `counts` and `reaches=1`; a public data row is listed
+ *     when services/datapackage/visible.ts says anyone may read it; each row says its `kind` (WP11).
  *   2026-11-01 — GET /v1/catalogue/knowledge: a data package's `datapackage` block carries `freshness`
  *     against its producer's promise, read for the page's packages only (plan doc-mvwxcas3dom3, D6.1).
  *   2026-11-01 — GET /v1/catalogue/dcat, the DCAT-AP feed of the public data packages, is mounted here
@@ -56,29 +60,15 @@ import { actionPricingFromRequest, presentActionPricing } from '../services/acti
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 import { readerFor } from '../services/classification/reader.js';
-import { presentMemories, classificationWarningOf } from '../services/classification/present-memory.js';
+import { presentMemories } from '../services/classification/present-memory.js';
 import { logger } from '../utils/logger.js';
-import { datasetFactsOf, datapackageListing } from '../services/datapackage/catalogue-facts.js';
-import { packageFreshness } from '../services/datapackage/freshness-read.js';
-import { freshnessBrief } from '../services/datapackage/freshness.js';
+import { datasetFactsOf } from '../services/datapackage/catalogue-facts.js';
+import { visiblePackages, viewerOf } from '../services/datapackage/visible.js';
 import { mountCatalogueDcat } from './catalogue-dcat.js';
-
-/** Shape of a stored knowledge-package manifest value (memory record `value`). */
-interface KnowledgePackageManifest {
-  type?: string;
-  name?: string;
-  author?: string;
-  content_type?: string;
-  language?: string;
-  maturity?: string;
-  synthesis?: unknown;
-  sharing?: unknown;
-  tags?: string[];
-  references?: Array<{ verified?: boolean }>;
-  entries?: Array<{ visibility?: string }>;
-  created?: string;
-  updated?: string;
-}
+import {
+  LIBRARY_REACHES, LIBRARY_KINDS, answerLibraryReach, reachCounts, knowledgeItemOf, freshnessOfFacts, matchesQuery,
+  manifestTexts, datasetTexts, type LibraryReach, type LibraryKind, type KnowledgePackageManifest,
+} from './catalogue-library.js';
 
 export function catalogueRouter(config: AimeatConfig, storage: Storage, directoryService?: DirectoryService): Router {
   const router = Router();
@@ -307,10 +297,22 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     ]));
   });
 
-  // GET /v1/catalogue/knowledge — shared knowledge packages (Tier 0)
+  // GET /v1/catalogue/knowledge — the library: knowledge and data packages, by the reader's reach
+  // (reach=public is the default and needs no session; shared, own and party: routes/catalogue-library.ts).
   router.get('/v1/catalogue/knowledge', async (req, res) => {
-    const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
-    const perPage = Math.min(50, Math.max(1, parseInt(req.query.limit as string ?? '20', 10)));
+    const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10) || 1);
+    const perPage = Math.min(50, Math.max(1, parseInt(req.query.limit as string ?? '20', 10) || 20));
+    const reach = (typeof req.query.reach === 'string' ? req.query.reach : 'public') as LibraryReach;
+    const kind = (typeof req.query.kind === 'string' ? req.query.kind : 'all') as LibraryKind;
+    const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 200) : '';
+    if (!LIBRARY_REACHES.includes(reach) || !LIBRARY_KINDS.includes(kind)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'reach is public, shared, own or party; kind is all, knowledge or data.'));
+      return;
+    }
+    if (reach !== 'public') {
+      await answerLibraryReach(req, res, { storage, config }, reach, { kind, q, page, perPage });
+      return;
+    }
     const contentType = req.query.content_type as string | undefined;
     const tagsFilter = req.query.tags ? (req.query.tags as string).split(',').map(t => t.trim()) : [];
     const language = req.query.language as string | undefined;
@@ -372,6 +374,18 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     // default, decideAll reads nothing and this is one array pass (reader.ts decideAll).
     manifests = await presentMemories(readerFor({ storage, config }, req.auth), manifests);
 
+    // A DATA row is listed when the one function that decides what a listing of data packages names
+    // says anyone may read it (services/datapackage/visible.ts, reach public): the audience the service
+    // recorded, not withdrawn, through the anonymous reader. A manifest left public by a package the
+    // service no longer records as public is not listed.
+    const openData = new Set((await visiblePackages({ storage, config }, { reader: null }, 'public')).map(v => `${v.facts.ownerGhii}|${v.facts.manifestKey}`));
+    const isData = (m: typeof manifests[number]) => m.value.content_type === 'dataset' && !!datasetFactsOf(m);
+    manifests = manifests.filter(m => !isData(m) || openData.has(`${m.ownerGaii}|${m.key}`));
+    if (q) manifests = manifests.filter(m => { const f = isData(m) ? datasetFactsOf(m) : null; return matchesQuery(q, f ? datasetTexts(f) : manifestTexts(m)); });
+    const dataN = manifests.filter(isData).length;
+    const counts = { all: manifests.length, knowledge: manifests.length - dataN, data: dataN };
+    if (kind !== 'all') manifests = manifests.filter(m => (kind === 'data') === isData(m));
+
     // Sort
     if (sort === 'recent') {
       manifests.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
@@ -381,44 +395,12 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const total = manifests.length;
     const paged = manifests.slice((page - 1) * perPage, page * perPage);
 
-    // The freshness of each data package on this page, against its producer's promise (D6.1): the
+    // Each data package on this page with its freshness against its producer's promise (D6.1): the
     // pointer and the product definition of the page's packages only.
-    const freshnessByKey = new Map<string, ReturnType<typeof freshnessBrief>>();
-    await Promise.all(paged.map(async m => {
-      const f = m.value?.content_type === 'dataset' ? datasetFactsOf(m) : null;
-      if (!f) return;
-      const fr = await packageFreshness({ storage, config }, f.ownerGhii, f.name,
-        f.producerKind ? { schedule: f.schedule ?? '', producerKind: f.producerKind } : {});
-      if (fr) freshnessByKey.set(`${m.ownerGaii}|${m.key}`, freshnessBrief(fr));
+    const items = await Promise.all(paged.map(async m => {
+      const f = isData(m) ? datasetFactsOf(m) : null;
+      return { ...knowledgeItemOf(config, m, f ? await freshnessOfFacts({ storage, config }, f) : null), reach: 'public' };
     }));
-
-    const items = paged.map(m => {
-      const v = m.value;
-      const packageId = m.key.replace('packages/', '').replace('/manifest', '');
-      // A warning-classified manifest carries what the reader put on it, as GET /v1/knowledge/:id does.
-      const warning = classificationWarningOf(m);
-      // A data package's entry says where its rows are: the facts of its manifest (no file read).
-      const dataset = v.content_type === 'dataset' ? datasetFactsOf(m) : null;
-      return {
-        package_id: packageId,
-        ...(warning ? { classificationWarning: warning } : {}),
-        name: v.name,
-        author: v.author,
-        content_type: v.content_type,
-        tags: v.tags,
-        language: v.language,
-        maturity: v.maturity,
-        synthesis: v.synthesis,
-        references_count: (v.references || []).length,
-        verified_references: (v.references || []).filter(r => r.verified).length,
-        entries_count: (v.entries || []).length,
-        public_entries: (v.entries || []).filter(e => e.visibility === 'public').length,
-        sharing: v.sharing,
-        created: v.created || m.createdAt,
-        updated: v.updated || m.updatedAt,
-        ...(dataset ? { datapackage: { ...datapackageListing(config.baseUrl, dataset), ...(freshnessByKey.get(`${m.ownerGaii}|${m.key}`) ? { freshness: freshnessByKey.get(`${m.ownerGaii}|${m.key}`) } : {}) } } : {}),
-      };
-    });
 
     res.json(success(config.nodeId, {
       packages: items,
@@ -426,6 +408,10 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       page,
       per_page: perPage,
       pages: Math.ceil(total / perPage),
+      reach: 'public',
+      counts,
+      // How many rows the caller's other reaches list, when the library asks (reaches=1).
+      ...(req.query.reaches === '1' ? { reaches: { public: counts.all, ...(await reachCounts(req, { storage, config }, viewerOf(config, req.auth), q)) } } : {}),
     }));
   });
 

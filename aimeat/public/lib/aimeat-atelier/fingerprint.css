@@ -1,0 +1,136 @@
+/*
+ * @file aimeat-atelier/fingerprint.css
+ * @description The fingerprint (fingerprint.js): seal, barcode, trust bar, quadrant views and the
+ *   hover card. The six genre colours are component tokens with the validated defaults (checked for
+ *   colour-blind separation in light and dark), --ak-fp-x is the kit's error colour, --ak-fp-zone the
+ *   quadrant ground and --ak-fp-dim how far an unlit topic fades. Every coloured mark paints with
+ *   var(--fp-c), which the drawing sets to one of the genre tokens, so a look changes a genre by
+ *   setting one variable. Everything else is a kit token.
+ * @version-history
+ *   v0.69.0 — 2026-11-02 — Initial (wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse).
+ */
+
+.ak-fp {
+  --ak-fp-F: #2a78d6;
+  --ak-fp-A: #1baf7a;
+  --ak-fp-M: #eb6834;
+  --ak-fp-O: #eda100;
+  --ak-fp-P: #e87ba4;
+  --ak-fp-K: #6250d6;
+  --ak-fp-x: var(--ak-err, #b3261e);
+  --ak-fp-zone: var(--ak-surface-2, #eceff4);
+  --ak-fp-dim: 0.2;
+  position: relative;
+  color: var(--ak-ink);
+  font-family: var(--ak-font);
+}
+:where(:root[data-theme='dark']) .ak-fp {
+  --ak-fp-F: #3987e5;
+  --ak-fp-A: #199e70;
+  --ak-fp-M: #d95926;
+  --ak-fp-O: #c98500;
+  --ak-fp-P: #d55181;
+  --ak-fp-K: #9085e9;
+}
+
+/* ── Views ─────────────────────────────────────────────────────────────────────────────── */
+.ak-fp[data-ak-view='row'] {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(120px, 300px);
+  gap: var(--ak-gap, 12px);
+  align-items: center;
+}
+@media (max-width: 560px) {
+  .ak-fp[data-ak-view='row'] { grid-template-columns: 48px minmax(0, 1fr); }
+  .ak-fp[data-ak-view='row'] .ak-fp__barcodebox { grid-column: 1 / -1; }
+}
+.ak-fp[data-ak-view='panel'] { display: grid; gap: var(--ak-gap, 14px); }
+.ak-fp__top { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 680px) { .ak-fp__top { grid-template-columns: 1fr; } }
+.ak-fp__side { min-width: 0; display: grid; gap: 6px; }
+.ak-fp__barcodebox { min-width: 0; }
+.ak-fp__barcodebox svg, .ak-fp__trustbar { display: block; width: 100%; height: auto; }
+.ak-fp__seal { display: block; max-width: 100%; height: auto; }
+.ak-fp__head { min-width: 0; }
+.ak-fp__title { font-weight: 600; overflow-wrap: anywhere; }
+.ak-fp__meta, .ak-fp__label { font-size: 0.8125rem; color: var(--ak-ink-dim); }
+.ak-fp__grids { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+.ak-fp__gridcard { background: var(--ak-surface); border: var(--ak-line-w, 1px) solid var(--ak-line); border-radius: var(--ak-radius, 12px); padding: 12px; min-width: 0; }
+.ak-fp__gridname { font-weight: 600; margin-bottom: 6px; }
+.ak-fp__picks { display: flex; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 6px; font-size: 0.8125rem; color: var(--ak-ink-dim); }
+.ak-fp__pick { display: inline-flex; gap: 4px; align-items: center; }
+.ak-fp__select { font: inherit; color: var(--ak-ink); background: var(--ak-surface); border: var(--ak-line-w, 1px) solid var(--ak-line); border-radius: 6px; padding: 2px 6px; max-width: 100%; }
+.ak-fp__grid { display: block; width: 100%; height: auto; }
+.ak-fp__gridleaning { font-size: 0.8125rem; color: var(--ak-ink-dim); margin-top: 4px; }
+.ak-fp__gridleaning b { color: var(--ak-ink); }
+.ak-fp__tag { margin: 0; padding: 10px 12px; background: var(--ak-fp-zone); border-radius: var(--ak-radius, 12px); font: 0.875rem/1.6 var(--ak-font); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ── Marks and colours ─────────────────────────────────────────────────────────────────── */
+.ak-fp__arc { fill: var(--fp-c); stroke: var(--ak-surface); stroke-width: 1.5; }
+.ak-fp__guide { fill: none; stroke: var(--ak-line); stroke-width: 1; }
+.ak-fp__poly { fill: var(--fp-c); fill-opacity: 0.3; stroke: var(--fp-c); stroke-width: 2; stroke-linejoin: round; }
+.ak-fp__poly--whole { fill: none; stroke: var(--ak-ink-dim); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.ak-fp__spoke { font-size: 11px; fill: var(--ak-ink-dim); }
+.ak-fp__stripe { fill: var(--fp-c); cursor: default; }
+.ak-fp[data-ak-clickable] .ak-fp__stripe { cursor: pointer; }
+.ak-fp__mark { font: 700 13px var(--ak-font-mono); fill: var(--ak-ink-dim); }
+.ak-fp__mark--small { font-size: 11px; }
+.ak-fp__mark[data-m='x'], .ak-fp__glyph[data-m='x'] { fill: var(--ak-fp-x); color: var(--ak-fp-x); }
+.ak-fp__band-bar { fill: var(--ak-ink-dim); }
+.ak-fp__hit { fill: transparent; }
+.ak-fp__band-name { font-size: 10.5px; fill: var(--ak-ink-dim); }
+.ak-fp__trust[data-m='+'] { fill: var(--ak-ink); }
+.ak-fp__trust[data-m='~'] { fill: var(--ak-ink-dim); }
+.ak-fp__trust[data-m='?'] { fill: var(--ak-surface); stroke: var(--ak-ink-dim); stroke-width: 1; stroke-dasharray: 4 3; }
+.ak-fp__trust[data-m='x'] { fill: var(--ak-fp-x); }
+.ak-fp__legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 6px; font-size: 0.8125rem; color: var(--ak-ink-dim); }
+.ak-fp__glyph { font: 700 0.9375rem var(--ak-font-mono); color: var(--ak-ink); }
+.ak-fp__zone { fill: var(--ak-fp-zone); }
+.ak-fp__cross { stroke: var(--ak-line); stroke-width: 1.5; }
+.ak-fp__zone-name { font-size: 11px; font-weight: 600; fill: var(--ak-ink-dim); }
+.ak-fp__axis { font-size: 11px; fill: var(--ak-ink-dim); }
+.ak-fp__bubble { fill: var(--fp-c); stroke: var(--ak-surface); stroke-width: 2; }
+.ak-fp__bubble--hollow { fill: var(--ak-surface); stroke: var(--fp-c); stroke-width: 2.5; stroke-dasharray: 4 3; }
+.ak-fp__bubble--x { stroke: var(--ak-fp-x); stroke-width: 3; }
+.ak-fp__bubble-mark { font-family: var(--ak-font-mono); font-weight: 700; fill: #fff; stroke: rgb(0 0 0 / 0.35); stroke-width: 2px; paint-order: stroke; pointer-events: none; }
+.ak-fp__bubble-mark--hollow { fill: var(--ak-ink); stroke: none; }
+.ak-fp__centre { stroke: var(--ak-ink); stroke-width: 2; }
+.ak-fp__tlabel { font-size: 11.5px; fill: var(--ak-ink); paint-order: stroke; stroke: var(--ak-fp-zone); stroke-width: 3px; pointer-events: none; }
+
+/* ── One topic lit, the others dimmed ──────────────────────────────────────────────────── */
+.ak-fp [data-topic], .ak-fp__arc { transition: opacity 120ms ease; }
+.ak-fp .ak-fp--dim { opacity: var(--ak-fp-dim); }
+.ak-fp[data-ak-still] [data-topic], .ak-fp[data-ak-still] .ak-fp__arc { transition: none; }
+@media (prefers-reduced-motion: reduce) { .ak-fp [data-topic], .ak-fp__arc { transition: none; } }
+
+/* ── Age: an old fingerprint loses its colour ──────────────────────────────────────────── */
+.ak-fp[data-ak-age='mid'] svg { filter: saturate(0.55); }
+.ak-fp[data-ak-age='old'] svg { filter: saturate(0.12); opacity: 0.55; }
+
+/* ── The hover note and the seal's card ────────────────────────────────────────────────── */
+.ak-fp__tip {
+  position: fixed;
+  z-index: 70;
+  max-width: 300px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--ak-ink);
+  color: var(--ak-surface);
+  font-size: 0.78rem;
+  pointer-events: none;
+}
+.ak-fp__tip[hidden] { display: none; }
+.ak-fp__tip--card { max-width: 560px; padding: 12px 14px; border-radius: var(--ak-radius, 10px); background: var(--ak-surface); color: var(--ak-ink); border: var(--ak-line-w, 1px) solid var(--ak-line); box-shadow: var(--ak-shadow, 0 8px 28px rgb(0 0 0 / 0.18)); }
+.ak-fp__card { display: flex; gap: 14px; align-items: center; }
+.ak-fp__card-genres { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 4px 0 8px; font-size: 0.75rem; color: var(--ak-ink-dim); }
+.ak-fp__chip { display: inline-flex; align-items: center; gap: 5px; }
+.ak-fp__swatch { width: 11px; height: 11px; border-radius: 3px; background: var(--fp-c); display: inline-block; }
+.ak-fp__slider { display: grid; grid-template-columns: 84px 90px 104px; gap: 8px; align-items: center; font-size: 0.75rem; color: var(--ak-ink-dim); line-height: 1.9; }
+.ak-fp__slider-lo { text-align: right; }
+.ak-fp__slider-track { position: relative; height: 4px; background: var(--ak-line); border-radius: 2px; }
+.ak-fp__slider-dot { position: absolute; top: -4px; left: var(--fp-at, 50%); width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--ak-ink); }
+
+/* ── Variants ──────────────────────────────────────────────────────────────────────────── */
+.ak-fp[data-ak-variant='dense'] .ak-fp__tag { display: none; }
+.ak-fp[data-ak-variant='dense'] .ak-fp__grids { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; }
+.ak-fp[data-ak-variant='plain'] .ak-fp__gridcard { background: none; border: 0; padding: 0; }

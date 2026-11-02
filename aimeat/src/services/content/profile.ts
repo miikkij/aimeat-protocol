@@ -28,28 +28,45 @@
  *   THE TAG. fingerprintTag() writes the profile as a few lines of text and coloured squares, so a
  *   chat that draws no pictures still shows it. Its words are English; the AI that shows it to a
  *   person says it in the person's language (built-in skill aimeat-content-classes).
- * @structure PROFILE_PROMPT · PROFILE_INSTRUCTION · segmentText() · profileItem() · fingerprintTag()
+ *   TWO WAYS TO LABEL. With the decision service on and content_class.profile_labels 'auto' (the
+ *   default), the decision model labels each section (profile-labels.ts: 98 % the same mark on a
+ *   second run, about 0.0005 $ a document) and the text model writes only the headings, claims and
+ *   topics (PROFILE_TEXT_INSTRUCTION). Otherwise, or when the decision service refuses, the text
+ *   model does all of it (PROFILE_INSTRUCTION). The profile says which (`labels`).
+ * @structure PROFILE_PROMPT · PROFILE_TEXT_PROMPT · PROFILE_INSTRUCTION · PROFILE_TEXT_INSTRUCTION ·
+ *   segmentText() · profileItem() · readTextAnswer() · fingerprintTag()
  * @usage
  *   const { profile, sections } = await profileItem(ctx, item, 'Report.pdf');
  *   const tag = fingerprintTag(profile);
  * @version-history
  *   v1.0.0 — 2026-11-02 — Initial: instruction version 4 of the measurement.
+ *   v1.1.0 — 2026-11-02 — The decision model labels when the node lets it (profile-labels.ts), the
+ *     text model writes; the owner's or the node's fingerprint model; 24 000 output tokens.
  */
 import { redact } from '../refinery/message.js';
+import { logger } from '../../utils/logger.js';
 import { askJson, type StageCtx, type StageItem } from './ai-stages.js';
+import { labelSections } from './profile-labels.js';
 import type {
-  ContentProfile, ProfileAxis, ProfileGenre, ProfileMark, ProfileSection, ProfileTopic,
+  ContentProfile, ProfileAxis, ProfileGenre, ProfileMark, ProfileSection, ProfileTopic, TextSection,
 } from './types.js';
 
 /** The version of the instruction below. Raise it whenever the instruction changes. */
 export const PROFILE_PROMPT = 'profile-4';
+/** The version of PROFILE_TEXT_INSTRUCTION, the text model's part when the decision model labels. */
+export const PROFILE_TEXT_PROMPT = 'profile-text-1';
 /** The most text a profile reads; a longer text is profiled from its beginning. */
 export const MAX_PROFILE_CHARS = 48_000;
 /** A text shorter than this is not profiled: there is too little to tell its kind. */
 export const MIN_PROFILE_CHARS = 200;
 const MAX_SECTIONS = 24;
 const MAX_TOPICS = 8;
-const MAX_TOKENS = 12_000;
+/**
+ * A reasoning model spends most of its answer thinking: DeepSeek V4 Pro used 9 639 of 12 000 tokens
+ * on reasoning for a 2 965-word document and the JSON was cut off (2026-11-02). The ceiling is paid
+ * only when it is used.
+ */
+const MAX_TOKENS = 24_000;
 
 export const GENRES: readonly ProfileGenre[] = ['F', 'A', 'M', 'O', 'P', 'K'];
 export const MARKS: readonly ProfileMark[] = ['+', '~', '?', 'x'];
@@ -99,8 +116,25 @@ export const PROFILE_INSTRUCTION = [
   'Every section you were given appears exactly once in `sections`, in the same order.',
 ].join('\n');
 
-/** One piece of the text, before a model has labelled it. */
-export interface TextSection { n: number; heading: string; text: string; words: number }
+/**
+ * The text model's part when the decision model labels the sections (profile-labels.ts): the words
+ * a decision model cannot write. The same rules for heading, claim, topic and kind as above.
+ */
+export const PROFILE_TEXT_INSTRUCTION = [
+  'You write the headings, one-sentence claims and topics of a document so that a person can see at a glance what it says, before reading it.',
+  '',
+  'The document has already been split into numbered sections. For every section, in order, give `n` (the section number you were given), `heading` (keep the given heading when it is informative; when the section has none, or it is only a number or a date, write a short heading of at most five words), `claim` (one plain sentence saying what the section states, keeping the concrete content: numbers, names, decisions; write it as the content itself ("Price rose 38 % in ten years."), never as a description of the text ("The section discusses prices.")) and `topic` (the 0-based index of its topic in `topics`).',
+  '',
+  'Topics: 2 to 6 topics that together cover the document, each named in at most four words. A topic is what the sections are about (for example "Hintakehitys", "Kilpailutilanne"), never the kind of text ("Analyysi", "Johdanto"). Also give `kind`: what this document is, in two or three words (for example "tutkimusraportti", "kokousmuistio", "asennusohje").',
+  '',
+  'Write headings, claims, topics and kind in the document\'s own language. Answer with one JSON object and nothing else:',
+  '',
+  '{"kind": "...", "topics": ["...", "..."], "sections": [{"n": 1, "heading": "...", "claim": "...", "topic": 0}]}',
+  '',
+  'Every section you were given appears exactly once in `sections`, in the same order.',
+].join('\n');
+
+export type { TextSection };
 
 const WORD = /[\p{L}\p{N}_]+/gu;
 const wordsIn = (s: string): number => (s.match(WORD) ?? []).length;
@@ -235,7 +269,9 @@ function buildTopics(names: string[], sections: ProfileSection[]): ProfileTopic[
  * Answers the compact profile for the facts (without detailKey, which the caller sets when it has
  * stored the sections) and the sections with their headings and claims.
  */
-export async function profileItem(ctx: StageCtx, item: StageItem, title: string): Promise<{ profile: ContentProfile; sections: ProfileSection[] }> {
+export async function profileItem(
+  ctx: StageCtx, item: StageItem, title: string, sourceId = item.sourceId,
+): Promise<{ profile: ContentProfile; sections: ProfileSection[] }> {
   const whole = (item.text ?? '').trim();
   if (whole.length < MIN_PROFILE_CHARS) throw Object.assign(new Error('The item has too few words to profile.'), { code: 'NO_TEXT' });
   const text = whole.slice(0, MAX_PROFILE_CHARS);
@@ -243,17 +279,82 @@ export async function profileItem(ctx: StageCtx, item: StageItem, title: string)
   const docTitle = cut.title || title;
   const doc = `Document title: ${docTitle}\n\n` + cut.sections.map((s) =>
     `=== Section ${s.n} ===\nGiven heading: ${s.heading || '(none)'}\n${redact(s.text).text}`).join('\n\n');
-  const r = await askJson(ctx, `${PROFILE_INSTRUCTION}\n\n${doc}`, { maxTokens: MAX_TOKENS });
+  // The owner's own fingerprint model, else the node's (content_class.profile_model), else the
+  // owner's text model and defaults (askJson).
+  const model = ctx.settings.models.profile || ctx.deps.config.contentClassProfileModel || undefined;
+  const ask = (instruction: string) => askJson(ctx, `${instruction}\n\n${doc}`, { maxTokens: MAX_TOKENS, ...(model ? { model } : {}) });
+  const common = { at: new Date().toISOString(), ...(whole.length > MAX_PROFILE_CHARS ? { truncatedAt: MAX_PROFILE_CHARS } : {}) };
+
+  // The decision model labels and the text model writes, when the node lets the decision model
+  // answer (content_class.profile_labels 'auto' and the decision service on). Any refusal from the
+  // decision service (switched off, no key, too large for the provider) falls back to the text
+  // model labelling everything, which is what a node without the decision service does.
+  if (ctx.deps.config.contentClassProfileLabels !== 'model' && ctx.deps.config.decideEnabled) {
+    let labelled: Awaited<ReturnType<typeof labelSections>> | null = null;
+    try {
+      labelled = await labelSections(ctx, docTitle, cut.sections, sourceId);
+    } catch (err) {
+      const e = err as { code?: unknown; message?: unknown };
+      logger.info('contentclass: the decision model did not label the fingerprint; the text model labels it', {
+        source: sourceId, code: String(e.code ?? ''), error: String(e.message ?? err).slice(0, 300),
+      });
+    }
+    if (labelled) {
+      const r = await ask(PROFILE_TEXT_INSTRUCTION);
+      const answer = readTextAnswer(r.json, cut.sections, labelled.labels);
+      const topics = buildTopics(answer.topics, answer.sections);
+      const profile: ContentProfile = {
+        v: 1, prompt: PROFILE_TEXT_PROMPT, model: r.model, ...(r.provenanceId ? { provenanceId: r.provenanceId } : {}),
+        labels: 'decide', labelModel: labelled.model, decisionIds: labelled.decisionIds,
+        kind: answer.kind, topics, sections: answer.sections.map((s) => [s.genre, s.words, s.certainty, s.mark, s.topic]),
+        axes: meanAxes(answer.sections), ...common,
+      };
+      return { profile, sections: answer.sections };
+    }
+  }
+
+  const r = await ask(PROFILE_INSTRUCTION);
   const answer = readAnswer(r.json, cut.sections);
   const topics = buildTopics(answer.topics, answer.sections);
   const profile: ContentProfile = {
     v: 1, prompt: PROFILE_PROMPT, model: r.model, ...(r.provenanceId ? { provenanceId: r.provenanceId } : {}),
-    at: new Date().toISOString(), kind: answer.kind, topics,
+    labels: 'model', kind: answer.kind, topics,
     sections: answer.sections.map((s) => [s.genre, s.words, s.certainty, s.mark, s.topic]),
-    axes: meanAxes(answer.sections),
-    ...(whole.length > MAX_PROFILE_CHARS ? { truncatedAt: MAX_PROFILE_CHARS } : {}),
+    axes: meanAxes(answer.sections), ...common,
   };
   return { profile, sections: answer.sections };
+}
+
+/**
+ * The text model's headings, claims and topics laid over the decision model's labels. A section
+ * the text model left out keeps its given heading and an empty claim; it still has its labels.
+ */
+function readTextAnswer(
+  json: Json, given: TextSection[], labels: Map<number, { genre: ProfileGenre; mark: ProfileMark; certainty: number; axes: Record<ProfileAxis, number> }>,
+): { kind: string; topics: string[]; sections: ProfileSection[] } {
+  const topics = (Array.isArray(json.topics) ? json.topics : [])
+    .map((t) => String(t ?? '').trim().slice(0, 60)).filter(Boolean).slice(0, MAX_TOPICS);
+  if (!topics.length) topics.push('—');
+  const byN = new Map<number, Json>();
+  for (const s of Array.isArray(json.sections) ? json.sections : []) {
+    const o = (s && typeof s === 'object' ? s : {}) as Json;
+    const n = Number(o.n);
+    if (Number.isInteger(n) && !byN.has(n)) byN.set(n, o);
+  }
+  const sections = given.map((g): ProfileSection => {
+    const s = byN.get(g.n) ?? {};
+    const l = labels.get(g.n);
+    const ti = Number(s.topic);
+    return {
+      n: g.n, words: g.words,
+      heading: String(s.heading ?? g.heading ?? '').trim().slice(0, 120) || g.heading.slice(0, 120) || `${g.n}`,
+      claim: String(s.claim ?? '').trim().slice(0, 400),
+      genre: l?.genre ?? 'F', mark: l?.mark ?? '?', certainty: l?.certainty ?? 0.5,
+      topic: Number.isInteger(ti) && ti >= 0 && ti < topics.length ? ti : 0,
+      axes: l?.axes ?? { fakta: 0, konkr: 0, aika: 0, toim: 0, yks: 0, varm: 0 },
+    };
+  });
+  return { kind: String(json.kind ?? '').trim().slice(0, 60), topics, sections };
 }
 
 const GENRE_NAME: Record<ProfileGenre, string> = { F: 'Fact', A: 'Analysis', M: 'Opinion', O: 'Instruction', P: 'Decision or plan', K: 'Narrative' };
@@ -295,7 +396,7 @@ export function fingerprintTag(p: ContentProfile): {
     `Topics: ${topicLine}`,
     `Trust: ${markLine}  (${MARKS.filter((m) => marks[m]).map((m) => `${m} ${MARK_NAME[m]}`).join(', ')})`,
     `Leaning: ${leaning.join(' · ')}`,
-    `Profiled by ${p.model} on ${p.at.slice(0, 10)}${p.truncatedAt ? `, from the first ${p.truncatedAt} characters` : ''}`,
+    `${p.labels === 'decide' && p.labelModel ? `Marked by ${p.labelModel}, written by ${p.model}` : `Profiled by ${p.model}`} on ${p.at.slice(0, 10)}${p.truncatedAt ? `, from the first ${p.truncatedAt} characters` : ''}`,
   ];
   return { squares, lines, text: [squares, ...lines].join('\n'), genres, marks, leaning };
 }

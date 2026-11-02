@@ -39,6 +39,9 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.6.0 — 2026-11-02 — The data packages, the named shares and the outside parties are ONE Data row with
+ *     the counts and a way to "Data you share" (exposure/named.js secData; WP11, board Mita-muut-nakevat);
+ *     the strip counts the four levels. The report itself keeps every item.
  *   v1.5.1 — 2026-11-01 — The heading and the sentence about asking one's own AI as on the board (WP10e B16).
  *   v1.5.0 — 2026-11-01 — How to close an item, a title the node words and the notes in the page's
  *     language, from the report's `close`, `title_parts` and `note_codes` (exposure/words.js; WP9c).
@@ -77,7 +80,7 @@ import { AudienceBadge } from '/components/AudienceBadge.js';
 import { openTab } from '/components/Rail.js';
 import { useConfirm } from '/components/Modal.js';
 import * as dp from '/js/services/dataproducts.js';
-import { secNamedShares, secParties, secProducts, NAMED_KINDS } from './exposure/named.js';
+import { secData, NAMED_KINDS } from './exposure/named.js';
 import { closeText, titleOf, noteTexts } from './exposure/words.js';
 
 const html = htm.bind(h);
@@ -180,7 +183,7 @@ function lowerOf(item) {
  */
 const PLACE = {
   memory: ['memory', 'profile.tabs.memory'], file: ['memory', 'profile.tabs.memory'],
-  datapackage: ['memory', 'profile.tabs.memory'], workspace_share: ['organisms', 'profile.tabs.organisms'],
+  datapackage: ['sharedData', 'profile.tabs.sharedData'], workspace_share: ['organisms', 'profile.tabs.organisms'],
   organism: ['organisms', 'profile.tabs.organisms'], board: ['boards', 'profile.tabs.boards'],
   knowledge: ['knowledge', 'knowledge.tabLabel'], package: ['packages', 'profile.tabs.packages'],
   skill: ['skills', 'skills.tabLabel'], portfolio: ['portfolio', 'portfolio.tabLabel'],
@@ -212,9 +215,8 @@ function WhoCell({ item }) {
 
 function Strip({ report }) {
   const failed = report.failed.length > 0;
-  // `named` stands after the four, outside their widest-first order (WP4's ruling): one person or
-  // program chosen by name is not a wider or a narrower audience than the members of one place.
-  const byKind = (kind) => report.counts.by_kind?.[kind]?.named ?? 0;
+  // The named shares and the outside parties are counted on the Data row and on "Data you share"
+  // (WP11), so the strip counts the four levels only.
   return html`<${FigureStrip} lead wrap stacked items=${[
     ...CAP_LEVELS.map((lv) => ({
       key: lv,
@@ -223,8 +225,6 @@ function Strip({ report }) {
       label: x(`level.${levelKey(lv)}`),
       sub: failed ? x('levelSubPartial') : x(`level.${levelKey(lv)}Sub`),
     })),
-    { key: 'named_share', n: byKind('named_share'), label: x('level.namedShares'), sub: x('level.namedSharesSub') },
-    { key: 'outside_party', n: byKind('outside_party'), label: x('level.parties'), sub: x('level.partiesSub') },
   ]} />`;
 }
 
@@ -288,8 +288,7 @@ export default function ExposureTab({ showToast }) {
   const [busy, setBusy] = useState('');
   const { confirm, ConfirmUI } = useConfirm();
 
-  const [packages, setPackages] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [shared, setShared] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -300,9 +299,8 @@ export default function ExposureTab({ showToast }) {
       swallowed('exposure-tab: load failed', err);
       setError(err?.message || x('loadFailed'));
     }
-    // The owner's packages and products, private ones included, for the data products section.
-    dp.listPackages().then((r) => setPackages(r?.packages || [])).catch((err) => swallowed('exposure-tab: packages', err));
-    dp.listProducts().then((r) => setProducts(r?.products || [])).catch((err) => swallowed('exposure-tab: products', err));
+    // What the person shares as data, for the one Data row (the view "Data you share" reads; WP11).
+    dp.sharedData().then((r) => setShared(r || { packages: [], counts: {} })).catch((err) => swallowed('exposure-tab: shared data', err));
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -358,25 +356,11 @@ export default function ExposureTab({ showToast }) {
   // The site's toast after a copy, as the other copy doors say it (the link's own "✓ Copied" too).
   const copied = () => showToast?.(x('copiedForAi'));
 
-  /** End a named share, after the site's confirm: the next read is refused. */
-  const onRevoke = (item) => confirm(x('named.revokeConfirm', { who: item.share.party_name, what: item.share.package }), async () => {
-    setBusy(`${item.kind}|${item.id}`);
-    setMessage('');
-    try {
-      await dp.revokeShare(item.id);
-      setMessage(x('named.revoked', { who: item.share.party_name }));
-      await load();
-    } catch (err) {
-      swallowed('exposure-tab: revoke failed', err);
-      setError(err?.message || x('closeFailed'));
-    } finally { setBusy(''); }
-  }, { title: x('named.revoke'), confirmLabel: x('named.revoke'), danger: true });
-
   const all = report?.items ?? [];
-  // The named shares, the parties and the data packages have sections of their own above the rest.
+  // The named shares, the parties and the data packages are the one Data row above the rest; each is
+  // listed and closed on "Data you share" (WP11).
   const items = all.filter((i) => !NAMED_KINDS.includes(i.kind));
   const total = (report?.counts?.total ?? 0) - (all.length - items.length);
-  const titles = Object.fromEntries(products.map((p) => [p.name, p.title || p.name]));
   // Where classification is on, the conflicts come first, in a section of their own.
   const cls = report?.classification ?? null;
   const conflicts = all.filter((i) => i.classification?.conflict);
@@ -405,10 +389,8 @@ export default function ExposureTab({ showToast }) {
             ${cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsWhy')}<//>` : null}
             ${cls.excepted ? html`<${Note} kind="hint">${x('cls.excepted', { n: cls.excepted })}<//>` : null}
           <//>` : null}
-        ${secNamedShares({ items: all, num: num(1), busy: !!busy, onRevoke, titles })}
-        ${secParties({ items: all, num: num(2) })}
-        ${secProducts({ packages, products, items: all, num: num(3) })}
-        <${Section} id="ex-items" num=${num(4)} title=${x('itemsTitle')} count=${total}>
+        ${secData({ shared, num: num(1) })}
+        <${Section} id="ex-items" num=${num(2)} title=${x('itemsTitle')} count=${total}>
           <${List} cols="item-kind-state-doors" keepCols
             head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
             empty=${report.failed.length ? x('emptyPartial') : x('empty')}
@@ -418,7 +400,7 @@ export default function ExposureTab({ showToast }) {
           ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
           <${Note} kind="hint">${x('askYourAi')}<//>
         <//>
-        <${Section} fold id="ex-notes" num=${num(5)} title=${x('notesTitle')} sub=${x('notesSub')}>
+        <${Section} fold id="ex-notes" num=${num(3)} title=${x('notesTitle')} sub=${x('notesSub')}>
           ${noteTexts(report).map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}
         <//>` : null}
     <//>`;

@@ -9,6 +9,7 @@
  * @structure dataProductTools · DATAPRODUCT_ACTIONS
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.4.0 — 2026-11-02 — action "shared": what the account shares as data and who reads it (WP11).
  *   v1.3.0 — 2026-11-01 — `attribution` and `i18n`; the description may be Markdown (WP10e).
  *   v1.2.0 — 2026-11-01 — `schedule: { on: "change" }`; action "describe" with `lang` (WP9c).
  *   v1.1.0 — 2026-11-01 — `retention`; "list" says what each row carries (WP9a).
@@ -22,7 +23,7 @@ import {
     DataProductScheduleSchema, DataProductRetentionSchema, DataProductVisibilitySchema, DataProductI18nSchema,
 } from '../../models/dataproduct-schemas.js';
 
-export const DATAPRODUCT_ACTIONS = ['define', 'get', 'list', 'preview', 'run', 'delete', 'describe'] as const;
+export const DATAPRODUCT_ACTIONS = ['define', 'get', 'list', 'shared', 'preview', 'run', 'delete', 'describe'] as const;
 
 export const dataProductTools = [
     {
@@ -32,7 +33,9 @@ export const dataProductTools = [
             + 'action "define" { name, sources, combine?, columns?, filter?, schedule?, visibility?, title?, description?, keywords?, license?, attribution?, i18n? } stores the definition (REPLACES one of the same name, so send every field again: "get" first, change what you need, define, then "run" to publish the change) after reading every source as you; '
             + 'the description may be Markdown (paragraphs, headings, lists, links), which the public dataset page renders; i18n carries the title, description and attribution per language; '
             + '"preview" { name } builds it without publishing: the first 20 rows of each resource, the row counts, the Table Schema, the validation result and the ODPS sheet the version would get (pass the definition fields too to preview a draft without storing it); '
-            + '"run" { name } builds and publishes one version (the same rows give no new version: unchanged true); "get"; "list" (each product with its freshness: fresh, late, stale or unscheduled; its audience, live named shares and reads in the last seven days, which answers "what data do I offer", "is any of it stale" and "who reads my data"); "delete" (removes the definition and its schedule; the package stays); "describe" { name, lang?, and the definition fields for a draft } asks the person\'s own AI for a two- or three-sentence description from the name, the sources and the columns (no row is sent; needs ai:use): a draft for the person to change, AI-written, with its provenance record. '
+            + '"run" { name } builds and publishes one version (the same rows give no new version: unchanged true); "get"; "list" (each product with its freshness: fresh, late, stale or unscheduled; its audience, live named shares and reads in the last seven days); '
+            + '"shared" (no name) answers "what data have I shared and who reads it": every data package of the account, made by a product or published directly, with its title, audience, licence, freshness, its live named shares (who, kind, until, last read, reads in 30 days), whether it is for sale on EXCHANGE or held by a data space participant, its reads in 30 days and last read; then the counts (all, public, named shares, for sale, data space), the shares to people and who read in 30 days. A public read with no account is not logged, so it is not counted. To stop one share use aimeat_consent_revoke with its id; to rebuild a product now, action "run"; the page is "Data you share" in the profile (/v1/profile?tab=sharedData). '
+            + '"delete" (removes the definition and its schedule; the package stays); "describe" { name, lang?, and the definition fields for a draft } asks the person\'s own AI for a two- or three-sentence description from the name, the sources and the columns (no row is sent; needs ai:use): a draft for the person to change, AI-written, with its provenance record. '
             + 'SOURCES, each { id (A, B...), kind, ... }: records { organism_id, ws, space } (each published record of a workspace records space is a row); app { app, key_prefix, rows_at? } (an app\'s data, only the families its data map marks publishable); memory { key, rows_at?, owner? } (the array at rows_at of one record); extension { ext, action, input?, rows_at? } (an extension action the node runs); file { key, sheet? } (a stored CSV or XLSX); datapackage { name, owner?, resource? } (another data package; it goes into the lineage). '
             + 'A source may name `columns`: a list to keep, or { column: "dotted.path" } to flatten nested values. '
             + 'COMBINE: "tables" (each source its own resource; the default with one source), "union" (rows appended; the columns must match), "join" with key { left: "A.kunta", right: "B.kunta" } (a left join of the first source; unmatched rows kept with nulls; a right key on several rows is refused). '
@@ -48,7 +51,7 @@ export const dataProductTools = [
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             action: { type: 'string', required: true, enum: [...DATAPRODUCT_ACTIONS], description: 'What to do. Start with "define", then "preview".' },
-            name: { type: 'string', description: 'The product, which is also the package name: lowercase letters, digits and dashes. Every action but list.', zod: z.string().max(64) },
+            name: { type: 'string', description: 'The product, which is also the package name: lowercase letters, digits and dashes. Every action but list and shared.', zod: z.string().max(64) },
             title: { type: 'string', description: 'For define: a human title for the package.', zod: z.string().max(INPUT_LIMITS.title) },
             description: { type: 'string', description: 'For define: what the package contains, for a person deciding whether to use it.', zod: z.string().max(INPUT_LIMITS.description) },
             keywords: { type: 'array', description: 'For define: keywords, which the catalogue and DCAT list.', zod: z.array(z.string().max(INPUT_LIMITS.name)).max(20) },

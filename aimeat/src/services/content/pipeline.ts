@@ -339,7 +339,7 @@ async function runModelStages(deps: Deps, ctx: StageCtx, r: StageRun): Promise<v
   if (r.wanted.includes('profile')) {
     await stage(r, 'profile', async () => {
       if (!si.text || si.text.trim().length < MIN_PROFILE_CHARS) return 'too few words to profile';
-      const p = await profileItem(ctx, si, item.filename);
+      const p = await profileItem(ctx, si, item.filename, r.sourceId);
       facts.profile = { ...p.profile, detailKey: await putProfileDetail(deps, r.writer, r.sourceId, p.sections) };
       return p.profile.truncatedAt ? `profiled from the first ${p.profile.truncatedAt} characters` : undefined;
     });

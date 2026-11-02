@@ -82,7 +82,17 @@ export interface ContentProfile {
   /** The shape version, and the instruction version that produced it. */
   v: 1;
   prompt: string;
+  /** The text model: all of the profile, or with `labels: 'decide'` the headings, claims and topics. */
   model: string;
+  /**
+   * Who labelled the sections: 'model' (the text model, everything in one answer) or 'decide' (the
+   * decision model, profile-labels.ts). Seals made the two ways sit on different scales and are not
+   * compared. Absent on a profile made before 2026-11-02 evening: 'model'.
+   */
+  labels?: 'model' | 'decide';
+  /** With labels 'decide': the decision model, and its decision records. */
+  labelModel?: string;
+  decisionIds?: string[];
   provenanceId?: string;
   at: string;
   /** What the item is, in two or three words in its own language. */
@@ -97,6 +107,9 @@ export interface ContentProfile {
   /** Set when only the first part of a long text was profiled. */
   truncatedAt?: number;
 }
+
+/** One piece of a text as profile.ts cut it, before anything labelled it. */
+export interface TextSection { n: number; heading: string; text: string; words: number }
 
 /** One section as the stored profile detail keeps it. */
 export interface ProfileSection {
@@ -310,8 +323,11 @@ export interface ContentSettings {
   approvalRule?: string;
   /** Ask trust lists and revocation over the network when a PDF's signatures are checked on arrival. */
   onlineSignatureChecks: boolean;
-  /** Models to use; empty: the owner's defaults. */
-  models: { text: string; vision: string };
+  /**
+   * Models to use; empty: the owner's defaults. `profile` is the fingerprint's model; empty: the
+   * node's (content_class.profile_model), and when that is empty too, `text`.
+   */
+  models: { text: string; vision: string; profile: string };
   /**
    * The language descriptions and alt texts are written in, as a BCP 47 tag ('fi', 'en', 'es').
    * Empty: the content's own language, and English for a picture with no words in it.
@@ -326,7 +342,7 @@ export const DEFAULT_SETTINGS: ContentSettings = Object.freeze({
   minTextChars: 2000,
   approval: 'ask',
   onlineSignatureChecks: false,
-  models: Object.freeze({ text: '', vision: '' }),
+  models: Object.freeze({ text: '', vision: '', profile: '' }),
   language: '',
 }) as ContentSettings;
 

@@ -5638,7 +5638,10 @@ components:
           properties:
             v: { type: integer }
             prompt: { type: string, description: The version of the instruction that made it. }
-            model: { type: string }
+            model: { type: string, description: 'The text model: all of it, or with labels decide the headings, claims and topics.' }
+            labels: { type: string, enum: [model, decide], description: 'Who marked the sections: the text model, or the decision model (content_class.profile_labels). Seals made the two ways are not compared.' }
+            labelModel: { type: string, description: With labels decide, the decision model. }
+            decisionIds: { type: array, items: { type: string }, description: With labels decide, its decision records. }
             provenanceId: { type: string }
             at: { type: string, format: date-time }
             kind: { type: string, description: What the item is, in its own language. }
@@ -23418,7 +23421,10 @@ paths:
 
         `data_intermediation` is section 12 (Data Governance Act 2022/868): `{ section, mode,
         mode_code, mode_text, notification, providers, findings, totals, art12, regulation, edit,
-        note }`. `mode` is AIMEAT_DATA_INTERMEDIATION (report, none, node, owners). `findings` holds
+        note, shared_data }`. `shared_data` (the node's report only) is the list behind the four
+        figures: `{ rows: [{ title, name (owner/name), owner, audience, organism_name, named_shares,
+        license, readers_30d, freshness, offered, outside_buyers, open_organism }], total, capped }`,
+        never a row of data and never a named recipient. `mode` is AIMEAT_DATA_INTERMEDIATION (report, none, node, owners). `findings` holds
         `{ id, kind, count, items, reason, code, regulation, source, review?, proposal?, owner? }`:
         data offerings listed to everyone, contracts with outside buyers, organisms anyone may join
         that carry data packages (each with the proposal to require approval, a PUT the organism's
@@ -28322,6 +28328,30 @@ paths:
         '401':
           description: Authentication required
 
+  /v1/datapackages/shared:
+    get:
+      operationId: getSharedData
+      summary: What the caller's account shares as data, and who reads it
+      description: |
+        The owner's "Data you share" (aimeat_dataproduct action "shared" answers the same):
+        `packages`, each with title, i18n, audience, organism_name, license, freshness, tables, rows,
+        product (a data product builds it), landing_url, its live named `shares` (id, party,
+        party_name, party_kind, expires, last_read_at, reads_30d), sale, dataspace, reads_30d,
+        last_read_at and `filters`; `counts` (all, public, named, sale, space); `people` (every live
+        named share); `readers` (who read in 30 days, per reader and package, with the endpoint
+        kinds); `reads_30d`; and `actions`. A public read with no account is not logged and not
+        counted. The person or their own agent with storage:read reads it; an app, an ecosystem app
+        and a visitor are refused 403.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/datapackages/validate:
     post:
       operationId: validateDataPackage
@@ -31657,16 +31687,66 @@ paths:
   /v1/catalogue/knowledge:
     get:
       operationId: getCatalogueKnowledge
-      summary: Knowledge packages catalogue
+      summary: The library of knowledge and data packages, by the reader's reach
       description: >
-        List discoverable knowledge packages in the catalogue. The item of a data package
-        (content_type `dataset`) carries `datapackage`: package_id, content_hash, descriptor_url,
-        odata_url, odps_url, schema_org_url, landing_url (the public dataset page) and per resource its
-        name, row_count, fields, bytes and csv_url.
+        The library: knowledge packages and data packages, by how far the reader reaches. `reach`
+        public (the default, no session) lists what anyone may read; shared (signed in) other accounts'
+        data packages at members or organism:<id> that admit the caller, a visitor's named shares, and
+        knowledge packages shared the same way; own (signed in) the caller's own data packages at every
+        audience, each with `why.reads_30d`; party (an outside party's key as Basic
+        `<owner>/<party>:<key>` or its token) the packages its live shares name. Every data row is decided
+        by the read's own audience rule, so the library never lists a package the reader cannot open.
+        Each item carries `kind` (knowledge or data) and, on a reach other than public, `why`: kind
+        (public, members, organism, own, share), by (the owner's account), organism_id and organism_name,
+        share_id and expires for a share, last_read_at (when this reader last read it through the share)
+        and reads_30d (own). The item of a data package carries `datapackage`: package_id, owner, name,
+        title, description, i18n (title and description per language), license, tables, rows,
+        content_hash, descriptor_url, odata_url, odps_url, schema_org_url, landing_url (the public dataset
+        page, public packages only), freshness and per resource its name, row_count, fields, bytes and
+        csv_url. `counts` are the rows per kind before `kind` narrows them; `reaches` (with reaches=1)
+        how many rows each reach the caller has lists.
       tags: [Catalogue]
+      parameters:
+        - name: reach
+          in: query
+          schema: { type: string, enum: [public, shared, own, party], default: public }
+        - name: kind
+          in: query
+          schema: { type: string, enum: [all, knowledge, data], default: all }
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+          description: Every word must appear in the row's name, description, tags, owner or table names.
+        - name: reaches
+          in: query
+          schema: { type: string, enum: ['1'] }
+          description: Add `reaches`, the row count of each reach the caller has.
+        - name: content_type
+          in: query
+          schema: { type: string }
+        - name: tags
+          in: query
+          schema: { type: string }
+          description: Comma-separated tags every row must carry (reach public).
+        - name: language
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/catalogue/dcat:
     get:
@@ -69126,6 +69206,7 @@ paths:
         propose and profile off until you turn them on), sources (files, memory, workspace), minTextChars (a
         shorter memory record gets no facts on arrival), approval (ask, auto, or rule with
         approvalRule: how a proposed class or property is approved), onlineSignatureChecks, models
+        (text, vision and profile; an empty profile model means the node's content_class.profile_model)
         and language.
       tags: [ContentClasses]
       security:

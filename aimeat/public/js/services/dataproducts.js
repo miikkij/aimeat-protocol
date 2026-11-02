@@ -11,11 +11,12 @@
  *   sendShareLink is the one call site of the e-mailed share link: it asks the node to mail the share's
  *   one-time link, and says when the node sends no mail, so no link is ever claimed as sent.
  * @structure listProducts · getProduct · defineProduct · previewDraft · describeDraft · runProduct · deleteProduct ·
- *   getPackage · listVersions · listPackages · withdrawPackage · sellPackage · listParties · getParty ·
+ *   getPackage · listVersions · listPackages · sharedData · withdrawPackage · sellPackage · listParties · getParty ·
  *   shareWithParty · revokeShare · createPartyKey · deletePartyKey · stopParty · resumeParty ·
  *   deleteParty · partyReads · createParty · sendShareLink · listSourceChoices
  * @usage import * as dp from '/js/services/dataproducts.js';
  * @version-history
+ *   v1.3.0 — 2026-11-02 — sharedData: the owner's "Data you share" (WP11).
  *   v1.2.0 — 2026-11-01 — sendShareLink sends the one-time link (POST /v1/parties/{party}/invite) in the
  *     page's language (WP9b).
  *   v1.1.0 — 2026-11-01 — describeDraft (the AI's description draft); shareWithParty takes `recipient`
@@ -52,6 +53,11 @@ export async function getPackage(owner, name) { return data(await apiGet(`/v1/da
 /** `{ versions: [{ contentHash, at, current, changes, rowCount, in_use }], retention_policy }`. */
 export async function listVersions(owner, name) { return data(await apiGet(`/v1/datapackages/${enc(owner)}/${enc(name)}/versions`)); }
 export async function listPackages() { return data(await apiGet('/v1/datapackages')); }
+/**
+ * What the account shares as data, and who reads it (GET /v1/datapackages/shared, the view
+ * aimeat_dataproduct "shared" answers): `{ packages, counts, people, readers, reads_30d }`.
+ */
+export async function sharedData() { return data(await apiGet('/v1/datapackages/shared')); }
 /** Withdraw a package: every read answers 410, its shares end, it leaves the catalogue. */
 export async function withdrawPackage(owner, name) { return data(await apiDelete(`/v1/datapackages/${enc(owner)}/${enc(name)}`)); }
 /** Sell a package on EXCHANGE: `{ exchange, model, prices_money, toll_morsels, usage_terms }`. */

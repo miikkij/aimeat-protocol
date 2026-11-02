@@ -4,6 +4,29 @@
     {
       "date": "2026-11-02",
       "kind": "feature",
+      "id": "2026-11-02-see-everything-you-share-as-data-in-one-place",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "See everything you share as data, in one place",
+        "fi": "Näet kaiken jakamasi datan yhdestä paikasta"
+      },
+      "summary": {
+        "en": "One page lists every dataset you share, who reads it and whether it is up to date.",
+        "fi": "Yksi sivu listaa jokaisen jakamasi aineiston, sen lukijat ja sen, onko se ajan tasalla."
+      },
+      "body": {
+        "en": "Data you share in your profile lists every dataset you let others use: public, shared by name, for sale or in a data space. It shows who reads each one and whether it is up to date, and you stop a share from the same page. Your AI answers \"what have I shared and who reads it\" from the same list. The public library now holds knowledge and data together: signed in, you also see what is shared with you, and someone with a share link sees what their key opens. On the admin Compliance page, the data intermediation figures open the list of datasets behind each number.",
+        "fi": "Profiilin Jakamasi data -sivu listaa jokaisen aineiston, jonka annat muiden käyttöön: julkisena, nimetylle ihmiselle, myyntiin tai data-avaruuteen. Sivu kertoo, kuka aineistoa lukee ja onko se ajan tasalla, ja voit lopettaa jaon samalta sivulta. Tekoälysi vastaa samasta listasta, kun kysyt, mitä olet jakanut ja kuka sitä lukee. Julkinen kirjasto näyttää nyt tiedon ja datan yhdessä: kirjautuneena näet myös sen, mitä sinulle on jaettu, ja jakolinkin saanut näkee, mitä hänen avaimensa avaa. Ylläpidon Vaatimustenmukaisuus-sivulla datanvälityksen luvut avaavat listan aineistoista, jotka niiden takana ovat."
+      }
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "feature",
       "id": "2026-11-02-what-kind-of-material-it-is",
       "highlight": false,
       "audience": [

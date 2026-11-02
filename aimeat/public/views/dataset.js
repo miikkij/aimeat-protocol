@@ -10,13 +10,17 @@
  *   addresses, the columns from the Table Schema, how it was made and its versions, "Need more?"
  *   with a way to ask the maker, and the machine-readable links (datapackage.json, odps.yaml, DCAT).
  *
- *   ONLY A PUBLIC PACKAGE. The page reads GET /v1/datapackages/{owner}/{name} with no session, so a
- *   package nobody without an account may read answers 404 here as there; the shell gave its head
- *   (title, description, the schema.org Dataset) only for a public one (routes/portal.ts).
+ *   WHO SEES IT. The page reads GET /v1/datapackages/{owner}/{name} as the reader: with no session a
+ *   package nobody without an account may read answers 404 here as there; a signed-in reader or an
+ *   outside party opens what was shared with them. The shell gives the head (title, description, the
+ *   schema.org Dataset) only for a public one (routes/portal.ts).
  *   Made of the component kit: it passes data and never a class.
  * @structure Dataset (default) · open · producerWords · bytesWords · leadOf
  * @usage routed at /v1/dataset/<owner>/<name> by spa.html
  * @version-history
+ *   v1.2.0 — 2026-11-02 — A package shared with the reader opens too: the read carries the account's
+ *     session, or an outside party's token held from the recipient page; the library's "Open" leads
+ *     here for every data row (WP11). The head the shell writes stays public packages only.
  *   v1.1.0 — 2026-11-01 — The description is Markdown (its first paragraph is the head, the whole under
  *     "About this data"); the title, description and attribution are the reader's language; a Licence
  *     section names the licence as a link to its deed, what it lets a reader do and who to credit; the
@@ -41,7 +45,8 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Beside, Stack } from '/components/Layout.js';
 import { AskPage } from '/components/AskPage.js';
 import { Markdown } from '/components/Markdown.js';
-import { getOwner } from '/js/services/auth.js';
+import { getOwner, getJwt } from '/js/services/auth.js';
+import { partyHeaders } from '/js/services/party-session.js';
 import { d, freshWord, versionNumber } from './profile/offers/data-model.js';
 import { wordsOf, licenceOf, versionNote, transformWords, shortLicence } from './profile/offers/data-words.js';
 import { LicenceNote } from './profile/offers/data-licence.js';
@@ -50,9 +55,17 @@ import { ColumnsTab } from './profile/offers/data-product.js';
 
 const p = (key, vars) => d('dataset.' + key, vars);
 
-/** A public read with no session: the envelope's data, or null for a 404. */
+/**
+ * The read: the envelope's data, or null for a 404 or a refusal. A public package needs no session; a
+ * package shared with this reader opens with what they hold: their account's session when signed in,
+ * else an outside party's token from the recipient page (js/services/party-session.js), the reader the
+ * library listed it for (WP11).
+ */
 async function open(path) {
-  const res = await fetch(path, { headers: { Accept: 'application/json' } });
+  const jwt = getJwt();
+  const auth = jwt ? { Authorization: `Bearer ${jwt}` } : partyHeaders();
+  const res = await fetch(path, { headers: { Accept: 'application/json', ...auth } });
+  if (res.status === 403 || res.status === 401) return null;
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json())?.data ?? null;

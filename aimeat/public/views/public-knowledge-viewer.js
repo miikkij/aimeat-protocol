@@ -8,8 +8,12 @@
  *   by name. A PACKAGE is a reading room: the entries open as text with their sources named
  *   verified or unchecked, cloning as the slab when signed in, Markdown and JSON as doors, the
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
- * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
+ * @structure PublicKnowledgeViewer · DetailView · entryToMarkdown · buildFullMarkdown (the library:
+ *   views/public-knowledge-library.js)
  * @version-history
+ *   v2.6.0 -- 2026-11-02 -- The library is views/public-knowledge-library.js, the one catalogue of
+ *     knowledge and data by the reader's reach; the reading room reads with the reader's session when
+ *     signed in, so a package shared with them opens (WP11).
  *   v2.5.2 -- 2026-10-29 -- The search field is kept out of password managers (autocomplete off, data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's sign-in name into a find field.
  *   v2.5.1 -- 2026-10-27 -- Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.5.0 -- 2026-10-16 -- Each entry shows the AI label its own record says it owes (the export's
@@ -24,20 +28,19 @@
  *   v1.x — 2026-05 to 2026-08 — the card grid and the accordion detail; provenance label (TARGET-058).
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate } from '/js/format.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { AiLabel } from '/components/ai-label.js';
-import { getSession } from '/js/services/auth.js';
+import { getSession, getJwt } from '/js/services/auth.js';
 import { apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { INPUT_LIMITS } from '/js/input-limits.js';
+import BrowseView from './public-knowledge-library.js';
 
-const CONTENT_TYPES = ['idea', 'research', 'plan', 'dataset', 'document', 'tutorial', 'collection', 'article', 'story', 'fiction', 'guide'];
-const c = (key, vars) => t('knowledge.cover.' + key, vars);
+const c =(key, vars) => t('knowledge.cover.' + key, vars);
 const day = (iso) => (iso ? fmtDate(iso) : '');
 const ctWord = (ct) => (ct ? (t('knowledge.contentTypes.' + ct) || ct) : '');
 const maturityWord = (m) => (m ? (t('knowledge.maturity.' + m) || m) : '');
@@ -45,21 +48,12 @@ const synthWord = (s) => (s ? (t('knowledge.synthesis.' + s) || s) : '');
 const relWord = (r) => c('relation.' + r) || r;
 const authorName = (a) => String(a || '').split('@')[0] || '';
 
-/* ── The public endpoints ── */
+/* ── The package reads: with the reader's session when signed in, so a package shared with them opens ── */
 async function fetchPublic(path) {
-  const resp = await fetch(path);
+  const jwt = getJwt();
+  const resp = await fetch(path, jwt ? { headers: { Authorization: `Bearer ${jwt}` } } : undefined);
   if (!resp.ok) { const err = new Error(`HTTP ${resp.status}`); err.status = resp.status; throw err; }
   return resp.json();
-}
-async function discoverPackages(opts = {}) {
-  const params = new URLSearchParams();
-  if (opts.content_type) params.set('content_type', opts.content_type);
-  if (opts.tags) params.set('tags', opts.tags);
-  if (opts.sort) params.set('sort', opts.sort);
-  if (opts.page) params.set('page', String(opts.page));
-  if (opts.limit) params.set('limit', String(opts.limit));
-  const qs = params.toString();
-  return fetchPublic(`/v1/catalogue/knowledge${qs ? '?' + qs : ''}`);
 }
 const getPackageManifest = (id) => fetchPublic(`/v1/knowledge/${encodeURIComponent(id)}`);
 const getPackageReputation = (id) => fetchPublic(`/v1/knowledge/${encodeURIComponent(id)}/reputation`);
@@ -149,87 +143,6 @@ const crumbPublic = (parts, onBack) => html`
     ${parts.length ? html`<button type="button" class="og-crumb-link" onClick=${onBack}>${t('pkv.title')}</button>` : html`<span class="og-crumb-here">${t('pkv.title')}</span>`}
     ${parts.map((p, i) => html`<span key=${i}>/</span><span class="og-crumb-here">${p}</span>`)}
   </div>`;
-
-/* ── The library ── */
-function BrowseView({ onSelect }) {
-  const [packages, setPackages] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [search, setSearch] = useState('');
-  const [contentType, setContentType] = useState('');
-  const [sort, setSort] = useState('newest');
-  const [page, setPage] = useState(1);
-  const debounceRef = useRef(null);
-  const signedIn = !!getSession();
-
-  const load = useCallback(async ({ p = 1, q = search, ct = contentType, s = sort } = {}) => {
-    setLoading(true); setError(null);
-    try {
-      const result = await discoverPackages({ content_type: ct, tags: q, sort: s === 'name' ? 'name' : 'newest', page: p, limit: 20 });
-      const items = result?.data?.packages || result?.data?.items || [];
-      setPackages(prev => (p > 1 ? [...prev, ...items] : items));
-      setTotal(result?.data?.total || items.length);
-      setPage(p);
-    } catch (err) { setError(err.message); }
-    finally { setLoading(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- every input is passed in; the defaults are the current state
-  }, []);
-  useEffect(() => {
-    load({ p: 1, ct: contentType, s: sort, q: search });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the search has its own debounced path; load is stable
-  }, [contentType, sort]);
-  const onSearch = (v) => { setSearch(v); if (debounceRef.current) clearTimeout(debounceRef.current); debounceRef.current = setTimeout(() => load({ p: 1, q: v, ct: contentType, s: sort }), 400); };
-
-  const shown = useMemo(() => (sort === 'refs' ? [...packages].sort((a, b) => (b.verified_references || 0) - (a.verified_references || 0) || (b.references_count || 0) - (a.references_count || 0)) : packages), [packages, sort]);
-  const publishers = new Set(packages.map(p => authorName(p.author)));
-  const clonable = packages.filter(p => p.sharing?.allow_clone !== false).length;
-  const typesPresent = CONTENT_TYPES.filter(ct => packages.some(p => p.content_type === ct) || ct === contentType);
-
-  return html`
-    ${crumbPublic([], null)}
-    <div class="og-mast">
-      <div class="og-mast-words">
-        <h1 class="og-title poster-page-title">${t('pkv.title')}</h1>
-        <div class="og-chips">
-          <span class="og-chip">${c('pubChipPackages', { n: total || packages.length })}</span>
-          ${publishers.size ? html`<span class="og-chip">${c('pubChipPublishers', { n: publishers.size })}</span>` : null}
-          <span class="og-chip">${c('pubChipClonable', { n: clonable })}</span>
-        </div>
-        <p class="og-desc">${c('pubDesc')}</p>
-      </div>
-      <div class="og-mast-actions"><div class="og-doors">
-        ${signedIn ? html`<a class="og-door" href="/v1/profile?tab=knowledge">${c('pubMine')}</a>` : null}
-        <a class="og-door og-door--quiet" href="/v1/help#knowledge">${c('pubWhat')}</a>
-      </div></div>
-    </div>
-    <div class="kp-desk poster-row--thing">
-      <input type="search" class="kp-field" maxLength=${INPUT_LIMITS.line} value=${search}
-        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" placeholder=${c('pubSearch')} onInput=${(e) => onSearch(e.target.value)} />
-      <div class="og-choice">
-        <button type="button" class=${`og-choice-btn ${contentType === '' ? 'on' : ''}`} onClick=${() => setContentType('')}>${c('pubAll')}</button>
-        ${typesPresent.map(ct => html`<button type="button" key=${ct} class=${`og-choice-btn ${contentType === ct ? 'on' : ''}`} onClick=${() => setContentType(contentType === ct ? '' : ct)}>${ctWord(ct)}</button>`)}
-      </div>
-      <div class="og-choice">
-        ${[['newest', c('pubNewest')], ['name', c('pubByName')], ['refs', c('pubByRefs')]].map(([id, label]) => html`<button type="button" key=${id} class=${`og-choice-btn ${sort === id ? 'on' : ''}`} onClick=${() => setSort(id)}>${label}</button>`)}
-      </div>
-    </div>
-    ${error ? html`<p class="kp-error">${error}</p>` : null}
-    ${!loading && !packages.length && !error ? html`<p class="og-empty kp-pub-empty">${c('pubEmpty')}</p>` : null}
-    ${packages.length ? html`
-      <div class="kp-lib kp-lib--head"><div>${c('pubColPackage')}</div><div>${c('pubColKind')}</div><div>${c('pubColContents')}</div><div></div><div></div></div>
-      <div class="kp-lib">
-        ${shown.map(p => { const cl = p.sharing?.allow_clone !== false; return html`
-          <div class="kp-nm" key=${'n' + p.package_id}><button type="button" class="og-tbl-name" onClick=${() => onSelect(p.package_id)}>${p.name || c('untitled')}</button>${p.synthesis?.description ? html`<small>${p.synthesis.description}</small>` : null}</div>
-          <div class="kp-m" key=${'t' + p.package_id}>${[ctWord(p.content_type), maturityWord(p.maturity), p.language ? String(p.language).toLowerCase() : ''].filter(Boolean).join(' · ')}<br /><b>${authorName(p.author)}</b></div>
-          <div class="kp-m" key=${'e' + p.package_id}>${c('entriesN', { n: p.public_entries ?? p.entries_count ?? 0 })}${p.references_count ? html`<br />${c('refsVerified', { v: p.verified_references || 0, n: p.references_count })}` : null}</div>
-          <div class="kp-m" key=${'c' + p.package_id}>${cl ? html`<b>${c('clonable')}</b>` : c('pubReadable')}</div>
-          <div class="og-tbl-door" key=${'d' + p.package_id}><button type="button" class="og-door" onClick=${() => onSelect(p.package_id)}>${c('open')}</button></div>`; })}
-      </div>` : null}
-    ${loading ? html`<p class="og-empty kp-loading kp-pub-empty">${c('pubLoading')}</p>` : null}
-    ${!loading && page * 20 < total ? html`<p class="kp-more"><button type="button" onClick=${() => load({ p: page + 1, q: search, ct: contentType, s: sort })}>${t('pkv.loadMore')}</button></p>` : null}
-    <p class="kp-hint">${c('pubHint')}</p>`;
-}
 
 /* ── The reading room ── */
 function DetailView({ packageId, onBack }) {

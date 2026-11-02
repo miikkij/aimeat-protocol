@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.23.0 — 2026-11-02 — An old ?tab=offers&product=… address opens the product on "Data you share"
+ *     (redirectMovedTab), on arrival and on Back (WP11).
  *   v3.22.0 — 2026-11-01 — On a customer's node a menu item reads its `Place` words when they exist:
  *     "Tekoälysaldo" (Jouni's review of v33). "Yhdistä ChatGPT, Claude tai Grok" did not fit the menu's width, so that item keeps "Yhdistä tekoälysi".
  *   v3.21.0 — 2026-10-29 — On a customer's node (site.js customerNode()) the menu before "Show all
@@ -138,7 +140,7 @@ import { t, tOr, getLocale } from "/js/i18n.js";
 import { listApps } from "/js/services/apps.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { getMemory, createMemory } from "/js/services/memory.js";
-import { syncTabHistory } from "./landing-page.helpers.js";
+import { syncTabHistory, redirectMovedTab } from "./landing-page.helpers.js";
 import { EditProfileModal, ChangePasswordModal } from "./landing-page.modals.js";
 import { swallowed } from '/js/swallowed.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
@@ -216,6 +218,8 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   // instead. F5 is unaffected, because an open view keeps its ?tab= in the URL.
   const [openView, setOpenView] = useState(() => {
     try {
+      // An old address of an item that moved tab (?tab=offers&product=…) names its new tab first (WP11).
+      redirectMovedTab();
       const asked = canonicalTab(new URLSearchParams(window.location.search).get('tab'));
       if (asked) {
         const v = { tabId: asked, slot: 'main' };
@@ -408,6 +412,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
    * tabs you opened and finally land on Home, instead of leaving the profile. */
   useEffect(() => {
     const onPop = () => {
+      redirectMovedTab();
       const tabId = canonicalTab(new URLSearchParams(window.location.search).get('tab'));
       fromPopRef.current = true;
       try {

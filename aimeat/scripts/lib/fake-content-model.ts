@@ -16,7 +16,8 @@
  *     `payment_terms`, labelled.
  *   - propose: a `recipe` class when the item's words say "resepti" or "recipe", else none; its two
  *     properties carry labels in fi, en and es.
- * @structure contentDecideAnswer · profileAnswer · contentChatAnswer
+ * @structure contentDecideAnswer · wordLabels · profileDecideAnswer · profileTextAnswer · profileAnswer ·
+ *   contentChatAnswer
  * @usage const a = contentChatAnswer(promptText); if (a) answer with it;
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -25,7 +26,8 @@
  *     filling every property with a fixed value, which made the sandbox look as if the pipeline read
  *     an invoice wrong (Jouni's look at it).
  *   v1.3.0 — 2026-11-02 — The fingerprint prompt (profileAnswer): every section labelled from its
- *     own words.
+ *     own words; the decision model's labels (profileDecideAnswer) and the text model's headings,
+ *     claims and topics beside them (profileTextAnswer), by the same rules.
  */
 
 /** Words that make an item a member of a class, per class id. */
@@ -45,6 +47,7 @@ const CLASS_WORDS: Record<string, RegExp> = {
 export function contentDecideAnswer(body: Record<string, unknown>): Record<string, unknown> | null {
   const questions = (body.questions ?? {}) as Record<string, { type?: string }>;
   const ids = Object.keys(questions);
+  if (ids.length && ids.every((id) => /^s\d+_(genre|mark|cert|fakta|konkr|aika|toim|yks|varm)$/.test(id))) return profileDecideAnswer(body, ids);
   if (!ids.length || !ids.every((id) => id.startsWith('c_') && questions[id]?.type === 'noul')) return null;
   const state = (body.state && typeof body.state === 'object' ? body.state : {}) as Record<string, unknown>;
   const words = `${String(state.text ?? '')}\n${String(state.description ?? '')}\n${String(state.facts ?? '')}`;
@@ -54,6 +57,50 @@ export function contentDecideAnswer(body: Record<string, unknown>): Record<strin
     answers[id] = { type: 'noul', noul: re && re.test(words) ? 0.94 : 0.04 };
   }
   return { model: body.model ?? 'sandbox-decide', answers, usage: { input_tokens: 600, output_tokens: 20 } };
+}
+
+/** A section's labels from its own words, the same rules profileAnswer uses. */
+function wordLabels(words: string): { genre: string; mark: string; firm: boolean; decided: boolean } {
+  const sourced = /https?:\/\/|\blähde\b|\bsource\b/i.test(words);
+  const decided = /\b(päätettiin|decided)\b/i.test(words);
+  const factual = /\d/.test(words);
+  return {
+    genre: decided ? 'decision_or_plan' : factual || sourced ? 'fact' : 'opinion',
+    mark: sourced ? 'checkable_source' : decided ? 'person_or_meeting' : 'nothing',
+    firm: sourced || decided, decided,
+  };
+}
+
+/**
+ * The fingerprint's labels as the decision model gives them (src/services/content/profile-labels.ts):
+ * a choice per genre and mark, a five-level score per certainty and axis, from each section's words.
+ */
+function profileDecideAnswer(body: Record<string, unknown>, ids: string[]): Record<string, unknown> {
+  const state = (body.state && typeof body.state === 'object' ? body.state : {}) as { sections?: Record<string, string> };
+  const answers: Record<string, unknown> = {};
+  for (const id of ids) {
+    const [, n, what] = /^s(\d+)_(.+)$/.exec(id) ?? [];
+    const l = wordLabels(String(state.sections?.[n] ?? ''));
+    if (what === 'genre') answers[id] = { type: 'choice', choice: l.genre, probabilities: { [l.genre]: 0.9 }, confidence: 0.9 };
+    else if (what === 'mark') answers[id] = { type: 'choice', choice: l.mark, probabilities: { [l.mark]: 0.9 }, confidence: 0.9 };
+    else if (what === 'aika' || what === 'toim') answers[id] = { type: 'score', score: l.decided ? 3.5 : 1, confidence: 0.9 };
+    else answers[id] = { type: 'score', score: l.firm ? 3.5 : 1, confidence: 0.9 };
+  }
+  return { model: 'sandbox-jev', answers, usage: { input_tokens: 900, output_tokens: 0 } };
+}
+
+/** The headings, claims and topics a text model writes beside the decision model's labels. */
+function profileTextAnswer(prompt: string): string {
+  const parts = prompt.split(/=== Section (\d+) ===\n/).slice(1);
+  const sections: Array<Record<string, unknown>> = [];
+  for (let i = 0; i + 1 < parts.length; i += 2) {
+    const body = parts[i + 1];
+    const given = /^Given heading: (.*)\n/.exec(body)?.[1] ?? '';
+    const words = body.replace(/^Given heading: .*\n/, '');
+    sections.push({ n: Number(parts[i]), heading: given && given !== '(none)' ? given : `Osio ${parts[i]}`, claim: words.trim().split(/[.!?]\s/)[0].slice(0, 120), topic: 0 });
+  }
+  sections.forEach((s, i) => { s.topic = i < Math.ceil(sections.length / 2) ? 0 : 1; });
+  return JSON.stringify({ kind: 'testiaineisto', topics: ['Alkuosa', 'Loppuosa'], sections });
 }
 
 /** The JSON shape a prompt asks for, after "of this shape: ". */
@@ -128,6 +175,7 @@ function profileAnswer(prompt: string): string {
 /** The stand-in completion for a content class prompt, or null for any other prompt. */
 export function contentChatAnswer(prompt: string): string | null {
   if (prompt.startsWith('You profile a document')) return profileAnswer(prompt);
+  if (prompt.startsWith('You write the headings, one-sentence claims and topics')) return profileTextAnswer(prompt);
   if (prompt.startsWith('Describe this picture')) {
     return JSON.stringify({ altText: 'A television test card with coloured bars.', description: 'A test card: vertical colour bars over a grey background, the kind used to check a screen.', text: '' });
   }
