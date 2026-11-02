@@ -18758,6 +18758,7 @@
             "write": "Instalar, encender y quitar los complementos de navegador de tu cuenta."
           },
           "exchange": {
+            "invoke": "Usar las herramientas de las aplicaciones con los contratos que ya tienes. No abre ningún contrato nuevo.",
             "beneficiary": "Repartir parte de lo que ganas con otras cuentas, y pagarles esa parte.",
             "grant": "Dar y retirar acceso gratuito a lo que vendes, a tu costa.",
             "read": "Mirar el mercado y ver tus contratos, tus ofertas y el trabajo pendiente.",

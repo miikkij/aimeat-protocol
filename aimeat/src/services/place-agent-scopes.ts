@@ -9,13 +9,16 @@
  *   the owner (the help's sentence he accepted on 1.11 at 13.50). On crew64 a morning digest's run failed
  *   whole because one call (notify) was refused for a word its agent did not hold.
  *
- *   THE OWNER KEEPS two kinds of word. First, every word no wildcard carries (SCOPES_OUTSIDE_WILDCARD,
+ *   THE OWNER KEEPS three kinds of word. First, every word no wildcard carries (SCOPES_OUTSIDE_WILDCARD,
  *   utils/scope-coverage.ts): account security, secrets, payment credentials, permission changes,
  *   sharing groups and shares, the as-owner reads, MCP management, publishing to the internet, operator
- *   and compliance words. Second, PLACE_OWNER_KEEPS below: words a wildcard carries that belong to the
- *   same five areas. `exchange:write` is among them although aimeat_app_tool_invoke asks for it: the one
- *   word also accepts a metered contract that spends money, so calling an app tool needs the owner's
- *   grant until the two are separate words.
+ *   and compliance words. Second, every word on the task start floor (TASK_START_FLOOR,
+ *   services/agent-task-rules.ts), read from that list so the two cannot drift: an agent holding one
+ *   never starts a task by itself, so a default that held one left every scheduled run queued for the
+ *   owner (crew76 on guestkoey3wfwk, 2.11; Jouni's option A, 10.25). The owner gives one per agent.
+ *   Third, PLACE_OWNER_KEEPS below: words a wildcard carries that belong to the same five areas.
+ *   aimeat_app_tool_invoke asks exchange:invoke, which is in the default; exchange:write, which opens a
+ *   paid contract, is on the floor.
  *
  *   IN THE RECORD, ONCE. The words go into the agent's own `defaultScopes` the first time it is approved
  *   or gets a token here (routes/agents/device-auth-approve.ts, routes/auth.ts, and
@@ -27,21 +30,21 @@
  *   widenForPlace(storage, config, agent)
  * @usage const scopes = await widenForPlace(storage, config, agent); // then mint with scopes
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The default leaves out every task start floor word, and carries exchange:invoke (Jouni, 10.25).
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { TOOL_SCOPES } from '../tool-catalog/scopes.js';
 import { exceedsCeiling, isOutsideWildcard, scopeIsCovered } from '../utils/scope-coverage.js';
+import { TASK_START_FLOOR } from './agent-task-rules.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
 import { logger } from '../utils/logger.js';
 
 /** Words a wildcard carries that the owner keeps on a store place: payments, sharing, permission changes. */
 export const PLACE_OWNER_KEEPS: readonly string[] = [
     'agent:write',            // approve a new agent, or another agent's device
-    'commerce:buy',           // spend the owner's money
     'commerce:sell',          // put something on sale in the owner's name
-    'exchange:write',         // accept a metered contract, which spends money, and sell a data package
     'exchange:beneficiary',   // say where the owner's earnings are paid
     'organism:invite',        // bring a person into the owner's shared places
     'consent:manage',         // let someone else read the owner's data
@@ -53,10 +56,11 @@ const PLACE_DEFAULT_KEY = 'place.agent-default-applied';
 /** The words an agent has by default on a store place, or null elsewhere. */
 export function placeAgentScopes(config: AimeatConfig): string[] | null {
     if (!(config.siteLinks?.purchasePlan ?? '').trim()) return null;
+    const floor = new Set(TASK_START_FLOOR.map(f => f.scope));
     const words = new Set<string>();
     for (const list of Object.values(TOOL_SCOPES)) {
         for (const w of [list].flat()) {
-            if (typeof w === 'string' && w && !isOutsideWildcard(w) && !PLACE_OWNER_KEEPS.includes(w)) words.add(w);
+            if (typeof w === 'string' && w && !isOutsideWildcard(w) && !floor.has(w) && !PLACE_OWNER_KEEPS.includes(w)) words.add(w);
         }
     }
     // The operator's ceiling on what an agent may hold (scopes.max_agent_scopes) still holds.

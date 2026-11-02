@@ -31,6 +31,7 @@
  * @structure refuseAppToolInvokeWithoutWord(req, res, config, storage)
  * @usage if (await refuseAppToolInvokeWithoutWord(req, res, config, storage, toolName)) return;
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The route asks exchange:invoke, which exchange:write still covers (Jouni, 10.25).
  *   v1.0.1 — 2026-10-22 — The ecosystem app's refusal sentence in plain words; the words it holds moved
  *     to `details.held` (check:plain-language).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v72).
@@ -50,7 +51,7 @@ import { APP_TOOL_INVOKE_WORD, appToolInvokeKept } from '../services/app-tool-in
 import { logger } from '../utils/logger.js';
 
 /**
- * Refuse an agent or ecosystem caller without exchange:write. True when the refusal was sent and the
+ * Refuse an agent or ecosystem caller without exchange:invoke (exchange:write covers it). True when the refusal was sent and the
  * route must stop; false when the call goes on. Asked before anything is metered, paced or run.
  */
 export async function refuseAppToolInvokeWithoutWord(
@@ -76,7 +77,7 @@ export async function refuseAppToolInvokeWithoutWord(
       baseUrl: config.baseUrl, agentGaii: auth.sub, tool: `the app tool "${toolName}"`, words: [APP_TOOL_INVOKE_WORD],
     });
     // The word written out, so test/unit/rest-scope-keep-working.test.ts reads it in its inline scan.
-    denyScope403(req, res, ['exchange:write'],
+    denyScope403(req, res, ['exchange:invoke'],
       `Scope "${APP_TOOL_INVOKE_WORD}" required to call an app tool, because the call can spend your person's contract budget or pacing. `
       + `Agent scopes: [${held.join(', ')}]. ${ask}`);
     return true;

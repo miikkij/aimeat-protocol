@@ -20490,6 +20490,7 @@
             "write": "Install, switch on and remove the browser add-ons in your account."
           },
           "exchange": {
+            "invoke": "Call app tools under the contracts you already have. It opens no new contract.",
             "beneficiary": "Share part of what you earn with other accounts, and pay those shares out.",
             "grant": "Give and withdraw free access to the things you sell, at your cost.",
             "read": "Browse the marketplace and see your contracts, offers and pending work.",

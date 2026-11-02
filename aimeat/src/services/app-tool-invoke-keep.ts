@@ -35,6 +35,7 @@
  *   await keepAppToolInvokeOnce(storage, config, { existedBefore });            // boot
  *   if (await appToolInvokeKept(storage, config.nodeId, auth.sub, auth.scopes)) // routes/webmcp-invoke-gate.ts
  * @version-history
+ *   2026-11-02 — APP_TOOL_INVOKE_WORD is exchange:invoke, split out of exchange:write, which covers it.
  *   2026-10-27 — secaudit2026oct26: the cutoff is never later than the rule's first try (keptBefore).
  *   v1.1.0 — 2026-10-27 — appToolInvokeKept also asks that the principal under the listed id is the
  *     one the step listed: same owner, and made before the step's time. A new agent under a released
@@ -50,8 +51,8 @@ import { isSharedAnonymous } from './rest-scope-gates-migration.js';
 
 /** The record under `system@<nodeId>` that lists the kept principals. */
 export const APP_TOOL_INVOKE_KEEP_KEY = 'migrations.app-tool-invoke-exchange-write.keep';
-/** The word the route asks of an agent or an ecosystem caller. */
-export const APP_TOOL_INVOKE_WORD = 'exchange:write';
+/** The word the route asks of an agent or an ecosystem caller. exchange:write still covers it (utils/scope-coverage.ts). */
+export const APP_TOOL_INVOKE_WORD = 'exchange:invoke';
 
 /** One principal the step kept, and the scope list it held then. */
 export interface KeptInvoker { id: string; owner: string; kind: 'agent' | 'ecosystem'; scopes: string[] }

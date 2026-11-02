@@ -18,6 +18,7 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-11-02 — exchange:invoke, split out of exchange:write: calling an app tool.
  *   2026-11-01 — party:manage, outside every wildcard: outside parties and the named shares to them
  *     (plan doc-mvwxcas3dom3, D2.7).
  *   2026-10-29 — agent:permissions-add, outside every wildcard: adding permissions it holds to another
@@ -285,7 +286,9 @@ export const SCOPE_DOMAINS = [
   // server of the agent's own choosing, and storing a credential there, is a human act.
   { key: 'mcp',       permissions: ['read', 'use', 'manage'] },
   { key: 'notifications', permissions: ['send'] },
-  { key: 'exchange',  permissions: ['read', 'write', 'grant', 'beneficiary'] },
+  // exchange:invoke calls an app tool under what is already accepted; exchange:write, which covers it,
+  // opens a paid contract and holds the agent's tasks for the owner (agent-task-rules.ts).
+  { key: 'exchange',  permissions: ['read', 'invoke', 'write', 'grant', 'beneficiary'] },
   // commerce:psp — write or destroy the payment credentials money is paid out through.
   // commerce:beneficiary-verify — record a beneficiary as verified, which is what makes a payout
   //   possible. Kept apart from the rest because a provider who could open this gate for their own

@@ -36,7 +36,7 @@
  *     code and no request (commercial-1c and aimeat-protocol-4e, the new model); aimeat.io is the
  *     node's queueOrigin, and the place's chat is the second way in when the node has it. Step 1
  *     says to pick an agent with full access on aimeat.io's consent page: the queue's tool needs
- *     exchange:write and ext:invoke.
+ *     exchange:write and ext:invoke (since 2026-11-02 exchange:invoke, which exchange:write covers).
  *   v1.0.1 — 2026-11-01 — The first state names the operator: the operator's agent takes the request
  *     to the queue, not the place. The node calls it 'waiting-for-operator' ('received' before).
  *   v1.0.0 — 2026-11-01 — Initial (Jouni, 1.11 16.22, via Grok and commercial-1c; the node's routes

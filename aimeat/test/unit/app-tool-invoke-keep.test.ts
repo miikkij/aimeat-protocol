@@ -143,7 +143,7 @@ describe('the app-tool gate', () => {
         expect(r.refused).toBe(true);
         expect(r.status).toBe(403);
         expect(r.body.error.code).toBe('SCOPE_DENIED');
-        expect(r.body.error.message).toContain('exchange:write');
+        expect(r.body.error.message).toContain('exchange:invoke');
     });
 
     it('refuses a kept agent whose person removed a word it held', async () => {
