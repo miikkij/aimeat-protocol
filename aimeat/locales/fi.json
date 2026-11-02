@@ -16383,6 +16383,15 @@
       "lineTarget": "{who} {what}: {target}",
       "failed": "(ei onnistunut)",
       "showReads": "Näytä myös tietojen lukemiset ja rutiinikirjaukset",
+      "run": {
+        "finished": "{who} sai työnsä valmiiksi ({steps})",
+        "failed": "{who} ei saanut työtään valmiiksi ({steps})",
+        "worked": "{who} teki työtä ({steps})",
+        "steps_one": "{n} vaihe",
+        "steps": "{n} vaihetta",
+        "failedSteps_one": "· {n} vaihe ei onnistunut",
+        "failedSteps": "· {n} vaihetta ei onnistunut"
+      },
       "did": {
         "sentRequest": "lähetti Rakennamme kanssasi -pyynnön",
         "checkedRequest": "tarkisti Rakennamme kanssasi -pyynnön tilan",
