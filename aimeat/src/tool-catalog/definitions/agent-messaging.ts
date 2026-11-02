@@ -231,7 +231,9 @@ export const agentMessagingTools = [
         annotations: { title: 'Home Feed', readOnlyHint: true },
         // The word GET /v1/home/feed asks: the rows derive from the owner's own records.
         scope: 'memory:read',
-        surfaces: ['agent', 'service'],
+        // A start tool of the node's chat: switched off, the test model spent its turn looking for it
+        // and stopped before answering "what is on my home" (crew70 on guestkoey3wfwk, 2.11).
+        surfaces: ['agent', 'service', 'chat'],
         // No input: the newest hundred rows, the answer GET /v1/home/feed gives the page.
         input: {},
     },
