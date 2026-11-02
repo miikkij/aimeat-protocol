@@ -8,14 +8,16 @@
  *   exchange:write, so an agent without ext:invoke was offered the tool and then refused by the route.
  *
  *   Checked on the tool catalog, with the running version passed in, as the MCP surface decides it:
- *     - the declared words are exchange:write and ext:invoke;
+ *     - the declared words are exchange:invoke and ext:invoke, and exchange:write still covers the first;
  *     - at 4.0.0 both decide whether the tool is offered: an agent with both words gets it, an agent
  *       with one of them does not;
- *     - before 4.0.0 only exchange:write decides, and a call without ext:invoke is counted (deferred),
+ *     - before 4.0.0 only exchange:invoke decides, and a call without ext:invoke is counted (deferred),
  *       as the extension action route counts it;
  *     - a tool whose `scopeEnforcedFrom` is one release still defers every word together.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-tool-invoke-scope.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The declared word is exchange:invoke, split out of exchange:write (Jouni, 10.25);
+ *     a caller holding exchange:write is still offered the tool.
  *   v1.0.0 — 2026-10-13 — Initial (wish-aimeat-app-tool-invoke-ilmoittaa-vain-exchange-write-vaikka-).
  */
 import { describe, it, expect } from 'vitest';
@@ -28,28 +30,32 @@ const TOOL = 'aimeat_app_tool_invoke';
 const OLD = '3.26.1';
 const NEW = '4.0.0';
 
-describe('aimeat_app_tool_invoke declares exchange:write and ext:invoke', () => {
+describe('aimeat_app_tool_invoke declares exchange:invoke and ext:invoke', () => {
     it('the release that enforces ext:invoke is the REST scope gates release, 4.0.0', () => {
         expect(REST_SCOPE_GATES_ENFORCED_IN).toBe(NEW);
     });
 
-    it('the declared scopes include ext:invoke beside exchange:write', () => {
-        expect(requiredScopesForTool(TOOL).sort()).toEqual(['exchange:write', 'ext:invoke']);
+    it('the declared scopes include ext:invoke beside exchange:invoke', () => {
+        expect(requiredScopesForTool(TOOL).sort()).toEqual(['exchange:invoke', 'ext:invoke']);
     });
 
     it('at 4.0.0 both words decide: a caller with both is offered the tool, a caller with one is not', () => {
         expect(deferredScopesForTool(TOOL, NEW)).toEqual([]);
-        expect(enforcedScopesForTool(TOOL, NEW).sort()).toEqual(['exchange:write', 'ext:invoke']);
+        expect(enforcedScopesForTool(TOOL, NEW).sort()).toEqual(['exchange:invoke', 'ext:invoke']);
+        expect(scopeAllowsTool(['exchange:invoke', 'ext:invoke'], TOOL, NEW)).toBe(true);
+        // Who held the old word keeps the tool: exchange:write covers exchange:invoke.
         expect(scopeAllowsTool(['exchange:write', 'ext:invoke'], TOOL, NEW)).toBe(true);
+        expect(scopeAllowsTool(['exchange:invoke'], TOOL, NEW)).toBe(false);
         expect(scopeAllowsTool(['exchange:write'], TOOL, NEW)).toBe(false);
         expect(scopeAllowsTool(['ext:invoke'], TOOL, NEW)).toBe(false);
         expect(scopeAllowsTool(['exchange:*', 'ext:*'], TOOL, NEW)).toBe(true);
         expect(scopeAllowsTool(['*'], TOOL, NEW)).toBe(true);
     });
 
-    it('before 4.0.0 only exchange:write decides, and ext:invoke is deferred (counted when missing)', () => {
+    it('before 4.0.0 only exchange:invoke decides, and ext:invoke is deferred (counted when missing)', () => {
         expect(deferredScopesForTool(TOOL, OLD)).toEqual(['ext:invoke']);
-        expect(enforcedScopesForTool(TOOL, OLD)).toEqual(['exchange:write']);
+        expect(enforcedScopesForTool(TOOL, OLD)).toEqual(['exchange:invoke']);
+        expect(scopeAllowsTool(['exchange:invoke'], TOOL, OLD)).toBe(true);
         expect(scopeAllowsTool(['exchange:write'], TOOL, OLD)).toBe(true);
         expect(scopeAllowsTool(['ext:invoke'], TOOL, OLD)).toBe(false);
         expect(scopeAllowsTool(['exchange:write', 'ext:invoke'], TOOL, OLD)).toBe(true);
