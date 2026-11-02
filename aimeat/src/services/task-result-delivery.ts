@@ -23,6 +23,8 @@
  *   deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
+ *   v1.0.2 — 2026-11-02 — The bell's excerpt is plain text: the bell does not render Markdown, and it showed
+ *     "**…**" and "*…" (c9's crew67 round); the email keeps the Markdown.
  *   v1.0.1 — 2026-11-02 — The heading's date in English is en-GB when the person set no region.
  *   v1.0.0 — 2026-11-02 — Initial. The agent's notify tool is taken out when a schedule asks for
  *     delivery (services/delivery-crew.ts).
@@ -124,6 +126,21 @@ async function mayEmail(storage: Storage, config: AimeatConfig, ownerGhii: strin
   return out.kept.length > 0;
 }
 
+/**
+ * The result as the bell shows it, which is plain text: emphasis, code marks and heading marks come
+ * off, and a link keeps its words. List numbers and line breaks stay, so the excerpt still reads as a
+ * list. The email carries the Markdown as written.
+ */
+export function plainText(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]\([^)\s]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/(\*\*|__)(.+?)\1/g, '$2')
+    .replace(/(^|[\s(])[*_]([^*_\n]+)[*_](?=[\s).,:;!?]|$)/gm, '$1$2')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/[ \t]+\n/g, '\n');
+}
+
 /** The body with a leading heading line (Markdown # or a whole **bold** line) taken off. */
 function withoutHeading(text: string): string {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
@@ -142,6 +159,7 @@ export async function deliverTaskResult(
     if (!entry) return;
     const result = await resultOf(storage, task, message);
     const body = withoutHeading(result.text).slice(0, MAX_BODY);
+    const bellText = plainText(body);
     if (!body) {
       logger.warn(`[delivery] task ${task.id} finished with no result to deliver`);
       return;
@@ -157,7 +175,7 @@ export async function deliverTaskResult(
 
     await notify(storage, ownerGhii, {
       type: 'agent_result', title: heading,
-      body: body.length > BELL_EXCERPT ? `${body.slice(0, BELL_EXCERPT)}…` : body,
+      body: bellText.length > BELL_EXCERPT ? `${bellText.slice(0, BELL_EXCERPT)}…` : bellText,
       link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
     });
 
