@@ -33,6 +33,9 @@
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
+ *   v1.4.2 — 2026-11-02 — The sentence asking the model to convert tool answers' UTC times is gone: on
+ *     crew72 it labelled UTC numbers as local without converting them. The home feed gives each row its
+ *     local time itself (services/home-feed.ts `at_local`), and the model copies it.
  *   v1.4.1 — 2026-11-02 — The clock line says times in tool answers are UTC and go to the person in their
  *     zone, written as the line writes them (c9's crew71 round: "01:55 UTC" from the home feed, and
  *     "5:55 AM" in Spanish, which writes 24-hour time).
@@ -153,7 +156,7 @@ export function clockLine(prefs: DisplayPrefs, pageZone: unknown, locale: Locale
     const zone = prefs.timezone ?? (isValidTimeZone(pageZone) ? pageZone : null);
     const at = formatForPerson({ ...prefs, region: prefs.region ?? locale, timezone: zone }, iso, { dateStyle: 'full', timeStyle: 'short' });
     return zone
-        ? `It is now ${at} where the person is (time zone ${zone}). Use this local time when they ask the time or the date, never UTC. Times in tool answers are UTC: give each to the person in this time zone, and write a time as this line writes it.`
+        ? `It is now ${at} where the person is (time zone ${zone}). Use this local time when they ask the time or the date, never UTC, and write a time as this line writes it.`
         : `It is now ${at}; the person's own time zone is not known, so say that a time you give is UTC.`;
 }
 

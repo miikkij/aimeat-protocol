@@ -28,6 +28,9 @@
  * @usage
  *   import { readHomeFeed, homeFeedAnswer } from '../services/home-feed.js';
  * @version-history
+ *   v2.4.0 — 2026-11-02 — Each row carries `at_local`, its time on the person's clock (their zone, else
+ *     the one their browser sent with a chat turn), and on a sold node an agent's short name is replaced
+ *     by its shown name (crew72: UTC times and "Aamukatsaus-agentin (morning-digest)").
  *   v2.3.0 — 2026-11-02 — homeFeedAnswer gives the rows as the home shows them (homeFeedAsShown): an agent's shown name in `agent_shown_name`, no row saying a node-resident agent (the chat, a basic agent) joined or left, and no AI cost row on a sold node, which the home already hid.
  *   v2.2.0 — 2026-11-02 — homeFeedAnswer: the answer GET /v1/home/feed and aimeat_home_feed both give, with the live knocking row.
  *   v2.1.0 — 2026-10-22 — readHomeFeed takes the reader and projects each recorded row for them (services/account-event-view.ts): a task row's title and decline reason only for the owner in person, an app grant holding task:read and the task's own agent; every other reader keeps the row and its `withheld` fields are named (secaudit 2026-10, v89).
@@ -44,6 +47,8 @@ import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { readAccountEvents, recordAccountEvent } from './account-events.js';
 import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from './account-event-view.js';
 import { isNodeResidentAgent } from './node-resident-agent.js';
+import { displayPrefsFor, formatForPerson } from './display-prefs.js';
+import { personZone } from './person-zone.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
@@ -59,6 +64,8 @@ export interface FeedItem {
     data?: Record<string, string>;
     /** The `data` fields this reader may not see and that were taken out (services/account-event-view.ts). */
     withheld?: string[];
+    /** `at` on the person's clock and in their format ("2.11. klo 4.10"), when the node knows their zone. */
+    at_local?: string;
 }
 
 /**
@@ -153,15 +160,37 @@ export async function homeFeedAsShown(
     // The agents the node runs itself (the chat, the basic agents) did not join: the person never
     // connected them, and no other page lists them as joined (crew71: "concierge" among the connected).
     const resident = new Set(agents.filter(isNodeResidentAgent).map(a => a.name));
+    // Each row's time on the person's clock, in their own format, when the node knows their zone: the
+    // one they chose, else the one their browser last sent with a chat turn (services/person-zone.ts).
+    // A model asked to convert UTC did not (crew72: "kello 02 : 10" for 04.10).
+    const prefs = await displayPrefsFor(storage, owner);
+    const zone = prefs.timezone ?? personZone(owner);
+    const region = prefs.region ?? prefs.locale ?? config.siteLinks?.defaultLocale ?? undefined;
+    const localAt = (at: string) => zone
+        ? formatForPerson({ ...prefs, region: region ?? null, timezone: zone }, at, { day: 'numeric', month: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : undefined;
     const items = answer.items
         .filter(i => !(sold && i.kind === 'ai_spend_daily'))
         .filter(i => !(MEMBERSHIP_KINDS.has(i.kind) && resident.has(i.data?.name ?? i.data?.agent ?? '')))
         .map(i => {
+            const at_local = localAt(i.at);
+            const row = at_local ? { ...i, at_local } : i;
             const short = i.data?.agent || i.data?.name;
             const name = short ? shown.get(short) : undefined;
-            return name && name !== short ? { ...i, data: { ...i.data, agent_shown_name: name } } : i;
+            if (!name || name === short) return row;
+            // On a sold node the short name is not a name the buyer has seen, so it goes (crew72: the
+            // chat wrote "Aamukatsaus-agentin (morning-digest)"); elsewhere both stay.
+            if (sold) return { ...row, data: withShownName(i.data!, short!, name) };
+            return { ...row, data: { ...i.data, agent_shown_name: name } };
         });
     return { ...answer, items, total: items.length };
+}
+
+/** A row's data with the agent's short name replaced by its shown name, in every field that held it. */
+function withShownName(data: Record<string, string>, short: string, name: string): Record<string, string> {
+    const out: Record<string, string> = { agent_shown_name: name };
+    for (const [k, v] of Object.entries(data)) out[k] = v === short ? name : v;
+    return out;
 }
 
 /** Which marker becomes which row, for an account that predates the recorded feed. */
