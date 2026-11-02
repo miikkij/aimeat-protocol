@@ -46,11 +46,14 @@
  * @structure AUDIENCE_RECORD_PREFIX · DATAPACKAGE_AUDIENCE_STEP_KEY · audienceRecordKey ·
  *   recordPackageAudience · recordPackageWithdrawal · recordPublicConfirmation · PublicConfirmation ·
  *   publicConfirmationOf · DATAPACKAGE_POINTER_STATE_STEP_KEY · pointerStateInForce · TrustedAudience ·
- *   trustedAudienceOf · trustedPackageOf · packageNamespaces · recordDatapackageAudiencesOnce
+ *   trustedAudienceOf · trustedPackageOf · RecordedAudience · recordedAudiencesOf · packageNamespaces ·
+ *   recordDatapackageAudiencesOnce
  * @usage
  *   const trusted = await trustedAudienceOf(storage, nodeId, ownerGhii, name, pointer);
  *   if (!(await datapackageReadable(storage, ownerGhii, trusted.visibility, reader))) return null;
  * @version-history
+ *   v1.3.0 -- 2026-11-02 -- recordedAudiencesOf: the recorded audience and withdrawal of many packages in
+ *     one bulk read, for the node-wide catalogue listing (secaudit2026nov02d round 13).
  *   v1.2.0 -- 2026-11-01 -- The record carries the owner's confirmation of a public package from personal
  *     data (`personalPublicConfirmed`, ./personal-guard.ts): recordPackageAudience writes it from the
  *     publish that carried it and keeps it on every later version; TrustedAudience answers it, and the
@@ -290,6 +293,47 @@ export async function trustedPackageOf(storage: Storage, nodeId: string, ownerGh
     const pointer = file ? pointerOf(ownerGhii, latestKey(name), file.data) : null;
     if (!pointer) return null;
     return { pointer, trusted: await trustedAudienceOf(storage, nodeId, ownerGhii, name, pointer) };
+}
+
+/** What a listing of every package takes from one package's record: its audience and its withdrawal. */
+export interface RecordedAudience {
+    visibility: string;
+    withdrawnAt?: string;
+}
+
+/** Records read per bulk read in recordedAudiencesOf. */
+const RECORD_READ_CHUNK = 500;
+
+/**
+ * The recorded audience of many packages in one bulk read, for a listing of every package of the node
+ * (./catalogue-facts.ts allDatasetFacts), keyed `${ownerGhii}|${name}`. A package with no record reads
+ * as private, as trustedAudienceOf reads it. Null before the boot step has recorded the existing
+ * packages: the listing then keeps the audience it read before.
+ */
+export async function recordedAudiencesOf(
+    storage: Storage, nodeId: string, pkgs: ReadonlyArray<{ ownerGhii: string; name: string }>,
+): Promise<Map<string, RecordedAudience> | null> {
+    if (!(await audienceRuleInForce(storage, nodeId))) return null;
+    const found = new Map<string, unknown>();
+    if (storage.getMemoryByKeysAnyOwner) {
+        const keys = [...new Set(pkgs.map(p => audienceRecordKey(p.name)))];
+        for (let i = 0; i < keys.length; i += RECORD_READ_CHUNK) {
+            for (const r of await storage.getMemoryByKeysAnyOwner(keys.slice(i, i + RECORD_READ_CHUNK))) found.set(`${r.ownerGaii}|${r.key}`, r.value);
+        }
+    } else {
+        for (const p of pkgs) {
+            const r = await storage.getMemory(p.ownerGhii, audienceRecordKey(p.name));
+            if (r) found.set(`${r.ownerGaii}|${r.key}`, r.value);
+        }
+    }
+    const out = new Map<string, RecordedAudience>();
+    for (const p of pkgs) {
+        const rec = parseRecord(found.get(`${p.ownerGhii}|${audienceRecordKey(p.name)}`));
+        out.set(`${p.ownerGhii}|${p.name}`, rec
+            ? { visibility: rec.visibility, ...(rec.withdrawnAt ? { withdrawnAt: rec.withdrawnAt } : {}) }
+            : { visibility: 'private' });
+    }
+    return out;
 }
 
 /** A stored pointer, or null when it is not readable JSON: such a package stays unreadable, as every read already answers it. */
