@@ -87,7 +87,7 @@
         "docs/security/verification-matrix.md",
         "aimeat/src/services/sign-in-policy.ts"
       ],
-      "digest": "sha256:7d3b09e7b2cf7bfc891a035e"
+      "digest": "sha256:9246e5793f5d051d3a395013"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -299,7 +299,7 @@
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
       "aimeat/src/middleware/cors.ts": "0f742801d6902ab5",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
-      "docs/security/verification-matrix.md": "34899889202d5b60",
+      "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105"
     },
     "08-threat-model.md": {

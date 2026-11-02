@@ -106,10 +106,6 @@ What the repository does not answer. Each one names who can answer it; most are 
 - OPEN: What does a call that needs vision do when neither the person nor the operator set a vision model: refuse, or use the text model? The maintainer can answer.
 - OPEN: Has the project measured a `local` provider on another host with vLLM or TGI under concurrent load (streaming, tool calls, embeddings)? The maintainer can answer.
 
-### [07 Security](07-security.md)
-
-- OPEN: What is the date and scope of the most recent outside penetration test, if any? The repository records internal audits and probe sessions only. (the maintainer)
-
 ### [08 Threat model](08-threat-model.md)
 
 - OPEN: Does the maintainer have a formal threat model (for example STRIDE per component) beyond `docs/security/threat-model.md`, and is it shareable under NDA? (the maintainer named in `.github/SECURITY.md`)

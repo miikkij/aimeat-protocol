@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.2.0 (commit 2c1cddba9) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit b4e3837a4) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -199,7 +199,8 @@ What the repository records, without numbers it does not state:
 - The node does not terminate TLS; the reverse proxy must.
 - EUDIW verification is blocked at startup until holder binding and replay defences exist ([Threat model](../security/threat-model.md)).
 - The audit reports with exploit detail are not public, so an outside reviewer can verify the fixes only through the tests and the code.
+- No commissioned outside penetration test is recorded. An adopting organisation's own security team has tested its production node; the organisation is not named and its report is not published ([verification matrix](../security/verification-matrix.md#what-the-probe-sessions-established)).
 
 ## Open questions
 
-- OPEN: What is the date and scope of the most recent outside penetration test, if any? The repository records internal audits and probe sessions only. (the maintainer)
+- None open on this page.
