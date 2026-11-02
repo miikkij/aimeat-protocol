@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-11-02 — The silent bridge answers login_required with reason two_step_setup_required for a session the required two-step policy ends on refresh, and mints no grant from it (secaudit2026nov02d round 13).
  *   2026-11-02 — GET /v1/app-grants/authorize from an app's draft origin reads the draft when the app was never published; it answered 404 APP_NOT_FOUND, so the owner could not sign in to a draft (services/app-origin-target.ts appRecordForAuthorize).
  *   2026-10-31 — GET /v1/app-grants/authorize carries the app's `lang` (en, fi, es) to the consent page (v27 P1).
  *   2026-10-31 — The owner's own portfolio origin gets its memory:read token, on the silent bridge and on refresh, only while the page served now was written by a writer with memory:read or allowed by the owner; otherwise consent_required with reason portfolio_read_waits and the request id, and 403 PORTFOLIO_READ_WAITS on refresh (services/portfolio-read-hold.ts; audit H-9, f-2026aug-h-9).
@@ -605,12 +606,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation. The same check
-    // the refresh makes (checkRefreshSession: the account's age and a reused token too, AUTH-1).
+    // the refresh makes (checkRefreshSession: the account's age, a reused token and the required two-step policy).
     const raw = readRefreshCookie(req, config);
-    const check = raw ? await checkRefreshSession(storage, hashToken(raw)) : null;
+    const check = raw ? await checkRefreshSession(storage, hashToken(raw), Date.now(), config) : null;
     // Include the resolved app so the SDK can open the consent popup (which prompts apex login) even
     // when no one is logged in — the user logs in there, then approves, in one flow.
-    if (!check?.ok) return reply({ ok: false, error: 'login_required', app: grantTarget, app_name: grantName });
+    if (!check?.ok) return reply({ ok: false, error: 'login_required', ...(check?.reason === 'two-step-setup-required' ? { reason: 'two_step_setup_required' } : {}), app: grantTarget, app_name: grantName });
     const owner = check.session.owner;
 
     // AUDIT H-9: a portfolio target gets the published ceiling and nothing more, before any branch

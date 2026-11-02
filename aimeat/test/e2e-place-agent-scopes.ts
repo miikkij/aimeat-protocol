@@ -10,6 +10,9 @@
  *   not a store place changes nothing.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=place-agent-scopes
  * @version-history
+ *   2026-11-02 — An agent another agent approves holds no place word its approver lacks, at approval or
+ *     at its first token mint; one a full-access agent approves still has the place's tools
+ *     (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -187,6 +190,56 @@ async function mcpSession(token: string) {
             const tok = await signIn(narrow);
             const r = await json('/v1/secrets', { headers: auth(tok) });
             assert(r.status === 403, `secrets ${r.status}`);
+        });
+
+        // An agent approved by another agent of the owner holds no word its approver lacks
+        // (secaudit2026nov02d round 13, place-agent-scopes/agent-approved-sibling-widened-at-first-mint).
+        const held = async (name: string) => {
+            const list = await json(`/v1/agents?owner=${OWNER}`, { headers: auth(owner) });
+            const rec = (list.body.data.agents as any[]).find(a => a.name === name);
+            return (rec.default_scopes ?? rec.scopes ?? rec.defaultScopes) as string[];
+        };
+        const refreshAgent = async (tok: string) => {
+            const r = await json('/v1/auth/refresh', { method: 'POST', headers: auth(tok) });
+            assert(r.status === 200 && typeof r.body?.data?.token === 'string', `refresh ${r.status}: ${JSON.stringify(r.body?.error)}`);
+            return r.body.data.token as string;
+        };
+
+        await test('DENIAL: an agent another agent approves gets no place word its approver lacks, at approval or at its first token mint', async () => {
+            const approver = await makeAgent(owner, 'approver', ['agent:write', 'memory:read']);
+            await signIn(approver);
+            // The owner narrows the approver back after it had the place's default.
+            const set = await json('/v1/agents/approver/scopes', { method: 'PATCH', headers: auth(owner), body: JSON.stringify({ scopes: ['agent:write', 'memory:read'] }) });
+            assert(set.status === 200, `narrowing ${set.status}: ${JSON.stringify(set.body?.error)}`);
+            const approverTok = await signIn(approver);
+            assert(JSON.stringify([...(claims(approverTok).scopes ?? [])].sort()) === '["agent:write","memory:read"]', `approver ${JSON.stringify(claims(approverTok).scopes)}`);
+            const start = await json('/v1/agents/device-authorize', { method: 'POST', headers: auth(approverTok), body: JSON.stringify({ owner: OWNER, agent_name: 'approved', scopes: ['memory:read'] }) });
+            assert(start.status === 200 && start.body?.data?.auto_approved === true, `device-authorize ${start.status}: ${JSON.stringify(start.body?.data ?? start.body?.error)}`);
+            const poll = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: start.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+            assert(poll.status === 200 && typeof poll.body?.access_token === 'string', `device-token ${poll.status}`);
+            const bound = ['agent:write', 'memory:read'];
+            const outside = (words: string[] | undefined) => (words ?? []).filter(w => !bound.includes(w));
+            assert(outside(claims(poll.body.access_token).scopes).length === 0, `the device token: ${JSON.stringify(claims(poll.body.access_token).scopes)}`);
+            const refreshed = await refreshAgent(poll.body.access_token);
+            assert(outside(claims(refreshed).scopes).length === 0, `the first mint added ${JSON.stringify(outside(claims(refreshed).scopes))}`);
+            assert(outside(await held('approved')).length === 0, `the record holds ${JSON.stringify(outside(await held('approved')))}`);
+            assert((claims(refreshed).scopes ?? []).includes('memory:read'), 'the approved agent keeps the word it asked for');
+        });
+
+        await test('an agent a full-access agent approves still has the place\'s tools after its first token mint', async () => {
+            const forge = await makeAgent(owner, 'forge', ['*']);
+            const forgeTok = await signIn(forge);
+            const start = await json('/v1/agents/device-authorize', { method: 'POST', headers: auth(forgeTok), body: JSON.stringify({ owner: OWNER, agent_name: 'forged', scopes: ['memory:read'] }) });
+            assert(start.status === 200 && start.body?.data?.auto_approved === true, `device-authorize ${start.status}: ${JSON.stringify(start.body?.data ?? start.body?.error)}`);
+            const poll = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: start.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+            assert(poll.status === 200 && typeof poll.body?.access_token === 'string', `device-token ${poll.status}`);
+            const tok = await refreshAgent(poll.body.access_token);
+            const scopes = claims(tok).scopes ?? [];
+            for (const word of ['notifications:send', 'memory:write', 'task:write']) assert(scopes.includes(word), `${word} is missing: ${JSON.stringify(scopes)}`);
+            assert(!scopes.includes('agent:write'), 'agent:write stays with the owner');
+            const n = await notify(tok);
+            assert(n.body?.ok === true, `notify ${n.status}: ${JSON.stringify(n.body?.error)}`);
+            assert((await held('forged')).includes('notifications:send'), 'the record says what it got');
         });
     } finally {
         await setPlan('');

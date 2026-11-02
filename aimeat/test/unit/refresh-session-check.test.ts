@@ -4,6 +4,8 @@
  *   session that the refresh and the app-grant silent bridge share (secaudit 2026-10, AUTH-1). The
  *   bridge's own copy checked revocation and expiry only; these are the cases it let through.
  * @version-history
+ *   2026-11-02 — The required two-step policy, which the check reads when the config is passed
+ *     (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-05 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -55,5 +57,31 @@ describe('checkRefreshSession', () => {
         expect(await checkRefreshSession(storageWith(null, owner), 'x', NOW)).toMatchObject({ ok: false, reason: 'unknown' });
         expect(await checkRefreshSession(storageWith({ ...baseSession, revoked: true }, owner), 'current', NOW)).toMatchObject({ ok: false, reason: 'revoked' });
         expect(await checkRefreshSession(storageWith({ ...baseSession, idleExpiresAt: iso(NOW - 1) }, owner), 'current', NOW)).toMatchObject({ ok: false, reason: 'expired' });
+    });
+});
+
+describe('checkRefreshSession with the required two-step policy (secaudit2026nov02d round 13)', () => {
+    const policy = (twoStepRequired: 'off' | 'operators' | 'everyone') => ({ twoStepRequired, passwordSignIn: 'on' as const, nodeId: 'n1' });
+    function storageWithAccount(ghii: Record<string, unknown>, passkeys: unknown[] = []): Storage {
+        return {
+            getSessionByRefreshHash: async () => baseSession,
+            getOwner: async () => owner,
+            getGHII: async () => ghii,
+            listPasskeysByOwner: async () => passkeys,
+        } as unknown as Storage;
+    }
+    const passwordOnly = { ownerName: 'alice' };
+
+    it('refuses a covered account with no TOTP, passkey or provider link', async () => {
+        expect(await checkRefreshSession(storageWithAccount(passwordOnly), 'current', NOW, policy('everyone')))
+            .toMatchObject({ ok: false, reason: 'two-step-setup-required' });
+    });
+
+    it('holds for an enrolled account, an account with a passkey, an uncovered account, and with the policy off', async () => {
+        const armed = { ownerName: 'alice', totpEnabled: true, totpSecret: 'S' };
+        expect(await checkRefreshSession(storageWithAccount(armed), 'current', NOW, policy('everyone'))).toMatchObject({ ok: true });
+        expect(await checkRefreshSession(storageWithAccount(passwordOnly, [{ id: 'pk' }]), 'current', NOW, policy('everyone'))).toMatchObject({ ok: true });
+        expect(await checkRefreshSession(storageWithAccount(passwordOnly), 'current', NOW, policy('operators'))).toMatchObject({ ok: true });
+        expect(await checkRefreshSession(storageWithAccount(passwordOnly), 'current', NOW, policy('off'))).toMatchObject({ ok: true });
     });
 });

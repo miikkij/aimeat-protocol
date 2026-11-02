@@ -11,6 +11,10 @@
  * @structure scopesExceedNodeMax(config, scopes) · approveDeviceAuth(...)
  * @usage import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
  * @version-history
+ *   2026-11-02 — On a store place an agent approver passes on the place's words its own scopes cover, at
+ *     approval, and the new agent is marked as having had its default, so its first token mint no longer
+ *     adds the full default (secaudit2026nov02d round 13,
+ *     place-agent-scopes/agent-approved-sibling-widened-at-first-mint).
  *   v1.4.0 — 2026-11-02 — On a store place an agent the owner approves in person gets the place's tools by
  *     default (services/place-agent-scopes.ts; Jouni 2.11 07.42); an agent approver still grants only
  *     what it holds.
@@ -135,9 +139,11 @@ export async function approveDeviceAuth(
    * out for anyone.
    */
   // On a store place an agent the owner approves in person has the place's tools by default
-  // (services/place-agent-scopes.ts; Jouni 2.11 07.42). An agent approver grants only what it holds.
+  // (services/place-agent-scopes.ts; Jouni 2.11 07.42). An agent approver grants only what it holds:
+  // the place's words its own scopes cover, here, and the agent is marked as having had its default,
+  // so its first token mint adds nothing beyond that bound (secaudit2026nov02d round 13).
   // Once per agent, so a re-approval does not undo what the owner took away since.
-  const placeDefault = async (scopes: string[]) => (approverAgentScopes ? scopes : applyPlaceDefault(storage, config, gaii, scopes));
+  const placeDefault = async (scopes: string[]) => applyPlaceDefault(storage, config, gaii, scopes, approverAgentScopes);
   let grantedScopes: string[];
 
   // An AGENT approver passes on no more clearance than it holds, the clearance half of the rule

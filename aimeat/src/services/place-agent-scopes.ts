@@ -29,10 +29,13 @@
  *   the frame the agent kept its old words for up to an hour (crew77 on guestkoey3wfwk, 2.11). PLACE_DEFAULT_KEY remembers the agents that had it, so a word the owner takes away
  *   afterwards stays away: the owner's own narrowing is the decision that counts. The door's intersection
  *   of token and record (auth/effective-scopes.ts) is unchanged. Elsewhere nothing changes.
- * @structure PLACE_OWNER_KEEPS · placeAgentScopes(config) · applyPlaceDefault(storage, config, gaii, held) ·
+ * @structure PLACE_OWNER_KEEPS · placeAgentScopes(config) · applyPlaceDefault(storage, config, gaii, held, within?) ·
  *   widenForPlace(storage, config, agent)
  * @usage const scopes = await widenForPlace(storage, config, agent); // then mint with scopes
  * @version-history
+ *   2026-11-02 — applyPlaceDefault takes `within`, the approving agent's scopes: an agent another agent
+ *     approves gets the place's words its approver holds, at approval and once, and no more at its first
+ *     mint (secaudit2026nov02d round 13, place-agent-scopes/agent-approved-sibling-widened-at-first-mint).
  *   v1.2.0 — 2026-11-02 — Enrolment applies the default, and the routes announce a widening to the live connector (crew77).
  *   v1.1.0 — 2026-11-02 — The default leaves out every task start floor word, and carries exchange:invoke (Jouni, 10.25).
  *   v1.0.0 — 2026-11-02 — Initial.
@@ -79,8 +82,16 @@ const parseApplied = (v: unknown): Record<string, string> =>
  * `held` with the place's default added, the first time this agent asks; `held` as it is off a store
  * place and every later time. A record that cannot be read or written leaves `held`, so a failure never
  * widens anything and the next sign-in tries again.
+ *
+ * `within`: the scopes of the AGENT that approves this one (routes/agents/device-auth-approve.ts). Only
+ * the place's words that list covers are added, and the agent is marked as having had its default, so
+ * its later mints add nothing beyond the approver's bound. Without the mark at approval the full
+ * default arrived at the agent's first mint (secaudit2026nov02d round 13,
+ * place-agent-scopes/agent-approved-sibling-widened-at-first-mint).
  */
-export async function applyPlaceDefault(storage: Storage, config: AimeatConfig, gaii: string, held: readonly string[]): Promise<string[]> {
+export async function applyPlaceDefault(
+    storage: Storage, config: AimeatConfig, gaii: string, held: readonly string[], within?: readonly string[],
+): Promise<string[]> {
     const place = placeAgentScopes(config);
     if (!place) return [...held];
     let first = false;
@@ -95,7 +106,7 @@ export async function applyPlaceDefault(storage: Storage, config: AimeatConfig, 
     }
     if (!first) return [...held];
     const out = [...held];
-    for (const w of place) if (!scopeIsCovered(out, w)) out.push(w);
+    for (const w of place) if (!scopeIsCovered(out, w) && (!within || scopeIsCovered(within, w))) out.push(w);
     return out;
 }
 

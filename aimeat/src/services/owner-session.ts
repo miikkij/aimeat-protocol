@@ -12,6 +12,10 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-11-02 — The required two-step test moved into checkRefreshSession (reason
+ *     'two-step-setup-required', with the config passed), so the app-grant silent bridge refuses the
+ *     session the refresh ends; the refresh answers as before (secaudit2026nov02d round 13,
+ *     app-grants.ts:app-grant-silent:two-step-policy-not-applied).
  *   2026-11-01 — SESSION_HINT_COOKIE, set and cleared with the refresh cookie, so a signed-out
  *     visitor's page asks no refresh at boot (WP10e B15).
  *   2026-11-02 — A refresh of an account the required two-step policy covers, with no TOTP, passkey or
@@ -292,7 +296,13 @@ export async function establishOwnerSession(
 }
 
 /** Why a refresh session does not hold. */
-export type RefreshSessionRefusal = 'unknown' | 'revoked' | 'account-disabled' | 'account-gone' | 'expired' | 'reused';
+export type RefreshSessionRefusal = 'unknown' | 'revoked' | 'account-disabled' | 'account-gone' | 'expired' | 'reused'
+  | 'two-step-setup-required';
+
+/** The config the sign-in policy test of checkRefreshSession reads. */
+type SessionPolicy = Pick<AimeatConfig, 'twoStepRequired' | 'passwordSignIn' | 'nodeId'>;
+
+type RefreshSessionCheck ={ ok: true; session: SessionRecord; previous: boolean } | { ok: false; session: SessionRecord | null; reason: RefreshSessionRefusal };
 
 /**
  * Whether the refresh session behind a presented token holds, read-only: the one check the refresh
@@ -301,11 +311,39 @@ export type RefreshSessionRefusal = 'unknown' | 'revoked' | 'account-disabled' |
  * and expiry only, so a session outliving its account, or a stolen previous token past its grace
  * window, still approved apps there (secaudit 2026-10, AUTH-1).
  *
+ * With `policy` (the node's config), a session that holds by every other test is refused with
+ * 'two-step-setup-required' when the required two-step policy covers its account and the account has
+ * no TOTP, no passkey and no identity provider link (services/sign-in-policy.ts). Both callers pass
+ * it, so the bridge mints no app grant from a session the refresh ends (secaudit2026nov02d round 13).
+ *
  * `previous` is true when the token is the one just rotated away, inside the grace window.
  */
 export async function checkRefreshSession(
   storage: Storage, presentedHash: string, now = Date.now(),
-): Promise<{ ok: true; session: SessionRecord; previous: boolean } | { ok: false; session: SessionRecord | null; reason: RefreshSessionRefusal }> {
+  policy?: SessionPolicy,
+): Promise<RefreshSessionCheck> {
+  const check = await checkSessionHolds(storage, presentedHash, now);
+  if (check.ok && policy && await twoStepEndsSession(storage, policy, check.session)) {
+    return { ok: false, session: check.session, reason: 'two-step-setup-required' };
+  }
+  return check;
+}
+
+/**
+ * Required two-step sign-in (services/sign-in-policy.ts): whether a session of a covered account with
+ * no code app, no passkey and no identity provider link ends. Nothing is read while the policy is off.
+ */
+async function twoStepEndsSession(
+  storage: Storage, policy: SessionPolicy, session: SessionRecord,
+): Promise<boolean> {
+  if (policy.twoStepRequired === 'off' || isExternalPrincipal(session.gaii)) return false;
+  if (!twoStepCovers(policy, await storage.getOwner(session.owner))) return false;
+  const ghii = await storage.getGHII(`${session.owner}@${policy.nodeId}`);
+  return !!ghii && !await hasStrongWayIn(storage, ghii);
+}
+
+/** The session tests of checkRefreshSession that need no config. */
+async function checkSessionHolds(storage: Storage, presentedHash: string, now: number): Promise<RefreshSessionCheck> {
   const session = await storage.getSessionByRefreshHash(presentedHash);
   if (!session) return { ok: false, session: null, reason: 'unknown' };
   if (session.revoked) return { ok: false, session, reason: 'revoked' };
@@ -362,7 +400,7 @@ export async function refreshOwnerSession(
 
   const presentedHash = hashToken(rawToken);
   const now = Date.now();
-  const check = await checkRefreshSession(storage, presentedHash, now);
+  const check = await checkRefreshSession(storage, presentedHash, now, config);
   if (!check.ok) {
     // A refusal that names a session ends it (the cookie's row), except one already revoked.
     if (check.session && check.reason !== 'revoked') await storage.revokeSession(check.session.sessionId);
@@ -384,24 +422,13 @@ export async function refreshOwnerSession(
       case 'account-gone': return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'The account this session was made for no longer exists' };
       case 'expired': return { ok: false, status: 401, code: 'SESSION_EXPIRED', message: 'Session expired — please log in again' };
       case 'reused': return { ok: false, status: 401, code: 'SESSION_REVOKED', message: 'Refresh token reuse detected' };
+      // Required two-step sign-in: the session ended above, so the person signs in again and enrols.
+      case 'two-step-setup-required': return { ok: false, status: 403, code: TWO_STEP_SETUP_REQUIRED,
+        message: 'The operator of this server now requires two-step sign-in for this account. Sign in again to set it up.' };
     }
   }
   const session = check.session;
   const absolute = session.absoluteExpiresAt ? Date.parse(session.absoluteExpiresAt) : 0;
-
-  // Required two-step sign-in (services/sign-in-policy.ts): a session of a covered account with no
-  // code app, no passkey and no identity provider link ends here, so the person signs in again and
-  // enrols. Nothing is read while the policy is off.
-  if (config.twoStepRequired !== 'off' && !isExternalPrincipal(session.gaii)
-      && twoStepCovers(config, await storage.getOwner(session.owner))) {
-    const ghii = await storage.getGHII(`${session.owner}@${config.nodeId}`);
-    if (ghii && !await hasStrongWayIn(storage, ghii)) {
-      await storage.revokeSession(session.sessionId);
-      clearRefreshCookie(req, res);
-      return { ok: false, status: 403, code: TWO_STEP_SETUP_REQUIRED,
-        message: 'The operator of this server now requires two-step sign-in for this account. Sign in again to set it up.' };
-    }
-  }
 
   // The presented token matched the PREVIOUS hash, inside the grace window.
   if (check.previous) {

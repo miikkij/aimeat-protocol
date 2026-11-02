@@ -9683,6 +9683,11 @@ paths:
         `invalid_scope` is answered before the session is read (one word outside GET
         /v1/app-grants/scopes refuses the whole list, whoever is signed in) and carries `app`
         (owner/filename), `app_name` and `unknown` (the ungrantable words, space-separated).
+        The session is checked as `POST /v1/auth/refresh` checks it: when the operator's required
+        two-step sign-in (`auth.two_step_required`) covers the account and the account has no
+        authenticator code, no passkey and no identity provider link, the answer is `login_required`
+        with `reason: two_step_setup_required` and no grant, so the app opens the visible sign-in,
+        where the person sets up two-step sign-in.
 
         **The owner's own app asks after all** for the scopes its owner's grant lacks when another
         account published its live version (a developer with the publisher or full right) or the
