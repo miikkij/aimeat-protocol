@@ -25859,7 +25859,12 @@
     "stopped": "Me detuve aquí porque esto tardó demasiado y mi respuesta no está terminada. Di \"continúa\" y sigo desde aquí, o pregunta de nuevo por partes más pequeñas.",
     "appReady": "Tu aplicación está lista. Ábrela aquí: {{url}}",
     "toolsNotConnected": "No pude conectar con tus herramientas de AIMEAT, así que no empecé. Inténtalo de nuevo en un momento.",
-    "noAnswer": "Esta vez no llegó ninguna respuesta. Envía tu mensaje otra vez y lo intento de nuevo."
+    "noAnswer": "Esta vez no llegó ninguna respuesta. Envía tu mensaje otra vez y lo intento de nuevo.",
+    "at": {
+      "today": "hoy a las {{time}}",
+      "yesterday": "ayer a las {{time}}",
+      "other": "el {{date}} a las {{time}}"
+    }
   },
   "explain": {
     "open": "Explicación: {term}",

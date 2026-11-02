@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.68.1 — 2026-11-02 — No change in this file. The kit's shell gives a phone a Menu entry that
+ *     opens every page of a side-navigation app, and the side column scrolls when it is taller than
+ *     the window (aimeat-atelier/workbench.css v0.3.2); the version moves with it.
  *   v0.68.0 — 2026-10-30 — No CSS change. The kit's JavaScript adds ornament sets
  *     (ornamentSet, ORNAMENT_SET_IDS), which paint with the figures' existing rules; the version
  *     moves with it.

@@ -2,10 +2,10 @@
   "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
   "skills": {
     "aimeat-writing": {
-      "digest": "sha256:198b0965fc25d9fabf43943c",
-      "decision": "ran",
-      "on": "2026-11-01",
-      "note": "opus (judge opus), 3 runs per case per arm: commit-message with 1.00 / without 1.00 (0.00); finnish-ui-copy with 1.00 / without 0.83 (+0.17; natural-finnish judge FAIL in 2 of 3 without-runs, 0 of 3 with-runs); operator-help-line with 1.00 / without 0.83 (+0.17; does-and-costs and keeps-the-term FAIL in 1 of 3 without-runs); mean +0.11, USD 2.32; after the data intermediation mode words row (WP10d); Jouni approved the run 2026-11-01"
+      "digest": "sha256:bb7696abff45dd5a14ede4f2",
+      "decision": "skipped",
+      "on": "2026-11-02",
+      "note": "two concept-table rows and a Changes line in references/language-context.md, the words the home cards and the digest email already ship; read against en/fi/es locales, no paid eval; the Chief of Staff for Jouni, 2026-11-02 07.37, under the ruling of 2026-11-01 18.36"
     },
     "aimeat-ai-capabilities": {
       "digest": "sha256:cd5753fef8b4cb9592d229b8",

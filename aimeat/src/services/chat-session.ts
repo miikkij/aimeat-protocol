@@ -452,7 +452,7 @@ export async function* runChatTurn(
     // The person's local date and time for the turn note: the model's own clock is UTC (crew68).
     const clock = clockLine(await displayPrefsFor(storage, gaii), opts.timezone, locale, now);
     // The same zone for what the node writes for this person's chat, such as the home feed's local times.
-    notePersonZone(ownerName, opts.timezone);
+    notePersonZone(ownerName, opts.timezone, locale);
 
     await appendTurn(storage, gaii, threadId, {
         role: 'user', text, at: now,
