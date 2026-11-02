@@ -17081,6 +17081,7 @@
       "workflowRunFailed": "{name} pysähtyi kesken.",
       "toolFirstUse": "{app} käytti työkalua {tool} ensimmäistä kertaa.",
       "toolPaid": "{app} maksoi {amount} työkalun {tool} käytöstä.",
+      "toolPaidBuyer": "Maksoit {amount} (sovellustyökalu)",
       "checkoutCompleted": "Ostit kohteen {what} hintaan {amount}.",
       "checkoutCancelled": "Peruit oston.",
       "aiSpendDaily": "AI maksoi {amount} päivänä {day}.",

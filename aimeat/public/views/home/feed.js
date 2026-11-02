@@ -12,7 +12,8 @@
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
  *   2026-11-02: On a node the store sold, an amount or a day the server wrote as text is shown in the
- *     place's own format ("12,50 €", "1.11.2026"), through money() and date() (CoS 04.12).
+ *     place's own format ("12,50 €", "1.11.2026"), through money() and date() (CoS 04.12). An app
+ *     tool's charge reads "Maksoit 0,50 $ (sovellustyökalu)" in its own currency (CoS 04.40).
  *   2026-11-02: On a node the store sold, a row names an agent as the person sees it, says a new agent
  *     plainly ("Uusi agentti on käytössä: <nimi>") and leaves out the day's AI cost in dollars
  *     (shownLine, isBookkeeping; the away card's rules, commercial's crew64 round). Other nodes as before.
@@ -326,6 +327,11 @@ export function shownLine(item, shownName) {
     ...(typeof raw.day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.day) ? { day: date(raw.day) } : {}),
   };
   item = { ...item, data: d };
+  // A charge an app made for a tool is the buyer's own payment, in the currency it was made in, said
+  // the same way in every language (CoS 04.40: "Maksoit 0,50 $ (sovellustyökalu)").
+  if (item.kind === 'app_tool_paid' && d.amount) {
+    return tr('home.feed.toolPaidBuyer', 'You paid {amount} (app tool)').replace('{amount}', d.amount);
+  }
   if (item.kind === 'agent_connected') {
     const name = shownName(d.name || d.agent || '');
     return name ? tr('home.away.agentNew', 'A new agent is at work: {name}').replace('{name}', name) : '';
