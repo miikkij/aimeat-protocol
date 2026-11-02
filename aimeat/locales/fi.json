@@ -12187,6 +12187,8 @@
   "notiftext.approval_living_ai_spend.body": "{writer} loi elävän dokumentin ”{document}”. Dokumentti päivittyy tekoälysi avulla, ja sinä maksat sen omalla avaimellasi tai tekoälysaldostasi. {writer} ei itse saa käyttää tekoälyäsi, joten päivitys odottaa sinun päätöstäsi. Jos sallit, dokumentti päivittyy aikataulunsa mukaan. Jos et salli, tekoäly ei päivitä sitä, eikä rahaa kulu.",
   "notiftext.approval_company_page_write.title": "{who} pyytää lupaa muuttaa yrityksesi {company} verkkosivua",
   "notiftext.approval_company_page_write.body": "{writer} yritti tallentaa yrityksellesi {company} uuden verkkosivun. Kaikki näkevät tämän sivun yrityksen osoitteessa. {writer} saa tallentaa tiedostojasi, mutta se ei saa muuttaa yritystesi verkkosivuja. Jos sallit, {writer} voi tästä eteenpäin muuttaa ja poistaa tämän yrityksen verkkosivun. Jos et salli, sivu pysyy ennallaan.",
+  "notiftext.approval_mcp_capability_use.title": "{who} pyytää, että käyttäjän {publisher} työkalu saa käyttää kirjautumistasi palvelimella {server}",
+  "notiftext.approval_mcp_capability_use.body": "Käyttäjän {publisher} kyvykkyys ”{capability}” käyttää palvelimen {server} työkalua {tool}. Palvelimelle {server} jokainen kirjautuu omalla tilillään, joten työkalu toimisi siellä sinun tililläsi ja sinun nimissäsi. Jos sallit, ”{capability}” käyttää kirjautumistasi, kun sinä, agenttisi tai sovelluksesi käytätte sitä. Jos et salli, se ei toimi, eikä mitään lähetetä.",
   "notiftext.approval_refinery_definition.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
   "notiftext.approval_refinery_definition.body": "Postinjalostamo hakee sähköpostisi ja tallentaa viestit työtilaan. Muutoksen jälkeen se lukee postilaatikkoa {mailbox} ja tallentaa jokaisen viestin työtilaan {workspace}. {who} ei saa tehdä tätä muutosta yksin, joten muutos odottaa hyväksyntääsi. Jos et salli, mikään ei muutu.",
   "notiftext.approval_refinery_definition_text.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
@@ -28961,6 +28963,17 @@
         "high": "Sivu pysyy ennallaan, eikä sovellukselta tai agentilta kysytä tästä uudelleen.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos teet yrityksesi verkkosivun tällä sovelluksella. Jos et tiedä, miksi sovellus haluaa muuttaa sivua, älä salli."
+      },
+      "approval_mcp_capability_use": {
+        "title": "Toisen tilin työkalu pyytää lupaa käyttää omaa kirjautumistasi",
+        "short": "Toisen tilin julkaisema kyvykkyys käyttää työkalua palvelimella, jolle kirjaudut omalla tililläsi.",
+        "what": "Joillekin MCP-palvelimille jokainen kirjautuu omalla tilillään, esimerkiksi omalla Jira-tilillään. Kyvykkyyden julkaissut tili valitsi, minkä työkalun se siellä käyttää. Kun käytät kyvykkyyttä, työkalu toimii sinun nimissäsi ja sinun tililläsi. Siksi sinulta kysytään ensin.",
+        "lowLabel": "Jos sallit",
+        "low": "Kyvykkyys käyttää työkaluaan sinun kirjautumisellasi, kun sinä, agenttisi tai sovelluksesi käytätte sitä.",
+        "highLabel": "Jos et salli",
+        "high": "Kyvykkyys ei toimi, eikä mitään lähetetä. Kun sitä käytetään seuraavan kerran, sinulta kysytään uudelleen.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos tunnet tilin, joka julkaisi kyvykkyyden, ja haluat sen työkalun toimivan omalla tililläsi. Jos et tiedä, miksi se tarvitsee kirjautumistasi, älä salli."
       },
       "approval_schedule_instruction": {
         "title": "Joku muutti ajastusta",

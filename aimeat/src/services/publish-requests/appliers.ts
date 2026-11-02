@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.22.0 — 2026-11-02 — Another account's capability running a tool on a remote MCP server with the
+ *     account holder's own sign-in, allowed by them (apply-mcp-capability-use.ts; secaudit2026nov02d round 13).
  *   v1.21.0 — 2026-11-01 — A writer without company:write changing a company's page through the file
  *     routes, allowed by the owner (apply-company-page-write.ts; secaudit2026oct31w2 round 11).
  *   v1.20.0 — 2026-10-31 — A living document refreshing itself with the owner's AI, set up by a writer
@@ -91,6 +93,7 @@ import { applyCortexHolder } from './apply-cortex-holder.js';
 import { applyConnectorProgram, declineConnectorProgram } from './apply-connector-program.js';
 import { applyLivingAiSpend } from './apply-living-ai-spend.js';
 import { applyCompanyPageWrite } from './apply-company-page-write.js';
+import { applyMcpCapabilityUse } from './apply-mcp-capability-use.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -126,6 +129,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'connector-program': applyConnectorProgram,
   'living-ai-spend': applyLivingAiSpend,
   'company-page-write': applyCompanyPageWrite,
+  'mcp-capability-use': applyMcpCapabilityUse,
 };
 
 /**
