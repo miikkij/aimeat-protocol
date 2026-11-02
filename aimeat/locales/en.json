@@ -16163,9 +16163,10 @@
       "invitedNamed": "An organism called {name} was made on {host} for your request. It is one shared place for you, your AI and the builders.",
       "invited": "An organism was made on {host} for your request. It is one shared place for you, your AI and the builders.",
       "acceptTo": "Accept the invitation in your email. It went to {email}.",
-      "acceptAccount": "Accept the invitation in your {host} account. It waits on the Shared places page.",
+      "acceptAccount": "The invitation went to your {host} account, on its Shared places page. Accept it there, if you have not done so yet.",
       "acceptAccountButton": "Open the invitation",
       "follow": "Follow the work on {host}.",
+      "followButton": "Open it on {host}",
       "connectThere": "Connect your AI to {host} too, the same way as here: open Connect your AI on {host}, pick your AI and follow the steps on the page. At the end you approve the connection.",
       "connectThereButton": "Connect your AI there",
       "doneTitle": "Your agent is ready and working.",
@@ -28009,7 +28010,8 @@
     },
     "stopped": "I stopped here because this took too long, and my answer is not finished. Say \"continue\" and I go on from here, or ask again in smaller parts.",
     "appReady": "Your app is ready. Open it here: {{url}}",
-    "toolsNotConnected": "I could not connect to your AIMEAT tools, so I did not start. Try again in a moment."
+    "toolsNotConnected": "I could not connect to your AIMEAT tools, so I did not start. Try again in a moment.",
+    "noAnswer": "No answer came this time. Send your message again, and I will try once more."
   },
   "explain": {
     "open": "Explain: {term}",

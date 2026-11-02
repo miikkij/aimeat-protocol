@@ -32,6 +32,8 @@
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
+ *   v1.3.0 — 2026-11-02 — noAnswerText(): the line for a turn that ended with no words and no work
+ *     (crew60: a build request turn ended in six seconds with an empty answer, and the page showed nothing).
  *   v1.2.9 — 2026-11-01 — A refused build request is told to the person, never replaced by a proposal of
  *     an agent of this place (crew55: the chat did that after a failed send).
  *   v1.2.8 — 2026-11-01 — The build request sentence moves ahead of the new-agent one and names one call,
@@ -252,6 +254,11 @@ export function progressText(locale: Locale, step: ProgressStep): string {
 /** The line the node writes when even the answer phase ran out. */
 export function stoppedText(locale: Locale): string {
     return createT(locale)('chatTurn.stopped');
+}
+
+/** The line the node writes when a turn ended with no words and no work: the person sees that, not nothing. */
+export function noAnswerText(locale: Locale): string {
+    return createT(locale)('chatTurn.noAnswer');
 }
 
 /**

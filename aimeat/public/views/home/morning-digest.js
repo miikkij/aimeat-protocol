@@ -13,17 +13,18 @@
  * @structure MorningDigestOffer({ visit }) · DIGEST_NAME
  * @usage <${MorningDigestOffer} visit=${visit} />
  * @version-history
+ *   v1.0.1 — 2026-11-02 — The answer is written through visits.js patchOffers, the one writer of `home.offers`.
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { customerNode } from '/js/site.js';
 import { startAgent } from '/js/services/agent-draft.js';
-import { useShared, invalidateShared } from '/views/surface/shared-read.js';
+import { useShared } from '/views/surface/shared-read.js';
+import { OFFERS_PATH, patchOffers } from './visits.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { Band } from '/components/Band.js';
 import { Note } from '/components/Note.js';
@@ -34,8 +35,6 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 const fill = (s, vars) => Object.entries(vars).reduce((out, [k, v]) => out.split(`{${k}}`).join(String(v)), s);
 
 export const DIGEST_NAME = 'morning-digest';
-const OFFERS_KEY = 'home.offers';
-const OFFERS_PATH = `/v1/memory/${OFFERS_KEY}?soft=1`;
 const AGENT_PATH = `/v1/home/agents?agent=${DIGEST_NAME}`;
 const CRON = '0 7 * * *';
 
@@ -53,15 +52,7 @@ function purposeFor(work) {
 }
 
 /** Write the person's answer to the offer, keeping what else the record holds. */
-async function rememberOffer(answer) {
-  const read = await api(OFFERS_PATH);
-  const cur = read?.data?.value && typeof read.data.value === 'object' ? read.data.value : {};
-  await api('/v1/memory', {
-    method: 'POST',
-    body: JSON.stringify({ key: OFFERS_KEY, value: { ...cur, digest: answer, digestAt: new Date().toISOString() }, visibility: 'private' }),
-  });
-  await invalidateShared('home-offers', OFFERS_PATH);
-}
+const rememberOffer = (answer) => patchOffers({ digest: answer, digestAt: new Date().toISOString() });
 
 /** The card, or nothing: not a store's node, not read yet, already answered, or the agent exists. */
 export function MorningDigestOffer({ visit }) {
