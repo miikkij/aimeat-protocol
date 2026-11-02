@@ -13568,6 +13568,7 @@
     "cfg_consent_audit_retention_days": "Conservar la auditoría (días)",
     "cfg_consent_share_max_days": "Duración máxima de un acceso compartido con una parte externa (días)",
     "cfg_consent_party_reads_per_minute": "Lecturas por minuto de una parte externa",
+    "cfg_consent_party_purchases_per_hour": "Compras que una dirección puede iniciar por hora",
     "cfg_consent_data_intermediation": "Servicio de intermediación de datos (UE 2022/868)",
     "cfg_consent_party_self_registration": "Registro en aplicaciones sin una cuenta",
     "cfg_dataspace_enabled": "Ofrecer paquetes de datos a espacios de datos",
@@ -13785,6 +13786,7 @@
     "cfgDesc_dataspace_participant_id": "El id de participante de este servidor en un espacio de datos. Vacío (el valor predeterminado): el did:web de la dirección pública de este servidor, cuyo documento está en /.well-known/did.json.",
     "cfgDesc_dataspace_tck_mode": "Ejecuta el kit de pruebas de conformidad del Dataspace Protocol contra este servidor: añade los conjuntos de datos y los acuerdos del kit y recorre sus escenarios. Solo funciona en un servidor de prueba o sandbox con una dirección local; un servidor público lo ignora.",
     "cfgDesc_consent_share_max_days": "Cuánto tiempo puede un propietario compartir un producto de datos con una parte externa con nombre.",
+    "cfgDesc_consent_party_purchases_per_hour": "Cuántas compras de un paquete de datos puede iniciar una dirección en una hora sin cuenta ni clave de parte. Pasado el límite, el servidor rechaza las siguientes hasta que termine la hora. Una parte externa que vuelve a comprar con su clave no cuenta. 0 significa sin límite.",
     "dataOut": {
       "dspTitle": "Dataspace Protocol ahora",
       "dspState": "Estado",

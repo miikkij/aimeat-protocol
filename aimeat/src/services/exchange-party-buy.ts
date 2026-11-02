@@ -32,23 +32,39 @@
  *
  *   WHERE IT LIVES. One record per provider per month, `party-purchases.<yyyy-mm>` (service-owned,
  *   utils/reserved-keys.ts), written on its version; the purchase id names the provider and the month,
- *   so a later call finds it without an index. A month keeps at most 2000 purchases.
+ *   so a later call finds it without an index. A month takes at most 2000 purchases that are paid or
+ *   still waiting for their payment; an opening that expired unpaid does not count, and the record
+ *   keeps only the newest 500 of those.
+ *
+ *   A FAILED DELIVERY. When a step after the collect fails, what this attempt wrote is undone (the
+ *   contract goes back to what it was, a share it made ends, a party it made is removed), the payment
+ *   goes back through the account checkout's refund helper with the seller's payment settings, and the
+ *   buyer reads what the rail did (commerce/undelivered-payment.ts). A refunded payment is kept on the
+ *   purchase, so the same payment cannot complete it again.
  * @structure PartyPurchase · PURCHASE_TTL_MS · openPartyPurchase · completePartyPurchase · readPartyPurchase
  * @usage
  *   const opened = await openPartyPurchase(deps, offeringId, body, renewalCtx);
  *   const done = await completePartyPurchase(deps, purchaseId, { handler: 'test.money', instrument: 'x' });
  * @version-history
+ *   v1.1.0 — 2026-11-02 — secaudit2026nov02d round 13: a failed delivery undoes the contract top-up, the
+ *     share and the party it made; the refund goes through refundCollected with the seller's payment
+ *     settings, the buyer is told it was refunded only when it was, and an unreturned payment is
+ *     recorded for the seller and the operator; a refunded payment does not complete the purchase
+ *     again; an opening that expired unpaid does not count toward the month's cap.
  *   v1.0.1 — 2026-11-01 — The card page handler is refused with 409 PROVIDER_TAKES_NO_CARD before
  *     anything is written when the provider has no Stripe account (it answered 500 and left an open
  *     purchase); a card page Stripe refuses removes the purchase and answers Stripe's refusal (WP10d).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.4).
  */
 import { randomBytes } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, ConsentRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import { getOffering, type Offering } from './exchange-market.js';
-import { createEntitlement, readContractForCall, type PricingSpec, type DatapackageSurface } from './metered-entitlements.js';
+import {
+    createEntitlement, readContractForCall, persistEntitlement, revokeEntitlement,
+    type MeteredEntitlement, type PricingSpec, type DatapackageSurface,
+} from './metered-entitlements.js';
 import { PER_MONTH_SECONDS } from './exchange-datapackage.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
 import { getPaymentHandler, PaymentError } from '../commerce/payment-handlers.js';
@@ -59,11 +75,12 @@ import { bookSessionlessSale } from '../commerce/session-service.js';
 import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../commerce/stripe-checkout.js';
 import { TEST_MONEY_HANDLER_ID } from '../commerce/test-money-handler.js';
 import { readPsp } from '../commerce/psp-record.js';
+import { refundCollected, refundSentence, recordUndeliveredPayment } from '../commerce/undelivered-payment.js';
 import { isValidEmail } from '../utils/email-validator.js';
 import { grantConsent } from './consent-write.js';
 import { PARTY_NAME_RE, partyRefOf, partyView, type PartyKind, type PartyRecord } from './parties/contract.js';
 import { newPartyKey, newPartyKeyId, newPartyUid } from './parties/keys.js';
-import { insertParty, findPartyByUid } from './parties/store.js';
+import { insertParty, findPartyByUid, removeParty } from './parties/store.js';
 import { connectionFileOf, isLiveShare, partySharesOf, setShareMeta, sharePatternOf, shareMetaOf, shareView } from './parties/shares.js';
 import type { PartyContext } from './parties/verify.js';
 import { emitChange } from './event-bus.js';
@@ -72,6 +89,8 @@ import { logger } from '../utils/logger.js';
 /** How long an open purchase waits for its payment. */
 export const PURCHASE_TTL_MS = 60 * 60 * 1000;
 const MAX_PER_MONTH = 2000;
+/** How many openings that expired unpaid a month's record keeps (the newest); they do not count toward MAX_PER_MONTH. */
+const EXPIRED_KEPT = 500;
 const HANDLERS = [STRIPE_CHECKOUT_HANDLER_ID, TEST_MONEY_HANDLER_ID];
 
 export interface PartyPurchase {
@@ -98,7 +117,12 @@ export interface PartyPurchase {
     partyUid?: string;
     entitlementId?: string;
     shareId?: string;
+    /** Tracking codes of payments refunded after a failed delivery: a collect that answers one again is not a payment. */
+    refundedTrackingCodes?: string[];
 }
+
+/** Whether a purchase takes one of the month's slots: paid (or being paid), or open and still waiting for its payment. */
+const holdsSlot = (p: PartyPurchase, nowMs: number): boolean => p.status !== 'open' || Date.parse(p.expiresAt) > nowMs;
 
 type Refusal = { ok: false; status: number; code: string; message: string };
 const refuse = (status: number, code: string, message: string): Refusal => ({ ok: false, status, code, message });
@@ -226,8 +250,13 @@ export async function openPartyPurchase(
     };
     let full = false;
     await updateRecord(storage, o.providerGhii, recordKey(monthOf(createdAt)), parseRecord, cur => {
-        if (cur.purchases.length >= MAX_PER_MONTH) { full = true; return UNCHANGED; }
-        return { purchases: [...cur.purchases, purchase] };
+        // An opening nobody paid for before it expired takes no slot, so unpaid openings cannot use
+        // up the provider's month. The record keeps the newest EXPIRED_KEPT of them and drops older ones.
+        const nowMs = now.getTime();
+        if (cur.purchases.filter(p => holdsSlot(p, nowMs)).length >= MAX_PER_MONTH) { full = true; return UNCHANGED; }
+        const expired = cur.purchases.filter(p => !holdsSlot(p, nowMs));
+        const dropped = new Set(expired.slice(0, Math.max(0, expired.length - EXPIRED_KEPT)).map(p => p.id));
+        return { purchases: [...cur.purchases.filter(p => !dropped.has(p.id)), purchase] };
     }, { tag: 'party-purchases' });
     if (full) return refuse(429, 'TOO_MANY_PURCHASES', 'This provider takes no more purchases this month. Try again later.');
 
@@ -332,11 +361,13 @@ export async function completePartyPurchase(
     const partyName = stored.party.name;
     const ref = partyRefOf(stored.providerOwner, partyName, config.nodeId);
     const fee = percentFee(stored.amount, commerceFeePercent(config));
+    // The seller's payment settings go to the collect and to a refund alike: the card rail refunds on
+    // the seller's own Stripe account and has no key without them.
+    const seller = { ghii: stored.providerGhii, owner: stored.providerOwner, psp: await readPsp(storage, stored.providerGhii) };
     let trackingCode: string;
     try {
         const collected = await handler.collect({ config, storage }, {
-            buyerGhii: ref, amount: stored.amount, currency: stored.currency, reference: id, fee, instrument: input.instrument,
-            seller: { ghii: stored.providerGhii, owner: stored.providerOwner, psp: await readPsp(storage, stored.providerGhii) },
+            buyerGhii: ref, amount: stored.amount, currency: stored.currency, reference: id, fee, instrument: input.instrument, seller,
         });
         trackingCode = collected.trackingCode;
     } catch (err) {
@@ -344,7 +375,15 @@ export async function completePartyPurchase(
         const e = err as { code?: string; statusCode?: number; message?: string };
         return refuse(e.statusCode ?? 402, e.code ?? 'PAYMENT_FAILED', e.message ?? 'The payment did not go through.');
     }
+    // A card page read back again answers the same payment, refunded or not: a payment this purchase
+    // gave back after a failed delivery does not pay for it again.
+    if ((claimed.refundedTrackingCodes ?? []).includes(trackingCode)) {
+        await reopen();
+        return refuse(402, 'PAYMENT_REFUNDED', 'This payment was refunded because the purchase could not be delivered, so it does not pay for it again. Start a new purchase to buy.');
+    }
 
+    // What this attempt wrote, so a failure after it can be undone.
+    const made: DeliveryWrites = {};
     try {
         // The party: the renewing one, or a new one made now, with its first key.
         let party: PartyRecord | undefined = stored.renewalOf ? await findPartyByUid(storage, stored.providerGhii, stored.renewalOf) : undefined;
@@ -361,11 +400,13 @@ export async function completePartyPurchase(
             };
             const outcome = await insertParty(storage, stored.providerGhii, party);
             if (outcome !== 'ok') throw Object.assign(new Error(outcome === 'full' ? 'The provider holds the most outside parties one account may.' : 'A party of that name exists.'), { code: outcome === 'full' ? 'QUOTA_EXCEEDED' : 'PARTY_EXISTS', statusCode: 409 });
+            made.partyName = partyName;
             key = fresh.key;
         }
 
         // The prepaid contract, keyed on the party's identity like any consumer's.
         const before = await readContractForCall(storage, ref, o.ext, o.action);
+        made.contract = { before };
         const pricing = prepaidPricing(stored, o, before?.state === 'revoked' ? null : before?.pricing ?? null, Date.now());
         const ent = await createEntitlement(storage, {
             consumerGaii: ref, providerGhii: o.providerGhii, ext: o.ext, action: o.action,
@@ -387,6 +428,7 @@ export async function completePartyPurchase(
             });
             if (!granted.ok) throw Object.assign(new Error(granted.message), { code: granted.code, statusCode: granted.status });
             share = granted.value;
+            made.share = share;
         }
         const written = await setShareMeta(storage, share, {
             contract: { offeringId: o.offeringId, entitlementId: ent.entitlementId, ifaceVersion: surface.ifaceVersion },
@@ -416,11 +458,64 @@ export async function completePartyPurchase(
             },
         };
     } catch (err) {
-        // The money moved and the delivery did not: give it back and reopen the purchase.
-        try { await handler.refund({ config, storage }, { buyerGhii: ref, amount: stored.amount, trackingCode, seller: { ghii: stored.providerGhii, owner: stored.providerOwner } }); }
-        catch (refundErr) { logger.error('exchange-party-buy: a refund after a failed delivery failed', { purchase: id, error: String(refundErr) }); }
-        await reopen();
+        // The money moved and the delivery did not: undo what this attempt wrote, give the money back
+        // through the account checkout's refund helper, and reopen the purchase.
         const e = err as { code?: string; statusCode?: number; message?: string };
-        return refuse(e.statusCode ?? 500, e.code ?? 'DELIVERY_FAILED', `${e.message ?? 'The purchase could not be delivered'}; the payment was refunded.`);
+        await undoDelivery(storage, stored.providerGhii, ref, o, made, id);
+        const refund = await refundCollected({ config, storage }, handler, { buyerGhii: ref, amount: stored.amount, trackingCode, seller });
+        if (refund.outcome === 'refunded') {
+            await changePurchase(storage, config.nodeId, id, p => (p.status === 'completing'
+                ? { ...p, status: 'open', refundedTrackingCodes: [...(p.refundedTrackingCodes ?? []), trackingCode].slice(-20) }
+                : UNCHANGED));
+        } else {
+            await reopen();
+            if (refund.outcome === 'failed' || refund.outcome === 'not_possible') {
+                await recordUndeliveredPayment({ config, storage }, {
+                    session: {
+                        id, buyerGhii: ref, sellerGhii: stored.providerGhii, total: stored.amount, currency: stored.currency,
+                        items: [{ title: `${o.title} (${stored.model === 'per_month' ? `${stored.quantity} month(s)` : `${stored.quantity} reads`})` }],
+                    } as unknown as CheckoutSessionRecord,
+                    trackingCode, rail: handler.id, refund, reason: e.message ?? 'unknown error',
+                });
+            }
+        }
+        const why = (e.message ?? 'The purchase could not be delivered').trim();
+        const said = refund.outcome === 'refunded'
+            ? `${why}; the payment was refunded.`
+            : `${why}${/[.!?]$/.test(why) ? '' : '.'} ${refundSentence(refund, id)}`;
+        return refuse(e.statusCode ?? 500, e.code ?? 'DELIVERY_FAILED', said);
+    }
+}
+
+/** What one completion attempt wrote before it failed. */
+interface DeliveryWrites {
+    /** The party it made (a renewal makes none). */
+    partyName?: string;
+    /** The contract as it was before this attempt topped it up (null: there was none). */
+    contract?: { before: MeteredEntitlement | null };
+    /** The share it granted (a renewal through a live share grants none). */
+    share?: ConsentRecord;
+}
+
+/**
+ * Undo what a failed completion wrote, newest first: a share it granted ends, the contract goes back
+ * to what it was before (a contract this attempt made is revoked), a party it made is removed (its key
+ * was never handed out). Each step is logged when it fails and never stops the buyer's answer.
+ */
+async function undoDelivery(storage: Storage, providerGhii: string, ref: string, o: Offering, made: DeliveryWrites, id: string): Promise<void> {
+    const step = async (what: string, run: () => Promise<unknown>): Promise<void> => {
+        try { await run(); } catch (err) { logger.error(`exchange-party-buy: undoing the ${what} of a failed delivery failed`, { purchase: id, error: String(err) }); }
+    };
+    if (made.share) {
+        const share = made.share;
+        await step('share', () => setShareMeta(storage, share, { endedReason: 'The purchase that made this share could not be delivered.' }, 'revoked'));
+    }
+    if (made.contract) {
+        const before = made.contract.before;
+        await step('contract', () => (before ? persistEntitlement(storage, before) : revokeEntitlement(storage, ref, o.ext, o.action)));
+    }
+    if (made.partyName) {
+        const name = made.partyName;
+        await step('party', () => removeParty(storage, providerGhii, name));
     }
 }
