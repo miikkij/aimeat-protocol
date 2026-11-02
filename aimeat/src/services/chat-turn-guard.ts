@@ -33,6 +33,8 @@
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
+ *   v1.4.3 — 2026-11-02 — The clock line writes the date in the turn's language, not the account's
+ *     region (crew74: a fi account on an English page got a Finnish date and answered in Finnish).
  *   v1.4.2 — 2026-11-02 — The sentence asking the model to convert tool answers' UTC times is gone: on
  *     crew72 it labelled UTC numbers as local without converting them. The home feed gives each row its
  *     local time itself (services/home-feed.ts `at_local`), and the model copies it.
@@ -147,6 +149,9 @@ export function turnNote(clock?: string): string {
     ].join('\n');
 }
 
+/** How the turn's language writes a date; English as the SPA writes it. */
+const TURN_REGION: Record<Locale, string> = { en: 'en-GB', fi: 'fi', es: 'es' };
+
 /**
  * The turn note's line with the person's local date and time. The zone is the one the person chose
  * in their settings, else the one their browser sent with the turn; with neither, the time is UTC and
@@ -154,7 +159,9 @@ export function turnNote(clock?: string): string {
  */
 export function clockLine(prefs: DisplayPrefs, pageZone: unknown, locale: Locale, iso: string): string {
     const zone = prefs.timezone ?? (isValidTimeZone(pageZone) ? pageZone : null);
-    const at = formatForPerson({ ...prefs, region: prefs.region ?? locale, timezone: zone }, iso, { dateStyle: 'full', timeStyle: 'short' });
+    // In the turn's own language, never the account's region: on crew74 an English page got
+    // "maanantai 2. marraskuuta 2026 klo 7.39" from a fi account, and the model answered in Finnish.
+    const at = formatForPerson({ ...prefs, region: TURN_REGION[locale], timezone: zone }, iso, { dateStyle: 'full', timeStyle: 'short' });
     return zone
         ? `It is now ${at} where the person is (time zone ${zone}). Use this local time when they ask the time or the date, never UTC, and write a time as this line writes it.`
         : `It is now ${at}; the person's own time zone is not known, so say that a time you give is UTC.`;

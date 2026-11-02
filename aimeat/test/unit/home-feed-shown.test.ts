@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { homeFeedAsShown, type FeedItem } from '../../src/services/home-feed.js';
+import { homeFeedAsShown, localTimeWriter, type FeedItem } from '../../src/services/home-feed.js';
 import { notePersonZone } from '../../src/services/person-zone.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
@@ -48,11 +48,29 @@ describe('homeFeedAsShown', () => {
     it('gives each row its time on the clock the person\'s browser last sent, and none before it sent one', async () => {
         const before = await homeFeedAsShown(storage, config(''), 'bob', { items: rows, total: 3 });
         expect(before.items[0].at_local).toBeUndefined();
-        notePersonZone('bob', 'Europe/Helsinki');
-        notePersonZone('bob', 'Not/AZone');
-        const fi = await homeFeedAsShown(storage, { siteLinks: { purchasePlan: '', defaultLocale: 'fi' } } as unknown as AimeatConfig, 'bob', { items: rows, total: 3 });
-        // 05:00 UTC is 7.00 in Helsinki in November, written as Finnish writes it.
-        expect(fi.items[0].at_local).toBe('2.11. klo 7.00');
+        notePersonZone('bob', 'Europe/Helsinki', 'fi');
+        notePersonZone('bob', 'Not/AZone', 'en');
+        const fi = await homeFeedAsShown(storage, config(''), 'bob', { items: rows, total: 3 });
+        // 05:00 UTC is 7.00 in Helsinki in November; the day is relative to the real today, so only its tail is fixed.
+        expect(fi.items[0].at_local).toMatch(/klo 7\.00$/);
+    });
+
+    it('writes a time in words of the chat\'s language, the day said relative to today', () => {
+        const now = '2026-11-02T05:30:00Z';
+        const fi = localTimeWriter('Europe/Helsinki', 'fi', now);
+        expect(fi('2026-11-02T05:00:00Z')).toBe('tänään klo 7.00');
+        expect(fi('2026-11-01T20:56:17Z')).toBe('eilen klo 22.56');
+        expect(fi('2026-10-31T17:37:13Z')).toBe('31. lokakuuta klo 19.37');
+        const en = localTimeWriter('Europe/Helsinki', 'en', now);
+        expect(en('2026-11-02T05:00:00Z')).toBe('today at 07:00');
+        expect(en('2026-11-01T20:56:17Z')).toBe('yesterday at 22:56');
+        const es = localTimeWriter('Europe/Helsinki', 'es', now);
+        expect(es('2026-11-02T05:00:00Z')).toBe('hoy a las 7:00');
+        expect(es('2026-10-31T17:37:13Z')).toBe('el 31 de octubre a las 19:37');
+        // Just after midnight in Helsinki (00.10 on 2.11), 23.50 is yesterday on the person's clock, though
+        // both instants fall on 1.11 in UTC.
+        const late = localTimeWriter('Europe/Helsinki', 'fi', '2026-11-01T22:10:00Z');
+        expect(late('2026-11-01T21:50:00Z')).toBe('eilen klo 23.50');
     });
 
     it('leaves out that an agent the node runs itself joined, and keeps its work', async () => {

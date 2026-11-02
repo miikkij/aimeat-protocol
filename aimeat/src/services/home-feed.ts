@@ -28,6 +28,8 @@
  * @usage
  *   import { readHomeFeed, homeFeedAnswer } from '../services/home-feed.js';
  * @version-history
+ *   v2.5.0 — 2026-11-02 — `at_local` is words in the chat's language with the day said relative to today
+ *     ("tänään klo 7.00", "yesterday at 22:56"), from localTimeWriter (crew73: the model misread "2.11.").
  *   v2.4.0 — 2026-11-02 — Each row carries `at_local`, its time on the person's clock (their zone, else
  *     the one their browser sent with a chat turn), and on a sold node an agent's short name is replaced
  *     by its shown name (crew72: UTC times and "Aamukatsaus-agentin (morning-digest)").
@@ -48,7 +50,8 @@ import { readAccountEvents, recordAccountEvent } from './account-events.js';
 import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from './account-event-view.js';
 import { isNodeResidentAgent } from './node-resident-agent.js';
 import { displayPrefsFor, formatForPerson } from './display-prefs.js';
-import { personZone } from './person-zone.js';
+import { personZone, personLocale } from './person-zone.js';
+import { createT, toLocale, type Locale } from '../i18n.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
@@ -64,7 +67,7 @@ export interface FeedItem {
     data?: Record<string, string>;
     /** The `data` fields this reader may not see and that were taken out (services/account-event-view.ts). */
     withheld?: string[];
-    /** `at` on the person's clock and in their format ("2.11. klo 4.10"), when the node knows their zone. */
+    /** `at` on the person's clock, in words of their chat's language ("tänään klo 4.10"), when the node knows their zone. */
     at_local?: string;
 }
 
@@ -165,10 +168,8 @@ export async function homeFeedAsShown(
     // A model asked to convert UTC did not (crew72: "kello 02 : 10" for 04.10).
     const prefs = await displayPrefsFor(storage, owner);
     const zone = prefs.timezone ?? personZone(owner);
-    const region = prefs.region ?? prefs.locale ?? config.siteLinks?.defaultLocale ?? undefined;
-    const localAt = (at: string) => zone
-        ? formatForPerson({ ...prefs, region: region ?? null, timezone: zone }, at, { day: 'numeric', month: 'numeric', hour: 'numeric', minute: '2-digit' })
-        : undefined;
+    const lang = personLocale(owner) ?? toLocale(prefs.locale ?? config.siteLinks?.defaultLocale ?? undefined);
+    const localAt = zone ? localTimeWriter(zone, lang, new Date().toISOString()) : () => undefined;
     const items = answer.items
         .filter(i => !(sold && i.kind === 'ai_spend_daily'))
         .filter(i => !(MEMBERSHIP_KINDS.has(i.kind) && resident.has(i.data?.name ?? i.data?.agent ?? '')))
@@ -184,6 +185,30 @@ export async function homeFeedAsShown(
             return { ...row, data: { ...i.data, agent_shown_name: name } };
         });
     return { ...answer, items, total: items.length };
+}
+
+/** How each language writes a time and a date; English as the SPA writes it (en-GB). */
+const WRITTEN_AS: Record<Locale, string> = { en: 'en-GB', fi: 'fi', es: 'es' };
+
+/**
+ * A row's time in words of the answer's language, on the person's clock: "tänään klo 7.00", "eilen
+ * klo 22.56", "1. marraskuuta klo 19.37"; "today at 07:00"; "hoy a las 7:00". Words, so a model copies
+ * it and never reads a date: on crew73 it wrote "2.11." as "lokakuun 2. päivä" and lost the colons in
+ * English (commercial-88).
+ */
+export function localTimeWriter(zone: string, lang: Locale, nowIso: string): (at: string) => string {
+    const t = createT(lang);
+    const prefs = { locale: lang, region: WRITTEN_AS[lang], timezone: zone };
+    const dayOf = (iso: string) => formatForPerson({ ...prefs, region: 'en-CA' }, iso, { year: 'numeric', month: '2-digit', day: '2-digit' });
+    const today = dayOf(nowIso);
+    const yesterday = dayOf(new Date(Date.parse(nowIso) - 86_400_000).toISOString());
+    return (at: string) => {
+        const time = formatForPerson(prefs, at, { timeStyle: 'short' });
+        const day = dayOf(at);
+        if (day === today) return t('chatTurn.at.today', { time });
+        if (day === yesterday) return t('chatTurn.at.yesterday', { time });
+        return t('chatTurn.at.other', { time, date: formatForPerson(prefs, at, { day: 'numeric', month: 'long' }) });
+    };
 }
 
 /** A row's data with the agent's short name replaced by its shown name, in every field that held it. */

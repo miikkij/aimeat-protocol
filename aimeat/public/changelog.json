@@ -4,6 +4,28 @@
     {
       "date": "2026-11-02",
       "kind": "feature",
+      "id": "2026-11-02-your-ai-sees-what-happens-on-your-home",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your AI sees what happens on your home",
+        "fi": "Tekoälysi näkee, mitä Kodissasi tapahtuu"
+      },
+      "summary": {
+        "en": "Ask your own AI what is new, and it reads the same rows as your home page.",
+        "fi": "Kysy omalta tekoälyltäsi, mitä uutta on, niin se lukee samat rivit kuin Koti-sivusi."
+      },
+      "body": {
+        "en": "Ask your own AI, or the chat of your place, what is new or what your home shows. It reads the same rows as your home page and tells you in its own words: which agent finished its work, what was installed, who joined. It names your agents as the Agents page does and gives each time on your own clock.",
+        "fi": "Kysy omalta tekoälyltäsi tai paikkasi chatilta, mitä uutta on tai mitä Kodissasi näkyy. Se lukee samat rivit kuin Koti-sivusi ja kertoo ne omin sanoin: mikä agentti sai työnsä valmiiksi, mitä asennettiin ja kuka liittyi. Se kutsuu agenttejasi samoilla nimillä kuin Agentit-sivu ja kertoo jokaisen ajan omalla kellollasi."
+      }
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "feature",
       "id": "2026-11-02-build-it-with-you",
       "highlight": true,
       "audience": [
