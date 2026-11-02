@@ -14265,6 +14265,8 @@
     "cfg_content_class_media_read_memory_mb": "Picture and video metadata: memory limit (MB)",
     "cfgDesc_content_class_media_read_seconds": "How long the server may read the metadata of a stored picture or video: EXIF, IPTC, XMP, the colour profile and the C2PA manifest. Past the limit the file stays stored, its format and size are still known, and the file's details say the rest was not read. 0 = no limit.",
     "cfgDesc_content_class_media_read_memory_mb": "How much memory the server may use to read the metadata of a stored picture or video. Past the limit the file stays stored, its format and size are still known, and the file's details say the rest was not read. A PNG colour profile larger than half of the limit is not read. 0 = no limit.",
+    "cfg_content_class_profile_model": "Fingerprint: AI model",
+    "cfgDesc_content_class_profile_model": "The AI model that makes the fingerprint of a document (what kind of text each part is and what it rests on) for a person who turned the fingerprint on and chose no model of their own. It runs on that person's own AI key or allowance. Empty: the person's own text model. Default ~deepseek/deepseek-pro-latest, the model it was measured on.",
     "cfgGroup_packages": "Packages",
     "cfgGroup_themes": "Themes",
     "cfgGroup_agents": "Agent migration",

@@ -15001,6 +15001,8 @@
     "cfg_content_class_media_read_memory_mb": "Kuvan ja videon metatiedot: muistiraja (Mt)",
     "cfgDesc_content_class_media_read_seconds": "Kuinka kauan palvelin saa lukea tallennetun kuvan tai videon metatietoja: EXIF, IPTC, XMP, väriprofiili ja C2PA-manifesti. Kun raja ylittyy, tiedosto pysyy tallessa, sen muoto ja koko tiedetään, ja tiedoston tiedot kertovat, että muuta ei luettu. 0 = ei rajaa.",
     "cfgDesc_content_class_media_read_memory_mb": "Kuinka paljon muistia palvelin saa käyttää tallennetun kuvan tai videon metatietojen lukemiseen. Kun raja ylittyy, tiedosto pysyy tallessa, sen muoto ja koko tiedetään, ja tiedoston tiedot kertovat, että muuta ei luettu. PNG-kuvan väriprofiilia ei lueta, jos se on suurempi kuin puolet rajasta. 0 = ei rajaa.",
+    "cfg_content_class_profile_model": "Sormenjälki: tekoälymalli",
+    "cfgDesc_content_class_profile_model": "Tekoälymalli, joka tekee asiakirjan sormenjäljen (millaista tekstiä kukin osa on ja mihin se perustuu) ihmiselle, joka on ottanut sormenjäljen käyttöön eikä ole valinnut omaa mallia. Malli käyttää kyseisen ihmisen omaa tekoälyavainta tai -kiintiötä. Tyhjä: ihmisen oma tekstimalli. Oletus on ~deepseek/deepseek-pro-latest, malli, jolla sormenjälki mitattiin.",
     "cfgGroup_packages": "Paketit",
     "cfgGroup_themes": "Teemat",
     "cfgGroup_agents": "Agenttien siirto",
