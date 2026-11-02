@@ -37,7 +37,8 @@
  *   NODE_OPTIONS="--import tsx --import file:///…/test/helpers/fake-goose-acp.ts"
  *   FAKE_GOOSE_LOG=<path to a JSONL file>
  * @version-history
- *   v1.5.0 — 2026-11-02 — SILENT: a turn that ends with no words and no tool call (crew60's empty answer).
+ *   v1.5.0 — 2026-11-02 — SILENT: a turn that ends with no words and no tool call (crew60's empty answer);
+ *     SILENTONCE: silent on the first ask of a session and answering on the second, for the node's retry.
  *   v1.4.0 — 2026-10-31 — A file `<FAKE_GOOSE_LOG>.fail-aimeat` makes session/new report the aimeat
  *     MCP server as failed to load, for the chat's CHAT_TOOLS_NOT_CONNECTED refusal (v27 P2).
  *   v1.3.0 — 2026-10-02 — `session/cancel` is obeyed as the notification ACP defines and refused as a
@@ -117,6 +118,8 @@ async function runPeer(): Promise<void> {
     const cancels = new Map<string, () => void>();
     /** Sessions whose model keeps reading in the answer phase too (LOOPALL). */
     const loopForever = new Set<string>();
+    /** Sessions whose SILENTONCE turn has already been silent once: the second ask answers. */
+    const silentOnce = new Set<string>();
 
     record({
         kind: 'started',
@@ -205,6 +208,19 @@ async function runPeer(): Promise<void> {
             return;
         }
 
+        // Silent on the first ask and answering on the second, for the node's one retry.
+        if (text.includes('SILENTONCE')) {
+            if (!silentOnce.has(sessionId)) {
+                silentOnce.add(sessionId);
+                record({ kind: 'silent', sessionId });
+                send({ jsonrpc: '2.0', id: requestId, result: { stopReason: 'end_turn' } });
+                return;
+            }
+            silentOnce.delete(sessionId);
+            update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'The second ask answered.' } });
+            send({ jsonrpc: '2.0', id: requestId, result: { stopReason: 'end_turn' } });
+            return;
+        }
         // A model that ends its turn with no words and no tool call, as gpt-oss-120b did on crew60.
         if (text.includes('SILENT')) {
             record({ kind: 'silent', sessionId });
