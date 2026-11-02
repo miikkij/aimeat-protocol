@@ -9,6 +9,8 @@
  *   TurnError({ message, onRetry, fixHref, choices, onFreeModel })
  * @usage html`<${Turn} key=${i} id=${`${thread.id}-${i}`} turn=${turn} />`
  * @version-history
+ *   v1.5.0 — 2026-11-02 — A saved agent turn with no words, work or cards reads chatTurn.noAnswer, the
+ *     sentence the node now saves in such a turn, instead of drawing nothing.
  *   v1.4.1 — 2026-10-31 — A saved turn's work log is drawn as ended (WorkLog `ended`).
  *   v1.4.0 — 2026-10-29 — TurnError takes `choices`: when the AI allowance is spent, the ways on
  *     (buy more, your own key, the free model) in place of Try again (UX review A1).
@@ -49,13 +51,15 @@ function timeShort(iso) {
  * The agent's words go through the markdown renderer because the agent writes markdown; the
  * person's do not, because what they typed is what they meant.
  */
-export function Turn({ turn, id }) {
-    const mine = turn.role === 'user';
+export function Turn({ turn: saved, id }) {
+    const mine = saved.role === 'user';
     const [reading, setReading] = useState(false);
-    // A turn that failed before the agent said anything leaves an empty record, and an empty bubble
-    // on screen reads as a message that arrived blank. Nothing was said, so nothing is drawn; the
-    // error above it is what happened.
-    if (!mine && !turn.text && !(turn.tools && turn.tools.length)) return null;
+    // An agent turn saved with no words and no work: since 2026-11-02 the node writes chatTurn.noAnswer
+    // into such a turn itself (services/chat-turn-guard.ts noAnswerText), and a turn saved before that
+    // says the same here rather than nothing, so a question in the history never stands unanswered
+    // (aimeat-apps-c9's finding on crew67, relayed by the Chief of Staff).
+    const empty = !mine && !saved.text && !(saved.tools && saved.tools.length) && !(saved.cards && saved.cards.length);
+    const turn = empty ? { ...saved, text: tr('chatTurn.noAnswer', 'No answer came this time. Send your message again and I will try once more.') } : saved;
 
     const listen = () => {
         if (reading) { stopSpeaking(); setReading(false); return; }
