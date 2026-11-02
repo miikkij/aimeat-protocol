@@ -1,14 +1,14 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see the README for how.
 
-This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request.
+This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
 ## Components and dependencies
 
 | Component | Required | What it is | Source |
 |---|---|---|---|
-| Node process | Yes | One Node.js process (engine `>=24.22.1`), plain HTTP on `AIMEAT_PORT` (40050). With `AIMEAT_BIND_HOST` empty it listens on every address | `aimeat/package.json`, `aimeat/src/index.ts`, `aimeat/.env.example` |
+| Node process | Yes | A Node.js process (engine `>=24.22.1`), plain HTTP on `AIMEAT_PORT` (40050). With `AIMEAT_BIND_HOST` empty it listens on every address. Several processes of one node can share one PostgreSQL database, with the per-process limits on [18](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database) | `aimeat/package.json`, `aimeat/src/index.ts`, `aimeat/.env.example` |
 | Reverse proxy | Yes, on any shared network | nginx, Caddy or a cloud load balancer. Holds TLS, passes `Host`, WebSocket upgrades and unbuffered streams | [Production deployment](../operations/production-deployment.md) |
 | Database | Yes | PostgreSQL 16 or 17 (`AIMEAT_STORAGE=postgres-kysely`, `DATABASE_URL`), or SQLite (`AIMEAT_STORAGE=sqlite`, `AIMEAT_SQLITE_PATH`). The node warns below PostgreSQL 16 and starts | `aimeat/src/storage/providers/postgres-kysely/server-version.ts`, `aimeat/src/storage/storage-factory.ts` |
 | File store | No | Stored file bytes: in the database (the default), in S3 or an S3-compatible service, or in Azure Blob (`AIMEAT_FILE_STORE`, `AIMEAT_FILE_STORE_S3_ENDPOINT`, `AIMEAT_FILE_STORE_AZURE_ACCOUNT`) | `aimeat/src/storage/blob/s3-client.ts`, `aimeat/src/storage/blob/azure-client.ts`, `aimeat/.env.example` |
@@ -33,7 +33,7 @@ flowchart LR
   end
   subgraph Your_network[Your network]
     P[Reverse proxy<br/>TLS, Host, WebSocket, SSE]
-    N[AIMEAT node<br/>one process, HTTP 40050]
+    N[AIMEAT node process<br/>HTTP 40050]
     DB[(PostgreSQL or SQLite)]
     K[[.env secrets<br/>node key file]]
   end
@@ -175,13 +175,13 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 
 The repository documents no minimum CPU, memory or disk size.
 
-**Horizontal scaling is not supported.** The code assumes one process per node and scales up, not out:
+**A node grows up first, and out by more nodes.** One process serves a node in the shape the guides describe, and the code's design notes say the platform grows by more nodes, each its own, federated (`aimeat/src/services/passkeys.ts`). Several processes of one node can share one PostgreSQL database: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`), a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`), and the processes take one node key. What stays in each process is listed with its consequence on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); in short:
 
 - rate limiters and the node-key spending hold are per process (`aimeat/src/services/ai/node-key-hold.ts`);
 - the replay cache for signed requests and the OAuth authorization codes are in process memory, and the code says both must move to storage before more than one process can serve without sticky routing (`aimeat/src/auth/signed-request.ts`);
-- the cache is an in-process map (`aimeat/src/services/cache.ts`).
+- live updates and the cache are per process (`aimeat/src/services/event-bus.ts`, `aimeat/src/services/cache.ts`).
 
-Two processes that overlap on one database, for example during a restart, are guarded for two things only: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`) and a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`). For availability, use a process manager restart, a tested restore and, on PostgreSQL, the database's own high-availability features.
+For availability, use a process manager restart, one active process with a standby, separate nodes to keep one outage small, a tested restore and, on PostgreSQL, the database's own high-availability features ([18](18-scope-and-deployment-patterns.md#availability)).
 
 ## On premises and in the cloud
 
@@ -195,7 +195,7 @@ Two processes that overlap on one database, for example during a restart, are gu
 
 ## Limits
 
-- Horizontal scaling (several node processes on one database) is not supported; the node scales up only.
+- Several node processes on one database share the data and the scheduled work, but live updates, rate limits, short sign-in steps and Config page changes stay per process, and the project records no test of that shape behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
 - The repository documents no minimum CPU, memory or disk size; the only figures are the heap ceilings and memory limits in `aimeat/deploy/aimeat.service` and `aimeat/Dockerfile` and one measured trace.
 - With `AIMEAT_STORAGE` unset, the node runs on an in-memory database and loses all data at restart; `aimeat validate` warns but the node starts (`aimeat/src/utils/env-validator.ts`, `aimeat/src/storage/storage-factory.ts`).
 - With `AIMEAT_BIND_HOST` empty the node listens on every address; the firewall must keep the port closed to everything but the proxy.
@@ -211,4 +211,3 @@ Two processes that overlap on one database, for example during a restart, are gu
 
 - OPEN: What are the minimum and recommended CPU, memory and disk sizes for a node of a given number of people and agents? The maintainer named in `.github/SECURITY.md` can answer; no sizing test is in the repository.
 - OPEN: Does the node work through an outbound HTTP proxy, for example with Node's `NODE_USE_ENV_PROXY` and `HTTPS_PROXY`? Nothing in the repository shows a test; the maintainer can answer.
-- OPEN: Is a high-availability pattern (for example an active-passive pair on PostgreSQL with one node process at a time) tested by the project? The maintainer can answer.

@@ -1,6 +1,6 @@
 # 01 Overview
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page tells an evaluating IT or security team what AIMEAT is, what it is not, under which licence it comes, how its versions work, which versions get security fixes, who maintains it, and which organisations it fits. Read it first. The other pages of this package go deeper on each subject.
 
@@ -20,7 +20,7 @@ AIMEAT is a self-hosted server ("node") that keeps the knowledge, apps and agent
 | CrewAI package | A Python package that connects CrewAI agents to a node, with its own version line | `python/aimeat-crewai/pyproject.toml` |
 | Desktop app | A packaged personal node, with its own version line | `aimeat-desktop/package.json` |
 
-Three principal types act on a node: people (GHII, a human identity such as `alice@node-id`), AI agents (GAII, an agent identity that acts for one person with scoped permissions) and ecosystem apps (GEAI, an outside application onboarded with a scope allowlist) ([Identity model](../coding-guidelines/identity-model.md)). People share knowledge in organisms (a group with members) and workspaces (a shared space inside an organism) ([Data ownership](../data-ownership.md)).
+Three principal types act on a node: people (GHII, a human identity such as `alice@node-id`), AI agents (GAII, an agent identity that acts for one person with scoped permissions) and ecosystem apps (GEAI, an outside application onboarded with a scope allowlist) ([Identity model](../coding-guidelines/identity-model.md)). People share knowledge in organisms (a group with members) and workspaces (a shared space inside an organism) ([Data ownership](../data-ownership.md)). What a node is for, and how an organisation runs one node, many nodes or a person's own node beside its other services, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
 ## What AIMEAT is not
 
@@ -29,7 +29,8 @@ Three principal types act on a node: people (GHII, a human identity such as `ali
 | A hosted service | You install, run, back up and update it. The project runs one demo node; nothing in this package makes claims about it | `.github/SECURITY.md` |
 | An AI model | AI features need an AI provider key or a local model server that you choose. Without one, the node stores and serves data, and AI features stay off | [06 AI and models](06-ai-and-models.md), `aimeat/src/services/ai/types.ts` |
 | A TLS terminator | The node speaks plain HTTP. A reverse proxy holds the certificates | [Production deployment](../operations/production-deployment.md) |
-| A cluster | One node is one process. Several processes on one database are not a supported mode | [02 Architecture](02-architecture.md) |
+| A data processing platform | A node keeps refined knowledge and the state apps show. High-volume processing runs in separate services that read from and write to the node | [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#what-a-node-is-for) |
+| A cluster manager | A node runs as one process, or as several processes on one PostgreSQL database with what stays per process listed on page 18. Growth beyond one node is more nodes, each with its own database, connected by federation | [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md) |
 | A backup system | Database, secrets and node key are yours to back up | [Backup and restore](../operations/backup-and-restore.md) |
 | A certified product | The repository holds no certification or audit attestation by a third party | [14 Compliance mapping](14-compliance-mapping.md) |
 
@@ -65,7 +66,7 @@ What this means for you: there is no long-term support line. Plan to follow rele
 | Who runs the node | Your organisation. You are the operator: you install, configure, update, back up and monitor it | [03 Shared responsibility](03-shared-responsibility.md) |
 | How security problems are reported | Privately, through GitHub private vulnerability reporting or the e-mail address in the security policy. The stated aim is acknowledgement within 48 hours, assessment within a week and a fix within two weeks | `.github/SECURITY.md` |
 | Is there a support contract | Not from the open-source project. A service level exists only if your organisation agrees one separately with a party that offers it | `.github/SECURITY.md` |
-| Can you maintain it yourselves | Yes. The licence allows it, the build runs from source (`pnpm build`), and the repository's checks run locally with `pnpm gate` | [17 Exit plan](17-exit-plan.md), `aimeat/scripts/gate.ts` |
+| Can you maintain it yourselves | Yes, with a team of any size. The MIT licence allows a fork, the build runs from source (`pnpm build`), the repository's checks run locally with `pnpm gate`, and the rules, guidelines, tests and CI a new team continues from are in the repository | [17 Exit plan, continue it yourselves](17-exit-plan.md#continue-it-yourselves), `aimeat/scripts/gate.ts` |
 
 ## Node types
 
@@ -91,15 +92,16 @@ What this means for you: there is no long-term support line. Plan to follow rele
 
 - has nobody to operate a Linux service, apply updates and test restores;
 - needs a vendor service level or a long-term support version as a condition of use;
-- needs active-active high availability with several node processes on one database (see [02 Architecture](02-architecture.md));
-- cannot accept a single-maintainer open-source project as the source of fixes, unless it is ready to maintain a fork itself ([17 Exit plan](17-exit-plan.md)).
+- needs active-active high availability of one node with no session affinity and no path routing at the load balancer (see [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database));
+- needs one system for high-volume data processing; that work runs in separate services beside the node ([18](18-scope-and-deployment-patterns.md#services-around-a-node));
+- cannot accept a single-maintainer open-source project as the source of fixes and is not ready to continue a fork itself, which the MIT licence allows ([17 Exit plan, continue it yourselves](17-exit-plan.md#continue-it-yourselves)).
 
 ## Limits
 
 - Only the newest node release receives security fixes; there is no long-term support line (`.github/SECURITY.md`).
 - No support contract or service level comes with the open-source project.
-- The project has one named maintainer (`.github/SECURITY.md`).
-- One node is one process; several processes on one database are not a supported mode.
+- The project has one named maintainer (`.github/SECURITY.md`). The MIT licence and the rules, checks and tests in the repository let an organisation continue the software itself ([17 Exit plan, continue it yourselves](17-exit-plan.md#continue-it-yourselves)).
+- Several processes of one node on one database share the data and the scheduled work, but live updates, rate limits, short sign-in steps and Config page changes stay per process, and the project records no test of that shape behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
 - `relay` and `mirror` node types are accepted, but the guide states that the names alone do not give working replication or a tested resource budget (`docs/coding-guidelines/environment-configs.md`).
 - The change log is in two places: `CHANGELOG.md` up to node 3.15.0, `aimeat/public/changelog.json` after it.
 - The repository holds no third-party certification or audit attestation.

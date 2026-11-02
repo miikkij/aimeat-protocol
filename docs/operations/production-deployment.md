@@ -12,6 +12,11 @@ The node is one Node.js process that listens on plain HTTP on `AIMEAT_PORT`. It 
 TLS, so it always runs behind a reverse proxy (nginx, Caddy, a cloud load balancer) that holds the
 certificates. Only the proxy should reach the node's port: block it in the firewall.
 
+This guide describes one node process. Several processes of one node can share one PostgreSQL
+database; what they share and what stays in each process (live updates, rate limits, short sign-in
+steps, Config page changes) is in
+[18 Scope and deployment patterns](../it-adoption/18-scope-and-deployment-patterns.md#several-node-processes-on-one-database).
+
 ## Names and certificates
 
 A public node uses up to four name families. Each is derived from `AIMEAT_BASE_URL` unless set:
