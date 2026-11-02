@@ -47,6 +47,9 @@ headers"). What they established that still holds:
   `test/e2e-static-hardening.ts` asserts it on both backends.
 - **No live credential is committed** (gitleaks over the full history and the working tree, every hit
   triaged to a fixture, a vendored library or a placeholder).
+- **An adopting organisation's security team has tested its production node** (reported by the
+  maintainer on 2026-11-02). The organisation is not named and its report is not published. No
+  commissioned outside penetration test is recorded.
 - **CORS reflection is by design and depends on one list.** Bearer-token paths reflect any `Origin`
   with credentials allowed (invariant C-1 in [cors.ts](../../aimeat/src/middleware/cors.ts)); the
   cookie-authed paths are fenced to listed origins. That stays safe only while `COOKIE_AUTHED_PATHS`
