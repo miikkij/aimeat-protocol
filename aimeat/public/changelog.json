@@ -4,6 +4,28 @@
     {
       "date": "2026-11-02",
       "kind": "feature",
+      "id": "2026-11-02-what-kind-of-material-it-is",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "What kind of material it is",
+        "fi": "Millaista aineisto on"
+      },
+      "body": {
+        "en": "Your AI can now tell you, before you read a document, what kind of material it is and how far it can be trusted: each section's kind of text and what it rests on (+ a source, ~ a person or meeting, ? nothing, x contradicted). Off until you turn it on.",
+        "fi": "Oma tekoälysi kertoo ennen lukemista, millaista aineisto on ja voiko siihen luottaa: jokaisen osion tekstilaji ja se, mihin osio perustuu (+ lähde, ~ ihminen tai kokous, ? ei mitään, x kumottu). Pois päältä, kunnes kytket sen päälle."
+      },
+      "summary": {
+        "en": "Your AI tells you what kind of material a document is and what it rests on, before you read it.",
+        "fi": "Oma tekoälysi kertoo ennen lukemista, millaista aineisto on ja mihin se perustuu."
+      }
+    },
+    {
+      "date": "2026-11-02",
+      "kind": "feature",
       "id": "2026-11-02-jira-and-confluence-ready-made",
       "highlight": false,
       "audience": [
