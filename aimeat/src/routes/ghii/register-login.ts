@@ -6,6 +6,12 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-02 — The sign-in policy (services/sign-in-policy.ts). POST /v1/ghii/login answers 403
+ *     PASSWORD_SIGN_IN_OFF before the password is read when password sign-in is off (a federated
+ *     sign-in also under `operators`), and after it for a non-operator under `operators`; a covered
+ *     account with no TOTP gets 403 TWO_STEP_SETUP_REQUIRED and a setup token instead of a session.
+ *     POST /v1/ghii refuses a password with PASSWORD_SIGN_IN_OFF unless the account becomes the first
+ *     operator (IT review).
  *   2026-10-27 — POST /v1/ghii reads fromNodeMachine(req) for the setup code: a registration the node replays onto loopback for a remote agent is not this machine's own (secaudit2026oct26).
  *   2026-10-27 — POST /v1/ghii reads fromLoopback through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — POST /v1/ghii passes whether the request came in on a loopback socket (fromLoopback): a
@@ -100,6 +106,9 @@ import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
 import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
+import { passwordSignInRefusal, passwordWayInRefusal, newPasswordRefusal, twoStepCovers } from '../../services/sign-in-policy.js';
+import { twoStepArmed } from '../../services/passkeys.js';
+import { twoStepSetupAnswer } from './login-two-step.js';
 
 export function registerRegisterLoginRoutes(
     router: Router,
@@ -121,6 +130,16 @@ export function registerRegisterLoginRoutes(
         if (modeRefusal) {
             res.status(403).json(error(config.nodeId, 'REGISTRATION_CLOSED', modeRefusal));
             return;
+        }
+
+        // Password sign-in policy (services/sign-in-policy.ts): with it off, or for operators only, an
+        // account made here gets no password, except the account that becomes the first operator.
+        if (password !== undefined && password !== null && config.passwordSignIn !== 'on') {
+            const noPassword = newPasswordRefusal(config, await createdAccountIsOperator(storage));
+            if (noPassword) {
+                res.status(noPassword.status).json(error(config.nodeId, noPassword.code, noPassword.message));
+                return;
+            }
         }
 
         // username is a required non-empty string by GhiiRegistrationSchema, which validateBody
@@ -377,6 +396,15 @@ export function registerRegisterLoginRoutes(
         const identifier = parseLoginIdentifier(username, config.nodeId);
         const federatedNodeId = identifier.federatedNodeId;
         let loginName = identifier.localName;
+
+        // Password sign-in policy (services/sign-in-policy.ts), before any password is read: `off`
+        // refuses every account. A visitor from another node holds no operator role here, so
+        // `operators` refuses it too, before its password is sent to the home node.
+        const passwordOff = federatedNodeId ? passwordWayInRefusal(config, null) : passwordSignInRefusal(config);
+        if (passwordOff) {
+            res.status(passwordOff.status).json(error(config.nodeId, passwordOff.code, passwordOff.message));
+            return;
+        }
         if (identifier.kind === 'email') {
             const resolved = await resolveOwnerByVerifiedEmail(storage, identifier.localName);
             if (!resolved.ok) {
@@ -619,6 +647,15 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
+        // `operators`: the password was right, and only now is the role read, so a non-operator gets
+        // the answer `off` gives and nothing tells which accounts are operators.
+        const account = await storage.getOwner(loginName);
+        const notForThisAccount = passwordWayInRefusal(config, account);
+        if (notForThisAccount) {
+            res.status(notForThisAccount.status).json(error(config.nodeId, notForThisAccount.code, notForThisAccount.message));
+            return;
+        }
+
         // Email confirmation check — if operator requires it, block unverified users.
         // The password was already verified above, so we return a machine-readable signal
         // letting the sign-in modal collect/confirm an email and finish account setup.
@@ -635,6 +672,18 @@ export function registerRegisterLoginRoutes(
         const second = await checkSecondFactor(storage, config, ghiiRecord, { totp_code, backup_code });
         if (!second.ok) {
             res.status(second.status).json(error(config.nodeId, second.code, second.message));
+            return;
+        }
+
+        // Required two-step sign-in (services/sign-in-policy.ts): a covered account with no code app
+        // gets no session, but a setup token to enrol with (login-two-step.ts). A deactivated account
+        // gets its own answer first, as completeOwnerLogin would give it.
+        if (!twoStepArmed(ghiiRecord) && twoStepCovers(config, account)) {
+            if (account?.disabledAt) {
+                res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
+                return;
+            }
+            await twoStepSetupAnswer(storage, config, res, ghiiRecord);
             return;
         }
 

@@ -1,6 +1,6 @@
 # Template: application register entry
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
 
 ## How to use
 
@@ -88,9 +88,9 @@ Copy the rows into your application register, CMDB or ISMS form; most such forms
 | Joiner and leaver process | [ORGANIZATION] *SCIM from the IdP, or the manual steps and who does them.* | SCIM per SSO connection (`aimeat_admin_sso_scim_token`) |
 | Disabling an account | An operator disables an owner | `aimeat_admin_owner_disable` |
 | AI agents | An agent connects by device authorization: the owner approves it and picks its permissions; the owner sees and removes every agent; an agent passes on only permissions it holds | `aimeat/src/routes/agents/device-auth.ts`, `aimeat/src/services/agent-scope-add.ts`, `aimeat_agents_list` |
-| Administrator accounts | The first operator is created either in the setup wizard (`/v1/setup/wizard`, `POST /v1/setup/init`; on a node whose address is not loopback, with the one-time setup code from the start log) or at `POST /v1/admin/setup/register` with `AIMEAT_ADMIN_PASSWORD` (or the generated secret in the `admin-setup-secret` file, mode 0600); further operators are granted on the admin Owners page | `aimeat/.env.example`, `aimeat/src/routes/setup.ts`, `aimeat/src/routes/admin.ts`, `aimeat/src/services/admin-setup-secret.ts` |
+| Administrator accounts | The first operator is created either in the setup wizard (`/v1/setup/wizard`, `POST /v1/setup/init`; on a node whose address is not loopback, with the one-time setup code from the start log) or at `POST /v1/admin/setup/register` with `AIMEAT_ADMIN_PASSWORD` (or the generated secret in the `admin-setup-secret` file, mode 0600) and the same setup code; further operators are granted on the admin Owners page | `aimeat/.env.example`, `aimeat/src/routes/setup.ts`, `aimeat/src/routes/admin/setup-register.ts`, `aimeat/src/services/admin-setup-secret.ts` |
 | Named administrators | [ORGANIZATION] *Names of everyone with the operator role, and of everyone with shell or database access.* | Operator role and host access are separate trust boundaries ([threat model](../../security/threat-model.md)) |
-| Second factor for administrators | [ORGANIZATION] *Your rule.* The deployment checklist asks for TOTP on operator accounts; no node setting enforces it | [Deployment checklist](../../security/deployment-checklist.md) |
+| Second factor for administrators | [ORGANIZATION] *Your rule.* The deployment checklist asks for TOTP on operator accounts; `AIMEAT_TWO_STEP_REQUIRED=operators` makes the node enforce it | [Deployment checklist](../../security/deployment-checklist.md), `aimeat/src/services/sign-in-policy.ts` |
 | Access review | [ORGANIZATION] *Interval and who reviews operators, agents and SSO connections.* | `aimeat_admin_agents`, `aimeat_admin_sso_list` |
 
 ## Server management and updates

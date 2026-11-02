@@ -13,10 +13,14 @@
  *   today is `second_factor`: an emailed sign-in link, or a first Google, Entra, Casdoor or SAML
  *   sign-in, on an account with two-step sign-in leaves a ticket, and the dialog opens on its code
  *   view (modal-totp.js, link mode).
- * @structure takeParam(name) · readAuthError() · readAuthStep() · authErrorText(i, code) ·
+ *   The second is `two_step_setup`: the operator requires two-step sign-in, the emailed link's account
+ *   has no authenticator app, and the setup token comes in the fragment (modal-two-step.js).
+ * @structure takeParam(name) · readAuthError() · readAuthStep() · readTwoStepToken() · authErrorText(i, code) ·
  *   showAuthErrorIn(i, code)
  * @usage import { readAuthError, readAuthStep, showAuthErrorIn } from './auth-error.js';
  * @version-history
+ *   v1.3.0 — 2026-11-02 — readAuthStep() knows `two_step_setup`, and readTwoStepToken() reads its token
+ *     from the fragment (required two-step sign-in).
  *   v1.2.0 — 2026-10-24 — The SECOND_FACTOR_EXPIRED sentence says to sign in again, which fits every
  *     way the code step starts, not only a sign-in link (secaudit2026oct22, external-login-skips-second-factor).
  *   v1.1.0 — 2026-10-09 — readAuthStep() for `?auth_step=second_factor`, and the sentence for
@@ -31,8 +35,13 @@ function takeParam(name) {
   var value = url.searchParams.get(name);
   if (!value) return null;
   url.searchParams.delete(name);
-  try { history.replaceState(history.state, '', url.pathname + url.search + url.hash); } catch { /* a sandboxed frame may refuse; the message still shows */ }
+  replaceAddress(url.pathname + url.search + url.hash);
   return value;
+}
+
+/** Rewrite the address without a reload. */
+function replaceAddress(path) {
+  try { history.replaceState(history.state, '', path); } catch { /* a sandboxed frame may refuse; the message still shows */ }
 }
 
 /** The refused sign-in's code from the address, removed from it; null when there is none. */
@@ -46,7 +55,19 @@ export function readAuthError() {
 /** The sign-in step the server asks for, removed from the address; null for none or an unknown one. */
 export function readAuthStep() {
   var step = takeParam('auth_step');
-  return step === 'second_factor' ? step : null;
+  return step === 'second_factor' || step === 'two_step_setup' ? step : null;
+}
+
+/**
+ * The setup token of a required two-step enrolment from the address fragment (`#two_step=<token>`,
+ * GET /v1/ghii/magic-link/open), removed from the address; null when there is none. The fragment is
+ * never sent to a server, so the token stays out of logs and Referer headers.
+ */
+export function readTwoStepToken() {
+  var m = /(?:^#|&)two_step=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash || '');
+  if (!m) return null;
+  replaceAddress(location.pathname + location.search);
+  return m[1];
 }
 
 /** The sentence for a code, in the dialog's language. */

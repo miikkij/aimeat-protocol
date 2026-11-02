@@ -697,6 +697,9 @@ const ALL_SUITES = [
     // Self-spawns its own server with AIMEAT_EMAIL_CONFIRMATION_REQUIRED=true (the shared server keeps
     // it OFF) to exercise the login email-gate + /v1/ghii/login/attach-email recovery flow. No SMTP needed.
     'test/e2e-login-attach-email.ts',
+    // The operator's sign-in policy (required two-step sign-in, password sign-in off) on a node of its
+    // own (28455): the suite changes both settings on the running node.
+    'test/e2e-sign-in-policy.ts',
     'test/e2e-extensions.ts',
     'test/e2e-ext-paywall.ts',
     // A public extension action answers a caller without an account, read-only (Comicland v3 A-7).

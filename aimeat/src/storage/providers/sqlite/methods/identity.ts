@@ -8,6 +8,7 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.10.0 — 2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   v1.9.0 — 2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   v1.8.0 — 2026-10-25 — credentialsValidAfter on update and read (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.7.0 — 2026-10-23 — taskStartFloor on create, update and read, a JSON list in TEXT (migration 0115).
@@ -84,6 +85,15 @@ export const identityMethods = {
   async listDisabledOwnerNames(this: SqliteStorage, opts: { limit: number }): Promise<string[]> {
     const rows = this.db.prepare('SELECT name FROM owners WHERE disabledAt IS NOT NULL ORDER BY disabledAt LIMIT ?')
       .all(Math.max(0, Math.floor(opts.limit))) as { name: string }[];
+    return rows.map(r => r.name);
+  },
+
+  async listOperatorNames(this: SqliteStorage, opts: { limit: number }): Promise<string[]> {
+    const rows = this.db.prepare(
+      `SELECT name FROM owners WHERE disabledAt IS NULL
+         AND EXISTS(SELECT 1 FROM json_each(owners.roles) WHERE json_each.value = 'operator')
+       ORDER BY name LIMIT ?`
+    ).all(Math.max(0, Math.floor(opts.limit))) as { name: string }[];
     return rows.map(r => r.name);
   },
 

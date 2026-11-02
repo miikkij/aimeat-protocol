@@ -10,6 +10,7 @@
  *   casts, and is shared by every lib (e.g. audio also needs webkitAudioContext).
  * @usage Picked up by tsconfig.sdk.json (its include globs the sdk-libs .d.ts files). No runtime effect.
  * @version-history
+ *   v1.4.0 — 2026-11-02 — __AIMEAT_AUTH_CFG__.passwordSignIn and twoStepRequired: the sign-in policy.
  *   v1.3.0 — 2026-10-31 — __AIMEAT_SDK_CFG__.defaultLocale: the node's own language (site.default_locale).
  *   v1.2.0 — 2026-10-31 — __AIMEAT_AUTH_CFG__.linkFirst (v28 #7).
  *   v1.1.0 — 2026-09-02 — Motion, anime and Lenis globals, the three vendored animation packs
@@ -36,6 +37,10 @@ interface Window {
     emailLogin?: boolean;
     /** Whether the sign-in dialog opens on the emailed link: a node bought from the store (v28 #7). */
     linkFirst?: boolean;
+    /** The node's password sign-in policy: 'on', 'operators' or 'off' (services/sign-in-policy.ts). */
+    passwordSignIn?: string;
+    /** Whose sign-in must be two-step: 'off', 'operators' or 'everyone'. */
+    twoStepRequired?: string;
   };
   /** aimeat-header's idempotency guard (mounts the canonical nav at most once). */
   __AIMEAT_HEADER_MOUNTED__?: boolean;

@@ -10,6 +10,9 @@
  * @structure registerAttachEmailRoute(router, config, storage, emailService).
  * @usage registerAttachEmailRoute(router, config, storage, emailService);
  * @version-history
+ *   v1.3.0 — 2026-11-02 — The password sign-in policy (services/sign-in-policy.ts): 403
+ *     PASSWORD_SIGN_IN_OFF before the password with it off, and after it for a non-operator under
+ *     `operators` (IT review).
  *   v1.2.0 — 2026-10-09 — The second factor after the password: an account with TOTP armed gives its
  *     code here as it does on the sign-in route (secaudit 2026-10-09, S1).
  *   v1.1.0 — 2026-10-05 — The password and its lock are services/password-check.ts, the check every
@@ -28,6 +31,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
 import { isValidEmail } from '../../utils/email-validator.js';
+import { passwordSignInRefusal, passwordWayInRefusal } from '../../services/sign-in-policy.js';
 
 export function registerAttachEmailRoute(
     router: Router,
@@ -64,6 +68,14 @@ export function registerAttachEmailRoute(
             }
         }
 
+        // Password sign-in policy (services/sign-in-policy.ts): this route takes the password as a
+        // sign-in does, so with password sign-in off it reads none.
+        const passwordOff = passwordSignInRefusal(config);
+        if (passwordOff) {
+            res.status(passwordOff.status).json(error(config.nodeId, passwordOff.code, passwordOff.message));
+            return;
+        }
+
         const ghii = `${loginName}@${config.nodeId}`;
         const ghiiRecord = await storage.getGHII(ghii);
         // Uniform failure for missing account / no password / wrong password — never reveal which.
@@ -77,6 +89,12 @@ export function registerAttachEmailRoute(
         const pw = await checkPassword(storage, config, ghiiRecord, password);
         if (!pw.ok) {
             res.status(pw.status).json(error(config.nodeId, pw.code, pw.message));
+            return;
+        }
+        // `operators`: the role is read after the password, and a non-operator gets the `off` answer.
+        const notForThisAccount = passwordWayInRefusal(config, await storage.getOwner(ghiiRecord.ownerName));
+        if (notForThisAccount) {
+            res.status(notForThisAccount.status).json(error(config.nodeId, notForThisAccount.code, notForThisAccount.message));
             return;
         }
 

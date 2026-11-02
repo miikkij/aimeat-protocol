@@ -13,6 +13,14 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.19.0 — 2026-11-02 — The operator's sign-in policy. With password sign-in off the dialog shows no
+ *     password form and says which ways in remain; with `operators` the form stands under a line
+ *     naming the operators; unless `on`, no register tab. TWO_STEP_SETUP_REQUIRED opens the two-step
+ *     enrolment step (modal-two-step.js), and so does opts.twoStepSetup from an emailed link. The
+ *     typed-values helpers and the username rules moved to modal-fields.js unchanged (max-file-lines).
+ *     The code step and the enrolment step hide the masthead and the tabs; a PASSWORD_SIGN_IN_OFF
+ *     refusal is said in the dialog's language and by the policy (modal-constants.js); the
+ *     operators-only line stands behind the divider, above the username field.
  *   v1.18.0 — 2026-10-31 — opts.signInOnly: no register tab, and the dialog opens on signing in
  *     whatever opts.tab says (a node the store sold, v31 K24), headed "Kirjaudu omaan AIMEATiisi"
  *     with no "Forgot username?". The two identifier rules moved to
@@ -83,7 +91,7 @@ import { auth, api, restoreSessionFromCookie } from './session.js';
 import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANGS } from './i18n.js';
 import { writeLang } from '../_core/lang.js';
-import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED, LINK_FIRST } from './config.js';
+import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED, LINK_FIRST, PASSWORD_SIGN_IN } from './config.js';
 import { MODAL_CSS, HEART_SVG, RULE_MARKS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
@@ -91,7 +99,9 @@ import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
 import { showAuthErrorIn } from './auth-error.js';
 import { signupInProgress } from './signup-state.js';
-import { EMAIL_RE, OWNER_NAME_RE } from './modal-constants.js';
+import { EMAIL_RE, OWNER_NAME_RE, passwordRefusalText, operatorsOnlyNoteHtml } from './modal-constants.js';
+import { captureInputs, restoreInputs, wireUsernameRules } from './modal-fields.js';
+import { twoStepViewHtml, wireTwoStepStep } from './modal-two-step.js';
 
 /** The domain in the crumb above the headline: this node's own, so a self-hosted node shows its
  *  domain there and the wordmark beside it says what the software is. */
@@ -115,7 +125,9 @@ export function showLoginModal(opts, renderBtn, onClosed) {
   // signInOnly: the caller's node takes no new accounts here, so the dialog has no register tab
   // (a node the store sold has its owner already, and others come in by invitation: v31 K24).
   var signInOnly = !!opts.signInOnly;
-  var tab = opts.tab === 'register' && !signInOnly ? 'register' : 'signin', linkFirst = opts.linkFirst === undefined ? LINK_FIRST : !!opts.linkFirst;
+  // A node whose password sign-in policy is not 'on' refuses a new password, so it shows no register tab.
+  var noRegister = signInOnly || PASSWORD_SIGN_IN !== 'on', passwordOff = PASSWORD_SIGN_IN === 'off';
+  var tab = opts.tab === 'register' && !noRegister ? 'register' : 'signin', linkFirst = opts.linkFirst === undefined ? LINK_FIRST : !!opts.linkFirst;
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();
@@ -130,29 +142,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     modal.remove = function () { removeModal(); onClosed(); };
   }
 
-  // Capture typed values so they survive a re-render (language change).
-  function captureInputs() {
-    var g = function (id) { var el = /** @type {any} */ (document.getElementById(id)); return el ? el.value : ''; };
-    return {
-      u: g('aimeat-username'), p: g('aimeat-password'),
-      ru: g('aimeat-reg-username'), rp: g('aimeat-reg-password'),
-      rd: g('aimeat-reg-displayname'), re: g('aimeat-reg-email'),
-    };
-  }
-  function restoreInputs(vals) {
-    // The input event is what keeps the username rules in step with the value, so a restored value
-    // announces itself the way a typed one would.
-    var s = function (id, val) {
-      var el = /** @type {any} */ (document.getElementById(id));
-      if (!el || !val) return;
-      el.value = val;
-      try { el.dispatchEvent(new Event('input')); } catch { /* no Event constructor */ }
-    };
-    s('aimeat-username', vals.u); s('aimeat-password', vals.p);
-    s('aimeat-reg-username', vals.ru); s('aimeat-reg-password', vals.rp);
-    s('aimeat-reg-displayname', vals.rd); s('aimeat-reg-email', vals.re);
-  }
-
+  // Typed values survive a re-render (captureInputs, restoreInputs: modal-fields.js).
   // Switch language: persist the choice, reload translations, re-render in place (no page reload).
   function switchLang(next) {
     if (next === lang) return;
@@ -258,7 +248,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
         : (((signInOnly || linkFirst) && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.'))
       + '</p>'
       // Two tabs, two jobs. Which one is showing decides what the body asks for.
-      + (signInOnly ? '' : '<div class="aimeat-tabs" role="tablist">'
+      + (noRegister ? '' : '<div class="aimeat-tabs" role="tablist">'
       + '<button type="button" role="tab" class="aimeat-tab' + (isReg ? '' : ' active') + '" data-tab="signin" aria-selected="' + (isReg ? 'false' : 'true') + '">' + escHtml(i.tabSignIn || 'Sign in') + '</button>'
       + '<button type="button" role="tab" class="aimeat-tab' + (isReg ? ' active' : '') + '" data-tab="register" aria-selected="' + (isReg ? 'true' : 'false') + '">' + escHtml(i.tabRegister || 'Create account') + '</button>'
       + '</div>')
@@ -271,6 +261,10 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       // Absent entirely on a browser without WebAuthn: an offer that cannot be taken is worse than
       // no offer.
       + passkeyButtonHtml(i)
+      // The password form: hidden when the node takes no password sign-in, and under a line naming
+      // the operators when only they may use it (auth.password_sign_in).
+      + '<div id="aimeat-pw-form"' + (passwordOff ? ' style="display:none"' : '') + '>'
+      + operatorsOnlyNoteHtml(i, !!passkeyButtonHtml(i))
       + field(i.identifierLabel || 'Username or email',
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i.identifierPlaceholder || 'Username or email') + '">')
       + field(i.passwordLabel || 'Password',
@@ -278,11 +272,12 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + '<div class="aimeat-actions">'
       + '<button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i.signInOnlyBtn || 'Sign in') + '</button>'
       + '<button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i.cancelBtn || 'Cancel') + '</button>'
-      + '</div>'
+      + '</div></div>'
       + '<p id="aimeat-error" class="aimeat-err"></p>'
+      + (passwordOff ? '<p class="aimeat-hint">' + escHtml(i.passwordSignInOff || 'This server does not use passwords. Sign in with a passkey, your organisation\'s sign-in or a sign-in link sent to your email.') + '</p>' : '')
       + '<div class="aimeat-links">'
-      + '<a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
-      + '<a href="#" id="aimeat-forgot-user" class="aimeat-link"' + (signInOnly ? ' style="display:none"' : '') + '>' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
+      + '<a href="#" id="aimeat-forgot-pw" class="aimeat-link"' + (passwordOff ? ' style="display:none"' : '') + '>' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
+      + '<a href="#" id="aimeat-forgot-user" class="aimeat-link"' + (signInOnly || passwordOff ? ' style="display:none"' : '') + '>' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
       + loginLinkAskHtml(i)
       + '</div>'
       + '</div>'
@@ -331,6 +326,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + loginLinkViewHtml(i, field, linkFirst)
       // Second-factor sub-view (hidden) — opened when the login answers TOTP_REQUIRED.
       + totpViewHtml(i, field)
+      // Two-step enrolment (hidden): the operator requires two-step sign-in (modal-two-step.js).
+      + twoStepViewHtml(i, field)
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
       // A returning person signing in does not need to be sold the thing they already have. A
       // numbered index under an ink rule, the last line in bold.
@@ -389,32 +386,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       });
     });
 
-    // The username rules, live. The field keeps only what the server's owner-name rule accepts
-    // (lowercase a to z, digits and hyphens; capitals are lowered as typed) and the three rules
-    // under it turn green as they are met, from the first typed character. The person sees what
-    // the name may be while choosing it rather than in a refusal afterwards.
-    var regUser = /** @type {any} */ (document.getElementById('aimeat-reg-username'));
-    var rulesEl = document.getElementById('aimeat-reg-rules');
-    function syncUsernameRules() {
-      if (!regUser || !rulesEl) return;
-      var raw = String(regUser.value || '');
-      var clean = raw.toLowerCase().replace(/[^a-z0-9-]/g, '');
-      if (clean !== raw) {
-        var pos = Math.max(0, (regUser.selectionStart == null ? raw.length : regUser.selectionStart) - (raw.length - clean.length));
-        regUser.value = clean;
-        try { regUser.setSelectionRange(pos, pos); } catch { /* not a text control */ }
-      }
-      rulesEl.classList.toggle('on', clean.length > 0);
-      var met = {
-        len: clean.length >= 3 && clean.length <= 64,
-        chars: clean.length > 0,
-        edges: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(clean),
-      };
-      rulesEl.querySelectorAll('.aimeat-rule').forEach(function (r) {
-        r.classList.toggle('ok', !!met[r.getAttribute('data-rule') || '']);
-      });
-    }
-    if (regUser) regUser.addEventListener('input', syncUsernameRules);
+    // The username rules, live (modal-fields.js).
+    wireUsernameRules();
 
     // Social sign-in — full-page navigation to the provider's OIDC start endpoint.
     modal.querySelectorAll('.aimeat-oauth-btn').forEach(function (btn) {
@@ -437,7 +410,11 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       document.getElementById('aimeat-forgot-user-view').style.display = view === 'forgot-user' ? '' : 'none';
       document.getElementById('aimeat-email-view').style.display = view === 'email' ? '' : 'none';
       document.getElementById('aimeat-totp-view').style.display = view === 'totp' ? '' : 'none';
+      document.getElementById('aimeat-two-step-view').style.display = view === 'two-step' ? '' : 'none';
       var ll = document.getElementById('aimeat-login-link-view'); if (ll) ll.style.display = view === 'login-link' ? '' : 'none';
+      // The code step and the two-step enrolment carry their own heading: the masthead and the tabs go.
+      var step = view === 'totp' || view === 'two-step';
+      modal.querySelectorAll('.aimeat-headline, .aimeat-line, .aimeat-tabs').forEach(function (el) { /** @type {any} */ (el).style.display = step ? 'none' : ''; });
     }
 
     /** A finished sign-in, whichever step produced it. The caller's onLogin is not called here: the
@@ -468,6 +445,17 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     });
     // An emailed link on a two-step account opens the dialog on the code view, once (modal-totp.js).
     if (opts.secondFactorLink) { opts.secondFactorLink = false; totpStep.openLinkStep(); }
+
+    // Required two-step enrolment (modal-two-step.js). The node answers a checked sign-in with
+    // TWO_STEP_SETUP_REQUIRED and a setup token; an emailed link brings the token in opts.twoStepSetup.
+    var twoStep = wireTwoStepStep({ i: i, showView: showView, adopt: function (data) { return auth.adoptLoginAnswer(data); }, onSuccess: finishLogin });
+    /** True when the error opened the enrolment step. */
+    function twoStepAsked(e) {
+      if (!e || e.code !== 'TWO_STEP_SETUP_REQUIRED' || !e.details || !e.details.setup_token) return false;
+      twoStep.open(e.details.setup_token);
+      return true;
+    }
+    if (opts.twoStepSetup) { var setupToken = opts.twoStepSetup; opts.twoStepSetup = null; twoStep.open(setupToken); }
 
     // Credentials captured from the last correct-password attempt that hit the email gate.
     var pendingEmailLogin = null;
@@ -578,6 +566,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
             try {
               await auth.loginWithPassword(pending.username, pending.password);
             } catch (le) {
+              if (twoStepAsked(le)) return;
               if (le.code !== 'TOTP_REQUIRED') throw le;
               totpStep.openTotpStep(pending.username, pending.password);
               return;
@@ -628,6 +617,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
         pendingEmailLogin = null;
         finishLogin();
       } catch (e) {
+        if (twoStepAsked(e)) { pendingEmailLogin = null; return; }
         errEl.textContent = e.message;
         errEl.style.display = 'block';
         btn.textContent = i.confirmAndSignIn || 'Confirm & Sign In';
@@ -714,6 +704,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
           totpStep.openTotpStep(isEmail || isFederated ? raw : localName, password);
           return;
         }
+        // Password correct, and the operator requires two-step sign-in that the account has not set up.
+        if (twoStepAsked(e)) { releaseBtn('aimeat-go-btn', signInLabel); return; }
         // A locked account is not a wrong password: say what the server said, not "does not match".
         if (e.code === 'TOTP_LOCKED') {
           errEl.textContent = e.message;
@@ -723,7 +715,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
         }
         errEl.textContent = e.message.includes('Invalid username or password')
           ? (i.errWrongCredentials || 'That username or email and password do not match an account here.')
-          : e.message;
+          : e.code === 'PASSWORD_SIGN_IN_OFF' ? passwordRefusalText(i, e.message) : e.message;
         errEl.style.display = 'block';
         releaseBtn('aimeat-go-btn', signInLabel);
       }
@@ -788,6 +780,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
           openEmailCompletion(username, password, false, 'register', displayName);
           return;
         }
+        // The account was made, and the operator requires two-step sign-in before its first session.
+        if (twoStepAsked(e)) { releaseBtn('aimeat-reg-btn', createLabel); return; }
         errEl.textContent = (e.message.includes('already registered') || e.message.includes('NAME_TAKEN'))
           ? (i.errNameTaken || 'That username is taken. If it is yours, sign in instead.')
           : e.message;

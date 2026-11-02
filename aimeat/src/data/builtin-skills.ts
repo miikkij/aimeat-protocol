@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-02 -- aimeat-node-guide: the operator's sign-in policy (two-step required, password sign-in off).
  *   2026-11-01 -- aimeat-node-guide: an agent keeps the node id and the node's address with its key and
  *     signs a return proof only toward that address (secaudit2026oct31w2 round 11).
  *   2026-10-31 -- aimeat-gen-rules joins the list after aimeat-ai-model-policy.
@@ -330,6 +331,11 @@ Fetch these in order of depth; each is self-describing:
 - Sign in with the password, as above. The older sign-in with the account's Ed25519 key
   (\`POST /v1/auth/token\` with \`owner\`) is removed in node 4.0.0; a script uses a personal access
   token or device authorization instead.
+- The operator may require two-step sign-in (\`auth.two_step_required\`): a right password of an
+  account without an authenticator app answers 403 \`TWO_STEP_SETUP_REQUIRED\` with
+  \`details.setup_token\`, and \`POST /v1/ghii/login/two-step/start\` then \`/finish\` set the app up and
+  sign in. With \`auth.password_sign_in\` off (or for operators only), a password answers 403
+  \`PASSWORD_SIGN_IN_OFF\`: the person signs in with a passkey, their organisation's sign-in or an emailed link.
 
 ## Agents: connect via device authorization (RFC 8628)
 

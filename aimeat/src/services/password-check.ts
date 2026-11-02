@@ -21,11 +21,14 @@
  *   Each answers `{ ok: true }` or a refusal the route sends as it is: status, code, message.
  * @structure CheckRefusal · checkPassword(storage, config, record, password) ·
  *   checkSecondFactor(storage, config, record, codes) ·
- *   checkTotpManagementCode(storage, config, record, codes, wrongMessage)
+ *   checkTotpManagementCode(storage, config, record, codes, wrongMessage) ·
+ *   checkEnrolmentCode(storage, config, record, pendingSecret, code)
  * @usage
  *   const pw = await checkPassword(storage, config, ghiiRecord, password);
  *   if (!pw.ok) { res.status(pw.status).json(error(config.nodeId, pw.code, pw.message)); return; }
  * @version-history
+ *   2026-11-02 — checkEnrolmentCode: the first code of a required two-step enrolment, against the
+ *     pending secret, with the TOTP lock (IT review, required two-step sign-in).
  *   2026-10-31 — An attempt is counted BEFORE the password or code is compared (reserveAttempt), in one
  *     conditional write on the attempts record, which now also carries the lock it set; the lock was
  *     read from the account record the request read at its start and the count written after the
@@ -294,6 +297,28 @@ async function totpWrongCode(
       message: `Too many wrong codes, so this account is paused until ${lockUntil}. Wait until then and try again.` };
   }
   return { ok: false, status: 401, code: 'INVALID_TOTP', message };
+}
+
+/**
+ * The first code of a required two-step enrolment (routes/ghii/login-two-step.ts), checked against
+ * the secret the setup made (`pendingSecret`, encrypted), with the account's TOTP lock: a wrong code
+ * counts toward it, and while it holds no code is accepted. No code answers INVALID_INPUT and counts
+ * nothing.
+ */
+export async function checkEnrolmentCode(
+  storage: Storage, config: TotpCheckConfig, rec: GHIIRecord, pendingSecret: string, code: unknown,
+): Promise<CheckResult> {
+  if (typeof code !== 'string' || !code.trim()) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'code is required: the six digits your authenticator app shows.' };
+  const locked = await totpLockRefusal(storage, rec);
+  if (locked) return locked;
+  const slot = await reserveTotpAttempt(storage, config, rec);
+  if ('locked' in slot) return totpLocked(slot.locked);
+  if (!validateTotpCode(pendingSecret, code.trim(), totpConfigOf(config)).valid) {
+    return totpWrongCode(storage, rec, slot, 'That code does not match. Check the app and try again.');
+  }
+  if (rec.totpFailedAttempts) await storage.updateGHII(rec.ghii, { totpFailedAttempts: 0, totpLockedUntil: null });
+  await clearAttempts(storage, TOTP_ATTEMPTS_NS, rec.ghii);
+  return { ok: true };
 }
 
 /**

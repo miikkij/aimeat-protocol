@@ -19,6 +19,7 @@
  *   ordered lists
  * @usage cd aimeat && DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/storage-conformance-lists.test.ts
  * @version-history
+ *   2026-11-02 — listOperatorNames: only the active operator accounts, by name, within the limit.
  *   2026-10-26 — listDisabledOwnerNames: only the disabled accounts, oldest first, within the limit.
  *   2026-10-25 — Subdomain sites: listSubdomainSitesPage pages in byte order of the label, and origin
  *     round-trips on create and update (secaudit2026oct22).
@@ -197,6 +198,20 @@ describe('the operator question without the owner table (QA audit P7-10)', () =>
       return { all, oneCount: one.length };
     });
     expect(same(r)).toEqual({ all: ['2', '0'], oneCount: 1 });
+  });
+
+  it('listOperatorNames gives the active operator accounts only, by name, within the limit, the same on both', async () => {
+    const r = await onEach(async (s, p) => {
+      const names = [0, 1, 2, 3].map(i => `opn${RUN}${p}${i}`);
+      const roles = [['owner', 'operator'], ['owner'], ['owner', 'operator'], ['owner', 'operator']];
+      for (const [i, n] of names.entries()) await s.createOwner({ name: n, displayName: n, publicKey: 'pk', roles: roles[i], createdAt: new Date().toISOString() });
+      // 3 is an operator, but disabled.
+      await s.updateOwner(names[3], { disabledAt: new Date().toISOString(), disabledBy: 'op' });
+      const all = (await s.listOperatorNames({ limit: 10_000 })).filter(n => names.includes(n)).map(n => n.slice(-1));
+      const one = await s.listOperatorNames({ limit: 1 });
+      return { all, oneCount: one.length };
+    });
+    expect(same(r)).toEqual({ all: ['0', '2'], oneCount: 1 });
   });
 });
 

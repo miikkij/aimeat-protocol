@@ -17,6 +17,12 @@
  * @usage const view = buildConfigView({ config, storage, provenance });
  *        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, changes);
  * @version-history
+ *   2026-11-02 — The sign-in policy: a change that weakens auth.two_step_required or
+ *     auth.password_sign_in is refused to an AI credential with PERSON_REQUIRED, and
+ *     auth.password_sign_in=off with 409 OPERATOR_LOCKOUT while no operator account has a passkey or an
+ *     identity provider link (services/sign-in-policy.ts; IT review). Both before anything is applied.
+ *     A request that leaves auth.two_step_required above off with totp.enabled false, whichever of the
+ *     two it moves, is refused with 409 TWO_STEP_NEEDS_TOTP.
  *   2026-10-31 — The classification switch check asks every change of classification.mode in the
  *     batch, each from the mode the change before it leaves; it asked the first one only, and the
  *     batch is applied in order (secaudit 2026-10-31 inv-14).
@@ -36,6 +42,9 @@ import { CLASSIFICATION_MODE_PATH, recordSwitchChange, switchRefusal, type Switc
 import { offerDefaultCapsWhenSwitchedOn } from './classification/default-caps.js';
 import { recordOperatorNodeAct } from './operator-access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import {
+    TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, TOTP_ENABLED_PATH, signInPolicyChangeRefusal, passwordOffLockoutRefusal, twoStepWithoutTotpRefusal,
+} from './sign-in-policy.js';
 
 export interface ConfigViewDeps { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance }
 
@@ -204,6 +213,39 @@ export async function changeNodeSettings(deps: ConfigViewDeps, caller: SwitchCal
         if (MUTABLE_CONFIG_MAP[CLASSIFICATION_MODE_PATH]?.validate(change.value)) modeAt = change.value;
     }
     const modeBefore = config.classificationMode;
+
+    // The sign-in policy (services/sign-in-policy.ts), asked the same way: a change that weakens
+    // two_step_required or password_sign_in is refused to an AI credential, each change from the value
+    // the one before it leaves; and password sign-in off is refused while no operator account has
+    // another way in. Nothing in the request is applied when either refuses.
+    const policyAt: Record<string, unknown> = {
+        [TWO_STEP_REQUIRED_PATH]: config.twoStepRequired, [PASSWORD_SIGN_IN_PATH]: config.passwordSignIn, [TOTP_ENABLED_PATH]: config.totpEnabled,
+    };
+    let movedLast: typeof TWO_STEP_REQUIRED_PATH | typeof TOTP_ENABLED_PATH | null = null;
+    for (const change of changes as Array<{ path?: unknown; value?: unknown }>) {
+        const path = change?.path;
+        if (path === TOTP_ENABLED_PATH) {
+            if (MUTABLE_CONFIG_MAP[path]?.validate(change.value)) { policyAt[path] = change.value; movedLast = path; }
+            continue;
+        }
+        if (path !== TWO_STEP_REQUIRED_PATH && path !== PASSWORD_SIGN_IN_PATH) continue;
+        const refusal = signInPolicyChangeRefusal(caller, path, policyAt[path], change.value);
+        if (refusal) return { ok: false, status: refusal.status, code: refusal.code, message: `${refusal.message} Nothing in this request was applied.` };
+        if (MUTABLE_CONFIG_MAP[path]?.validate(change.value)) {
+            policyAt[path] = change.value;
+            if (path === TWO_STEP_REQUIRED_PATH) movedLast = path;
+        }
+    }
+    // Two-step sign-in required needs TOTP on: refused whichever of the two the request moves, on the
+    // values the whole batch leaves (so one request may switch TOTP on and require it).
+    if (movedLast) {
+        const needsTotp = twoStepWithoutTotpRefusal(policyAt[TWO_STEP_REQUIRED_PATH], policyAt[TOTP_ENABLED_PATH], movedLast);
+        if (needsTotp) return { ok: false, status: needsTotp.status, code: needsTotp.code, message: `${needsTotp.message} Nothing in this request was applied.` };
+    }
+    if (policyAt[PASSWORD_SIGN_IN_PATH] === 'off' && config.passwordSignIn !== 'off') {
+        const lockout = await passwordOffLockoutRefusal(storage, config.nodeId);
+        if (lockout) return { ok: false, status: lockout.status, code: lockout.code, message: `${lockout.message} Nothing in this request was applied.` };
+    }
 
     // The loop that checks, persists and applies each change: services/config-apply.ts, shared with
     // the other door that changes settings (Themes & Styles' who-chooses).

@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-02 -- aimeat-node-operations: the go-live walk reads the two sign-in policy settings
+ *     (auth.two_step_required, auth.password_sign_in), and says an AI may tighten them, not loosen them.
  *   2026-11-01 -- aimeat-node-operations: "Before the node goes online", the go-live walk an operator's
  *     AI makes with the admin tools (wish-it-adoption-package-and-go-live-checklist-for-an-aimeat-node).
  *   2026-10-31 — manage-my-agents: approval_url is the proposal's own page, and a proposal may carry
@@ -145,7 +147,11 @@ in order. Read each one first, show the operator what you found, and change a se
    the test send is on the admin Email page (\`/v1/admin?tab=email\`).
 4. **Sign-in.** \`aimeat_admin_sso_list\` for SAML and SCIM connections, and \`aimeat_admin_config\`
    with \`q: "entra"\` and \`q: "google"\` for the Microsoft and Google sign-in. Each needs an app
-   registration at the identity provider whose redirect address is the node's own.
+   registration at the identity provider whose redirect address is the node's own. Then
+   \`q: "auth."\`: whether two-step sign-in is required (\`auth.two_step_required\`: off, operators or
+   everyone; operators is the usual choice for an organisation) and whether people may still sign in
+   with a password (\`auth.password_sign_in\`: on, operators or off). You may tighten either on the
+   operator's word; loosening one is refused from an AI and is the operator's to do in person.
 5. **AI.** \`aimeat_ai_providers\` and \`aimeat_ai_provider_test\`: which model sources the node has and
    whether each answers. Ask where the organisation's data may be processed before you suggest a
    provider or a region.

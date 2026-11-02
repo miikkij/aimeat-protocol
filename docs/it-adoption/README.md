@@ -1,6 +1,6 @@
 # AIMEAT IT adoption package
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see "How this package stays current" below.
+> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see "How this package stays current" below.
 
 What an organisation's IT and information security need to evaluate, approve, install and run AIMEAT as their own internal system. AIMEAT is open-source software (MIT) that the organisation runs on its own server: people and their AI agents keep their knowledge there and share it through MCP, the protocol that AI tools such as Claude, Claude Code, Codex, Cursor and VS Code connect with, without a migration between AI vendors. Nothing here is specific to one organisation. Every claim names its source in the repository (a file, a setting or an MCP tool), and what the repository does not answer is listed under [Open questions](#open-questions). The limits are stated as plainly as the features: [16 Known limitations](16-known-limitations.md) collects them.
 
@@ -71,10 +71,6 @@ The "Checked against" line at the top of each page says which version and commit
 
 What the repository does not answer. Each one names who can answer it; most are for the maintainer named in `.github/SECURITY.md`. When one is answered, the page changes and the line leaves this list.
 
-### [00 Go-live checklist](00-go-live-checklist.md)
-
-- OPEN: Is there a supported way to require two-step sign-in for operator accounts, or for every account on an organisation node? No setting was found in `aimeat/.env.example` or `aimeat/src/config-types-account-security.ts`. The maintainer named in `.github/SECURITY.md` can answer.
-
 ### [01 Overview](01-overview.md)
 
 - OPEN: Does any party offer a commercial support contract or service level for self-hosted AIMEAT nodes, and on what terms? The maintainer named in `.github/SECURITY.md` can answer.
@@ -91,7 +87,7 @@ What the repository does not answer. Each one names who can answer it; most are 
 
 ### [04 Identity and access](04-identity-access.md)
 
-- OPEN: Is there a supported way to make an SSO-managed account sign in only through its identity provider (no password, no emailed sign-in link)? The maintainer named in `.github/SECURITY.md` can answer.
+- OPEN: Is there a supported way to stop an SSO-managed account from signing in with an emailed sign-in link, so that it signs in only through its identity provider? `AIMEAT_PASSWORD_SIGN_IN` covers the password; the link has no switch. The maintainer named in `.github/SECURITY.md` can answer.
 - OPEN: What is the supported recovery when the only operator of a node loses both the TOTP device and the backup codes? The maintainer can answer.
 - OPEN: Which scopes does a new agent created on the MCP OAuth consent page start with when the owner keeps the preselected choice: `AIMEAT_DEFAULT_AGENT_SCOPES` or another set? The maintainer can answer; `aimeat/public/oauth-consent.html` holds the page.
 - OPEN: Can an organisation's IdP group membership be mapped to organism membership or to the operator role in any way other than one organism per SSO connection? The maintainer can answer.
@@ -113,7 +109,6 @@ What the repository does not answer. Each one names who can answer it; most are 
 
 ### [07 Security](07-security.md)
 
-- OPEN: Should an organisation node be able to turn password sign-in off entirely when SSO is on? (the maintainer)
 - OPEN: What is the date and scope of the most recent outside penetration test, if any? The repository records internal audits and probe sessions only. (the maintainer)
 
 ### [08 Threat model](08-threat-model.md)

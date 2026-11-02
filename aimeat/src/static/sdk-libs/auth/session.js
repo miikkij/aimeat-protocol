@@ -12,6 +12,7 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.8.0 — 2026-11-02 — auth.adoptLoginAnswer(data): the session of a finished two-step enrolment.
  *   v1.7.1 — 2026-10-16 — Every caught error leaves a trace (QA audit F6-03). session.fetch's comment
  *     states its contract (ok:false is a refusal, never an empty result); a non-JSON refresh answer
  *     throws with its cause; a codeless cookie-restore failure and an unreachable sign-out log; a
@@ -625,6 +626,9 @@ export const auth = {
     const data = await passkeySignIn(username);
     return sessionFromLogin(data);
   },
+
+  /** The answer of POST /v1/ghii/login/two-step/finish is a sign-in answer: the session it carries. */
+  adoptLoginAnswer(data) { return sessionFromLogin(data); },
 
   /** Does this browser have WebAuthn? A caller shows the passkey button only when it does. */
   passkeySupported,
