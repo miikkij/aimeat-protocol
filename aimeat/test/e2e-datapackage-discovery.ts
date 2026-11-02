@@ -22,6 +22,10 @@
  *     PERSONAL_DATA_PUBLIC, nothing written) until the request confirms; the confirmation stays on the
  *     package; a map row naming the package's own family decides alone.
  * @version-history
+ *   v1.2.0 — 2026-11-02 — The suite follows WP10e (fbf5ec149), whose source change these three
+ *     assertions still described the old way, so they were red on main since then: D1.3a dct:license
+ *     is the EU licence vocabulary IRI for CC BY 4.0, D1.4c the schema.org license is the deed's
+ *     address, and D1.4d a page with no public package answers 404 (still noindex), not 200.
  *   v1.1.0 — 2026-11-01 — The public page is /v1/dataset/{owner}/{name} in every listing, the feed, the
  *     sitemap and schema.org; D1.4d its head carries the Dataset JSON-LD for a public package only (WP9b;
  *     the address was the knowledge viewer, so these assertions fail on the previous code).
@@ -256,7 +260,7 @@ await test('D1.3a JSON-LD: a dcat:Catalog with the public datasets, their distri
     for (const n of [P.mem, P.org, P.priv, P.gone]) assert(!idents.includes(pkgOf(n)) && !r.text.includes(`/${n}/`), `the feed names ${n}`);
     const ds = sets.find((s: Body) => s['dct:identifier'] === pkgOf(P.pub));
     assert(ds['@type'] === 'dcat:Dataset' && ds['dct:title'] === 'Shortage list' && ds['dct:description'], `dataset ${JSON.stringify(ds).slice(0, 400)}`);
-    assert(ds['dct:publisher']['foaf:name'] === A.name && ds['dct:license']?.['rdfs:label'] === 'CC-BY-4.0', `publisher/license ${JSON.stringify([ds['dct:publisher'], ds['dct:license']])}`);
+    assert(ds['dct:publisher']['foaf:name'] === A.name && ds['dct:license']?.['@id'] === 'http://publications.europa.eu/resource/authority/licence/CC_BY_4_0', `publisher/license ${JSON.stringify([ds['dct:publisher'], ds['dct:license']])}`);
     assert(ds['dct:issued']['@type'] === 'xsd:dateTime' && ds['dcat:landingPage']['@id'].endsWith(`/v1/dataset/${A.name}/${P.pub}`), 'issued/landingPage');
     const dists = [].concat(ds['dcat:distribution']) as Body[];
     const csv = dists.find(d => d['dcat:mediaType']?.['@id']?.endsWith('text/csv'));
@@ -329,7 +333,7 @@ await test('D1.4c ?format=schemaorg answers a schema.org Dataset; the public one
     assert(r.status === 200 && r.type.includes('application/ld+json'), show(r));
     const doc = JSON.parse(r.text);
     assert(doc['@context'] === 'https://schema.org' && doc['@type'] === 'Dataset' && doc.name === 'Shortage list', `doc ${r.text.slice(0, 300)}`);
-    assert(doc.license === 'CC-BY-4.0' && doc.url.endsWith(`/v1/dataset/${A.name}/${P.pub}`) && doc.isAccessibleForFree === true, `license/url ${JSON.stringify([doc.license, doc.url])}`);
+    assert(doc.license === 'https://creativecommons.org/licenses/by/4.0/' && doc.url.endsWith(`/v1/dataset/${A.name}/${P.pub}`) && doc.isAccessibleForFree === true, `license/url ${JSON.stringify([doc.license, doc.url])}`);
     assert(doc.distribution[0]['@type'] === 'DataDownload' && doc.distribution[0].contentUrl.endsWith('/data/items.csv'), 'distribution');
     assert(doc.variableMeasured.map((v: Body) => v.name).join(',') === 'id,label', `variables ${JSON.stringify(doc.variableMeasured)}`);
     const d = await call(`/v1/datapackages/${A.name}/${P.pub}`);
@@ -349,7 +353,7 @@ await test('D1.4d The public dataset page carries its title and the schema.org D
     for (const n of [P.priv, P.mem, P.gone]) {
         const other = await fetch(`${BASE}/v1/dataset/${A.name}/${n}`, { signal: AbortSignal.timeout(60_000) });
         const body = await other.text();
-        assert(other.status === 200 && !body.includes('"@type":"Dataset"') && !body.includes(n) && (other.headers.get('x-robots-tag') ?? '').includes('noindex'),
+        assert(other.status === 404 && !body.includes('"@type":"Dataset"') && !body.includes(n) && (other.headers.get('x-robots-tag') ?? '').includes('noindex'),
             `${n}: no head of its own and noindex (${other.headers.get('x-robots-tag')})`);
     }
 });
