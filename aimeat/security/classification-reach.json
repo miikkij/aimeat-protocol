@@ -1385,9 +1385,9 @@
       "reads": {
         "getMemory": 2,
         "getMemoryByKeys": 1,
-        "getStorageFile": 1
+        "getStorageFile": 2
       },
-      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the owner's own contentclass.facts.<nn> shards and the text file the pipeline itself stored for an item. The item was shown to its reader by the pipeline (pipeline.ts loadItem, reader.show) before any fact or text was kept, and service.ts answers facts only to the item's own namespace or its account holder."
+      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the owner's own contentclass.facts.<nn> shards and the text file the pipeline itself stored for an item. The item was shown to its reader by the pipeline (pipeline.ts loadItem, reader.show) before any fact or text was kept, and service.ts answers facts only to the item's own namespace or its account holder. 2026-11-02 (wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse): the second getStorageFile reads the profile sections file the pipeline itself stored (contentclass-profile/<hash>.json, getProfileDetail, keys under that prefix only), on the same terms as the text file: written after reader.show and useForAi passed, answered by service.ts factsViewFor only to the item's own namespace or its account holder."
     },
     "src/services/content/intake.ts": {
       "reads": {

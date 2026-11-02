@@ -146,7 +146,8 @@ the weak one?".
 
 No profile yet: the profile step is off (ask before running it, as for every model step:
 \`aimeat_content_inspect { kind, key, stages: ["profile"] }\`, or the setting for everything that
-arrives). A profile is the model's reading and can be wrong; it says which model made it. The marks
+arrives, \`aimeat_content_settings { patch: { stages: { profile: true } } }\`; the Data Wallet page
+does not show this switch yet, so it is changed from chat). A profile is the model's reading and can be wrong; it says which model made it. The marks
 judge what the text shows, not whether its claims are true.
 
 ## When something is wrong: correct it
