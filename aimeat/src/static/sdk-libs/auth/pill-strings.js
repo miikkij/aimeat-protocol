@@ -33,7 +33,7 @@
 
 export var PILL_STRINGS = {
   en: {
-    loggedIn: 'logged in', logoutBtn: 'Logout', signInBtn: '❤️ Sign In', account: 'Account',
+    loggedIn: 'logged in', logoutBtn: 'Log out', signInBtn: '❤️ Sign In', account: 'Account',
     federated: 'Federated', manageAccess: 'Manage permissions',
     lightMode: 'Light mode', darkMode: 'Dark mode', themeLabel: 'Light or dark',
     autoMode: 'Automatic: follows your device', autoShort: 'Auto',
