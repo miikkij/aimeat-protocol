@@ -441,6 +441,46 @@ await test('19. A granted scope does NOT take effect on the pinned credential, a
     await t.close();
 });
 
+// FAILED FIRST: on crew77 the record held 44 words and the connector's calls still carried 5 (agent's
+// call refused "exchange:invoke required"): the store place's default said nothing to the live socket.
+await test('19b. A store place\'s default reaches a connector that attached before it, and applies once re-attached', async () => {
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'placebot', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(reg.status === 201, `agent: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const key = reg.body.data.private_key as string;
+    const t = await TunnelClient.connect(BASE, fullAgentToken);
+    const narrow = await getToken(gaii, key);
+    const joined = await t.attach(gaii, narrow);
+    assert(joined.type === 'attached', `attach: ${joined.type} ${joined.message ?? ''}`);
+    const refused = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+    assert(refused.status === 403, `expected 403 before the default, got ${refused.status}`);
+
+    const setPlan = (value: string) => json('/v1/admin/config', { method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ changes: [{ path: 'site.purchase_plan', value }] }) });
+    const on = await setPlan('Solo');
+    assert(on.status === 200, `plan: ${on.status} ${JSON.stringify(on.body?.error)}`);
+    try {
+        // A run's mint is what applies the default: the connector's own token is still the old one.
+        const wide = await getToken(gaii, key);
+        const frame = await t.waitForScopesChanged(2000);
+        assert(frame !== null && frame.agent === gaii, `the live socket must be told, got ${JSON.stringify(frame)}`);
+        const still = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+        assert(still.status === 403, `the pinned token still refuses until it is replaced, got ${still.status}`);
+        const again = await t.attach(gaii, wide);
+        assert(again.type === 'attached', `re-attach: ${again.type} ${again.message ?? ''}`);
+        const allowed = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });
+        assert(allowed.status === 200, `after the re-attach the default must apply, got ${allowed.status}`);
+        // The fresh mint adds nothing, so it asks for nothing: a connector does not loop on this frame.
+        await getToken(gaii, key);
+        assert((await t.waitForScopesChanged(500)) === null, 'a mint that adds no word must send no frame');
+    } finally {
+        await setPlan('');
+        await t.close();
+    }
+});
+
 await test('20. A REMOVED scope is told the same way, and stops applying once re-attached', async () => {
     // The gap is two-way and this is the serious half: a permission taken away went on being
     // honoured for the rest of the pinned token's life, and nobody reported it.

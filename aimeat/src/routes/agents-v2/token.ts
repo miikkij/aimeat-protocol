@@ -43,7 +43,7 @@ import { isValidGAII } from '../../utils/gaii.js';
 import { verifyCardJws, base64KeyToJwkX } from '../../services/agent-card.js';
 import { spendAssertion } from '../../services/assertion-spend.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
-import { widenForPlace } from '../../services/place-agent-scopes.js';
+import { widenAndAnnounce } from '../agents/announce-scopes.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 
@@ -175,7 +175,7 @@ export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, 
     // are. Scopes are what the OWNER granted this agent, never what the assertion asked for. On a store
     // place that is the place's default the first time (services/place-agent-scopes.ts): this is the
     // mint a crew's run uses, so the default did not reach crew agents without it (crew75, 2.11).
-    const scopes = await widenForPlace(storage, config, agent);
+    const scopes = await widenAndAnnounce(storage, config, agent);
     let token: string;
     try {
       token = await issueJWT({

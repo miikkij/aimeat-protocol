@@ -118,7 +118,7 @@ import { ecosystemRefreshDecision, ECO_REAPPROVAL_SECONDS } from '../services/ec
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 import { getStats } from '../services/stats.js';
-import { widenForPlace } from '../services/place-agent-scopes.js';
+import { widenAndAnnounce } from './agents/announce-scopes.js';
 
 // In-memory challenge store
 const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
@@ -302,7 +302,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         roles,
         // On a store place the agent has the place's tools by default, written to its record first
         // (services/place-agent-scopes.ts; Jouni 2.11 07.42). Elsewhere: its record as it is.
-        scopes: await widenForPlace(storage, config, agent),
+        scopes: await widenAndAnnounce(storage, config, agent),
       }, config.jwtTtlSeconds, sessionId);
 
       await storage.createSession({
@@ -563,7 +563,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // not scope) — an intra-owner privilege escalation / scope collapse.
       freshRoles = ['agent'];
       // The store place's default, as at the token above (services/place-agent-scopes.ts).
-      freshScopes = await widenForPlace(storage, config, agent);
+      freshScopes = await widenAndAnnounce(storage, config, agent);
     } else if (req.auth!.roles.includes('ecosystem')) {
       // The same rule as the agent branch, for the principal class it forgot. `else` handed the
       // OWNER's roles to anything that was not an agent, and an ecosystem app is not an agent: one

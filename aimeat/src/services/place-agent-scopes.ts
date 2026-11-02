@@ -21,15 +21,19 @@
  *   paid contract, is on the floor.
  *
  *   IN THE RECORD, ONCE. The words go into the agent's own `defaultScopes` the first time it is approved
- *   or gets a token here (routes/agents/device-auth-approve.ts, routes/auth.ts, and
- *   routes/agents-v2/token.ts, the mint a crew's run and a card-made agent use), so the Agents tab shows
- *   what it may do. PLACE_DEFAULT_KEY remembers the agents that had it, so a word the owner takes away
+ *   or gets a token here (routes/agents/device-auth-approve.ts, routes/auth.ts,
+ *   routes/agents-v2/enrolment.ts, the token a new agent's connector attaches with, and
+ *   routes/agents-v2/token.ts, the mint a crew's run uses), so the Agents tab shows what it may do. The
+ *   routes call widenAndAnnounce (routes/agents/announce-scopes.ts), which tells the agent's live
+ *   connector to fetch a fresh token: it calls with the token its identity attached with, so without
+ *   the frame the agent kept its old words for up to an hour (crew77 on guestkoey3wfwk, 2.11). PLACE_DEFAULT_KEY remembers the agents that had it, so a word the owner takes away
  *   afterwards stays away: the owner's own narrowing is the decision that counts. The door's intersection
  *   of token and record (auth/effective-scopes.ts) is unchanged. Elsewhere nothing changes.
  * @structure PLACE_OWNER_KEEPS · placeAgentScopes(config) · applyPlaceDefault(storage, config, gaii, held) ·
  *   widenForPlace(storage, config, agent)
  * @usage const scopes = await widenForPlace(storage, config, agent); // then mint with scopes
  * @version-history
+ *   v1.2.0 — 2026-11-02 — Enrolment applies the default, and the routes announce a widening to the live connector (crew77).
  *   v1.1.0 — 2026-11-02 — The default leaves out every task start floor word, and carries exchange:invoke (Jouni, 10.25).
  *   v1.0.0 — 2026-11-02 — Initial.
  */
