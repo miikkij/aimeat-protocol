@@ -16394,6 +16394,8 @@
       "lineTarget": "{who} {what}: {target}",
       "failed": "(ei onnistunut)",
       "showReads": "Näytä myös tietojen lukemiset ja rutiinikirjaukset",
+      "times_one": "({n} kerran)",
+      "times": "({n} kertaa)",
       "run": {
         "finished": "{who} sai työnsä valmiiksi ({steps})",
         "failed": "{who} ei saanut työtään valmiiksi ({steps})",

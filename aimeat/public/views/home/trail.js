@@ -15,6 +15,8 @@
  *   CODE_PHRASE, FAMILY_PHRASE, ROUTINE, EVENT_PHRASE, Day, byDay
  * @usage routed at /v1/home?trail=1 by spa.html
  * @version-history
+ *   v1.4.3 — 2026-11-02 — The same row again within 15 minutes is one row with how many times
+ *     ("vieras-testi kysyi chatissa (8 kertaa)"; crew74's real log had eight in a minute).
  *   v1.4.2 — 2026-11-02 — A chat turn names no target (its target is the conversation's id), and a
  *     random id with a hyphen or an underscore is no name either (crew72's real log: "kysyi chatissa:
  *     jMsQjKj-CzR8").
@@ -244,7 +246,18 @@ export function foldRuns(entries, quiet, shownName) {
   for (const { entries: group } of groups) {
     const first = group[0];
     if (group.length === 1) {
-      if (!quiet(first)) out.push({ at: first.at, actorKind: first.actorKind, text: trailLine(first, shownName) });
+      if (quiet(first)) continue;
+      const text = trailLine(first, shownName);
+      // The same sentence again right after, such as a person asking in the chat eight times in a
+      // minute (crew74's real log), is one row with how many times.
+      const last = out[out.length - 1];
+      if (last && last.single === text && Math.abs(Date.parse(last.lastAt) - Date.parse(first.at)) <= RUN_GAP_MS) {
+        last.times += 1;
+        last.lastAt = first.at;
+        last.text = `${text} ${tn('home.trail.times', last.times)}`;
+        continue;
+      }
+      out.push({ at: first.at, actorKind: first.actorKind, text, single: text, times: 1, lastAt: first.at });
       continue;
     }
     const phrases = group.map(phraseOf);
