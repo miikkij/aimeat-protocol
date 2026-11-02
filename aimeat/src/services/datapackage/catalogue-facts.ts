@@ -46,7 +46,7 @@ import type { AimeatConfig } from '../../config.js';
 import { signedInOnly } from '../../config-visibility.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
-import { currentNodeId } from '../../utils/gaii.js';
+import { currentNodeId, localAccountName } from '../../utils/gaii.js';
 import { recordedAudiencesOf } from './audience-record.js';
 
 /** One resource of a dataset, as its catalogue entry states it. */
@@ -139,11 +139,11 @@ export function csvUrlOf(descriptorUrl: string, resource: string): string {
  * written by the service, whatever its value says.
  */
 function writtenByService(rec: Pick<MemoryRecord, 'key' | 'ownerGaii'>, packageId: string, owner: string): boolean {
-  const at = rec.ownerGaii.lastIndexOf('@');
-  if (at <= 0 || rec.ownerGaii.includes('#') || rec.ownerGaii.slice(0, at) !== owner) return false;
+  if (rec.key !== `${catalogueKeyRoot(packageId)}/manifest`) return false;
   const node = currentNodeId();
-  if (node && rec.ownerGaii.slice(at + 1) !== node) return false;
-  return rec.key === `${catalogueKeyRoot(packageId)}/manifest`;
+  if (node) return rec.ownerGaii === `${owner}@${node}`;
+  // No node id known (a unit run): an account's namespace, never an agent's, of that account name.
+  return !rec.ownerGaii.includes('#') && rec.ownerGaii.includes('@') && localAccountName(rec.ownerGaii) === owner;
 }
 
 /**

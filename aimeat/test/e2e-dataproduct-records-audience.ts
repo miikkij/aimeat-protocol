@@ -8,7 +8,8 @@
  *   workspace and C none, so C does not read the workspace.
  *     R1  B (a viewer) defines a product over the workspace at the organism's audience: 409
  *         AUDIENCE_WIDER_THAN_SOURCE naming "private", and C reads no row of it. Fails on the code
- *         before round 13, where the product published and C read the rows.
+ *         before round 13, where the product published and C read the rows. C's own product over the
+ *         workspace is refused.
  *     U1  B's product over the workspace at private builds, and B reads its rows.
  *     U2  A (the workspace's creator and the organism's creator) builds a product over it at the
  *         organism's audience, and C reads its rows: the person who decides the workspace's access
@@ -102,6 +103,9 @@ await test('R1. B (a viewer) defines a product over the restricted workspace at 
     assert(d.text.includes('"private"'), `the refusal names the audience allowed: ${show(d)}`);
     const c = await rowsOf(C.token, B.name, N('wide'));
     assert(!c.text.includes(SECRET), `C reads the restricted record: ${show(c)}`);
+    // C, who does not read the workspace, builds no product from it at any audience.
+    const byC = await define(C.token, N('c'), 'private');
+    assert(byC.status === 403 || byC.status === 404, `C's product over the restricted workspace: ${show(byC)}`);
 });
 
 await test('U1. B\'s product over the workspace at private builds, and B reads its rows', async () => {

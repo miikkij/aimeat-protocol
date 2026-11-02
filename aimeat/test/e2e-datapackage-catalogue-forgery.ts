@@ -8,7 +8,8 @@
  *   package from the service's own records: the manifest the service wrote in the package owner's own
  *   namespace at its deterministic key, and the audience the service recorded (datapkg-audience.<name>).
  *     F1  owner B writes `packages/<x>/manifest` through POST /v1/memory naming owner A's private package
- *         as public: no catalogue lists A's package, and B's own discovery does not list it as B's.
+ *         as public: no catalogue lists A's package, and B's own discovery does not list it as B's;
+ *         B's withdrawal of A's package is refused (403).
  *     F2  an app of owner A (memory:write) rewrites the manifest of A's private package to say public:
  *         no public catalogue lists it.
  *     F3  with the Dataspace Protocol on, the forged manifest of F1 gives A's private package no open
@@ -120,6 +121,9 @@ await test('F1. Owner B\'s memory record naming A\'s private package as public: 
     assert(!(await sitemap()).includes(landing(N.priv)), 'the dataset sitemap lists A\'s private package');
     assert(!(await discoverIds('public')).includes(pkgOf(N.priv)), 'public discovery lists A\'s private package');
     assert(!(await discoverIds('own', B.token)).includes(pkgOf(N.priv)), 'B\'s own discovery lists A\'s package as B\'s');
+    // B holds nothing of A's package: its withdrawal is A's alone.
+    const w = await call('DELETE', `/v1/datapackages/${A.name}/${N.priv}`, B.token);
+    assert(w.status === 403, `B withdraws A's package: ${show(w)}`);
 });
 
 await test('F2. An app of A rewrites the manifest of A\'s private package to say public: no public catalogue lists it', async () => {
