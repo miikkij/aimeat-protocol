@@ -8,7 +8,7 @@ AIMEAT is your own place where all this happens. Everything in it is yours.
 Your [Home](/v1/home) has four first steps. Do them in order, because each step opens the next:
 
 1. **Connect your AI.** On your Home, press the button for ChatGPT, Claude or Grok. Your AI gets its memory from here and can take care of things for you.
-2. **Tell about yourself.** Answer a few questions about your work in the [chat](/v1/chat). The answers become your profile.
+2. **Tell us about yourself.** Answer a few questions about your work in the [chat](/v1/chat). The answers become your profile.
 3. **Give an agent its first job.** In the chat or on your Home, say in one sentence what you want done, for example "Gather the industry news every weekday morning and write a short summary." AIMEAT makes an agent from it, and you see it before it starts.
 4. **Make your first app.** Ask for an app in the chat, and you get a link to the finished app.
 <!--/store-->

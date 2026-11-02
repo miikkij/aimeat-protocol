@@ -15250,7 +15250,7 @@
     },
     "history": {
       "signInTitle": "Tu historial es tuyo",
-      "back": "Volver a tu casa",
+      "back": "Volver al inicio",
       "sub": "Las últimas {n} cosas de tu cuenta, la más reciente primero.",
       "subPlain": "Todo lo que ha pasado en tu cuenta, lo más reciente primero.",
       "empty": "Aquí todavía no hay nada. Se irá llenando a medida que uses el sitio.",
@@ -15321,7 +15321,7 @@
     "startPage": {
       "title": "Página de inicio",
       "hint": "Adonde llegas al iniciar sesión o al entrar por la portada.",
-      "home": "Hogar",
+      "home": "Inicio",
       "chat": "Chat",
       "controls": "Configuración y controles"
     },
@@ -16778,7 +16778,7 @@
   "nav": {
     "devView": "Para desarrolladores",
     "signIn": "Iniciar sesión",
-    "home": "Hogar",
+    "home": "Inicio",
     "messages": "Mensajes",
     "agents": "Agentes",
     "apps": "Aplicaciones",
