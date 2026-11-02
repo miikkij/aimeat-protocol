@@ -645,7 +645,7 @@
   var PILL_STRINGS = {
     en: {
       loggedIn: "logged in",
-      logoutBtn: "Logout",
+      logoutBtn: "Log out",
       signInBtn: "❤️ Sign In",
       account: "Account",
       federated: "Federated",
