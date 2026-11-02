@@ -24,6 +24,8 @@
  * @structure requestTransfer · readTransferFor · transferMessage · endAgreementTransfers · locateTransfer
  * @usage const out = await requestTransfer(deps, participant, req.body);
  * @version-history
+ *   v1.0.1 — 2026-11-02 — A new transfer asks the process room (./settings.ts processRoomRefusal): ended
+ *     processes take none, one participant a share only (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.4).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -32,13 +34,13 @@ import { localAccountName } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
 import { UNCHANGED } from '../record-cas.js';
 import {
-    DSP_PATH, HTTP_ENDPOINT_TYPE, MAX_LIVE_PROCESSES, PULL_FORMAT, TRANSFER_TERMINAL, callbackUrl, dspBody,
+    DSP_PATH, HTTP_ENDPOINT_TYPE, PULL_FORMAT, TRANSFER_TERMINAL, callbackUrl, dspBody,
     locateAgreement, locatePid, newProcessHex, transferAck, transferError, transferNext, transferPid, withHistory,
     type NegotiationRecord, type TransferRecord, type TransferState,
 } from './contract.js';
 import { callbackAllowed, later, sendCallback } from './callbacks.js';
-import { changeTransfer, createTransfer, listTransfers, liveProcessCount, readNegotiation, readTransfer, sweepArchive } from './store.js';
-import { tckModeOn } from './settings.js';
+import { changeTransfer, createTransfer, listTransfers, readNegotiation, readTransfer, sweepArchive } from './store.js';
+import { processRoomRefusal, tckModeOn } from './settings.js';
 import { isTckAgreement, tckOwnerGhii, transferScript, type TransferStep } from './tck.js';
 import { dropTransferKey, mintTransferKey, restoreTransferKey } from './transfer-token.js';
 import type { Participant } from './verifier.js';
@@ -170,7 +172,8 @@ export async function requestTransfer(deps: Deps, participant: Participant, msg:
     const open = (await listTransfers(deps.storage, ag.ownerGhii)).find(x => x.consumerPid === consumerPid && x.participantId === participant.id && x.agreementId === agreementId && !TRANSFER_TERMINAL.includes(x.state));
     if (open) return { status: 201, body: transferAck(open) };
     await sweepArchive(deps.storage, ag.ownerGhii);
-    if (await liveProcessCount(deps.storage, ag.ownerGhii) >= MAX_LIVE_PROCESSES) return bad({ consumerPid }, 'PROVIDER_BUSY', 'This provider holds too many open transfers. Try again later.');
+    const full = await processRoomRefusal(deps.storage, deps.config, ag.ownerGhii, participant.id, 'transfers');
+    if (full) return bad({ consumerPid }, full.code, full.reason);
 
     const hex = newProcessHex();
     const now = new Date().toISOString();

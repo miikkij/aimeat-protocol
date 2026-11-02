@@ -28,6 +28,8 @@
  *   providerOffer · locateNegotiation
  * @usage const out = await requestNegotiation(deps, participant, req.body); res.status(out.status).json(out.body);
  * @version-history
+ *   v1.0.1 — 2026-11-02 — A new request asks the process room (./settings.ts processRoomRefusal): ended
+ *     processes take none, one participant a share only (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -37,7 +39,7 @@ import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { UNCHANGED } from '../record-cas.js';
 import {
-    MAX_LIVE_PROCESSES, NEGOTIATION_TERMINAL, agreementIdOf, callbackUrl, dspBody, locatePid, negotiationAck,
+    NEGOTIATION_TERMINAL, agreementIdOf, callbackUrl, dspBody, locatePid, negotiationAck,
     negotiationError, negotiationNext, negotiationPid, newProcessHex, parseDatasetId, withHistory,
     type NegotiationRecord, type NegotiationState,
 } from './contract.js';
@@ -45,8 +47,8 @@ import { datasetFor, offerById, type OfferEntry } from './catalog.js';
 import { agreementOf } from './policy.js';
 import { materialiseAgreement, endAgreement } from './agreement.js';
 import { callbackAllowed, later, sendCallback } from './callbacks.js';
-import { changeNegotiation, createNegotiation, liveProcessCount, readNegotiation, sweepArchive } from './store.js';
-import { autoAgreeFor, nodeParticipantId, tckModeOn } from './settings.js';
+import { changeNegotiation, createNegotiation, readNegotiation, sweepArchive } from './store.js';
+import { autoAgreeFor, nodeParticipantId, processRoomRefusal, tckModeOn } from './settings.js';
 import { negotiationScript, tckDataset, tckOwnerGhii } from './tck.js';
 import type { Participant } from './verifier.js';
 import { endAgreementTransfers } from './transfer.js';
@@ -199,9 +201,8 @@ export async function requestNegotiation(deps: Deps, participant: Participant, m
     if (!found.ok) return bad({ consumerPid }, found.code, found.reason, found.status);
 
     await sweepArchive(deps.storage, found.owner);
-    if (await liveProcessCount(deps.storage, found.owner) >= MAX_LIVE_PROCESSES) {
-        return bad({ consumerPid }, 'PROVIDER_BUSY', 'This provider holds too many open negotiations. Try again later.');
-    }
+    const full = await processRoomRefusal(deps.storage, deps.config, found.owner, participant.id, 'negotiations');
+    if (full) return bad({ consumerPid }, full.code, full.reason);
     const hex = newProcessHex();
     const now = new Date().toISOString();
     const n: NegotiationRecord = {

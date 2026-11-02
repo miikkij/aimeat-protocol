@@ -13,17 +13,26 @@
  *   record deleted. The sweep runs at most once an hour per owner, when a new process is made. An owner
  *   holds at most MAX_LIVE_PROCESSES live records; a new request past it is refused, so the 1000-key
  *   budget of an account is never spent by strangers.
+ *
+ *   THE ROOM (processRoom). A process that ended takes no room: when the owner's records reach
+ *   MAX_LIVE_PROCESSES, the ones that ended longest ago fold into the archive at once, so the records
+ *   stay within the budget and only live processes refuse a request. One participant holds at most
+ *   AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT live ones with one owner, so it cannot take the whole
+ *   room and lock the other participants out.
  * @structure readNegotiation · readTransfer · createNegotiation · createTransfer · changeNegotiation ·
- *   changeTransfer · listNegotiations · listTransfers · liveProcessCount · sweepArchive · readArchive
+ *   changeTransfer · listNegotiations · listTransfers · liveProcessCount · processRoom · sweepArchive ·
+ *   readArchive
  * @usage const n = await changeNegotiation(storage, owner, hex, cur => ({ ...cur, state: 'AGREED' }));
  * @version-history
+ *   v1.1.0 — 2026-11-02 — processRoom: ended processes take no room and one participant takes a share of
+ *     it only (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
  */
 import type { Storage } from '../../storage/interface.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
 import {
-    ARCHIVE_AFTER_DAYS, NEGOTIATIONS_PREFIX, TRANSFERS_PREFIX, archiveKey, negotiationKey, transferKey,
+    ARCHIVE_AFTER_DAYS, MAX_LIVE_PROCESSES, NEGOTIATIONS_PREFIX, TRANSFERS_PREFIX, archiveKey, negotiationKey, transferKey,
     type NegotiationRecord, type TransferRecord,
 } from './contract.js';
 
@@ -141,17 +150,25 @@ export async function sweepArchive(storage: Storage, ownerGhii: string, opts: { 
     if (!opts.force && (lastSweep.get(ownerGhii) ?? 0) > now - 3_600_000) return 0;
     lastSweep.set(ownerGhii, now);
     const cutoff = now - ARCHIVE_AFTER_DAYS * 86_400_000;
-    let moved = 0;
-    const batches: Array<{ key: string; line: ArchiveLine }> = [];
+    const batches = (await processRows(storage, ownerGhii)).filter(r => r.line && Date.parse(r.line.endedAt) <= cutoff)
+        .map(r => ({ key: r.key, line: r.line! }));
+    return foldIntoArchive(storage, ownerGhii, batches);
+}
+
+/** One process record of the owner: its key, its participant, and its archive line once it ended. */
+interface ProcessRow { key: string; participantId: string; line: ArchiveLine | null }
+
+/** Every process record of the owner, each with its archive line when it ended. */
+async function processRows(storage: Storage, ownerGhii: string): Promise<ProcessRow[]> {
+    const out: ProcessRow[] = [];
     for (const [prefix, kind] of [[NEGOTIATIONS_PREFIX, 'negotiation'], [TRANSFERS_PREFIX, 'transfer']] as const) {
         for (const row of await storage.listMemory(ownerGhii, { prefix })) {
             const rec = kind === 'negotiation' ? asNegotiation(row.value) : asTransfer(row.value);
             if (!rec) continue;
             const ended = endedAt(rec, kind);
-            if (!ended || Date.parse(ended) > cutoff) continue;
             const n = rec as NegotiationRecord;
-            batches.push({
-                key: row.key, line: {
+            out.push({
+                key: row.key, participantId: rec.participantId, line: !ended ? null : {
                     kind, providerPid: rec.providerPid, consumerPid: rec.consumerPid, participantId: rec.participantId, state: rec.state,
                     ...(kind === 'negotiation' ? { datasetId: n.datasetId, ...(n.agreementId ? { agreementId: n.agreementId } : {}), ...(n.materialised ? { shareId: n.materialised.shareId } : {}) } : { agreementId: (rec as TransferRecord).agreementId }),
                     createdAt: rec.createdAt, endedAt: ended,
@@ -159,6 +176,35 @@ export async function sweepArchive(storage: Storage, ownerGhii: string, opts: { 
             });
         }
     }
+    return out;
+}
+
+/**
+ * Is there room for one more process of `participantId` with this owner? A process that ended does
+ * not take room: when the owner's records reach MAX_LIVE_PROCESSES, the ones that ended longest ago are
+ * folded into the archive at once (a summary line each, as the 90-day sweep does), so the key budget
+ * stays bounded. Answers null when there is room, 'provider' when the owner holds MAX_LIVE_PROCESSES
+ * live ones, and 'participant' when this participant holds `perParticipant` live ones (0: no limit).
+ */
+export async function processRoom(
+    storage: Storage, ownerGhii: string, participantId: string, perParticipant: number,
+): Promise<{ full: 'provider' | 'participant'; live: number } | null> {
+    const rows = await processRows(storage, ownerGhii);
+    const live = rows.filter(r => !r.line);
+    const liveOf = live.filter(r => r.participantId === participantId).length;
+    if (perParticipant > 0 && liveOf >= perParticipant) return { full: 'participant', live: liveOf };
+    if (live.length >= MAX_LIVE_PROCESSES) return { full: 'provider', live: live.length };
+    const over = rows.length - MAX_LIVE_PROCESSES + 1;
+    if (over > 0) {
+        const ended = rows.filter(r => r.line).sort((a, b) => a.line!.endedAt.localeCompare(b.line!.endedAt)).slice(0, over);
+        await foldIntoArchive(storage, ownerGhii, ended.map(r => ({ key: r.key, line: r.line! })));
+    }
+    return null;
+}
+
+/** Fold ended processes into the monthly archive and delete their records. Answers how many moved. */
+async function foldIntoArchive(storage: Storage, ownerGhii: string, batches: Array<{ key: string; line: ArchiveLine }>): Promise<number> {
+    let moved = 0;
     for (const b of batches) {
         const month = b.line.endedAt.slice(0, 7);
         let kept = false;
