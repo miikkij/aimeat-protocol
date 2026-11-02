@@ -36,9 +36,12 @@
  *   - getRegion() / getTimeZone() — null when the reader follows their browser
  *   - resolvedTimeZone() / zoneLabel() — the zone actually in force, and how to name it
  *   - onPrefsChange(fn) — for anything that wants the values without a re-render
+ *   - getAccountLocale() — the account's own language from the same read, for i18n's applyAccountLocale
  * @usage import { getRegion, getTimeZone } from '/js/display-prefs.js';
  * @version-history
  *   v1.0.0 — 2026-09-12 — Initial, with the profile's region and timezone fields.
+ *   v1.1.0 — 2026-11-02 — The same read carries the account's language (`locale`) to the listeners,
+ *     so the page can speak it after sign-in without a second request (spa.html, i18n.js).
  */
 // apiGet, not a bare fetch. This SPA signs in with a JWT held in localStorage and attaches it per
 // request; a plain `fetch` with `credentials: 'same-origin'` sends no credential at all and gets a
@@ -51,6 +54,8 @@ import { swallowed } from '/js/swallowed.js';
 /** Null means "follow the browser", which is a real answer and not a missing one. */
 let region = null;
 let timezone = null;
+/** The account's own language; it never moves a date's format, only i18n reads it. */
+let accountLocale = null;
 let loaded = false;
 let inflight = null;
 const listeners = new Set();
@@ -69,7 +74,7 @@ const listeners = new Set();
  */
 function announce(changed) {
   for (const fn of listeners) {
-    try { fn({ region, timezone }); } catch (err) { swallowed('display-prefs: listener', err); }
+    try { fn({ region, timezone, locale: accountLocale }); } catch (err) { swallowed('display-prefs: listener', err); }
   }
   try {
     window.dispatchEvent(new CustomEvent('aimeat-prefs-change', { detail: { region, timezone } }));
@@ -99,6 +104,7 @@ export function loadDisplayPrefs() {
       if (d) {
         region = d.region || null;
         timezone = d.timezone || null;
+        accountLocale = d.locale || null;
       }
       loaded = true;
       announce(was !== region + '|' + timezone);
@@ -125,6 +131,9 @@ export function setDisplayPrefs(next) {
 
 /** The BCP-47 tag to format with, or null to follow the browser. */
 export function getRegion() { return region; }
+
+/** The signed-in account's language, or null before the read or when it has none. */
+export function getAccountLocale() { return accountLocale; }
 
 /** The IANA zone to read the clock in, or null to follow the browser. */
 export function getTimeZone() { return timezone; }
