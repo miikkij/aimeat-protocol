@@ -19,6 +19,7 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   2026-11-02 — POST /v1/agents/v2/token carries a store place's default for agents, once (services/place-agent-scopes.ts).
  *   2026-10-31 — A proposal's approval_url is its own page on the home, /v1/home?new-agent=1&proposal=<id> (v31 K51).
  *   2026-10-19 — The public card's field list allows `avatar` and `avatar_problem`: the agent's picture is public by design.
  *   2026-10-15 — The approval's llm_choice carries the policy warning for a pinned model the owner's
@@ -692,6 +693,36 @@ async function run() {
 
         const use = await json('/v1/memory', { headers: { Authorization: `Bearer ${mintedToken}` } });
         assert(use.status === 200, `the minted credential should work, got ${use.status}`);
+    });
+
+    // FAILED FIRST: on crew75 the default reached POST /v1/auth/token and not this mint, which is the one
+    // a crew's run uses, so morning-digest kept its 13 words (aimeat-commercial-1c, 2.11).
+    await test('on a store place the credential a crew run mints carries the place default, once, and the owner keeps theirs', async () => {
+        const gaii = `workflow-manager#${a.owner}@${NODE_ID}`;
+        const mint = async () => {
+            const assertion = await signAssertion(gaii, keysByAgent.get('workflow-manager')!);
+            const r = await json('/v1/agents/v2/token', { method: 'POST', body: JSON.stringify({ grant_type: KEY_GRANT, assertion }) });
+            assert(r.status === 200, `token ${r.status}: ${JSON.stringify(r.body)}`);
+            return r.body.scopes as string[];
+        };
+        const setPlan = (value: string) => json('/v1/admin/config', { method: 'PUT', headers: authA, body: JSON.stringify({ changes: [{ path: 'site.purchase_plan', value }] }) });
+        const before = await mint();
+        assert(!before.includes('memory:purge'), `the template lacks the word this proves with: ${before.join(' ')}`);
+        const on = await setPlan('Solo');
+        assert(on.status === 200, `setting the plan: ${on.status} ${JSON.stringify(on.body?.error)}`);
+        try {
+            const widened = await mint();
+            assert(widened.includes('memory:purge') && widened.includes('notifications:send'), `the place default arrived: ${widened.join(' ')}`);
+            for (const kept of ['agent:write', 'commerce:buy', 'exchange:write', 'secrets:manage', 'consent:manage']) {
+                assert(!widened.includes(kept), `${kept} stays with the owner`);
+            }
+            for (const word of before) assert(widened.includes(word), `${word} it held stays`);
+            const taken = await json('/v1/agents/workflow-manager/scopes', { method: 'PATCH', headers: authA, body: JSON.stringify({ scopes: before }) });
+            assert(taken.status === 200, `the owner narrows it back: ${taken.status} ${JSON.stringify(taken.body?.error)}`);
+            assert(!(await mint()).includes('memory:purge'), 'the default applies once: what the owner took away stays away');
+        } finally {
+            await setPlan('');
+        }
     });
 
     await test('the same assertion cannot be spent twice', async () => {

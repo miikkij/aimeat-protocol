@@ -18,7 +18,8 @@
  *   grant until the two are separate words.
  *
  *   IN THE RECORD, ONCE. The words go into the agent's own `defaultScopes` the first time it is approved
- *   or gets a token here (routes/agents/device-auth-approve.ts, routes/auth.ts), so the Agents tab shows
+ *   or gets a token here (routes/agents/device-auth-approve.ts, routes/auth.ts, and
+ *   routes/agents-v2/token.ts, the mint a crew's run and a card-made agent use), so the Agents tab shows
  *   what it may do. PLACE_DEFAULT_KEY remembers the agents that had it, so a word the owner takes away
  *   afterwards stays away: the owner's own narrowing is the decision that counts. The door's intersection
  *   of token and record (auth/effective-scopes.ts) is unchanged. Elsewhere nothing changes.
