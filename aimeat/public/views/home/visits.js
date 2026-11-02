@@ -10,6 +10,8 @@
  * @structure useHomeVisit(signedIn) · VISIT_GAP_MS · OFFERS_KEY · OFFERS_PATH · patchOffers(patch)
  * @usage const visit = useHomeVisit(!!session);   // null until read, then 1, 2, 3, …
  * @version-history
+ *   v1.2.0 — 2026-11-02 — Counted on a store place only (customerNode): the offers it times show nowhere
+ *     else, so another node writes no `home.visits` (Jouni, 2.11 07.43).
  *   v1.1.0 — 2026-11-02 — patchOffers(): the one writer of `home.offers`, the home's record of its offers
  *     and the person's answers, shared by morning-digest.js and made-for-you.js.
  *   v1.0.0 — 2026-11-02 — Initial.
@@ -18,6 +20,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { invalidateShared } from '/views/surface/shared-read.js';
+import { customerNode } from '/js/site.js';
 
 /** The home's offers and the person's answers to them: one private record, read through useShared('home-offers'). */
 export const OFFERS_KEY = 'home.offers';
@@ -53,11 +56,15 @@ async function countVisit() {
   return next;
 }
 
-/** Which visit this is: null until it is read. A failed read or write leaves it null, and no offer shows. */
+/**
+ * Which visit this is: null until it is read. A failed read or write leaves it null, and no offer shows.
+ * Counted on a store place only, where the offers are (customerNode, site.purchase_plan): elsewhere
+ * nothing reads the count, so nothing is written (Jouni, 2.11 07.43).
+ */
 export function useHomeVisit(signedIn) {
   const [visit, setVisit] = useState(null);
   useEffect(() => {
-    if (!signedIn) return undefined;
+    if (!signedIn || !customerNode()) return undefined;
     let live = true;
     countVisit()
       .then((n) => { if (live) setVisit(n); })
