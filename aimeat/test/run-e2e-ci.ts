@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-02 -- e2e-dataproduct-records-audience.ts joins the list (not the guard tier): a data product's records source allows the audience its workspace admits (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-datapackage-catalogue-forgery.ts joins the list (not the guard tier): the public data package catalogues trust only the service's manifest and audience record (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-files-connections.ts joins the list (not the guard tier): a connected SharePoint on an own node (:28285).
  *   2026-11-01 -- e2e-iam-parties.ts joins the list (not the guard tier): a person registered to an app as a member AIMEAT.iam reads (WP9d).
@@ -1286,6 +1287,8 @@ const ALL_SUITES = [
     'test/e2e-dataproduct.ts',
     // The canvas capabilities WP9a lacked: a run when a source changes, the AI description draft, the column descriptions from the source (WP9c).
     'test/e2e-dataproduct-canvas.ts',
+    // A records source allows the audience its workspace admits, not the whole organism (secaudit2026nov02d round 13).
+    'test/e2e-dataproduct-records-audience.ts',
     // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
     'test/e2e-party.ts',
     // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
