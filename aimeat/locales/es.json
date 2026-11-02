@@ -16825,7 +16825,7 @@
     "noAgents": "No tienes agentes. Crea uno primero en tu perfil.",
     "noAgentsCreate": "Todavía no tienes agentes. Ponle un nombre al agente: con ese nombre trabajará {client} en AIMEAT.",
     "createNewAgent": "Crear un agente nuevo",
-    "newAgentName": "Nombre del agente (3-64 caracteres, minúsculas, números y guiones)",
+    "newAgentName": "Nombre del agente (3–64 caracteres: minúsculas, números y guiones)",
     "newAgentNamePlaceholder": "por ejemplo, {example}",
     "newAgentDisplayName": "Nombre visible (opcional)",
     "newAgentDisplayNameHint": "por ejemplo, {client} en el portátil del trabajo",
