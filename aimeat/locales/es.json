@@ -14504,9 +14504,10 @@
       "invitedNamed": "Para tu solicitud se ha creado el organismo {name} en {host}. Es un lugar compartido para ti, tu IA y quienes lo construyen.",
       "invited": "Para tu solicitud se ha creado un organismo en {host}. Es un lugar compartido para ti, tu IA y quienes lo construyen.",
       "acceptTo": "Acepta la invitación desde tu correo. Se envió a {email}.",
-      "acceptAccount": "Acepta la invitación en tu cuenta de {host}. Te espera en la página Lugares compartidos.",
+      "acceptAccount": "La invitación llegó a tu cuenta de {host}, en la página Lugares compartidos. Acéptala allí si aún no lo has hecho.",
       "acceptAccountButton": "Abrir la invitación",
       "follow": "Sigue el trabajo en {host}.",
+      "followButton": "Ábrelo en {host}",
       "connectThere": "Conecta tu IA también a {host}, igual que aquí: abre Conecta tu IA en {host}, elige tu IA y sigue los pasos de la página. Al final apruebas la conexión.",
       "connectThereButton": "Conecta tu IA allí",
       "doneTitle": "Tu agente está listo y funciona.",
@@ -25828,7 +25829,8 @@
     },
     "stopped": "Me detuve aquí porque esto tardó demasiado y mi respuesta no está terminada. Di \"continúa\" y sigo desde aquí, o pregunta de nuevo por partes más pequeñas.",
     "appReady": "Tu aplicación está lista. Ábrela aquí: {{url}}",
-    "toolsNotConnected": "No pude conectar con tus herramientas de AIMEAT, así que no empecé. Inténtalo de nuevo en un momento."
+    "toolsNotConnected": "No pude conectar con tus herramientas de AIMEAT, así que no empecé. Inténtalo de nuevo en un momento.",
+    "noAnswer": "Esta vez no llegó ninguna respuesta. Envía tu mensaje otra vez y lo intento de nuevo."
   },
   "explain": {
     "open": "Explicación: {term}",

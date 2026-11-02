@@ -7,15 +7,19 @@
  *   finished piece of work for it with the place's own AI (a checklist for work they repeat, a short
  *   plan for what gets in their way, a first draft for what they need, an explanation for what is
  *   unclear), and offers it whole; one press keeps it.
- *   The work is made once: it is written to the person's own memory record `home.made-for-you`
- *   ({ state: offered | kept | declined, title, why, body, madeAt }, private) as soon as it exists, so
- *   a reload shows the same piece and costs nothing. Kept, it stays in that record, where their AI
- *   and the Memory page find it. Shown on a node the store sold, from the third visit (visits.js),
- *   when the profile has an answer; nothing is shown while it is made or when the model cannot be
- *   reached.
+ *   The work is made once: it is written to the home's bookkeeping record `home.offers` as `madeForYou`
+ *   ({ state: offered | kept | declined, title, why, body, madeAt }) as soon as it exists, so a reload
+ *   shows the same piece and costs nothing. Kept, it is written to the person's own record
+ *   `home.made-for-you` ({ state: kept, … }, private), where their AI and the Memory page find it, and
+ *   which the place's activity log shows as the work they kept; the offer itself is routine there.
+ *   Shown on a node the store sold, from the third visit (visits.js), when the profile has an answer;
+ *   nothing is shown while it is made or when the model cannot be reached.
  * @structure MadeForYouOffer({ visit }) · MADE_KEY
  * @usage <${MadeForYouOffer} visit=${visit} />
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The offered piece lives in `home.offers`, and only the press that keeps it
+ *     writes `home.made-for-you`: written there on offering too, the log said the person kept it twice
+ *     (first-timer round on crew60). A record left `offered` in `home.made-for-you` is still read.
  *   v1.0.0 — 2026-11-02 — Initial.
  */
 import { h } from 'preact';
@@ -27,6 +31,7 @@ import { swallowed } from '/js/swallowed.js';
 import { customerNode } from '/js/site.js';
 import { useShared, invalidateShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
+import { OFFERS_PATH, patchOffers } from './visits.js';
 import { Band } from '/components/Band.js';
 import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -105,25 +110,29 @@ async function makeWork(lines) {
   // api() throws on a refusal (no model, a spent budget), so what comes back here is an answer.
   const work = parseWork(resp?.data?.content);
   if (!work) throw new Error('NO_WORK');
-  await writeMade({ state: 'offered', ...work, madeAt: new Date().toISOString() });
+  await patchOffers({ madeForYou: { state: 'offered', ...work, madeAt: new Date().toISOString() } });
 }
 
 /** The card, or nothing: not a store's node, before the third visit, no usable answer, answered, or not made. */
 export function MadeForYouOffer({ visit }) {
   const enabled = customerNode() && Number(visit) >= FROM_VISIT;
   const { journey, ready } = useHomeState();
-  const made = useShared('home-made-for-you', enabled ? MADE_PATH : '', ['memory'], (d) => (d?.value && typeof d.value === 'object' ? d.value : null));
+  const pick = (d) => (d?.value && typeof d.value === 'object' ? d.value : null);
+  const offers = useShared('home-offers', enabled ? OFFERS_PATH : '', ['memory'], pick);
+  const made = useShared('home-made-for-you', enabled ? MADE_PATH : '', ['memory'], pick);
   const [phase, setPhase] = useState('');
   const lines = profileLines(journey?.profile);
+  // The offered piece; a record left `offered` in home.made-for-you by the first version is read too.
+  const work = offers.data?.madeForYou ?? (made.data?.state === 'offered' ? made.data : null);
+  const answered = !!made.data && made.data.state !== 'offered';
 
   useEffect(() => {
-    if (!enabled || !ready || !made.ready || made.data || !lines || making) return;
+    if (!enabled || !ready || !offers.ready || !made.ready || work || answered || !lines || making) return;
     making = makeWork(lines)
       .catch((err) => swallowed('made for you: making the work', err))
       .finally(() => { making = null; });
-  }, [enabled, ready, made.ready, made.data, lines]);
+  }, [enabled, ready, offers.ready, made.ready, work, answered, lines]);
 
-  const work = made.data;
   if (!enabled || !work) return null;
   if (phase === 'kept') {
     return html`
@@ -132,12 +141,15 @@ export function MadeForYouOffer({ visit }) {
         <${Actions}><${Action} small soft href="/v1/profile?tab=memory">${tr('home.madeForYou.memoryLink', 'Memory page')} →<//><//>
       <//>`;
   }
-  if (work.state !== 'offered') return null;
+  if (work.state !== 'offered' || answered) return null;
 
   const answer = (state) => async () => {
     setPhase('busy');
     try {
-      await writeMade({ ...work, state, answeredAt: new Date().toISOString() });
+      const answeredAt = new Date().toISOString();
+      // Only keeping writes the person's own record; saying no is the home's bookkeeping.
+      if (state === 'kept') await writeMade({ ...work, state, answeredAt });
+      await patchOffers({ madeForYou: { ...work, state, answeredAt } });
       setPhase(state === 'kept' ? 'kept' : '');
     } catch (err) {
       swallowed('made for you: the answer', err);

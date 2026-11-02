@@ -16357,9 +16357,10 @@
       "invitedNamed": "Pyyntöäsi varten on tehty organismi {name} palveluun {host}. Se on yhteinen paikka sinulle, tekoälyllesi ja rakentajille.",
       "invited": "Pyyntöäsi varten on tehty organismi palveluun {host}. Se on yhteinen paikka sinulle, tekoälyllesi ja rakentajille.",
       "acceptTo": "Hyväksy kutsu sähköpostistasi. Kutsu lähti osoitteeseen {email}.",
-      "acceptAccount": "Hyväksy kutsu {host}-tililläsi. Kutsu odottaa sivulla Yhteiset paikat.",
+      "acceptAccount": "Kutsu lähti {host}-tilillesi sivulle Yhteiset paikat. Hyväksy se siellä, jos et ole vielä hyväksynyt.",
       "acceptAccountButton": "Avaa kutsu",
       "follow": "Seuraa työtä palvelussa {host}.",
+      "followButton": "Avaa se palvelussa {host}",
       "connectThere": "Yhdistä tekoälysi myös palveluun {host} samalla tavalla kuin tähän paikkaan: avaa siellä Yhdistä tekoälysi, valitse tekoälysi ja seuraa sivun ohjeita. Lopuksi hyväksyt yhteyden.",
       "connectThereButton": "Yhdistä tekoälysi siellä",
       "doneTitle": "Agenttisi on valmis ja toimii.",
@@ -28188,7 +28189,8 @@
     },
     "stopped": "Lopetin tähän, koska tämä kesti liian kauan, eikä vastaukseni ole valmis. Sano \"jatka\", niin jatkan tästä, tai kysy asia pienemmissä osissa.",
     "appReady": "Sovelluksesi on valmis. Avaa se tästä: {{url}}",
-    "toolsNotConnected": "En saanut yhteyttä AIMEAT-työkaluihisi, joten en aloittanut. Yritä hetken päästä uudelleen."
+    "toolsNotConnected": "En saanut yhteyttä AIMEAT-työkaluihisi, joten en aloittanut. Yritä hetken päästä uudelleen.",
+    "noAnswer": "Vastausta ei tullut tällä kertaa. Lähetä viestisi uudelleen, niin yritän vielä."
   },
   "explain": {
     "open": "Ohje: {term}",
