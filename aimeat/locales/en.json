@@ -16200,6 +16200,8 @@
       "lineTarget": "{who} {what}: {target}",
       "failed": "(did not succeed)",
       "showReads": "Show reads and routine entries too",
+      "times_one": "({n} time)",
+      "times": "({n} times)",
       "run": {
         "finished": "{who} finished its work ({steps})",
         "failed": "{who} could not finish its work ({steps})",

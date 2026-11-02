@@ -14541,6 +14541,8 @@
       "lineTarget": "{who} {what}: {target}",
       "failed": "(no se completó)",
       "showReads": "Mostrar también las consultas y los registros rutinarios",
+      "times_one": "({n} vez)",
+      "times": "({n} veces)",
       "run": {
         "finished": "{who} terminó su trabajo ({steps})",
         "failed": "{who} no pudo terminar su trabajo ({steps})",
