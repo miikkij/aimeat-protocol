@@ -10,14 +10,17 @@
  *   `https://<host>[:<port>]/<path…>/did.json`, or `/.well-known/did.json` with no path. Only https,
  *   except an origin the operator listed in AIMEAT_DATASPACE_CALLBACK_ORIGINS (a lab on a private
  *   network), which is fetched as listed. Every fetch goes through safeFetch (SSRF guard, redirect
- *   re-validation); a document is kept five minutes.
+ *   re-validation); a document is kept five minutes, and at most DID_CACHE_MAX documents are kept.
  *
  *   KEYS. A verification method with `publicKeyJwk` (JsonWebKey2020, JsonWebKey, Multikey with a JWK).
  *   The relationship (`capabilityInvocation`, `authentication`, `assertionMethod`) lists the method by
  *   id, relative (`#key-1`) or absolute, or embeds it.
- * @structure FetchJson · defaultFetchJson · didWebUrl · resolveDid · pickKey · DidDocumentLike · clearDidCache
+ * @structure FetchJson · defaultFetchJson · didWebUrl · resolveDid · pickKey · DidDocumentLike · clearDidCache ·
+ *   didCacheSize · DID_CACHE_MAX
  * @usage const doc = await resolveDid(did, { fetchJson, allowOrigins }); const key = pickKey(doc, kid, 'capabilityInvocation');
  * @version-history
+ *   v1.0.1 — 2026-11-02 — The document cache is bounded (DID_CACHE_MAX): the expired go first, then the
+ *     oldest (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.5).
  */
 import { importJWK, type JWK } from 'jose';
@@ -67,14 +70,35 @@ export function didWebUrl(did: string, allowOrigins: readonly string[] = []): st
 
 const cache = new Map<string, { doc: DidDocumentLike; until: number }>();
 const TTL_MS = 5 * 60_000;
+/**
+ * The most documents kept. A DID is the caller's choice and is resolved before any signature check,
+ * so the cache is bounded: past it the expired documents go, then the oldest. A document that went is
+ * fetched again on its next use, so the bound refuses nobody and is not a setting.
+ */
+export const DID_CACHE_MAX = 1000;
 
 /** Drop every kept document (unit tests, and a key rotation an operator wants seen at once). */
 export function clearDidCache(): void { cache.clear(); }
+
+/** How many documents are kept now (unit tests). */
+export function didCacheSize(): number { return cache.size; }
+
+/** Keep a document, making room first: the expired ones go, then the oldest kept. */
+function keep(did: string, doc: DidDocumentLike, now: number): void {
+    cache.delete(did);
+    if (cache.size >= DID_CACHE_MAX) {
+        for (const [k, v] of cache) if (v.until <= now) cache.delete(k);
+        // A Map iterates in insertion order, so the first key is the oldest kept.
+        while (cache.size >= DID_CACHE_MAX) cache.delete(cache.keys().next().value as string);
+    }
+    cache.set(did, { doc, until: now + TTL_MS });
+}
 
 /** The DID document of `did`, or null when it cannot be resolved or its `id` is not `did`. */
 export async function resolveDid(did: string, opts: { fetchJson?: FetchJson; allowOrigins?: readonly string[] } = {}): Promise<DidDocumentLike | null> {
     const hit = cache.get(did);
     if (hit && hit.until > Date.now()) return hit.doc;
+    if (hit) cache.delete(did);
     const url = didWebUrl(did, opts.allowOrigins ?? []);
     if (!url) return null;
     const fetchJson = opts.fetchJson ?? defaultFetchJson(opts.allowOrigins ?? []);
@@ -86,7 +110,7 @@ export async function resolveDid(did: string, opts: { fetchJson?: FetchJson; all
     }
     const doc = res.json as DidDocumentLike | null;
     if (res.status !== 200 || !doc || typeof doc !== 'object' || doc.id !== did) return null;
-    cache.set(did, { doc, until: Date.now() + TTL_MS });
+    keep(did, doc, Date.now());
     return doc;
 }
 
