@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-02 — An agent_task schedule takes `deliver`: "owner" on create and edit ("none" on edit takes
+ *     it off), and the node then hands each finished task's result to the owner
+ *     (services/task-result-delivery.ts).
  *   2026-11-01 — The `dataproduct` kind: create and edit check that input.name names a data product
  *     definition of the owner (services/dataproduct/schedule-input.ts); only the name is stored (plan
  *     doc-mvwxcas3dom3, D9.5).
@@ -111,6 +114,7 @@ import { aiScheduleInputRefusal } from './schedule-ai-read.js';
 import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './schedule-instruction-hold.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
+import { withDeliver } from './task-result-delivery.js';
 import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
 import { checkDataproductScheduleInput } from './dataproduct/schedule-input.js';
 
@@ -542,6 +546,8 @@ export async function createScheduleRecord(
                     technicalChecks: Array.isArray(v.technical_checks) ? v.technical_checks : [],
                 },
                 resources: tmpl?.resources,
+                // The node hands each finished task's result to the owner (services/task-result-delivery.ts).
+                ...(body.deliver === 'owner' ? { deliver: 'owner' } : {}),
             },
         };
     } else if (kind === 'eco-capability') {
@@ -692,6 +698,12 @@ export async function updateScheduleRecord(
     if (patch.prompt !== undefined) {
         const next = withSchedulePrompt({ type: job.type, input: updates.input ?? job.input }, patch.prompt);
         if (!next.ok) return next;
+        updates.input = next.input;
+    }
+    // Who gets an agent_task's result (services/task-result-delivery.ts).
+    if (patch.deliver !== undefined) {
+        const next = withDeliver(job.type, updates.input ?? job.input, patch.deliver);
+        if (!next.ok) return { ok: false, status: 400, code: 'INVALID_INPUT', message: next.message };
         updates.input = next.input;
     }
 

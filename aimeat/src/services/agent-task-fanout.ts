@@ -38,6 +38,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.10.0 — 2026-11-02 — A completed task whose schedule said deliver: "owner" has its result handed to
+ *     the owner by the node (services/task-result-delivery.ts).
  *   v1.9.0 — 2026-10-31 — The onboarding smoke test does not reach the owner's home feed when it
  *     finishes; it is the agent's own check, not work the owner asked for (Jouni v27 P6).
  *   v1.8.0 — 2026-10-25 — A task that does a work of an agent goal (workTrackingCode goal:…) settles
@@ -74,6 +76,7 @@ import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { recordTaskCompleted, recordTaskFailed } from './activity-recorder.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { notifyAutomationTaskComplete } from './ecosystem-automation-notify.js';
+import { deliverTaskResult } from './task-result-delivery.js';
 import { processAutomationAdvisories } from './ecosystem-automation-advisories.js';
 import { closeItemsForTask } from './open-items.js';
 import { reclaimTaskLiveTrace } from '../routes/agent-tasks/helpers.js';
@@ -207,6 +210,10 @@ export async function afterTaskCompleted(
     // email the owner a short report + store an in-app report record.
     void notifyAutomationTaskComplete(storage, config, updated ?? task, message)
         .catch(e => logger.error('automation completion notify failed', { taskId: id, error: String(e) }));
+
+    // A scheduled task whose schedule says `deliver: "owner"`: the node hands its result to the owner
+    // (bell, and email when it can), so the promise does not rest on the agent calling a tool.
+    void deliverTaskResult(storage, config, { ...(updated ?? task), deliverableKey: deliverableKey ?? updated?.deliverableKey ?? task.deliverableKey }, message);
 
     // B7/B8 — drain the owner's advisory outbox for this app: deliver immediately (no approval) over
     // the connector tunnel, or gate behind owner approval.

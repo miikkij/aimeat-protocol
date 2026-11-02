@@ -11,6 +11,8 @@
  * @structure TaskWake · runAgentTaskJob(storage, wake, job, trigger) · materialiseAgentTask(storage, wake, args)
  * @usage import { runAgentTaskJob, materialiseAgentTask } from './scheduler-agent-task.js';
  * @version-history
+ *   v1.4.0 — 2026-11-02 — A template with deliver: "owner" gives the task the delivery scope entry, and
+ *     the node then hands the result to the owner on completion (services/task-result-delivery.ts).
  *   v1.3.1 — 2026-10-28 — Both paths decide on the agent record as it is: the node no longer narrows
  *     an agent holding `*` by itself (Jouni, 2026-10-28).
  *   v1.3.0 — 2026-10-25 — materialiseAgentTask takes `workTrackingCode` and `startedBy`: an agent goal's
@@ -34,6 +36,7 @@ import { emitChange, emitDelivery } from './event-bus.js';
 import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
 import { isStopped } from './agent-stop-rules.js';
 import { scheduleFireRefusal } from './schedule-fire-refusal.js';
+import { deliveryScopeEntry } from './task-result-delivery.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import type { JobTrigger, JobRunResult } from './scheduler-types.js';
@@ -70,6 +73,8 @@ export async function runAgentTaskJob(
       title?: string; description?: string; scope?: AgentTaskScope[]; rules?: string[];
       verification?: { userExpects?: string; technicalChecks?: string[] };
       resources?: { knowledgePackages?: string[]; memoryKeys?: string[]; memoryPrefixes?: string[] };
+      /** 'owner': the node hands the finished task's result to the owner (schedule-write.ts). */
+      deliver?: string;
     };
   };
   const tmpl = cfg.taskTemplate;
@@ -122,13 +127,15 @@ export async function runAgentTaskJob(
   const scheduleScope: AgentTaskScope = {
     name: 'schedule', value: job.cron, type: 'cron', description: job.displayName || job.name,
   };
+  // The node hands the result to the owner when the task is done (services/task-result-delivery.ts).
+  const delivery = tmpl.deliver === 'owner' ? [deliveryScopeEntry(job.timezone)] : [];
   const record: AgentTaskRecord = {
     id: randomUUID(),
     agentGaii,
     ownerGaii: owner,
     title: tmpl.title,
     description: tmpl.description ?? '',
-    scope: [...(tmpl.scope ?? []), scheduleScope],
+    scope: [...(tmpl.scope ?? []), scheduleScope, ...delivery],
     rules: tmpl.rules ?? [],
     verification: {
       userExpects: tmpl.verification?.userExpects ?? '',

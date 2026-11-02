@@ -6796,6 +6796,13 @@ components:
           properties:
             title: { type: string }
             description: { type: string }
+        deliver:
+          type: string
+          enum: [owner]
+          description: >
+            agent_task: `owner` makes the node hand each finished task's result to the owner itself (the
+            bell, and email when the owner has a notification address), the heading and date written
+            by the node, so a promised result does not depend on the agent calling a tool.
         extension_name: { type: string }
         action_id: { type: string }
         instance_id: { type: string }
@@ -62127,6 +62134,14 @@ paths:
                     agent_task schedule's `input.taskTemplate.description`. The rest of the input
                     stays. Applied on top of `input` when both are sent. Other kinds refuse 400 NO_PROMPT;
                     an empty prompt is refused 400 INVALID_INPUT.
+                deliver:
+                  type: string
+                  enum: [owner, none]
+                  description: >
+                    agent_task only: `owner` makes the node hand each finished task's result to the owner
+                    (the bell, and email when the owner has a notification address), with the date
+                    written by the node; `none` leaves it to the agent. Another kind, or another value,
+                    is refused 400 INVALID_INPUT.
       responses:
         '200':
           description: >

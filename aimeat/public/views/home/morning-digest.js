@@ -13,6 +13,8 @@
  * @structure MorningDigestOffer({ visit }) · DIGEST_NAME
  * @usage <${MorningDigestOffer} visit=${visit} />
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The schedule says deliver: "owner": the node emails each digest and writes its
+ *     date (services/task-result-delivery.ts); on crew63 the model sent nothing and wrote October.
  *   v1.0.1 — 2026-11-02 — The answer is written through visits.js patchOffers, the one writer of `home.offers`.
  *   v1.0.0 — 2026-11-02 — Initial.
  */
@@ -79,7 +81,9 @@ export function MorningDigestOffer({ visit }) {
         name: DIGEST_NAME, displayName: tr('home.digest.agentName', 'Morning digest'),
         purpose: purposeFor(work), does: [], reach: 'standard', template: 'morningDigest', crewDef: null,
       };
-      const out = await startAgent(draft, { when: 'clock', cron: CRON });
+      // deliver 'owner': the node sends each digest to the person itself, so the email the card
+      // promises does not rest on the model calling its notify tool (crew63: it did not).
+      const out = await startAgent(draft, { when: 'clock', cron: CRON, deliver: 'owner' });
       if (out?.schedule_problem) setProblem(String(out.schedule_problem));
       await rememberOffer('started').catch((err) => swallowed('morning digest: remember started', err));
       setPhase('done');
