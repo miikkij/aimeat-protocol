@@ -8,6 +8,9 @@
  *     open or share offer   a named share (a consent record, services/parties/shares.ts) of the package
  *                           to the participant's party (./participant.ts), its purpose and end copied
  *                           from the offer, marked with the agreement (`dspAgreement`, node-written).
+ *                           The share is no wider than the offer: an open offer stood on the package
+ *                           being public, so its share reads what a public reader reads (`publicOnly`);
+ *                           a share offer keeps the version the share it stood on pins.
  *     exchange offer        an EXCHANGE contract: an entitlement on the listing's coordinate, prepaid
  *                           for what the compensate duty prices (a month of reads, or a block of
  *                           PER_READ_BLOCK reads), the share bound to it (`contract`), and the sale
@@ -22,13 +25,15 @@
  * @structure Materialised · materialiseAgreement · endAgreement
  * @usage const m = await materialiseAgreement(deps, negotiation); if (!m.ok) terminate(m.message);
  * @version-history
+ *   v1.0.1 — 2026-11-02 — The share carries the offer's scope: an open offer's share reads what a public
+ *     reader reads, a share offer's keeps its pin (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { grantConsent } from '../consent-write.js';
-import { endShares, setShareMeta, sharePatternOf } from '../parties/shares.js';
+import { endShares, setShareMeta, shareMetaOf, sharePatternOf } from '../parties/shares.js';
 import { partyRefOf } from '../parties/contract.js';
 import { changeParty } from '../parties/store.js';
 import { UNCHANGED } from '../record-cas.js';
@@ -59,6 +64,14 @@ function prepaid(model: 'per_month' | 'per_read', amount: number, plan: { callsP
     }
     const left = before?.model === 'bundle' ? before.callsRemaining : 0;
     return { model: 'bundle', blockSize: PER_READ_BLOCK, blockPrice: amount * PER_READ_BLOCK, callsRemaining: left + PER_READ_BLOCK };
+}
+
+/** The version a share offer's share pins: recorded at the request, or read from the share itself. */
+async function sharePin(storage: Storage, n: NegotiationRecord): Promise<string | undefined> {
+    if (n.offerKind !== 'share') return undefined;
+    if (n.terms?.pinnedVersion) return n.terms.pinnedVersion;
+    const source = n.offerRef ? await storage.getConsent(n.offerRef) : null;
+    return source ? shareMetaOf(source).pinnedVersion : undefined;
 }
 
 /** Make the grants an agreement stands for. A TCK seed agreement makes none. */
@@ -104,21 +117,28 @@ export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Pr
         }
     }
 
+    const pin = await sharePin(storage, n);
     const granted = await grantConsent({ storage, config }, { ownerGaii: n.ownerGhii, roles: ['owner'], scopes: [], collectionMethod: 'dataspace-agreement' }, {
         recipient: ref, dataPattern: sharePatternOf(n.packageName),
         purpose: n.terms?.purpose || `Dataspace agreement ${n.agreementId} with ${n.participantId}.`,
         ...(n.terms?.expires ? { expires: n.terms.expires } : {}),
-        metadata: { terms_required: false },
+        metadata: { terms_required: false, ...(pin ? { pinned_version: pin } : {}) },
     });
     if (!granted.ok) {
         if (entitlementId && contract) await revokeEntitlement(storage, ref, `datapkg:${owner}/${n.packageName}`, 'read');
         return { ok: false, code: granted.code, message: granted.message };
     }
+    const publicOnly = n.offerKind === 'open';
     const share = await setShareMeta(storage, granted.value, {
-        dspAgreement: n.agreementId, termsAcceptedAt: new Date().toISOString(), ...(contract ? { contract } : {}),
-    }) ?? granted.value;
+        dspAgreement: n.agreementId, termsAcceptedAt: new Date().toISOString(), ...(contract ? { contract } : {}), ...(publicOnly ? { publicOnly: true } : {}),
+    });
+    if (!share && publicOnly) {
+        // A share that does not say it reads what a public reader reads would be wider than the offer.
+        await endShares(storage, n.ownerGhii, c => c.id === granted.value.id, 'dsp-agreement-not-made');
+        return { ok: false, code: 'AGREEMENT_NOT_MADE', message: 'The share of the agreement could not be written. Try again.' };
+    }
     emitChange('consent', n.ownerGhii);
-    return { ok: true, value: { partyName: party.name, partyUid: party.uid, shareId: share.id, ...(entitlementId ? { entitlementId } : {}) } };
+    return { ok: true, value: { partyName: party.name, partyUid: party.uid, shareId: (share ?? granted.value).id, ...(entitlementId ? { entitlementId } : {}) } };
 }
 
 /** End what an agreement made: its share, its contract, and every transfer key of the share. */

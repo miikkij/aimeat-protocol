@@ -28,6 +28,8 @@
  *   providerOffer · locateNegotiation
  * @usage const out = await requestNegotiation(deps, participant, req.body); res.status(out.status).json(out.body);
  * @version-history
+ *   v1.0.2 — 2026-11-02 — A share offer records the pinned version of its share (secaudit2026nov02d
+ *     round 13).
  *   v1.0.1 — 2026-11-02 — A new request asks the process room (./settings.ts processRoomRefusal): ended
  *     processes take none, one participant a share only (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
@@ -210,7 +212,9 @@ export async function requestNegotiation(deps: Deps, participant: Participant, m
         participantId: participant.id, authMethod: participant.method, ...(participant.dataspace ? { dataspace: participant.dataspace } : {}),
         callbackAddress: msg.callbackAddress as string, datasetId: target, ...(found.packageName ? { packageName: found.packageName } : {}),
         offerId, offerKind: found.entry.kind, offer: found.entry.offer, ...(found.entry.ref ? { offerRef: found.entry.ref } : {}),
-        ...(found.entry.kind === 'share' ? { terms: { purpose: found.entry.purpose, expires: found.entry.expires ?? null } } : {}),
+        ...(found.entry.kind === 'share' ? { terms: {
+            purpose: found.entry.purpose, expires: found.entry.expires ?? null, ...(found.entry.pinnedVersion ? { pinnedVersion: found.entry.pinnedVersion } : {}),
+        } } : {}),
         ...(found.entry.priced ? { priced: found.entry.priced } : {}),
         lastOfferFrom: 'consumer', ...(found.tck ? { tck: found.tck } : {}),
         history: [{ at: now, event: 'request', from: '', to: 'REQUESTED', by: 'consumer' }], createdAt: now, updatedAt: now,
