@@ -7,6 +7,9 @@
  *   with an empty template pulses to completion without one, which is exactly what makes the scan
  *   path testable.
  * @version-history
+ *   2026-11-02 -- A config a member of another account published over gathers nothing and calls no AI
+ *     until the owner allows it; a draft of that member the owner publishes calls the AI as before
+ *     (secaudit2026nov02d round 13, publishDraft:cross-account-living-config-outside-pulse-spend-tally).
  *   2026-10-31 -- A config an app without ai:use wrote waits for the owner's one press before the pulse
  *     calls the AI; the owner's own config, an app holding ai:use and a Full access agent spend as
  *     before (secaudit2026oct31w2 round 10, f-2026aug-ai-paths-3).
@@ -356,6 +359,60 @@ await test('After the owner allows it, the app\'s config calls the AI on the nex
     await triggerPulse();
     const events = await ledgerEvents('appdoc');
     assert(events.some(e => AI_ATTEMPT.includes(e)), `the allowed config did not call the AI: ${JSON.stringify(events)}`);
+});
+
+// ── A member of another account publishes over the owner's config (secaudit2026nov02d round 13) ──
+// A workspace publish writes the publisher's draft into the existing `.latest` under its holder. It
+// recorded no writer, so the pulse took a config another account had just rewritten for the owner's own:
+// it gathered the owner's material into the shared workspace for that member's sections and called the
+// owner's AI. The publish now records the publisher, and such a config waits for the owner's one press.
+let bobName = '';
+let bobToken = '';
+const bobDraft = (doc: string) => json('/v1/memory', { method: 'POST', headers: auth(bobToken), body: JSON.stringify({
+    key: `organism.${orgId}.w.${WS}.living.${doc}.draft`, value: spendConfig(doc), visibility: 'private' }) });
+const publishAs = (bearer: string, doc: string) => json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: auth(bearer),
+    body: JSON.stringify({ ws: WS, namespace: 'living', id: doc }) });
+
+await test('Setup: a member of another account, an admin of the organism, and an owner config per case', async () => {
+    bobName = `lpbob${stamp}`;
+    bobToken = (await registerOwner(BASE, bobName)).token;
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(bobToken), body: '{}' });
+    assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+    const a = await json(`/v1/organisms/${orgId}/admins`, { method: 'POST', headers: auth(token), body: JSON.stringify({ target_ghii: bobName }) });
+    assert(a.status === 200, `promote ${a.status}: ${JSON.stringify(a.body.error)}`);
+    for (const doc of ['xacct', 'xown']) {
+        const v = await writeAs(token, `lpspendsrc.${doc}`, { text: `${spendWord(doc)} a note the owner keeps for their own documents` }, 'owner');
+        assert(v.status === 201, `source ${doc}: ${v.status}: ${JSON.stringify(v.body.error)}`);
+        const c = await writeAs(token, spendKey(doc), { ...spendConfig(doc), template: [] }, 'private');
+        assert(c.status === 201, `owner config ${doc}: ${c.status}: ${JSON.stringify(c.body.error)}`);
+    }
+});
+
+await test('A config another account published over gathers nothing and calls no AI; the owner is asked once, naming that member', async () => {
+    const d = await bobDraft('xacct');
+    assert(d.status === 201 || d.status === 200, `draft: ${d.status}: ${JSON.stringify(d.body.error)}`);
+    const p = await publishAs(bobToken, 'xacct');
+    assert(p.status === 200, `publish: ${p.status}: ${JSON.stringify(p.body.error)}`);
+    await triggerPulse();
+    const events = await ledgerEvents('xacct');
+    assert(!events.some(e => AI_ATTEMPT.includes(e)), `the pulse called the owner's AI for the other account's config: ${JSON.stringify(events)}`);
+    assert(events.includes('derive-waiting'), `the ledger says the section waits: ${JSON.stringify(events)}`);
+    const origins = (await sourcesOf('xacct')).map(s => s.value?.origin);
+    assert(!origins.includes(`lpspendsrc.xacct`), `the owner's material was copied for the other account's config: ${JSON.stringify(origins)}`);
+    const asks = (await spendAsks()).filter(q => q.target?.key === spendKey('xacct'));
+    assert(asks.length === 1 && asks[0].state === 'awaiting_owner', `one waiting question: ${JSON.stringify(asks)}`);
+    assert(String(asks[0].requested_by?.principal ?? '').startsWith(`${bobName}@`), `the question names the member: ${JSON.stringify(asks[0].requested_by)}`);
+});
+
+await test('Usage: a draft of another account that the owner publishes is the owner\'s save, and calls the AI unasked', async () => {
+    const d = await bobDraft('xown');
+    assert(d.status === 201 || d.status === 200, `draft: ${d.status}: ${JSON.stringify(d.body.error)}`);
+    const p = await publishAs(token, 'xown');
+    assert(p.status === 200, `owner publish: ${p.status}: ${JSON.stringify(p.body.error)}`);
+    await triggerPulse();
+    const events = await ledgerEvents('xown');
+    assert(events.some(e => AI_ATTEMPT.includes(e)) && !events.includes('derive-waiting'), `the owner's publish did not call the AI as before: ${JSON.stringify(events)}`);
+    assert(!(await spendAsks()).some(q => q.target?.key === spendKey('xown')), 'asked about the owner\'s own publish');
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

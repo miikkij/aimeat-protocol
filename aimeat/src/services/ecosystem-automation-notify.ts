@@ -15,7 +15,7 @@
  *     1. In-app: always (when email:true) writes an `automation.reports.*` memory record under the
  *        owner's namespace, so the report is visible in the portal even with no SMTP configured. This
  *        is the SMTP-free observable surface the E2E asserts on.
- *     2. Email: if SMTP is configured AND the owner has a notification email on their GHII record,
+ *     2. Email: if SMTP is configured AND the owner has a verified notification email on their GHII record,
  *        sends it via the shared EmailService. If email isn't configured, logs "email skipped (not
  *        configured)" and continues — never throws.
  *
@@ -38,10 +38,15 @@
  *   v1.2.0 — 2026-09-29 — The deliverable and the advisories the report quotes pass the
  *     classification leave() (external, to the owner's e-mail); what stays behind is named in the
  *     report body, kept on the record as `classifiedLeftOut`, and logged (TARGET-082 V4).
+ *   v1.3.0 — 2026-11-02 — The report is mailed only to an address the owner confirmed
+ *     (owner-mail-address.ts); with an unconfirmed one the in-app record carries
+ *     `emailSkipped: 'address_not_verified'` (secaudit2026nov02d round 13,
+ *     notifyAutomationTaskComplete:mails-unverified-notification-address).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { getActiveEmailService } from './email.js';
+import { verifiedNotificationEmail, notificationEmailUnverified } from './owner-mail-address.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -271,15 +276,25 @@ export async function notifyAutomationTaskComplete(
       logger.info('automation report email skipped (not configured)', { owner: ownerName, recipe: auto.recipeId });
       return;
     }
-    let ownerEmail: string | undefined;
+    let ownerEmail: string | null = null;
+    let unverified = false;
     try {
+      // Only an address the owner proved (owner-mail-address.ts): any principal of the owner holding
+      // memory:write-reserved may set notification_email, and a new one arrives unverified.
       const ghii = await storage.getGHII(ownerGhii);
-      ownerEmail = ghii?.notificationEmail;
+      ownerEmail = verifiedNotificationEmail(ghii);
+      unverified = notificationEmailUnverified(ghii);
     } catch (err) {
       logger.warn('automation report: owner GHII lookup failed', { owner: ownerName, error: String(err) });
     }
     if (!ownerEmail) {
-      logger.info('automation report email skipped (owner has no notification email)', { owner: ownerName, recipe: auto.recipeId });
+      logger.info(`automation report email skipped (${unverified ? 'the owner has not confirmed the notification email' : 'owner has no notification email'})`, { owner: ownerName, recipe: auto.recipeId });
+      // The in-app record says why it was not mailed, and what to do: confirm the address on the Email page.
+      if (unverified) {
+        try {
+          await storage.setMemory({ ...reportRecord, value: { ...(reportRecord.value as object), emailSkipped: 'address_not_verified' }, version: 2, updatedAt: new Date().toISOString() });
+        } catch (err) { logger.warn('automation report: the not-mailed note was not stored', { error: String(err) }); }
+      }
       return;
     }
     const sent = await emailSvc.sendNotification(ownerEmail, subject, bodyText);

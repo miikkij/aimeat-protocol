@@ -27,6 +27,8 @@
  * @structure AgreementEvent · tellAgreement()
  * @usage const told = await tellAgreement(deps, agreement, 'sent', { pdf });
  * @version-history
+ *   v1.0.1 — 2026-11-02 — A counterparty account's own address is used only when it is verified
+ *     (owner-mail-address.ts); `contactEmail` is unchanged (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D4.3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -34,6 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { notify } from './notify.js';
 import { getActiveEmailService } from './email.js';
+import { verifiedNotificationEmail } from './owner-mail-address.js';
 import { wrapHtml, esc } from './email-templates.js';
 import { displayPrefsFor, formatForPerson } from './display-prefs.js';
 import { inForce, newest } from './compliance-agreements.js';
@@ -146,10 +149,15 @@ function changedSubprocessors(a: Agreement, lang: Lang): string[] {
   ];
 }
 
+/**
+ * The counterparty account's address when it proved it (owner-mail-address.ts), else null: any
+ * principal of that account holding memory:write-reserved may set the address, and a new one arrives
+ * unverified. Without one the step goes to the bell, the operator's `contactEmail` still reaches the
+ * counterparty, and the operator's answer says what went out (`told.counterpartyEmail`).
+ */
 async function emailOf(storage: Storage, account: string | undefined): Promise<string | null> {
   if (!account) return null;
-  const g = await storage.getGHII(account);
-  return (g as { notificationEmail?: string | null } | null)?.notificationEmail ?? null;
+  return verifiedNotificationEmail(await storage.getGHII(account));
 }
 
 function html(lang: Lang, subject: string, lines: string[], link: string | null, linkText: string, a: Agreement): { html: string; text: string } {

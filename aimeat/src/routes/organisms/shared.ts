@@ -8,6 +8,10 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-11-02 — publishDraft and publishDraftsBatch record the publisher in the memory write tally for
+ *     the `.latest` they write, as every memory write door does: a member of another account who
+ *     publishes over an owner's living-document config is its latest writer, so the unattended pulse
+ *     asks the owner before it reads or spends for it (secaudit2026nov02d round 13).
  *   2026-10-30 — A published document's embedded images are bound by the publisher's principal too.
  *   2026-10-30 — publishDraft and publishDraftsBatch bind every file a published value links with
  *     /v1/pub, and the publisher controls, to the workspace (services/record-files.ts; Jouni, 2026-10-30).
@@ -120,6 +124,7 @@ export type { ShareAccess, ShareMeta, ResolvedShare, PublicDoc, PublicRecord } f
 import type { ResolvedShare } from './share-types.js';
 import { readShareMetaOf, redactShareOf, memberRoleOf } from '../../services/workspace-share.js';
 import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from '../../services/html-page.js';
+import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 
 export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
 
@@ -304,6 +309,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       createdAt: existingLatest?.createdAt ?? now, updatedAt: now,
     });
     await collapseKeyTo(storage, `${base}.latest`, latestOwner);
+    // Who wrote it, as every memory write door records: the publisher, which may be a member of
+    // another account writing over the holder's record (the living pulse reads this; secaudit2026nov02d).
+    recordMemoryTouch({ ownerGaii: latestOwner, key: `${base}.latest`, writerPrincipal: publisher, kind: 'write' });
     // Memory Contracts (reactive): publishing a watched record fires Tracked Response evaluation
     // (gated O(1) on the track-registry in the subscriber).
     emitMemoryWritten(latestOwner, `${base}.latest`);
@@ -503,6 +511,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     // ...and schedule write-time classification of each (TARGET-082 V3), never awaited.
     for (const e of toEmit) {
+      recordMemoryTouch({ ownerGaii: e.owner, key: e.key, writerPrincipal: publisher, kind: 'write' });
       emitMemoryWritten(e.owner, e.key);
       classifyAfterWrite({ storage, config }, e.owner, e.key, e.value);
     }

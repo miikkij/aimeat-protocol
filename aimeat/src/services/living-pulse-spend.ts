@@ -33,11 +33,16 @@
  *   const held = await livingSpendHold(deps, ownerGhii, holder, configKey, title);   // before the model is called
  *   if (held) { ...skip the derive, note held.requestId... }
  * @version-history
+ *   v1.1.0 -- 2026-11-02 -- A member of another account who published over the owner's config is its
+ *     latest writer (the publish records the publisher in the tally), and such a writer never spends the
+ *     owner's AI without the owner's one press; the living pulse reads and asks nothing for it until
+ *     then (spenderOfOtherAccount; secaudit2026nov02d round 13,
+ *     publishDraft:cross-account-living-config-outside-pulse-spend-tally).
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10, f-2026aug-ai-paths-3).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { appSlug, isGEAI, localAccountName, parseGAII, parseGaiiLoose } from '../utils/gaii.js';
+import { appSlug, isGEAI, isSameOwner, localAccountName, parseGAII, parseGaiiLoose } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { flushWriteTallyBuffer } from './data-map/write-tally-buffer.js';
@@ -70,21 +75,32 @@ function ownPrincipal(principal: string, owner: string, nodeId: string): boolean
 
 /**
  * The principal whose permission a config's AI spend runs under, or null for the owner's own. An
- * agent- or app-held config: its holder. A config in the owner's namespace: the latest writer of this
- * owner in the write tally when that is not the owner.
+ * agent- or app-held config: its holder. A config in the owner's namespace: its latest writer in the
+ * write tally when that is not the owner: an agent or app of the owner, or a member of another
+ * account who published over the config in a shared workspace (routes/organisms/shared.ts records
+ * the publisher; secaudit2026nov02d round 13).
  */
 export async function pulseSpender(deps: Deps, holder: string, key: string): Promise<string | null> {
   if (holder.includes('#')) return holder;
   await flushWriteTallyBuffer();
-  const owner = localAccountName(holder);
-  const rows = (await deps.storage.listMemoryWriteTally({ ownerGaii: holder, key }))
-    .filter(r => r.writerPrincipal === holder || ownPrincipal(r.writerPrincipal, owner, deps.config.nodeId));
+  const rows = await deps.storage.listMemoryWriteTally({ ownerGaii: holder, key });
   const latest = rows.reduce<typeof rows[number] | null>((a, r) => (!a || r.lastAt > a.lastAt ? r : a), null);
   return !latest || latest.writerPrincipal === holder ? null : latest.writerPrincipal;
 }
 
-/** Does `spender` hold ai:use now: an agent by its record, an ecosystem app by its record, an app grant by its live grants. */
-export async function spenderMayUseAi(deps: Deps, spender: string): Promise<boolean> {
+/** True when `spender` is a principal of another account than the config's holder (or of another node). */
+export function spenderOfOtherAccount(deps: Deps, holder: string, spender: string): boolean {
+  return !(spender === holder || ownPrincipal(spender, localAccountName(holder), deps.config.nodeId)
+    || (!spender.includes('#') && isSameOwner(spender, holder)));
+}
+
+/**
+ * Does `spender` hold ai:use now: an agent by its record, an ecosystem app by its record, an app grant
+ * by its live grants. A principal of another account than `holder` never does: its words reach its own
+ * account's AI, not this owner's.
+ */
+export async function spenderMayUseAi(deps: Deps, spender: string, holder?: string): Promise<boolean> {
+  if (holder && spenderOfOtherAccount(deps, holder, spender)) return false;
   if (isGEAI(spender)) {
     const eco = await deps.storage.getEcosystemApp(spender).catch((err: unknown) => {
       logger.warn('living pulse: the ecosystem app record was not read; its app grants decide', { spender, error: String(err) });
@@ -106,7 +122,7 @@ async function writeHold(deps: Deps, ownerGhii: string, configKey: string, mutat
 }
 
 /** The name a person reads for a writer: an agent's or an app's own name, never the whole identity. */
-const nameOf = (principal: string) => parseGaiiLoose(principal).agent || principal;
+const nameOf = (principal: string) => parseGaiiLoose(principal).agent || localAccountName(principal) || principal;
 
 /**
  * Whether the pulse must not call the model for this config now. null: it may (the owner's own, a
@@ -118,7 +134,7 @@ export async function livingSpendHold(
 ): Promise<{ requestId: string | null; declined: boolean } | null> {
   try {
     const spender = await pulseSpender(deps, holder, configKey);
-    if (!spender || await spenderMayUseAi(deps, spender)) return null;
+    if (!spender || await spenderMayUseAi(deps, spender, holder)) return null;
     const ownerGhii = ownerGhiiOf(deps, holder);
     const hold = parseHold((await deps.storage.getMemory(ownerGhii, livingSpendHoldKey(configKey)))?.value);
     const state = hold.spenders[spender] ?? {};
@@ -134,7 +150,8 @@ export async function livingSpendHold(
       return { requestId: null, declined: true };
     }
     const who = nameOf(spender);
-    const filed = await fileAsk(deps, localAccountName(holder), { principal: spender, kind: isGEAI(spender) ? 'app' : 'agent', sub: spender }, {
+    const kind = isGEAI(spender) ? 'app' : spender.includes('#') ? 'agent' : 'person';
+    const filed = await fileAsk(deps, localAccountName(holder), { principal: spender, kind, sub: spender }, {
       kind: 'living-ai-spend',
       target: { key: configKey, holder, spender },
       title: `the living document "${title}" refreshing itself with your AI`,
