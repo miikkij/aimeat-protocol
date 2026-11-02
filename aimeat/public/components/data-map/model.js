@@ -15,6 +15,8 @@
  * @structure LABEL_KEYS · labelKeyFor · ROW_ORDER · orderRows · placeOf · summaryOf
  * @usage import { labelKeyFor, orderRows } from '/components/data-map/model.js';
  * @version-history
+ *   v2.2.0 — 2026-11-01 — A static page that lists files somebody else writes is no contradiction
+ *     (writtenByThePage; WP10e C3). Byte-identical to the app-catalog copy.
  *   v2.1.0 — 2026-08-26 — `organism-rows` in the where vocabulary and in the organism test. Kept
  *     byte-identical to src/static/app-catalog/js/data-map-model.js, which a unit test enforces.
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2 per its definition (docs/specs/datamap.md).
@@ -102,8 +104,18 @@ export function contradictionOf(map) {
 
   if (sharedForm && allPrivate) return 'dataMap.contradiction.sharedButPrivate';
   if (map.form === 'one-person' && inOrganism) return 'dataMap.contradiction.personalButShared';
-  if (map.form === 'static') return 'dataMap.contradiction.staticButStores';
+  // A static page may read files somebody else writes (the owner's agent publishes them); only a row
+  // the page writes itself, or one that names no writer, is storage (services/data-map/data-map-check.ts).
+  if (map.form === 'static' && map.held.some(writtenByThePage)) return 'dataMap.contradiction.staticButStores';
   return null;
+}
+
+/** Whether a row is the page's own storage: written by the page, or no writer named. */
+export function writtenByThePage(row) {
+  const raw = row && row.writers;
+  const writers = (Array.isArray(raw) ? raw : raw === undefined || raw === null ? [] : [raw])
+    .map(w => String(w).trim()).filter(Boolean);
+  return writers.length === 0 || writers.some(w => w === 'person-in-the-ui' || w === 'the-app-for-the-person');
 }
 
 /** Which places this map's rows land in, biggest group first: the one line a list shows. */

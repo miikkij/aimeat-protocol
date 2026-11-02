@@ -6857,8 +6857,13 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     const sharedForm = map.form === "group" || map.form === "organism-workspace" || map.form === "shared-with-named";
     if (sharedForm && allPrivate) return "dataMap.contradiction.sharedButPrivate";
     if (map.form === "one-person" && inOrganism) return "dataMap.contradiction.personalButShared";
-    if (map.form === "static") return "dataMap.contradiction.staticButStores";
+    if (map.form === "static" && map.held.some(writtenByThePage)) return "dataMap.contradiction.staticButStores";
     return null;
+  }
+  function writtenByThePage(row) {
+    const raw = row && row.writers;
+    const writers = (Array.isArray(raw) ? raw : raw === void 0 || raw === null ? [] : [raw]).map((w) => String(w).trim()).filter(Boolean);
+    return writers.length === 0 || writers.some((w) => w === "person-in-the-ui" || w === "the-app-for-the-person");
   }
   function placesOf(map) {
     const counts = /* @__PURE__ */ new Map();

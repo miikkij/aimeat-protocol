@@ -10,6 +10,8 @@
  *   CRM that were all the same bug. If that assertion ever goes green by accident, the map is
  *   decoration.
  * @version-history
+ *   v2.1.0 — 2026-11-01 — A static page that reads files somebody else writes is no contradiction, on
+ *     both the page's copy and the server's check (WP10e C3).
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2.
  */
 import { describe, it, expect } from 'vitest';
@@ -18,6 +20,7 @@ import { join } from 'node:path';
 import {
   labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, VALUES, DATA_MAP_SPEC,
 } from '../../public/components/data-map/model.js';
+import { checkMap } from '../../src/services/data-map/data-map-check.js';
 
 const ROOT = join(import.meta.dirname, '../..');
 
@@ -100,6 +103,25 @@ describe('contradictionOf: the check the whole feature exists for', () => {
 
   it('says nothing about a map with no rows', () => {
     expect(contradictionOf(map({ held: [] }))).toBeNull();
+  });
+
+  // Varoituskartta (2026-11-02): a static page that draws public files the owner's agent writes.
+  it('says nothing about a static page that reads files somebody else writes', () => {
+    const read = row({ where: 'file-storage', readers: 'anyone', writers: ['an-agent'] });
+    expect(contradictionOf(map({ form: 'static', held: [read] }))).toBeNull();
+    const words = row({ where: 'file-storage', writers: 'Claude Jounin pyynnöstä' });
+    expect(contradictionOf(map({ form: 'static', held: [words] }))).toBeNull();
+    const checked = checkMap(map({ form: 'static', held: [read, words] }) as never, '2026-11-02T00:00:00.000Z');
+    expect(checked.findings.map(f => f.code)).not.toContain('DATAMAP_FORM_CONTRADICTED');
+  });
+
+  it('still catches a static page with a row the page writes or that names no writer', () => {
+    const own = row({ writers: ['person-in-the-ui'] });
+    expect(contradictionOf(map({ form: 'static', held: [own] }))).toBe('dataMap.contradiction.staticButStores');
+    const silent = row({ writers: [] });
+    expect(contradictionOf(map({ form: 'static', held: [silent] }))).toBe('dataMap.contradiction.staticButStores');
+    const checked = checkMap(map({ form: 'static', held: [own] }) as never, '2026-11-02T00:00:00.000Z');
+    expect(checked.findings.map(f => f.code)).toContain('DATAMAP_FORM_CONTRADICTED');
   });
 });
 

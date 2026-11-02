@@ -15,6 +15,8 @@
  * @structure summariseMap · checkMap · statesInvites · statesRegisters · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.8.1 — 2026-11-01 — DATAMAP_FORM_CONTRADICTED does not fire for a static page whose rows are files
+ *     somebody else writes (writtenByThePage; Varoituskartta, WP10e C3).
  *   v1.8.0 — 2026-11-01 — DATAMAP_REGISTERS_UNSTATED: an app whose party signup is open (checkMap's
  *     `registersParties`) and whose map has neither `registers-parties` nor a `registers` statement is a
  *     finding, after the invites one, and never a refusal (plan doc-mvwxcas3dom3, D4.4).
@@ -212,10 +214,26 @@ function formContradiction(map: DataMap): string | null {
       && map.held.every(r => r.where === 'owner-memory-private')) {
     return 'This says several people share it, and every row lands in one person\'s own memory, where only they can read it.';
   }
-  if (map.form === 'static' && map.held.length > 0) {
+  if (map.form === 'static' && map.held.some(writtenByThePage)) {
     return 'This says it is a static page, and it lists rows it stores.';
   }
   return null;
+}
+
+/** The writers a static page cannot have: the page itself, for the person or from the screen. */
+const PAGE_WRITERS: readonly string[] = ['person-in-the-ui', 'the-app-for-the-person'];
+
+/**
+ * Whether a row is the page's own storage. A static page may still READ files somebody else writes
+ * (the owner's agent publishes public files and the page draws them, as Varoituskartta does), and such
+ * a row names its writer: an agent, a schedule, a seed, or in the maker's own words. A row whose
+ * writers are the page, or that names no writer at all, is one the page stores.
+ */
+export function writtenByThePage(row: Pick<DataMapRow, 'writers'>): boolean {
+    const raw = (row as { writers?: unknown }).writers;
+    const writers = (Array.isArray(raw) ? raw : raw === undefined || raw === null ? [] : [raw])
+        .map(w => String(w).trim()).filter(Boolean);
+    return writers.length === 0 || writers.some(w => PAGE_WRITERS.includes(w));
 }
 
 export interface MapCheck {
