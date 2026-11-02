@@ -31,6 +31,7 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-11-02 — exchange:invoke is covered by exchange:write (COVERED_BY_WIDER_WORD), the split of the app tool call.
  *   2026-11-01 — party:manage (PARTY_MANAGE_SCOPE) joins the own-tick family: outside parties and the
  *     named shares to them (plan doc-mvwxcas3dom3, D2.7).
  *   2026-10-29 — agent:permissions-add (PERMISSIONS_ADD_SCOPE) joins the own-tick family: an agent adding
@@ -374,14 +375,26 @@ export function isOutsideWildcard(scope: string): boolean {
 }
 
 /**
+ * A word split out of a wider one: holding the wider word still covers it, one way only.
+ * exchange:invoke calls an app tool under what the owner already accepted, and was part of
+ * exchange:write until 2026-11-02 (Jouni, 10.25); exchange:write still accepts paid contracts. So an
+ * agent holding exchange:write loses nothing, and exchange:invoke opens no contract.
+ */
+const COVERED_BY_WIDER_WORD: Readonly<Record<string, readonly string[]>> = {
+    'exchange:invoke': ['exchange:write'],
+};
+
+/**
  * Does a principal holding `held` already have `scope`?
  *
  * Same rules as requireScope — the global wildcard, the domain wildcard, or the exact string — with
- * the one deliberate exception above, where only the exact string counts.
+ * the one deliberate exception above, where only the exact string counts, and a word split out of a
+ * wider one (COVERED_BY_WIDER_WORD).
  */
 export function scopeIsCovered(held: readonly string[], scope: string): boolean {
     if (held.includes(scope)) return true;
     if (isOutsideWildcard(scope)) return false;
+    if (COVERED_BY_WIDER_WORD[scope]?.some((w) => held.includes(w))) return true;
     if (held.includes('*')) return true;
     const domain = scope.split(':')[0];
     return !!domain && held.includes(`${domain}:*`);

@@ -33379,7 +33379,7 @@ paths:
         `details.violations`). A schema that does not compile is not enforced. A tool whose
         backing extension serves an app with access `members-only` answers 403 MEMBERS_ONLY to a
         caller who is not a member, before anything is settled. An agent or an ecosystem app needs
-        the scope exchange:write, as the MCP tool aimeat_app_tool_invoke does, before anything is
+        the scope exchange:invoke (exchange:write covers it), as the MCP tool aimeat_app_tool_invoke does, before anything is
         metered, paced or run; without it the call answers 403 SCOPE_DENIED, and
         `details.allow_url` is where its person allows the word with one press (an agent) or
         approves the app's new request (an ecosystem app). The owner in person and an app grant are

@@ -707,19 +707,19 @@ async function run() {
         };
         const setPlan = (value: string) => json('/v1/admin/config', { method: 'PUT', headers: authA, body: JSON.stringify({ changes: [{ path: 'site.purchase_plan', value }] }) });
         const before = await mint();
-        assert(!before.includes('memory:purge'), `the template lacks the word this proves with: ${before.join(' ')}`);
+        assert(!before.includes('social:write'), `the template lacks the word this proves with: ${before.join(' ')}`);
         const on = await setPlan('Solo');
         assert(on.status === 200, `setting the plan: ${on.status} ${JSON.stringify(on.body?.error)}`);
         try {
             const widened = await mint();
-            assert(widened.includes('memory:purge') && widened.includes('notifications:send'), `the place default arrived: ${widened.join(' ')}`);
-            for (const kept of ['agent:write', 'commerce:buy', 'exchange:write', 'secrets:manage', 'consent:manage']) {
+            assert(widened.includes('social:write') && widened.includes('notifications:send') && widened.includes('exchange:invoke'), `the place default arrived: ${widened.join(' ')}`);
+            for (const kept of ['agent:write', 'commerce:buy', 'exchange:write', 'memory:purge', 'outbound:send', 'connections:use', 'messages:send-as-owner', 'secrets:manage', 'consent:manage']) {
                 assert(!widened.includes(kept), `${kept} stays with the owner`);
             }
             for (const word of before) assert(widened.includes(word), `${word} it held stays`);
             const taken = await json('/v1/agents/workflow-manager/scopes', { method: 'PATCH', headers: authA, body: JSON.stringify({ scopes: before }) });
             assert(taken.status === 200, `the owner narrows it back: ${taken.status} ${JSON.stringify(taken.body?.error)}`);
-            assert(!(await mint()).includes('memory:purge'), 'the default applies once: what the owner took away stays away');
+            assert(!(await mint()).includes('social:write'), 'the default applies once: what the owner took away stays away');
         } finally {
             await setPlan('');
         }

@@ -49,6 +49,8 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.5.1 — 2026-11-02 — The floor's note names exchange:invoke, which is not on it. A store place's default for an
+ *     agent leaves every floor word out (services/place-agent-scopes.ts).
  *   v2.5.0 — 2026-10-28 — `*` never reaches the floor and `wildcardReady` is gone: the node no longer
  *     narrows an agent holding `*` by itself, so there is no failed narrowing to fall back on. An
  *     agent keeps the permissions its owner gave it, and its tasks are decided on them (Jouni
@@ -95,6 +97,8 @@ export const TASK_EFFECTS: readonly TaskEffect[] = ['spend', 'send_as_owner', 'd
  *     its own word on 2026-10-02, `memory:purge`, and that one is on the floor.
  *   - `work:request`. It calls capabilities under contracts the owner already accepted, metered
  *     against the owner's own budget. Starting a new paid relationship takes `exchange:write`.
+ *   - `exchange:invoke`. The same for an app tool: split out of `exchange:write` so that calling a tool
+ *     under what is already accepted does not hold a task (Jouni, 2026-11-02).
  */
 export const TASK_START_FLOOR: ReadonlyArray<{ scope: string; kind: TaskEffect }> = [
     { scope: 'commerce:buy', kind: 'spend' },

@@ -20688,6 +20688,7 @@
             "write": "Asenna, ota käyttöön ja poista tilisi selainlisäosia."
           },
           "exchange": {
+            "invoke": "Käytä sovellusten työkaluja niillä sopimuksilla, jotka sinulla jo on. Tämä ei avaa uutta sopimusta.",
             "beneficiary": "Jaa osa tuloistasi muille tileille ja maksa nuo osuudet ulos.",
             "grant": "Anna ja peru ilmainen pääsy myymiisi asioihin sinun kustannuksellasi.",
             "read": "Selaa markkinapaikkaa ja näe sopimuksesi, tarjouksesi ja kesken olevat työt.",

@@ -44,10 +44,10 @@ const OWNER = `place${Date.now().toString(36)}`;
 const PASSWORD = 'PlaceScopesPass12345';
 
 /** An agent of the owner holding exactly `scopes` in its record. */
-async function makeAgent(ownerToken: string, name: string, scopes: string[]) {
+async function makeAgent(ownerToken: string, name: string, scopes: string[], mode = 'interactive') {
     const ag = await json('/v1/agents', {
         method: 'POST', headers: auth(ownerToken),
-        body: JSON.stringify({ name, owner: OWNER, capabilities: [], mode: 'interactive', scopes }),
+        body: JSON.stringify({ name, owner: OWNER, capabilities: [], mode, scopes }),
     });
     assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body?.error)}`);
     return { gaii: ag.body.data.agent.gaii as string, key: ag.body.data.private_key as string };
@@ -108,6 +108,7 @@ async function mcpSession(token: string) {
 
     const elsewhere = await makeAgent(owner, 'elsewhere', ['memory:read']);
     const narrow = await makeAgent(owner, 'narrow', ['memory:read']);
+    const runner = await makeAgent(owner, 'runner', ['memory:read'], 'task-runner');
 
     await test('a node that is not a store place changes nothing: the agent keeps its one word and notify is refused', async () => {
         const tok = await signIn(elsewhere);
@@ -140,13 +141,32 @@ async function mcpSession(token: string) {
 
         await test('DENIAL: the words the owner keeps stay out: approving agents, payments, sharing, secrets, security', async () => {
             const scopes = claims(await signIn(narrow)).scopes ?? [];
-            for (const kept of ['agent:write', 'commerce:buy', 'commerce:sell', 'commerce:psp', 'exchange:write', 'exchange:beneficiary', 'consent:manage', 'share:manage',
-                'secrets:manage', 'account:security', 'agent:permissions', 'mcp:manage', 'organism:invite', 'connections:read-as-owner']) {
+            for (const kept of ['agent:write', 'commerce:sell', 'commerce:psp', 'exchange:beneficiary', 'consent:manage', 'share:manage',
+                'secrets:manage', 'account:security', 'agent:permissions', 'mcp:manage', 'organism:invite', 'connections:read-as-owner',
+                // The task start floor, whole: an agent holding one of these never starts a task by itself.
+                'commerce:buy', 'exchange:write', 'connections:use', 'outbound:send', 'messages:send-as-owner', 'messages:delete-as-owner', 'memory:purge']) {
                 assert(!scopes.includes(kept), `${kept} reached the token`);
             }
             assert(!scopes.includes('*'), 'a wildcard reached the token');
             // The rest of the place's tools: an ordinary tool's word arrives.
-            for (const word of ['memory:purge', 'organism:write', 'ext:invoke', 'task:write']) assert(scopes.includes(word), `${word} is missing`);
+            for (const word of ['exchange:invoke', 'organism:write', 'ext:invoke', 'task:write']) assert(scopes.includes(word), `${word} is missing`);
+        });
+
+        // FAILED FIRST: crew76 gave agents floor words, so every scheduled task stayed queued for the
+        // owner and the next run answered "busy" (guestkoey3wfwk, 2.11). The test checked words, not this.
+        await test('a scheduled task of an agent with the default starts by itself', async () => {
+            await signIn(runner);
+            const made = await json('/v1/agents/runner/schedules', {
+                method: 'POST', headers: auth(owner),
+                body: JSON.stringify({ kind: 'agent_task', cron: '0 7 * * *', timezone: 'Europe/Helsinki', task_template: { title: 'Morning', description: 'x' } }),
+            });
+            assert(made.status === 201, `schedule ${made.status}: ${JSON.stringify(made.body?.error)}`);
+            const fired = await json(`/v1/schedules/${made.body.data.schedule.id}/trigger`, { method: 'POST', headers: auth(owner) });
+            const taskId = fired.body?.data?.task_id;
+            assert(typeof taskId === 'string', `trigger: ${JSON.stringify(fired.body)}`);
+            const task = await json(`/v1/agents/runner/tasks/${taskId}`, { headers: auth(owner) });
+            const status = task.body?.data?.task?.status ?? task.body?.data?.status;
+            assert(status === 'active', `the task must start by itself, got ${status}: ${JSON.stringify(task.body?.data ?? task.body?.error).slice(0, 300)}`);
         });
 
         await test('a word the owner takes away stays away: the default applies once', async () => {

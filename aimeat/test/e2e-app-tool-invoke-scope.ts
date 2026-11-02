@@ -162,7 +162,7 @@ try {
     return { status: r.status, body };
   };
   const refusedForWord = (r: { status: number; body: any }) => r.status === 403 && r.body.error?.code === 'SCOPE_DENIED'
-    && String(r.body.error?.message ?? '').includes('exchange:write') && !r.body.data?.result;
+    && String(r.body.error?.message ?? '').includes('exchange:invoke') && !r.body.data?.result;
 
   // An agent its person narrowed: it may read memory and run extension actions, and may not act on the EXCHANGE.
   const narrowed = await makeAgent(buyer, 'narrow', ['memory:read', 'ext:invoke']);
@@ -170,7 +170,7 @@ try {
   await test('a narrowed agent is refused the contracted tool, and the budget and the balance stay', async () => {
     const before = await balance(buyer.token), budget = await spent(buyer);
     const r = await call(narrowed.token, 'sold');
-    assert(refusedForWord(r), 'expected 403 SCOPE_DENIED naming exchange:write, got ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
+    assert(refusedForWord(r), 'expected 403 SCOPE_DENIED naming exchange:invoke, got ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
     assert(await balance(buyer.token) === before, 'the balance moved');
     assert(await spent(buyer) === budget, 'the contract budget moved');
   });
@@ -178,12 +178,12 @@ try {
     const r = await call(narrowed.token, 'sold');
     const url = String(r.body.error?.details?.allow_url ?? '');
     assert(r.body.error?.details?.one_press === true && url.includes('/v1/allow?') && url.includes('agent=' + narrowed.name)
-      && decodeURIComponent(url).includes('need=exchange:write'), 'allow address: ' + JSON.stringify(r.body.error?.details));
+      && decodeURIComponent(url).includes('need=exchange:invoke'), 'allow address: ' + JSON.stringify(r.body.error?.details));
   });
   await test('a narrowed agent is refused the free paced tool, and the pacing is not charged', async () => {
     const before = await balance(buyer.token);
     const r = await call(narrowed.token, 'paced');
-    assert(refusedForWord(r), 'expected 403 SCOPE_DENIED naming exchange:write, got ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
+    assert(refusedForWord(r), 'expected 403 SCOPE_DENIED naming exchange:invoke, got ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
     assert(await balance(buyer.token) === before, 'the pacing was charged');
   });
   await test('the app origin refuses the narrowed agent the same way', async () => {
@@ -197,7 +197,7 @@ try {
   await test('the narrowed agent\'s refusal is a 403 on both addresses, with the missing word in its details', async () => {
     for (const r of [await call(narrowed.token, 'paced'), await onOrigin(narrowed.token, 'paced')]) {
       assert(r.status === 403, 'expected 403, got ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
-      assert(decodeURIComponent(JSON.stringify(r.body.error?.details ?? {})).includes('exchange:write'), 'details: ' + JSON.stringify(r.body.error?.details));
+      assert(decodeURIComponent(JSON.stringify(r.body.error?.details ?? {})).includes('exchange:invoke'), 'details: ' + JSON.stringify(r.body.error?.details));
     }
   });
 
@@ -220,6 +220,18 @@ try {
     const origin = await onOrigin(full.token, 'paced');
     assert(origin.status === 200 && origin.body.data.result?.ran === true, 'app origin ' + origin.status + ' ' + JSON.stringify(origin.body.error));
   });
+  // The split (Jouni, 2026-11-02 10.25): nothing an owner granted changes meaning. exchange:write above
+  // still calls the tools; exchange:invoke calls them too, and opens no contract.
+  await test('an agent holding exchange:invoke calls both tools, and cannot open a paid contract', async () => {
+    const caller = await makeAgent(buyer, 'invoker', ['exchange:invoke', 'ext:invoke']);
+    const sold = await call(caller.token, 'sold');
+    assert(sold.status === 200 && sold.body.data.metered === true, 'contracted ' + sold.status + ' ' + JSON.stringify(sold.body.error));
+    const paced = await call(caller.token, 'paced');
+    assert(paced.status === 200 && paced.body.data.result?.ran === true, 'paced ' + paced.status + ' ' + JSON.stringify(paced.body.error));
+    const open = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(caller.token),
+      body: JSON.stringify({ offering_id: listed.body.data.offering.offeringId, cap_units: 5 }) });
+    assert(open.status === 403, 'exchange:invoke must open no contract, got ' + open.status + ' ' + JSON.stringify(open.body.data ?? open.body.error));
+  });
   await test('an app grant with no exchange word calls the free tool, as aimeat-webmcp.js does', async () => {
     const token = await appGrantToken(buyer, ['memory:read', 'ext:invoke']);
     const r = await call(token, 'paced');
@@ -233,13 +245,13 @@ try {
 
   await test('the person allows the word with one press, and the narrowed agent then calls the tool', async () => {
     const allowed = await json('/v1/agents/' + encodeURIComponent(narrowed.name) + '/allow', { method: 'POST', headers: auth(buyer.token),
-      body: JSON.stringify({ scopes: ['exchange:write'] }) });
+      body: JSON.stringify({ scopes: ['exchange:invoke'] }) });
     assert(allowed.status === 200, 'allow ' + allowed.status + ' ' + JSON.stringify(allowed.body.error));
     const r = await call(await agentToken(narrowed.gaii, narrowed.privateKey), 'paced');
     assert(r.status === 200 && r.body.data.result?.ran === true, 'after the press ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
   });
 
-  await test('an ecosystem app without exchange:write is refused, with its person\'s approval page named', async () => {
+  await test('an ecosystem app without exchange:invoke is refused, with its person\'s approval page named', async () => {
     const eco = await ecosystemToken(buyer, 'scopeeco' + stamp, ['memory:read', 'ext:invoke']);
     const before = await balance(buyer.token), budget = await spent(buyer);
     for (const tool of ['sold', 'paced']) {
@@ -250,7 +262,7 @@ try {
     assert(await balance(buyer.token) === before && await spent(buyer) === budget, 'nothing moved');
   });
   await test('…and after it asks again and its person approves, it calls the tool', async () => {
-    const eco = await ecosystemToken(buyer, 'scopeeco' + stamp, ['memory:read', 'ext:invoke', 'exchange:write']);
+    const eco = await ecosystemToken(buyer, 'scopeeco' + stamp, ['memory:read', 'ext:invoke', 'exchange:invoke']);
     const r = await call(eco, 'paced');
     assert(r.status === 200 && r.body.data.result?.ran === true, 'approved ecosystem app ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
   });

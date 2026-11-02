@@ -13,6 +13,7 @@
  *   Money is 6-decimal micro-units; morsels are whole units of pacing, never a price. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-11-02 — aimeat_app_tool_invoke asks exchange:invoke, split out of exchange:write, which still covers it (Jouni, 10.25).
  *   2026-10-13 — aimeat_app_tool_invoke declares ext:invoke beside exchange:write, enforced from 4.0.0 like
  *     the extension action route it reaches (wish-aimeat-app-tool-invoke-ilmoittaa-vain-exchange-write-vaikka-).
  *   2026-10-12 — The six act-on-EXCHANGE tools declare all three interfaces (agentEverywhere) and have a
@@ -226,8 +227,9 @@ export const exchangeTools = [
         annotations: { title: 'Invoke App Tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         // ext:invoke: the call runs the backing extension action with the caller's token, and
         // POST /v1/ext/... asks that word from 4.0.0 (routes/extensions/actions.ts). Before 4.0.0 a
-        // call without it is allowed and counted, as on that route; exchange:write applies on every release.
-        scope: ['exchange:write', 'ext:invoke'],
+        // call without it is allowed and counted, as on that route; exchange:invoke applies on every
+        // release. It calls under what is already accepted; exchange:write, which covers it, opens a contract.
+        scope: ['exchange:invoke', 'ext:invoke'],
         scopeEnforcedFrom: { 'ext:invoke': REST_SCOPE_GATES_ENFORCED_IN },
         // On `service`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
         // On `agent`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
