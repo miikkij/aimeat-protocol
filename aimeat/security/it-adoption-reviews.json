@@ -13,7 +13,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/routes/admin/setup-register.ts"
       ],
-      "digest": "sha256:7d1df87885a944a2176a8aa6"
+      "digest": "sha256:a3becf6f6611b82032ba7075"
     },
     "01-overview.md": {
       "reviewedOn": "2026-11-01",
@@ -56,7 +56,7 @@
         "aimeat/src/services/two-step-setup.ts",
         "aimeat/src/routes/ghii/login-two-step.ts"
       ],
-      "digest": "sha256:35c0457fe3ddd1667a551b31"
+      "digest": "sha256:fa6a63db5cc5988e9245a456"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-01",
@@ -87,7 +87,7 @@
         "docs/security/verification-matrix.md",
         "aimeat/src/services/sign-in-policy.ts"
       ],
-      "digest": "sha256:99e51a1516a26544070b70e6"
+      "digest": "sha256:7d3b09e7b2cf7bfc891a035e"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -105,7 +105,7 @@
         "docs/security/deployment-checklist.md",
         "aimeat/src/services/sign-in-policy.ts"
       ],
-      "digest": "sha256:5a7e585f7be8d95d2e87f1a4"
+      "digest": "sha256:b2f99bb17edd638b2506e4dc"
     },
     "10-logging-monitoring.md": {
       "reviewedOn": "2026-11-01",
@@ -191,7 +191,7 @@
       "watches": [
         "docs/security/deployment-checklist.md"
       ],
-      "digest": "sha256:dc27331a594149759c71d286"
+      "digest": "sha256:f6163b6673b8634853c126f4"
     },
     "templates/organization-profile.md": {
       "reviewedOn": "2026-11-02",
@@ -226,11 +226,11 @@
     "00-go-live-checklist.md": {
       "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
       "aimeat/src/services/setup-code.ts": "c964751fae8c0c54",
-      "aimeat/src/config-types-account-security.ts": "9154691d8deb296a",
+      "aimeat/src/config-types-account-security.ts": "c3ce3a30afc3150e",
       "aimeat/src/services/config-schema-email.ts": "1cb6b9c5dac991f4",
       "aimeat/src/services/config-schema-seo.ts": "b88168360d49fb08",
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
-      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692",
+      "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105",
       "aimeat/src/routes/admin/setup-register.ts": "3f588fa2c4fd8b18"
     },
     "01-overview.md": {
@@ -254,9 +254,9 @@
       "aimeat/src/services/oidc-providers.ts": "e784e39b32c1fe2a",
       "aimeat/src/routes/scim.ts": "2a7149ea1dc93d7c",
       "aimeat/src/routes/saml-login.ts": "147ff327a6c5f0e7",
-      "aimeat/src/config-types-account-security.ts": "9154691d8deb296a",
+      "aimeat/src/config-types-account-security.ts": "c3ce3a30afc3150e",
       "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
-      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692",
+      "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105",
       "aimeat/src/services/two-step-setup.ts": "e8f73c13e7d1f680",
       "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c"
     },
@@ -277,7 +277,7 @@
       "aimeat/src/middleware/cors.ts": "0f742801d6902ab5",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/verification-matrix.md": "34899889202d5b60",
-      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692"
+      "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105"
     },
     "08-threat-model.md": {
       "docs/security/threat-model.md": "211b04c0cc93e8fe",
@@ -286,8 +286,8 @@
     "09-hardening-guide.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
-      "docs/security/deployment-checklist.md": "38fac06cbb361bb4",
-      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692"
+      "docs/security/deployment-checklist.md": "9d2d4a4391821c1e",
+      "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105"
     },
     "10-logging-monitoring.md": {
       "aimeat/src/utils/logger.ts": "b8403e0859974c28",
@@ -329,7 +329,7 @@
       "docs/operations/openrouter-region.md": "a474e66988081377"
     },
     "templates/approval-checklist.md": {
-      "docs/security/deployment-checklist.md": "38fac06cbb361bb4"
+      "docs/security/deployment-checklist.md": "9d2d4a4391821c1e"
     },
     "templates/organization-profile.md": {
       "aimeat/src/data/classification-packs.ts": "ffbb4b6a6349fce1"

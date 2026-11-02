@@ -34689,8 +34689,8 @@ paths:
         auth consent for that node is checked before the password; a missing consent,
         a consent whose `expires` time has passed, a missing account and a wrong password
         all answer 401 FEDERATION_AUTH_FAILED.
-        The password has the same per-account lock as the sign-in route (429
-        PASSWORD_LOCKED), and an account with two-step sign-in needs its code
+        With this node's `auth.sign_in_lockout` = `on` the password has the same per-account lock as
+        the sign-in route (429 PASSWORD_LOCKED; off by default), and an account with two-step sign-in needs its code
         (401 TOTP_REQUIRED without one). Returns a signed attestation on success.
         With this node's `auth.password_sign_in` = `off` it answers 403 PASSWORD_SIGN_IN_OFF before
         the consent or the password is read; with `operators` a non-operator gets the same answer
@@ -34775,7 +34775,7 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '429':
-          description: PASSWORD_LOCKED or TOTP_LOCKED, the account's own lock, or the per-IP limit
+          description: PASSWORD_LOCKED or TOTP_LOCKED, the account's own lock (only with `auth.sign_in_lockout` on, off by default), or the per-IP limit
 
   # ── Federation Internal (node-to-node) ─────────────────────
   /v1/federation/ping:

@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.2.0 (commit e9b9813d5) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 2c1cddba9) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -81,12 +81,12 @@ The same code runs a single-user laptop node and a multi-user public node. The d
 | Topic | How it works | Source |
 |---|---|---|
 | People | Password (`POST /v1/ghii/login`), passkey (`AIMEAT_PASSKEY_ENABLED`, `AIMEAT_PASSKEY_RP_ID`), or an identity provider: Entra ID, Google or Casdoor over OIDC, or SAML through an SSO connection | [Organisation node sign-in](../organisation-node-sign-in.md), `aimeat/.env.example` |
-| Second factor | TOTP with backup codes; wrong codes pause sign-in (`429 TOTP_LOCKED`) | [Security practices](../coding-guidelines/security.md) |
+| Second factor | TOTP with backup codes; with `AIMEAT_SIGN_IN_LOCKOUT=on` wrong codes pause sign-in (`429 TOTP_LOCKED`), off by default | [Security practices](../coding-guidelines/security.md) |
 | Sign-in policy | `AIMEAT_TWO_STEP_REQUIRED` requires two-step sign-in for operators or everyone: a covered account without TOTP gets no session from a password or an emailed link and enrols first; a passkey or an IdP sign-in satisfies it. `AIMEAT_PASSWORD_SIGN_IN` limits password sign-in to operators or turns it off (403 `PASSWORD_SIGN_IN_OFF`). An AI credential may tighten either setting, not weaken it (403 `PERSON_REQUIRED`) | `aimeat/src/services/sign-in-policy.ts`, `aimeat/src/services/config-admin-view.ts`, [04 Identity and access](04-identity-access.md) |
 | Owner sessions | A short access token (`AIMEAT_ACCESS_TTL`, 900 s) and a rotating httpOnly refresh cookie, `__Host-aimeat_rt` on https, idle limit `AIMEAT_REFRESH_IDLE_DAYS` (30), absolute limit `AIMEAT_REFRESH_ABSOLUTE_DAYS` (90) | `aimeat/.env.example`, `aimeat/src/services/owner-session.ts` |
 | Tokens | Every access JWT the node issues is EdDSA, signed with the node's Ed25519 key (`jose`); personal access tokens, SCIM tokens and refresh tokens are opaque random values stored as SHA-256 hashes. Agent tokens last `AIMEAT_AGENT_JWT_TTL` (90 days), ecosystem app tokens `AIMEAT_ECO_JWT_TTL` (90 days), a person's access token `AIMEAT_ACCESS_TTL` (900 s), other node-issued JWTs `AIMEAT_JWT_TTL` (3600 s). A token with no `scopes` claim can do nothing. Revocation is stored per node and survives a restart | [Security practices](../coding-guidelines/security.md) |
 | Agents | Device authorization (RFC 8628): the owner approves the agent and picks its scopes | [Identity model](../coding-guidelines/identity-model.md) |
-| Guessing | Per-address tarpit in front of password, code and signature routes; account lockout after `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5) for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15); a sign-in rate limit (`AIMEAT_LOGIN_RATE_LIMIT_MAX`) | `aimeat/src/middleware/login-tarpit.ts`, `aimeat/.env.example` |
+| Guessing | Per-address tarpit in front of password, code and signature routes; a sign-in rate limit (`AIMEAT_LOGIN_RATE_LIMIT_MAX`). Account lockout is off by default; `AIMEAT_SIGN_IN_LOCKOUT=on` locks after `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5) for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15) | `aimeat/src/middleware/login-tarpit.ts`, `aimeat/.env.example` |
 | Rate limits | Per caller (`sub`) or per IP, per area, with role multipliers fixed in code; `AIMEAT_RL_GLOBAL` is the fallback | [Security practices](../coding-guidelines/security.md) |
 | Deprovisioning | SCIM `active: false` or an operator's Deactivate ends every session, agent token, access token, app grant and connector tunnel of the person within the request; their data stays | [Organisation node sign-in](../organisation-node-sign-in.md) section 7 |
 | Owner key | The Ed25519 owner key returned at registration signs no one in since 4.0.0 | [Security practices](../coding-guidelines/security.md) |

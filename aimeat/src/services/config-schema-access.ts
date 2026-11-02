@@ -15,6 +15,7 @@
  *   switching it off makes every agent's scopes advisory, which whoever runs the node decides.
  * @structure ACCESS_CONFIG_FIELDS
  * @version-history
+ *   v1.3.0 — 2026-11-02 — auth.sign_in_lockout (AIMEAT_SIGN_IN_LOCKOUT: off, on), off by default (Jouni, 08.02).
  *   v1.2.0 — 2026-11-02 — auth.two_step_required (AIMEAT_TWO_STEP_REQUIRED: off, operators, everyone) and
  *     auth.password_sign_in (AIMEAT_PASSWORD_SIGN_IN: on, operators, off), mutable, read on every
  *     sign-in. A change that weakens either is refused to an AI credential, and password_sign_in=off is
@@ -29,7 +30,7 @@
 // config-types.ts; config-schema.ts checks each key against AimeatConfig where it spreads the rows.
 import type { ConfigFieldShape } from './config-field-def.js';
 import { isEmptyOrHttpUrl, oneOf } from './config-schema-validators.js';
-import { TWO_STEP_REQUIRED_VALUES, PASSWORD_SIGN_IN_VALUES } from '../config-types-account-security.js';
+import { TWO_STEP_REQUIRED_VALUES, PASSWORD_SIGN_IN_VALUES, SIGN_IN_LOCKOUT_VALUES } from '../config-types-account-security.js';
 
 const whole = (min: number) => (v: unknown): boolean => typeof v === 'number' && Number.isInteger(v) && v >= min;
 const bool = (v: unknown): boolean => typeof v === 'boolean';
@@ -42,7 +43,7 @@ type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' 
   | 'entraOAuthEnabled' | 'entraOAuthTenant' | 'entraOAuthClientId' | 'entraOAuthClientSecret' | 'entraOAuthRedirectUri'
   | 'casdoorOAuthEnabled' | 'casdoorOAuthEndpoint' | 'casdoorOAuthClientId' | 'casdoorOAuthClientSecret' | 'casdoorOAuthRedirectUri'
   | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes' | 'mcpTaskAfterMs'
-  | 'twoStepRequired' | 'passwordSignIn';
+  | 'twoStepRequired' | 'passwordSignIn' | 'signInLockout';
 
 export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Token lifetimes ──
@@ -56,6 +57,7 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Which sign-ins a person may use (services/sign-in-policy.ts) ──
   { key: 'twoStepRequired', dotPath: 'auth.two_step_required', envVar: 'AIMEAT_TWO_STEP_REQUIRED', type: 'string', ...oneOf(...TWO_STEP_REQUIRED_VALUES), immutable: false, description: 'Who must use two-step sign-in: off (nobody is made to), operators (accounts with the operator role) or everyone. A password or emailed-link sign-in of such an account without a code app set up asks the person to set one up before it opens. A passkey and a sign-in through an identity provider count as two-step. A signed-in session of such an account with no code app, passkey or identity provider link ends at its next renewal, so the person signs in again and sets it up. An AI cannot lower it' },
   { key: 'passwordSignIn', dotPath: 'auth.password_sign_in', envVar: 'AIMEAT_PASSWORD_SIGN_IN', type: 'string', ...oneOf(...PASSWORD_SIGN_IN_VALUES), immutable: false, description: 'Who may sign in with a password: on (everyone), operators (only accounts with the operator role, as a way in when other ways fail) or off (nobody: people use a passkey, the organisation\'s sign-in or an emailed sign-in link). Off and operators also refuse a new password: password registration, invitations with a password, and password reset. Off is refused while no operator has a passkey or an identity provider link. An AI cannot open it wider' },
+  { key: 'signInLockout', dotPath: 'auth.sign_in_lockout', envVar: 'AIMEAT_SIGN_IN_LOCKOUT', type: 'string', ...oneOf(...SIGN_IN_LOCKOUT_VALUES), immutable: false, description: 'Whether wrong passwords and wrong two-step codes lock an account for a while: off (default, nothing is counted and nobody is locked out) or on (AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS and _MINUTES, AIMEAT_TOTP_MAX_FAILED and AIMEAT_TOTP_LOCKOUT_SECONDS then decide when and how long). A lock also lets anyone who knows a username keep its owner out; with it off, the per-address delay and the login rate limit bound guessing. An AI cannot switch it off' },
 
   // ── Sign in with Google ──
   { key: 'googleOAuthEnabled', dotPath: 'auth.google_enabled', envVar: 'AIMEAT_GOOGLE_OAUTH_ENABLED', type: 'boolean', validate: bool, immutable: false, applies: 'restart', description: 'Offer "Sign in with Google"' },
