@@ -20,14 +20,17 @@ import { TOTP, Secret } from 'otpauth';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { checkPassword, checkSecondFactor, checkTotpManagementCode } from '../../src/services/password-check.js';
 import { hashPassword } from '../../src/services/password.js';
+import { accountSecurityDefaults } from '../../src/config-types-account-security.js';
 import type { GHIIRecord } from '../../src/storage/interface.js';
 
 const NODE = 'aimeat-local-001-dev';
 const config = {
   totpIssuer: 'T', totpPeriod: 30, totpWindow: 1, totpBackupCodeCount: 10,
   totpSecretEncryptionKey: null, encryptionKey: null, totpMaxFailedAttempts: 5, totpLockoutSeconds: 300,
-  passwordLockoutAttempts: 5, passwordLockoutMinutes: 15,
+  passwordLockoutAttempts: 5, passwordLockoutMinutes: 15, signInLockout: 'on',
 } as never;
+/** The same node with the lockout off, the default (auth.sign_in_lockout; Jouni, 2026-11-02 08.02). */
+const lockoutOff = { ...(config as object), signInLockout: 'off' } as never;
 
 let storage: SqliteStorage;
 let secret = '';
@@ -53,6 +56,46 @@ async function snapshot(): Promise<() => GHIIRecord> {
   const rec = (await storage.getGHII(ghii))!;
   return () => structuredClone(rec);
 }
+
+describe('with the lockout off, the default, nothing locks an account', () => {
+  it('a node with no setting has the lockout off', () => {
+    expect(accountSecurityDefaults('https://x.example', 'X').signInLockout).toBe('off');
+  });
+
+  it('password: many wrong ones answer wrong, count nothing, and the right one still signs in', async () => {
+    for (let i = 0; i < 12; i++) {
+      const r = await checkPassword(storage, lockoutOff, (await storage.getGHII(ghii))!, 'wrong-password');
+      expect(r.ok ? '' : r.code).toBe('AUTH_REQUIRED');
+    }
+    const rec = (await storage.getGHII(ghii))!;
+    expect(rec.passwordFailedAttempts ?? 0).toBe(0);
+    expect(rec.passwordLockedUntil ?? null).toBe(null);
+    expect((await checkPassword(storage, lockoutOff, rec, 'Right-Password-1234')).ok).toBe(true);
+  });
+
+  it('a lock left from when it was on does not hold', async () => {
+    await storage.updateGHII(ghii, { passwordFailedAttempts: 5, passwordLockedUntil: new Date(Date.now() + 3_600_000).toISOString() });
+    const rec = (await storage.getGHII(ghii))!;
+    expect((await checkPassword(storage, config, rec, 'Right-Password-1234')).ok, 'with the lockout on it does hold').toBe(false);
+    expect((await checkPassword(storage, lockoutOff, rec, 'Right-Password-1234')).ok).toBe(true);
+  });
+
+  it('two-step code: many wrong ones answer wrong and count nothing, and the right one passes', async () => {
+    for (let i = 0; i < 12; i++) {
+      const r = await checkSecondFactor(storage, lockoutOff, (await storage.getGHII(ghii))!, { totp_code: codeAt(-20 - i) });
+      expect(r.ok ? '' : r.code).toBe('INVALID_TOTP');
+    }
+    const rec = (await storage.getGHII(ghii))!;
+    expect(rec.totpFailedAttempts ?? 0).toBe(0);
+    expect((await checkSecondFactor(storage, lockoutOff, rec, { totp_code: codeAt() })).ok).toBe(true);
+  });
+
+  it('with the setting on, the lock still works: the fifth wrong password locks', async () => {
+    let last = await checkPassword(storage, config, (await storage.getGHII(ghii))!, 'wrong-password');
+    for (let i = 0; i < 5; i++) last = await checkPassword(storage, config, (await storage.getGHII(ghii))!, 'wrong-password');
+    expect(last.ok ? '' : last.code).toBe('PASSWORD_LOCKED');
+  });
+});
 
 describe('an attempt is counted before it is compared (W2-10)', () => {
   it('second factor at sign-in: past the limit, a right code from a request that read the account earlier is refused', async () => {

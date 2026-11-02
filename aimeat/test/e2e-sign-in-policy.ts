@@ -104,7 +104,7 @@ async function startNode(): Promise<ChildProcess> {
         AIMEAT_ANONYMOUS: 'false',
         AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         // The suite's subject starts at its defaults, whatever the developer's environment says.
-        AIMEAT_TWO_STEP_REQUIRED: 'off', AIMEAT_PASSWORD_SIGN_IN: 'on',
+        AIMEAT_TWO_STEP_REQUIRED: 'off', AIMEAT_PASSWORD_SIGN_IN: 'on', AIMEAT_SIGN_IN_LOCKOUT: 'off',
     };
     const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the sign-in policy node' });
@@ -385,6 +385,40 @@ async function main() {
             assert(r.status === 200, `off: ${r.status} ${JSON.stringify(r.body?.error)}`);
             const a = await ownerSignIn(BASE, alice.name, alice.password);
             assert(a.status === 200 && typeof a.body?.data?.token === 'string', `alice: ${a.status} ${JSON.stringify(a.body?.error)}`);
+        });
+
+        // ── The sign-in lockout (auth.sign_in_lockout): off unless the operator turns it on (Jouni, 2026-11-02 08.02) ──
+        const locked = await registerOwner(BASE, `pollock${stamp}`);
+        const guess = (password: string) => post('/v1/ghii/login', { username: locked.name, password });
+        await test('LOCKOUT off: many wrong passwords answer wrong and lock nothing, and the right one signs in', async () => {
+            const cfg = await json('/v1/admin/config', { headers: auth(opSession) });
+            assert(cfg.body?.data?.schema?.['auth.sign_in_lockout']?.value === 'off', `the node's value: ${cfg.body?.data?.schema?.['auth.sign_in_lockout']?.value}`);
+            for (let i = 0; i < 8; i++) {
+                const r = await guess(`WrongPassword${i}`);
+                assert(r.status === 401 && r.body?.error?.code === 'AUTH_REQUIRED', `wrong ${i}: ${r.status} ${r.body?.error?.code}`);
+            }
+            const right = await ownerSignIn(BASE, locked.name, locked.password);
+            assert(right.status === 200, `the right password: ${right.status} ${right.body?.error?.code}`);
+        });
+
+        await test('LOCKOUT on: an AI credential may turn it on, and wrong passwords then lock with their own answer', async () => {
+            const r = await setPolicy(opPat, [{ path: 'auth.sign_in_lockout', value: 'on' }]);
+            assert(r.status === 200, `on: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            for (let i = 0; i < 5; i++) await guess(`WrongPassword${i}`);
+            const held = await ownerSignIn(BASE, locked.name, locked.password);
+            assert(held.status === 429 && held.body?.error?.code === 'PASSWORD_LOCKED', `the right password while locked: ${held.status} ${held.body?.error?.code}`);
+        });
+
+        await test('DENIAL: an AI credential does not switch the lockout off (PERSON_REQUIRED)', async () => {
+            const r = await setPolicy(opPat, [{ path: 'auth.sign_in_lockout', value: 'off' }]);
+            assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED', `off by AI: ${r.status} ${r.body?.error?.code}`);
+        });
+
+        await test('LOCKOUT off again: the operator in person switches it off, and the lock it set no longer holds', async () => {
+            const r = await setPolicy(opSession, [{ path: 'auth.sign_in_lockout', value: 'off' }]);
+            assert(r.status === 200, `off in person: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            const right = await ownerSignIn(BASE, locked.name, locked.password);
+            assert(right.status === 200, `the right password: ${right.status} ${right.body?.error?.code}`);
         });
     } finally {
         node.kill('SIGTERM');

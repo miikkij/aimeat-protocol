@@ -10,6 +10,7 @@
  * @structure HeldSection · IncidentsSection (CapOffers, EntryActions, SubdomainChoices) · AccountsSection · SettingsSection · AskAiSection ·
  *   isHeldIncident · entryLine
  * @version-history
+ *   2026-11-02 -- The lockout row says when the lockout is off (auth.sign_in_lockout).
  *   2026-10-28 -- An open address of the subdomain incident shows its two choices as rows, each saying
  *     with both full addresses what happens when it is chosen, its button at the end (SubdomainChoices);
  *     Jouni could not tell what the two bare buttons decided.
@@ -429,8 +430,10 @@ export function SettingsSection({ ov, number, switchPage }) {
           door: S('settings.doors.security'), onClick: toConfig,
         }),
         doorRow('lockout', {
-          title: S('settings.lockout', { attempts: num(s.password_lockout.attempts), minutes: num(s.password_lockout.minutes) }),
-          why: S('settings.lockoutWhy'), door: S('settings.doors.security'), onClick: toConfig,
+          title: s.password_lockout.enabled
+            ? S('settings.lockout', { attempts: num(s.password_lockout.attempts), minutes: num(s.password_lockout.minutes) })
+            : S('settings.lockoutOff'),
+          why: S(s.password_lockout.enabled ? 'settings.lockoutWhy' : 'settings.lockoutOffWhy'), door: S('settings.doors.security'), onClick: toConfig,
         }),
         doorRow('registration', {
           title: S('settings.registration', { max: num(s.registration_rate_limit.max), window: windowWord(s.registration_rate_limit.window_ms) }),

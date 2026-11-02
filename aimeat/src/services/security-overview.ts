@@ -27,6 +27,7 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   2026-11-02 -- password_lockout.enabled: the lockout is off unless auth.sign_in_lockout turns it on.
  *   2026-11-01 -- `parties`: the outside parties, the stopped ones, the wrong keys and the reads of the
  *     last seven days, for the Security page (services/parties/admin.ts; plan doc-mvwxcas3dom3, D2.9).
  *   2026-10-16 -- `now.test_switches`: the other test-only settings in force on a non-loopback node,
@@ -146,7 +147,7 @@ export interface SecurityOverview {
     agent_token_rate_limit: { max: number; window_ms: number };
     registration_rate_limit: { max: number; window_ms: number };
     admin_auth_rate_limit: { max: number; window_ms: number };
-    password_lockout: { attempts: number; minutes: number };
+    password_lockout: { enabled: boolean; attempts: number; minutes: number };
     tarpit: { enabled: boolean; free_failures: number; step_ms: number; max_delay_ms: number; block_after: number; window_ms: number; max_concurrent: number };
     totp: { enabled: boolean; issuer: string; backup_codes: number; max_failed: number; lockout_seconds: number };
     passkeys_enabled: boolean;
@@ -318,7 +319,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
       agent_token_rate_limit: { max: config.agentTokenRateLimitMax, window_ms: 60_000 },
       registration_rate_limit: { max: config.registrationRateLimitMax, window_ms: config.registrationRateLimitWindowMs },
       admin_auth_rate_limit: { max: config.adminAuthRateLimitMax, window_ms: config.adminAuthRateLimitWindowMs },
-      password_lockout: { attempts: config.passwordLockoutAttempts, minutes: config.passwordLockoutMinutes },
+      password_lockout: { enabled: config.signInLockout === 'on', attempts: config.passwordLockoutAttempts, minutes: config.passwordLockoutMinutes },
       tarpit: {
         enabled: config.loginTarpitEnabled, free_failures: config.loginTarpitFreeFailures, step_ms: config.loginTarpitStepMs,
         max_delay_ms: config.loginTarpitMaxDelayMs, block_after: config.loginTarpitBlockAfter,

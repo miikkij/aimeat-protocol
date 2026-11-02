@@ -65,7 +65,7 @@ Library: `otpauth`. Each setting is read in `src/config-types-account-security.t
 | `AIMEAT_TOTP_PERIOD` | How long one code is valid, in seconds | `totpPeriod` |
 | `AIMEAT_TOTP_WINDOW` | How many periods before and after the current one are still accepted | `totpWindow` |
 | `AIMEAT_TOTP_BACKUP_CODE_COUNT` | How many single-use backup codes a person gets | `totpBackupCodeCount` |
-| `AIMEAT_TOTP_MAX_FAILED` | How many wrong codes pause the account's sign-in (`429 TOTP_LOCKED`, `src/services/password-check.ts`) | `totpMaxFailedAttempts` |
+| `AIMEAT_TOTP_MAX_FAILED` | With `AIMEAT_SIGN_IN_LOCKOUT=on`, how many wrong codes pause the account's sign-in (`429 TOTP_LOCKED`, `src/services/password-check.ts`) | `totpMaxFailedAttempts` |
 | `AIMEAT_TOTP_LOCKOUT_SECONDS` | How long that pause lasts, in seconds | `totpLockoutSeconds` |
 | `AIMEAT_TOTP_ENCRYPTION_KEY` | The older name of the at-rest key; see below | `totpSecretEncryptionKey` |
 
@@ -222,7 +222,7 @@ Middleware: `rateLimit()` in `src/middleware/rate-limit.ts`. The bucket key is t
 
 The other per-area limits (GHII, flags, appeals, admin setup, federation, catalogue, auth challenge) are `rate_limits.*` rows in `src/services/config-schema-rate-limits.ts`, each with its own environment variable.
 
-Sign-in attempts and password lockout have their own settings: `AIMEAT_LOGIN_RATE_LIMIT_MAX` (`loginRateLimitMax`) and `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (`passwordLockoutAttempts`), both in `src/config.ts`.
+Sign-in attempts and password lockout have their own settings: `AIMEAT_LOGIN_RATE_LIMIT_MAX` (`loginRateLimitMax`) and `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (`passwordLockoutAttempts`), both in `src/config.ts`. The lockout counts only with `AIMEAT_SIGN_IN_LOCKOUT=on` (`signInLockout`); it is off by default (Jouni, 2026-11-02).
 
 ### Role Multipliers
 

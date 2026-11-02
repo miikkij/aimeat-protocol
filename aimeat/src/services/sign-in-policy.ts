@@ -43,6 +43,7 @@
  *   const off = passwordSignInRefusal(config);           // before the password is read
  *   if (off) { res.status(off.status).json(error(config.nodeId, off.code, off.message)); return; }
  * @version-history
+ *   v1.3.0 — 2026-11-02 — auth.sign_in_lockout is a setting an AI may turn on and not off (signInPolicyLoosens).
  *   v1.2.0 — 2026-11-02 — Under `operators` the refusal says the password is the operators' only, which
  *     agrees with the sign-in dialog's line; under `off` it says the server takes none (browser check).
  *   v1.1.0 — 2026-11-02 — twoStepWithoutTotpRefusal / twoStepWithoutTotpWarning: two-step sign-in
@@ -51,13 +52,14 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
-import { PASSWORD_SIGN_IN_VALUES, TWO_STEP_REQUIRED_VALUES } from '../config-types-account-security.js';
+import { PASSWORD_SIGN_IN_VALUES, SIGN_IN_LOCKOUT_VALUES, TWO_STEP_REQUIRED_VALUES } from '../config-types-account-security.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { readerKindOf } from './classification/reader-kind.js';
 import { twoStepArmed } from './passkeys.js';
 
 export const TWO_STEP_REQUIRED_PATH = 'auth.two_step_required';
 export const PASSWORD_SIGN_IN_PATH = 'auth.password_sign_in';
+export const SIGN_IN_LOCKOUT_PATH = 'auth.sign_in_lockout';
 
 /** The error code a refused password sign-in or a refused new password carries. */
 export const PASSWORD_SIGN_IN_OFF = 'PASSWORD_SIGN_IN_OFF';
@@ -74,11 +76,12 @@ const OTHER_WAYS = 'Sign in with a passkey, with your organisation\'s sign-in, o
 /** Index of a value in its open-to-strict order, or -1 for a value the setting does not take. */
 function strictness(path: string, value: unknown): number {
   const order: readonly string[] = path === TWO_STEP_REQUIRED_PATH ? TWO_STEP_REQUIRED_VALUES
-    : path === PASSWORD_SIGN_IN_PATH ? PASSWORD_SIGN_IN_VALUES : [];
+    : path === PASSWORD_SIGN_IN_PATH ? PASSWORD_SIGN_IN_VALUES
+      : path === SIGN_IN_LOCKOUT_PATH ? SIGN_IN_LOCKOUT_VALUES : [];
   return typeof value === 'string' ? order.indexOf(value) : -1;
 }
 
-/** Whether moving one of the two settings from `from` to `to` gives protection away. */
+/** Whether moving one of these settings from `from` to `to` gives protection away. */
 export function signInPolicyLoosens(path: string, from: unknown, to: unknown): boolean {
   const a = strictness(path, from);
   const b = strictness(path, to);

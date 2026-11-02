@@ -1,6 +1,6 @@
 # 00 Go-live checklist
 
-> Checked against AIMEAT node 4.2.0 (commit e9b9813d5) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 2c1cddba9) on 2026-11-02. Maintained with the code: see the README for how.
 
 Everything to do when an AIMEAT node goes online, in the order it must be done. It is for the person who runs the installation and for the people who supply what the installation needs: the DNS admin, the identity provider (IdP) admin, the mail admin and the data protection officer (DPO). Each item says what to do, why, which setting or tool does it, what goes wrong if it is skipped, and who provides it. The detail lives in the linked guides; this page is the order.
 
@@ -109,6 +109,7 @@ Read [organisation node sign-in](../organisation-node-sign-in.md) in full before
 | 6.5 | Passkeys | On by default; bound to the RP ID decided in 1.1. `AIMEAT_PASSKEY_EXTRA_ORIGINS` lists further origins (`aimeat/src/config-types-account-security.ts`) | `AIMEAT_PASSKEY_ENABLED`, `AIMEAT_PASSKEY_RP_NAME` | None | IT |
 | 6.6 | Confirm the registration mode from 1.7 | The mode decides account creation only; existing accounts sign in under every mode | `AIMEAT_REGISTRATION_MODE` (editable at runtime) | See 1.7 | IT |
 | 6.7 | Decide who may sign in with a password | `AIMEAT_PASSWORD_SIGN_IN` is `on` by default. `operators` keeps the password for operator accounts only, as the way in when the IdP fails; `off` refuses every password sign-in and every new password (403 `PASSWORD_SIGN_IN_OFF`). The node refuses to save `off` while no operator account has a passkey or an IdP link (`OPERATOR_LOCKOUT`) (`aimeat/src/services/sign-in-policy.ts`) | `AIMEAT_PASSWORD_SIGN_IN=operators` on an organisation node with an IdP; `off` only when every operator has a passkey or an IdP link | People keep passwords the IdP does not govern | IT |
+| 6.7a | Decide whether wrong attempts lock an account | `AIMEAT_SIGN_IN_LOCKOUT` is `off` by default: wrong passwords and two-step codes are not counted and lock nothing, and the per-address delay and the login rate limit bound guessing. `on` locks the account after `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5) for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15), and after `AIMEAT_TOTP_MAX_FAILED` (5) for `AIMEAT_TOTP_LOCKOUT_SECONDS` (300) (`aimeat/src/services/password-check.ts`) | `on` where your policy requires an account lockout, knowing that anyone who knows a username can then keep its owner out for the lockout's length | A policy that requires a lockout is not met | IT |
 
 ## Phase 7: AI
 

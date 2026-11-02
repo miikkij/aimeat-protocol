@@ -17,6 +17,7 @@
  * @usage const view = buildConfigView({ config, storage, provenance });
  *        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, changes);
  * @version-history
+ *   2026-11-02 — auth.sign_in_lockout: switching it off is refused to an AI credential, like the two below.
  *   2026-11-02 — The sign-in policy: a change that weakens auth.two_step_required or
  *     auth.password_sign_in is refused to an AI credential with PERSON_REQUIRED, and
  *     auth.password_sign_in=off with 409 OPERATOR_LOCKOUT while no operator account has a passkey or an
@@ -43,7 +44,7 @@ import { offerDefaultCapsWhenSwitchedOn } from './classification/default-caps.js
 import { recordOperatorNodeAct } from './operator-access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
-    TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, TOTP_ENABLED_PATH, signInPolicyChangeRefusal, passwordOffLockoutRefusal, twoStepWithoutTotpRefusal,
+    TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, SIGN_IN_LOCKOUT_PATH, TOTP_ENABLED_PATH, signInPolicyChangeRefusal, passwordOffLockoutRefusal, twoStepWithoutTotpRefusal,
 } from './sign-in-policy.js';
 
 export interface ConfigViewDeps { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance }
@@ -219,7 +220,8 @@ export async function changeNodeSettings(deps: ConfigViewDeps, caller: SwitchCal
     // the one before it leaves; and password sign-in off is refused while no operator account has
     // another way in. Nothing in the request is applied when either refuses.
     const policyAt: Record<string, unknown> = {
-        [TWO_STEP_REQUIRED_PATH]: config.twoStepRequired, [PASSWORD_SIGN_IN_PATH]: config.passwordSignIn, [TOTP_ENABLED_PATH]: config.totpEnabled,
+        [TWO_STEP_REQUIRED_PATH]: config.twoStepRequired, [PASSWORD_SIGN_IN_PATH]: config.passwordSignIn,
+        [SIGN_IN_LOCKOUT_PATH]: config.signInLockout, [TOTP_ENABLED_PATH]: config.totpEnabled,
     };
     let movedLast: typeof TWO_STEP_REQUIRED_PATH | typeof TOTP_ENABLED_PATH | null = null;
     for (const change of changes as Array<{ path?: unknown; value?: unknown }>) {
@@ -228,7 +230,7 @@ export async function changeNodeSettings(deps: ConfigViewDeps, caller: SwitchCal
             if (MUTABLE_CONFIG_MAP[path]?.validate(change.value)) { policyAt[path] = change.value; movedLast = path; }
             continue;
         }
-        if (path !== TWO_STEP_REQUIRED_PATH && path !== PASSWORD_SIGN_IN_PATH) continue;
+        if (path !== TWO_STEP_REQUIRED_PATH && path !== PASSWORD_SIGN_IN_PATH && path !== SIGN_IN_LOCKOUT_PATH) continue;
         const refusal = signInPolicyChangeRefusal(caller, path, policyAt[path], change.value);
         if (refusal) return { ok: false, status: refusal.status, code: refusal.code, message: `${refusal.message} Nothing in this request was applied.` };
         if (MUTABLE_CONFIG_MAP[path]?.validate(change.value)) {

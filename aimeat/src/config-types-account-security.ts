@@ -20,10 +20,15 @@
  *   to what a node did before they existed, so nothing changes until the operator sets them. The
  *   rules that read them are in services/sign-in-policy.ts.
  *
- * @structure AccountSecurityConfig · TwoStepRequired · PasswordSignIn · TWO_STEP_REQUIRED_VALUES ·
- *   PASSWORD_SIGN_IN_VALUES · accountSecurityDefaults()
+ *   THE LOCKOUT IS OFF UNLESS THE OPERATOR TURNS IT ON (signInLockout, auth.sign_in_lockout; Jouni,
+ *   2026-11-02 08.02). A lock lets anyone who knows a username keep its owner out; the per-address
+ *   tarpit and the login rate limit bound guessing without doing that.
+ *
+ * @structure AccountSecurityConfig · TwoStepRequired · PasswordSignIn · SignInLockout ·
+ *   TWO_STEP_REQUIRED_VALUES · PASSWORD_SIGN_IN_VALUES · SIGN_IN_LOCKOUT_VALUES · accountSecurityDefaults()
  * @usage import type { AccountSecurityConfig } from './config-types-account-security.js';
  * @version-history
+ *   v1.2.0 — 2026-11-02 — signInLockout (AIMEAT_SIGN_IN_LOCKOUT: off, on), off by default (Jouni, 08.02).
  *   v1.1.0 — 2026-11-02 — twoStepRequired (AIMEAT_TWO_STEP_REQUIRED: off, operators, everyone) and
  *     passwordSignIn (AIMEAT_PASSWORD_SIGN_IN: on, operators, off), from an IT review of the node.
  *   v1.0.0 — 2026-09-04 — Extracted from config-types.ts, with the passkey settings.
@@ -36,6 +41,10 @@ export type TwoStepRequired = typeof TWO_STEP_REQUIRED_VALUES[number];
 /** Who may sign in with a password at all. Ordered from open to strict. */
 export const PASSWORD_SIGN_IN_VALUES = ['on', 'operators', 'off'] as const;
 export type PasswordSignIn = typeof PASSWORD_SIGN_IN_VALUES[number];
+
+/** Whether wrong passwords and wrong codes lock an account for a while. Ordered from open to strict. */
+export const SIGN_IN_LOCKOUT_VALUES = ['off', 'on'] as const;
+export type SignInLockout = typeof SIGN_IN_LOCKOUT_VALUES[number];
 
 /** The environment's value when it is one of `values`, the default otherwise. The start check reports a wrong one. */
 function pick<T extends string>(raw: string | undefined, values: readonly T[], fallback: T): T {
@@ -68,6 +77,8 @@ export interface AccountSecurityConfig {
   twoStepRequired: TwoStepRequired;
   /** on: as before · operators: only an operator account signs in with a password · off: no account does. */
   passwordSignIn: PasswordSignIn;
+  /** off (default): no lockout · on: wrong passwords and wrong codes lock the account (services/password-check.ts). */
+  signInLockout: SignInLockout;
 
   // General-purpose encryption key (fallback: totpSecretEncryptionKey)
   encryptionKey: string | null;
@@ -97,6 +108,7 @@ export function accountSecurityDefaults(baseUrl: string, siteName: string): Acco
       .split(',').map(s => s.trim()).filter(Boolean),
     twoStepRequired: pick(process.env.AIMEAT_TWO_STEP_REQUIRED, TWO_STEP_REQUIRED_VALUES, 'off'),
     passwordSignIn: pick(process.env.AIMEAT_PASSWORD_SIGN_IN, PASSWORD_SIGN_IN_VALUES, 'on'),
+    signInLockout: pick(process.env.AIMEAT_SIGN_IN_LOCKOUT, SIGN_IN_LOCKOUT_VALUES, 'off'),
     encryptionKey: process.env.AIMEAT_ENCRYPTION_KEY ?? null,
   };
 }

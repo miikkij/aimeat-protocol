@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit e9b9813d5) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 2c1cddba9) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -19,9 +19,9 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 
 | Method | Default | Settings | What IT decides | Source |
 |---|---|---|---|---|
-| Password | On for everyone (`AIMEAT_PASSWORD_SIGN_IN=on`) | `AIMEAT_PASSWORD_SIGN_IN` (`on`, `operators`, `off`), `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5), `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15), `AIMEAT_LOGIN_RATE_LIMIT_MAX` | Whether people sign in locally at all: `operators` keeps the password for operator accounts only, `off` for nobody (see below). | `aimeat/src/utils/password-validation.ts`, `aimeat/src/services/password.ts`, `aimeat/src/services/sign-in-policy.ts` |
+| Password | On for everyone (`AIMEAT_PASSWORD_SIGN_IN=on`) | `AIMEAT_PASSWORD_SIGN_IN` (`on`, `operators`, `off`), `AIMEAT_SIGN_IN_LOCKOUT` (`off`), `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` (5) and `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (15) when the lockout is on, `AIMEAT_LOGIN_RATE_LIMIT_MAX` | Whether people sign in locally at all: `operators` keeps the password for operator accounts only, `off` for nobody (see below). Whether wrong attempts lock an account: no by default (see below). | `aimeat/src/utils/password-validation.ts`, `aimeat/src/services/password.ts`, `aimeat/src/services/sign-in-policy.ts` |
 | Passkey (WebAuthn) | On | `AIMEAT_PASSKEY_ENABLED`, `AIMEAT_PASSKEY_RP_ID`, `AIMEAT_PASSKEY_EXTRA_ORIGINS` | The domain, before the first passkey (see below). | `aimeat/src/routes/passkeys.ts`, `aimeat/src/config-types-account-security.ts` |
-| Two-step sign-in (TOTP) | Available, armed by each person; required for nobody (`AIMEAT_TWO_STEP_REQUIRED=off`) | `AIMEAT_TWO_STEP_REQUIRED` (`off`, `operators`, `everyone`), `AIMEAT_TOTP_ENABLED`, `AIMEAT_TOTP_MAX_FAILED` (5), `AIMEAT_TOTP_LOCKOUT_SECONDS` (300), `AIMEAT_TOTP_BACKUP_CODE_COUNT` (10) | Who must use it: operator accounts or every account (see below). | `aimeat/src/config-types-account-security.ts`, `aimeat/src/services/sign-in-policy.ts` |
+| Two-step sign-in (TOTP) | Available, armed by each person; required for nobody (`AIMEAT_TWO_STEP_REQUIRED=off`) | `AIMEAT_TWO_STEP_REQUIRED` (`off`, `operators`, `everyone`), `AIMEAT_TOTP_ENABLED`, `AIMEAT_TOTP_MAX_FAILED` (5) and `AIMEAT_TOTP_LOCKOUT_SECONDS` (300) when the lockout is on, `AIMEAT_TOTP_BACKUP_CODE_COUNT` (10) | Who must use it: operator accounts or every account (see below). | `aimeat/src/config-types-account-security.ts`, `aimeat/src/services/sign-in-policy.ts` |
 | Sign-in link by email | Per account: on once the person has proved an address through email verification or attach-email, off for accounts created by SCIM, SAML or OIDC; no node-wide switch | Rate limit 5 requests per IP address per 10 minutes | Whether email delivery is configured. | `aimeat/src/services/login-link.ts`, `aimeat/src/routes/ghii/web-verify.ts`, `aimeat/src/routes/ghii/login-link-second-factor.ts` |
 | Microsoft Entra ID (OIDC) | Off | `AIMEAT_ENTRA_OAUTH_ENABLED`, `AIMEAT_ENTRA_OAUTH_TENANT`, `AIMEAT_ENTRA_ALLOWED_TENANTS`, `AIMEAT_ENTRA_LINK_DOMAINS` | Tenants allowed, domains whose addresses count as verified. | `aimeat/src/services/oidc-providers.ts` |
 | Google (OIDC) | Off | `AIMEAT_GOOGLE_OAUTH_ENABLED` and client settings | Whether any Google account may sign in (there is no domain gate). | `aimeat/src/services/oidc-providers.ts` |
@@ -159,7 +159,13 @@ Two settings decide the sign-in policy. Both can be changed while the node runs:
 - The first operator still gets a password, through the setup wizard or `POST /v1/admin/setup/register` (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/routes/admin/setup-register.ts`).
 - Saving `off` is refused with 409 `OPERATOR_LOCKOUT` while no operator account has a passkey or an identity provider link. Set that way from the environment, the node starts and logs a `SECURITY` warning (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/index-start.ts`).
 
-**Who changes them.** A change that weakens either setting is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set` (`aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`).
+**Lockout after wrong attempts.** `AIMEAT_SIGN_IN_LOCKOUT` (Config `auth.sign_in_lockout`) is `off` by default.
+
+- `off`: wrong passwords and wrong two-step codes are not counted and lock no account, and a lock stored while it was on no longer holds. A person cannot be kept out by someone guessing at their username. Guessing is bounded per address by the growing delay and the login rate limit (`aimeat/src/middleware/login-tarpit.ts`, `AIMEAT_LOGIN_RATE_LIMIT_MAX`), not per account: guesses from many addresses at one account are not stopped by a count.
+- `on`: `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` wrong passwords lock the account for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (429 `PASSWORD_LOCKED`), and `AIMEAT_TOTP_MAX_FAILED` wrong codes for `AIMEAT_TOTP_LOCKOUT_SECONDS` (429 `TOTP_LOCKED`) (`aimeat/src/services/password-check.ts`).
+- An organisation whose policy requires an account lockout sets it `on`.
+
+**Who changes them.** A change that weakens any of these settings is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set` (`aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`).
 
 ## First-run setup
 

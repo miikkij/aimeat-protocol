@@ -27,6 +27,8 @@
  *   const pw = await checkPassword(storage, config, ghiiRecord, password);
  *   if (!pw.ok) { res.status(pw.status).json(error(config.nodeId, pw.code, pw.message)); return; }
  * @version-history
+ *   2026-11-02 — The lockout is off unless auth.sign_in_lockout is on (Jouni, 08.02): off, no attempt is
+ *     counted and no lock is read, for the password and the TOTP code alike.
  *   2026-11-02 — checkEnrolmentCode: the first code of a required two-step enrolment, against the
  *     pending secret, with the TOTP lock (IT review, required two-step sign-in).
  *   2026-10-31 — An attempt is counted BEFORE the password or code is compared (reserveAttempt), in one
@@ -58,9 +60,17 @@ import { logger } from '../utils/logger.js';
 export type CheckRefusal = { ok: false; status: number; code: string; message: string };
 export type CheckResult = { ok: true } | CheckRefusal;
 
-type PasswordConfig = Pick<AimeatConfig, 'passwordLockoutAttempts' | 'passwordLockoutMinutes'>;
+type PasswordConfig = Pick<AimeatConfig, 'passwordLockoutAttempts' | 'passwordLockoutMinutes' | 'signInLockout'>;
 type TotpCheckConfig = Pick<AimeatConfig, 'totpIssuer' | 'totpPeriod' | 'totpWindow' | 'totpBackupCodeCount'
-  | 'totpSecretEncryptionKey' | 'encryptionKey' | 'totpMaxFailedAttempts' | 'totpLockoutSeconds'>;
+  | 'totpSecretEncryptionKey' | 'encryptionKey' | 'totpMaxFailedAttempts' | 'totpLockoutSeconds' | 'signInLockout'>;
+
+/**
+ * Whether wrong attempts count and lock (auth.sign_in_lockout). Off, the default, nothing is counted and
+ * no lock is read, one left from when it was on included, so nobody is kept out of an account by what
+ * was typed at its name (Jouni, 2026-11-02 08.02). Asked here, so every route that takes a password or
+ * a code follows it.
+ */
+const lockoutOn = (config: Pick<AimeatConfig, 'signInLockout'>): boolean => config.signInLockout === 'on';
 
 const WRONG: CheckRefusal = { ok: false, status: 401, code: 'AUTH_REQUIRED', message: 'Invalid username or password' };
 
@@ -158,8 +168,11 @@ export async function checkPassword(storage: Storage, config: PasswordConfig, re
     return { ok: false, status: 400, code: 'NO_PASSWORD', message: 'This account has no password set. Password login is not available.' };
   }
 
+  // With the lockout off, only the comparison and the hash upgrade run.
+  const lockout = lockoutOn(config);
+
   // Per-account password lockout (brute-force protection)
-  if (rec.passwordLockedUntil) {
+  if (lockout && rec.passwordLockedUntil) {
     const lockExpires = new Date(rec.passwordLockedUntil).getTime();
     if (Date.now() < lockExpires) return passwordLocked(rec.passwordLockedUntil);
     await storage.updateGHII(rec.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
@@ -170,22 +183,28 @@ export async function checkPassword(storage: Storage, config: PasswordConfig, re
 
   // The attempt is counted before the verify, so guesses sent at the same moment are bounded by the
   // lock too; a right password clears the count below.
-  const slot = await reserveAttempt(storage, ATTEMPTS_NS, rec.ghii, rec.passwordFailedAttempts,
-    config.passwordLockoutAttempts, config.passwordLockoutMinutes * 60_000);
-  if ('locked' in slot) return passwordLocked(slot.locked);
+  const slot = lockout
+    ? await reserveAttempt(storage, ATTEMPTS_NS, rec.ghii, rec.passwordFailedAttempts,
+      config.passwordLockoutAttempts, config.passwordLockoutMinutes * 60_000)
+    : null;
+  if (slot && 'locked' in slot) return passwordLocked(slot.locked);
 
   if (!await verifyPassword(password, rec.passwordHash)) {
-    const update: Record<string, unknown> = { passwordFailedAttempts: slot.reserved };
-    if (slot.lockedUntil) update.passwordLockedUntil = slot.lockedUntil;
-    await storage.updateGHII(rec.ghii, update);
+    if (slot) {
+      const update: Record<string, unknown> = { passwordFailedAttempts: slot.reserved };
+      if (slot.lockedUntil) update.passwordLockedUntil = slot.lockedUntil;
+      await storage.updateGHII(rec.ghii, update);
+    }
     return WRONG;
   }
 
   // Reset failed attempts on success
-  if (rec.passwordFailedAttempts) {
-    await storage.updateGHII(rec.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
+  if (lockout) {
+    if (rec.passwordFailedAttempts) {
+      await storage.updateGHII(rec.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
+    }
+    await resetAttempts(storage, rec.ghii);
   }
-  await resetAttempts(storage, rec.ghii);
 
   // Transparent scrypt parameter upgrade (v1 -> v2)
   if (isLegacyHash(rec.passwordHash)) {
@@ -207,7 +226,7 @@ export async function checkSecondFactor(
   const totp_code = typeof codes.totp_code === 'string' && codes.totp_code ? codes.totp_code : undefined;
   const backup_code = typeof codes.backup_code === 'string' && codes.backup_code ? codes.backup_code : undefined;
 
-  const locked = await totpLockRefusal(storage, rec);
+  const locked = await totpLockRefusal(storage, config, rec);
   if (locked) return locked;
 
   if (!totp_code && !backup_code) {
@@ -257,8 +276,8 @@ const totpLocked = (until: string): CheckRefusal => ({ ok: false, status: 429, c
   message: `Account temporarily locked due to too many failed TOTP attempts. Try again after ${until}` });
 
 /** The refusal while the account's TOTP lock holds, or null; a lock that has run out is cleared. */
-async function totpLockRefusal(storage: Storage, rec: GHIIRecord): Promise<CheckRefusal | null> {
-  if (!rec.totpLockedUntil) return null;
+async function totpLockRefusal(storage: Storage, config: TotpCheckConfig, rec: GHIIRecord): Promise<CheckRefusal | null> {
+  if (!lockoutOn(config) || !rec.totpLockedUntil) return null;
   if (Date.now() < new Date(rec.totpLockedUntil).getTime()) return totpLocked(rec.totpLockedUntil);
   // Lock expired — reset counters
   await storage.updateGHII(rec.ghii, { totpFailedAttempts: 0, totpLockedUntil: null });
@@ -278,6 +297,8 @@ export async function clearTotpAttempts(storage: Storage, ghii: string): Promise
 
 /** Count one code before it is compared (reserveAttempt), with the TOTP limit and lock length. */
 function reserveTotpAttempt(storage: Storage, config: TotpCheckConfig, rec: GHIIRecord): Promise<Reservation> {
+  // With the lockout off nothing is counted: reserved 0 is the slot totpWrongCode writes nothing for.
+  if (!lockoutOn(config)) return Promise.resolve({ reserved: 0, lockedUntil: null });
   return reserveAttempt(storage, TOTP_ATTEMPTS_NS, rec.ghii, rec.totpFailedAttempts,
     config.totpMaxFailedAttempts, config.totpLockoutSeconds * 1000);
 }
@@ -290,6 +311,7 @@ function reserveTotpAttempt(storage: Storage, config: TotpCheckConfig, rec: GHII
 async function totpWrongCode(
   storage: Storage, rec: GHIIRecord, slot: { reserved: number; lockedUntil: string | null }, message: string,
 ): Promise<CheckRefusal> {
+  if (slot.reserved === 0) return { ok: false, status: 401, code: 'INVALID_TOTP', message };
   const lockUntil = slot.lockedUntil ?? undefined;
   await storage.updateGHII(rec.ghii, { totpFailedAttempts: slot.reserved, totpLockedUntil: lockUntil });
   if (lockUntil) {
@@ -309,7 +331,7 @@ export async function checkEnrolmentCode(
   storage: Storage, config: TotpCheckConfig, rec: GHIIRecord, pendingSecret: string, code: unknown,
 ): Promise<CheckResult> {
   if (typeof code !== 'string' || !code.trim()) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'code is required: the six digits your authenticator app shows.' };
-  const locked = await totpLockRefusal(storage, rec);
+  const locked = await totpLockRefusal(storage, config, rec);
   if (locked) return locked;
   const slot = await reserveTotpAttempt(storage, config, rec);
   if ('locked' in slot) return totpLocked(slot.locked);
@@ -336,7 +358,7 @@ export async function checkTotpManagementCode(
   const code = typeof codes.code === 'string' && codes.code ? codes.code : undefined;
   const backup = typeof codes.backup_code === 'string' && codes.backup_code ? codes.backup_code : undefined;
   if (!code && !backup) return { ok: false, status: 401, code: 'INVALID_TOTP', message: wrongMessage };
-  const locked = await totpLockRefusal(storage, rec);
+  const locked = await totpLockRefusal(storage, config, rec);
   if (locked) return locked;
   const slot = await reserveTotpAttempt(storage, config, rec);
   if ('locked' in slot) return totpLocked(slot.locked);

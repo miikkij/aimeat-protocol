@@ -21,6 +21,7 @@
  * @structure GeneratedAnnexes · generateAnnexes() · operatorParty() · measuresFromConfig() · subprocessorsFor() · DEFAULT_PROCESSING
  * @usage const g = await generateAnnexes({ storage, config }, input);
  * @version-history
+ *   v1.0.1 — 2026-11-02 — The security measures name the password lock only when auth.sign_in_lockout is on.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -127,7 +128,7 @@ export function measuresFromConfig(config: AimeatConfig, lang: Lang): Array<{ ar
     L(lang, 'Salasanat tallennetaan vain scrypt-tiivisteinä.', 'Passwords are stored only as scrypt hashes.'),
     config.totpEnabled ? L(lang, 'Kaksivaiheinen tunnistus (TOTP) on käytettävissä.', 'Two-step verification (TOTP) is available.') : '',
     config.passkeyEnabled ? L(lang, 'Passkey-kirjautuminen on käytettävissä.', 'Passkey sign-in is available.') : '',
-    config.passwordLockoutAttempts ? L(lang, `Tili lukitaan ${config.passwordLockoutAttempts} väärän salasanan jälkeen ${config.passwordLockoutMinutes} minuutiksi.`, `An account locks for ${config.passwordLockoutMinutes} minutes after ${config.passwordLockoutAttempts} wrong passwords.`) : '',
+    config.signInLockout === 'on' && config.passwordLockoutAttempts ? L(lang, `Tili lukitaan ${config.passwordLockoutAttempts} väärän salasanan jälkeen ${config.passwordLockoutMinutes} minuutiksi.`, `An account locks for ${config.passwordLockoutMinutes} minutes after ${config.passwordLockoutAttempts} wrong passwords.`) : '',
     L(lang, 'Agentit ja sovellukset saavat vain ne oikeudet, jotka käyttäjä niille myöntää, ja käyttäjä voi perua ne.', 'Agents and apps get only the permissions the user grants them, and the user can revoke them.'),
   ].filter(Boolean).join(' ');
   out.push({ area: 'identification', text: signIn });
