@@ -1,8 +1,8 @@
 # 17 Exit plan
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see the README for how.
 
-This page is for the system owner, the DPO and procurement. It answers three exit questions before you go live: how people and the organisation get their data out and in which formats, how a node is shut down and its data destroyed, and how you keep running AIMEAT if the project or its maintainer stops. Every route and tool named here was checked in the code.
+This page is for the system owner and the DPO of the adopting organisation. It answers three exit questions before you go live: how people and the organisation get their data out and in which formats, how a node is shut down and its data destroyed, and how you keep running and developing AIMEAT yourselves if the project or its maintainer stops. Every route and tool named here was checked in the code.
 
 ## Three kinds of exit
 
@@ -11,6 +11,7 @@ This page is for the system owner, the DPO and procurement. It answers three exi
 | Stop using AIMEAT and move the data to another system | Per-person and per-group exports, plus the database in a standard format | [Data export](#data-export-and-portability) |
 | Close the node | A shutdown sequence and the destruction of every copy | [Shutting down](#shutting-down-a-node), [Data destruction](#data-destruction) |
 | Keep running without the maintainer | The licence, the source and your own build | [Independence](#independence-from-the-maintainer-and-any-vendor) |
+| Continue the development yourselves | A fork, your own team, and the rules, checks and tests the repository carries | [Continue it yourselves](#continue-it-yourselves) |
 
 ## Data export and portability
 
@@ -97,6 +98,29 @@ Once the node key and the process are gone, every token the node issued to peopl
 | Data formats | JSON, ZIP, CSV with Frictionless Table Schema, and a standard PostgreSQL or SQLite database | sections above |
 | AI vendor lock-in | The node talks to five provider types, any OpenAI-compatible address and local model servers; people bring their own AI clients over MCP | `aimeat/src/services/ai/types.ts`, [06 AI and models](06-ai-and-models.md) |
 | What a fork does not get | The `aimeat` name on npm, the MCP registry entry (`server.json`) and the maintainer's security fixes. A fork publishes under its own names and backports fixes itself | `server.json`, `.github/SECURITY.md` |
+
+## Continue it yourselves
+
+The MIT licence is there so that anyone can continue the software: an organisation can take it in, fork it and develop it with its own team, of any size, for its own use or for others (`LICENSE`). The repository is set up so that a new team starts from the same point as the current one, with the same rules and the same checks.
+
+| What a new team needs | Where it is | Source |
+|---|---|---|
+| The design rules and the working rules | The project instructions, and the rules that load per area of code (backend, security, MCP tool surfaces, frontend, tests, gates) | `CLAUDE.md`, `.claude/rules/` |
+| How the code is written | Coding guidelines: architecture, security invariants, storage, testing, identity model, file headers | `docs/coding-guidelines/` |
+| The traps already met | One catalogue, by symptom | `docs/pitfalls.md` |
+| The checks a change must pass | `pnpm gate` runs, on the developer's own machine, the read-only checks, the unit tests the change reaches, and the guard tier when security-relevant code changed; the list of read-only checks is in one registry | `aimeat/scripts/gate.ts`, `aimeat/scripts/lib/check-registry.mjs` |
+| The hooks | Lint and type checks before a commit, a boot check before a push, a commit message check | `.githooks/pre-commit`, `.githooks/pre-push`, `.githooks/commit-msg` |
+| The tests | E2E suites run on both databases, PostgreSQL and SQLite, the security guard tier (`pnpm test:e2e:guards:postgres-kysely`), and the unit tests | `aimeat/test/`, [testing requirements](../coding-guidelines/testing-requirements.md), [verification matrix](../security/verification-matrix.md) |
+| CI | The same checks and CodeQL on every push, dependency review on pull requests, and a scheduled vulnerability scan | `.github/workflows/ci.yml`, `.github/workflows/codeql.yml`, `.github/workflows/dependency-review.yml`, `.github/workflows/vulnerability-scan.yml` |
+| The contract | The API contract and the protocol specification | `openapi.yaml`, `docs/AIMEAT-Core-2026-11.md` |
+| The record of what each page of this package claims | The pages are tied to the code they describe, and the check names the page when that code changes | `aimeat/security/it-adoption-reviews.json`, `aimeat/scripts/check-it-adoption.ts` |
+
+The steps:
+
+1. Fork the repository at a release tag, or at the commit `GET /v1/build` reports for the node you run.
+2. Install and run the checks once on your own machine (`pnpm install` and `pnpm gate` in the `aimeat` folder), so the team knows the starting point is green.
+3. Choose the names a fork publishes under (npm package, MCP registry entry) and where security reports go; change `.github/SECURITY.md` to name your own contact.
+4. Follow the upstream repository while it is maintained, and take its security fixes into the fork ([12 Updates and releases](12-updates-releases.md)).
 
 ## Limits
 

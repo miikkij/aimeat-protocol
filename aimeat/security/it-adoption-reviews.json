@@ -16,7 +16,7 @@
       "digest": "sha256:a3becf6f6611b82032ba7075"
     },
     "01-overview.md": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
         ".github/SECURITY.md",
         "docs/coding-guidelines/environment-configs.md",
@@ -25,7 +25,7 @@
       "digest": "sha256:9823b75b60d5dd8f313cb74f"
     },
     "02-architecture.md": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/storage/storage-factory.ts",
         "aimeat/deploy/aimeat.service",
@@ -33,7 +33,7 @@
         "aimeat/src/services/ai/openrouter-region.ts",
         "docs/operations/production-deployment.md"
       ],
-      "digest": "sha256:9effe69ac14d54ca3f5cdb7d"
+      "digest": "sha256:0310ac52e4f7a8a6991d632f"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -154,22 +154,45 @@
         "docs/operations/production-deployment.md",
         "aimeat/deploy/aimeat.service"
       ],
-      "digest": "sha256:18640b9b457c33757941bfbf"
+      "digest": "sha256:60255f4da7f7db43f6d9710c"
     },
     "16-known-limitations.md": {
       "reviewedOn": "2026-11-02",
       "watches": [
         "docs/known_gaps.md",
-        "docs/security/threat-model.md"
+        "docs/security/threat-model.md",
+        "aimeat/src/services/operator-access-audit.ts",
+        "aimeat/src/services/scheduler-fire-claim.ts"
       ],
-      "digest": "sha256:4b0dfb3c6ff468e0ff1fce23"
+      "digest": "sha256:c65ec4238ccb6d9d5e0841c6"
     },
     "17-exit-plan.md": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
-        "docs/data-ownership.md"
+        "docs/data-ownership.md",
+        "LICENSE",
+        ".github/SECURITY.md"
       ],
-      "digest": "sha256:b0f1fb72099578a9047c1bc6"
+      "digest": "sha256:4a124591b51f02e11c124e14"
+    },
+    "18-scope-and-deployment-patterns.md": {
+      "reviewedOn": "2026-11-02",
+      "watches": [
+        "aimeat/src/services/scheduler-fire-claim.ts",
+        "aimeat/src/services/once-only-step.ts",
+        "aimeat/src/services/event-bus.ts",
+        "aimeat/src/mcp/oauth.ts",
+        "aimeat/src/mcp/legacy-sessions.ts",
+        "aimeat/src/services/passkeys.ts",
+        "aimeat/src/middleware/rate-limit.ts",
+        "aimeat/src/services/ai-jobs/service.ts",
+        "aimeat/src/services/config-apply.ts",
+        "aimeat/src/services/operator-access-audit.ts",
+        "aimeat/src/config-private-host.ts",
+        "docs/operations/federation.md",
+        "docs/coding-guidelines/environment-configs.md"
+      ],
+      "digest": "sha256:783df77e5f8b7f2bcdba16fd"
     },
     "README.md": {
       "reviewedOn": "2026-11-02",
@@ -243,7 +266,7 @@
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "d2a16dcfe98bf7f5",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
-      "docs/operations/production-deployment.md": "f7059a57efbc2112"
+      "docs/operations/production-deployment.md": "f36fca30fbc34332"
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
@@ -311,15 +334,19 @@
       "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
     },
     "15-operations-runbook.md": {
-      "docs/operations/production-deployment.md": "f7059a57efbc2112",
+      "docs/operations/production-deployment.md": "f36fca30fbc34332",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577"
     },
     "16-known-limitations.md": {
       "docs/known_gaps.md": "b84d33c81044e2c7",
-      "docs/security/threat-model.md": "211b04c0cc93e8fe"
+      "docs/security/threat-model.md": "211b04c0cc93e8fe",
+      "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
+      "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46"
     },
     "17-exit-plan.md": {
-      "docs/data-ownership.md": "84a68e8bf35ce846"
+      "docs/data-ownership.md": "84a68e8bf35ce846",
+      "LICENSE": "125eb0733ed6fbb1",
+      ".github/SECURITY.md": "3298fcc91e6ba5ee"
     },
     "README.md": {
       "docs/operations/README.md": "febe51a3cdddf7af"
@@ -342,6 +369,21 @@
     },
     "templates/risk-assessment.md": {
       "docs/security/threat-model.md": "211b04c0cc93e8fe"
+    },
+    "18-scope-and-deployment-patterns.md": {
+      "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
+      "aimeat/src/services/once-only-step.ts": "08156126e71309f0",
+      "aimeat/src/services/event-bus.ts": "0ccba87737ae9f24",
+      "aimeat/src/mcp/oauth.ts": "66a8f23e8c8562ae",
+      "aimeat/src/mcp/legacy-sessions.ts": "9307c49d8f8d3ff6",
+      "aimeat/src/services/passkeys.ts": "57fd388e3fb070ef",
+      "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
+      "aimeat/src/services/ai-jobs/service.ts": "acf25fba1b6088c2",
+      "aimeat/src/services/config-apply.ts": "d4d3534332d03a4c",
+      "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
+      "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
+      "docs/operations/federation.md": "cda244de75d54c60",
+      "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961"
     }
   }
 }

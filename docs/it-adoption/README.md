@@ -1,6 +1,6 @@
 # AIMEAT IT adoption package
 
-> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see "How this package stays current" below.
+> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see "How this package stays current" below.
 
 What an organisation's IT and information security need to evaluate, approve, install and run AIMEAT as their own internal system. AIMEAT is open-source software (MIT) that the organisation runs on its own server: people and their AI agents keep their knowledge there and share it through MCP, the protocol that AI tools such as Claude, Claude Code, Codex, Cursor and VS Code connect with, without a migration between AI vendors. Nothing here is specific to one organisation. Every claim names its source in the repository (a file, a setting or an MCP tool), and what the repository does not answer is listed under [Open questions](#open-questions). The limits are stated as plainly as the features: [16 Known limitations](16-known-limitations.md) collects them.
 
@@ -29,6 +29,7 @@ Then the go-live checklist, which is the work itself, and the rest by topic.
 | [00 Go-live checklist](00-go-live-checklist.md) | Everything to do when a node goes online, in order: the domain (passkeys are bound to it), DNS and TLS, secrets, the first start, email (SPF, DKIM, DMARC), sign-in (Entra, Google, SAML, SCIM, passkeys), AI, search engines, compliance settings, and the checks before users arrive |
 | [01 Overview](01-overview.md) | What AIMEAT is and is not, licence, versions, maintenance model, who it fits |
 | [02 Architecture](02-architecture.md) | Components, data flows, inbound traffic, the outbound traffic as an egress allowlist, resources |
+| [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md) | What a node is for and what runs beside it, one node or many, several processes on one database and what stays per process, a node of one's own, availability, and why the operator keeps access |
 | [04 Identity and access](04-identity-access.md) | SSO, provisioning and leavers, MFA, the role model, agent identities, tokens |
 | [05 Data protection](05-data-protection.md) | Data inventory, encryption, classification, retention and deletion, GDPR export, data location |
 | [06 AI and models](06-ai-and-models.md) | Model sources, what is sent to a model, local-only data, budgets, AI Act transparency, and what IT prepares for Azure, AWS Bedrock, OpenRouter, its own GPU servers or a direct provider |
@@ -38,7 +39,7 @@ Then the go-live checklist, which is the work itself, and the rest by topic.
 | [13 Apps, agents and endpoints](13-apps-agents-endpoints.md) | Who publishes apps, the connector on workstations, MCP connections from AI chats |
 | [14 Compliance mapping](14-compliance-mapping.md) | GDPR, EU AI Act, ISO/IEC 27001 Annex A and NIS2, with AIMEAT's support and the organisation's part |
 | [15 Operations runbook](15-operations-runbook.md) | Installation, the settings to decide, routines, troubleshooting, RACI |
-| [17 Exit plan](17-exit-plan.md) | Export, shutdown, data destruction, running without a vendor |
+| [17 Exit plan](17-exit-plan.md) | Export, shutdown, data destruction, running without a vendor, continuing the development yourselves |
 
 ## Templates the organisation fills in
 
@@ -79,8 +80,6 @@ What the repository does not answer. Each one names who can answer it; most are 
 
 - OPEN: What are the minimum and recommended CPU, memory and disk sizes for a node of a given number of people and agents? The maintainer named in `.github/SECURITY.md` can answer; no sizing test is in the repository.
 - OPEN: Does the node work through an outbound HTTP proxy, for example with Node's `NODE_USE_ENV_PROXY` and `HTTPS_PROXY`? Nothing in the repository shows a test; the maintainer can answer.
-- OPEN: Is a high-availability pattern (for example an active-passive pair on PostgreSQL with one node process at a time) tested by the project? The maintainer can answer.
-
 ### [03 Shared responsibility](03-shared-responsibility.md)
 
 - OPEN: Is there a supported procedure to rotate the node's Ed25519 key (`AIMEAT_NODE_KEY_PATH`) without breaking every issued token and every federation peer? The maintainer named in `.github/SECURITY.md` can answer.
@@ -159,6 +158,12 @@ What the repository does not answer. Each one names who can answer it; most are 
 
 - OPEN: Which personal data does the node log, and for how long, so that log destruction can be scoped? See [10 Logging and monitoring](10-logging-monitoring.md); if that page leaves it open, the maintainer can answer.
 - OPEN: Is there a documented way to migrate a whole node (all accounts) to another AIMEAT node other than restoring its database there? The maintainer can answer.
+
+### [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md)
+
+- OPEN: Has the project run one node as several processes on one PostgreSQL database behind a load balancer, or as an active process with a standby, under load, and with which load balancer rules? The maintainer named in `.github/SECURITY.md` can answer.
+- OPEN: Will the short sign-in steps (MCP OAuth codes, app grant codes, passkey ceremonies, WebSocket tickets), the replay cache and the start-up reconciliation of AI jobs and workflow runs move to the database, so that several processes can serve without routing the sign-in paths to one process? The maintainer can answer.
+- OPEN: Can a person signed in from a peer node through cross-node sign-in be a member of an organism on this node, and which workspace operations are open to such a member? The maintainer can answer.
 
 ### [Template: record of processing activities (GDPR Article 30)](templates/processing-record.md)
 

@@ -1,6 +1,6 @@
 # 14 Compliance mapping
 
-> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is for the DPO, the compliance officer and the auditor. It maps GDPR, the EU AI Act, ISO/IEC 27001:2022 Annex A and NIS2 Article 21 to what the AIMEAT node does, and says what stays with the organisation. AIMEAT is not certified, and the repository holds no external audit or attestation. "Yes" below means the node has the mechanism; it never means the organisation is compliant by running it. The node's own compliance features say the same: every risk or framework verdict is served with a not-legal-advice note (`aimeat/src/data/compliance-questionnaire.ts`).
 
@@ -76,7 +76,7 @@ Controls the node touches ([ISO/IEC 27001:2022](https://www.iso.org/standard/270
 | 8.24 Use of cryptography | partial | AES-256-GCM for secrets (`aimeat/src/services/encryption.ts`), Ed25519 signatures for federation and tokens (`aimeat/src/auth/node-keys.ts`) | TLS, key custody, disk encryption |
 | 8.25 Secure development life cycle | partial | security invariants ([Security DNA](../coding-guidelines/security-development-dna.md)), gates before merge | own acceptance of releases |
 | 8.26 Application security requirements | partial | [Threat model](../security/threat-model.md), [Verification matrix](../security/verification-matrix.md) | requirements for the organisation's apps on the node |
-| 8.27 Secure architecture | partial | one process behind a proxy, storage interface, egress guard ([02 Architecture](02-architecture.md)) | network zoning ([DMZ architecture](../aimeat-dmz-architecture.md)) |
+| 8.27 Secure architecture | partial | node processes behind a proxy, storage interface, egress guard, separate nodes per unit or partner ([02 Architecture](02-architecture.md), [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md)) | network zoning ([DMZ architecture](../aimeat-dmz-architecture.md)) |
 | 8.28 Secure coding | partial | CodeQL (`.github/workflows/codeql.yml`), security ratchet files such as `aimeat/security/route-scope-exemptions.json` | review of own extensions and apps |
 
 ## NIS2 Article 21 risk management measures
