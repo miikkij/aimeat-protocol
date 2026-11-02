@@ -11,6 +11,9 @@
  * @structure scopesExceedNodeMax(config, scopes) · approveDeviceAuth(...)
  * @usage import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
  * @version-history
+ *   v1.4.0 — 2026-11-02 — On a store place an agent the owner approves in person gets the place's tools by
+ *     default (services/place-agent-scopes.ts; Jouni 2.11 07.42); an agent approver still grants only
+ *     what it holds.
  *   v1.3.0 — 2026-10-27 — A new agent under a name whose earlier agent left schedules or saved workflows
  *     tells the owner it takes them over (secaudit2026oct26, deleted-agent-authority-revived-by-same-name-agent).
  *   v1.2.0 — 2026-10-25 — `opts`: an existing agent approved without proof that it is coming back is a
@@ -45,6 +48,7 @@ import { newAgentClearance, clearanceBoundByApprover } from '../../services/agen
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { logger } from '../../utils/logger.js';
 import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
+import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 export function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -130,7 +134,11 @@ export async function approveDeviceAuth(
    * wrong; it is a one-hour token and the connector does not auto-refresh, so that was not a way
    * out for anyone.
    */
-  let grantedScopes = finalScopes;
+  // On a store place an agent the owner approves in person has the place's tools by default
+  // (services/place-agent-scopes.ts; Jouni 2.11 07.42). An agent approver grants only what it holds.
+  // Once per agent, so a re-approval does not undo what the owner took away since.
+  const placeDefault = async (scopes: string[]) => (approverAgentScopes ? scopes : applyPlaceDefault(storage, config, gaii, scopes));
+  let grantedScopes: string[];
 
   // An AGENT approver passes on no more clearance than it holds, the clearance half of the rule
   // above for scopes: an agent the owner limited to a classification made an unlimited sibling and
@@ -150,7 +158,7 @@ export async function approveDeviceAuth(
     // the consent card's templates or by an agent's request, so re-approval is never the place it
     // was meant to be dropped — the owner removes it in the editor, deliberately, as they added it.
     const preserved = SCOPES_OUTSIDE_WILDCARD.filter(s => held.includes(s) && !finalScopes.includes(s));
-    grantedScopes = scopesRequested ? [...finalScopes, ...preserved] : held;
+    grantedScopes = await placeDefault(scopesRequested ? [...finalScopes, ...preserved] : held);
     // An AGENT approver grants no word its own token does not carry, whichever of the two branches
     // above produced the list. Both of them read the TARGET's held scopes, so without this an agent
     // holding `agent:write` and `memory:read` re-approved a sibling and was handed that sibling's
@@ -188,6 +196,7 @@ export async function approveDeviceAuth(
     // New agent: create from scratch
     keyPair = await generateKeyPair();
     const startClearance = await bound(newAgentClearance(config).clearance ?? null);
+    grantedScopes = await placeDefault(finalScopes);
 
     await storage.createAgent({
       name: request.agentName,
@@ -196,7 +205,7 @@ export async function approveDeviceAuth(
       displayName: request.displayName ?? request.agentName,
       description: request.description,
       capabilities: [],
-      defaultScopes: finalScopes,
+      defaultScopes: grantedScopes,
       publicKey: keyPair.publicKey,
       trustScore: 50,
       morselBalance: 0,

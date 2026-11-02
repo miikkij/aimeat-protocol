@@ -1136,6 +1136,7 @@ const ALL_SUITES = [
     // A store place sends that request itself, with the person's own account on the builders' node,
     // through the MCP server they attached (aimeat-commercial-1c, crew54).
     'test/e2e-build-with-you-send.ts',
+    'test/e2e-place-agent-scopes.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',
