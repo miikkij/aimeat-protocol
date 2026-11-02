@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-02 -- e2e-dsp-agreements.ts joins the list (not the guard tier): what a Dataspace agreement grants and books, and the process room (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-files-connections.ts joins the list (not the guard tier): a connected SharePoint on an own node (:28285).
  *   2026-11-01 -- e2e-iam-parties.ts joins the list (not the guard tier): a person registered to an app as a member AIMEAT.iam reads (WP9d).
  *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
@@ -1305,6 +1306,8 @@ const ALL_SUITES = [
     'test/e2e-party-invite.ts',
     // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
     'test/e2e-dsp.ts',
+    // What a Dataspace agreement grants (the offer's version pin and audience) and books (one sale, once made), stacked agreements, the process room (secaudit2026nov02d round 13).
+    'test/e2e-dsp-agreements.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
     // The conflicts in that report: each item's effective classification and cap, conflicts first,

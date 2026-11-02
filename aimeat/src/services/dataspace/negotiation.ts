@@ -28,6 +28,8 @@
  *   providerOffer · locateNegotiation
  * @usage const out = await requestNegotiation(deps, participant, req.body); res.status(out.status).json(out.body);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The sale of a priced agreement is booked after the consumer took the
+ *     agreement, once (secaudit2026nov02d round 13).
  *   v1.0.2 — 2026-11-02 — A share offer records the pinned version of its share (secaudit2026nov02d
  *     round 13).
  *   v1.0.1 — 2026-11-02 — A new request asks the process room (./settings.ts processRoomRefusal): ended
@@ -47,7 +49,7 @@ import {
 } from './contract.js';
 import { datasetFor, offerById, type OfferEntry } from './catalog.js';
 import { agreementOf } from './policy.js';
-import { materialiseAgreement, endAgreement } from './agreement.js';
+import { materialiseAgreement, endAgreement, bookAgreementSale } from './agreement.js';
 import { callbackAllowed, later, sendCallback } from './callbacks.js';
 import { changeNegotiation, createNegotiation, readNegotiation, sweepArchive } from './store.js';
 import { autoAgreeFor, nodeParticipantId, processRoomRefusal, tckModeOn } from './settings.js';
@@ -142,6 +144,8 @@ export async function providerAgree(deps: Deps, n: NegotiationRecord, by: 'provi
         if (made.value) await endAgreement(deps, { ...n, agreementId, materialised: made.value }, 'dsp-callback-failed');
         await moveBack(deps, n, n.state, 'AGREED', out.error, { agreementId: undefined, agreement: undefined, materialised: undefined });
     } else if (made.value) {
+        // The agreement is made: its sale is booked now, once (./agreement.ts).
+        if (made.sale) await bookAgreementSale(deps, { ...n, agreementId }, made.sale);
         void recordAccountEvent(deps.storage, {
             ownerGhii: n.ownerGhii, kind: 'contract_started', actorGaii: `dsp:${n.participantId}`, subject: agreementId,
             link: '/v1/dataspace/negotiations', data: { name: `${n.packageName} (Dataspace: ${n.participantId})` },
