@@ -15,6 +15,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.14.0 — 2026-11-02 — POST /v1/chat/threads/:id/turn takes `timezone`, the browser's zone, for the
+ *     person's local time in the turn note (services/chat-turn-guard.ts clockLine).
  *   v1.13.0 — 2026-11-02 — A closed stream no longer ends the turn: it runs to its end and is saved, so a
  *     person who reloads or opens another page mid-thought comes back to the answer (c9's finding on
  *     crew64). Stop is POST /v1/chat/threads/:id/stop. Reverses v1.2.0's "a closed stream aborts".
@@ -238,7 +240,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     // something, and a person watching a spinner for four minutes cannot tell work from a hang.
     router.post('/v1/chat/threads/:id/turn', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
         const threadId = req.params.id as string;
-        const { text, attachments, images, starter, lang } = req.body ?? {};
+        const { text, attachments, images, starter, lang, timezone } = req.body ?? {};
         // The language of the lines the node itself writes into the turn (its progress lines and the
         // stopped line): the page's own language when it sends one, which follows the platform's
         // language switch, else the browser's.
@@ -315,7 +317,12 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         running.add(turnKey);
         stoppers.set(turnKey, abort);
         try {
-            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, attachmentKeys, { locale })) {
+            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, attachmentKeys, {
+                locale,
+                // The browser's own time zone, for the person's local time in the turn note; the
+                // service checks it and the person's chosen zone wins (services/chat-turn-guard.ts).
+                ...(typeof timezone === 'string' && timezone.length <= 64 ? { timezone } : {}),
+            })) {
                 if (!finished) send(update);
             }
         } catch (err) {

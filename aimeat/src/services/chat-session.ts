@@ -32,6 +32,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.19.0 -- 2026-11-02 -- The turn note carries the person's local date and time (clockLine): their
+ *     own time zone, else `opts.timezone`, the one their browser sent with the turn (crew68).
  *   v1.18.0 -- 2026-11-02 -- A turn that ends with no words, no tool call and no card is asked once more
  *     in the same session; only an empty second answer writes chatTurn.noAnswer (the Chief of Staff,
  *     2.11 02.20).
@@ -104,7 +106,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from './goose-acp.js';
 import {
-    TURN_LIMITS, TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, noAnswerText, appReadyText, publishedAppUrl,
+    TURN_LIMITS, TurnWatch, stepForTool, turnNote, clockLine, wrapUpPrompt, withTicks, progressText, stoppedText, noAnswerText, appReadyText, publishedAppUrl,
     type GuardReason, type NodeUpdate, type ProgressStep,
 } from './chat-turn-guard.js';
 import { DEFAULT_LOCALE, createT, type Locale } from '../i18n.js';
@@ -120,6 +122,7 @@ import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
 import { pdfReadLimits } from './file-text/pdf-bounded.js';
 import { systemReader } from './classification/reader.js';
+import { displayPrefsFor } from './display-prefs.js';
 import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
@@ -412,7 +415,7 @@ async function sessionFor(
  */
 export async function* runChatTurn(
     deps: ChatDeps, ownerName: string, threadId: string, text: string, signal?: AbortSignal,
-    attachmentKeys: string[] = [], opts: { locale?: Locale } = {},
+    attachmentKeys: string[] = [], opts: { locale?: Locale; timezone?: string } = {},
 ): AsyncGenerator<ChatUpdate> {
     const { storage, config } = deps;
     const locale = opts.locale ?? DEFAULT_LOCALE;
@@ -444,6 +447,8 @@ export async function* runChatTurn(
         ...notes,
         ...(skipped.length ? [`These files were attached but could not be read as text or as a picture, so you have not seen them: ${skipped.join(', ')}. Say so plainly if they matter.`] : []),
     ].join('\n\n');
+    // The person's local date and time for the turn note: the model's own clock is UTC (crew68).
+    const clock = clockLine(await displayPrefsFor(storage, gaii), opts.timezone, locale, now);
 
     await appendTurn(storage, gaii, threadId, {
         role: 'user', text, at: now,
@@ -583,7 +588,7 @@ export async function* runChatTurn(
     }
 
     try {
-        let main = yield* phase(`${prompt}\n\n${turnNote()}`, images, new TurnWatch({
+        let main = yield* phase(`${prompt}\n\n${turnNote(clock)}`, images, new TurnWatch({
             toolCalls: TURN_LIMITS.softToolCalls, rounds: TURN_LIMITS.softRounds, ms: TURN_LIMITS.softMs,
         }, startedAt));
         // A model that ends the turn with no words and no work is asked once more, in the same session,
@@ -592,7 +597,7 @@ export async function* runChatTurn(
         if (main.end?.kind !== 'error' && !main.limit && !signal?.aborted
             && !withoutToolMarkers(answer).trim() && !tools.size && !cards.size) {
             logger.warn(`[chat] ${gaii}: the turn ended with no words and no tool call; asking once more`);
-            main = yield* phase(`${prompt}\n\n${turnNote()}`, [], new TurnWatch({
+            main = yield* phase(`${prompt}\n\n${turnNote(clock)}`, [], new TurnWatch({
                 toolCalls: TURN_LIMITS.softToolCalls, rounds: TURN_LIMITS.softRounds, ms: TURN_LIMITS.softMs,
             }, Date.now()));
         }

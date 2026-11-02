@@ -14378,6 +14378,13 @@ paths:
                   description: >-
                     The language of the lines the node writes into the turn (progress, and the
                     stopped line). The page sends its own language. Accept-Language when omitted.
+                timezone:
+                  type: string
+                  maxLength: 64
+                  description: >-
+                    The browser's IANA time zone, such as Europe/Helsinki. The agent is told the
+                    person's local date and time in it; the zone the person chose in their own
+                    settings wins, and with neither the time is given as UTC. An unknown zone is ignored.
       responses:
         '200':
           description: SSE stream of turn updates
