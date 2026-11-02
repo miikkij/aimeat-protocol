@@ -10,6 +10,10 @@
  *   deliveryRows · rel · crumb · pageLinks · renderPage
  * @usage import { renderPage, c, deliveryRows } from './frame.js';
  * @version-history
+ *   v2.3.0 -- 2026-11-02 -- The data products left the Offers page for "Data you share"
+ *     (views/profile/shared-data-tab.js): the rail no longer lists them, and renderPage hands a page to
+ *     `ctx.frame` when the tab that hosts it passes one, so the product page and its wizard stay the
+ *     same pages under the other tab's crumb and rail (WP11).
  *   v2.2.0 -- 2026-11-01 -- renderPage `wide`: no rail, the whole width (the data product wizard; WP10e B8).
  *   v2.1.0 -- 2026-11-01 -- The rail's pages end with the data products, "Data products · n", and
  *     "Out of date · n" while a product is late or stale; renderPage passes a `label` over the title
@@ -114,20 +118,18 @@ const PAGES = [['inbox', 'inbox'], ['map', 'map'], ['sell', 'sell']];
 export function pageLinks(ctx, current) {
   const m = ctx.model;
   const n = { inbox: m.latest.length, sell: m.selling.length };
-  const products = ctx.data?.products || [];
-  const old = products.filter((p) => ['late', 'stale'].includes(p.freshness?.state)).length;
-  return [
-    ...PAGES.map(([id, key]) => ({ key: id, mark: '→', label: c(key), count: id in n ? n[id] : '→', on: current === id, onClick: () => ctx.pickView({ kind: 'page', id }) })),
-    { key: 'data', mark: '→', label: t('dataout.list.filterAll'), count: products.length, on: current === 'data' && ctx.view.filter !== 'old', onClick: () => ctx.pickView({ kind: 'page', id: 'data' }) },
-    old ? { key: 'data-old', mark: '→', label: t('dataout.list.filterOld'), count: old, on: current === 'data' && ctx.view.filter === 'old', onClick: () => ctx.pickView({ kind: 'page', id: 'data', filter: 'old' }) } : null,
-  ].filter(Boolean);
+  return PAGES.map(([id, key]) => ({ key: id, mark: '→', label: c(key), count: id in n ? n[id] : '→', on: current === id, onClick: () => ctx.pickView({ kind: 'page', id }) }));
 }
 
 /**
  * A page inside the Offers page. `marks` are its tags as data, `actions` its doors, `desc` its line
  * under the head, `rail` more groups of the rail ([{ label, items }]) after the way back.
  */
-export function renderPage(ctx, { id, crumbs, label = null, title, marks = null, actions = null, desc = null, strip = null, rail = null, after = null, wide = false, children }) {
+export function renderPage(ctx, opts) {
+  // A page this file's pages share with another tab (a data product's page and its wizard, at home on
+  // "Data you share" since WP11) is framed by that tab: its crumb, its rail.
+  if (ctx.frame) return ctx.frame(ctx, opts);
+  const { id, crumbs, label = null, title, marks = null, actions = null, desc = null, strip = null, rail = null, after = null, wide = false, children } = opts;
   // `wide`: the page takes the whole width with no rail (the data product wizard, whose step 2 is a
   // six-column table; the canvas boards Vaihe1 to Vaihe6 have no rail).
   return html`

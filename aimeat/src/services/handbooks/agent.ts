@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.62.0 -- 2026-11-02 -- Discover: "what data have I shared and who reads it" is aimeat_dataproduct
+ *     "shared", stopping a party aimeat_party "stop", rebuilding "run" (WP11).
  *   v1.61.0 -- 2026-11-01 -- Discover: a data product's Markdown description, `i18n`, licence and
  *     `attribution`, and that define replaces the whole definition (WP10e).
  *   v1.60.0 -- 2026-11-02 -- aimeat_home_feed: what the person's home lists, read before answering about it.
@@ -377,8 +379,12 @@ of X, update it on Mondays and share it with Matti for a month") is ONE proposal
 show the person the source, the columns, a personal column left out, the rows, the schedule and who
 may use it; \`define\`, \`run\` and \`share\` only when they agree. "What data do I offer?" and "Is any of
 it out of date?" are \`aimeat_dataproduct\` \`list\` (each product's freshness, audience, live shares and
-reads this week); "Who reads my data?" is \`aimeat_exposure_report\` and \`aimeat_party\` \`reads\`;
-"Withdraw it" is \`aimeat_datapackage_withdraw\`. To sell a package on EXCHANGE (by the month, or by
+reads this week); "What data have I shared, and who reads it?" is \`aimeat_dataproduct\` \`shared\`
+(every package with its audience, licence, freshness, shares with who and until, reads in 30 days and
+the last read: the same list as the profile's "Data you share" page, /v1/profile?tab=sharedData); the
+person ends one share there (End share), \`aimeat_party\` \`stop\` stops a party's every share, and
+\`run\` rebuilds a product now; one party's reads in detail are \`aimeat_party\` \`reads\`; "Withdraw it"
+is \`aimeat_datapackage_withdraw\`. To sell a package on EXCHANGE (by the month, or by
 the read), use \`aimeat_datapackage_sell\` with the money price and the usage terms; a buyer with an
 account accepts it with \`aimeat_exchange_accept\`, a buyer with none buys at the listing's \`buy\`
 address and gets a key. When the server offers packages to data spaces (the Eclipse Dataspace

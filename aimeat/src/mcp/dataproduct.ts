@@ -13,6 +13,8 @@
  * @structure registerDataProductTool(mcp, config, storage, caller)
  * @usage registerDataProductTool(mcp, config, storage, caller);   // from registerCoreDataPackageTools
  * @version-history
+ *   v1.4.0 — 2026-11-02 — action "shared": what the account shares as data and who reads it
+ *     (services/datapackage/shared-data.ts sharedDataForCaller, which GET /v1/datapackages/shared calls; WP11).
  *   v1.3.0 — 2026-11-01 — define and a draft preview take `attribution` and `i18n` (WP10e).
  *   v1.2.0 — 2026-11-01 — action "describe": a description draft by the owner's own AI (WP9c).
  *   v1.1.0 — 2026-11-01 — define and a draft preview take `retention` (WP9a).
@@ -32,6 +34,7 @@ import {
     type DataProductAnswer, type DataProductCtx,
 } from '../services/dataproduct/service.js';
 import { describeProduct } from '../services/dataproduct/describe.js';
+import { sharedDataForCaller } from '../services/datapackage/shared-data.js';
 
 const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'attribution', 'i18n', 'sources', 'combine', 'columns', 'filter', 'schedule', 'retention', 'visibility', 'confirm_personal_public'] as const;
 
@@ -57,6 +60,12 @@ export function registerDataProductTool(
         const a = args as Record<string, unknown>;
         const name = typeof a.name === 'string' ? a.name.trim() : '';
         const action = String(a.action ?? '');
+        // "shared": what the account shares as data and who reads it, the route GET
+        // /v1/datapackages/shared answers with the same service function (WP11).
+        if (action === 'shared') {
+            const out = await sharedDataForCaller({ storage, config }, caller());
+            return out.ok ? { content: [{ type: 'text' as const, text: JSON.stringify(out.data, null, 2) }] } : toolError(out.code, out.message);
+        }
         if (action !== 'list' && !name) return toolError('INVALID_INPUT', `action "${action}" needs name, the product (and package) name.`);
         const body = Object.fromEntries(DEFINITION_FIELDS.filter(f => a[f] !== undefined).map(f => [f, a[f]]));
         switch (action) {
@@ -67,7 +76,7 @@ export function registerDataProductTool(
             case 'run': return answer(await runStored(ctx, name));
             case 'delete': return answer(await deleteProduct(ctx, name));
             case 'describe': return answer(await describeProduct(ctx, name, { ...body, ...(typeof a.lang === 'string' ? { lang: a.lang } : {}) }));
-            default: return toolError('INVALID_INPUT', 'action is one of define, get, list, preview, run, delete, describe.');
+            default: return toolError('INVALID_INPUT', 'action is one of define, get, list, shared, preview, run, delete, describe.');
         }
     });
 }

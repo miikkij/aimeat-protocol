@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-11-02 — The "Data you share" tab (views/profile/shared-data-tab.js, id 'sharedData'): every data
+ *     package the person shares, who reads it, and the data products, moved from Offers (WP11).
  *   2026-10-31 — The AI tab hands its three cards (decision model, transparency, compliance) to the
  *     page as `extras`, so a buyer's simple view keeps them inside "Lisäasetukset" (v31 K58).
  *   2026-10-29 — The "Your own storage" tab (views/profile/storage-tab.js, id 'storage'): a person keeps
@@ -92,6 +94,7 @@ import AccessTab from './profile/access-tab.js';
 import ExposureTab from './profile/exposure-tab.js';
 import AgreementsTab from './profile/agreements-tab.js';
 import DataWalletTab from './profile/data-wallet-tab.js';
+import SharedDataTab from './profile/shared-data-tab.js';
 import StorageTab from './profile/storage-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
 import AppDevTab from './profile/appdev-tab.js';
@@ -178,6 +181,7 @@ const TABS = [
   { id: 'access',        key: 'profile.tabs.access',         component: AccessTab,         minTier: 'new' },
   { id: 'exposure',      key: 'profile.tabs.exposure',       component: ExposureTab,       minTier: 'new' },
   { id: 'agreements',    key: 'profile.tabs.agreements',     component: AgreementsTab,     minTier: 'new' },
+  { id: 'sharedData',    key: 'profile.tabs.sharedData',     component: SharedDataTab,     minTier: 'new' },
   { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     component: DataWalletTab,     minTier: 'active' },
   { id: 'storage',       key: 'profile.tabs.storage',        component: StorageTab,        minTier: 'new' },
   { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      component: NodeStatsTab,      minTier: 'experienced' },

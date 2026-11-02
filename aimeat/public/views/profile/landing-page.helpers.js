@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Time, tab-navigation, and number/byte format helpers. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-11-02 — redirectMovedTab: ?tab=offers&product=… opens the product on "Data you share" (WP11).
  *   v1.3.0 — 2026-11-01 — openTabAt(href): a link inside the profile opens the tab at its item; the
  *     history keeps `product` and `party` of an address that already names the tab (WP10e B2).
  *   v1.2.0 — 2026-10-14 — The mount reflection keeps `section` too (a link into a page's section).
@@ -45,6 +46,21 @@ export function openProfileTab(tabId) {
  * query (?tab=offers&product=…), then the tab opens and reads it as a deep link does. The profile reads
  * ?tab= only on mount, so a plain link changed the address and not the view.
  */
+/**
+ * An address that names a tab's item where it lived before rewritten to where it lives now, in place,
+ * before the profile reads ?tab=. The data products moved from Offers to "Data you share" (WP11): a
+ * link `?tab=offers&product=<name>` (a mail, a bookmark, an AI's answer) opens the product there.
+ */
+export function redirectMovedTab() {
+  try {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('tab') === 'offers' && url.searchParams.get('product')) {
+      url.searchParams.set('tab', 'sharedData');
+      history.replaceState(history.state, '', url.pathname + url.search);
+    }
+  } catch (err) { swallowed('landing-page.helpers: redirectMovedTab', err); }
+}
+
 export function openTabAt(href) {
   try {
     const url = new URL(href, window.location.origin);

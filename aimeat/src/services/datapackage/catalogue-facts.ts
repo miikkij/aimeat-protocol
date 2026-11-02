@@ -24,6 +24,8 @@
  * @usage
  *   const facts = (await allDatasetFacts(storage)).filter(f => f.audience === 'public');
  * @version-history
+ *   v1.3.0 — 2026-11-02 — datapackageListing carries the owner, the name, the title, the description and
+ *     words per language, the licence and the table and row counts, for a library row (WP11).
  *   v1.2.0 — 2026-11-01 — DatasetFacts.i18n: the title and description per language (WP10e A2).
  *   v1.1.0 — 2026-11-01 — datasetLandingUrl names the public dataset page /v1/dataset/{owner}/{name}
  *     (board Julkinen-sivu); it named the public knowledge viewer, which shows no data package (WP9b).
@@ -260,6 +262,16 @@ export function datapackageListing(baseUrl: string, f: DatasetFacts): Record<str
   const links = datasetLinks(baseUrl, f);
   return {
     package_id: f.packageId,
+    // What a library row says without opening the package: whose, which, its words per language, its
+    // licence and its size (the library, WP11).
+    owner: f.owner,
+    name: f.name,
+    title: f.title,
+    ...(f.description ? { description: f.description } : {}),
+    ...(f.i18n ? { i18n: f.i18n } : {}),
+    ...(f.license ? { license: f.license } : {}),
+    tables: f.resources.length,
+    rows: f.resources.reduce((n, r) => n + r.rowCount, 0),
     content_hash: f.contentHash,
     descriptor_url: links.descriptor,
     odata_url: links.odata,

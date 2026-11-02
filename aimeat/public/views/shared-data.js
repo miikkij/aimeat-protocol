@@ -20,6 +20,9 @@
  * @structure SharedData (default) · call · partyFetch · fileOf
  * @usage routed at /v1/shared-data?invite=<code> by spa.html
  * @version-history
+ *   v1.2.0 — 2026-11-02 — Once the key is taken, "Everything shared with you" opens the library with the
+ *     party's token held in memory (js/services/party-session.js), and a return from it shows this page
+ *     as it stood (the link is spent); the key is never shown in the library (WP11, board Kirjasto-avaimella).
  *   v1.1.0 — 2026-11-01 — The title and description are the reader's language and the description is
  *     Markdown; step 1 shows the licence (its deed, what it allows, who to credit) where it said there
  *     are no terms; "Change the key" asks first; a used link offers the change of key with the key
@@ -51,6 +54,8 @@ import { wordsOf, licenceOf, shortLicence } from './profile/offers/data-words.js
 import { LicenceNote } from './profile/offers/data-licence.js';
 import { ConnectSteps } from './profile/offers/data-connect.js';
 import { RotateByKey } from './shared-data-rotate.js';
+import { t } from '/js/i18n.js';
+import { holdPartySession, keepRecipientPage, keptRecipientPage } from '/js/services/party-session.js';
 
 const r = (key, vars) => d('recipient.' + key, vars);
 
@@ -100,14 +105,26 @@ function refusalWords(code) {
   return r('refused.' + (known.includes(code) ? code : 'other'));
 }
 
+/** Hold the party's token for the library and keep this page's state for the way back (WP11). */
+function holdFor(code, view, got, expiresIn) {
+  const party = view?.party || {};
+  holdPartySession({
+    token: got.token, expiresIn, inviteCode: code,
+    party: { name: party.name, display_name: party.display_name, kind: party.kind, owner: view?.owner, owner_name: view?.owner_name },
+  });
+  keepRecipientPage(code, { view, got });
+}
+
 export default function SharedData() {
   const code = new URLSearchParams(window.location.search).get('invite') || '';
-  const [view, setView] = useState(null);       // the preview, then the redemption's answer
+  // Back from the library: the link is spent, so the page as it stood is kept in memory for this tab.
+  const [kept] = useState(() => keptRecipientPage(code));
+  const [view, setView] = useState(kept?.view || null);       // the preview, then the redemption's answer
   const [failed, setFailed] = useState(code ? '' : 'INVITE_NOT_FOUND');
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [got, setGot] = useState(null);         // { key, token, connection, basicUser }
+  const [got, setGot] = useState(kept?.got || null);         // { key, token, connection, basicUser }
   const [showSteps, setShowSteps] = useState(false);
   const [ended, setEnded] = useState(false);
   const [rotated, setRotated] = useState(false);
@@ -115,11 +132,11 @@ export default function SharedData() {
   const [askingRotate, setAskingRotate] = useState(false);  // "Change the key" pressed once, waiting for the yes
 
   useEffect(() => {
-    if (!code) return;
+    if (!code || kept) return;
     call('/v1/parties/invites/preview', { body: { code } })
       .then(setView)
       .catch((err) => setFailed(err.code || 'other'));
-  }, [code]);
+  }, [code, kept]);
 
   const file = got ? fileOf(got.connection) : '';
   const fileUrl = useMemo(() => (file ? URL.createObjectURL(new Blob([file], { type: 'application/json' })) : ''), [file]);
@@ -155,7 +172,9 @@ export default function SharedData() {
     try {
       const out = await call('/v1/parties/invites/redeem', { body: { code, ...(termsNeeded ? { accept_terms: true } : {}) } });
       setView(out);
-      setGot({ key: out.key, token: out.access_token, connection: out.connection, basicUser: out.basic_user });
+      const g = { key: out.key, token: out.access_token, connection: out.connection, basicUser: out.basic_user };
+      setGot(g);
+      holdFor(code, out, g, out.expires_in);
     } catch (err) {
       if (['INVITE_USED', 'INVITE_EXPIRED', 'SHARE_ENDED', 'INVITE_NOT_FOUND'].includes(err.code)) setFailed(err.code);
       else setError(err.message);
@@ -171,7 +190,9 @@ export default function SharedData() {
       const tok = await call('/v1/parties/token', { body: { grant_type: 'client_credentials', client_id: got.basicUser, client_secret: out.key } });
       const connection = await call(`/v1/parties/me/shares/${encodeURIComponent(share.id)}/connection`, { token: tok.access_token })
         .catch((err) => { swallowed('shared-data: connection after rotation', err); return null; });
-      setGot({ ...got, key: out.key, token: tok.access_token, connection: withKey(connection?.connection || got.connection, out.key) });
+      const g = { ...got, key: out.key, token: tok.access_token, connection: withKey(connection?.connection || got.connection, out.key) };
+      setGot(g);
+      holdFor(code, view, g, tok.expires_in);
       setRotated(true);
     } catch (err) { setError(err.message); }
     setBusy(false);
@@ -213,6 +234,7 @@ export default function SharedData() {
       title=${words.title || pkg.title}
       marks=${[{ label: r('noAccount') }]}
       desc=${share.purpose ? r('lead', { until, purpose: share.purpose }) : r('leadNoPurpose', { until })}
+      actions=${got ? html`<${Actions}><${Action} small href="/v1/publicknowledgeviewer?reach=party">${t('library.party.allShared')}<//><//>` : null}
       strip=${strip}>
       ${words.description ? html`<${Markdown} text=${words.description} />` : null}
       <${Box} tone="raised">

@@ -17,6 +17,8 @@
  *   Every assertion fails on the code before WP9c: no share named a GHII recipient, and a visitor read
  *   nothing private.
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The library's reach "shared" lists the visitor's share and nothing for the
+ *     namesake of another home node (WP11).
  *   v1.0.0 — 2026-11-01 — Initial (WP9c).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-share-visitor
@@ -207,6 +209,18 @@ async function main() {
         const one = await call(`/v1/dataproducts/${PKG}`, { token: alice.token });
         const vs = one.body.data?.visitor_shares ?? [];
         assert(vs.length === 1 && vs[0].recipient === `${bobName}@${H1}` && vs[0].display_name === 'Bob' && vs[0].reads_7d >= 0, `the product's page lists it: ${JSON.stringify(vs)}`);
+    });
+
+    await test('the library: the visitor\'s "Shared with you" lists exactly the shared package; the namesake of home node two sees none (WP11)', async () => {
+        const one = await call('/v1/catalogue/knowledge?reach=shared', { token: visitorOne });
+        assert(one.status === 200, `visitor one: ${show(one)}`);
+        const names = (one.body.data?.packages ?? []).map((p: Body) => p.datapackage?.name);
+        assert(names.length === 1 && names[0] === PKG, `visitor one lists only the shared package: ${JSON.stringify(names)}`);
+        const row = one.body.data.packages[0];
+        assert(row.why?.kind === 'share' && row.why.share_id === shareId && row.why.by === alice.name && typeof row.why.expires === 'string', `the row says why: ${JSON.stringify(row.why)}`);
+        assert(!names.includes(MEMBERS_PKG), 'a members package is never shared with a visitor');
+        const two = await call('/v1/catalogue/knowledge?reach=shared', { token: visitorTwo });
+        assert(two.status === 200 && (two.body.data?.packages ?? []).length === 0, `visitor two lists nothing: ${show(two)}`);
     });
 
     await test('ending the share refuses the visitor\'s next read with SHARE_ENDED', async () => {

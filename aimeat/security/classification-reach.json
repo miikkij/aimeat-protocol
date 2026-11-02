@@ -1546,6 +1546,19 @@
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.1, D1.3), passes the reader at the point of use: the node-wide scan of the data package catalogue manifests (packages/*/manifest tagged data-package), cached and shared. publicDatasetFacts passes the anonymous classification reader before the DCAT feed, the dataset sitemap and the IndexNow plan; the discovery source passes the caller's reader (ctx.reader.show) and the package audience rule; the MCP resource list names packages the session's audience rule admits, as the descriptor read does."
     },
+    "src/services/datapackage/shared-data.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-02 (WP11), the node's own read: the names of the caller's own data product definitions (dataproducts.* keys under the caller's GHII), to mark which packages a product builds. No value is answered; the packages themselves come from visiblePackages (./visible.ts), which passes the caller's classification reader."
+    },
+    "src/services/knowledge-shared.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Reviewed 2026-11-02 (WP11), passes the reader at the point of use: the cached node-wide scan of knowledge package manifests shared with members or an organism; sharedKnowledgeFor admits each by knowledgeAudienceAllows and then runs presentMemories with the caller's classification reader before the library answers, as GET /v1/knowledge/:id does."
+    },
     "src/services/datapackage/personal-guard.ts": {
       "reads": {
         "getMemory": 1

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.31.0 -- 2026-11-02 -- "Data you share" under Account, before the Data Wallet, and in the basic menu (WP11).
  *   v1.30.0 -- 2026-10-31 -- On a node the store sold, the usage card's AI line is the AI credit left in euros with no bar (js/ai-credit.js), the number the Home, the chat and the AI page show (v28 finding 9).
  *   v1.29.0 -- 2026-10-29 -- "Your own storage" under Account, after Data Wallet: a person keeps their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.28.0 -- 2026-10-29 -- CUSTOMER_TAB_IDS: the menu on a node the store made for a buyer, the eight Jouni chose (UX review 2026-10-29, C). On such a node the profile card shows no node address, federation state, full identity, presence or pacer balance, and says "Your AI is connected" for MCP connected.
@@ -680,6 +681,9 @@ export const SIDEBAR_GROUPS = [
   ] },
   { titleKey: 'profile.landing.menuAccount', items: [
     { id: 'wallet', labelKey: 'profile.tabs.wallet' },
+    /* Every data package the person shares, who reads it, and the data products that build them
+     * (WP11, board Jakamasi-data), beside the Data Wallet and What others can see. */
+    { id: 'sharedData', labelKey: 'profile.tabs.sharedData' },
     { id: 'dataWallet', labelKey: 'profile.tabs.dataWallet' },
     { id: 'storage', labelKey: 'profile.tabs.storage' },
     { id: 'access', labelKey: 'profile.tabs.access' },
@@ -709,7 +713,7 @@ export const BASIC_TAB_IDS = new Set([
   'agents', 'mcp',                              // the chat/agent connection
   'notifications', 'contacts',                  // what happened, who with
   'apps', 'packages', 'portfolio',              // what you made, and the apps you get
-  'wallet', 'access', 'exposure',               // account
+  'wallet', 'access', 'exposure', 'sharedData', // account; what you share as data (WP11)
 ]);
 
 /**

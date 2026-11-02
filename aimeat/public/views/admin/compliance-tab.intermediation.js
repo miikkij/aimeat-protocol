@@ -26,6 +26,9 @@
  *   IntermediationSection (default) · IntermediationPrint
  * @usage html`<${IntermediationSection} di=${report.data_intermediation} switchPage=${switchPage} onChanged=${reload} onMessage=${msg} />`
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The four figures are buttons: each opens the list behind its number under the
+ *     strip (compliance-tab.shared-data.js), and the printout carries the same lists (WP11, board
+ *     Admin-aineistot).
  *   v1.0.2 — 2026-11-01 — A recital is cited in the page's language, on screen and in the printout (WP10e B4).
  *   v1.0.1 — 2026-11-01 — The three parts open with SubHeading rule (the board's coral labels), and the
  *     notification record stands in a Box with its door (lead's browser review).
@@ -52,6 +55,7 @@ import { Row as Line } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Box } from '/components/Box.js';
 import { PrintTable, PrintList } from '/components/PrintPage.js';
+import SharedDataList, { SharedDataPrint } from './compliance-tab.shared-data.js';
 
 const html = htm.bind(h);
 /** The section's words: admin.compliance.di.<key>. */
@@ -182,7 +186,10 @@ function NotificationForm({ open, onClose, current, onSaved, onMessage }) {
 export default function IntermediationSection({ di, switchPage, onChanged, onMessage }) {
   const [busy, setBusy] = useState('');
   const [formOpen, setFormOpen] = useState(false);
+  // The figure whose list stands under the strip (WP11, board Admin-aineistot): a press opens it, a second closes it.
+  const [which, setWhich] = useState('');
   if (!di) return null;
+  const pick = (k) => () => setWhich((cur) => (cur === k ? '' : k));
   const mode = di.mode || 'report';
   const fig = figuresOf(di);
   const shown = (di.findings || []).filter((f) => f.count > 0);
@@ -223,7 +230,8 @@ export default function IntermediationSection({ di, switchPage, onChanged, onMes
         { key: 'buyers', n: String(fig.buyers), label: D('fig.buyers'), sub: D('fig.buyersSub'), tone: fig.buyers ? 'notice' : undefined },
         { key: 'organisms', n: String(fig.organisms), label: D('fig.organisms'), sub: D('fig.organismsSub', { n: String(fig.organismPackages) }), tone: fig.organisms ? 'notice' : undefined },
         { key: 'apps', n: String(fig.apps), label: D('fig.apps'), sub: D('fig.appsSub'), tone: fig.apps ? 'notice' : undefined },
-      ]} />
+      ].map((f) => ({ ...f, onClick: pick(f.key), title: which === f.key ? D('list.hide') : D('list.show') }))} />
+      <${SharedDataList} di=${di} which=${which} />
 
       <${SubHeading} rule>${D('proposalsTitle')}<//>
       <${List} cols="name-desc-state-doors" empty=${D('proposalsNone')}>
@@ -290,6 +298,7 @@ export function IntermediationPrint({ di }) {
       [D('fig.organisms'), `${fig.organisms} · ${D('fig.organismsSub', { n: String(fig.organismPackages) })}`],
       [D('fig.apps'), String(fig.apps)],
     ]} />
+    <${SharedDataPrint} di=${di} />
     <${Note} kind="quiet">${D('proposalsTitle')}<//>
     ${shown.length === 0 ? html`<${Note} kind="quiet">${D('proposalsNone')}<//>` : html`
       <${PrintTable} head=${[D('print.finding'), D('print.regulation'), D('print.decision')]} rows=${shown.map((f) => {

@@ -13,6 +13,8 @@
  * @structure DataIntermediationSection · MODE_TEXT · buildDataIntermediationSection
  * @usage const di = await buildDataIntermediationSection({ storage, config }, { ownerGhii });
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The node's report carries `shared_data`, the packages behind the four figures
+ *     (services/datapackage/shared-data.ts nodeSharedData; WP11, board Admin-aineistot).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D7.1–D7.6).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -26,6 +28,7 @@ import { DGA_REFS, type Art12Row, type DgaRef, type IntermediationFinding } from
 import { art12Rows } from './art12.js';
 import { buildFindings, gatherFacts } from './findings.js';
 import { readIntermediationDocs, providerOrganisms } from './gate.js';
+import { nodeSharedData, type NodeSharedRow } from '../datapackage/shared-data.js';
 
 export interface DataIntermediationSection {
     /** The section's place on the Compliance page and in the printout. */
@@ -45,6 +48,12 @@ export interface DataIntermediationSection {
     /** Where the notification and the reviews are written. */
     edit: { method: 'PUT' | 'PATCH'; url: string; note: string };
     note: string;
+    /**
+     * The node's report only: the packages behind the four figures, one row each with its name, owner,
+     * audience, licence, readers in 30 days and freshness, and the flags each figure filters on
+     * (services/datapackage/shared-data.ts nodeSharedData). Never a row of data, never a named recipient.
+     */
+    shared_data?: { rows: NodeSharedRow[]; total: number; capped: boolean };
 }
 
 const MODE_TEXT: Record<AimeatConfig['dataIntermediation'], string> = {
@@ -105,5 +114,6 @@ export async function buildDataIntermediationSection(
             ? { method: 'PUT', url: '/v1/compliance/docs/intermediation?scope=organism&organism_id=<id>', note: 'An organism you manage keeps its own notification record and reviews (mode owners).' }
             : { method: 'PUT', url: '/v1/compliance/docs/intermediation', note: 'The node\'s notification record (an item of type notification) and a review per finding (type review, the finding\'s id, accepted or dismissed). aimeat_compliance_register_write with kind intermediation does the same.' },
         note: 'This is a reading of Regulation (EU) 2022/868, not a legal opinion. Each finding is a proposal until a person reviews it.',
+        ...(owner ? {} : { shared_data: await nodeSharedData(deps) }),
     };
 }
