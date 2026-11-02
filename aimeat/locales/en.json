@@ -16887,6 +16887,7 @@
       "workflowRunFailed": "{name} stopped without finishing.",
       "toolFirstUse": "{app} used {tool} for the first time.",
       "toolPaid": "{app} paid {amount} to use {tool}.",
+      "toolPaidBuyer": "You paid {amount} (app tool)",
       "checkoutCompleted": "You bought {what} for {amount}.",
       "checkoutCancelled": "You cancelled a purchase.",
       "aiSpendDaily": "AI cost you {amount} on {day}.",
