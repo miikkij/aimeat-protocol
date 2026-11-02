@@ -26,6 +26,8 @@
  *   const token = await ownerToken(BASE, name);
  *   await seedPassword(name, 'Pw12345678', { sqlitePath }); // a suite's own node
  * @version-history
+ *   v1.1.1 — 2026-11-02 — signInByLink finds the refresh cookie on any Set-Cookie line, since
+ *     aimeat_session_hint comes before it (fbf5ec149).
  *   v1.1.0 — 2026-10-13 — seedSignInLink(), the first half of signInByLink, for a suite whose subject
  *     is what GET /v1/ghii/magic-link/verify hands out (e2e-agent-token-revocation).
  *   v1.0.0 — 2026-10-12 — Initial (wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po).
@@ -61,7 +63,8 @@ export async function seedSignInLink(base: string, username: string, email: stri
 export async function signInByLink(base: string, username: string, email: string, opts: { sqlitePath?: string; nodeId?: string } = {}): Promise<string> {
     const link = await seedSignInLink(base, username, email, opts);
     const opened = await fetch(link, { redirect: 'manual' });
-    const rt = /(?:^|;\s*)aimeat_rt=([^;]*)/.exec(opened.headers.getSetCookie().join('\n'))?.[1];
+    // One line per Set-Cookie header, in the order the node sets them: `m` finds the cookie on any line.
+    const rt = /(?:^|;\s*)aimeat_rt=([^;]*)/m.exec(opened.headers.getSetCookie().join('\n'))?.[1];
     if (opened.status !== 302 || !rt) throw new Error(`signInByLink ${username}: the link opened no session (${opened.status} ${opened.headers.get('location')})`);
     const refreshed = await fetch(`${base}/v1/auth/refresh`, {
         method: 'POST',

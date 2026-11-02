@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-11-02 — The emailed link's refresh cookie is found on any Set-Cookie line, since aimeat_session_hint
+ *     comes before it (fbf5ec149).
  *   2026-10-31 — A notification with email: true is mailed to the owner, at most ten a day (v31 K46),
  *     with Reply-To from email.reply_to when it is set, and an address that does not parse is refused.
  *   2026-10-31 — The auth prelude says linkFirst only on a node with a purchase plan (v28 #7).
@@ -362,7 +364,7 @@ async function run(): Promise<void> {
         magicToken = /magic-link\/open\?token=([a-f0-9]{64})/.exec(mail.text)![1];
 
         const opened = await fetch(`${BASE}/v1/ghii/magic-link/open?token=${magicToken}`, { redirect: 'manual' });
-        const rt = /(?:^|;\s*)aimeat_rt=([^;]*)/.exec(opened.headers.getSetCookie().join('\n'))?.[1];
+        const rt = /(?:^|;\s*)aimeat_rt=([^;]*)/m.exec(opened.headers.getSetCookie().join('\n'))?.[1];
         assert(opened.status === 302 && opened.headers.get('location') === `${BASE}/` && !!rt,
             `the emailed link must sign in and redirect: ${opened.status} ${opened.headers.get('location')}`);
         const refresh = await json('/v1/auth/refresh', { method: 'POST', headers: { Cookie: `aimeat_rt=${rt}`, 'X-AIMEAT-Refresh': '1' } });
