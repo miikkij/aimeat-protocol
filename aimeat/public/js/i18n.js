@@ -27,7 +27,7 @@
  *     language instead of the browser's; switchLocale() marks a pick made on this device, which
  *     keeps winning (Chief of Staff 2.11 02.00, rk-testi fi on aimeat.io).
  */
-import { detectLocale, persistLocale } from './utils.js';
+import { detectLocale, persistLocale, langPickedHere, LANG_CHOSEN_KEY } from './utils.js';
 import { swallowed } from '/js/swallowed.js';
 
 /** Flatten a nested object into dot-notation keys. */
@@ -152,13 +152,11 @@ export function getLocale() {
 }
 
 /**
- * Marks a language the person picked on this device. `aimeat-lang` alone cannot say so:
+ * Has the person picked a language on this device? `aimeat-lang` alone cannot say so:
  * loadTranslations() stores whatever was detected on every load, the browser's language included.
  */
-const CHOSEN_KEY = 'aimeat-lang-chosen';
-
 function chosenHere() {
-  try { return localStorage.getItem(CHOSEN_KEY) === '1'; } catch (err) { swallowed('i18n: read the choice mark', err); return false; }
+  try { return langPickedHere(); } catch (err) { swallowed('i18n: read the choice mark', err); return false; }
 }
 
 async function applyLocale(locale) {
@@ -169,9 +167,9 @@ async function applyLocale(locale) {
 
 /** Switch locale and notify listeners. Every caller is the person's own pick (the pill, the help, a setting). */
 export async function switchLocale(newLocale) {
-  try { localStorage.setItem(CHOSEN_KEY, '1'); } catch (err) { swallowed('i18n: mark the choice', err); }
+  try { localStorage.setItem(LANG_CHOSEN_KEY, '1'); } catch (err) { swallowed('i18n: mark the choice', err); }
   // The same mark as a cookie: the server's front page reads it (src/i18n.ts pickedLocale).
-  document.cookie = `${CHOSEN_KEY}=1;path=/;max-age=31536000;SameSite=Lax`;
+  document.cookie = `${LANG_CHOSEN_KEY}=1;path=/;max-age=31536000;SameSite=Lax`;
   await applyLocale(newLocale);
 }
 
