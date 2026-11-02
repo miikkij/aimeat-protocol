@@ -68,8 +68,6 @@ const WriteBody = z.object({
 }).catchall(z.unknown());
 type WriteBody = z.infer<typeof WriteBody>;
 
-const validated = <T>(req: Request): T => (req as Request & { validated: T }).validated;
-
 export function connectionFilesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const providers = buildOutboundProviders(config);
@@ -109,7 +107,8 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
     validateBody(FileBody, config.nodeId), async (req: Request, res: Response) => {
       const opened = await open(req, res, 'read');
       if (!opened) return;
-      const { drive_id, item_id } = validated<FileBody>(req);
+      // validateBody has checked the body against FileBody above.
+      const { drive_id, item_id } = req.body as FileBody;
       const out = await driveFileText(opened.ctx, opened.connectionId, { drive_id, item_id });
       if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
       res.json(success(config.nodeId, { text: out.text, ...(out.note ? { note: out.note } : {}), source: out.source }));
@@ -119,7 +118,7 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
     requireScope('storage:write'), validateBody(FileBody, config.nodeId), async (req: Request, res: Response) => {
       const opened = await open(req, res, 'read');
       if (!opened) return;
-      const { drive_id, item_id, key } = validated<FileBody>(req);
+      const { drive_id, item_id, key } = req.body as FileBody;
       // The file is the caller's owner's, as every file an agent or an app stores in that person's name.
       const out = await storeDriveFile(opened.ctx, { storage, config, emitResourceUpdated, emitResourceListChanged },
         resolve(req), opened.connectionId, { drive_id, item_id, key });
@@ -132,7 +131,8 @@ export function connectionFilesRouter(config: AimeatConfig, storage: Storage): R
     validateBody(WriteBody, config.nodeId), async (req: Request, res: Response) => {
       const opened = await open(req, res, 'name');
       if (!opened) return;
-      const b: Record<string, unknown> = { ...validated<WriteBody>(req) };
+      // validateBody has checked the body against WriteBody above.
+      const b: Record<string, unknown> = { ...(req.body as WriteBody) };
 
       // The bytes of a file write: a stored file of the caller's (after the classification gate), or
       // text given inline. Neither for a folder or a list row, whose body the provider entry builds.
