@@ -13,6 +13,7 @@
  *     own title and description.
  * @usage cd aimeat && pnpm exec vitest run test/unit/front-page-start.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-02 — A browser that lists Finnish anywhere gets Finnish; a marked pick beats it.
  *   v1.1.0 — 2026-10-27 — The head metadata the shell gets: the page was sent as read from disk, so
  *     aimeat.io's front page had no canonical, og:* or JSON-LD from 2026-10-21 (AGENTSCAN S10, S12, S13).
  *   v1.0.0 — 2026-10-21 — Initial (the "accelerate your AI" front page, staged before the flip).
@@ -80,6 +81,26 @@ describe('AIMEAT_FRONT_PAGE=start', () => {
         const enText = await en.text();
         expect(enText).toContain('<html lang="en">');
         expect(enText).toContain('Accelerate your AI.');
+    });
+
+    it('gives Finnish to a browser that lists Finnish anywhere, and a pick on this device beats it', async () => {
+        const url = await serve({ ...base, frontPage: 'start' });
+        const lang = async (headers: Record<string, string>, path = '/') => {
+            const res = await fetch(`${url}${path}`, { headers: { Accept: 'text/html', ...headers } });
+            return /<html lang="([a-z]+)">/.exec(await res.text())?.[1];
+        };
+        expect(await lang({ 'Accept-Language': 'en-US,en;q=0.9,fi;q=0.8' })).toBe('fi');
+        expect(await lang({ 'Accept-Language': 'en-GB,en;q=0.9' })).toBe('en');
+        expect(await lang({ 'Accept-Language': 'en-US,fi;q=0' })).toBe('en');
+        expect(await lang({})).toBe('en');
+        // What the SPA stored by itself is not a pick; with the mark beside it, it is.
+        expect(await lang({ 'Accept-Language': 'fi', Cookie: 'aimeat-lang=en' })).toBe('fi');
+        expect(await lang({ 'Accept-Language': 'fi', Cookie: 'aimeat-lang=en; aimeat-lang-chosen=1' })).toBe('en');
+        expect(await lang({ 'Accept-Language': 'en', Cookie: 'aimeat-lang=fi; aimeat-lang-chosen=1' })).toBe('fi');
+        // The address beats the pick.
+        expect(await lang({ Cookie: 'aimeat-lang=fi; aimeat-lang-chosen=1' }, '/?lang=en')).toBe('en');
+        const res = await fetch(`${url}/`, { headers: { Accept: 'text/html' } });
+        expect(res.headers.get('vary') ?? '').toMatch(/Cookie/i);
     });
 
     it('carries the node head metadata and keeps its own title and description', async () => {

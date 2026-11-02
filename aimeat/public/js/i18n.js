@@ -170,6 +170,8 @@ async function applyLocale(locale) {
 /** Switch locale and notify listeners. Every caller is the person's own pick (the pill, the help, a setting). */
 export async function switchLocale(newLocale) {
   try { localStorage.setItem(CHOSEN_KEY, '1'); } catch (err) { swallowed('i18n: mark the choice', err); }
+  // The same mark as a cookie: the server's front page reads it (src/i18n.ts pickedLocale).
+  document.cookie = `${CHOSEN_KEY}=1;path=/;max-age=31536000;SameSite=Lax`;
   await applyLocale(newLocale);
 }
 

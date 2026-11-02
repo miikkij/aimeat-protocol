@@ -1,7 +1,7 @@
 /**
  * @file front-start.js
  * @description The only script of the "accelerate your AI" front page (front-start.html and
- *   front-start.fi.html). Three things, each of which degrades to the static HTML:
+ *   front-start.fi.html). Four things, each of which degrades to the static HTML:
  *   1. The five level buttons: pressing one marks it pressed and writes its example prompt and
  *      its McKinsey match (the button's data-example and data-mck attributes) into the panel
  *      under the row. Without the script the panel keeps the level 1 text baked into the page.
@@ -9,8 +9,10 @@
  *   3. A signed-in visitor gets a "Your home" link (/v1/home) in place of "Sign in". No
  *      automatic redirect: this page is the public front page, and a signed-in visitor may
  *      still want to read it.
+ *   4. The EN/FI link stores the person's pick, so the front page at / keeps it on this device.
  *   Plain same-origin script, no modules, no importmap entry needed.
  * @version-history
+ *   v1.1.0 - 2026-11-02 - The EN/FI link stores the pick (Jouni: the person can change the language).
  *   v1.0.0 - 2026-10-21 - Initial: level picker (scrolls its answer into view on a phone, quote
  *     marks by language), copy button, signed-in link.
  */
@@ -67,4 +69,13 @@
       }
     }
   } catch (err) { console.warn('[front-start] session not readable, staying a guest:', err.message); }
+
+  // 4. The EN/FI link is the person's pick: the address / keeps it on this device.
+  Array.prototype.slice.call(document.querySelectorAll('.fs-lang')).forEach(function (link) {
+    link.addEventListener('click', function () {
+      var year = ';path=/;max-age=31536000;SameSite=Lax';
+      document.cookie = 'aimeat-lang=' + link.getAttribute('lang') + year;
+      document.cookie = 'aimeat-lang-chosen=1' + year;
+    });
+  });
 })();

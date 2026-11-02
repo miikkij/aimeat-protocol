@@ -14,6 +14,7 @@
  *   - servedPageLocale(req, nodeLocale): ?lang, cookie, the node's language, then the browser's
  *
  * @version-history
+ *   2026-11-02 — acceptLanguageLists() and pickedLocale(), for a static front page's language.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-12 — Spanish (es) added. localeFromCookie now matches any two-letter tag and
  *     validates it against LOCALES, so a fourth language needs one edit here rather than two.
@@ -104,6 +105,27 @@ export function localeFromCookie(cookieHeader: string | undefined): Locale | und
   const match = cookieHeader.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
   if (!match) return undefined;
   return LOCALES.includes(match[1] as Locale) ? (match[1] as Locale) : undefined;
+}
+
+/**
+ * Whether the browser lists a language at all, wherever in its order (q=0 is a refusal). A Finn whose
+ * browser says "en-US,en;q=0.9,fi;q=0.8" is a Finnish visitor (Jouni, 2.11.2026).
+ */
+export function acceptLanguageLists(acceptLang: string | undefined, locale: Locale): boolean {
+  return (acceptLang ?? '').split(',').some((entry) => {
+    const [tag, ...params] = entry.trim().split(';');
+    const refused = params.some((p) => /^\s*q\s*=\s*0(?:\.0*)?\s*$/i.test(p));
+    return !refused && tag.trim().split('-')[0].toLowerCase() === locale;
+  });
+}
+
+/**
+ * The language a person picked on this device. aimeat-lang alone cannot say so: the SPA stores what it
+ * detected on every load (public/js/i18n.js), so a pick carries the mark aimeat-lang-chosen=1 beside it.
+ */
+export function pickedLocale(cookieHeader: string | undefined): Locale | undefined {
+  if (!cookieHeader || !/(?:^|;\s*)aimeat-lang-chosen=1(?:;|$)/.test(cookieHeader)) return undefined;
+  return localeFromCookie(cookieHeader);
 }
 
 /** Resolve locale from request: ?lang= query > cookie > Accept-Language > default. */

@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-02 — A static front page goes Finnish when the browser lists Finnish anywhere, not only
+ *     first, and a language picked on this device beats the browser (Jouni, 2.11).
  *   2026-11-01 — The explore path names the public data packages in discovery and the DCAT data catalogue
  *     (plan doc-mvwxcas3dom3, D1.5).
  *   2026-10-28 — GET /v1/health moved unchanged to ./health.ts (line ceiling, after a merge of main).
@@ -88,6 +90,7 @@ import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
+import { acceptLanguageLists, pickedLocale } from '../i18n.js';
 import type { Storage } from '../storage/interface.js';
 import type { TunnelManager } from '../services/personal-tunnel.js';
 import type { SiteService } from '../services/site.js';
@@ -279,15 +282,21 @@ export function bootstrapRouter(
         return;
       }
       // The static front pages, behind one switch (AIMEAT_FRONT_PAGE=demo|os|start). Finnish
-      // readers get the Finnish sibling; the ?lang override beats the header so each page's own
-      // EN/FI links work. Falls through to the SPA when the file is missing, so a broken deploy
-      // shows the classic front rather than nothing.
+      // readers get the Finnish sibling: a browser that lists Finnish anywhere, not only first,
+      // since many Finnish browsers list English first (Jouni, 2.11.2026). ?lang beats everything
+      // so each page's own EN/FI links work, and a language picked on this device beats the header.
+      // Falls through to the SPA when the file is missing, so a broken deploy shows the classic
+      // front rather than nothing.
       if (config.frontPage !== 'classic') {
         res.vary('Accept-Language');
+        res.vary('Cookie');
         const base = `front-${config.frontPage}`;
         const langParam = typeof _req.query.lang === 'string' ? _req.query.lang.toLowerCase() : '';
+        const picked = pickedLocale(_req.headers.cookie);
         const wantsFi = langParam === 'fi'
-          || (langParam === '' && /^fi\b/i.test((_req.headers['accept-language'] as string | undefined) ?? ''));
+          || (langParam === '' && (picked
+            ? picked === 'fi'
+            : acceptLanguageLists(_req.headers['accept-language'] as string | undefined, 'fi')));
         const staticPath = resolvePublicFile(wantsFi ? `${base}.fi.html` : `${base}.html`);
         if (staticPath) {
           res.set('Cache-Control', 'no-cache');
