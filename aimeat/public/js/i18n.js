@@ -12,6 +12,7 @@
  *   - tn(key, n, vars): a count in the language's plural form (`<key>_one`, `<key>_other`, …)
  *   - tPrefix(prefix): every loaded string under one prefix, the prefix taken off
  *   - switchLocale() / onLocaleChange(): change locale and notify subscribed listeners
+ *   - applyAccountLocale(): the signed-in account's language, unless ?lang= or a pick on this device
  *   - flatten(): internal — collapses nested translation objects to dot-notation keys
  *
  * @version-history
@@ -22,6 +23,9 @@
  *   v1.1.0 — 2026-10-14 — tEn(): a key's English text, for the menu find's English words.
  *   v1.2.0 — 2026-10-18 — tn(): a count in the language's plural form, through Intl.PluralRules.
  *   v1.3.0 — 2026-10-31 — tPrefix(): the sign-in dialog's strings for the consent page (v27 P1).
+ *   v1.4.0 — 2026-11-02 — applyAccountLocale(): at sign-in the page speaks the account's saved
+ *     language instead of the browser's; switchLocale() marks a pick made on this device, which
+ *     keeps winning (Chief of Staff 2.11 02.00, rk-testi fi on aimeat.io).
  */
 import { detectLocale, persistLocale } from './utils.js';
 import { swallowed } from '/js/swallowed.js';
@@ -147,11 +151,40 @@ export function getLocale() {
   return currentLocale;
 }
 
-/** Switch locale and notify listeners. */
-export async function switchLocale(newLocale) {
-  await loadTranslations(newLocale);
+/**
+ * Marks a language the person picked on this device. `aimeat-lang` alone cannot say so:
+ * loadTranslations() stores whatever was detected on every load, the browser's language included.
+ */
+const CHOSEN_KEY = 'aimeat-lang-chosen';
+
+function chosenHere() {
+  try { return localStorage.getItem(CHOSEN_KEY) === '1'; } catch (err) { swallowed('i18n: read the choice mark', err); return false; }
+}
+
+async function applyLocale(locale) {
+  await loadTranslations(locale);
   for (const fn of listeners) fn(currentLocale);
   window.dispatchEvent(new CustomEvent('lang-change', { detail: { locale: currentLocale } }));
+}
+
+/** Switch locale and notify listeners. Every caller is the person's own pick (the pill, the help, a setting). */
+export async function switchLocale(newLocale) {
+  try { localStorage.setItem(CHOSEN_KEY, '1'); } catch (err) { swallowed('i18n: mark the choice', err); }
+  await applyLocale(newLocale);
+}
+
+/**
+ * The signed-in account's own language (GET /v1/ghii/me `locale`, the one its email is written in).
+ * It wins over what the browser says, so a buyer whose account is Finnish reads Finnish on a node
+ * that never saw them before (rk-testi on aimeat.io, 2.11). An address's ?lang= and a pick made on
+ * this device still win over it. 'en' is not taken as a wish: several ways of making an account
+ * write it as a default, so it would move a Finnish browser to English for nothing.
+ */
+export async function applyAccountLocale(locale) {
+  if (locale !== 'fi' && locale !== 'es') return;
+  if (locale === currentLocale || chosenHere()) return;
+  if (new URLSearchParams(window.location.search).get('lang')) return;
+  await applyLocale(locale);
 }
 
 /** Subscribe to locale changes. Returns unsubscribe function. */
