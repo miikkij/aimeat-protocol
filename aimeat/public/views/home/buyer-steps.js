@@ -15,6 +15,8 @@
  * @structure buyerSteps(journey) · BuyerSteps({ journey })
  * @usage html`<${BuyerSteps} journey=${journey} />`
  * @version-history
+ *   v1.3.0 — 2026-11-02 — A step is ticked only in order: one done before a step it follows keeps its
+ *     link without ✓ until the steps before it are done, and the count says the same.
  *   v1.2.0 — 2026-11-01 — While the place's chat answers (ai-credit.js chatWorks), an unconnected
  *     outside AI does not lock step 2, which is done in that chat.
  *   v1.1.0 — 2026-11-01 — A step after the next one is plain quiet text with "Aukeaa, kun edellinen on
@@ -50,15 +52,19 @@ export function buyerSteps(journey) {
 /** @param {{ journey: any }} props */
 export function BuyerSteps({ journey }) {
   const { data: chatStatus } = useShared('chat-status', '/v1/chat/status', ['chat']);
-  const steps = buyerSteps(journey);
-  const count = steps.filter((s) => s.done).length;
-  const next = steps.find((s) => !s.done);
   // While the place's own chat answers, connecting an outside AI does not hold back the steps after
   // it: the profile is made in that chat (commercial's crew52 check: step 2 looked locked although
   // the chat worked). The next action still names the first step not done.
   const holds = (s) => !s.done && !(s.id === 'connect' && chatWorks(chatStatus));
-  const held = steps.find(holds);
-  const nextAt = held ? steps.indexOf(held) : steps.length;
+  const raw = buyerSteps(journey);
+  const held = raw.find(holds);
+  const nextAt = held ? raw.indexOf(held) : raw.length;
+  // A step is ticked only in order: one done before a step it follows is not, keeps its link and
+  // no tick until the order reaches it (aimeat-protocol-4e's first-timer round on crew60: step 3
+  // showed ✓ before step 2).
+  const steps = raw.map((s, i) => ({ ...s, ticked: s.done && i < nextAt }));
+  const count = steps.filter((s) => s.ticked).length;
+  const next = steps.find((s) => !s.ticked);
   return html`
     <${Chooser} titleId="home-journey-title"
       title=${t('buyerSteps.title', { done: count, total: steps.length })}
@@ -72,7 +78,7 @@ export function BuyerSteps({ journey }) {
               <${Note} kind="quiet" inline>${t('buyerSteps.' + s.id)}<//>
             <//>`
           : html`
-            <${IndexStep} key=${s.id} line=${t('buyerSteps.' + s.id + 'Line')} endWord=${s.done ? t('buyerSteps.done') : null}>
+            <${IndexStep} key=${s.id} line=${t('buyerSteps.' + s.id + 'Line')} endWord=${s.ticked ? t('buyerSteps.done') : null}>
               <${Action} href=${s.href}>${t('buyerSteps.' + s.id)}<//>
             <//>`)}
       <//>
