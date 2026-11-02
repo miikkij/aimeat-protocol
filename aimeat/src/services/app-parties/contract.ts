@@ -22,9 +22,11 @@
  *   `epoch` ends every token at a sign-out or a removal.
  * @structure APP_PARTIES_PREFIX · appPartiesKey · AppPartyRecord · AppPartyRegistration · AppPartiesValue ·
  *   parseAppPartiesValue · APP_PARTY_PREFIX · MAX_APP_PARTIES · LINK_TTL_MS · APP_PARTY_SESSION_SECONDS ·
- *   emailHashOf · appPartyView · PARTY_DATA_PREFIX · partyDataKey · sharedDataKey · DATA_KEY_RE
+ *   stalePending · emailHashOf · appPartyView · PARTY_DATA_PREFIX · partyDataKey · sharedDataKey · DATA_KEY_RE
  * @usage const v = parseAppPartiesValue(rec?.value);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — stalePending: a signup nobody confirmed stops holding a place in the app
+ *     after consent.app_party_pending_hours (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4; lead decisions L1 to L3).
  */
 import { createHash } from 'node:crypto';
@@ -89,6 +91,19 @@ export function parseAppPartiesValue(v: unknown): AppPartiesValue {
     const parties = Array.isArray(o.parties) ? o.parties.filter((p): p is AppPartyRecord =>
         !!p && typeof p === 'object' && typeof p.uid === 'string' && typeof p.name === 'string' && typeof p.emailHash === 'string') : [];
     return { ...(typeof o.appId === 'string' ? { appId: o.appId } : {}), registration: reg, parties };
+}
+
+/**
+ * A signup nobody confirmed whose place has run out: still pending, no link open, and the last link
+ * (or the signup, when no link was stored) more than `hours` ago. 0 hours: never (the setting
+ * consent.app_party_pending_hours). Active and stopped parties never are.
+ */
+export function stalePending(p: AppPartyRecord, hours: number, now: number): boolean {
+    if (p.status !== 'pending' || p.verifiedAt || !(hours > 0)) return false;
+    const linkEnds = p.link ? Date.parse(p.link.expiresAt) : NaN;
+    if (linkEnds > now) return false;
+    const last = Math.max(Date.parse(p.createdAt) || 0, Number.isFinite(linkEnds) ? linkEnds - LINK_TTL_MS : 0);
+    return now - last > hours * 3_600_000;
 }
 
 /** The lookup hash of an e-mail address. */

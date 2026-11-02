@@ -33,6 +33,9 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-02 -- secaudit2026nov02d round 13: the "Data out" group shows the two settings of app
+ *     signups (consent.app_party_signups_per_hour, consent.app_party_pending_hours) after app
+ *     registration without an account.
  *   2026-11-01 -- The "Data out" group (design canvas "Data ulos", board Admin-Config; WP9b): PAGE_GROUPS
  *     collects data intermediation, app registration without an account, the whole `dataspace` section
  *     and the longest share into one group of its own domain, in the board's order, with the stored
@@ -165,7 +168,7 @@ const DOMAINS = [
  * this map, so a page group needs its dashboard.cfgGroup_<group> name like a section does.
  */
 const PAGE_GROUPS = {
-  data_out: ['consent.data_intermediation', 'consent.party_self_registration', 'dataspace.*', 'consent.share_max_days'],
+  data_out: ['consent.data_intermediation', 'consent.party_self_registration', 'consent.app_party_signups_per_hour', 'consent.app_party_pending_hours', 'dataspace.*', 'consent.share_max_days'],
 };
 
 /** The place of `path` in a page group's list, or -1 when no entry names it. */

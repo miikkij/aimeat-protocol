@@ -15,6 +15,9 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.8.0 — 2026-11-02 — secaudit2026nov02d round 13: appPartySignupsPerHour
+ *     (AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30) and appPartyPendingHours (AIMEAT_APP_PARTY_PENDING_HOURS,
+ *     24); 0 is no limit for each.
  *   v1.7.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR, 20, 0 = no limit):
  *     purchases one address may open an hour without a party key (secaudit2026nov02d round 13).
  *   v1.6.0 — 2026-11-01 — The Dataspace Protocol provider's settings (config-dataspace.ts) are spread in
@@ -91,6 +94,10 @@ export function dataAccessDefaults() {
     // Whether an app's own users may register as outside parties of its owner (services/app-parties/).
     // off, the default, refuses every signup; a node that shows its content to signed-in accounts only forces off.
     partySelfRegistration: parsePartySelfRegistration(process.env.AIMEAT_PARTY_SELF_REGISTRATION),
+    // Signups to apps one network address may make in an hour (routes/app-parties.ts); 0 = no limit.
+    appPartySignupsPerHour: wholeNumber(process.env.AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30, 100_000),
+    // Hours an unconfirmed app signup keeps its place after its last link (services/app-parties/); 0 = always.
+    appPartyPendingHours: wholeNumber(process.env.AIMEAT_APP_PARTY_PENDING_HOURS, 24, 8760),
     // The Eclipse Dataspace Protocol provider (services/dataspace/): off, and every list empty, by default.
     ...dataspaceDefaults(),
   };
@@ -121,6 +128,12 @@ export const DATA_INTERMEDIATION_MODES: readonly DataIntermediationMode[] = ['re
 /** An unknown value is `report`, the one that refuses nothing. */
 export function parseDataIntermediationMode(v: unknown): DataIntermediationMode {
   return DATA_INTERMEDIATION_MODES.find(m => m === v) ?? 'report';
+}
+
+/** A whole number from 0 to `max`; anything else is `fallback`. */
+function wholeNumber(raw: string | undefined, fallback: number, max: number): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  return Number.isInteger(n) && n >= 0 && n <= max ? n : fallback;
 }
 
 /** A whole number from 1 to `max`; anything else is `fallback`. */

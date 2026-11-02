@@ -11,14 +11,17 @@
  *   sends no mail, since nobody could open the link. A new address makes a `pending` person party of the
  *   app's owner bound to the app and mails a verify link; an address already there gets a new link
  *   (verify while pending, sign-in once active). The answer is the same 202 for each, so it does not say
- *   which addresses are registered.
+ *   which addresses are registered. A pending signup holds its place in the app's MAX_APP_PARTIES for
+ *   consent.app_party_pending_hours after its last link; the next new signup drops the ones past it.
+ *   One network address may sign up consent.app_party_signups_per_hour times an hour (routes/app-parties.ts).
  *
  *   THE LINK is 32 random bytes, mailed to the app's own address as `?aimeat_party_link=`, kept as its
  *   SHA-256 on the party, good for 30 minutes and once, and mailed at most once a minute to one person.
  *   Opening it activates a pending party, puts it on
  *   the app's roster with the registration's role (services/app-members.ts; no exchange grant, since a
  *   party has no account to carry), and answers the session: a purpose token naming the app and the
- *   party's epoch. A password-free passkey sign-in can join here later as a second way to answer
+ *   party's epoch. Only that first opening makes the roster row; a later sign-in link leaves the roster
+ *   as the owner or a manager left it. A password-free passkey sign-in can join here later as a second way to answer
  *   verifyLink with a session (EXTENSION POINT: signInWith); nothing of it is built.
  *
  *   EVERY REQUEST RE-READS THE PARTY (appPartyFromRequest): the token must name this app, the party
@@ -27,6 +30,11 @@
  * @structure AppPartyCtx · signUp · signIn · verifyLink · partyMe · signOut · appPartyFromRequest · signInWith
  * @usage const out = await signUp(deps, { owner, filename }, body);
  * @version-history
+ *   v1.2.0 — 2026-11-02 — secaudit2026nov02d round 13: a pending signup past
+ *     consent.app_party_pending_hours no longer counts toward MAX_APP_PARTIES, and the next new signup
+ *     drops it (with any roster row the owner gave it).
+ *   v1.1.0 — 2026-11-02 — secaudit2026nov02d round 13: verifyLink makes the roster row only at the first
+ *     verification of a pending party, so a removal by the owner or a manager holds across sign-ins.
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4.2; lead decisions L1 to L3).
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -39,12 +47,12 @@ import { getActiveEmailService } from '../email.js';
 import { resolveAppUrls } from '../app-urls.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
-import { getMember, putMember } from '../app-members.js';
+import { getMember, putMember, removeMember } from '../app-members.js';
 import { newPartyUid } from '../parties/keys.js';
 import { partyRefOf, PARTY_TOKEN_PREFIX } from '../parties/contract.js';
 import { mintPartyToken, verifyPartyToken } from '../parties/token.js';
 import {
-    APP_PARTY_PREFIX, APP_PARTY_SESSION_SECONDS, LINK_TTL_MS, MAX_APP_PARTIES, appPartyView, emailHashOf,
+    APP_PARTY_PREFIX, APP_PARTY_SESSION_SECONDS, LINK_TTL_MS, MAX_APP_PARTIES, appPartyView, emailHashOf, stalePending,
     type AppPartyRecord,
 } from './contract.js';
 import { appIdOf, changeAppParties, readAppParties, registrationMode, signupOpen } from './store.js';
@@ -138,7 +146,12 @@ export async function signUp(deps: Deps, ref: AppRef, body: Record<string, unkno
     const hash = emailHashOf(email);
     let party = record.parties.find(p => p.emailHash === hash);
     if (!party) {
-        if (record.parties.length >= MAX_APP_PARTIES) return refuse(429, 'TOO_MANY_PARTIES', 'This app has as many registered people as it may hold. Ask its owner.');
+        // A signup nobody confirmed holds its place for consent.app_party_pending_hours after its last
+        // link; past that it no longer counts toward the app's limit and this write drops it.
+        const pendingHours = deps.config.appPartyPendingHours ?? 24;
+        const now = Date.now();
+        const live = (ps: AppPartyRecord[]) => ps.filter(p => !stalePending(p, pendingHours, now));
+        if (live(record.parties).length >= MAX_APP_PARTIES) return refuse(429, 'TOO_MANY_PARTIES', 'This app has as many registered people as it may hold. Ask its owner.');
         const at = new Date().toISOString();
         const displayName = typeof body.display_name === 'string' && body.display_name.trim() ? body.display_name.trim().slice(0, 120) : email.slice(0, email.indexOf('@')).slice(0, 120);
         const made: AppPartyRecord = {
@@ -147,12 +160,18 @@ export async function signUp(deps: Deps, ref: AppRef, body: Record<string, unkno
             app: appId, emailHash: hash, verifiedAt: null, link: null, epoch: 0,
         };
         let full = false;
+        let dropped: string[] = [];
         await changeAppParties(deps.storage, ownerGhii, appId, cur => {
+            full = false; dropped = [];
             if (cur.parties.some(p => p.emailHash === hash)) return UNCHANGED;
-            if (cur.parties.length >= MAX_APP_PARTIES) { full = true; return UNCHANGED; }
-            return { ...cur, parties: [...cur.parties, made] };
+            const kept = live(cur.parties);
+            if (kept.length >= MAX_APP_PARTIES) { full = true; return UNCHANGED; }
+            dropped = cur.parties.filter(p => !kept.includes(p)).map(p => p.name);
+            return { ...cur, parties: [...kept, made] };
         });
         if (full) return refuse(429, 'TOO_MANY_PARTIES', 'This app has as many registered people as it may hold. Ask its owner.');
+        // A dropped signup never signed in; a roster row the owner gave it names a party that is gone.
+        for (const name of dropped) await removeMember(deps.storage, appId, partyRefOf(ref.owner, name, deps.config.nodeId));
         party = (await readAppParties(deps.storage, ownerGhii, appId)).parties.find(p => p.emailHash === hash);
     }
     if (party && party.status !== 'stopped') await sendLink(deps, ref, ownerGhii, appId, party, email, lang);
@@ -197,10 +216,13 @@ export async function verifyLink(deps: Deps, ref: AppRef, body: Record<string, u
     const hash = sha(token);
     const now = Date.now();
     let opened: AppPartyRecord | undefined;
+    // The first opening of a pending party's link: the one time the roster row is made for it.
+    let firstVerification = false as boolean;
     await changeAppParties(deps.storage, app.ownerGhii, app.appId, cur => {
         const i = cur.parties.findIndex(p => !!p.link && same(p.link.hash, hash) && Date.parse(p.link.expiresAt) > now && p.status !== 'stopped');
         if (i < 0) { opened = undefined; return UNCHANGED; }
         const p = cur.parties[i]!;
+        firstVerification = p.status === 'pending' && !p.verifiedAt;
         const at = new Date(now).toISOString();
         opened = { ...p, link: null, status: 'active', verifiedAt: p.verifiedAt ?? at, lastSeenAt: at };
         const parties = [...cur.parties];
@@ -210,7 +232,10 @@ export async function verifyLink(deps: Deps, ref: AppRef, body: Record<string, u
     if (!opened) return refuse(401, 'LINK_INVALID', 'This link has been used, has expired, or is not one this app sent. Ask for a new one.');
     const record = await readAppParties(deps.storage, app.ownerGhii, app.appId);
     const memberRef = partyRefOf(ref.owner, opened.name, deps.config.nodeId);
-    if (!(await getMember(deps.storage, app.appId, memberRef))) {
+    // Only the first verification puts the party on the roster. A later sign-in leaves the roster as
+    // the owner or a manager left it: a row they removed, or one whose term lapsed, stays gone until
+    // one of them adds the party again (owner.ts setPartyMember).
+    if (firstVerification && !(await getMember(deps.storage, app.appId, memberRef))) {
         await putMember(deps.storage, { appId: app.appId, account: memberRef, role: record.registration.role || 'member', approvedBy: `app:${app.appId}`, offerings: [], note: 'Registered to the app.' });
     }
     return { ok: true, data: await signInWith(deps, ref, app.ownerGhii, opened) };

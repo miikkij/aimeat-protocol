@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.29.0 — 2026-11-02 — appPartySignupsPerHour and appPartyPendingHours (secaudit2026nov02d round 13).
  *   v1.28.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR; secaudit2026nov02d round 13).
  *   v1.27.0 — 2026-11-01 — DataspaceConfig mixed in (config-dataspace.ts; plan doc-mvwxcas3dom3, D8).
  *   v1.26.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION; plan doc-mvwxcas3dom3, D4.3).
@@ -493,6 +494,10 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   dataIntermediation: DataIntermediationMode;
   /** Whether an app's users may register as outside parties of its owner (services/app-parties/). */
   partySelfRegistration: PartySelfRegistration;
+  /** Signups to apps one network address may make in an hour (routes/app-parties.ts); 0 = no limit. */
+  appPartySignupsPerHour: number;
+  /** Hours an unconfirmed app signup keeps its place after its last link; 0 = it keeps it. */
+  appPartyPendingHours: number;
   /**
    * How many events stay in an account's "what has happened" window before the oldest move to the
    * archive. A COUNT rather than a number of days: recency is relative to how much happens to

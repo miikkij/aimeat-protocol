@@ -39734,6 +39734,10 @@ paths:
         `party:<owner>/ap-<hex>@<node>`, and mails a link to the app's address with
         `?aimeat_party_link=`, good for 30 minutes and once. The answer is the same 202 for an address
         already registered, so it says nothing about who is. Browser: AIMEAT.parties.signUp(email).
+        A pending signup holds its place in the app's 1000 people for consent.app_party_pending_hours
+        (AIMEAT_APP_PARTY_PENDING_HOURS, 24) after its last link; the next new signup drops the ones past
+        it. One network address may sign up consent.app_party_signups_per_hour times an hour over every
+        app (AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR, 30; 0 = no limit); past it 429 RATE_LIMITED with Retry-After.
       tags: [Apps]
       security: [{}]
       parameters:
@@ -39749,7 +39753,7 @@ paths:
         '400': { description: INVALID_INPUT }
         '403': { description: 'PARTY_REGISTRATION_OFF or PARTY_REGISTRATION_CLOSED' }
         '404': { description: No such app }
-        '429': { description: TOO_MANY_PARTIES }
+        '429': { description: 'TOO_MANY_PARTIES, or RATE_LIMITED (consent.app_party_signups_per_hour)' }
         '503': { description: MAIL_NOT_CONFIGURED }
   /v1/apps/{owner}/{filename}/parties/signin:
     post:
