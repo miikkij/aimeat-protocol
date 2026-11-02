@@ -1,6 +1,6 @@
 # 09 Hardening guide
 
-> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit e9b9813d5) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is the organisation-level hardening checklist for the sysadmin and the security officer who take a node into production. The node-level checklist that every deployment runs first is [docs/security/deployment-checklist.md](../security/deployment-checklist.md); the proxy, TLS and health-check detail is in [Production deployment](../operations/production-deployment.md). This page adds the decisions an organisation makes on top of those, and says for each item whether the shipped default already does it or the operator must change something. The reasons behind each default are in [07 Security](07-security.md); the threats they answer are in [08 Threat model](08-threat-model.md).
 

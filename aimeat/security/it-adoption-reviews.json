@@ -13,7 +13,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/routes/admin/setup-register.ts"
       ],
-      "digest": "sha256:196cdce2146ce19f72b6802e"
+      "digest": "sha256:7d1df87885a944a2176a8aa6"
     },
     "01-overview.md": {
       "reviewedOn": "2026-11-01",
@@ -56,7 +56,7 @@
         "aimeat/src/services/two-step-setup.ts",
         "aimeat/src/routes/ghii/login-two-step.ts"
       ],
-      "digest": "sha256:d917b0db8668780e4d9aaa44"
+      "digest": "sha256:35c0457fe3ddd1667a551b31"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-01",
@@ -87,7 +87,7 @@
         "docs/security/verification-matrix.md",
         "aimeat/src/services/sign-in-policy.ts"
       ],
-      "digest": "sha256:f145c0c5746c014b6e61c27a"
+      "digest": "sha256:99e51a1516a26544070b70e6"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -105,7 +105,7 @@
         "docs/security/deployment-checklist.md",
         "aimeat/src/services/sign-in-policy.ts"
       ],
-      "digest": "sha256:8423684bae499f620c4e6c54"
+      "digest": "sha256:5a7e585f7be8d95d2e87f1a4"
     },
     "10-logging-monitoring.md": {
       "reviewedOn": "2026-11-01",
@@ -230,7 +230,7 @@
       "aimeat/src/services/config-schema-email.ts": "1cb6b9c5dac991f4",
       "aimeat/src/services/config-schema-seo.ts": "b88168360d49fb08",
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
-      "aimeat/src/services/sign-in-policy.ts": "79b5451fd4976896",
+      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692",
       "aimeat/src/routes/admin/setup-register.ts": "3f588fa2c4fd8b18"
     },
     "01-overview.md": {
@@ -256,7 +256,7 @@
       "aimeat/src/routes/saml-login.ts": "147ff327a6c5f0e7",
       "aimeat/src/config-types-account-security.ts": "9154691d8deb296a",
       "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
-      "aimeat/src/services/sign-in-policy.ts": "79b5451fd4976896",
+      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692",
       "aimeat/src/services/two-step-setup.ts": "e8f73c13e7d1f680",
       "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c"
     },
@@ -277,7 +277,7 @@
       "aimeat/src/middleware/cors.ts": "0f742801d6902ab5",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/verification-matrix.md": "34899889202d5b60",
-      "aimeat/src/services/sign-in-policy.ts": "79b5451fd4976896"
+      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692"
     },
     "08-threat-model.md": {
       "docs/security/threat-model.md": "211b04c0cc93e8fe",
@@ -287,7 +287,7 @@
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/deployment-checklist.md": "38fac06cbb361bb4",
-      "aimeat/src/services/sign-in-policy.ts": "79b5451fd4976896"
+      "aimeat/src/services/sign-in-policy.ts": "ef7d9587a19e7692"
     },
     "10-logging-monitoring.md": {
       "aimeat/src/utils/logger.ts": "b8403e0859974c28",
