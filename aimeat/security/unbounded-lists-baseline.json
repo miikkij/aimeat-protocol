@@ -104,8 +104,11 @@
       "listOwners": 1
     },
     "src/routes/admin.ts": {
-      "listOwners": 3,
+      "listOwners": 2,
       "listAgents": 1
+    },
+    "src/routes/admin/setup-register.ts": {
+      "listOwners": 1
     },
     "src/routes/appeals.ts": {
       "listAgents": 1

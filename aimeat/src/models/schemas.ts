@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   2026-11-02 — TwoStepStartSchema and TwoStepFinishSchema for POST /v1/ghii/login/two-step/start and
+ *     /finish (required two-step sign-in).
  *   2026-10-31 — PeerSettlementCeilingSchema for PUT /v1/federation/peers/:nodeId/settlement-ceiling
  *     (secaudit2026oct31w2 round 10).
  *   2026-10-30 — ChunkedUploadInitSchema takes `store` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -514,6 +516,17 @@ export const GhiiLoginSchema = z.object({
     // Set by clients that hold no owner signing key locally (a brand-new device),
     // asking the server to mint a fresh owner keypair. Omitted/false reuses the
     // existing key so other devices' signing keys stay valid. See ghii.ts login.
+    request_owner_key: z.boolean().optional(),
+});
+
+// The two steps of a required two-step enrolment (routes/ghii/login-two-step.ts). The token is 43
+// base64url characters; a longer one is not a token, and the route answers any wrong one the same.
+export const TwoStepStartSchema = z.object({
+    setup_token: z.string().min(1).max(64),
+});
+export const TwoStepFinishSchema = z.object({
+    setup_token: z.string().min(1).max(64),
+    code: z.string().min(1).max(16),
     request_owner_key: z.boolean().optional(),
 });
 

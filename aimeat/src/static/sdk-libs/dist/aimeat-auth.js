@@ -187,6 +187,10 @@
   var EMAIL_REQUIRED = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailRequired);
   var EMAIL_LOGIN = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailLogin);
   var LINK_FIRST = EMAIL_LOGIN && !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.linkFirst);
+  var PASSWORD_SIGN_IN = (function() {
+    var v = window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.passwordSignIn;
+    return v === "off" || v === "operators" ? v : "on";
+  })();
   var PROVIDER_ICONS = {
     google: '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>',
     entra: '<svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>',
@@ -1336,7 +1340,13 @@
     "border-bottom:1px solid " + line + ";font:400 13.5px/1.45 " + font + ";color:" + ink + "}",
     ".aimeat-why-row:last-child{border-bottom:0}",
     ".aimeat-why-row.strong{font-weight:600}",
-    ".aimeat-why-num{font:400 12px/1.45 " + mono + ";color:" + accent + "}"
+    ".aimeat-why-num{font:400 12px/1.45 " + mono + ";color:" + accent + "}",
+    /* The two-step enrolment step (modal-two-step.js): the QR on paper with a quiet zone, the key in the
+       mono face so a hand-typed copy is legible, and the backup codes as a two-column list. */
+    ".aimeat-ts-qr{display:block;width:180px;height:180px;margin:0 0 12px;padding:8px;background:#fff;border:2px solid " + ink + "}",
+    ".aimeat-ts-secret{font:400 12.5px/1.45 " + mono + ";color:" + ink + ";overflow-wrap:anywhere}",
+    ".aimeat-ts-codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:0 0 16px;padding:0;list-style:none;",
+    "font:400 14px/1.45 " + mono + ";color:" + ink + "}"
   ].join("");
 
   // src/static/sdk-libs/auth/http.js
@@ -1379,11 +1389,14 @@
     var value = url.searchParams.get(name);
     if (!value) return null;
     url.searchParams.delete(name);
+    replaceAddress(url.pathname + url.search + url.hash);
+    return value;
+  }
+  function replaceAddress(path) {
     try {
-      history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+      history.replaceState(history.state, "", path);
     } catch {
     }
-    return value;
   }
   function readAuthError() {
     var code = takeParam("auth_error");
@@ -1392,7 +1405,13 @@
   }
   function readAuthStep() {
     var step = takeParam("auth_step");
-    return step === "second_factor" ? step : null;
+    return step === "second_factor" || step === "two_step_setup" ? step : null;
+  }
+  function readTwoStepToken() {
+    var m = /(?:^#|&)two_step=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash || "");
+    if (!m) return null;
+    replaceAddress(location.pathname + location.search);
+    return m[1];
   }
   function authErrorText(i, code) {
     i = i || {};
@@ -1986,6 +2005,241 @@
   // src/static/sdk-libs/auth/modal-constants.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+  function passwordRefusalText(i, fallback) {
+    if (PASSWORD_SIGN_IN === "operators") return i.passwordOperatorsRefused || fallback;
+    return i.passwordSignInOff || fallback;
+  }
+  function operatorsOnlyNoteHtml(i, passkeyShown) {
+    if (PASSWORD_SIGN_IN !== "operators") return "";
+    return (passkeyShown ? '<div class="aimeat-or"><span></span><b>' + escHtml(i.orLabel || "OR") + "</b><span></span></div>" : "") + '<div class="aimeat-field"><p class="aimeat-sub-desc">' + escHtml(i.passwordOperatorsOnly || "Password sign-in is only for the operators of this server.") + "</p></div>";
+  }
+
+  // src/static/sdk-libs/auth/modal-fields.js
+  function captureInputs() {
+    var g = function(id) {
+      var el = (
+        /** @type {any} */
+        document.getElementById(id)
+      );
+      return el ? el.value : "";
+    };
+    return {
+      u: g("aimeat-username"),
+      p: g("aimeat-password"),
+      ru: g("aimeat-reg-username"),
+      rp: g("aimeat-reg-password"),
+      rd: g("aimeat-reg-displayname"),
+      re: g("aimeat-reg-email")
+    };
+  }
+  function restoreInputs(vals) {
+    var s = function(id, val) {
+      var el = (
+        /** @type {any} */
+        document.getElementById(id)
+      );
+      if (!el || !val) return;
+      el.value = val;
+      try {
+        el.dispatchEvent(new Event("input"));
+      } catch {
+      }
+    };
+    s("aimeat-username", vals.u);
+    s("aimeat-password", vals.p);
+    s("aimeat-reg-username", vals.ru);
+    s("aimeat-reg-password", vals.rp);
+    s("aimeat-reg-displayname", vals.rd);
+    s("aimeat-reg-email", vals.re);
+  }
+  function wireUsernameRules() {
+    var regUser = (
+      /** @type {any} */
+      document.getElementById("aimeat-reg-username")
+    );
+    var rulesEl = document.getElementById("aimeat-reg-rules");
+    function syncUsernameRules() {
+      if (!regUser || !rulesEl) return;
+      var raw = String(regUser.value || "");
+      var clean = raw.toLowerCase().replace(/[^a-z0-9-]/g, "");
+      if (clean !== raw) {
+        var pos = Math.max(0, (regUser.selectionStart == null ? raw.length : regUser.selectionStart) - (raw.length - clean.length));
+        regUser.value = clean;
+        try {
+          regUser.setSelectionRange(pos, pos);
+        } catch {
+        }
+      }
+      rulesEl.classList.toggle("on", clean.length > 0);
+      var met = {
+        len: clean.length >= 3 && clean.length <= 64,
+        chars: clean.length > 0,
+        edges: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(clean)
+      };
+      rulesEl.querySelectorAll(".aimeat-rule").forEach(function(r) {
+        r.classList.toggle("ok", !!met[r.getAttribute("data-rule") || ""]);
+      });
+    }
+    if (regUser) regUser.addEventListener("input", syncUsernameRules);
+  }
+
+  // src/static/sdk-libs/auth/modal-two-step.js
+  function onlyDigits2(value) {
+    return String(value || "").replace(/\D/g, "").slice(0, 6);
+  }
+  function goTo2(redirect) {
+    var target;
+    try {
+      target = new URL(redirect, location.href);
+    } catch {
+      return;
+    }
+    if (target.protocol !== "https:" && target.protocol !== "http:") return;
+    if (target.href === location.href) return;
+    location.assign(target.href);
+  }
+  function twoStepViewHtml(i, field) {
+    return '<div id="aimeat-two-step-view" class="aimeat-body" style="display:none"><div id="aimeat-ts-setup"><h3 class="aimeat-sub-title">' + escHtml(i.twoStepTitle || "Set up two-step sign-in") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.twoStepWhy || "The operator of this server requires two-step sign-in for your account.") + '</p><p class="aimeat-sub-desc">' + escHtml(i.twoStepScan || "Scan the QR code with your authenticator app, or type the key into the app.") + '</p><img id="aimeat-ts-qr" class="aimeat-ts-qr" alt="' + escHtml(i.twoStepQrAlt || "QR code for your authenticator app") + '" style="display:none"><p class="aimeat-hint">' + escHtml(i.twoStepKeyLabel || "Key") + ': <code id="aimeat-ts-secret" class="aimeat-ts-secret"></code></p>' + field(
+      i.twoStepCodeLabel || "Code from the app",
+      '<input id="aimeat-ts-code" class="aimeat-inp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">'
+    ) + '<div class="aimeat-actions"><button id="aimeat-ts-go" class="aimeat-go">' + escHtml(i.twoStepConfirm || "Confirm") + '</button><button id="aimeat-ts-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div></div><div id="aimeat-ts-done" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.twoStepCodesTitle || "Save your backup codes") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.twoStepCodesDesc || "Each code signs you in once if you cannot use your phone. You see them only now, so save them somewhere safe.") + '</p><ul id="aimeat-ts-codes" class="aimeat-ts-codes"></ul><div class="aimeat-actions"><button id="aimeat-ts-continue" class="aimeat-go">' + escHtml(i.twoStepCodesDone || "I saved them, continue") + '</button></div></div><p id="aimeat-ts-err" class="aimeat-err"></p></div>';
+  }
+  function wireTwoStepStep(ctx) {
+    var i = ctx.i;
+    var token = null;
+    var finished = null;
+    var $ = function(id) {
+      return (
+        /** @type {any} */
+        document.getElementById(id)
+      );
+    };
+    var setupEl = $("aimeat-ts-setup"), doneEl = $("aimeat-ts-done"), qrEl = $("aimeat-ts-qr"), secretEl = $("aimeat-ts-secret");
+    var codeEl = $("aimeat-ts-code"), goBtn = $("aimeat-ts-go"), backBtn = $("aimeat-ts-back"), errEl = $("aimeat-ts-err");
+    var codesEl = $("aimeat-ts-codes"), continueBtn = $("aimeat-ts-continue");
+    if (!setupEl || !doneEl || !codeEl || !goBtn || !backBtn || !errEl || !codesEl || !continueBtn) return { open: function() {
+    } };
+    function fail(message) {
+      errEl.textContent = message;
+      errEl.style.display = "block";
+    }
+    function expiredText() {
+      return i.twoStepExpired || "The time to set up two-step sign-in has run out. Sign in again.";
+    }
+    var rawSecret = "";
+    if (secretEl) secretEl.addEventListener("copy", function(e) {
+      var sel = String(window.getSelection && window.getSelection() || "");
+      if (!rawSecret || !e.clipboardData) return;
+      e.clipboardData.setData("text/plain", sel.replace(/\s+/g, "") || rawSecret);
+      e.preventDefault();
+    });
+    codeEl.addEventListener("input", function() {
+      codeEl.value = onlyDigits2(codeEl.value);
+    });
+    codeEl.addEventListener("keydown", function(e) {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (!goBtn.disabled) goBtn.click();
+    });
+    backBtn.addEventListener("click", function() {
+      token = null;
+      errEl.style.display = "none";
+      ctx.showView("login");
+    });
+    goBtn.addEventListener("click", async function() {
+      if (!token) {
+        ctx.showView("login");
+        return;
+      }
+      var code = onlyDigits2(codeEl.value);
+      errEl.style.display = "none";
+      if (code.length !== 6) {
+        fail(i.errTotpSix || "The code is six digits.");
+        return;
+      }
+      var label = i.twoStepConfirm || "Confirm";
+      goBtn.textContent = i.working || "Working...";
+      goBtn.disabled = true;
+      try {
+        finished = await api("/v1/ghii/login/two-step/finish", {
+          method: "POST",
+          credentials: "include",
+          body: JSON.stringify({ setup_token: token, code })
+        });
+        token = null;
+        var codes = finished.data && finished.data.backup_codes || [];
+        codesEl.innerHTML = codes.map(function(c) {
+          return "<li><code>" + escHtml(String(c)) + "</code></li>";
+        }).join("");
+        setupEl.style.display = "none";
+        doneEl.style.display = "";
+        setTimeout(function() {
+          continueBtn.focus();
+        }, 50);
+      } catch (e) {
+        if (e.code === "SETUP_TOKEN_EXPIRED") {
+          token = null;
+          fail(expiredText());
+        } else if (e.code === "TOTP_LOCKED") fail(e.message);
+        else if (e.code === "INVALID_TOTP") fail(i.errTotpWrong || "That code does not match. Check the app and try again.");
+        else fail(e.message);
+        codeEl.value = "";
+      } finally {
+        goBtn.textContent = label;
+        goBtn.disabled = false;
+      }
+    });
+    continueBtn.addEventListener("click", async function() {
+      if (!finished) {
+        ctx.showView("login");
+        return;
+      }
+      var answer = finished;
+      finished = null;
+      continueBtn.disabled = true;
+      try {
+        var session = await ctx.adopt(answer);
+        ctx.onSuccess(session);
+        var back = answer.data && answer.data.redirect;
+        if (back) goTo2(back);
+      } catch (e) {
+        continueBtn.disabled = false;
+        fail(e.message);
+      }
+    });
+    return {
+      /** A checked sign-in that stops at the enrolment: ask the node for the secret and show it. */
+      open: function(setupToken) {
+        token = setupToken;
+        finished = null;
+        codeEl.value = "";
+        errEl.style.display = "none";
+        setupEl.style.display = "";
+        doneEl.style.display = "none";
+        if (qrEl) qrEl.style.display = "none";
+        if (secretEl) secretEl.textContent = "";
+        rawSecret = "";
+        ctx.showView("two-step");
+        api("/v1/ghii/login/two-step/start", { method: "POST", body: JSON.stringify({ setup_token: setupToken }) }).then(function(r) {
+          var d = r.data || {};
+          if (qrEl && typeof d.qr_data_url === "string" && d.qr_data_url.indexOf("data:image/") === 0) {
+            qrEl.src = d.qr_data_url;
+            qrEl.style.display = "";
+          }
+          rawSecret = String(d.secret || "");
+          if (secretEl) secretEl.textContent = rawSecret.replace(/(.{4})(?=.)/g, "$1 ");
+          setTimeout(function() {
+            codeEl.focus();
+          }, 50);
+        }).catch(function(e) {
+          if (e.code === "SETUP_TOKEN_EXPIRED") {
+            token = null;
+            fail(expiredText());
+          } else fail(e.message);
+        });
+      }
+    };
+  }
 
   // src/static/sdk-libs/auth/modal.js
   var NODE_HOST = (function() {
@@ -2000,7 +2254,8 @@
     var i = opts.i18n || {};
     var lang = currentModalLang();
     var signInOnly = !!opts.signInOnly;
-    var tab = opts.tab === "register" && !signInOnly ? "register" : "signin", linkFirst = opts.linkFirst === void 0 ? LINK_FIRST : !!opts.linkFirst;
+    var noRegister = signInOnly || PASSWORD_SIGN_IN !== "on", passwordOff = PASSWORD_SIGN_IN === "off";
+    var tab = opts.tab === "register" && !noRegister ? "register" : "signin", linkFirst = opts.linkFirst === void 0 ? LINK_FIRST : !!opts.linkFirst;
     const old = document.getElementById("aimeat-modal");
     if (old) old.remove();
     const modal = document.createElement("div");
@@ -2011,43 +2266,6 @@
         removeModal();
         onClosed();
       };
-    }
-    function captureInputs() {
-      var g = function(id) {
-        var el = (
-          /** @type {any} */
-          document.getElementById(id)
-        );
-        return el ? el.value : "";
-      };
-      return {
-        u: g("aimeat-username"),
-        p: g("aimeat-password"),
-        ru: g("aimeat-reg-username"),
-        rp: g("aimeat-reg-password"),
-        rd: g("aimeat-reg-displayname"),
-        re: g("aimeat-reg-email")
-      };
-    }
-    function restoreInputs(vals) {
-      var s = function(id, val) {
-        var el = (
-          /** @type {any} */
-          document.getElementById(id)
-        );
-        if (!el || !val) return;
-        el.value = val;
-        try {
-          el.dispatchEvent(new Event("input"));
-        } catch {
-        }
-      };
-      s("aimeat-username", vals.u);
-      s("aimeat-password", vals.p);
-      s("aimeat-reg-username", vals.ru);
-      s("aimeat-reg-password", vals.rp);
-      s("aimeat-reg-displayname", vals.rd);
-      s("aimeat-reg-email", vals.re);
     }
     function switchLang(next) {
       if (next === lang) return;
@@ -2102,13 +2320,13 @@
       }
       return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-crumb-right"><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : (signInOnly || linkFirst) && i2.loginLinkTitleFirst || i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : (signInOnly || linkFirst) && i2.loginLinkDescFirst || i2.descReturning || "Enter the username or email you signed up with.") + "</p>" + (signInOnly ? "" : '<div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + "</button></div>") + '</div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
+      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : (signInOnly || linkFirst) && i2.loginLinkTitleFirst || i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : (signInOnly || linkFirst) && i2.loginLinkDescFirst || i2.descReturning || "Enter the username or email you signed up with.") + "</p>" + (noRegister ? "" : '<div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + "</button></div>") + '</div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + '<div id="aimeat-pw-form"' + (passwordOff ? ' style="display:none"' : "") + ">" + operatorsOnlyNoteHtml(i2, !!passkeyButtonHtml(i2)) + field(
         i2.identifierLabel || "Username or email",
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
       ) + field(
         i2.passwordLabel || "Password",
         '<input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password") + '">'
-      ) + '<div class="aimeat-actions"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" class="aimeat-err"></p><div class="aimeat-links"><a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" class="aimeat-link"' + (signInOnly ? ' style="display:none"' : "") + ">" + escHtml(i2.forgotUsername || "Forgot username?") + "</a>" + loginLinkAskHtml(i2) + '</div></div><div id="aimeat-tab-register"' + (isReg ? "" : ' style="display:none"') + ">" + field(
+      ) + '<div class="aimeat-actions"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div></div><p id="aimeat-error" class="aimeat-err"></p>' + (passwordOff ? '<p class="aimeat-hint">' + escHtml(i2.passwordSignInOff || "This server does not use passwords. Sign in with a passkey, your organisation's sign-in or a sign-in link sent to your email.") + "</p>" : "") + '<div class="aimeat-links"><a href="#" id="aimeat-forgot-pw" class="aimeat-link"' + (passwordOff ? ' style="display:none"' : "") + ">" + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" class="aimeat-link"' + (signInOnly || passwordOff ? ' style="display:none"' : "") + ">" + escHtml(i2.forgotUsername || "Forgot username?") + "</a>" + loginLinkAskHtml(i2) + '</div></div><div id="aimeat-tab-register"' + (isReg ? "" : ' style="display:none"') + ">" + field(
         i2.usernameLabel || "Username",
         '<input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"><div id="aimeat-reg-rules" class="aimeat-rules">' + rule("len", i2.usernameRuleLength || "3 to 64 characters") + rule("chars", i2.usernameRuleChars || "Letters a to z, digits and hyphens") + rule("edges", i2.usernameRuleEdges || "Starts and ends with a letter or digit") + "</div>",
         '<p class="aimeat-hint">' + escHtml(i2.usernameLowercase || "Capital letters become lowercase.") + " " + escHtml(i2.usernameHint || "This becomes your permanent name here.") + "</p>"
@@ -2126,7 +2344,7 @@
         i2.displayNameOptional || "optional"
       ) + '<div class="aimeat-actions"><button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i2.createAccountBtn || "Create account") + '</button><button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-reg-error" class="aimeat-err"></p></div>' + (AUTH_PROVIDERS.length ? '<div class="aimeat-or"><span></span><b>' + escHtml(i2.orLabel || "OR") + "</b><span></span></div>" + AUTH_PROVIDERS.map(function(p) {
         return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '">' + (PROVIDER_ICONS[p.id] || "") + escHtml(i2[p.i18nKey] || p.label) + "</button>";
-      }).join("") : "") + "</div>" + recoveryViewsHtml(i2, field) + loginLinkViewHtml(i2, field, linkFirst) + totpViewHtml(i2, field) + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
+      }).join("") : "") + "</div>" + recoveryViewsHtml(i2, field) + loginLinkViewHtml(i2, field, linkFirst) + totpViewHtml(i2, field) + twoStepViewHtml(i2, field) + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
     }
     function wireModal() {
       modal.querySelectorAll(".aimeat-lang").forEach(function(b) {
@@ -2175,34 +2393,7 @@
           }, 30);
         });
       });
-      var regUser = (
-        /** @type {any} */
-        document.getElementById("aimeat-reg-username")
-      );
-      var rulesEl = document.getElementById("aimeat-reg-rules");
-      function syncUsernameRules() {
-        if (!regUser || !rulesEl) return;
-        var raw = String(regUser.value || "");
-        var clean = raw.toLowerCase().replace(/[^a-z0-9-]/g, "");
-        if (clean !== raw) {
-          var pos = Math.max(0, (regUser.selectionStart == null ? raw.length : regUser.selectionStart) - (raw.length - clean.length));
-          regUser.value = clean;
-          try {
-            regUser.setSelectionRange(pos, pos);
-          } catch {
-          }
-        }
-        rulesEl.classList.toggle("on", clean.length > 0);
-        var met = {
-          len: clean.length >= 3 && clean.length <= 64,
-          chars: clean.length > 0,
-          edges: /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(clean)
-        };
-        rulesEl.querySelectorAll(".aimeat-rule").forEach(function(r) {
-          r.classList.toggle("ok", !!met[r.getAttribute("data-rule") || ""]);
-        });
-      }
-      if (regUser) regUser.addEventListener("input", syncUsernameRules);
+      wireUsernameRules();
       modal.querySelectorAll(".aimeat-oauth-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
           var id = btn.getAttribute("data-provider") || "";
@@ -2217,8 +2408,13 @@
         document.getElementById("aimeat-forgot-user-view").style.display = view === "forgot-user" ? "" : "none";
         document.getElementById("aimeat-email-view").style.display = view === "email" ? "" : "none";
         document.getElementById("aimeat-totp-view").style.display = view === "totp" ? "" : "none";
+        document.getElementById("aimeat-two-step-view").style.display = view === "two-step" ? "" : "none";
         var ll = document.getElementById("aimeat-login-link-view");
         if (ll) ll.style.display = view === "login-link" ? "" : "none";
+        var step = view === "totp" || view === "two-step";
+        modal.querySelectorAll(".aimeat-headline, .aimeat-line, .aimeat-tabs").forEach(function(el) {
+          el.style.display = step ? "none" : "";
+        });
       }
       function finishLogin() {
         modal.remove();
@@ -2244,6 +2440,19 @@
       if (opts.secondFactorLink) {
         opts.secondFactorLink = false;
         totpStep.openLinkStep();
+      }
+      var twoStep = wireTwoStepStep({ i, showView, adopt: function(data) {
+        return auth.adoptLoginAnswer(data);
+      }, onSuccess: finishLogin });
+      function twoStepAsked(e) {
+        if (!e || e.code !== "TWO_STEP_SETUP_REQUIRED" || !e.details || !e.details.setup_token) return false;
+        twoStep.open(e.details.setup_token);
+        return true;
+      }
+      if (opts.twoStepSetup) {
+        var setupToken = opts.twoStepSetup;
+        opts.twoStepSetup = null;
+        twoStep.open(setupToken);
       }
       var pendingEmailLogin = null;
       function openEmailCompletion(user, pass, hasEmail, mode, displayName, prefillEmail) {
@@ -2347,6 +2556,7 @@
               try {
                 await auth.loginWithPassword(pending.username, pending.password);
               } catch (le) {
+                if (twoStepAsked(le)) return;
                 if (le.code !== "TOTP_REQUIRED") throw le;
                 totpStep.openTotpStep(pending.username, pending.password);
                 return;
@@ -2408,6 +2618,10 @@
           pendingEmailLogin = null;
           finishLogin();
         } catch (e) {
+          if (twoStepAsked(e)) {
+            pendingEmailLogin = null;
+            return;
+          }
           errEl.textContent = e.message;
           errEl.style.display = "block";
           btn.textContent = i.confirmAndSignIn || "Confirm & Sign In";
@@ -2494,13 +2708,17 @@
             totpStep.openTotpStep(isEmail || isFederated ? raw : localName, password);
             return;
           }
+          if (twoStepAsked(e)) {
+            releaseBtn("aimeat-go-btn", signInLabel);
+            return;
+          }
           if (e.code === "TOTP_LOCKED") {
             errEl.textContent = e.message;
             errEl.style.display = "block";
             releaseBtn("aimeat-go-btn", signInLabel);
             return;
           }
-          errEl.textContent = e.message.includes("Invalid username or password") ? i.errWrongCredentials || "That username or email and password do not match an account here." : e.message;
+          errEl.textContent = e.message.includes("Invalid username or password") ? i.errWrongCredentials || "That username or email and password do not match an account here." : e.code === "PASSWORD_SIGN_IN_OFF" ? passwordRefusalText(i, e.message) : e.message;
           errEl.style.display = "block";
           releaseBtn("aimeat-go-btn", signInLabel);
         }
@@ -2564,6 +2782,10 @@
           if (e.code === "EMAIL_REQUIRED") {
             releaseBtn("aimeat-reg-btn", createLabel);
             openEmailCompletion(username, password, false, "register", displayName);
+            return;
+          }
+          if (twoStepAsked(e)) {
+            releaseBtn("aimeat-reg-btn", createLabel);
             return;
           }
           errEl.textContent = e.message.includes("already registered") || e.message.includes("NAME_TAKEN") ? i.errNameTaken || "That username is taken. If it is yours, sign in instead." : e.message;
@@ -3223,6 +3445,10 @@
       const data = await passkeySignIn(username);
       return sessionFromLogin(data);
     },
+    /** The answer of POST /v1/ghii/login/two-step/finish is a sign-in answer: the session it carries. */
+    adoptLoginAnswer(data) {
+      return sessionFromLogin(data);
+    },
     /** Does this browser have WebAuthn? A caller shows the passkey button only when it does. */
     passkeySupported,
     /** Add THIS device to the signed-in account. Returns the stored passkey as the node describes it. */
@@ -3613,9 +3839,17 @@
     var code = readAuthError();
     if (code) showLoginModal({ authError: code }, function() {
     });
-    if (readAuthStep() === "second_factor") {
+    var step = readAuthStep();
+    if (step === "second_factor") {
       loadModalI18n(currentModalLang()).then(function(i18n) {
         showLoginModal({ i18n: i18n || {}, secondFactorLink: true }, function() {
+        });
+      });
+    }
+    var setupToken = step === "two_step_setup" ? readTwoStepToken() : null;
+    if (setupToken) {
+      loadModalI18n(currentModalLang()).then(function(i18n) {
+        showLoginModal({ i18n: i18n || {}, twoStepSetup: setupToken }, function() {
         });
       });
     }
@@ -3660,5 +3894,5 @@
     });
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-10-09-001";
+  ns.version = "2026-11-02-001";
 })();

@@ -1816,6 +1816,9 @@ components:
             - TOTP_LOCKED: Account locked due to failed TOTP attempts
             - TOTP_REPLAY: TOTP code already used
             - TOTP_ALREADY_ENABLED: TOTP already set up
+            - TWO_STEP_SETUP_REQUIRED: The operator requires two-step sign-in (auth.two_step_required) and the account has no authenticator app set up. A password sign-in carries `details.setup_token` for POST /v1/ghii/login/two-step/start and /finish; a session refresh asks the person to sign in again
+            - PASSWORD_SIGN_IN_OFF: The operator's password sign-in policy (auth.password_sign_in) refuses this password sign-in or this new password
+            - SETUP_TOKEN_EXPIRED: The two-step setup token is unknown, spent or older than ten minutes
             - CSM_NOT_FOUND: CSM service not found
             - VALIDATION_ERROR: A field of the request is not valid. `details` lists each field (FieldError): its path, a code, the limit and a sentence in the caller's language. A NUL character or a broken (lone surrogate) character anywhere in the body, the query or the path gets this answer on every route.
             - ALREADY_FLAGGED: User has already flagged this target
@@ -9303,7 +9306,10 @@ paths:
             (the owner's current display name, so the client login pill picks up profile edits).
             A session whose account is gone, or was made after the session because the name was
             registered again, answers `401 SESSION_REVOKED` and ends; a deactivated account's
-            answers `403 ACCOUNT_DISABLED`.
+            answers `403 ACCOUNT_DISABLED`. When the operator requires two-step sign-in
+            (`auth.two_step_required`) for the account and it has no authenticator app, no passkey
+            and no identity provider link, the refresh answers `403 TWO_STEP_SETUP_REQUIRED` and the
+            session ends, so the person signs in again and sets the app up.
           * **Agent (Bearer):** an agent sends its valid Bearer access token and gets a new one with
             roles `['agent']` and its current stored scopes.
           * **Access-token session (refused):** a credential made from a personal access token (the raw
@@ -34679,6 +34685,10 @@ paths:
         The password has the same per-account lock as the sign-in route (429
         PASSWORD_LOCKED), and an account with two-step sign-in needs its code
         (401 TOTP_REQUIRED without one). Returns a signed attestation on success.
+        With this node's `auth.password_sign_in` = `off` it answers 403 PASSWORD_SIGN_IN_OFF before
+        the consent or the password is read; with `operators` a non-operator gets the same answer
+        after the password. An account this node's `auth.two_step_required` covers, with no
+        authenticator app, gets 403 TWO_STEP_SETUP_REQUIRED instead of an attestation.
       tags: [Federation]
       requestBody:
         required: true
@@ -35388,6 +35398,13 @@ paths:
         Refuses the WHOLE request with 403 `SEALED_CONFIG` when any path in it was sealed by the
         node's host, applying none of the other changes in the same request. The error `details`
         carry `sealed`, the list of offending paths.
+
+        The sign-in policy. `auth.two_step_required` (off, operators, everyone) and
+        `auth.password_sign_in` (on, operators, off). A change that lowers the first or opens the
+        second wider is refused WHOLE to an AI credential (an agent, a personal access token) with
+        403 `PERSON_REQUIRED`; tightening applies from anyone who may change settings.
+        `auth.password_sign_in` = `off` is refused whole with 409 `OPERATOR_LOCKOUT` while no
+        operator account has a passkey or an identity provider link.
 
         Pacing settings. `morsel_policy.burn_rate` (0.0 to 1.0) is the share of every pacing charge
         that burns; the provider gets the rest, after the flow's own operator share
@@ -77805,6 +77822,15 @@ paths:
         told apart from a GHII by its dot-bearing domain, which a node id never has, so
         `alice@aimeat-fi-001` still routes as a federated login. An address matching no verified
         account answers 401 exactly like a wrong password, so this cannot enumerate addresses.
+
+        The operator's sign-in policy. With `auth.password_sign_in` = `off` every password sign-in
+        answers 403 `PASSWORD_SIGN_IN_OFF` before the password is read; with `operators` a
+        federated sign-in gets that answer before the password is sent to the home node, and a
+        local account without the operator role gets it after the password checked out, so the
+        answer tells no role. With `auth.two_step_required` covering the account (`operators` and
+        an operator account, or `everyone`) and no authenticator app set up, a right password
+        opens no session: 403 `TWO_STEP_SETUP_REQUIRED` with `details.setup_token` (ten minutes,
+        single use, bound to the account) for POST /v1/ghii/login/two-step/start and /finish.
       requestBody:
         required: true
         content:
@@ -77856,6 +77882,120 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /v1/ghii/login/two-step/start:
+    post:
+      operationId: ghiiLoginTwoStepStart
+      tags: [GHII]
+      summary: Start the two-step enrolment of a sign-in
+      description: |
+        The first step of a required two-step enrolment (`auth.two_step_required`). A password
+        sign-in (POST /v1/ghii/login) or an emailed sign-in link of an account the policy covers,
+        with no authenticator app set up, opened no session and gave a setup token: in
+        `details.setup_token` of the 403 TWO_STEP_SETUP_REQUIRED answer, or in the address fragment
+        `#two_step=<token>` of the front page the link redirects to. This endpoint makes a new TOTP
+        secret, keeps it encrypted with the token, and answers it with the otpauth address and a
+        QR code. Calling it again replaces the secret. No auth: the token is the credential. Rate
+        limited per client address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [setup_token]
+              properties:
+                setup_token: { type: string, description: The token from the TWO_STEP_SETUP_REQUIRED answer }
+      responses:
+        '200':
+          description: The secret for the authenticator app
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          secret: { type: string, description: The Base32 key, for typing into the app }
+                          otpauth_url: { type: string, description: 'The otpauth:// address the QR code carries' }
+                          qr_data_url: { type: string, description: The QR code as a PNG data URL }
+                          expires_at: { type: string, format: date-time, description: When the setup token ends }
+        '401':
+          description: SETUP_TOKEN_EXPIRED, the token is unknown, spent or expired
+        '403':
+          description: ACCOUNT_DISABLED
+        '409':
+          description: TOTP_ALREADY_ENABLED, the account set up an app meanwhile; sign in with its code
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: FEATURE_DISABLED (two-step sign-in is off on this node) or ENCRYPTION_NOT_CONFIGURED
+  /v1/ghii/login/two-step/finish:
+    post:
+      operationId: ghiiLoginTwoStepFinish
+      tags: [GHII]
+      summary: Finish the two-step enrolment and sign in
+      description: |
+        The second step of a required two-step enrolment. Checks `code` against the secret
+        /start made, with the account's TOTP lock: a wrong code is refused (401 INVALID_TOTP),
+        counts toward the lock (429 TOTP_LOCKED), and keeps the token for another try. A right
+        code spends the token (single use), sets up the app on the account with fresh backup
+        codes, and signs in the way POST /v1/ghii/login does: the refresh cookie is set and the
+        answer is that route's answer, plus `backup_codes` (shown once) and, for an emailed link,
+        `redirect`. Send it with `credentials: 'include'` so the cookie is kept.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [setup_token, code]
+              properties:
+                setup_token: { type: string }
+                code: { type: string, description: The six digits the authenticator app shows }
+                request_owner_key: { type: boolean, description: Mint a fresh owner keypair (new device with no local key) }
+      responses:
+        '200':
+          description: Signed in, with the backup codes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii:
+                            type: object
+                            properties:
+                              ghii: { type: string }
+                              username: { type: string }
+                              display_name: { type: string }
+                          owner:
+                            type: object
+                            properties:
+                              name: { type: string }
+                          token: { type: string }
+                          session_id: { type: string }
+                          expires_in: { type: integer }
+                          expires_at: { type: string }
+                          owner_public_key: { type: string }
+                          backup_codes: { type: array, items: { type: string }, description: Shown once }
+                          redirect: { type: string, description: 'An emailed link only: the place it returns to' }
+        '400':
+          description: INVALID_INPUT, no code
+        '401':
+          description: SETUP_TOKEN_EXPIRED, or INVALID_TOTP for a wrong code
+        '403':
+          description: ACCOUNT_DISABLED
+        '409':
+          description: TWO_STEP_NOT_STARTED (call /start first) or TOTP_ALREADY_ENABLED
+        '429':
+          description: TOTP_LOCKED, or the per-address rate limit
   /v1/ghii/list:
     get:
       operationId: listGhii
@@ -80763,6 +80903,12 @@ paths:
 
         `password` is required (400 without it): the new operator signs in with the name and this
         password on `POST /v1/ghii/login`, because the account-key sign-in was removed in 4.0.0.
+
+        On a node without an operator it also asks for the one-time setup code the start log
+        prints (`setupCode`), as every other route that makes the first operator does: 403
+        `SETUP_CODE_REQUIRED` without it, 403 `SETUP_CODE_INVALID` with a wrong one, before any
+        write. A request from the node's own machine to a node whose base URL is loopback needs no
+        code.
       requestBody:
         required: true
         content:
@@ -80774,6 +80920,7 @@ paths:
                 name: { type: string }
                 display_name: { type: string }
                 password: { type: string, description: 'The password the new operator signs in with. Held to the password strength rule.' }
+                setupCode: { type: string, description: 'The one-time setup code from the start log. Case, spaces and hyphens do not matter.' }
       responses:
         '200':
           description: Owner registered
@@ -80793,6 +80940,8 @@ paths:
                   private_key: { type: string }
                   public_key: { type: string }
                   has_password: { type: boolean }
+        '403':
+          description: SETUP_CODE_REQUIRED or SETUP_CODE_INVALID, on a node without an operator, before any write.
         '400':
           description: Invalid input
           content:

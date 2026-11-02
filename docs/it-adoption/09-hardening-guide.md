@@ -1,6 +1,6 @@
 # 09 Hardening guide
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit e9b9813d5) on 2026-11-02. Maintained with the code: see the README for how.
 
 This page is the organisation-level hardening checklist for the sysadmin and the security officer who take a node into production. The node-level checklist that every deployment runs first is [docs/security/deployment-checklist.md](../security/deployment-checklist.md); the proxy, TLS and health-check detail is in [Production deployment](../operations/production-deployment.md). This page adds the decisions an organisation makes on top of those, and says for each item whether the shipped default already does it or the operator must change something. The reasons behind each default are in [07 Security](07-security.md); the threats they answer are in [08 Threat model](08-threat-model.md).
 
@@ -32,8 +32,8 @@ Marks used below:
 - [ ] **[change]** Connect the organisation's IdP: Entra ID over OIDC with a tenant allowlist (`AIMEAT_ENTRA_OAUTH_ENABLED`, `AIMEAT_ENTRA_ALLOWED_TENANTS`), or a SAML and SCIM connection (`aimeat_admin_sso_create`, then `AIMEAT_SSO_ENABLED=true`) ([Organisation node sign-in](../organisation-node-sign-in.md)). Why: the IdP brings your MFA, conditional access and leaver process.
 - [ ] **[change]** Make SSO the only way to get an account: `AIMEAT_REGISTRATION_MODE=oauth` (accounts come from the IdP or an invitation) or `invite` (`aimeat/src/config.ts`). Why: the default `open` lets anyone register.
 - [ ] **[change]** Turn off every sign-in provider you do not use. Why: each enabled provider is another front door, and under `oauth` it creates accounts too ([Organisation node sign-in](../organisation-node-sign-in.md), section 6).
-- [ ] **[change]** Password sign-in cannot be turned off in this version (no setting exists; see Limits). Compensate: create accounts through SCIM or the IdP so people never set a password, and watch password sign-ins in the refusal log.
-- [ ] **[change]** Two-step sign-in for operators: there is no setting that forces it. Make it a written rule, and check the Security page, which lists who uses two-step sign-in (`aimeat_admin_security_overview`).
+- [ ] **[change]** Require two-step sign-in: `AIMEAT_TWO_STEP_REQUIRED=operators` on an organisation node, or `everyone` when local accounts must also have it (Config `auth.two_step_required`). Keep `AIMEAT_TOTP_ENABLED` on; the node refuses to save the two together otherwise (`TWO_STEP_NEEDS_TOTP`). Why: the default `off` requires it for nobody. A covered account without TOTP then sets it up at its next password or emailed-link sign-in, and a passkey or an IdP sign-in satisfies the rule (`aimeat/src/services/sign-in-policy.ts`, `aimeat/src/services/config-admin-view.ts`). Check who uses two-step sign-in on the Security page (`aimeat_admin_security_overview`).
+- [ ] **[change]** Limit password sign-in: `AIMEAT_PASSWORD_SIGN_IN=operators` on an organisation node with an IdP, so that the password stays only as the operators' way in when the IdP fails (Config `auth.password_sign_in`). Set `off` only when every operator has a passkey or an IdP link; the node refuses to save `off` while no operator has one (`OPERATOR_LOCKOUT`). Why: the default `on` lets every account sign in with a password even when SSO is on; `operators` and `off` also refuse password registration, invitations with a password, code keys and password resets for the accounts they cover (`aimeat/src/services/sign-in-policy.ts`).
 - [ ] **[change]** Deprovision through SCIM. Why: SCIM `active: false` ends every session and token of a leaver at once ([Organisation node sign-in](../organisation-node-sign-in.md), section 7).
 - [ ] **[decide]** Freeze sign-in settings against operator sessions with `AIMEAT_SEALED_CONFIG_KEYS` (`aimeat/.env.example`). `sso.enabled,sso.connections_locked` freezes the SAML and SCIM setup only; to freeze who may sign in, also seal `registration.mode`, `auth.google_enabled`, `auth.entra_enabled`, `auth.entra_tenant` and `auth.entra_link_domains` (`aimeat/src/services/config-schema-access.ts`). Why: changing who may sign in then takes a deploy.
 - [ ] **[decide]** `AIMEAT_CONTENT_ACCESS=signed-in` for an internal-only node. Why: the default `open` serves published apps, public files and shared pages to anyone (`aimeat/.env.example`).
@@ -83,8 +83,8 @@ Marks used below:
 
 ## Limits
 
-- No setting turns password sign-in off; an existing password account can always sign in with its password.
-- No setting makes two-step sign-in mandatory.
+- The emailed sign-in link has no node-wide switch; `AIMEAT_PASSWORD_SIGN_IN=off` leaves it on (`aimeat/src/services/login-link.ts`).
+- A passkey or an IdP sign-in satisfies required two-step sign-in without the node's TOTP code, by design; on the IdP path MFA is the IdP's (`aimeat/src/services/sign-in-policy.ts`).
 - The node has no outbound proxy setting; egress is controlled only by firewall destinations.
 - The shipped systemd unit does not set `NODE_ENV=production`, so its log is coloured text, not JSON, until the operator adds it.
 - There is no setting that removes the federation routes.

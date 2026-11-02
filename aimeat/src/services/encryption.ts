@@ -19,7 +19,17 @@
  *   - decryptBound(data, key, context) — plaintext, or a throw when the form or the context differ
  *   - isBoundCiphertext(data) — true for the v2 form
  *   - getEncryptionKey(config) — resolves key from config with fallback
+ *
+ *   ADDING THE DATA KEY LATER. A node installed with `aimeat init` runs on AIMEAT_TOTP_ENCRYPTION_KEY
+ *   alone. When AIMEAT_ENCRYPTION_KEY is added, getEncryptionKey() returns it, and nothing re-encrypts
+ *   what is stored, so until 2026-11-02 every AI provider key, MCP server credential, connected account
+ *   and payment key written before stopped opening. getEncryptionKey() now remembers the TOTP key as
+ *   the data key's fallback, and decrypt() and decryptBound() try it when the data key's tag check
+ *   fails. New values are written under the data key; the old ones keep opening as long as the TOTP
+ *   key stays set (IT adoption review; Jouni, 2026-11-02).
  * @version-history
+ *   v1.2.0 -- 2026-11-02 -- decrypt() and decryptBound() fall back to AIMEAT_TOTP_ENCRYPTION_KEY when
+ *     AIMEAT_ENCRYPTION_KEY was added later (test/unit/encryption-key-fallback.test.ts).
  *   v1.1.0 — 2026-10-09 — encryptBound / decryptBound / isBoundCiphertext: ciphertext bound to the
  *     place it belongs (secrets audit 2026-10-09, finding 1.1, ruling 3).
  *   v1.0.0 — 2026-03-20 — Initial: extracted from totp.ts pattern
@@ -44,6 +54,10 @@ export function encrypt(plaintext: string, key: Buffer): string {
  * @param data Format: `iv:authTag:ciphertext` (all hex)
  */
 export function decrypt(data: string, key: Buffer): string {
+  return withFallback(key, k => decryptWith(data, k));
+}
+
+function decryptWith(data: string, key: Buffer): string {
   const [ivHex, authTagHex, ciphertextHex] = data.split(':');
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
@@ -51,6 +65,32 @@ export function decrypt(data: string, key: Buffer): string {
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(authTag);
   return decipher.update(ciphertext) + decipher.final('utf8');
+}
+
+/**
+ * The data key's older key, for values written before the data key was set: AIMEAT_TOTP_ENCRYPTION_KEY
+ * when both are set and differ. Keyed by the data key's hex, so a process serving several nodes opens
+ * each node's values only with that node's own two keys. Filled by getEncryptionKey(), which every
+ * caller asks for the key it then decrypts with, so no start step is needed.
+ */
+const fallbackKeys = new Map<string, Buffer>();
+
+/**
+ * Run `open` with `key`, and when the tag check fails, once more with that key's fallback. The first
+ * error is the one thrown when neither opens, so a caller sees the same failure as before.
+ */
+function withFallback(key: Buffer, open: (k: Buffer) => string): string {
+  try {
+    return open(key);
+  } catch (err) {
+    const older = fallbackKeys.get(key.toString('hex'));
+    if (!older) throw err;
+    try {
+      return open(older);
+    } catch {
+      throw err;
+    }
+  }
 }
 
 const BOUND_PREFIX = 'v2:';
@@ -79,6 +119,10 @@ export function encryptBound(plaintext: string, key: Buffer, context: string): s
  */
 export function decryptBound(data: string, key: Buffer, context: string): string {
   if (!isBoundCiphertext(data)) throw new Error('not a bound ciphertext');
+  return withFallback(key, k => decryptBoundWith(data, k, context));
+}
+
+function decryptBoundWith(data: string, key: Buffer, context: string): string {
   const [ivHex, authTagHex, ciphertextHex] = data.slice(BOUND_PREFIX.length).split(':');
   const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
   decipher.setAAD(Buffer.from(context, 'utf8'));
@@ -86,14 +130,24 @@ export function decryptBound(data: string, key: Buffer, context: string): string
   return decipher.update(Buffer.from(ciphertextHex, 'hex')) + decipher.final('utf8');
 }
 
-/**
- * Resolve the encryption key from config. Returns null if not configured.
- * Checks AIMEAT_ENCRYPTION_KEY first, falls back to AIMEAT_TOTP_ENCRYPTION_KEY.
- */
-export function getEncryptionKey(config: { encryptionKey: string | null; totpSecretEncryptionKey: string | null }): Buffer | null {
-  const keyHex = config.encryptionKey ?? config.totpSecretEncryptionKey;
+/** A 32-byte key from its hex form, or null. */
+function keyOf(keyHex: string | null): Buffer | null {
   if (!keyHex) return null;
   const buf = Buffer.from(keyHex, 'hex');
-  if (buf.length !== 32) return null; // Must be 256 bits
-  return buf;
+  return buf.length === 32 ? buf : null; // Must be 256 bits
+}
+
+/**
+ * Resolve the encryption key from config. Returns null if not configured.
+ * Checks AIMEAT_ENCRYPTION_KEY first, falls back to AIMEAT_TOTP_ENCRYPTION_KEY. When both are set and
+ * differ, the TOTP key is remembered as the data key's fallback, so decrypt() and decryptBound() still
+ * open what was written under it before the data key was set; new values are written under the data key.
+ */
+export function getEncryptionKey(config: { encryptionKey: string | null; totpSecretEncryptionKey: string | null }): Buffer | null {
+  // A data key that is set but malformed is no key, as before: the TOTP key never stands in for it.
+  const primary = config.encryptionKey ? keyOf(config.encryptionKey) : keyOf(config.totpSecretEncryptionKey);
+  if (!primary) return null;
+  const older = config.encryptionKey ? keyOf(config.totpSecretEncryptionKey) : null;
+  if (older && !older.equals(primary)) fallbackKeys.set(primary.toString('hex'), older);
+  return primary;
 }

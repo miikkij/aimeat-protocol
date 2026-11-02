@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-11-02 — listOperatorNames: the active operator accounts' names, one filtered query with a limit.
  *   2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   2026-10-25 — credentialsValidAfter on read (migration 0117); updateAgent passes it through
  *     (secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
@@ -144,6 +145,12 @@ export const identityMethods = {
   async listDisabledOwnerNames(this: PostgresKyselyStorage, opts: { limit: number }): Promise<string[]> {
     const rows = await this.db.selectFrom('Owner').select('name').where('disabledAt', 'is not', null)
       .orderBy('disabledAt').limit(Math.max(0, Math.floor(opts.limit))).execute();
+    return rows.map(r => r.name);
+  },
+  async listOperatorNames(this: PostgresKyselyStorage, opts: { limit: number }): Promise<string[]> {
+    const rows = await this.db.selectFrom('Owner').select('name')
+      .where(sql<boolean>`'operator' = any("roles")`).where('disabledAt', 'is', null)
+      .orderBy('name').limit(Math.max(0, Math.floor(opts.limit))).execute();
     return rows.map(r => r.name);
   },
   async operatorAccountState(this: PostgresKyselyStorage, opts?: { claim?: boolean }): Promise<{ anyOwner: boolean; anyOperator: boolean }> {

@@ -15,11 +15,33 @@
  *   reason; the override exists only for a node served under a subdomain that wants its keys to
  *   work across the parent domain.
  *
- * @structure AccountSecurityConfig
+ *   THE SIGN-IN POLICY. Two operator settings decide which sign-ins a person may use at all:
+ *   twoStepRequired (auth.two_step_required) and passwordSignIn (auth.password_sign_in). Both default
+ *   to what a node did before they existed, so nothing changes until the operator sets them. The
+ *   rules that read them are in services/sign-in-policy.ts.
+ *
+ * @structure AccountSecurityConfig · TwoStepRequired · PasswordSignIn · TWO_STEP_REQUIRED_VALUES ·
+ *   PASSWORD_SIGN_IN_VALUES · accountSecurityDefaults()
  * @usage import type { AccountSecurityConfig } from './config-types-account-security.js';
  * @version-history
+ *   v1.1.0 — 2026-11-02 — twoStepRequired (AIMEAT_TWO_STEP_REQUIRED: off, operators, everyone) and
+ *     passwordSignIn (AIMEAT_PASSWORD_SIGN_IN: on, operators, off), from an IT review of the node.
  *   v1.0.0 — 2026-09-04 — Extracted from config-types.ts, with the passkey settings.
  */
+
+/** Whose password sign-in must also carry a code from an authenticator app. Ordered from open to strict. */
+export const TWO_STEP_REQUIRED_VALUES = ['off', 'operators', 'everyone'] as const;
+export type TwoStepRequired = typeof TWO_STEP_REQUIRED_VALUES[number];
+
+/** Who may sign in with a password at all. Ordered from open to strict. */
+export const PASSWORD_SIGN_IN_VALUES = ['on', 'operators', 'off'] as const;
+export type PasswordSignIn = typeof PASSWORD_SIGN_IN_VALUES[number];
+
+/** The environment's value when it is one of `values`, the default otherwise. The start check reports a wrong one. */
+function pick<T extends string>(raw: string | undefined, values: readonly T[], fallback: T): T {
+  const v = (raw ?? '').trim().toLowerCase();
+  return (values as readonly string[]).includes(v) ? v as T : fallback;
+}
 
 export interface AccountSecurityConfig {
   // TOTP / 2FA (Phase 0.5)
@@ -40,6 +62,12 @@ export interface AccountSecurityConfig {
   passkeyRpName: string;
   /** Origins a passkey ceremony may come from. baseUrl always counts; this adds to it. */
   passkeyExtraOrigins: string[];
+
+  // The sign-in policy (services/sign-in-policy.ts). Read on every sign-in, so a change applies at once.
+  /** off: as before · operators: an operator account needs two-step sign-in · everyone: every account does. */
+  twoStepRequired: TwoStepRequired;
+  /** on: as before · operators: only an operator account signs in with a password · off: no account does. */
+  passwordSignIn: PasswordSignIn;
 
   // General-purpose encryption key (fallback: totpSecretEncryptionKey)
   encryptionKey: string | null;
@@ -67,6 +95,8 @@ export function accountSecurityDefaults(baseUrl: string, siteName: string): Acco
     passkeyRpName: process.env.AIMEAT_PASSKEY_RP_NAME ?? (siteName || 'AIMEAT'),
     passkeyExtraOrigins: (process.env.AIMEAT_PASSKEY_EXTRA_ORIGINS ?? '')
       .split(',').map(s => s.trim()).filter(Boolean),
+    twoStepRequired: pick(process.env.AIMEAT_TWO_STEP_REQUIRED, TWO_STEP_REQUIRED_VALUES, 'off'),
+    passwordSignIn: pick(process.env.AIMEAT_PASSWORD_SIGN_IN, PASSWORD_SIGN_IN_VALUES, 'on'),
     encryptionKey: process.env.AIMEAT_ENCRYPTION_KEY ?? null,
   };
 }

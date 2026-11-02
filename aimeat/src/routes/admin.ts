@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-11-02 -- POST /v1/admin/setup/register moved to routes/admin/setup-register.ts unchanged, where it
+ *     now asks for the one-time setup code on a node without an operator (Jouni, 2026-11-02).
  *   2026-10-23 — POST /v1/admin/setup/token is behind OWNER_KEY_LOGIN_REMOVED_IN like POST /v1/auth/token's
  *     owner branch (410 OWNER_KEY_LOGIN_OFF from 4.0.0), and POST /v1/admin/setup/register needs a
  *     password, the new operator's only way to sign in (secaudit2026oct22; Jouni, 2026-10-23). GET
@@ -65,13 +67,12 @@ import type { TransactionTypeSum } from '../storage/repositories/wallet.reposito
 import { morselsInCirculation } from '../services/morsel.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
-import { generateKeyPair, sign } from '../auth/keypair.js';
-import { validateOwnerName, resolveIdentity } from '../utils/gaii.js';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { sign } from '../auth/keypair.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
 // i18n imports removed — admin UI is now a client-side SPA
 // admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
-import { hashPassword } from '../services/password.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
@@ -89,13 +90,11 @@ import { adminAgentsRouter } from './admin-agents.js';
 import { adminMaintenanceRouter } from './admin-maintenance.js';
 import { adminEconomyRouter } from './admin-economy.js';
 import { adminMemoryRouter } from './admin-memory.js';
-import { validatePasswordStrength } from '../utils/password-validation.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { ADMIN_LOGIN_HTML, ADMIN_SETUP_HTML } from './admin/setup-html.js';
+import { registerSetupRegisterRoute } from './admin/setup-register.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorCaller } from '../services/operator-override.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
-import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../services/admin-setup-secret.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config-security.js';
 import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
@@ -198,125 +197,14 @@ export function adminRouter(
         res.type('text/html').send(injectCspNonce(ADMIN_LOGIN_HTML, res));
     });
 
-    // POST /v1/admin/setup/register — register owner (password-protected, no auth)
-    router.post('/v1/admin/setup/register', adminAuthLimit, async (req, res) => {
-        // Check admin session (cookie or header) or password via header (NOT query param)
-        const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
-        const pw = (req.headers['x-admin-password'] as string) ?? '';
-        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword))) {
-            res.status(401).json({ ok: false, error: 'Invalid admin password' });
-            return;
-        }
-
-        // The admin password creates the FIRST operator and nothing after it. Until 2026-10-09 this
-        // route created an operator for anyone holding the password for the life of the process,
-        // and a node without AIMEAT_ADMIN_PASSWORD wrote its generated password to stderr, so
-        // reading the server log was enough to become an operator (secrets audit 2026-10-09, 1.4).
-        // Refused before any write. The setting keeps the old behaviour for test nodes, whose
-        // suites register several operators with the password.
-        if (!config.adminSetupOpenAfterFirstOperator && (await storage.listOwners()).some(isOperatorAccount)) {
-            res.status(410).json(error(config.nodeId, 'SETUP_CLOSED',
-                'This node already has an operator, so setup registration is closed. '
-                + 'The new person creates an ordinary account (POST /v1/ghii), and an operator grants it the operator role '
-                + 'on the admin Owners page (/v1/admin?tab=owners, Grant operator) or with POST /v1/admin/roles/grant.'));
-            return;
-        }
-
-        const { name, display_name, password } = req.body ?? {};
-        if (!name || typeof name !== 'string') {
-            res.status(400).json({ ok: false, error: 'name is required' });
-            return;
-        }
-
-        const nameError = validateOwnerName(name);
-        if (nameError) {
-            res.status(400).json({ ok: false, error: nameError });
-            return;
-        }
-
-        const existing = await storage.getOwner(name);
-        if (existing) {
-            res.status(409).json({ ok: false, error: `Owner "${name}" already exists` });
-            return;
-        }
-
-        // Refuse before you write: until 2026-09-08 the owner row was created first and the
-        // password judged after, so a weak password answered 400 and left a half-made account
-        // behind with the name taken (e2e-admin-doors-2). The strength check comes first now.
-        // The password is required: the account-key sign-in was removed in 4.0.0, so an account
-        // made here without one had no way to sign in (secaudit2026oct22; Jouni, 2026-10-23).
-        if (typeof password !== 'string' || password.length === 0) {
-            res.status(400).json({ ok: false, error: 'password is required: the new operator signs in with the name and this password (POST /v1/ghii/login).' });
-            return;
-        }
-        const pwErr = validatePasswordStrength(password);
-        if (pwErr) {
-            res.status(400).json({ ok: false, error: pwErr });
-            return;
-        }
-
-        const keyPair = await generateKeyPair();
-        // Setup wizard is admin-password-protected — always grant operator
-        const roles = ['owner', 'operator'];
-
-        // Always create GHII profile (required for single-balance economy)
-        let hasPassword = false;
-        const ghii = `${name}@${config.nodeId}`;
-        const now = new Date().toISOString();
-        const existingGhii = await storage.getGHIIByOwner(name);
-        let passwordHash: string | undefined;
-        if (!existingGhii && password && typeof password === 'string') {
-            passwordHash = await hashPassword(password);
-        }
-        // The owner row, the GHII profile and the welcome bonus commit together or not at all. The
-        // profile write had its error swallowed, so a failure left an operator account with no
-        // profile and no password (QA audit E6-02); now the whole request fails and can be retried.
-        const owner = await storage.transaction(async () => {
-            const created = await storage.createOwner({
-                name,
-                displayName: display_name,
-                publicKey: keyPair.publicKey,
-                roles,
-                createdAt: now,
-            });
-            if (!existingGhii) {
-                if (passwordHash) hasPassword = true;
-                await storage.createGHII({
-                    username: name,
-                    nodeId: config.nodeId,
-                    ghii,
-                    displayName: display_name ?? name,
-                    passwordHash,
-                    verificationLevel: 0,
-                    ownerName: name,
-                    totpEnabled: false,
-                    morselBalance: config.welcomeBonus,
-                    createdAt: now,
-                    updatedAt: now,
-                });
-                // Record welcome bonus transaction
-                await storage.addTransaction({
-                    id: `tx-${randomUUID()}`,
-                    gaii: ghii,
-                    type: 'welcome_bonus',
-                    amount: config.welcomeBonus,
-                    timestamp: now,
-                });
-            } else {
-                hasPassword = !!existingGhii.passwordHash;
-            }
-            return created;
-        });
-
-        // The node has an owner now, so the boot's secret file has done its job (services/admin-setup-secret.ts).
-        try {
-            removeAdminSetupSecretFile(adminSetupSecretDir(config));
-        } catch (err) {
-            logger.warn('setup/register: the admin-setup-secret file could not be deleted', { error: String(err) });
-        }
-
-        res.json({ ok: true, owner: { name: owner.name, roles: owner.roles }, private_key: keyPair.privateKey, public_key: keyPair.publicKey, has_password: hasPassword });
-        emitChange('config');
+    // POST /v1/admin/setup/register — the first operator (routes/admin/setup-register.ts)
+    registerSetupRegisterRoute(router, {
+        config, storage, rateLimiter: adminAuthLimit,
+        isAdmin: req => {
+            const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
+            const pw = (req.headers['x-admin-password'] as string) ?? '';
+            return !!(sessionId && validateAdminSession(sessionId)) || (!!config.adminPassword && verifyAdminPassword(pw, config.adminPassword));
+        },
     });
 
     // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)

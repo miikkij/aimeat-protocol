@@ -15,6 +15,11 @@
  *   switching it off makes every agent's scopes advisory, which whoever runs the node decides.
  * @structure ACCESS_CONFIG_FIELDS
  * @version-history
+ *   v1.2.0 — 2026-11-02 — auth.two_step_required (AIMEAT_TWO_STEP_REQUIRED: off, operators, everyone) and
+ *     auth.password_sign_in (AIMEAT_PASSWORD_SIGN_IN: on, operators, off), mutable, read on every
+ *     sign-in. A change that weakens either is refused to an AI credential, and password_sign_in=off is
+ *     refused while no operator has a passkey or an identity provider link (services/sign-in-policy.ts,
+ *     asked by config-admin-view.ts).
  *   v1.1.0 — 2026-10-26 — mcp.task_after_ms (AIMEAT_MCP_TASK_AFTER_MS, default 10000, 0 = at once), mutable:
  *     when a tool call of a client that declares the MCP Tasks extension answers with a task
  *     (mcp/tasks-extension.ts). Read on every call, so a change takes effect at once.
@@ -23,7 +28,8 @@
 // Typed by the keys alone, not AimeatConfig, which would close an import cycle through
 // config-types.ts; config-schema.ts checks each key against AimeatConfig where it spreads the rows.
 import type { ConfigFieldShape } from './config-field-def.js';
-import { isEmptyOrHttpUrl } from './config-schema-validators.js';
+import { isEmptyOrHttpUrl, oneOf } from './config-schema-validators.js';
+import { TWO_STEP_REQUIRED_VALUES, PASSWORD_SIGN_IN_VALUES } from '../config-types-account-security.js';
 
 const whole = (min: number) => (v: unknown): boolean => typeof v === 'number' && Number.isInteger(v) && v >= min;
 const bool = (v: unknown): boolean => typeof v === 'boolean';
@@ -35,7 +41,8 @@ type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' 
   | 'ecoJwtTtlSeconds' | 'googleOAuthEnabled' | 'googleOAuthClientId' | 'googleOAuthClientSecret' | 'googleOAuthRedirectUri'
   | 'entraOAuthEnabled' | 'entraOAuthTenant' | 'entraOAuthClientId' | 'entraOAuthClientSecret' | 'entraOAuthRedirectUri'
   | 'casdoorOAuthEnabled' | 'casdoorOAuthEndpoint' | 'casdoorOAuthClientId' | 'casdoorOAuthClientSecret' | 'casdoorOAuthRedirectUri'
-  | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes' | 'mcpTaskAfterMs';
+  | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes' | 'mcpTaskAfterMs'
+  | 'twoStepRequired' | 'passwordSignIn';
 
 export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Token lifetimes ──
@@ -45,6 +52,10 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   { key: 'refreshGraceMs', dotPath: 'auth.refresh_grace_ms', envVar: 'AIMEAT_REFRESH_GRACE_MS', type: 'number', validate: whole(0), immutable: false, description: 'Milliseconds a replaced refresh token still works, for two tabs renewing at once (default 60000)', range: '0-600000' },
   { key: 'agentJwtTtlSeconds', dotPath: 'auth.agent_jwt_ttl_seconds', envVar: 'AIMEAT_AGENT_JWT_TTL', type: 'number', validate: whole(1), immutable: false, description: 'How long an agent\'s token lasts, in seconds (default 7776000, 90 days)', range: '60-31536000' },
   { key: 'ecoJwtTtlSeconds', dotPath: 'auth.eco_jwt_ttl_seconds', envVar: 'AIMEAT_ECO_JWT_TTL', type: 'number', validate: whole(1), immutable: false, description: 'How long an ecosystem app\'s token lasts, in seconds (default 7776000, 90 days)', range: '60-31536000' },
+
+  // ── Which sign-ins a person may use (services/sign-in-policy.ts) ──
+  { key: 'twoStepRequired', dotPath: 'auth.two_step_required', envVar: 'AIMEAT_TWO_STEP_REQUIRED', type: 'string', ...oneOf(...TWO_STEP_REQUIRED_VALUES), immutable: false, description: 'Who must use two-step sign-in: off (nobody is made to), operators (accounts with the operator role) or everyone. A password or emailed-link sign-in of such an account without a code app set up asks the person to set one up before it opens. A passkey and a sign-in through an identity provider count as two-step. A signed-in session of such an account with no code app, passkey or identity provider link ends at its next renewal, so the person signs in again and sets it up. An AI cannot lower it' },
+  { key: 'passwordSignIn', dotPath: 'auth.password_sign_in', envVar: 'AIMEAT_PASSWORD_SIGN_IN', type: 'string', ...oneOf(...PASSWORD_SIGN_IN_VALUES), immutable: false, description: 'Who may sign in with a password: on (everyone), operators (only accounts with the operator role, as a way in when other ways fail) or off (nobody: people use a passkey, the organisation\'s sign-in or an emailed sign-in link). Off and operators also refuse a new password: password registration, invitations with a password, and password reset. Off is refused while no operator has a passkey or an identity provider link. An AI cannot open it wider' },
 
   // ── Sign in with Google ──
   { key: 'googleOAuthEnabled', dotPath: 'auth.google_enabled', envVar: 'AIMEAT_GOOGLE_OAUTH_ENABLED', type: 'boolean', validate: bool, immutable: false, applies: 'restart', description: 'Offer "Sign in with Google"' },

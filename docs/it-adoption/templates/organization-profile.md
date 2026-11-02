@@ -1,6 +1,6 @@
 # Template: organisation profile
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
 
 ## How to use
 
@@ -58,7 +58,7 @@ The operator name and email feed the controller field of the node's own register
 | Identity provider | [ORGANIZATION] *Microsoft Entra ID (OIDC), a SAML 2.0 IdP, or local accounts only.* | Entra: `AIMEAT_ENTRA_OAUTH_ENABLED`, off by default. SAML and SCIM: `AIMEAT_SSO_ENABLED`, off by default. [Organisation node sign-in](../../organisation-node-sign-in.md) |
 | Allowed Entra tenants | [ORGANIZATION] *Directory (tenant) GUIDs of your organisation and approved partners.* | `AIMEAT_ENTRA_ALLOWED_TENANTS`, `AIMEAT_ENTRA_LINK_DOMAINS` |
 | Provisioning and deprovisioning | [ORGANIZATION] *SCIM from the IdP, or a manual leaver process.* | SCIM token per SSO connection: `aimeat_admin_sso_scim_token` |
-| Second factor for local accounts | [ORGANIZATION] *Policy: TOTP or passkey required for operators and for everyone.* | TOTP `AIMEAT_TOTP_ENABLED` (`aimeat/src/services/totp.ts`); passkeys, on unless `AIMEAT_PASSKEY_ENABLED` is false, with the relying party ID from `AIMEAT_PASSKEY_RP_ID` or the host of the public address (`aimeat/src/config-types-account-security.ts`). No node setting that forces a second factor was found; enforce it in the IdP or by procedure |
+| Second factor for local accounts | [ORGANIZATION] *Policy: TOTP or passkey required for operators and for everyone.* | TOTP `AIMEAT_TOTP_ENABLED` (`aimeat/src/services/totp.ts`); passkeys, on unless `AIMEAT_PASSKEY_ENABLED` is false, with the relying party ID from `AIMEAT_PASSKEY_RP_ID` or the host of the public address (`aimeat/src/config-types-account-security.ts`). `AIMEAT_TWO_STEP_REQUIRED` (`off`, `operators`, `everyone`) makes the node require it; a passkey or an IdP sign-in satisfies it, and the IdP's MFA is enforced in the IdP. `AIMEAT_PASSWORD_SIGN_IN` (`on`, `operators`, `off`) decides who may use a password (`aimeat/src/services/sign-in-policy.ts`) |
 | Do people see each other by default | [ORGANIZATION] *true on a company node where everyone is a colleague; false otherwise.* | `AIMEAT_MEMBERS_SEE_EACH_OTHER`, default false |
 
 ## 5. Model providers

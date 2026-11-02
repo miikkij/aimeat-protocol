@@ -10,6 +10,7 @@
  *   AUTH_PROVIDERS · PROVIDER_ICONS.
  * @usage import { NODE_URL, APEX_URL, AUTH_PROVIDERS, appDeclaredScopes } from './config.js';
  * @version-history
+ *   v1.3.0 — 2026-11-02 — PASSWORD_SIGN_IN: the node's password sign-in policy, read from the auth prelude.
  *   v1.2.0 — 2026-10-31 — LINK_FIRST: the sign-in dialog opens on the emailed link on a store-bought node (v28 #7).
  *   v1.1.0 — 2026-09-29 — EMAIL_LOGIN: whether the node sends mail, read from the auth prelude.
  *   v1.0.1 — 2026-09-13 — The appDeclaredScopes comment says what the node does with an unknown
@@ -58,6 +59,15 @@ export const EMAIL_LOGIN = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH
 // node bought from the store that sends mail: its buyer was promised no passwords (v28 #7). A caller
 // that passes opts.linkFirst decides for itself.
 export const LINK_FIRST = EMAIL_LOGIN && !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.linkFirst);
+
+// Who may sign in with a password on this node (auth.password_sign_in, services/sign-in-policy.ts):
+// 'on' (everyone), 'operators' (the operators' way in) or 'off' (nobody). The dialog shows no password
+// form when 'off', shows it under a line naming the operators when 'operators', and offers no
+// register tab unless 'on', because the node refuses a new password then.
+export const PASSWORD_SIGN_IN = (function () {
+  var v = window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.passwordSignIn;
+  return v === 'off' || v === 'operators' ? v : 'on';
+})();
 
 // Per-provider button glyphs (inline SVG — no external fetch).
 export const PROVIDER_ICONS = {

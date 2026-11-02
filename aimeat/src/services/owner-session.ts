@@ -12,6 +12,9 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-11-02 — A refresh of an account the required two-step policy covers, with no TOTP, passkey or
+ *     identity provider link, ends the session and answers 403 TWO_STEP_SETUP_REQUIRED
+ *     (services/sign-in-policy.ts; IT review).
  *   2026-10-27 — A refresh token issued for the `__Host-` cookie starts with HOST_REFRESH_TOKEN_PREFIX,
  *     and readRefreshCookie does not read such a token under the old name on https: this node never set
  *     it there, so a same-site app origin wrote it (secaudit2026oct26,
@@ -49,6 +52,7 @@ import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
 import { isExternalPrincipal } from '../utils/gaii.js';
+import { twoStepCovers, hasStrongWayIn, TWO_STEP_SETUP_REQUIRED } from './sign-in-policy.js';
 
 /**
  * Name of the httpOnly refresh-token cookie on an https node. The `__Host-` prefix makes the browser
@@ -372,6 +376,20 @@ export async function refreshOwnerSession(
   }
   const session = check.session;
   const absolute = session.absoluteExpiresAt ? Date.parse(session.absoluteExpiresAt) : 0;
+
+  // Required two-step sign-in (services/sign-in-policy.ts): a session of a covered account with no
+  // code app, no passkey and no identity provider link ends here, so the person signs in again and
+  // enrols. Nothing is read while the policy is off.
+  if (config.twoStepRequired !== 'off' && !isExternalPrincipal(session.gaii)
+      && twoStepCovers(config, await storage.getOwner(session.owner))) {
+    const ghii = await storage.getGHII(`${session.owner}@${config.nodeId}`);
+    if (ghii && !await hasStrongWayIn(storage, ghii)) {
+      await storage.revokeSession(session.sessionId);
+      clearRefreshCookie(req, res);
+      return { ok: false, status: 403, code: TWO_STEP_SETUP_REQUIRED,
+        message: 'The operator of this server now requires two-step sign-in for this account. Sign in again to set it up.' };
+    }
+  }
 
   // The presented token matched the PREVIOUS hash, inside the grace window.
   if (check.previous) {

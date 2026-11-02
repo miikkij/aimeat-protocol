@@ -6,7 +6,7 @@
 - [ ] Set `AIMEAT_STORAGE=postgres-kysely` or `AIMEAT_STORAGE=sqlite` (never use `memory` in production)
 - [ ] Set a strong `AIMEAT_ADMIN_PASSWORD`, or leave it unset and the node generates a random one at start. The node itself checks no strength rule: `aimeat init` asks for at least 8 characters, and anything longer and random is better
 - [ ] Set `AIMEAT_BASE_URL` to your HTTPS URL
-- [ ] Set `AIMEAT_ENCRYPTION_KEY` before the first start: it encrypts every stored secret, two-step sign-in secrets included. `AIMEAT_TOTP_ENCRYPTION_KEY` is the data key when it is not set, which is the case on a node installed with `aimeat init`. **Do not add `AIMEAT_ENCRYPTION_KEY` to a node that already runs on the TOTP key**: AI provider keys, MCP server credentials, connected accounts and payment keys stored before then stop opening, because the node does not re-encrypt them ([IT adoption, backup and recovery](../it-adoption/11-backup-recovery.md)). Follow `.env.example` for the format
+- [ ] Set `AIMEAT_ENCRYPTION_KEY` before the first start: it encrypts every stored secret, two-step sign-in secrets included. `AIMEAT_TOTP_ENCRYPTION_KEY` is the data key when it is not set, which is the case on a node installed with `aimeat init`. Adding `AIMEAT_ENCRYPTION_KEY` later to such a node is safe: new secrets use it, and the ones stored before keep opening with the TOTP key, **so never remove `AIMEAT_TOTP_ENCRYPTION_KEY` afterwards** ([IT adoption, backup and recovery](../it-adoption/11-backup-recovery.md)). Follow `.env.example` for the format
 - [ ] Set `AIMEAT_SECURITY_PROFILE=public` for a public deployment (otherwise the node infers `local` or `public` from the base URL host and node type), and read the startup self-check's warnings
 - [ ] Confirm app-origin isolation, wildcard DNS and TLS for hosted apps
 - [ ] Set `AIMEAT_KEY_PASSPHRASE` to encrypt node keys at rest
@@ -29,9 +29,11 @@
 
 ## Authentication
 
-- [ ] The first operator is created once, with the admin password at `/v1/admin/setup` or with the one-time setup code the start log prints on a node whose address is not localhost. Keep the admin password as secret as the encryption key until the operator exists
+- [ ] The first operator is created once, in the setup wizard or at `/v1/admin/setup` with the admin password. On a node whose address is not localhost, both ask for the one-time setup code the start log prints
 - [ ] Owners sign in with a password (`POST /v1/ghii/login`), a passkey or a configured identity provider. Registration at `POST /v1/owners` still returns an Ed25519 private key once; signing in with that key (`POST /v1/auth/token` with `owner`) is the legacy owner-key login, removed in 4.0.0 (on a 3.x node `AIMEAT_OWNER_KEY_LOGIN=false` switches it off)
 - [ ] Enable TOTP for operator accounts
+- [ ] Require two-step sign-in: `AIMEAT_TWO_STEP_REQUIRED=operators` (or `everyone`), Config `auth.two_step_required`; the default `off` requires it for nobody. A covered account without TOTP that signs in with a password or an emailed link gets no session until it sets TOTP up (`POST /v1/ghii/login/two-step/start` and `/finish`); a passkey or an identity provider sign-in satisfies the rule. Keep `AIMEAT_TOTP_ENABLED` on: the node refuses to save the two together otherwise (`TWO_STEP_NEEDS_TOTP`)
+- [ ] Decide who may sign in with a password: `AIMEAT_PASSWORD_SIGN_IN=operators` on a node with an identity provider keeps the password for operator accounts only; `off` refuses every password sign-in, password registration, invitation with a password, code key, password reset and password change (403 `PASSWORD_SIGN_IN_OFF`). Set `off` only when every operator has a passkey or an identity provider link; saving `off` is refused while no operator has one (`OPERATOR_LOCKOUT`), and the emailed sign-in link stays on. An AI credential may tighten either setting but not weaken it (`PERSON_REQUIRED`)
 - [ ] Review the token lifetimes: `AIMEAT_ACCESS_TTL` for a person's access token (default 900 s, renewed by a refresh cookie that ends after `AIMEAT_REFRESH_IDLE_DAYS` idle and `AIMEAT_REFRESH_ABSOLUTE_DAYS` at most), `AIMEAT_AGENT_JWT_TTL` and `AIMEAT_ECO_JWT_TTL` for agents and ecosystem apps (default 90 days). `AIMEAT_JWT_TTL` covers only the legacy and admin tokens
 - [ ] Token revocation persists across restarts (requires sqlite/postgres-kysely)
 

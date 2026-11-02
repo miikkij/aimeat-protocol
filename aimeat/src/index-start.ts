@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-02 — At start, AIMEAT_PASSWORD_SIGN_IN=off with no operator account that has a passkey or an
+ *     identity provider link logs a SECURITY warning; the node still starts (services/sign-in-policy.ts).
+ *     So does AIMEAT_TWO_STEP_REQUIRED other than off with AIMEAT_TOTP_ENABLED=false.
  *   2026-10-27 — secaudit2026oct26 (services/realtime-upgrade-guards.ts): the realtime socket takes no
  *     frame larger than its size check can pass (1009), the personal tunnel has the connect tunnel's
  *     ceiling, an anonymous echat upgrade is counted by the client address Express's trust-proxy rule
@@ -84,6 +87,7 @@ import { turnDeprecationWarning } from './services/turn-credentials.js';
 import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
 import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
 import { signedInOnly } from './config-visibility.js';
+import { passwordOffLockoutWarning, twoStepWithoutTotpWarning } from './services/sign-in-policy.js';
 
 /** How long shutdown waits for scheduled runs in progress; the process exits 5 s after server.close. */
 const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
@@ -245,6 +249,14 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       logger.warn(`SECURITY: this node has ${postureWarnings.length} risky setting(s) — override deliberately or harden:`);
       for (const msg of postureWarnings) logger.warn(`  • ${msg}`);
     }
+    // Password sign-in off with no operator who can sign in another way: warned, and the node starts
+    // (services/sign-in-policy.ts). It reads the store, so it is asked here, not in the sync check above.
+    void passwordOffLockoutWarning(storage, config)
+      .then(w => { if (w) logger.warn(`SECURITY: ${w}`); })
+      .catch(err => logger.warn('the password sign-in lockout check did not run', { error: String(err) }));
+    // Two-step sign-in required with TOTP off: warned, and the node starts.
+    const twoStepWarning = twoStepWithoutTotpWarning(config);
+    if (twoStepWarning) logger.warn(`SECURITY: ${twoStepWarning}`);
 
     // Log active service extensions and their instances
     storage.listExtensions().then(async (extensions) => {
