@@ -346,6 +346,51 @@ async function run(): Promise<void> {
         assert((await call(P('/parties/me'), { token: X.token })).status === 200, 'the session works again');
     });
 
+    console.log('\nsecaudit2026nov02d round 13');
+
+    await test('A person the owner took off the roster stays off at their next sign-in; the first verification and a plain sign-in keep the role', async () => {
+        const emailZ = `z${stamp}@example.test`;
+        smtp!.clear();
+        assert((await call(P('/parties/signup'), { body: { email: emailZ } })).status === 202, 'Z signs up');
+        const v = await call(P('/parties/verify'), { body: { token: await linkIn(emailZ) } });
+        assert(v.status === 200 && v.body.data.role === 'member', `the first verification puts Z on the roster: ${show(v)}`);
+        const zRef = String(v.body.data.party.party_ref);
+        smtp!.clear();
+        assert((await call(P('/parties/signin'), { body: { email: emailZ } })).status === 202, 'Z asks for a sign-in link');
+        const kept = await call(P('/parties/verify'), { body: { token: await linkIn(emailZ) } });
+        assert(kept.status === 200 && kept.body.data.role === 'member', `a sign-in with the row in place keeps the role: ${show(kept)}`);
+        const rm = await call(P(`/members/${encodeURIComponent(zRef)}`), { token: A.token, method: 'DELETE' });
+        assert(rm.status === 200, `the owner takes Z off the roster: ${show(rm)}`);
+        const off = await call(P('/members/me'), { token: kept.body.data.token });
+        assert(off.status === 200 && off.body.data.member === null, `members/me after the removal: ${show(off)}`);
+        smtp!.clear();
+        assert((await call(P('/parties/signin'), { body: { email: emailZ } })).status === 202, 'Z asks for a sign-in link again');
+        const back = await call(P('/parties/verify'), { body: { token: await linkIn(emailZ) } });
+        assert(back.status === 200 && back.body.data.role === null, `the sign-in after the removal: ${show(back)}`);
+        const me = await call(P('/members/me'), { token: back.body.data.token });
+        assert(me.status === 200 && me.body.data.member === null, `members/me after the sign-in: ${show(me)}`);
+        const roster = await call(P('/members'), { token: A.token });
+        assert(!JSON.stringify(roster.body.data.members).includes(String(v.body.data.party.name)), `the roster after the sign-in: ${show(roster)}`);
+        const re = await call(P('/members'), { token: A.token, body: { party: zRef, role: 'member' } });
+        assert([200, 201].includes(re.status), `the owner puts Z back on purpose: ${show(re)}`);
+        assert((await call(P('/parties/me'), { token: back.body.data.token })).body.data.role === 'member', 'Z has the role again');
+    });
+
+    await test('The signup takes a limited number of signups an hour from one address; the refusal names the setting, and 0 is no limit', async () => {
+        assert((await setConfig('consent.app_party_signups_per_hour', 2)).status === 200, 'the limit set to 2');
+        let refused: Answer | null = null;
+        for (let i = 0; i < 4 && !refused; i++) {
+            const s = await call(P('/parties/signup'), { body: { email: `rl${i}-${stamp}@example.test` } });
+            if (s.status === 429) refused = s;
+            else assert(s.status === 202, `signup ${i}: ${show(s)}`);
+        }
+        assert(refused && codeOf(refused) === 'RATE_LIMITED' && /app_party_signups_per_hour/.test(refused.text), `the refusal: ${refused ? show(refused) : 'none'}`);
+        assert((await setConfig('consent.app_party_signups_per_hour', 0)).status === 200, 'no limit');
+        const free = await call(P('/parties/signup'), { body: { email: `rlfree-${stamp}@example.test` } });
+        assert(free.status === 202, `with no limit: ${show(free)}`);
+        assert((await setConfig('consent.app_party_signups_per_hour', 30)).status === 200, 'the default again');
+    });
+
     console.log(`\n${passed} passed, ${failed} failed\n`);
 }
 

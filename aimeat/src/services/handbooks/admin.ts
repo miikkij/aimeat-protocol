@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.32.0 -- 2026-11-02 -- consent.app_party_signups_per_hour and consent.app_party_pending_hours (secaudit2026nov02d round 13).
  *   v1.31.0 -- 2026-11-01 -- aimeat_admin_app_party_registrations: the apps that ask to let people register, and the decision (WP9b).
  *   v1.30.0 -- 2026-11-01 -- Data intermediation: the setting, section 12 of the report and the part
  *     `intermediation` (plan doc-mvwxcas3dom3, D7).
@@ -196,7 +197,9 @@ When \`consent.party_self_registration\` is apps-ask, an app's owner asks to let
 without an account here. \`aimeat_admin_app_party_registrations\` lists the apps that asked (state
 requested, open or refused) and, with \`action: "decide"\`, approves or refuses one (\`owner\`, \`app\`,
 \`decision\`, \`reason\`). Decide only as the operator says; the Config page's group Data out shows the
-same list.
+same list. One network address may sign up to the apps \`consent.app_party_signups_per_hour\` times an
+hour (30; 0 is no limit), and a signup nobody confirms keeps its place in the app's 1000 people for
+\`consent.app_party_pending_hours\` after its last link (24; 0 keeps it until the owner removes it).
 
 **Where stored files keep their bytes (operator).** By default the node's database holds them. The
 operator can send new files to one S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any
