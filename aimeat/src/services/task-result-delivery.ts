@@ -17,14 +17,17 @@
  *   the completion message. A leading heading line is replaced by the node's own: the task's title and
  *   the date in the schedule's time zone, written by the node, never by the model. Into the bell
  *   (services/notify.ts, push included) always, and by email to the owner's notification address when
- *   the node sends mail and the owner has one. A result with no words sends nothing.
+ *   the node sends mail, the owner has one, and the deliverable's classification lets it leave the node
+ *   (the same leave() check the automation report makes). A result with no words sends nothing.
  * @structure DELIVERY_SCOPE · deliveryScopeEntry(timezone) · withDeliver(kind, input, deliver) ·
  *   deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
  *   v1.0.0 — 2026-11-02 — Initial.
  */
-import type { Storage, AgentTaskRecord, AgentTaskScope } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord, AgentTaskScope, MemoryRecord } from '../storage/interface.js';
+import { systemReader } from './classification/reader.js';
+import { memoryTarget } from './classification/labels.js';
 import type { AimeatConfig } from '../config.js';
 import { notify } from './notify.js';
 import { getActiveEmailService } from './email.js';
@@ -78,21 +81,43 @@ function dayOf(prefs: DisplayPrefs, iso: string, locale: string, timezone?: stri
   );
 }
 
-/** The result as text: the deliverable record, else the completion message. */
-async function resultText(storage: Storage, task: AgentTaskRecord, message?: string): Promise<string> {
+/** A record's value as text, or ''. */
+function textOf(v: unknown): string {
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    for (const k of ['text', 'output', 'result', 'content', 'body']) if (typeof o[k] === 'string' && (o[k] as string).trim()) return o[k] as string;
+  }
+  return '';
+}
+
+/**
+ * The result: the deliverable record when it has words (with the record, which the email's
+ * classification check needs), else the completion message.
+ */
+async function resultOf(storage: Storage, task: AgentTaskRecord, message?: string): Promise<{ text: string; record: MemoryRecord | null }> {
   if (task.deliverableKey) {
     const rec = await storage.getMemory(task.agentGaii, task.deliverableKey).catch((err: Error) => {
       logger.warn(`[delivery] the deliverable of task ${task.id} could not be read: ${err.message}`);
       return null;
     });
-    const v = rec?.value;
-    if (typeof v === 'string' && v.trim()) return v;
-    if (v && typeof v === 'object') {
-      const o = v as Record<string, unknown>;
-      for (const k of ['text', 'output', 'result', 'content', 'body']) if (typeof o[k] === 'string' && (o[k] as string).trim()) return o[k] as string;
-    }
+    const text = textOf(rec?.value);
+    if (rec && text.trim()) return { text, record: rec };
   }
-  return typeof message === 'string' ? message : '';
+  return { text: typeof message === 'string' ? message : '', record: null };
+}
+
+/**
+ * Whether the deliverable may leave the node by email: the classification check every report that
+ * quotes a record makes (services/classification, as ecosystem-automation-notify.ts does). A
+ * completion message is the agent's own words to the owner and has no record to label.
+ */
+async function mayEmail(storage: Storage, config: AimeatConfig, ownerGhii: string, record: MemoryRecord | null): Promise<boolean> {
+  if (!record) return true;
+  const out = await systemReader({ storage, config }, ownerGhii)
+    .leave([record], (r) => memoryTarget(r.ownerGaii, r.key), { kind: 'external', to: `email:${ownerGhii}` });
+  for (const l of out.left) logger.info(`[delivery] ${l.item.key} stays out of the email: ${l.label} (${l.reason})`);
+  return out.kept.length > 0;
 }
 
 /** The body with a leading heading line (Markdown # or a whole **bold** line) taken off. */
@@ -111,7 +136,8 @@ export async function deliverTaskResult(
   try {
     const entry = (task.scope ?? []).find((s) => s.name === DELIVERY_SCOPE && s.value === 'owner');
     if (!entry) return;
-    const body = withoutHeading(await resultText(storage, task, message)).slice(0, MAX_BODY);
+    const result = await resultOf(storage, task, message);
+    const body = withoutHeading(result.text).slice(0, MAX_BODY);
     if (!body) {
       logger.warn(`[delivery] task ${task.id} finished with no result to deliver`);
       return;
@@ -134,6 +160,10 @@ export async function deliverTaskResult(
     const mail = getActiveEmailService();
     if (!mail?.enabled || !ghii?.notificationEmail) {
       logger.info(`[delivery] task ${task.id}: in the bell only (${!mail?.enabled ? 'no mail on this node' : 'the owner has no notification address'})`);
+      return;
+    }
+    if (!await mayEmail(storage, config, ownerGhii, result.record)) {
+      logger.info(`[delivery] task ${task.id}: in the bell only (its classification keeps it inside the node)`);
       return;
     }
     const sent = await mail.sendNotification(ghii.notificationEmail, heading, body);

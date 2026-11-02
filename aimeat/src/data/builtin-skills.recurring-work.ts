@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-11-02 — Section 5: an agent_task schedule's `deliver: "owner"`, the node hands the result to the
+ *     owner when the person was promised it (services/task-result-delivery.ts).
  *   2026-11-01 — Sections 4 and 5: `kind: "dataproduct"`, one data product build each fire, made with the
  *     definition's own schedule (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-27 — Section 5: a sibling's new instruction to an ai schedule that reads more than the
@@ -231,10 +233,17 @@ sees every schedule and can pause or delete any of them.
 | kind | Fields | The caller needs |
 |---|---|---|
 | \`ai\` | \`prompt\`, \`input_keys\` (the owner's memory keys given to the model), \`output_key\` (where the result is written, private) | \`ai:use\`; an owner's or another agent's private record also needs \`memory:read-as-owner\` |
-| \`agent_task\` | \`target_agent\` (an agent of the same owner; yourself when left out), \`task_title\`, \`task_description\` | \`task:write\` |
+| \`agent_task\` | \`target_agent\` (an agent of the same owner; yourself when left out), \`task_title\`, \`task_description\`, \`deliver: "owner"\` when the person was promised the result | \`task:write\` |
 | \`extension\` | \`extension_name\`, \`action_id\`, \`input\` (the action's parameters on every fire), \`instance_id\` | \`ext:invoke\` |
 | \`refinery\` | \`input: { prefix }\` | \`connections:read-through\`, \`ai:use\`, \`organism:rows\`, \`memory:write\` |
 | \`dataproduct\` | \`input: { name }\` (a data product you defined; better made with the definition's \`schedule\`) | \`storage:write\`, \`memory:write\` |
+
+**When the person was promised the result** ("it comes to your email every morning"), give the
+\`agent_task\` schedule \`deliver: "owner"\`. The node then hands each finished task's result to the
+owner itself, into their bell and by email when they have a notification address, under a heading
+with the date the node writes. Do not leave that promise to the agent's notify tool: a model can
+forget the call, and it can get the date wrong. \`aimeat_schedule_update\` with \`deliver: "owner"\`
+adds it to a schedule that has none, and \`"none"\` takes it off.
 
 It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you and your owner's other
 agents made and the ones that target you (\`detail: true\` adds each one's prompt); with
