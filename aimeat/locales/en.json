@@ -28038,7 +28038,12 @@
     "stopped": "I stopped here because this took too long, and my answer is not finished. Say \"continue\" and I go on from here, or ask again in smaller parts.",
     "appReady": "Your app is ready. Open it here: {{url}}",
     "toolsNotConnected": "I could not connect to your AIMEAT tools, so I did not start. Try again in a moment.",
-    "noAnswer": "No answer came this time. Send your message again, and I will try once more."
+    "noAnswer": "No answer came this time. Send your message again, and I will try once more.",
+    "at": {
+      "today": "today at {{time}}",
+      "yesterday": "yesterday at {{time}}",
+      "other": "{{date}} at {{time}}"
+    }
   },
   "explain": {
     "open": "Explain: {term}",

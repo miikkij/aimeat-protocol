@@ -28217,7 +28217,12 @@
     "stopped": "Lopetin tähän, koska tämä kesti liian kauan, eikä vastaukseni ole valmis. Sano \"jatka\", niin jatkan tästä, tai kysy asia pienemmissä osissa.",
     "appReady": "Sovelluksesi on valmis. Avaa se tästä: {{url}}",
     "toolsNotConnected": "En saanut yhteyttä AIMEAT-työkaluihisi, joten en aloittanut. Yritä hetken päästä uudelleen.",
-    "noAnswer": "Vastausta ei tullut tällä kertaa. Lähetä viestisi uudelleen, niin yritän vielä."
+    "noAnswer": "Vastausta ei tullut tällä kertaa. Lähetä viestisi uudelleen, niin yritän vielä.",
+    "at": {
+      "today": "tänään klo {{time}}",
+      "yesterday": "eilen klo {{time}}",
+      "other": "{{date}} klo {{time}}"
+    }
   },
   "explain": {
     "open": "Ohje: {term}",
