@@ -24,6 +24,7 @@
  * @structure registerAgentV2TokenRoute(router, config, storage)
  * @usage registerAgentV2TokenRoute(router, config, storage);
  * @version-history
+ *   v1.4.0 — 2026-11-02 — The minted scopes carry a store place's default for agents (services/place-agent-scopes.ts).
  *   v1.3.0 — 2026-10-31 — The per-IP limit is the setting agentTokenRateLimitMax (default 600), not a fixed 60.
  *   v1.2.0 — 2026-10-11 — The two refusals of the key carry `details.reason: 'key_not_pinned'`. A
  *     connector whose agent had moved away could not tell them from a passing failure and minted
@@ -42,6 +43,7 @@ import { isValidGAII } from '../../utils/gaii.js';
 import { verifyCardJws, base64KeyToJwkX } from '../../services/agent-card.js';
 import { spendAssertion } from '../../services/assertion-spend.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
+import { widenForPlace } from '../../services/place-agent-scopes.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 
@@ -170,8 +172,10 @@ export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, 
     const sessionId = generateSessionId();
     const ttl = config.agentV2TokenTtlSeconds;
     // Roles are NAMED, never inherited: `['agent']` and nothing else, whatever the owner's own roles
-    // are. Scopes are what the OWNER granted this agent, never what the assertion asked for.
-    const scopes = agent.defaultScopes ?? [];
+    // are. Scopes are what the OWNER granted this agent, never what the assertion asked for. On a store
+    // place that is the place's default the first time (services/place-agent-scopes.ts): this is the
+    // mint a crew's run uses, so the default did not reach crew agents without it (crew75, 2.11).
+    const scopes = await widenForPlace(storage, config, agent);
     let token: string;
     try {
       token = await issueJWT({
