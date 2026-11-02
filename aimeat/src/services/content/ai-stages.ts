@@ -28,7 +28,8 @@
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.1.0 — 2026-10-21 — A proposed property asks for a label in fi, en and es; cleanNewProperties
  *     keeps it when fi and en are strings of at most 80 characters and drops it otherwise.
- *   v1.2.0 — 2026-11-02 — askJson is exported for the profile stage (profile.ts) and takes maxTokens.
+ *   v1.2.0 — 2026-11-02 — askJson is exported for the profile stage (profile.ts) and takes maxTokens
+ *     and a model of its own.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -100,9 +101,9 @@ function dataUrl(mime: string, b: Buffer): string { return `data:${mime};base64,
  */
 export async function askJson(
   ctx: StageCtx, prompt: string,
-  opts: { images?: string[]; files?: Array<{ data: Uint8Array; mediaType: string; filename?: string }>; vision?: boolean; maxTokens?: number },
+  opts: { images?: string[]; files?: Array<{ data: Uint8Array; mediaType: string; filename?: string }>; vision?: boolean; maxTokens?: number; model?: string },
 ): Promise<{ json: Json; model: string; provenanceId?: string }> {
-  const model = (opts.vision || opts.images?.length || opts.files?.length ? ctx.settings.models.vision : ctx.settings.models.text) || undefined;
+  const model = opts.model || (opts.vision || opts.images?.length || opts.files?.length ? ctx.settings.models.vision : ctx.settings.models.text) || undefined;
   const ask = () => completeForOwner(ctx.deps.storage, ctx.deps.config, ctx.ownerGhii, {
     prompt, model, temperature: 0, appId: 'contentclass', ...callerOpts(ctx),
     ...(opts.maxTokens ? { maxTokens: opts.maxTokens } : {}),

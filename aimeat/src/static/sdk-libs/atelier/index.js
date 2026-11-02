@@ -57,6 +57,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.69.0 — 2026-11-02 — fingerprint(spec): the node's content profile drawn as a seal, a barcode
+ *     with the marks + ~ ? x and the topics, a trust bar and three quadrant views, one topic lit across
+ *     all of them, views panel, row, seal and barcode, and FINGERPRINT_SAMPLE (fingerprint.js,
+ *     fingerprint-draw.js, fingerprint-i18n.js, fingerprint.css;
+ *     wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse).
  *   v0.68.1 — 2026-11-02 — The shell's phone bar ends in a Menu entry that opens every page of a
  *     side-navigation app in a sheet, and the side column scrolls when taller than the window
  *     (shell.js, shell-parts.js).
@@ -448,6 +453,7 @@ import { workspaceTeam } from './workspace-team.js';
 import { workspacePicker } from './workspace-picker.js';
 import { board } from './board.js';
 import { handbook } from './handbook.js';
+import { fingerprint, FINGERPRINT_SAMPLE } from './fingerprint.js';
 import { requestPanel } from './request-panel.js';
 import { shelf } from './shelf.js';
 import { verbs } from './verbs.js';
@@ -493,7 +499,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.68.1',
+  version: '0.69.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -581,6 +587,10 @@ const atelier = {
   // ── An app's own manual from its header: contents, chapters from the app and the page, a
   //    search, every word per language, and the place a chapter names marked in the app ──
   handbook,
+
+  // ── The fingerprint: what kind of material an item is and what it rests on (seal, barcode,
+  //    trust bar, quadrant views), from the node's content profile; FINGERPRINT_SAMPLE is a real one ──
+  fingerprint, FINGERPRINT_SAMPLE,
 
   // ── A Public Intake form and its admin list (AIMEAT.intake), the owner's outside accounts (AIMEAT.connect) ──
   intakeForm, intakeAdmin, connections,

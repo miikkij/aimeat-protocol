@@ -69174,6 +69174,7 @@ paths:
         propose and profile off until you turn them on), sources (files, memory, workspace), minTextChars (a
         shorter memory record gets no facts on arrival), approval (ask, auto, or rule with
         approvalRule: how a proposed class or property is approved), onlineSignatureChecks, models
+        (text, vision and profile; an empty profile model means the node's content_class.profile_model)
         and language.
       tags: [ContentClasses]
       security:

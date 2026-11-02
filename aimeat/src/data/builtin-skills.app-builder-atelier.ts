@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.40.0 — 2026-11-02 — Kit 0.69.0: fingerprint (the node's profile of a document) named beside the
+ *     handbook, with the facts route the app reads it from. Read against describe-data.js after it joined.
  *   v1.39.0 — 2026-10-30 — A new app asks for its style kit (aimeat_designbook_kit) before it picks a genre, and a look the person wants again is saved as a kit.
  *   v1.38.0 — 2026-10-30 — The structure page's first write carries two or three layouts drawn for the app
  *     (proposals), and the steps stay out of the chat.
@@ -371,6 +373,12 @@ moved under you says so.
    it on screen first). It also collects every element carrying \`data-ak-help="<id>"\` with
    \`data-ak-help-title\` and \`data-ak-help-text\`, so help written on the control is a chapter that
    points at it. \`app({ help: book })\` puts its button in the header.
+   What kind of material a document is, the node's fingerprint of it, is \`fingerprint({ target,
+   view: 'panel'|'row'|'seal'|'barcode', data: { profile, sections }, onSection })\`: coloured
+   stripes per section with the marks + ~ ? x, the seal, the trust bar and three quadrants. The app
+   fetches the data itself, \`GET /v1/content/facts?kind=memory&key=<key>&with_profile=true\` on its
+   own session (storage:read and memory:read), and passes \`facts.profile\` and \`profile_sections\`;
+   \`view: 'row'\` is the list row.
    **A form checks what is typed with the kit, never with checks of your own.** Declare the rules
    on the fields of \`form()\` (\`required\`, \`format\` such as \`email\`, \`fi-business-id\`, \`iban\`,
    \`fi-postal-code\`, \`phone\`, \`pattern\`, \`minLength\`, \`min\`, \`max\`, \`sameAs\`, \`messages\`), or

@@ -20,7 +20,7 @@
  *   await writeSettings(deps, writer, { stages: { describe: true } });
  * @version-history
  *   v1.1.0 — 2026-11-02 — stages.profile (the fingerprint), off by default like every AI stage; the
- *     stage list is types.ts STAGE_NAMES.
+ *     stage list is types.ts STAGE_NAMES; models.profile, the fingerprint's own model.
  *   v1.0.1 — 2026-10-20 — `stages.technical` is always on: a patch turning it off is refused with the
  *     setting that does stop reading (onArrival), and a stored false reads as true. The pipeline always
  *     ran it, so the setting promised what nothing did.
@@ -34,7 +34,7 @@ export const SETTINGS_KEY = 'contentclass.settings';
 
 const STAGES: readonly StageName[] = STAGE_NAMES;
 const SOURCES = ['files', 'memory', 'workspace'] as const;
-const MODELS = ['text', 'vision'] as const;
+const MODELS = ['text', 'vision', 'profile'] as const;
 const APPROVALS: readonly ContentSettings['approval'][] = ['ask', 'auto', 'rule'];
 const RULE_ID = /^[A-Za-z0-9_.-]{1,64}$/;
 const LANGUAGE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
@@ -120,7 +120,7 @@ function applyPatch(cur: ContentSettings, patch: unknown): ContentSettings {
         next.approvalRule = v;
         break;
       case 'models':
-        if (!isObj(v)) throw refuse('models must be an object with text and vision.');
+        if (!isObj(v)) throw refuse('models must be an object with text, vision and profile.');
         for (const [m, name] of Object.entries(v)) {
           if (!MODELS.includes(m as (typeof MODELS)[number])) throw refuse(`models.${m} is not a setting. The keys are: ${MODELS.join(', ')}.`);
           if (!okModel(name)) throw refuse(`models.${m} must be a model id of at most 200 characters, or empty for the owner's default.`);

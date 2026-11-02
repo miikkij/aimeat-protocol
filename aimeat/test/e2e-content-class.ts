@@ -546,6 +546,9 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(JSON.stringify(p.sections.map((x: any) => x[3])) === '["+","~","?"]', `marks ${JSON.stringify(p.sections)}`);
     assert(p.topics.length === 2 && Math.abs(p.topics.reduce((a: number, t: any) => a + t.share, 0) - 1) < 0.01, `topics ${JSON.stringify(p.topics)}`);
     assert(typeof p.detailKey === 'string' && p.detailKey.startsWith('contentclass-profile/'), `detailKey ${p.detailKey}`);
+    // The owner chose no fingerprint model: the node's default (content_class.profile_model) is asked.
+    const asked = mail.seen.chat.filter((c: any) => JSON.stringify(c).includes('You profile a document')).pop() as any;
+    assert(JSON.stringify(asked ?? {}).includes('~deepseek/deepseek-pro-latest'), `the profile asked ${JSON.stringify(asked)?.slice(0, 200)}`);
     // The facts answer carries the tag; with_profile adds the sections with their headings and claims.
     const f = await json(`${factsPath('notes.report.heat', 'memory')}&with_profile=true`, { headers: auth(D.token) });
     assert(f.status === 200, `facts ${f.status}`);

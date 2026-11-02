@@ -310,8 +310,11 @@ export interface ContentSettings {
   approvalRule?: string;
   /** Ask trust lists and revocation over the network when a PDF's signatures are checked on arrival. */
   onlineSignatureChecks: boolean;
-  /** Models to use; empty: the owner's defaults. */
-  models: { text: string; vision: string };
+  /**
+   * Models to use; empty: the owner's defaults. `profile` is the fingerprint's model; empty: the
+   * node's (content_class.profile_model), and when that is empty too, `text`.
+   */
+  models: { text: string; vision: string; profile: string };
   /**
    * The language descriptions and alt texts are written in, as a BCP 47 tag ('fi', 'en', 'es').
    * Empty: the content's own language, and English for a picture with no words in it.
@@ -326,7 +329,7 @@ export const DEFAULT_SETTINGS: ContentSettings = Object.freeze({
   minTextChars: 2000,
   approval: 'ask',
   onlineSignatureChecks: false,
-  models: Object.freeze({ text: '', vision: '' }),
+  models: Object.freeze({ text: '', vision: '', profile: '' }),
   language: '',
 }) as ContentSettings;
 

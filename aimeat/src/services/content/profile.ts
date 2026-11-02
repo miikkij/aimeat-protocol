@@ -49,7 +49,12 @@ export const MAX_PROFILE_CHARS = 48_000;
 export const MIN_PROFILE_CHARS = 200;
 const MAX_SECTIONS = 24;
 const MAX_TOPICS = 8;
-const MAX_TOKENS = 12_000;
+/**
+ * A reasoning model spends most of its answer thinking: DeepSeek V4 Pro used 9 639 of 12 000 tokens
+ * on reasoning for a 2 965-word document and the JSON was cut off (2026-11-02). The ceiling is paid
+ * only when it is used.
+ */
+const MAX_TOKENS = 24_000;
 
 export const GENRES: readonly ProfileGenre[] = ['F', 'A', 'M', 'O', 'P', 'K'];
 export const MARKS: readonly ProfileMark[] = ['+', '~', '?', 'x'];
@@ -243,7 +248,10 @@ export async function profileItem(ctx: StageCtx, item: StageItem, title: string)
   const docTitle = cut.title || title;
   const doc = `Document title: ${docTitle}\n\n` + cut.sections.map((s) =>
     `=== Section ${s.n} ===\nGiven heading: ${s.heading || '(none)'}\n${redact(s.text).text}`).join('\n\n');
-  const r = await askJson(ctx, `${PROFILE_INSTRUCTION}\n\n${doc}`, { maxTokens: MAX_TOKENS });
+  // The owner's own fingerprint model, else the node's (content_class.profile_model), else the
+  // owner's text model and defaults (askJson).
+  const model = ctx.settings.models.profile || ctx.deps.config.contentClassProfileModel || undefined;
+  const r = await askJson(ctx, `${PROFILE_INSTRUCTION}\n\n${doc}`, { maxTokens: MAX_TOKENS, ...(model ? { model } : {}) });
   const answer = readAnswer(r.json, cut.sections);
   const topics = buildTopics(answer.topics, answer.sections);
   const profile: ContentProfile = {
