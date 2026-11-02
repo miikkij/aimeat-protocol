@@ -38,7 +38,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, tn, getLocale } from '/js/i18n.js';
-import { useAgentNames } from './away.js';
+import { useAgentNames } from './agent-names.js';
 import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { getSession } from '/js/services/auth.js';
