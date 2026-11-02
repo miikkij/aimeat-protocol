@@ -28,6 +28,12 @@
  *   providerOffer · locateNegotiation
  * @usage const out = await requestNegotiation(deps, participant, req.body); res.status(out.status).json(out.body);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The sale of a priced agreement is booked after the consumer took the
+ *     agreement, once (secaudit2026nov02d round 13).
+ *   v1.0.2 — 2026-11-02 — A share offer records the pinned version of its share (secaudit2026nov02d
+ *     round 13).
+ *   v1.0.1 — 2026-11-02 — A new request asks the process room (./settings.ts processRoomRefusal): ended
+ *     processes take none, one participant a share only (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -37,16 +43,16 @@ import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { UNCHANGED } from '../record-cas.js';
 import {
-    MAX_LIVE_PROCESSES, NEGOTIATION_TERMINAL, agreementIdOf, callbackUrl, dspBody, locatePid, negotiationAck,
+    NEGOTIATION_TERMINAL, agreementIdOf, callbackUrl, dspBody, locatePid, negotiationAck,
     negotiationError, negotiationNext, negotiationPid, newProcessHex, parseDatasetId, withHistory,
     type NegotiationRecord, type NegotiationState,
 } from './contract.js';
 import { datasetFor, offerById, type OfferEntry } from './catalog.js';
 import { agreementOf } from './policy.js';
-import { materialiseAgreement, endAgreement } from './agreement.js';
+import { materialiseAgreement, endAgreement, bookAgreementSale } from './agreement.js';
 import { callbackAllowed, later, sendCallback } from './callbacks.js';
-import { changeNegotiation, createNegotiation, liveProcessCount, readNegotiation, sweepArchive } from './store.js';
-import { autoAgreeFor, nodeParticipantId, tckModeOn } from './settings.js';
+import { changeNegotiation, createNegotiation, readNegotiation, sweepArchive } from './store.js';
+import { autoAgreeFor, nodeParticipantId, processRoomRefusal, tckModeOn } from './settings.js';
 import { negotiationScript, tckDataset, tckOwnerGhii } from './tck.js';
 import type { Participant } from './verifier.js';
 import { endAgreementTransfers } from './transfer.js';
@@ -138,6 +144,8 @@ export async function providerAgree(deps: Deps, n: NegotiationRecord, by: 'provi
         if (made.value) await endAgreement(deps, { ...n, agreementId, materialised: made.value }, 'dsp-callback-failed');
         await moveBack(deps, n, n.state, 'AGREED', out.error, { agreementId: undefined, agreement: undefined, materialised: undefined });
     } else if (made.value) {
+        // The agreement is made: its sale is booked now, once (./agreement.ts).
+        if (made.sale) await bookAgreementSale(deps, { ...n, agreementId }, made.sale);
         void recordAccountEvent(deps.storage, {
             ownerGhii: n.ownerGhii, kind: 'contract_started', actorGaii: `dsp:${n.participantId}`, subject: agreementId,
             link: '/v1/dataspace/negotiations', data: { name: `${n.packageName} (Dataspace: ${n.participantId})` },
@@ -199,9 +207,8 @@ export async function requestNegotiation(deps: Deps, participant: Participant, m
     if (!found.ok) return bad({ consumerPid }, found.code, found.reason, found.status);
 
     await sweepArchive(deps.storage, found.owner);
-    if (await liveProcessCount(deps.storage, found.owner) >= MAX_LIVE_PROCESSES) {
-        return bad({ consumerPid }, 'PROVIDER_BUSY', 'This provider holds too many open negotiations. Try again later.');
-    }
+    const full = await processRoomRefusal(deps.storage, deps.config, found.owner, participant.id, 'negotiations');
+    if (full) return bad({ consumerPid }, full.code, full.reason);
     const hex = newProcessHex();
     const now = new Date().toISOString();
     const n: NegotiationRecord = {
@@ -209,7 +216,9 @@ export async function requestNegotiation(deps: Deps, participant: Participant, m
         participantId: participant.id, authMethod: participant.method, ...(participant.dataspace ? { dataspace: participant.dataspace } : {}),
         callbackAddress: msg.callbackAddress as string, datasetId: target, ...(found.packageName ? { packageName: found.packageName } : {}),
         offerId, offerKind: found.entry.kind, offer: found.entry.offer, ...(found.entry.ref ? { offerRef: found.entry.ref } : {}),
-        ...(found.entry.kind === 'share' ? { terms: { purpose: found.entry.purpose, expires: found.entry.expires ?? null } } : {}),
+        ...(found.entry.kind === 'share' ? { terms: {
+            purpose: found.entry.purpose, expires: found.entry.expires ?? null, ...(found.entry.pinnedVersion ? { pinnedVersion: found.entry.pinnedVersion } : {}),
+        } } : {}),
         ...(found.entry.priced ? { priced: found.entry.priced } : {}),
         lastOfferFrom: 'consumer', ...(found.tck ? { tck: found.tck } : {}),
         history: [{ at: now, event: 'request', from: '', to: 'REQUESTED', by: 'consumer' }], createdAt: now, updatedAt: now,

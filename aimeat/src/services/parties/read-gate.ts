@@ -22,6 +22,8 @@
  * @structure PartyReadTarget · PartyReadVerdict · partyReadVerdict
  * @usage const v = await partyReadVerdict(deps, ctx, { name, version, what: 'rows' }); if (!v.ok) refuse(v);
  * @version-history
+ *   v1.4.0 — 2026-11-02 — The reader carries the share's `publicOnly`, so a Dataspace agreement on an open
+ *     offer reads what a public reader reads (secaudit2026nov02d round 13).
  *   v1.3.0 — 2026-11-01 — A key a DSP transfer minted reads only the share it names (plan D8.4).
  *   v1.2.0 — 2026-11-01 — A share a purchase made reads the purchased interface's versions only, and the
  *     verdict names its `contract` for the metering (plan D5.3, D5.4).
@@ -126,6 +128,7 @@ export async function partyReadVerdict(
         party: {
             ownerGhii: ctx.ownerGhii, packageName: target.name, shareId: share.id,
             ...(meta.pinnedVersion ? { pinnedVersion: meta.pinnedVersion } : {}), ...(versions ? { versions } : {}),
+            ...(meta.publicOnly ? { publicOnly: true } : {}),
         },
     };
     const shareId = share.id;

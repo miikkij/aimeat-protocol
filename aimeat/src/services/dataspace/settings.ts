@@ -13,23 +13,26 @@
  *   sandbox's dev mode, or NODE_ENV=test). A public node that sets it is told so in the admin status and
  *   acts as if it were off.
  * @structure nodeParticipantId · nodeDidWeb · authMethods · trustedIssuers · staticParticipantFor ·
- *   callbackOrigins · tckModeVerdict · tckModeOn · PackageDspSettings · OwnerDspSettings ·
- *   readOwnerSettings · writeOwnerSettings · autoAgreeFor
+ *   callbackOrigins · maxProcessesPerParticipant · processRoomRefusal · tckModeVerdict · tckModeOn ·
+ *   PackageDspSettings · OwnerDspSettings · readOwnerSettings · writeOwnerSettings · autoAgreeFor
  * @usage if (tckModeOn(config)) …;  const did = nodeParticipantId(config);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — maxProcessesPerParticipant and processRoomRefusal: one participant's share of an
+ *     owner's process room, and the refusal that names the setting (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8).
  */
 import { timingSafeEqual, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { parseDataspaceAuth, type DataspaceAuthMethod } from '../../config-dataspace.js';
+import { DEFAULT_MAX_PROCESSES_PER_PARTICIPANT, parseDataspaceAuth, type DataspaceAuthMethod } from '../../config-dataspace.js';
 import { isLoopbackBaseUrl } from '../../utils/test-money-guard.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { SETTINGS_KEY } from './contract.js';
+import { processRoom } from './store.js';
 
 type Cfg = Pick<AimeatConfig, 'baseUrl'> & Partial<Pick<AimeatConfig,
     'dataspaceParticipantId' | 'dataspaceAuth' | 'dataspaceTrustedIssuers' | 'dataspaceStaticTokens' |
-    'dataspaceCallbackOrigins' | 'dataspaceTckMode' | 'testMode' | 'devMode'>>;
+    'dataspaceCallbackOrigins' | 'dataspaceTckMode' | 'dataspaceMaxProcessesPerParticipant' | 'testMode' | 'devMode'>>;
 
 /** did:web of the node's public address: the host, a port percent-encoded, a path as colons. */
 export function nodeDidWeb(baseUrl: string): string {
@@ -92,6 +95,29 @@ export function staticParticipantFor(config: Cfg, presented: string): string | n
 /** The private origins a callback may reach, as exact origins. */
 export function callbackOrigins(config: Cfg): string[] {
     return (config.dataspaceCallbackOrigins ?? '').split(',').map(s => s.trim()).filter(s => URL.canParse(s)).map(s => new URL(s).origin);
+}
+
+/** The most live processes one participant holds with one owner (AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT); 0 is no limit of its own. */
+export function maxProcessesPerParticipant(config: Cfg): number {
+    const v = config.dataspaceMaxProcessesPerParticipant;
+    return typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : DEFAULT_MAX_PROCESSES_PER_PARTICIPANT;
+}
+
+/**
+ * The refusal of a new process when the owner has no room for it (./store.ts processRoom), as the
+ * consumer reads it: the code and the reason, which names the setting the operator raises. Null: room.
+ */
+export async function processRoomRefusal(
+    storage: Storage, config: Cfg, ownerGhii: string, participantId: string, what: 'negotiations' | 'transfers',
+): Promise<{ code: string; reason: string } | null> {
+    const limit = maxProcessesPerParticipant(config);
+    const room = await processRoom(storage, ownerGhii, participantId, limit);
+    if (!room) return null;
+    if (room.full === 'provider') return { code: 'PROVIDER_BUSY', reason: `This provider holds too many open ${what}. Try again later.` };
+    return {
+        code: 'PARTICIPANT_BUSY',
+        reason: `You hold ${room.live} open negotiations and transfers with this provider, the most one participant may (AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT is ${limit} on this server). Complete or terminate one first, or ask the operator of this server to raise that setting.`,
+    };
 }
 
 /** Whether the TCK mode is in force, and when it is set but refused, why. */

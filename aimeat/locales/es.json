@@ -13579,6 +13579,7 @@
     "cfg_dataspace_callback_origins": "Direcciones privadas donde puede estar un participante",
     "cfg_dataspace_participant_id": "Identificador de participante de este servidor",
     "cfg_dataspace_tck_mode": "Modo del kit de pruebas de conformidad",
+    "cfg_dataspace_max_processes_per_participant": "Negociaciones y transferencias abiertas que puede tener un participante",
     "cfg_totp_enabled": "TOTP activado",
     "cfg_totp_period": "Periodo del código (segundos)",
     "cfg_totp_window": "Ventana de validación",
@@ -13786,6 +13787,7 @@
     "cfgDesc_dataspace_callback_origins": "Direcciones privadas donde puede estar la llamada de retorno de un participante, separadas por comas, como http://10.0.0.5:8083. Cualquier otra llamada de retorno debe ser una dirección https pública. Vacío por defecto.",
     "cfgDesc_dataspace_participant_id": "El id de participante de este servidor en un espacio de datos. Vacío (el valor predeterminado): el did:web de la dirección pública de este servidor, cuyo documento está en /.well-known/did.json.",
     "cfgDesc_dataspace_tck_mode": "Ejecuta el kit de pruebas de conformidad del Dataspace Protocol contra este servidor: añade los conjuntos de datos y los acuerdos del kit y recorre sus escenarios. Solo funciona en un servidor de prueba o sandbox con una dirección local; un servidor público lo ignora.",
+    "cfgDesc_dataspace_max_processes_per_participant": "Cuántas negociaciones y transferencias abiertas puede tener un participante con una misma cuenta a la vez. Una cuenta tiene 400 en total, así que este límite impide que un solo participante las ocupe todas y deje fuera a los demás. Por encima del límite, el servidor rechaza al participante hasta que complete o termine una. 0: sin límite propio, solo el de 400 de la cuenta. El valor predeterminado es 100.",
     "cfgDesc_consent_share_max_days": "Cuánto tiempo puede un propietario compartir un producto de datos con una parte externa con nombre.",
     "dataOut": {
       "dspTitle": "Dataspace Protocol ahora",

@@ -41,6 +41,8 @@
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.5.0 — 2026-11-02 — `publicOnly` (node-written): a share that reads what a public reader reads, the
+ *     share a Dataspace agreement on an open offer makes (secaudit2026nov02d round 13).
  *   v1.4.2 — 2026-11-01 — The connection file's password and client_secret are the key itself when the
  *     file carries it, else "<key>"; they said "the key above" in English (WP10e B4).
  *   v1.4.1 — 2026-11-01 — Share creation and descriptorFor take the package's version and withdrawal
@@ -94,13 +96,19 @@ export interface ShareMeta {
     dspAgreement?: string;
     /** The recipient is a person on another AIMEAT node, who reads as a visitor of this node. */
     visitor?: boolean;
+    /**
+     * The share reads what a public reader reads, and nothing more (services/datapackage/audience.ts):
+     * the package while its audience is public, and only the versions open to anyone. A Dataspace
+     * agreement on an open offer is such a share, because the offer stood on the package being public.
+     */
+    publicOnly?: boolean;
 }
 
 /** What binds a share to a contract: the offering bought and the interface version its reads cover. */
 export interface ShareContract { offeringId: string; entitlementId: string; ifaceVersion: number }
 
 /** The metadata keys the node writes on a share; a request's own values under them are dropped. */
-const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason', 'contract', 'dspAgreement', 'visitor'] as const;
+const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason', 'contract', 'dspAgreement', 'visitor', 'publicOnly'] as const;
 
 export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
     const m = (c.metadata ?? {}) as Record<string, unknown>;
@@ -115,6 +123,7 @@ export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
         ...(contractOf(m.contract) ? { contract: contractOf(m.contract)! } : {}),
         ...(typeof m.dspAgreement === 'string' && m.dspAgreement ? { dspAgreement: m.dspAgreement } : {}),
         ...(m.visitor === true ? { visitor: true } : {}),
+        ...(m.publicOnly === true ? { publicOnly: true } : {}),
     };
 }
 

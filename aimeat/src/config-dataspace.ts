@@ -10,10 +10,13 @@
  *
  *   The values are read raw here and parsed where they are used (services/dataspace/settings.ts), so a
  *   save on the Config page takes effect on the next request without a restart.
- * @structure DataspaceConfig · DATASPACE_AUTH_METHODS · DataspaceAuthMethod · dataspaceDefaults ·
- *   parseDataspaceAuth
+ * @structure DataspaceConfig · DATASPACE_AUTH_METHODS · DataspaceAuthMethod · DEFAULT_MAX_PROCESSES_PER_PARTICIPANT ·
+ *   dataspaceDefaults · parseDataspaceAuth
  * @usage import { dataspaceDefaults } from './config-dataspace.js';   // spread by dataAccessDefaults()
  * @version-history
+ *   v1.1.0 — 2026-11-02 — dataspaceMaxProcessesPerParticipant (AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT,
+ *     100, 0 no limit of its own): one participant's share of an owner's process room (secaudit2026nov02d
+ *     round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8).
  */
 
@@ -41,6 +44,21 @@ export interface DataspaceConfig {
     dataspaceParticipantId: string;
     /** AIMEAT_DATASPACE_TCK_MODE: seed the TCK's ids and script its scenarios. Refused on a public node. */
     dataspaceTckMode: boolean;
+    /**
+     * AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT: the most live negotiations and transfers one
+     * participant holds with one owner, so one participant cannot take every process slot an owner has
+     * (services/dataspace/store.ts processRoom). 0: no limit of its own. Default 100.
+     */
+    dataspaceMaxProcessesPerParticipant: number;
+}
+
+/** The default of AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT: a quarter of an owner's process room. */
+export const DEFAULT_MAX_PROCESSES_PER_PARTICIPANT = 100;
+
+/** A count from the environment: a whole number from 0 up, else the default. */
+function countOr(v: string | undefined, dflt: number): number {
+    const n = Number((v ?? '').trim());
+    return (v ?? '').trim() !== '' && Number.isInteger(n) && n >= 0 && n <= 100_000 ? n : dflt;
 }
 
 /** The DSP provider settings, from the environment. */
@@ -53,6 +71,7 @@ export function dataspaceDefaults(): DataspaceConfig {
         dataspaceCallbackOrigins: (process.env.AIMEAT_DATASPACE_CALLBACK_ORIGINS ?? '').trim(),
         dataspaceParticipantId: (process.env.AIMEAT_DATASPACE_PARTICIPANT_ID ?? '').trim(),
         dataspaceTckMode: process.env.AIMEAT_DATASPACE_TCK_MODE === 'true',
+        dataspaceMaxProcessesPerParticipant: countOr(process.env.AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT, DEFAULT_MAX_PROCESSES_PER_PARTICIPANT),
     };
 }
 

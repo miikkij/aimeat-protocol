@@ -83,8 +83,8 @@ export interface NegotiationRecord {
     offer: Record<string, unknown>;
     /** For a share offer: the share the offer stood on. For an exchange offer: the offering. */
     offerRef?: string;
-    /** The purpose and end the agreement's share takes over from a share offer. */
-    terms?: { purpose?: string; expires?: string | null };
+    /** The purpose, end and pinned version the agreement's share takes over from a share offer. */
+    terms?: { purpose?: string; expires?: string | null; pinnedVersion?: string };
     /** A priced offer: what the compensate duty prices. Such a request always waits for the owner. */
     priced?: { amount: number; currency: string; model: 'per_month' | 'per_read'; offeringId: string };
     /** Who sent the offer now on the table: the consumer's request, or the provider's offer. */

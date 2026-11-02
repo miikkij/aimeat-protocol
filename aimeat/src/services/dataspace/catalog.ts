@@ -22,6 +22,8 @@
  *   CATALOG_PAGE
  * @usage const list = await visibleDatasets(deps, participant); res.json(catalogJson(config, list));
  * @version-history
+ *   v1.0.2 — 2026-11-02 — A share offer carries the share's pinned version, so the agreement's share keeps
+ *     it (secaudit2026nov02d round 13).
  *   v1.0.1 — 2026-11-01 — A package's existence, withdrawal and usage terms come from the service's
  *     records, not the latest.json pointer (WP9e, incident ...-mvxozs2r).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.2).
@@ -32,7 +34,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { publicDatasetFacts } from '../datapackage/catalogue-facts.js';
 import { trustedPackageOf } from '../datapackage/audience-record.js';
 import { saleTermsOf } from '../datapackage/sale-terms-record.js';
-import { descriptorFor, isLiveShare, packageOfPattern, partySharesOf } from '../parties/shares.js';
+import { descriptorFor, isLiveShare, packageOfPattern, partySharesOf, shareMetaOf } from '../parties/shares.js';
 import { listOfferings, type Offering } from '../exchange-market.js';
 import { dataListingRefusal } from '../data-intermediation/gate.js';
 import type { PartyRecord } from '../parties/contract.js';
@@ -57,6 +59,8 @@ export interface OfferEntry {
     /** The share's purpose and end (share), copied into the agreement's share. */
     purpose?: string;
     expires?: string | null;
+    /** The version the share pins (share), carried into the agreement's share. */
+    pinnedVersion?: string;
 }
 
 /** A dataset as this node offers it to one participant. */
@@ -116,8 +120,9 @@ async function offersOf(deps: Deps, src: OfferSources, ownerGhii: string, name: 
             if (!isLiveShare(s) || packageOfPattern(s.dataPattern) !== name) continue;
             // A share an agreement made is the agreement's own; it is not offered again.
             if ((s.metadata as Record<string, unknown> | undefined)?.dspAgreement) continue;
+            const pin = shareMetaOf(s).pinnedVersion;
             offers.push({
-                kind: 'share', ref: s.id, purpose: s.purpose, expires: s.expires,
+                kind: 'share', ref: s.id, purpose: s.purpose, expires: s.expires, ...(pin ? { pinnedVersion: pin } : {}),
                 offer: offerOf(offerIdOf(owner, name, 'share', s.id), { usage, purpose: s.purpose, expires: s.expires }),
             });
         }

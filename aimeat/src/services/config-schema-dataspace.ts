@@ -9,6 +9,7 @@
  * @structure DATASPACE_CONFIG_FIELDS
  * @usage import { DATASPACE_CONFIG_FIELDS } from './config-schema-dataspace.js';
  * @version-history
+ *   v1.1.0 — 2026-11-02 — dataspace.max_processes_per_participant (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8).
  */
 import type { DataspaceConfig } from '../config-dataspace.js';
@@ -26,4 +27,5 @@ export const DATASPACE_CONFIG_FIELDS: ConfigFieldShape<keyof DataspaceConfig>[] 
     { key: 'dataspaceCallbackOrigins', dotPath: 'dataspace.callback_origins', envVar: 'AIMEAT_DATASPACE_CALLBACK_ORIGINS', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 4000, immutable: false, description: 'Private addresses a participant\'s callback may be at, comma-separated origins such as http://10.0.0.5:8083. Every other callback must be a public https address. Empty by default' },
     { key: 'dataspaceParticipantId', dotPath: 'dataspace.participant_id', envVar: 'AIMEAT_DATASPACE_PARTICIPANT_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length <= 300, immutable: false, description: 'This server\'s participant id in a data space. Empty (the default): did:web of this server\'s public address, whose document is at /.well-known/did.json' },
     { key: 'dataspaceTckMode', dotPath: 'dataspace.tck_mode', envVar: 'AIMEAT_DATASPACE_TCK_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Run the Dataspace Protocol conformance test kit (TCK) against this server: it seeds the test kit\'s datasets and agreements and acts out its scenarios. Works only on a test or sandbox server with a loopback address; a public server ignores it' },
+    { key: 'dataspaceMaxProcessesPerParticipant', dotPath: 'dataspace.max_processes_per_participant', envVar: 'AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100000, immutable: false, description: 'The most open negotiations and transfers one participant may hold with one account at a time, so one participant cannot take all of an account\'s room (400 in all) and lock the others out. Past it the participant is refused until it completes or terminates one. 0: no limit of its own, only the account\'s 400. Default 100', range: '0-100000' },
 ];

@@ -14460,6 +14460,7 @@
     "cfg_dataspace_callback_origins": "Private addresses a participant may be at",
     "cfg_dataspace_participant_id": "This server's participant id",
     "cfg_dataspace_tck_mode": "Conformance test kit mode",
+    "cfg_dataspace_max_processes_per_participant": "Open negotiations and transfers one participant may hold",
     "cfg_totp_enabled": "TOTP Enabled",
     "cfg_totp_period": "Code Period (seconds)",
     "cfg_totp_window": "Validation Window",
@@ -14667,6 +14668,7 @@
     "cfgDesc_dataspace_callback_origins": "Private addresses where a participant's callback may be, separated by commas, such as http://10.0.0.5:8083. Every other callback must be a public https address. Empty by default.",
     "cfgDesc_dataspace_participant_id": "This server's participant id in a data space. Empty (the default): did:web of this server's public address, whose document is at /.well-known/did.json.",
     "cfgDesc_dataspace_tck_mode": "Runs the Dataspace Protocol conformance test kit against this server: it adds the test kit's datasets and agreements and plays its scenarios. Works only on a test or sandbox server with a loopback address; a public server ignores it.",
+    "cfgDesc_dataspace_max_processes_per_participant": "How many open negotiations and transfers one participant may hold with one account at a time. An account holds 400 in all, so this limit stops one participant from taking them all and locking the others out. Past it the participant is refused until it completes or terminates one. 0: no limit of its own, only the account's 400. The default is 100.",
     "cfgDesc_consent_share_max_days": "How long an owner may share a data product with a named outside party.",
     "dataOut": {
       "dspTitle": "Dataspace Protocol now",

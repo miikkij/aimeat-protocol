@@ -8,32 +8,47 @@
  *     open or share offer   a named share (a consent record, services/parties/shares.ts) of the package
  *                           to the participant's party (./participant.ts), its purpose and end copied
  *                           from the offer, marked with the agreement (`dspAgreement`, node-written).
+ *                           The share is no wider than the offer: an open offer stood on the package
+ *                           being public, so its share reads what a public reader reads (`publicOnly`);
+ *                           a share offer keeps the version the share it stood on pins.
  *     exchange offer        an EXCHANGE contract: an entitlement on the listing's coordinate, prepaid
  *                           for what the compensate duty prices (a month of reads, or a block of
  *                           PER_READ_BLOCK reads), the share bound to it (`contract`), and the sale
  *                           booked on the manual-invoice rail (commerce/invoice-handler.ts): DSP moves
  *                           no money, so the provider collects it from the participant out of band.
- *                           That is why a priced agreement always waits for the owner's approval.
+ *                           That is why a priced agreement always waits for the owner's approval. The
+ *                           sale is booked once, when the agreement is made: after the record is AGREED
+ *                           and the consumer took the agreement (./negotiation.ts calls bookAgreementSale).
  *
  *   The share is granted in the owner's name: the owner's published policy (autoAgree) or the owner's
  *   approval is the consent, as listing a package for sale is in services/exchange-party-buy.ts.
  *   ENDING an agreement (a termination, the owner's decline after it was finalised) revokes the share
- *   and the contract and deletes every transfer key of the share, so the next read is refused.
- * @structure Materialised · materialiseAgreement · endAgreement
+ *   and deletes every transfer key of the share, so the next read is refused. The contract is one slot
+ *   per participant and package, which later agreements stack onto: ending one agreement takes back
+ *   what that agreement added (its month or its block of reads) while another agreement of the same
+ *   participant on the package is live, and revokes the contract when it was the last one.
+ * @structure Materialised · AgreementSale · materialiseAgreement · bookAgreementSale · endAgreement
  * @usage const m = await materialiseAgreement(deps, negotiation); if (!m.ok) terminate(m.message);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The sale is booked once, when the agreement is made (bookAgreementSale), never
+ *     for one that is not; ending one of several stacked priced agreements takes back only what it
+ *     added (secaudit2026nov02d round 13).
+ *   v1.0.1 — 2026-11-02 — The share carries the offer's scope: an open offer's share reads what a public
+ *     reader reads, a share offer's keeps its pin (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { grantConsent } from '../consent-write.js';
-import { endShares, setShareMeta, sharePatternOf } from '../parties/shares.js';
+import { endShares, setShareMeta, shareMetaOf, sharePatternOf } from '../parties/shares.js';
 import { partyRefOf } from '../parties/contract.js';
 import { changeParty } from '../parties/store.js';
 import { UNCHANGED } from '../record-cas.js';
 import { getOffering } from '../exchange-market.js';
-import { createEntitlement, readContractForCall, revokeEntitlement, type PricingSpec } from '../metered-entitlements.js';
+import {
+    createEntitlement, persistEntitlement, readContractForCall, revokeEntitlement, type PricingSpec,
+} from '../metered-entitlements.js';
 import { PER_MONTH_SECONDS } from '../exchange-datapackage.js';
 import { getPaymentHandler } from '../../commerce/payment-handlers.js';
 import { INVOICE_HANDLER_ID } from '../../commerce/invoice-handler.js';
@@ -42,9 +57,14 @@ import { emitChange } from '../event-bus.js';
 import type { NegotiationRecord } from './contract.js';
 import { ensureParticipantParty } from './participant.js';
 import { PER_READ_BLOCK } from './policy.js';
+import { listNegotiations } from './store.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
-export type Materialised = { ok: true; value: NonNullable<NegotiationRecord['materialised']> | null } | { ok: false; code: string; message: string };
+/** The sale a priced agreement books on the invoice rail once it is made. */
+export interface AgreementSale { gross: number; currency: string; sellerGhii: string; buyerRef: string; ext: string; action: string; owner: string }
+export type Materialised =
+    | { ok: true; value: NonNullable<NegotiationRecord['materialised']> | null; sale?: AgreementSale }
+    | { ok: false; code: string; message: string };
 
 /** The prepaid pricing one priced agreement buys, on top of what an earlier one of the same party left. */
 function prepaid(model: 'per_month' | 'per_read', amount: number, plan: { callsPerWindow?: number; windowSeconds?: number } | undefined, before: PricingSpec | null): PricingSpec {
@@ -61,7 +81,52 @@ function prepaid(model: 'per_month' | 'per_read', amount: number, plan: { callsP
     return { model: 'bundle', blockSize: PER_READ_BLOCK, blockPrice: amount * PER_READ_BLOCK, callsRemaining: left + PER_READ_BLOCK };
 }
 
-/** Make the grants an agreement stands for. A TCK seed agreement makes none. */
+/**
+ * Take back from the contract what one priced agreement added to it (prepaid above): its month, or its
+ * block of reads. The other agreements stacked on the slot keep the rest.
+ */
+async function takeBack(storage: Storage, ref: string, ext: string, model: 'per_month' | 'per_read'): Promise<void> {
+    const ent = await readContractForCall(storage, ref, ext, 'read');
+    if (!ent || ent.state === 'revoked' || !ent.pricing) return;
+    const p = ent.pricing;
+    if (model === 'per_read' && p.model === 'bundle') {
+        ent.pricing = { ...p, callsRemaining: Math.max(0, p.callsRemaining - PER_READ_BLOCK) };
+    } else if (model === 'per_month' && p.model === 'subscription') {
+        const until = Math.max(Date.now(), Date.parse(p.validUntil) - PER_MONTH_SECONDS * 1000);
+        ent.pricing = { ...p, validUntil: new Date(until).toISOString() };
+    } else {
+        return;
+    }
+    ent.updatedAt = new Date().toISOString();
+    await persistEntitlement(storage, ent);
+}
+
+/** Is another agreement of the same participant on the same package live, besides `n`? */
+async function anotherLiveAgreement(storage: Storage, n: NegotiationRecord): Promise<boolean> {
+    return (await listNegotiations(storage, n.ownerGhii)).some(o => o.providerPid !== n.providerPid
+        && o.participantId === n.participantId && o.packageName === n.packageName && !!o.materialised?.entitlementId
+        && ['AGREED', 'VERIFIED', 'FINALIZED'].includes(o.state) && !o.agreementEndedAt);
+}
+
+/**
+ * Undo what an agreement added to the contract slot of its participant and package: revoke the slot
+ * when no other agreement of the participant on the package is live, else take back its share only.
+ */
+async function undoContract(storage: Storage, n: NegotiationRecord, ref: string, owner: string): Promise<void> {
+    const ext = `datapkg:${owner}/${n.packageName}`;
+    if (n.priced && await anotherLiveAgreement(storage, n)) await takeBack(storage, ref, ext, n.priced.model);
+    else await revokeEntitlement(storage, ref, ext, 'read');
+}
+
+/** The version a share offer's share pins: recorded at the request, or read from the share itself. */
+async function sharePin(storage: Storage, n: NegotiationRecord): Promise<string | undefined> {
+    if (n.offerKind !== 'share') return undefined;
+    if (n.terms?.pinnedVersion) return n.terms.pinnedVersion;
+    const source = n.offerRef ? await storage.getConsent(n.offerRef) : null;
+    return source ? shareMetaOf(source).pinnedVersion : undefined;
+}
+
+/** Make the grants an agreement stands for. A TCK seed agreement makes none. The sale is booked later. */
 export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Promise<Materialised> {
     const { storage, config } = deps;
     if (n.offerKind === 'tck' || !n.packageName || !n.agreementId) return { ok: true, value: null };
@@ -72,6 +137,7 @@ export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Pr
     const ref = partyRefOf(owner, party.name, config.nodeId);
     let entitlementId: string | undefined;
     let contract: { offeringId: string; entitlementId: string; ifaceVersion: number } | undefined;
+    let sale: AgreementSale | undefined;
 
     if (n.offerKind === 'exchange') {
         const o = n.offerRef ? await getOffering(storage, n.offerRef) : null;
@@ -89,39 +155,56 @@ export async function materialiseAgreement(deps: Deps, n: NegotiationRecord): Pr
         });
         entitlementId = ent.entitlementId;
         contract = { offeringId: o.offeringId, entitlementId: ent.entitlementId, ifaceVersion: surface.ifaceVersion };
-        // The obligation is booked on the invoice rail: the participant pays the provider out of band.
-        const handler = getPaymentHandler(INVOICE_HANDLER_ID);
         const gross = pricing.model === 'subscription' ? pricing.periodPrice : pricing.model === 'bundle' ? pricing.blockPrice : o.basePrice;
-        if (handler) {
-            const { trackingCode } = await handler.collect({ config, storage }, {
-                buyerGhii: ref, amount: gross, currency: o.currency ?? 'EUR', reference: n.agreementId, fee: 0, instrument: undefined,
-                seller: { ghii: o.providerGhii, owner, psp: null },
-            });
-            await bookSessionlessSale(storage, config, {
-                gross, currency: o.currency ?? 'EUR', sellerGhii: o.providerGhii, buyerRef: ref, ext: o.ext, action: o.action,
-                trackingCode, handler: INVOICE_HANDLER_ID, reference: n.agreementId,
-            });
-        }
+        sale = { gross, currency: o.currency ?? 'EUR', sellerGhii: o.providerGhii, buyerRef: ref, ext: o.ext, action: o.action, owner };
     }
 
+    const pin = await sharePin(storage, n);
     const granted = await grantConsent({ storage, config }, { ownerGaii: n.ownerGhii, roles: ['owner'], scopes: [], collectionMethod: 'dataspace-agreement' }, {
         recipient: ref, dataPattern: sharePatternOf(n.packageName),
         purpose: n.terms?.purpose || `Dataspace agreement ${n.agreementId} with ${n.participantId}.`,
         ...(n.terms?.expires ? { expires: n.terms.expires } : {}),
-        metadata: { terms_required: false },
+        metadata: { terms_required: false, ...(pin ? { pinned_version: pin } : {}) },
     });
     if (!granted.ok) {
-        if (entitlementId && contract) await revokeEntitlement(storage, ref, `datapkg:${owner}/${n.packageName}`, 'read');
+        if (entitlementId && contract) await undoContract(storage, n, ref, owner);
         return { ok: false, code: granted.code, message: granted.message };
     }
+    const publicOnly = n.offerKind === 'open';
     const share = await setShareMeta(storage, granted.value, {
-        dspAgreement: n.agreementId, termsAcceptedAt: new Date().toISOString(), ...(contract ? { contract } : {}),
-    }) ?? granted.value;
+        dspAgreement: n.agreementId, termsAcceptedAt: new Date().toISOString(), ...(contract ? { contract } : {}), ...(publicOnly ? { publicOnly: true } : {}),
+    });
+    if (!share && publicOnly) {
+        // A share that does not say it reads what a public reader reads would be wider than the offer.
+        await endShares(storage, n.ownerGhii, c => c.id === granted.value.id, 'dsp-agreement-not-made');
+        return { ok: false, code: 'AGREEMENT_NOT_MADE', message: 'The share of the agreement could not be written. Try again.' };
+    }
     emitChange('consent', n.ownerGhii);
-    return { ok: true, value: { partyName: party.name, partyUid: party.uid, shareId: share.id, ...(entitlementId ? { entitlementId } : {}) } };
+    return {
+        ok: true, value: { partyName: party.name, partyUid: party.uid, shareId: (share ?? granted.value).id, ...(entitlementId ? { entitlementId } : {}) },
+        ...(sale ? { sale } : {}),
+    };
 }
 
-/** End what an agreement made: its share, its contract, and every transfer key of the share. */
+/**
+ * Book the sale of a priced agreement on the manual-invoice rail: the participant pays the provider out
+ * of band. Called once, after the agreement is AGREED and the consumer took it.
+ */
+export async function bookAgreementSale(deps: Deps, n: NegotiationRecord, sale: AgreementSale): Promise<void> {
+    const handler = getPaymentHandler(INVOICE_HANDLER_ID);
+    if (!handler || !n.agreementId) return;
+    const { config, storage } = deps;
+    const { trackingCode } = await handler.collect({ config, storage }, {
+        buyerGhii: sale.buyerRef, amount: sale.gross, currency: sale.currency, reference: n.agreementId, fee: 0, instrument: undefined,
+        seller: { ghii: sale.sellerGhii, owner: sale.owner, psp: null },
+    });
+    await bookSessionlessSale(storage, config, {
+        gross: sale.gross, currency: sale.currency, sellerGhii: sale.sellerGhii, buyerRef: sale.buyerRef, ext: sale.ext, action: sale.action,
+        trackingCode, handler: INVOICE_HANDLER_ID, reference: n.agreementId,
+    });
+}
+
+/** End what an agreement made: its share, its part of the contract, and every transfer key of the share. */
 export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: string): Promise<number> {
     const { storage, config } = deps;
     const m = n.materialised;
@@ -129,7 +212,7 @@ export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: str
     const ended = await endShares(storage, n.ownerGhii, c => c.id === m.shareId, reason);
     const owner = localAccountName(n.ownerGhii);
     const ref = partyRefOf(owner, m.partyName, config.nodeId);
-    if (m.entitlementId && n.packageName) await revokeEntitlement(storage, ref, `datapkg:${owner}/${n.packageName}`, 'read');
+    if (m.entitlementId && n.packageName) await undoContract(storage, n, ref, owner);
     await changeParty(storage, n.ownerGhii, m.partyName, p => {
         const keys = p.keys.filter(k => k.share !== m.shareId);
         return keys.length === p.keys.length ? UNCHANGED : { ...p, keys };

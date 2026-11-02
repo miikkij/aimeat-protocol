@@ -31,6 +31,9 @@
  * @usage
  *   if (!(await datapackageReadable(storage, ownerGhii, pointer?.visibility, req.auth))) return null;
  * @version-history
+ *   v1.5.0 — 2026-11-02 — A party whose share reads what a public reader reads (`publicOnly`, the share of
+ *     a Dataspace agreement on an open offer) opens the package only while it is public, and only the
+ *     versions open to anyone (secaudit2026nov02d round 13).
  *   v1.4.0 — 2026-11-01 — A contract reader (`contract`, ./contract-read.ts) opens the one package its
  *     EXCHANGE contract names, at the versions of the interface the contract pins, and nothing else; like
  *     a party it carries no owner, so no other level admits it (plan doc-mvwxcas3dom3, D5.3).
@@ -105,6 +108,8 @@ export interface PartyReaderFacts {
   pinnedVersion?: string;
   /** A share bound to a purchase reads the versions of the purchased interface only (./contract-read.ts). */
   versions?: string[];
+  /** The share reads what a public reader reads (services/parties/shares.ts `publicOnly`). */
+  publicOnly?: boolean;
 }
 
 /**
@@ -157,7 +162,8 @@ export async function datapackageReadable(
   /** The package decided about. A party reader is admitted only when it is the package its share names. */
   name?: string,
 ): Promise<boolean> {
-  if (reader?.party) return partyAdmits(ownerGhii, name, reader);
+  // A share that reads what a public reader reads opens the package only while its audience is public.
+  if (reader?.party) return partyAdmits(ownerGhii, name, reader) && (!reader.party.publicOnly || parseAudience(visibility ?? 'public')?.level === 'public');
   if (reader?.contract) return name !== undefined && reader.contract.ownerGhii === ownerGhii && reader.contract.packageName === name;
   if (readsAsPackageOwner(ownerGhii, reader)) return true;
   const audience = parseAudience(visibility ?? 'public');
@@ -207,7 +213,11 @@ export async function versionOpenTo(
   // A party reads every version of the shared package, or the one version its share pins. The caller
   // has already admitted it to the package (datapackageReadable with the name).
   if (reader?.party?.versions && !reader.party.versions.some(v => bareHash(v) === bareHash(contentHash))) return false;
-  if (reader?.party) return !reader.party.pinnedVersion || bareHash(reader.party.pinnedVersion) === bareHash(contentHash);
+  if (reader?.party) {
+    if (reader.party.pinnedVersion && bareHash(reader.party.pinnedVersion) !== bareHash(contentHash)) return false;
+    // A share that reads what a public reader reads opens the versions a public reader opens.
+    return reader.party.publicOnly ? versionOpenTo(storage, ownerGhii, null, pointer, contentHash, versionFile) : true;
+  }
   // A contract reads the versions of the interface it was signed on, and no other (plan D5.1).
   if (reader?.contract) return reader.contract.versions.some(v => bareHash(v) === bareHash(contentHash));
   if (readsAsPackageOwner(ownerGhii, reader)) return true;

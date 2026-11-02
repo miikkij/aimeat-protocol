@@ -15196,6 +15196,7 @@
     "cfg_dataspace_callback_origins": "Yksityiset osoitteet, joissa osallistuja voi olla",
     "cfg_dataspace_participant_id": "Tämän palvelimen osallistujatunniste",
     "cfg_dataspace_tck_mode": "Yhteensopivuustestien tila",
+    "cfg_dataspace_max_processes_per_participant": "Yhden osallistujan avoimet neuvottelut ja siirrot enintään",
     "cfg_totp_enabled": "TOTP käytössä",
     "cfg_totp_period": "Koodijakso (sekuntia)",
     "cfg_totp_window": "Validointi-ikkuna",
@@ -15403,6 +15404,7 @@
     "cfgDesc_dataspace_callback_origins": "Yksityiset osoitteet, joissa osallistujan paluukutsu voi olla, pilkulla erotettuina, esimerkiksi http://10.0.0.5:8083. Kaikkien muiden paluukutsujen on oltava julkisia https-osoitteita. Oletuksena tyhjä.",
     "cfgDesc_dataspace_participant_id": "Tämän palvelimen osallistujatunniste data-avaruudessa. Tyhjä (oletus): palvelimen julkisen osoitteen did:web, jonka kuvaus on osoitteessa /.well-known/did.json.",
     "cfgDesc_dataspace_tck_mode": "Ajaa Dataspace Protocolin yhteensopivuustestit tätä palvelinta vastaan: lisää testien aineistot ja sopimukset ja käy läpi niiden tilanteet. Toimii vain testi- tai hiekkalaatikkopalvelimella, jonka osoite on paikallinen. Julkinen palvelin ei välitä tästä asetuksesta.",
+    "cfgDesc_dataspace_max_processes_per_participant": "Kuinka monta avointa neuvottelua ja siirtoa yhdellä osallistujalla voi olla yhtä aikaa saman tilin kanssa. Tilillä voi olla niitä yhteensä 400. Raja estää yhtä osallistujaa viemästä ne kaikki ja sulkemasta muita ulos. Kun osallistuja on rajalla, palvelin kieltäytyy sen uusista pyynnöistä, kunnes se päättää jonkin. 0: osallistujalla ei ole omaa rajaa, vain tilin 400. Oletus on 100.",
     "cfgDesc_consent_share_max_days": "Kuinka pitkäksi aikaa omistaja voi jakaa datatuotteen nimetylle ulkopuoliselle osapuolelle.",
     "dataOut": {
       "dspTitle": "Dataspace Protocol nyt",

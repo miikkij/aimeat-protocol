@@ -29202,7 +29202,12 @@ paths:
         `<callbackAddress>/negotiations/<consumerPid>/agreement`; otherwise the request waits for the
         owner's approval (GET /v1/dataspace/negotiations). A priced offer always waits. The agreement is
         a named share of the package to the participant's party (kind dataspace), or for a priced offer
-        an EXCHANGE contract booked on the invoice rail with the share bound to it.
+        an EXCHANGE contract booked on the invoice rail with the share bound to it. The share reads no
+        more than the offer: an open offer's share reads what a public reader reads, a share offer's
+        keeps the version its share pins. The sale of a priced offer is booked once, when the consumer
+        took the agreement. PROVIDER_BUSY: the owner holds 400 live negotiations and transfers;
+        PARTICIPANT_BUSY: this participant holds AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT live ones
+        with the owner (default 100), and the reason names the setting. Ended ones do not count.
       tags: [Dataspace]
       security: [{ DataspaceAuth: [] }]
       requestBody:
@@ -29210,7 +29215,7 @@ paths:
         content: { application/json: { schema: { type: object } } }
       responses:
         '201': { description: A ContractNegotiation (state REQUESTED) }
-        '400': { description: 'ContractNegotiationError: INVALID_MESSAGE, INVALID_CALLBACK, UNKNOWN_DATASET, UNKNOWN_OFFER, PROVIDER_BUSY' }
+        '400': { description: 'ContractNegotiationError: INVALID_MESSAGE, INVALID_CALLBACK, UNKNOWN_DATASET, UNKNOWN_OFFER, PROVIDER_BUSY, PARTICIPANT_BUSY' }
         '401': { description: ContractNegotiationError UNAUTHORIZED }
   /dsp/2025-1/negotiations/{pid}:
     get:
@@ -29295,7 +29300,7 @@ paths:
       requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
       responses:
         '201': { description: A TransferProcess (state REQUESTED) }
-        '400': { description: 'TransferError: INVALID_MESSAGE, UNSUPPORTED_FORMAT, INVALID_CALLBACK, UNKNOWN_AGREEMENT, PROVIDER_BUSY' }
+        '400': { description: 'TransferError: INVALID_MESSAGE, UNSUPPORTED_FORMAT, INVALID_CALLBACK, UNKNOWN_AGREEMENT, PROVIDER_BUSY, PARTICIPANT_BUSY' }
         '401': { description: TransferError UNAUTHORIZED }
   /dsp/2025-1/transfers/{pid}:
     get:
