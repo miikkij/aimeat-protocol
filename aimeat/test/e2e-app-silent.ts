@@ -8,6 +8,8 @@
  *   subdomain-served app HTML and the bridge page is framable only by app origins.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-silent.ts
  * @version-history
+ *   2026-11-02 — Phase 8: a never-published app's draft signs in from its draft origin (it answered 404
+ *     APP_NOT_FOUND), and its own origin and the shared host still answer 404.
  *   2026-10-27 — An access token minted from a consent to an erased author's app stops working once the
  *     name is registered again; the same author's republish keeps it. A version another author's app
  *     published through the owner's grant asks once for its new words and the owner is told; the
@@ -714,6 +716,32 @@ async function main() {
             assert(det.body.data.origin_bound === false, `a draft's request is bound, so the owner's consent screen is skipped: ${det.body.data.origin_bound}`);
             const otherApp = await authorize(`${bn}/app-b.html`, 'memory:read', `${ORIGIN_A_DRAFT}/callback`);
             assert(otherApp.status === 400, `another app's flow accepted a draft origin it does not own: ${otherApp.status}`);
+        });
+        // An app with a draft and no published version runs only at its draft origin. Its sign-in
+        // answered 404 APP_NOT_FOUND there, because authorize read the published record alone (Jouni,
+        // 2026-11-02, a draft preview on orgnode.example). Red before the fix: the source was broken.
+        await test('a never-published app\'s draft signs in from its draft origin, and from nowhere else', async () => {
+            const html = '<!doctype html><title>Only a draft</title><p>DRAFT-ONLY';
+            const save = await json(`/v1/apps/${a}/draft-only.html/draft`, {
+                method: 'PUT', headers: { Authorization: `Bearer ${A.token}` },
+                body: JSON.stringify({ content: b64(html), name: 'Only a draft' }),
+            });
+            assert(save.status === 200, `draft save: ${save.status} ${JSON.stringify(save.body?.error)}`);
+            const tok = await json(`/v1/apps/${a}/draft-only.html/draft/preview-token`, { method: 'POST', headers: { Authorization: `Bearer ${A.token}` }, body: '{}' });
+            assert(tok.status === 200, `preview token: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+            const draftHost = new URL(tok.body.data.preview_url as string).hostname;
+            assert(draftHost.endsWith(`--draft.${APP_HOST}`), `the preview link is not on a draft origin: ${draftHost}`);
+            const redirect = `https://${draftHost}/callback`;
+            const r = await authorize(`${a}/draft-only.html`, 'memory:read', redirect);
+            assert(r.status === 302 && !!r.requestId, `authorize from the draft origin: ${r.status} ${JSON.stringify(r.body)}`);
+            const det = await json(`/v1/app-grants/request/${r.requestId}`);
+            assert(det.body.data.origin_bound === false, `a draft's request is bound: ${det.body.data.origin_bound}`);
+            await consentAndExchange(r.requestId!, r.verifier, redirect, A.token);
+            // The app's own origin serves nothing until it is published, and neither does the shared host.
+            const own = await authorize(`${a}/draft-only.html`, 'memory:read', `https://${draftHost.replace('--draft.', '.')}/callback`);
+            assert(own.status === 404 && own.body?.error?.code === 'APP_NOT_FOUND', `the app's own origin: ${own.status} ${JSON.stringify(own.body)}`);
+            const path = await authorize(`${a}/draft-only.html`, 'memory:read', `https://${APP_HOST}/${a}/draft-only.html`);
+            assert(path.status === 404 && path.body?.error?.code === 'APP_NOT_FOUND', `the shared host: ${path.status} ${JSON.stringify(path.body)}`);
         });
         // GET /v1/apps/:owner/:filename answers on every host. On an app's own origin it served the
         // draft by its preview token, and any other published app inline, so code that was not the

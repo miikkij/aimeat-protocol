@@ -14,9 +14,11 @@
  *   The single-label rule is load-bearing in both families: `a.b.apps.example` must NOT resolve, or
  *   a nested subdomain could stand in for the app one level up.
  * @structure PORTFOLIO_TARGET_PREFIX · isPortfolioTarget · appOriginHostFamily · appOfRequestOrigin ·
- *   resolveAppOriginTarget · resolveFrameAppTarget
+ *   resolveAppOriginTarget · resolveFrameAppTarget · appRecordForAuthorize
  * @usage const resolved = await resolveAppOriginTarget(config, storage, req.query.origin);
  * @version-history
+ *   v1.8.0 — 2026-11-02 — appRecordForAuthorize: authorize from an app's draft origin reads the draft
+ *     when the app was never published; it answered 404 APP_NOT_FOUND.
  *   v1.7.0 — 2026-10-06 — appOfRequestOrigin: the app a request's per-app origin serves, and whether
  *     it is the draft origin, for a route that runs app code there (audit of the secaudit last items).
  *   v1.6.0 — 2026-10-06 — An app's draft origin (`<sub>--draft.<appHost>`) resolves to its app with
@@ -42,6 +44,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { AppManifest } from '../storage/types/apps.js';
 import { resolvePublishedPortfolio } from '../routes/portfolio.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from '../routes/subdomains.js';
 
@@ -230,4 +233,31 @@ export async function resolveFrameAppTarget(
     name: record.manifest?.name?.trim() || record.filename,
     owner: record.ownerName,
   };
+}
+
+/**
+ * The record GET /v1/app-grants/authorize shows on the consent page for `app` ("owner/filename"):
+ * the published app, or null when there is none. Without a published version the draft answers,
+ * but only when `redirectUri` is on the app's draft origin and that origin's label is bound to `app`.
+ *
+ * An app with a draft and no published version runs only at its draft origin. Its sign-in reached
+ * authorize there and got 404 APP_NOT_FOUND, because only the published record was read, so the owner
+ * could not sign in to their own draft (Jouni, 2026-11-02). The route still checks the binding and
+ * keeps the request unbound, so the consent screen shows even to the owner (secaudit 2026-10
+ * follow-up, A2). `redirectUri` is an absolute URL the route has already validated.
+ */
+export async function appRecordForAuthorize(
+  config: AimeatConfig, storage: Storage, app: string, redirectUri: string,
+): Promise<{ manifest?: AppManifest } | null> {
+  const slash = app.indexOf('/');
+  const owner = app.slice(0, slash);
+  const filename = app.slice(slash + 1);
+  const published = await storage.getAppByOwnerName(owner, filename);
+  if (published) return published;
+  const family = appOriginHostFamily(config, new URL(redirectUri).hostname);
+  const draftOf = family?.family === 'app' ? draftBaseLabel(family.label) : null;
+  if (draftOf === null) return null;
+  const site = await storage.getSubdomainSite(draftOf);
+  if (!site || !site.enabled || site.kind !== 'app' || site.target !== app) return null;
+  return storage.getAppDraft(`${owner}@${config.nodeId}`, filename);
 }

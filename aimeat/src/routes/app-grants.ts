@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-11-02 — GET /v1/app-grants/authorize from an app's draft origin reads the draft when the app was never published; it answered 404 APP_NOT_FOUND, so the owner could not sign in to a draft (services/app-origin-target.ts appRecordForAuthorize).
  *   2026-10-31 — GET /v1/app-grants/authorize carries the app's `lang` (en, fi, es) to the consent page (v27 P1).
  *   2026-10-31 — The owner's own portfolio origin gets its memory:read token, on the silent bridge and on refresh, only while the page served now was written by a writer with memory:read or allowed by the owner; otherwise consent_required with reason portfolio_read_waits and the request id, and 403 PORTFOLIO_READ_WAITS on refresh (services/portfolio-read-hold.ts; audit H-9, f-2026aug-h-9).
  *   2026-10-27 — A version another author's app published through its grant (`manifest.publishedByApp`) asks like one another account published: the silent bridge adds `published_by_app`, and `published_by_other` names that app (services/app-published-by-app.ts; secaudit2026oct26).
@@ -148,7 +149,7 @@ import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
-import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel } from '../services/app-origin-target.js';
+import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel, appRecordForAuthorize } from '../services/app-origin-target.js';
 import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app-grant-portfolio.js';
 import { portfolioReadHold } from '../services/portfolio-read-hold.js';
 import { ownAppConsentNeed } from '../services/own-app-consent.js';
@@ -384,7 +385,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (slash <= 0 || slash === app.length - 1) {
       return res.status(400).json(error(config.nodeId, 'INVALID_APP', 'app must be "owner/filename"'));
     }
-    const appRecord = await storage.getAppByOwnerName(app.slice(0, slash), app.slice(slash + 1));
+    // A never-published app's draft signs in from its draft origin (services/app-origin-target.ts).
+    const appRecord = await appRecordForAuthorize(config, storage, app, redirectUri);
     if (!appRecord) {
       return res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No published app "${app}"`));
     }
