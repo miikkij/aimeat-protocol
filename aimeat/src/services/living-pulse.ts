@@ -27,6 +27,10 @@
  * @version-history
  *   2026-11-02 — SECURITY: the retirement notice is mailed only to an address the owner confirmed
  *     (owner-mail-address.ts; secaudit2026nov02d round 13).
+ *   2026-11-02 — SECURITY: a config whose latest writer is a member of another account (a workspace
+ *     publish over it, which now records the publisher) gathers nothing, asks no agent and calls no
+ *     model until the owner allows it with one press or saves it again; each section's ledger says
+ *     `derive-waiting` (secaudit2026nov02d round 13, publishDraft:cross-account-living-config-outside-pulse-spend-tally).
  *   2026-10-31 — SECURITY: the model is called for a config only when its holder or latest writer may
  *     use the owner's AI (ai:use), or the owner allowed it with one press; otherwise the section waits
  *     (`derive-waiting`, status.ai_spend_request) and the owner is asked once (living-pulse-spend.ts).
@@ -86,7 +90,7 @@ import { emitDelivery } from './event-bus.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
 import { updateRecord } from './record-cas.js';
 import { flushWriteTallyBuffer } from './data-map/write-tally-buffer.js';
-import { livingSpendHold } from './living-pulse-spend.js';
+import { livingSpendHold, pulseSpender, spenderOfOtherAccount } from './living-pulse-spend.js';
 
 /** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
  *  are written regardless; these are the extra out-of-app nudges. */
@@ -427,9 +431,19 @@ export async function pulseInstanceServer(
   const organismCaller = await holderCaller(storage, config, reader);
   // Decided when the first section reaches the model, so a pulse with nothing to derive reads nothing.
   let spendHold: Awaited<ReturnType<typeof livingSpendHold>> | undefined;
+  // A config a member of another account published over last is not read for, dispatched for or
+  // derived for until the owner allows it with one press or saves it again (living-pulse-spend.ts):
+  // the gather would copy the owner's material into the shared workspace for that member's sections.
+  const latestSpender = await pulseSpender({ storage, config }, ownerGaii, configKey(loc));
+  const foreignWriter = !!latestSpender && spenderOfOtherAccount({ storage, config }, ownerGaii, latestSpender);
+  if (foreignWriter) spendHold = await livingSpendHold({ storage, config }, ownerGaii, configKey(loc), String(cfg.title || 'Living document'));
 
   for (const sec of sections) {
     const slot = String(sec.slot);
+    if (foreignWriter && spendHold) {
+      await addLedger(storage, ownerGaii, loc, { event: 'derive-waiting', slot, request_id: spendHold.requestId, declined: spendHold.declined });
+      continue;
+    }
     if (sec.agent) {
       // Agent-backed section: dispatch a task, then fold its deliverable on a later pulse.
       const r = await handleAgentSection(storage, config, ownerGaii, loc, sec, slot, charter, readsAll, reader);
