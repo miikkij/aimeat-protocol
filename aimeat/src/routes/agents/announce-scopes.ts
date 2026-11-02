@@ -6,14 +6,18 @@
  *   the old list. Moved unchanged out of ./management.ts so POST /v1/agents/:name/allow
  *   (./permission-allow.ts) says it the same way as PATCH /v1/agents/:name/scopes and the
  *   read-through routes.
- * @structure announceScopes(gaii)
+ * @structure announceScopes(gaii) · widenAndAnnounce(storage, config, agent)
  * @usage announceScopes(updated.gaii);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — widenAndAnnounce: a store place's default, announced when it adds a word.
  *   v1.0.0 — 2026-10-17 — Pure extraction from ./management.ts
  *     (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
+import type { AimeatConfig } from '../../config.js';
+import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { emitToolListChanged } from '../../mcp/index.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { widenForPlace } from '../../services/place-agent-scopes.js';
 
 /**
  * An agent's permissions changed: tell the two places that hold the old list. Moved unchanged out of
@@ -31,4 +35,16 @@ export function announceScopes(gaii: string): void {
   // nothing else — it must never be auth_revoked, which stops the identity, because then ADDING a
   // permission would kill the agent.
   getActiveConnectTunnelManager()?.notifyScopesChanged(gaii);
+}
+
+/**
+ * The scopes for a token about to be minted: a store place's default the agent's first time
+ * (services/place-agent-scopes.ts), announced when it added a word, because the agent's live connector
+ * still calls with the token it attached with (crew77, 2.11). The fresh mint this asks for adds nothing,
+ * so it announces nothing further.
+ */
+export async function widenAndAnnounce(storage: Storage, config: AimeatConfig, agent: AgentRecord): Promise<string[]> {
+  const scopes = await widenForPlace(storage, config, agent);
+  if (scopes.length !== (agent.defaultScopes ?? []).length) announceScopes(agent.gaii);
+  return scopes;
 }

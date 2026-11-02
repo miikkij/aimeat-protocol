@@ -1129,6 +1129,46 @@ async function run() {
         assert(r.status === 409, `expected 409, got ${r.status}`);
     });
 
+    // FAILED FIRST: on crew77 enrolment minted from the record, so a new agent's connector attached with
+    // its proposal's words only, and its app tool was refused (2.11).
+    await test('on a store place the credential enrolment gives a new agent carries the place default', async () => {
+        const setPlan = (value: string) => json('/v1/admin/config', { method: 'PUT', headers: authA, body: JSON.stringify({ changes: [{ path: 'site.purchase_plan', value }] }) });
+        const proposed = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({ name: 'place-enrolled', purpose: 'Reads the morning news into five points.', scopes: ['memory:read'], crew_def: PROPOSED_DEF }),
+        });
+        assert(proposed.status === 201, `proposal ${proposed.status}: ${JSON.stringify(proposed.body?.error)}`);
+        const earlier = dA.onEnrol;
+        let enrolled: any = null;
+        dA.onEnrol = async (offer) => {
+            const cards: string[] = [];
+            for (const offered of offer.agents) {
+                const key = await makeKey();
+                keysByAgent.set(offered.name, key);
+                cards.push(await signWith(cardFor(offered, a.owner, key), key));
+            }
+            const res = await json('/v1/agents/v2/enrol', {
+                method: 'POST', headers: { Authorization: `Bearer ${daemonA.token}` },
+                body: JSON.stringify({ grant_id: offer.grant_id, cards }),
+            });
+            enrolled = res.body?.data?.enrolled?.[0] ?? res.body;
+            return { ok: res.status === 200, result: null };
+        };
+        const on = await setPlan('Solo');
+        assert(on.status === 200, `plan: ${on.status} ${JSON.stringify(on.body?.error)}`);
+        try {
+            const r = await json(`/v1/agents/v2/agent-proposals/${proposed.body.data.proposal.id}/approve`, { method: 'POST', headers: authA });
+            assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+            assert(Array.isArray(enrolled?.scopes), `the connector was offered the agent: ${JSON.stringify(enrolled)}`);
+            assert(enrolled.scopes.includes('exchange:invoke') && enrolled.scopes.includes('ext:invoke') && enrolled.scopes.includes('memory:read'),
+                `the enrolled credential: ${enrolled.scopes.join(' ')}`);
+            for (const kept of ['exchange:write', 'memory:purge', 'outbound:send', 'agent:write']) assert(!enrolled.scopes.includes(kept), `${kept} stays with the owner`);
+        } finally {
+            dA.onEnrol = earlier;
+            await setPlan('');
+        }
+    });
+
     await test('a proposal cannot ask for more scope than the proposer holds', async () => {
         const r = await json('/v1/agents/v2/agent-proposals', {
             method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },

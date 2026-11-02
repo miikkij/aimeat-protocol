@@ -34,6 +34,7 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   v1.4.0 — 2026-11-02 — The enrolled credential carries a store place's default for agents (services/place-agent-scopes.ts).
  *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): agent:write on POST /v1/agents/v2/enrol. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.2.0 — 2026-10-10 — A move grant: an agent that holds a key gets a new one from the connector
  *     the owner moved it to. Its sessions end before the new key is pinned, and the old connector's
@@ -51,6 +52,7 @@ import { buildGAII } from '../../utils/gaii.js';
 import { readCardJws, verifyCardJws } from '../../services/agent-card.js';
 import type { CardDefect } from '../../models/agent-card.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
+import { widenAndAnnounce } from '../agents/announce-scopes.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { emitChange } from '../../services/event-bus.js';
 import { cardUri, jwksUri } from './card.js';
@@ -273,8 +275,10 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
       const sessionId = generateSessionId();
       const ttl = config.agentV2TokenTtlSeconds;
       // Named, not inherited. The requesting daemon's own roles and scopes are irrelevant here: what
-      // this agent may do is what the owner's template said, stored on its record.
-      const scopes = item.record.defaultScopes ?? [];
+      // this agent may do is what the owner's template said, stored on its record, and on a store place
+      // the place's default the first time (services/place-agent-scopes.ts): this is the token a new
+      // agent's connector attaches with, so it has to carry the words (crew77, 2.11).
+      const scopes = await widenAndAnnounce(storage, config, item.record);
       let token: string;
       try {
         token = await issueJWT({ sub: gaii, owner: item.record.owner, node: config.nodeId, roles: ['agent'], scopes }, ttl, sessionId);
