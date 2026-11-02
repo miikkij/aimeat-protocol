@@ -75,6 +75,8 @@ import { openBuildOffer } from '../services/build-with-you.js';
 import { nodeOpenRouterKey } from '../services/ai/node-openrouter-key.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
+import { validateBody } from '../models/schemas.js';
+import { EmptyBodySchema } from '../models/app-party-schemas.js';
 
 /** The conversations with a turn being answered now, as `<owner identity>:<thread id>`. One process holds a turn. */
 const running = new Set<string>();
@@ -218,7 +220,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
 
     // POST /v1/chat/threads/:id/stop — the person's Stop: the running turn is told to end, and what
     // it said so far is saved. Leaving the page does not stop a turn; this does.
-    router.post('/v1/chat/threads/:id/stop', requireAuth(), requireRole('owner'), async (req, res) => {
+    router.post('/v1/chat/threads/:id/stop', requireAuth(), requireRole('owner'), validateBody(EmptyBodySchema, config.nodeId), async (req, res) => {
         const gaii = identity(req);
         const id = req.params.id as string;
         if (!await readThread(storage, gaii, id)) {
