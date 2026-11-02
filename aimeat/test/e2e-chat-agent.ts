@@ -535,33 +535,51 @@ async function run(): Promise<void> {
 
     // ── Stopping, resetting, dying ──
 
-    await test('leaving the page reaches the agent: the turn is cancelled, not paid for in silence', async () => {
-        // Closing the stream aborts the turn and `cancel()` tells goose to stop (routes/chat.ts
-        // v1.2.0, chat-session.ts v1.2.0). This asserted a hole first, on 2026-09-08: the route
-        // listened for `close` on the REQUEST, which on Express 5 fires once as soon as the body is
-        // read, before the handler's awaits return, so the person leaving was never seen and the
-        // agent went on for the whole turn. Fixed in routes/chat.ts v1.6.0 (`res.on('close')`).
-        //
-        // It asserted a second hole on 2026-10-02: the node sent `session/cancel` as a request, real
-        // goose 1.50.0 answers that with "-32601: Method not found", and the peer here had answered
-        // it as a request too, so this test passed while no cancel had ever reached goose. In ACP the
-        // cancel is a notification; the peer now refuses the request form the way goose does.
+    await test('leaving the page does not end the turn: it runs to its end and its answer is saved', async () => {
+        // routes/chat.ts v1.13.0 (2026-11-02): a closed stream ends the stream, not the turn, so a
+        // person who reloads or opens another page mid-thought comes back to the answer. Until then
+        // the close aborted the turn (v1.2.0), and on crew64 a question left mid-thought had no
+        // answer at all after a reload (c9). STALL talks for eight seconds and ends on its own.
         const before = peerNotifications('session/cancel').length;
         const stalls = peerEntries().filter((e) => e.kind === 'stall-ended').length;
-        await turnAndLeave(threadId, 'STALL: keep going until I stop you');
-        const deadline = Date.now() + 6_000;
-        while (peerNotifications('session/cancel').length === before && Date.now() < deadline) await sleep(250);
-        assert(peerNotifications('session/cancel').length === before + 1,
-            `the agent is told to stop once the person has gone, cancels seen: ${peerNotifications('session/cancel').length - before}`);
-        while (peerEntries().filter((e) => e.kind === 'stall-ended').length === stalls && Date.now() < deadline + 4_000) await sleep(250);
+        await turnAndLeave(threadId, 'STALL: keep going while I am away');
+        const deadline = Date.now() + 15_000;
+        while (peerEntries().filter((e) => e.kind === 'stall-ended').length === stalls && Date.now() < deadline) await sleep(250);
         const ended = peerEntries().filter((e) => e.kind === 'stall-ended').at(-1);
-        assert(ended?.cancelled === true, `and the agent stopped because of it, got ${JSON.stringify(ended)}`);
+        assert(ended?.cancelled === false, `the turn ran to its end, got ${JSON.stringify(ended)}`);
+        assert(peerNotifications('session/cancel').length === before, 'nobody told the agent to stop');
+        await sleep(1_500);
+        const kept = (await readThread(threadId)).turns.filter((t: any) => t.role === 'agent').at(-1);
+        assert(String(kept?.text ?? '').includes('....'), `the whole answer is saved, got ${JSON.stringify(kept?.text)}`);
+    });
 
-        await sleep(2_000);
-        const thread = await readThread(threadId);
-        const stalled = (thread.turns as any[]).filter((t) => t.role === 'agent').at(-1);
-        assert(!stalled?.text?.includes('....'),
-            `nothing keeps being written after the person left, got ${JSON.stringify(stalled?.text)}`);
+    await test('Stop ends the turn: the agent is told to stop, and what it said is saved', async () => {
+        // The person's Stop is POST …/stop. The cancel is an ACP notification, as goose 1.50.0 takes
+        // it (it refuses the request form with -32601, which this peer imitates).
+        const before = peerNotifications('session/cancel').length;
+        const stalls = peerEntries().filter((e) => e.kind === 'stall-ended').length;
+        const res = await fetch(`${BASE}/v1/chat/threads/${threadId}/turn`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ text: 'STALL: keep going until I stop you' }),
+        });
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let seen = '';
+        while (!seen.includes('"kind":"text"')) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            seen += decoder.decode(value, { stream: true });
+        }
+        const stopped = await json(`/v1/chat/threads/${threadId}/stop`, authed({ method: 'POST' }));
+        assert(stopped.status === 200 && stopped.body.data.stopped === true, `stop: ${stopped.status} ${JSON.stringify(stopped.body)}`);
+        while (!(await reader.read()).done) { /* the rest of the stream */ }
+        const deadline = Date.now() + 6_000;
+        while (peerEntries().filter((e) => e.kind === 'stall-ended').length === stalls && Date.now() < deadline) await sleep(250);
+        assert(peerNotifications('session/cancel').length === before + 1, `one cancel, got ${peerNotifications('session/cancel').length - before}`);
+        const ended = peerEntries().filter((e) => e.kind === 'stall-ended').at(-1);
+        assert(ended?.cancelled === true, `the agent stopped because of it, got ${JSON.stringify(ended)}`);
+        const idle = await json(`/v1/chat/threads/${threadId}/stop`, authed({ method: 'POST' }));
+        assert(idle.status === 200 && idle.body.data.stopped === false, `nothing running: ${JSON.stringify(idle.body)}`);
     });
 
     // ── The turn ceiling (services/chat-turn-guard.ts) ──

@@ -14288,6 +14288,25 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/chat/threads/{id}/stop:
+    post:
+      operationId: stopChatTurn
+      tags: [Chat]
+      summary: Stop the turn this conversation is answering
+      description: |
+        The person's Stop: the running turn is told to end, and what it said so far is saved. Closing
+        the turn's stream does not end the turn: it runs to its end within its own limits and is saved,
+        so a person who reloads or opens another page comes back to the answer. `stopped` is false when
+        no turn was running. Owner sessions only.
+      responses:
+        '200':
+          description: '`{ stopped: boolean }`'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/chat/threads/{id}/turn:
     post:
       operationId: sendChatTurn

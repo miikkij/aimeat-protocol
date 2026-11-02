@@ -17,6 +17,8 @@
  *   import * as chat from '/js/services/chat.js';
  *   for await (const u of chat.streamTurn(threadId, 'build me pong')) { … }
  * @version-history
+ *   v1.6.0 — 2026-11-02 — stopTurn(): Stop is POST /v1/chat/threads/:id/stop; a closed stream no longer
+ *     ends a turn on the node (routes/chat.ts v1.13.0).
  *   v1.5.0 — 2026-10-31 — streamTurn ends the turn with CONNECTION_LOST, in the page's language, when
  *     45 s pass with no frame and no keepalive, and when the stream closes without a verdict. A turn
  *     whose node was recreated waited forever (v27 P2).
@@ -70,6 +72,11 @@ export async function deleteThread(id) {
  */
 export async function resetThread(id) {
     return api(`/v1/chat/threads/${enc(id)}/reset`, { method: 'POST' });
+}
+
+/** The person's Stop: the node ends the running turn and saves what it said. Leaving the page does not. */
+export async function stopTurn(id) {
+    return api(`/v1/chat/threads/${enc(id)}/stop`, { method: 'POST', retries: 0 });
 }
 
 /**
