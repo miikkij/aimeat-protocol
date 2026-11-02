@@ -67,7 +67,7 @@
         "docs/data-classification.md",
         "aimeat/src/services/connections/drive-files.ts"
       ],
-      "digest": "sha256:1fd5fd7554ba14736eba34fb"
+      "digest": "sha256:2771e162385378c51550fefa"
     },
     "06-ai-and-models.md": {
       "reviewedOn": "2026-11-01",
@@ -291,7 +291,7 @@
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
       "aimeat/src/services/classification/levels.ts": "fdec7ded5eb8b0a5",
       "docs/data-classification.md": "31bca57ac51f0be3",
-      "aimeat/src/services/connections/drive-files.ts": "062833964370c140"
+      "aimeat/src/services/connections/drive-files.ts": "b49a3a7cea3b7bbe"
     },
     "06-ai-and-models.md": {
       "aimeat/src/services/ai/adapters/index.ts": "b0c3e188f7fb76a1",
