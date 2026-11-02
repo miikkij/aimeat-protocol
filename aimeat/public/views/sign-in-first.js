@@ -17,6 +17,7 @@
  * @structure SignInFirst()
  * @usage spa.html viewFor(): signInFirst(pathname, !!getSession()) → import('/views/sign-in-first.js' + B)
  * @version-history
+ *   v1.1.0 — 2026-11-02 — The tab names the page in the page's language (Jouni, 2.11).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V1.5).
  */
 import { h } from 'preact';
@@ -34,6 +35,8 @@ export default function SignInFirst() {
   // The dialog returns an emailed sign-in link to this address by default, which is the page the
   // visitor opened. Without the auth library there is no dialog: a reload loads it again.
   const signIn = () => { if (!showLoginModal({})) window.location.reload(); };
+  // The static <title> is English; this page sets none of its own otherwise.
+  document.title = `${t('signInFirst.title')} — AIMEAT`;
   return html`
     <${AskPage} title=${t('signInFirst.title')}
       who=${{ name: host, text: host.charAt(0).toUpperCase() }}

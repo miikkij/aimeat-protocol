@@ -20,6 +20,8 @@ import { relative } from '/js/format.js';
  *   - downloadBlob/toCsvBlob: hand the viewer a file the page built, and build a CSV Excel can read
  *
  * @version-history
+ *   v1.3.0 — 2026-11-02 — detectLocale: a browser that lists Finnish anywhere gets Finnish, and a stored
+ *     language counts only as a person's pick, not as what an earlier load detected (Jouni, 2.11).
  *   v1.2.0 — 2026-10-29 — detectLocale reads the node's own language (window.__SITE.defaultLocale)
  *     before the browser's: a node bought from the store speaks its buyer's language.
  *   v1.0.1 — 2026-10-05 — escHtml escapes `'` too, so its result is safe in either kind of quoted
@@ -134,32 +136,52 @@ export async function copyToClipboard(text) {
 /** The languages this node ships UI text in. Mirrors LOCALES in src/i18n.ts. */
 export const LOCALES = ['en', 'fi', 'es'];
 
-/** Detect user's preferred locale from URL → localStorage → cookie → navigator. */
+/** The mark that a language was picked on this device (localStorage, and a cookie for the server). */
+export const LANG_CHOSEN_KEY = 'aimeat-lang-chosen';
+
+/** Did the person pick a language on this device, here or on the front page? */
+export function langPickedHere() {
+  return localStorage.getItem(LANG_CHOSEN_KEY) === '1' || /(?:^|;\s*)aimeat-lang-chosen=1(?:;|$)/.test(document.cookie);
+}
+
+const baseTag = (tag) => String(tag || '').split('-')[0].toLowerCase();
+
+/**
+ * The browser's language this node speaks. A browser that lists Finnish anywhere gets Finnish: many
+ * Finnish browsers list English first (Jouni, 2.11.2026). 'es-CO' and 'es-419' both answer 'es'.
+ */
+function browserLocale() {
+  const listed = (navigator.languages?.length ? [...navigator.languages] : [navigator.language]).map(baseTag);
+  if (listed.includes('fi')) return 'fi';
+  return listed.find((tag) => LOCALES.includes(tag)) ?? 'en';
+}
+
+/** Detect user's preferred locale from URL → a pick stored on this device → the node's own language → the browser. */
 export function detectLocale() {
   // 1. URL parameter
   const params = new URLSearchParams(window.location.search);
   const langParam = params.get('lang');
   if (LOCALES.includes(langParam)) return langParam;
 
-  // 2. localStorage
-  const stored = localStorage.getItem('aimeat-lang');
-  if (LOCALES.includes(stored)) return stored;
-
-  // 3. Cookie
-  const match = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
-  if (match && LOCALES.includes(match[1])) return match[1];
-
-  // 4. The node's own language, when the operator named one (site.default_locale): a node bought from
+  // The node's own language, when the operator named one (site.default_locale): a node bought from
   // the store speaks its buyer's language on the first visit, whatever the browser says (UX review
   // 2026-10-29, the onboarding buttons read in English on a Finnish customer's node).
   const nodeLang = typeof window !== 'undefined' ? /** @type {any} */ (window).__SITE?.defaultLocale : undefined;
-  if (LOCALES.includes(nodeLang)) return nodeLang;
+  const fromNode = LOCALES.includes(nodeLang) ? nodeLang : null;
 
-  // 5. Browser language. 'es-CO' and 'es-419' both answer 'es'.
-  const nav = (navigator.language || '').split('-')[0].toLowerCase();
-  if (LOCALES.includes(nav)) return nav;
+  // 2-3. Stored, in localStorage or the cookie. loadTranslations() stores whatever was detected on
+  // every load, so a stored value counts as a pick only with its mark, or when it differs from what
+  // those loads detected (the node's language, else the browser's first): a pick from before the mark.
+  const detectedBefore = fromNode ?? (LOCALES.includes(baseTag(navigator.language)) ? baseTag(navigator.language) : 'en');
+  const picked = langPickedHere();
+  const counts = (value) => LOCALES.includes(value) && (picked || value !== detectedBefore);
+  const stored = localStorage.getItem('aimeat-lang');
+  if (counts(stored)) return stored;
+  const match = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+  if (match && counts(match[1])) return match[1];
 
-  return 'en';
+  // 4. The node's own language; 5. the browser's.
+  return fromNode ?? browserLocale();
 }
 
 /** Persist locale preference to localStorage and cookie. */
