@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.60.0 -- 2026-11-02 -- aimeat_home_feed: what the person's home lists, read before answering about it.
  *   v1.59.0 -- 2026-11-01 -- Discover names aimeat_party "share" with `email` and "send_link": the one-time share link (WP9b).
  *   v1.58.0 -- 2026-11-01 -- Discover names aimeat_dataspace: the data space requests that wait for the person (plan doc-mvwxcas3dom3, D8).
  *   v1.57.0 -- 2026-11-01 -- Discover: a data product and its share are one proposal, and the follow-ups name their tools (WP9a).
@@ -506,6 +507,9 @@ ${NEW_AGENT_MD}
 runs, what is used or what has gone quiet: one call answers computers, agents, apps, organisms and
 workspaces, and offerings, with use in the period and the ties between them (\`focus\` follows one item).
 Say it in their words, then give them the page: \`/v1/home?overview=1&focus=<item id>\`.
+
+**What their home shows — \`aimeat_home_feed\`.** When the person asks what is on their home page, what
+has happened lately or what is new: the rows their home lists, newest first. Read it before you answer.
 
 **Ask the operators — \`support@operators\`.** When something here does not work, when a step will
 not complete, or when you need a decision only a human can make, send it:
