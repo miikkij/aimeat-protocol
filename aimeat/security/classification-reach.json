@@ -2846,6 +2846,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the node's layout records and their earlier versions."
     },
+    "src/services/task-result-delivery.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-02, checked: a scheduled task's deliverable, read under its agent for the owner who commissioned it; it goes to that owner's own bell, and to their e-mail only after passing leave (external, e-mail), as ecosystem-automation-notify.ts does. A record that stays behind is logged by key and goes to the bell only."
+    },
     "src/services/task-outcome.ts": {
       "reads": {
         "getMemory": 1,
