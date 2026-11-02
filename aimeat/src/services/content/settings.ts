@@ -19,6 +19,8 @@
  *   if (aiStagesOn(s)) { ... }
  *   await writeSettings(deps, writer, { stages: { describe: true } });
  * @version-history
+ *   v1.1.0 — 2026-11-02 — stages.profile (the fingerprint), off by default like every AI stage; the
+ *     stage list is types.ts STAGE_NAMES.
  *   v1.0.1 — 2026-10-20 — `stages.technical` is always on: a patch turning it off is refused with the
  *     setting that does stop reading (onArrival), and a stored false reads as true. The pipeline always
  *     ran it, so the setting promised what nothing did.
@@ -26,11 +28,11 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { ContentClassError, updateOwnRecord, type ContentDeps, type ContentWriter } from './classes.js';
-import { AI_STAGES, DEFAULT_SETTINGS, type ContentSettings, type StageName } from './types.js';
+import { AI_STAGES, DEFAULT_SETTINGS, STAGE_NAMES, type ContentSettings, type StageName } from './types.js';
 
 export const SETTINGS_KEY = 'contentclass.settings';
 
-const STAGES: readonly StageName[] = ['technical', 'describe', 'classify', 'extract', 'propose'];
+const STAGES: readonly StageName[] = STAGE_NAMES;
 const SOURCES = ['files', 'memory', 'workspace'] as const;
 const MODELS = ['text', 'vision'] as const;
 const APPROVALS: readonly ContentSettings['approval'][] = ['ask', 'auto', 'rule'];

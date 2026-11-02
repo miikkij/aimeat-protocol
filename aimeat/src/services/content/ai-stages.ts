@@ -21,13 +21,14 @@
  *   classification's useForAi for the item first and calls none of these when it is refused.
  *
  *   One instruction per stage, built here, so every model is told the same thing.
- * @structure StageCtx · StageItem · describeItem · classifyItem · extractClass · proposeClass ·
+ * @structure StageCtx · StageItem · askJson · describeItem · classifyItem · extractClass · proposeClass ·
  *   CLASS_THRESHOLD
  * @usage const d = await describeItem(ctx, item); const m = await classifyItem(ctx, item, classes);
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.1.0 — 2026-10-21 — A proposed property asks for a label in fi, en and es; cleanNewProperties
  *     keeps it when fi and en are strings of at most 80 characters and drops it otherwise.
+ *   v1.2.0 — 2026-11-02 — askJson is exported for the profile stage (profile.ts) and takes maxTokens.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -93,13 +94,18 @@ function languageLine(settings: ContentSettings): string {
 
 function dataUrl(mime: string, b: Buffer): string { return `data:${mime};base64,${b.toString('base64')}`; }
 
-/** One completion asked for a JSON object, asked once more when the answer is not one. */
-async function askJson(
-  ctx: StageCtx, prompt: string, opts: { images?: string[]; files?: Array<{ data: Uint8Array; mediaType: string; filename?: string }>; vision?: boolean },
+/**
+ * One completion asked for a JSON object, asked once more when the answer is not one. `maxTokens`
+ * is for a stage whose answer is long (the profile); without it the owner's own preference applies.
+ */
+export async function askJson(
+  ctx: StageCtx, prompt: string,
+  opts: { images?: string[]; files?: Array<{ data: Uint8Array; mediaType: string; filename?: string }>; vision?: boolean; maxTokens?: number },
 ): Promise<{ json: Json; model: string; provenanceId?: string }> {
   const model = (opts.vision || opts.images?.length || opts.files?.length ? ctx.settings.models.vision : ctx.settings.models.text) || undefined;
   const ask = () => completeForOwner(ctx.deps.storage, ctx.deps.config, ctx.ownerGhii, {
     prompt, model, temperature: 0, appId: 'contentclass', ...callerOpts(ctx),
+    ...(opts.maxTokens ? { maxTokens: opts.maxTokens } : {}),
     ...(opts.images?.length ? { images: opts.images } : {}),
     ...(opts.files?.length ? { files: opts.files } : {}),
   });

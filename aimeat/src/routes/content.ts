@@ -10,6 +10,8 @@
  * @structure contentRouter(config, storage)
  * @usage app.use(contentRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-11-02 — GET /v1/content/facts for one item answers the fingerprint tag when the item
+ *     has a profile, and its sections with with_profile=true.
  *   v1.1.0 — 2026-10-21 — POST /v1/content/correct: a person or their AI corrects an item's classes and
  *     extracted values.
  *   v1.0.1 — 2026-10-20 — Every route asks storage:read at the door (check:route-scopes).
@@ -23,7 +25,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
 import {
-  factsFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
+  factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
   removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, ContentError, ContentClassError,
 } from '../services/content/service.js';
 
@@ -66,11 +68,12 @@ export function contentRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   }));
 
-  // ── GET /v1/content/facts ── one item's facts (kind and key), or a page of all of them.
+  // ── GET /v1/content/facts ── one item's facts (kind and key) with its fingerprint tag when it has
+  //    a profile, and with with_profile=true the profile's sections; or a page of all of them.
   router.get('/v1/content/facts', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
     const caller = callerOf(req, config.nodeId, storage);
     if (typeof req.query.key === 'string' && req.query.key) {
-      res.json(success(config.nodeId, { facts: await factsFor(deps, caller, sourceOfQuery(req)) }));
+      res.json(success(config.nodeId, await factsViewFor(deps, caller, sourceOfQuery(req), { withProfile: req.query.with_profile === 'true' })));
       return;
     }
     res.json(success(config.nodeId, await listFactsFor(deps, caller, req.query as Record<string, unknown>)));

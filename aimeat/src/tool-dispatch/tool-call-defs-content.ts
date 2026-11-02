@@ -14,6 +14,7 @@
  * @structure contentCliTools
  * @usage import { contentCliTools } from './tool-call-defs-content.js';
  * @version-history
+ *   v1.2.0 — 2026-11-02 — aimeat_content_facts forwards with_profile to GET /v1/content/facts.
  *   v1.1.0 — 2026-10-21 — aimeat_content_correct, a proxy over POST /v1/content/correct.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings
  *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -43,7 +44,10 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
             const refusal = refused('aimeat_content_facts', input);
             if (refusal) return refusal;
             if (optionalString(input, 'key')) {
-                const facts = await client.get(`/v1/content/facts${itemQuery(input)}`);
+                const facts = await client.get(`/v1/content/facts${query({
+                    kind: optionalString(input, 'kind'), key: optionalString(input, 'key'), owner: optionalString(input, 'owner'),
+                    with_profile: optionalBoolean(input, 'with_profile'),
+                })}`);
                 if (!facts.ok || optionalBoolean(input, 'with_text') !== true) return facts;
                 const text = await client.get(`/v1/content/text${itemQuery(input)}`);
                 // No kept text is an answer here, not a failure: the facts were found.

@@ -25,6 +25,8 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.3.0 — 2026-11-02 — The profile stage (profile.ts): the item's fingerprint into its facts, its
+ *     sections into a private file.
  *   v1.2.0 — 2026-10-29 — An automatic read of a PDF whose text reached the node's PDF read limit
  *     tells the account (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.1.0 — 2026-10-21 — Extracting a class again keeps the values a person corrected (correct.ts).
@@ -44,7 +46,8 @@ import { readTechnicalFacts } from './technical.js';
 import { videoFrames, videoAudio } from './extract-video.js';
 import { measureText } from './extract-text.js';
 import { aiMarksOf } from './provenance-read.js';
-import { getFacts, putFacts, putText, getText, sourceIdOf } from './facts-store.js';
+import { getFacts, putFacts, putText, getText, putProfileDetail, sourceIdOf } from './facts-store.js';
+import { profileItem, MIN_PROFILE_CHARS } from './profile.js';
 import { readSettings } from './settings.js';
 import { listClasses, addProposal, decideProposal, entityFor } from './classes.js';
 import { fieldsOf } from './correct-fields.js';
@@ -330,6 +333,15 @@ async function runModelStages(deps: Deps, ctx: StageCtx, r: StageRun): Promise<v
         facts.textKey = await putText(deps, r.writer, r.sourceId, words);
         facts.technical.text = measureText(words, 'model');
       }
+    });
+  }
+
+  if (r.wanted.includes('profile')) {
+    await stage(r, 'profile', async () => {
+      if (!si.text || si.text.trim().length < MIN_PROFILE_CHARS) return 'too few words to profile';
+      const p = await profileItem(ctx, si, item.filename);
+      facts.profile = { ...p.profile, detailKey: await putProfileDetail(deps, r.writer, r.sourceId, p.sections) };
+      return p.profile.truncatedAt ? `profiled from the first ${p.profile.truncatedAt} characters` : undefined;
     });
   }
 

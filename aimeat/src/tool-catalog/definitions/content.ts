@@ -22,6 +22,7 @@
  * @structure checkContentInput() · contentTools
  * @usage imported by tool-catalog/definitions.ts; checkContentInput by mcp/content.ts and tool-dispatch/tool-call-defs-content.ts
  * @version-history
+ *   v1.3.0 — 2026-11-02 — The profile step (the fingerprint) and aimeat_content_facts with_profile.
  *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-21 — aimeat_content_correct: correct an item's classes and extracted values.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings.
@@ -32,7 +33,7 @@ import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
-const STAGE_NAMES = ['technical', 'describe', 'classify', 'extract', 'propose'] as const;
+const STAGE_NAMES = ['technical', 'describe', 'classify', 'extract', 'propose', 'profile'] as const;
 const ITEM_KINDS = ['pdf', 'image', 'video', 'text', 'other'] as const;
 
 const SOURCE_KIND = {
@@ -46,7 +47,7 @@ const SOURCE_OWNER = {
 };
 const STAGES = {
     type: 'array' as const,
-    description: 'The steps to run, any of technical (reads the file itself, no AI), describe (a description and alt text), classify (which content classes it belongs to), extract (the fields of each class), propose (suggests new classes or fields for the owner to approve). Omit to run what the owner turned on in the settings.',
+    description: 'The steps to run, any of technical (reads the file itself, no AI), describe (a description and alt text), classify (which content classes it belongs to), extract (the fields of each class), propose (suggests new classes or fields for the owner to approve), profile (the fingerprint: what kind of text each section is, what it rests on, its topic and leaning). Omit to run what the owner turned on in the settings.',
     zod: z.array(z.enum(STAGE_NAMES)),
 };
 
@@ -56,7 +57,7 @@ const INTERFACE_FIELDS = ['action', 'agent_name', 'response_format', 'ai_provena
 /** The fields each mode of a multi-mode tool reads. A field of another mode is refused, never ignored. */
 const MODE_FIELDS: Record<string, Record<string, readonly string[]>> = {
     aimeat_content_facts: {
-        one: ['kind', 'key', 'owner', 'with_text'],
+        one: ['kind', 'key', 'owner', 'with_text', 'with_profile'],
         list: ['of_kind', 'class', 'stale', 'limit', 'after'],
     },
     aimeat_content_scan: {
@@ -110,7 +111,7 @@ export function checkContentInput(tool: string, input: Record<string, unknown>):
 export const contentTools = [
     {
         name: 'aimeat_content_facts',
-        description: "What a stored file or a memory record says about itself, as this node read it: its \"facts\". For a PDF: pages, title, author, producer, dates, whether it has a text layer, and its digital signatures (who signed, when, and whether the signature checks out). For a picture: format, size, camera, lens and exposure, when it was taken, location when it carries one, creator and copyright, and any alt text it already has. For a video or audio file: length, container, codecs, frame size and rate. For any item: its size and hash, and whether it declares being made by AI (from the node's own record, IPTC or a C2PA manifest; an item that says nothing is \"unknown\", this is not a detector). When the owner has turned the AI steps on, the facts also carry a description and alt text written by a model, the content classes the item belongs to (invoice, contract, receipt, photo and the owner's own), and for each class the fields extracted from it as a JSON-LD entity. With `key`: the facts of that one item (NOT_FOUND when it was not read yet; run aimeat_content_inspect first), and with `with_text` also the text kept from it (a PDF's text layer, the words a model read from a picture; null when there is none). Without `key`: a page of facts, newest first, filtered by `of_kind`, `class` or `stale` (read from an older version of the item); with no filter at all the answer also carries an overview: how much of the owner's content is read, the settings, a running scan and how many proposed classes wait for approval. Needs storage:read, and memory:read for a memory record.",
+        description: "What a stored file or a memory record says about itself, as this node read it: its \"facts\". For a PDF: pages, title, author, producer, dates, whether it has a text layer, and its digital signatures (who signed, when, and whether the signature checks out). For a picture: format, size, camera, lens and exposure, when it was taken, location when it carries one, creator and copyright, and any alt text it already has. For a video or audio file: length, container, codecs, frame size and rate. For any item: its size and hash, and whether it declares being made by AI (from the node's own record, IPTC or a C2PA manifest; an item that says nothing is \"unknown\", this is not a detector). When the owner has turned the AI steps on, the facts also carry a description and alt text written by a model, the content classes the item belongs to (invoice, contract, receipt, photo and the owner's own), and for each class the fields extracted from it as a JSON-LD entity. When the owner turned the profile step on, an item also has a fingerprint: each section's kind of text (F fact, A analysis, M opinion, O instruction, P decision or plan, K narrative), what it rests on (+ a source the reader can check, ~ an identified person or meeting, ? nothing, x contradicted or replaced), how firmly it is stated, its topic, and where the item leans; the answer then carries `fingerprint`, ready lines and coloured squares to show the person when they ask what kind of material the item is (say the lines in their language). With `key`: the facts of that one item (NOT_FOUND when it was not read yet; run aimeat_content_inspect first), with `with_text` also the text kept from it (a PDF's text layer, the words a model read from a picture; null when there is none), and with `with_profile` also the profile's sections with their headings and one-sentence claims (null when the item has no profile). Without `key`: a page of facts, newest first, filtered by `of_kind`, `class` or `stale` (read from an older version of the item); with no filter at all the answer also carries an overview: how much of the owner's content is read, the settings, a running scan and how many proposed classes wait for approval. Needs storage:read, and memory:read for a memory record.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Content Facts', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -121,6 +122,7 @@ export const contentTools = [
             key: { type: 'string', description: 'The stored file\'s key, or the memory record\'s key. Omit to list.', zod: z.string().max(1024) },
             owner: SOURCE_OWNER,
             with_text: { type: 'boolean', description: 'With `key`: also return the text kept from the item.' },
+            with_profile: { type: 'boolean', description: 'With `key`: also return the profile\'s sections, each with its heading, a one-sentence claim, its kind of text, what it rests on and its topic.' },
             of_kind: { type: 'string', description: 'Listing only: the kind of item, pdf, image, video, text or other.', enum: ITEM_KINDS },
             class: { type: 'string', description: 'Listing only: the id of a content class (aimeat_content_classes lists them); only items that belong to it.' },
             stale: { type: 'boolean', description: 'Listing only: true lists the items whose facts were read from an older version of the item.' },
@@ -130,7 +132,7 @@ export const contentTools = [
     },
     {
         name: 'aimeat_content_inspect',
-        description: "Read one stored file or memory record now and keep its facts (see aimeat_content_facts for what they are). Answers with the facts and which steps ran. Without `stages` the owner's own settings decide which steps run, and every AI step is off until the owner turns it on, so by default only the technical step runs: it reads the file itself and needs no AI. A step that calls an AI model (describe, classify, extract, propose) also needs ai:use and spends the owner's AI allowance. An item whose facts are current is not read again unless `force` is true. Needs storage:read, and memory:read for a memory record.",
+        description: "Read one stored file or memory record now and keep its facts (see aimeat_content_facts for what they are). Answers with the facts and which steps ran. Without `stages` the owner's own settings decide which steps run, and every AI step is off until the owner turns it on, so by default only the technical step runs: it reads the file itself and needs no AI. A step that calls an AI model (describe, classify, extract, propose, profile) also needs ai:use and spends the owner's AI allowance. An item whose facts are current is not read again unless `force` is true. Needs storage:read, and memory:read for a memory record.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Inspect One Item', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -198,7 +200,7 @@ export const contentTools = [
     },
     {
         name: 'aimeat_content_settings',
-        description: "The owner's content class settings, which decide what this node reads from their content and what spends their AI allowance. Without `patch`: the settings. With `patch`: changes the fields it names and answers with the new settings; this needs memory:write-reserved. The fields: onArrival (true: read new content as it arrives; false: only on request); stages ({ technical, describe, classify, extract, propose }, each true or false; technical needs no AI and every AI step is off until the owner turns it on); sources ({ files, memory, workspace }: which content is read on arrival); minTextChars (a memory record or document shorter than this is not read on arrival); approval (how a proposed class or field is taken in: \"ask\" waits for the owner, \"auto\" takes it at once, \"rule\" lets the owner's decision rule named in approvalRule decide); onlineSignatureChecks (ask trust lists and revocation over the network when a PDF's signatures are checked on arrival); models ({ text, vision }: the models to use; empty means the owner's defaults); language (a BCP 47 tag such as en or fi for descriptions and alt texts; empty means the content's own language). Change a setting only when the owner asked for it. Needs storage:read to read.",
+        description: "The owner's content class settings, which decide what this node reads from their content and what spends their AI allowance. Without `patch`: the settings. With `patch`: changes the fields it names and answers with the new settings; this needs memory:write-reserved. The fields: onArrival (true: read new content as it arrives; false: only on request); stages ({ technical, describe, classify, extract, propose, profile }, each true or false; technical needs no AI and every AI step is off until the owner turns it on; profile writes the fingerprint of an item with words); sources ({ files, memory, workspace }: which content is read on arrival); minTextChars (a memory record or document shorter than this is not read on arrival); approval (how a proposed class or field is taken in: \"ask\" waits for the owner, \"auto\" takes it at once, \"rule\" lets the owner's decision rule named in approvalRule decide); onlineSignatureChecks (ask trust lists and revocation over the network when a PDF's signatures are checked on arrival); models ({ text, vision }: the models to use; empty means the owner's defaults); language (a BCP 47 tag such as en or fi for descriptions and alt texts; empty means the content's own language). Change a setting only when the owner asked for it. Needs storage:read to read.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Content Class Settings', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

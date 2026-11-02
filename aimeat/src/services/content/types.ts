@@ -24,13 +24,17 @@
  *   extracted text is a stored file of its own (`contentclass-text/<sourceHash>.txt`), never part of
  *   a memory value.
  * @structure ContentSource · TechnicalFacts (Pdf, Image, Video, Text) · AiMarks · ContentFacts ·
- *   ContentSettings · ContentClass · ClassProposal · StageName
+ *   ContentSettings · ContentClass · ClassProposal · StageName · STAGE_NAMES · ContentProfile ·
+ *   ProfileTopic · ProfileSection
  * @usage import type { ContentFacts, ContentSource } from './types.js';
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
  *   v1.1.0 — 2026-10-21 — ClassProperty.label: the property's name for a person in fi, en and es.
  *   v1.2.0 — 2026-10-29 — PdfFacts.textNotRead: the text read reached the node's PDF read limit
  *     (secaudit2026oct26 round 8c, memory-b-09).
+ *   v1.3.0 — 2026-11-02 — The `profile` stage and ContentFacts.profile: the fingerprint (wish
+ *     wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse). STAGE_NAMES is the one
+ *     list of stages the settings, the service and the tool catalog read.
  */
 
 /** Where an item lives. The source id (sourceIdOf) is stable for the same item. */
@@ -41,9 +45,71 @@ export type ContentSource =
 /** The four kinds the pipeline tells apart, from the MIME type and the file name. */
 export type ContentKind = 'pdf' | 'image' | 'video' | 'text' | 'other';
 
-/** The stages, in the order they run. `technical` needs no model; the other four do. */
-export type StageName = 'technical' | 'describe' | 'classify' | 'extract' | 'propose';
-export const AI_STAGES: readonly StageName[] = ['describe', 'classify', 'extract', 'propose'];
+/** The stages, in the order they run. `technical` needs no model; the other five do. */
+export type StageName = 'technical' | 'describe' | 'classify' | 'extract' | 'propose' | 'profile';
+export const STAGE_NAMES: readonly StageName[] = ['technical', 'describe', 'classify', 'extract', 'propose', 'profile'];
+export const AI_STAGES: readonly StageName[] = ['describe', 'classify', 'extract', 'propose', 'profile'];
+
+/**
+ * The kind of text a section is (profile.ts): F fact, A analysis, M opinion, O instruction,
+ * P decision or plan, K narrative.
+ */
+export type ProfileGenre = 'F' | 'A' | 'M' | 'O' | 'P' | 'K';
+/**
+ * What a section rests on: + a source the reader can check, ~ an identified person or meeting,
+ * ? nothing, x contradicted or replaced.
+ */
+export type ProfileMark = '+' | '~' | '?' | 'x';
+/** The six directions a section or a topic leans, each -1 to 1. */
+export type ProfileAxis = 'fakta' | 'konkr' | 'aika' | 'toim' | 'yks' | 'varm';
+
+/** One topic of a profile: its share of the words, its main genre and mark, and its leaning. */
+export interface ProfileTopic {
+  name: string;
+  /** Share of the item's words, 0 to 1. */
+  share: number;
+  genre: ProfileGenre;
+  mark: ProfileMark;
+  axes: Record<ProfileAxis, number>;
+}
+
+/**
+ * The fingerprint of an item (the `profile` stage, profile.ts): the compact part kept in the facts.
+ * The sections' headings, claims and per-section axes are a stored file of their own (detailKey),
+ * so the facts shards stay small.
+ */
+export interface ContentProfile {
+  /** The shape version, and the instruction version that produced it. */
+  v: 1;
+  prompt: string;
+  model: string;
+  provenanceId?: string;
+  at: string;
+  /** What the item is, in two or three words in its own language. */
+  kind: string;
+  topics: ProfileTopic[];
+  /** Per section in reading order: [genre, words, certainty 0..1, mark, topic index]. */
+  sections: Array<[ProfileGenre, number, number, ProfileMark, number]>;
+  /** The item's leaning, the word-weighted mean of its sections. */
+  axes: Record<ProfileAxis, number>;
+  /** "contentclass-profile/<sourceHash>.json": the sections with their headings and claims. */
+  detailKey?: string;
+  /** Set when only the first part of a long text was profiled. */
+  truncatedAt?: number;
+}
+
+/** One section as the stored profile detail keeps it. */
+export interface ProfileSection {
+  n: number;
+  heading: string;
+  claim: string;
+  words: number;
+  genre: ProfileGenre;
+  mark: ProfileMark;
+  certainty: number;
+  topic: number;
+  axes: Record<ProfileAxis, number>;
+}
 
 /** A PDF's own metadata (the Info dictionary and its XMP packet) and its signatures. */
 export interface PdfFacts {
@@ -218,6 +284,8 @@ export interface ContentFacts {
     /** Set when a person (or their AI) corrected values: those properties keep their value when the class is extracted again. */
     corrected?: { by: string; at: string; properties: string[] };
   }>;
+  /** The fingerprint: what kind of material the item is and how far it can be trusted (profile.ts). */
+  profile?: ContentProfile;
   /** Which stages ran, when; a stage left out did not run. */
   stages: Partial<Record<StageName, { at: string; ok: boolean; note?: string }>>;
   /** The hash the facts were read from. Differs from the source's current hash: stale. */
@@ -253,7 +321,7 @@ export interface ContentSettings {
 
 export const DEFAULT_SETTINGS: ContentSettings = Object.freeze({
   onArrival: true,
-  stages: Object.freeze({ technical: true, describe: false, classify: false, extract: false, propose: false }),
+  stages: Object.freeze({ technical: true, describe: false, classify: false, extract: false, propose: false, profile: false }),
   sources: Object.freeze({ files: true, memory: true, workspace: true }),
   minTextChars: 2000,
   approval: 'ask',

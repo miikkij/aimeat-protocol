@@ -16,7 +16,9 @@
  *
  *   TEXT IS A FILE. The text read from a source (a PDF's text layer, a model's reading of a picture)
  *   is stored as a private file `contentclass-text/<sourceHash>.txt`, never inside a memory value,
- *   so the shards stay small. ContentFacts.textKey names it.
+ *   so the shards stay small. ContentFacts.textKey names it. A profile's sections (their headings
+ *   and claims) are a private file the same way, `contentclass-profile/<sourceHash>.json`, named by
+ *   ContentFacts.profile.detailKey; the facts keep only the compact profile, about 1 kB.
  *
  *   STALE. listFacts({ stale: true }) answers the facts whose `readFrom` differs from their
  *   `technical.contentHash`: the technical stage read a new version of the source and the AI stages
@@ -24,26 +26,30 @@
  *   caller's to compare, since this file does not read sources.
  * @structure FACT_SHARDS · SHARD_LIMIT_BYTES · sourceIdOf() · sourceHash() · shardKeyOf() ·
  *   getFacts() · putFacts() · deleteFacts() · listFacts() · coverage() · textKeyOf() · putText() ·
- *   getText() · deleteText()
+ *   getText() · deleteText() · profileKeyOf() · putProfileDetail() · getProfileDetail() ·
+ *   deleteProfileDetail()
  * @usage
  *   const id = sourceIdOf({ kind: 'file', owner, key: 'docs/a.pdf' });
  *   await putFacts(deps, writer, facts);
  *   const page = await listFacts(storage, ownerGhii, { kind: 'pdf', limit: 50 });
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
+ *   v1.1.0 — 2026-11-02 — The profile's sections as a private file (putProfileDetail and its kin).
  */
 import { createHash } from 'node:crypto';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { UNCHANGED } from '../record-cas.js';
+import { logger } from '../../utils/logger.js';
 import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
 import { ContentClassError, updateOwnRecord, type ContentDeps, type ContentWriter } from './classes.js';
-import type { ContentFacts, ContentKind, ContentSource } from './types.js';
+import type { ContentFacts, ContentKind, ContentSource, ProfileSection } from './types.js';
 
 export const FACT_SHARDS = 32;
 const SHARD_PREFIX = 'contentclass.facts.';
 /** A shard is refused past this size, under the 1024 kB value ceiling. */
 export const SHARD_LIMIT_BYTES = 900 * 1024;
 const TEXT_PREFIX = 'contentclass-text/';
+const PROFILE_PREFIX = 'contentclass-profile/';
 
 interface Shard { v: 1; items: Record<string, ContentFacts> }
 
@@ -194,6 +200,42 @@ export async function getText(storage: Storage, ownerGhii: string, key: string):
   if (!key.startsWith(TEXT_PREFIX)) return null;
   const file = await storage.getStorageFile(ownerGhii, key);
   return file?.data ? Buffer.from(file.data).toString('utf8') : null;
+}
+
+/** The stored profile sections of a source: `contentclass-profile/<sourceHash>.json`. */
+export function profileKeyOf(sourceId: string): string { return `${PROFILE_PREFIX}${sourceHash(sourceId)}.json`; }
+
+/** Store a profile's sections (headings, claims, per-section axes) as a private file of the owner. Answers its key. */
+export async function putProfileDetail(deps: ContentDeps, writer: ContentWriter, sourceId: string, sections: ProfileSection[]): Promise<string> {
+  const key = profileKeyOf(sourceId);
+  const r = await writeStorageFile({ storage: deps.storage, config: deps.config }, writer.ownerGhii,
+    { key, data: Buffer.from(JSON.stringify({ v: 1, sections }), 'utf8'), mimeType: 'application/json', visibility: 'private' });
+  if (!r.ok) throw new ContentClassError(r.code, r.status, r.message);
+  return key;
+}
+
+/** A profile's stored sections, or null. Reads only keys under contentclass-profile/. */
+export async function getProfileDetail(storage: Storage, ownerGhii: string, key: string): Promise<ProfileSection[] | null> {
+  if (!key.startsWith(PROFILE_PREFIX)) return null;
+  const file = await storage.getStorageFile(ownerGhii, key);
+  if (!file?.data) return null;
+  try {
+    const v = JSON.parse(Buffer.from(file.data).toString('utf8')) as { sections?: unknown };
+    return Array.isArray(v.sections) ? v.sections as ProfileSection[] : null;
+  } catch (err) {
+    // A detail file that does not parse is read as none; the compact profile in the facts stays.
+    logger.warn('contentclass: a profile sections file does not parse', { key, error: String(err) });
+    return null;
+  }
+}
+
+/** Remove a profile's stored sections. Answers false when there were none. */
+export async function deleteProfileDetail(deps: ContentDeps, ownerGhii: string, key: string): Promise<boolean> {
+  if (!key.startsWith(PROFILE_PREFIX)) throw new ContentClassError('INVALID_INPUT', 400, `${key} is not a content class profile file.`);
+  const r = await removeStorageFile({ storage: deps.storage, config: deps.config }, ownerGhii, key);
+  if (r.ok) return true;
+  if (r.code === 'NOT_FOUND') return false;
+  throw new ContentClassError(r.code, r.status, r.message);
 }
 
 /** Remove a stored text. Answers false when there was none. */

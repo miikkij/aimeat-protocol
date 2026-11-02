@@ -18,6 +18,8 @@
  * @structure CONTENT_CLASSES_SKILL_ENTRY
  * @usage import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
  * @version-history
+ *   v1.2.0 — 2026-11-02 — "The fingerprint": the profile step, the tag aimeat_content_facts answers
+ *     and how to say it to the person (wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse).
  *   v1.1.1 — 2026-10-29 — A PDF's facts may carry textNotRead (the node's PDF read limit;
  *     secaudit2026oct26 round 8c). Added, nothing else changed.
  *   v1.1.0 — 2026-10-21 — "When something is wrong: correct it": aimeat_content_correct, and who
@@ -34,7 +36,7 @@ export const CONTENT_CLASSES_SKILL_ENTRY: BuiltinSkillEntry =
     visibility: 'public',
     skillMd: `---
 name: aimeat-content-classes
-description: What an AIMEAT node knows about the person's files and long texts — facts read without AI (a PDF's author, pages and signatures; a picture's camera, time, size and AI mark; a video's length and codecs) and, when the person turns them on, a description, the content classes (invoice, contract, photo, ...) and each class's fields as JSON-LD. Read the facts before the file; scan old files; decide proposed classes; correct a wrong class or field; give the OWL ontology. Use when a person asks what a file is, who signed it, whether a picture is AI-made, to find invoices or contracts, to describe pictures, or to tabulate documents by their fields. Triggers on content class, sisältöluokka, what is this file, who signed this, is this picture AI, alt text, find my invoices, extract fields, ontology, OWL, tiedoston tiedot, onko kuva tekoälyn tekemä.
+description: What an AIMEAT node knows about the person's files and long texts — facts read without AI (a PDF's author, pages and signatures; a picture's camera, time, size and AI mark; a video's length and codecs) and, when the person turns them on, a description, the content classes (invoice, contract, photo, ...) and each class's fields as JSON-LD. and a fingerprint (each section's kind of text and what it rests on). Read the facts before the file; scan; decide proposals; correct a wrong class or field. Use when a person asks what a file is, who signed it, whether a picture is AI-made, what kind of material a document is or whether it can be trusted, to find invoices or contracts, or to tabulate documents by their fields. Triggers on content class, sisältöluokka, what is this file, who signed this, is this picture AI, alt text, find my invoices, ontology, fingerprint, sormenjälki, millaista tämä aineisto on, voiko tähän luottaa.
 license: MIT
 metadata:
   audience: agent
@@ -61,8 +63,9 @@ document) the node reads it and keeps its **facts**. One item, one set of facts:
    words in a picture or a scanned page; a video's transcript), \`classify\` (the content classes it
    belongs to, from one decision with a yes-or-no question per class, so an item can be in several),
    \`extract\` (each class's properties as a JSON-LD entity typed \`cc:<class>\` and the class's
-   schema.org type), \`propose\` (a new class when none fits, or new properties a class lacks). Every one
-   is **off by default** and spends the owner's AI allowance.
+   schema.org type), \`propose\` (a new class when none fits, or new properties a class lacks),
+   \`profile\` (the fingerprint, below). Every one is **off by default** and spends the owner's AI
+   allowance.
 
 "Content class" is the kind of thing an item is. It is not the node's sensitivity classification
 (who may read what), and not the MIME type.
@@ -117,6 +120,34 @@ To find items of a class: \`aimeat_content_facts { class: "invoice" }\` pages th
 first; each item's \`entities.invoice.entity\` holds the extracted fields. Each membership in
 \`classes\` says who decided it (\`by\`: model, owner, rule), how sure (\`confidence\`) and, for the
 model, its \`decisionId\` (the decision record, which the person sees on their AI page).
+
+## The fingerprint: what kind of material it is
+
+When the person asks what kind of material an item is, whether it can be trusted, or what it rests
+on, read its fingerprint. The \`profile\` step cuts a text with words into sections and labels each:
+
+- its kind of text, as a colour: F fact 🟦, A analysis 🟩, M opinion 🟧, O instruction 🟨, P decision
+  or plan 🟥, K narrative 🟪;
+- what it rests on, as a mark: **+** a source the reader can check (a link, a named study or
+  document, data shown), **~** an identified person or meeting stands behind it, **?** nothing stands
+  behind it, **x** the text says it is contradicted or replaced;
+- how firmly it is stated, its topic, and where it leans (fact or opinion, concrete or abstract, past
+  or future, describes or directs action, overview or detail, certain or a guess).
+
+\`aimeat_content_facts { kind, key }\` then answers \`fingerprint\`: \`squares\` (one square per section,
+as wide as its share of the words) and five \`lines\` (kind and genres, topics with their marks, trust
+shares, where it leans, which model made it and when). Show the squares as they are and say the
+lines in the person's own language, keeping the marks + ~ ? x as they are; for example "🟦🟦🟩🟦🟩🟧
+A research report: mostly fact and analysis. Hintakehitys + and Kilpailutilanne + rest on named
+sources; the recommendations ~ rest on the researchers' word." Lead with what matters to the
+question: a high share of ? is worth saying first ("most of it states things with nothing behind
+them"). \`with_profile: true\` adds each section's heading and one-sentence claim, for "which part is
+the weak one?".
+
+No profile yet: the profile step is off (ask before running it, as for every model step:
+\`aimeat_content_inspect { kind, key, stages: ["profile"] }\`, or the setting for everything that
+arrives). A profile is the model's reading and can be wrong; it says which model made it. The marks
+judge what the text shows, not whether its claims are true.
 
 ## When something is wrong: correct it
 

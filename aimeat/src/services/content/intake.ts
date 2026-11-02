@@ -30,6 +30,7 @@
  * @usage contentAfterStore({ storage, config }, file.ownerGaii, file.key);
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
+ *   v1.0.1 — 2026-11-02 — A removed file's profile sections file goes with its facts.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -41,7 +42,7 @@ import { callerFromAuth } from '../caller-context.js';
 import { setStorageFileHooks } from '../storage-file-write.js';
 import { inspectSource, memoryValueText } from './pipeline.js';
 import { readSettings } from './settings.js';
-import { getFacts, deleteFacts, deleteText, sourceIdOf } from './facts-store.js';
+import { getFacts, deleteFacts, deleteText, deleteProfileDetail, sourceIdOf } from './facts-store.js';
 import type { ContentSource } from './types.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -143,6 +144,7 @@ export function contentAfterRemove(deps: Deps, ownerGaii: string, key: string): 
     if (!facts) return;
     const writer = { principal: ownerGhii, ownerGhii, scopes: [] as string[], roles: ['owner'] };
     if (facts.textKey) await deleteText(deps, ownerGhii, facts.textKey);
+    if (facts.profile?.detailKey) await deleteProfileDetail(deps, ownerGhii, facts.profile.detailKey);
     await deleteFacts(deps, writer, sourceId);
   })().catch((e: unknown) => logger.warn('contentclass: the facts of a removed file were not removed', { key, error: String((e as Error)?.message ?? e) }));
 }

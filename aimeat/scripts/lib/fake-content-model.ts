@@ -16,7 +16,7 @@
  *     `payment_terms`, labelled.
  *   - propose: a `recipe` class when the item's words say "resepti" or "recipe", else none; its two
  *     properties carry labels in fi, en and es.
- * @structure contentDecideAnswer · contentChatAnswer
+ * @structure contentDecideAnswer · profileAnswer · contentChatAnswer
  * @usage const a = contentChatAnswer(promptText); if (a) answer with it;
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -24,6 +24,8 @@
  *   v1.2.0 — 2026-10-21 — The extraction reads the item's words (readDocumentFields) instead of
  *     filling every property with a fixed value, which made the sandbox look as if the pipeline read
  *     an invoice wrong (Jouni's look at it).
+ *   v1.3.0 — 2026-11-02 — The fingerprint prompt (profileAnswer): every section labelled from its
+ *     own words.
  */
 
 /** Words that make an item a member of a class, per class id. */
@@ -94,8 +96,38 @@ function readDocumentFields(text: string): Record<string, unknown> {
   return out;
 }
 
+/**
+ * The stand-in fingerprint (src/services/content/profile.ts): every section the prompt carries is
+ * labelled from its own words, so a test can predict the answer. A link or "lähde"/"source" makes
+ * it `+`, "päätettiin"/"decided" a decision resting on the meeting (`~`), a digit a fact, and
+ * anything else an opinion with no grounds (`?`). Two topics: the first half and the second.
+ */
+function profileAnswer(prompt: string): string {
+  const parts = prompt.split(/=== Section (\d+) ===\n/).slice(1);
+  const sections: Array<Record<string, unknown>> = [];
+  for (let i = 0; i + 1 < parts.length; i += 2) {
+    const n = Number(parts[i]);
+    const body = parts[i + 1];
+    const words = body.replace(/^Given heading: .*\n/, '');
+    const given = /^Given heading: (.*)\n/.exec(body)?.[1] ?? '';
+    const sourced = /https?:\/\/|\blähde\b|\bsource\b/i.test(words);
+    const decided = /\b(päätettiin|decided)\b/i.test(words);
+    const factual = /\d/.test(words);
+    const genre = decided ? 'P' : factual || sourced ? 'F' : 'M';
+    const trust = sourced ? '+' : decided ? '~' : '?';
+    sections.push({
+      n, heading: given && given !== '(none)' ? given : `Osio ${n}`,
+      claim: words.trim().split(/[.!?]\s/)[0].slice(0, 120), genre, trust, certainty: trust === '?' ? 0.4 : 0.85,
+      topic: 0, axes: { fakta: trust === '?' ? -0.6 : 0.7, konkr: 0.3, aika: decided ? 0.6 : -0.2, toim: decided ? 0.8 : -0.4, yks: 0.2, varm: trust === '?' ? -0.4 : 0.7 },
+    });
+  }
+  sections.forEach((s, i) => { s.topic = i < Math.ceil(sections.length / 2) ? 0 : 1; });
+  return JSON.stringify({ kind: 'testiaineisto', topics: ['Alkuosa', 'Loppuosa'], sections });
+}
+
 /** The stand-in completion for a content class prompt, or null for any other prompt. */
 export function contentChatAnswer(prompt: string): string | null {
+  if (prompt.startsWith('You profile a document')) return profileAnswer(prompt);
   if (prompt.startsWith('Describe this picture')) {
     return JSON.stringify({ altText: 'A television test card with coloured bars.', description: 'A test card: vertical colour bars over a grey background, the kind used to check a screen.', text: '' });
   }

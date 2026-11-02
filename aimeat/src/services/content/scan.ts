@@ -21,6 +21,7 @@
  * @usage const { scan } = startScan(deps, caller, { kinds: ['image'], stages: ['describe'] });
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
+ *   v1.0.1 — 2026-11-02 — prune removes a gone item's profile sections file too.
  */
 import { randomBytes } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
@@ -31,7 +32,7 @@ import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { inspectSource, ContentError } from './pipeline.js';
 import { contentKindOf } from './kind.js';
-import { listFacts, getFacts, deleteFacts, deleteText, sourceIdOf } from './facts-store.js';
+import { listFacts, getFacts, deleteFacts, deleteText, deleteProfileDetail, sourceIdOf } from './facts-store.js';
 import type { ContentKind, ContentSource, StageName } from './types.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -147,6 +148,7 @@ async function prune(deps: Deps, caller: CallerContext): Promise<number> {
         : !!(await deps.storage.getMemory(s.owner, s.key));
       if (exists) continue;
       if (f.textKey) await deleteText(deps, caller.ownerGhii, f.textKey);
+      if (f.profile?.detailKey) await deleteProfileDetail(deps, caller.ownerGhii, f.profile.detailKey);
       await deleteFacts(deps, writer, f.sourceId);
       removed += 1;
     }

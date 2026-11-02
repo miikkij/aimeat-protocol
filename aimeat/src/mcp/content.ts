@@ -18,6 +18,8 @@
  * @structure registerContentTools(mcp, storage, config, caller)
  * @usage registerContentTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.2.0 — 2026-11-02 — aimeat_content_facts for one item answers the fingerprint tag when the item
+ *     has a profile, and its sections with with_profile (services/content/service.ts factsViewFor).
  *   v1.1.1 — 2026-10-21 — Tools register with mcp.registerTool and the MCP SDK v2 server types, the
  *     form main moved to (plan doc-mvguy322f9se, steps 3 and 4b).
  *   v1.1.0 — 2026-10-21 — aimeat_content_correct: correct an item's classes and extracted values.
@@ -34,7 +36,7 @@ import { toolError } from './tool-error.js';
 import { withCaughtError } from './tool-fault.js';
 import { checkContentInput } from '../tool-catalog/definitions/content.js';
 import {
-  factsFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
+  factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
   removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, ContentError, ContentClassError,
 } from '../services/content/service.js';
 
@@ -64,13 +66,13 @@ export function registerContentTools(
     async (args) => {
       const checked = checkContentInput('aimeat_content_facts', args);
       if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
-      const { kind, key, owner, with_text, of_kind, class: classId, stale, limit, after } = args;
+      const { kind, key, owner, with_text, with_profile, of_kind, class: classId, stale, limit, after } = args;
       try {
         const who = caller();
         if (checked.mode === 'one') {
           const source = { kind, key, owner };
-          const facts = await factsFor(deps, who, source);
-          if (!with_text) return ok({ facts });
+          const view = await factsViewFor(deps, who, source, { withProfile: with_profile === true });
+          if (!with_text) return ok(view);
           let text: { text: string; from: string } | null = null;
           try {
             text = await textFor(deps, who, source);
@@ -78,7 +80,7 @@ export function registerContentTools(
             // No kept text is an answer here, not a failure: the facts were found.
             if (!(isRefusal(err) && err.code === 'NOT_FOUND')) throw err;
           }
-          return ok({ facts, text: text?.text ?? null, text_from: text?.from ?? null });
+          return ok({ ...view, text: text?.text ?? null, text_from: text?.from ?? null });
         }
         // No filter at all: the overview rides along, as GET /v1/content answers it.
         const filtered = [of_kind, classId, stale, limit, after].some((v) => v !== undefined && v !== null);

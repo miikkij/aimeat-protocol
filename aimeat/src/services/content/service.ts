@@ -13,11 +13,13 @@
  *   or a proposal needs memory:write-reserved, as the AI policy does (routes/ai-policy.ts): the
  *   settings decide what spends the owner's key. The account holder in person holds every word.
  *   A visitor from another node is refused: the facts are a local account's own.
- * @structure parseSource · factsFor · textFor · inspectFor · correctFor · scanFor · scanStatusFor · settingsFor ·
+ * @structure parseSource · factsFor · factsViewFor · textFor · inspectFor · correctFor · scanFor · scanStatusFor · settingsFor ·
  *   updateSettingsFor · classesFor · setClassFor · removeClassFor · proposalsFor · decideProposalFor ·
  *   ontologyFor · overviewFor · listFactsFor · RESERVED_WORD
  * @usage const out = await inspectFor(deps, caller, { source: { kind: 'file', key: 'a.pdf' } });
  * @version-history
+ *   v1.2.0 — 2026-11-02 — factsViewFor: one item's facts with its fingerprint tag, and on request
+ *     the profile's sections; the stage list is types.ts STAGE_NAMES.
  *   v1.1.0 — 2026-10-21 — correctFor: a person or their AI corrects an item's classes and extracted
  *     values (memory:write; extract again: ai:use).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -29,14 +31,15 @@ import { ownerGhiiOf } from '../../utils/gaii.js';
 import { inspectSource, stagesToRun, ContentError, type InspectResult } from './pipeline.js';
 import { startScan, getScan, runningScanOf, type ScanOptions, type ScanState } from './scan.js';
 import { correctFacts } from './correct.js';
-import { getFacts, getText, listFacts, coverage, sourceIdOf, type FactsFilter } from './facts-store.js';
+import { getFacts, getText, getProfileDetail, listFacts, coverage, sourceIdOf, type FactsFilter } from './facts-store.js';
 import { readSettings, writeSettings } from './settings.js';
+import { fingerprintTag } from './profile.js';
 import {
   listClasses, setOwnerClass, removeOwnerClass, listProposals, decideProposal, owlOntology, ContentClassError,
 } from './classes.js';
 import {
-  AI_STAGES, type ContentFacts, type ContentSource, type ContentSettings, type ContentClass, type ClassProposal,
-  type StageName, type ContentKind,
+  AI_STAGES, STAGE_NAMES, type ContentFacts, type ContentSource, type ContentSettings, type ContentClass, type ClassProposal,
+  type StageName, type ContentKind, type ProfileSection,
 } from './types.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -44,7 +47,7 @@ type Deps = { storage: Storage; config: AimeatConfig };
 /** The word that changes what spends the owner's AI key: the settings, the classes, the proposals. */
 export const RESERVED_WORD = 'memory:write-reserved';
 
-const STAGES: readonly StageName[] = ['technical', 'describe', 'classify', 'extract', 'propose'];
+const STAGES: readonly StageName[] = STAGE_NAMES;
 const KINDS: readonly ContentKind[] = ['pdf', 'image', 'video', 'text', 'other'];
 const KEY_MAX = 1024;
 
@@ -100,6 +103,25 @@ export async function factsFor(deps: Deps, caller: CallerContext, sourceInput: u
   const f = await getFacts(deps.storage, caller.ownerGhii, sourceIdOf(source));
   if (!f) refuse('NOT_FOUND', 404, `Nothing has been read from ${source.kind} "${source.key}" yet. Inspect it first.`);
   return f;
+}
+
+/**
+ * One item's facts as the facts tool and GET /v1/content/facts answer them: with the fingerprint tag
+ * when the item has a profile, and with `withProfile` also the profile's sections (headings and
+ * claims), read from their own file.
+ */
+export async function factsViewFor(
+  deps: Deps, caller: CallerContext, sourceInput: unknown, opts: { withProfile?: boolean } = {},
+): Promise<{ facts: ContentFacts; fingerprint?: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null }> {
+  const facts = await factsFor(deps, caller, sourceInput);
+  if (!facts.profile) return { facts };
+  const out: { facts: ContentFacts; fingerprint: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null } = {
+    facts, fingerprint: fingerprintTag(facts.profile),
+  };
+  if (opts.withProfile) {
+    out.profile_sections = facts.profile.detailKey ? await getProfileDetail(deps.storage, caller.ownerGhii, facts.profile.detailKey) : null;
+  }
+  return out;
 }
 
 /** The text kept for one item (a PDF's text layer, the words a model read from a picture, a transcript). */

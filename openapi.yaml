@@ -5623,6 +5623,39 @@ components:
               confidence: { type: number }
               by: { type: string, enum: [model, owner, rule] }
               decisionId: { type: string }
+        profile:
+          type: object
+          description: >
+            The fingerprint, when the owner turned the profile step on: what kind of material the item
+            is and how far it can be trusted. sections is one row per section in reading order:
+            [genre, words, certainty 0..1, mark, topic index], where genre is F fact, A analysis,
+            M opinion, O instruction, P decision or plan, K narrative, and mark is + (a source the
+            reader can check), ~ (an identified person or meeting), ? (nothing) or x (contradicted or
+            replaced). axes are six directions from -1 to 1: fakta (opinion to fact), konkr (abstract
+            to concrete), aika (past to future), toim (describes to directs action), yks (overview to
+            detail), varm (guess to certain). The sections' headings and claims are in the file
+            detailKey names (GET /v1/content/facts with with_profile=true).
+          properties:
+            v: { type: integer }
+            prompt: { type: string, description: The version of the instruction that made it. }
+            model: { type: string }
+            provenanceId: { type: string }
+            at: { type: string, format: date-time }
+            kind: { type: string, description: What the item is, in its own language. }
+            topics:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  share: { type: number }
+                  genre: { type: string, enum: [F, A, M, O, P, K] }
+                  mark: { type: string, enum: ['+', '~', '?', x] }
+                  axes: { type: object, additionalProperties: { type: number } }
+            sections: { type: array, items: { type: array, items: {} } }
+            axes: { type: object, additionalProperties: { type: number } }
+            detailKey: { type: string }
+            truncatedAt: { type: integer, description: Set when only the first part of a long text was profiled. }
         entities:
           type: object
           description: Per content class id, the JSON-LD entity extracted with that class's properties.
@@ -68789,9 +68822,13 @@ paths:
         size and codecs; whether the item declares being made by AI, with the IPTC or C2PA mark that
         says so), and, when the owner turned the AI steps on, its description and alt text, its
         content classes and the entity extracted for each class (JSON-LD typed by the class's OWL
-        class). Without `key`: a page of facts, newest first. Needs storage:read (memory:read for a
-        memory record). The account holder may name one of their agents as `owner`; anything else
-        answers 404, as an item that does not exist does.
+        class). An item with a profile (the profile step) also answers `fingerprint`: the profile as
+        a row of coloured squares and a few lines of text a chat shows as they are, with the genre
+        and mark shares; with `with_profile=true` also `profile_sections`, each section's heading,
+        one-sentence claim, genre, mark, certainty, topic and axes. Without `key`: a page of facts,
+        newest first. Needs storage:read (memory:read for a memory record). The account holder may
+        name one of their agents as `owner`; anything else answers 404, as an item that does not
+        exist does.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -68799,6 +68836,7 @@ paths:
         - { name: kind, in: query, schema: { type: string, enum: [file, memory, pdf, image, video, text, other] }, description: 'With key: file or memory. Without key: filter the page by item kind.' }
         - { name: key, in: query, schema: { type: string } }
         - { name: owner, in: query, schema: { type: string }, description: The identity the item is stored under, when it is one of your agents. }
+        - { name: with_profile, in: query, schema: { type: boolean }, description: 'With key: also answer the profile''s sections (null when the item has no profile).' }
         - { name: class, in: query, schema: { type: string }, description: Only items of this content class. }
         - { name: stale, in: query, schema: { type: boolean } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000 } }
@@ -68817,6 +68855,31 @@ paths:
                         type: object
                         properties:
                           facts: { $ref: '#/components/schemas/ContentFacts' }
+                          fingerprint:
+                            type: object
+                            description: The profile as text, present when the item has a profile.
+                            properties:
+                              squares: { type: string }
+                              lines: { type: array, items: { type: string } }
+                              text: { type: string }
+                              genres: { type: object, additionalProperties: { type: number } }
+                              marks: { type: object, additionalProperties: { type: number } }
+                              leaning: { type: array, items: { type: string } }
+                          profile_sections:
+                            type: array
+                            nullable: true
+                            items:
+                              type: object
+                              properties:
+                                n: { type: integer }
+                                heading: { type: string }
+                                claim: { type: string }
+                                words: { type: integer }
+                                genre: { type: string }
+                                mark: { type: string }
+                                certainty: { type: number }
+                                topic: { type: integer }
+                                axes: { type: object, additionalProperties: { type: number } }
                           items: { type: array, items: { $ref: '#/components/schemas/ContentFacts' } }
                           total: { type: integer }
                           next: { type: string }
@@ -68884,7 +68947,7 @@ paths:
                     owner: { type: string }
                 stages:
                   type: array
-                  items: { type: string, enum: [technical, describe, classify, extract, propose] }
+                  items: { type: string, enum: [technical, describe, classify, extract, propose, profile] }
                 force:
                   type: boolean
                   description: Run the asked stages again even when they ran on the same bytes.
@@ -68982,7 +69045,7 @@ paths:
                 kinds: { type: array, items: { type: string, enum: [pdf, image, video, text, other] } }
                 memory_prefix: { type: string }
                 missing_only: { type: boolean, default: true }
-                stages: { type: array, items: { type: string, enum: [technical, describe, classify, extract, propose] } }
+                stages: { type: array, items: { type: string, enum: [technical, describe, classify, extract, propose, profile] } }
                 force: { type: boolean }
                 limit: { type: integer, minimum: 1, maximum: 2000 }
                 prune: { type: boolean }
@@ -69030,8 +69093,8 @@ paths:
       operationId: getContentSettings
       summary: Your content class settings
       description: >
-        onArrival (run when content arrives), stages (technical on; describe, classify, extract and
-        propose off until you turn them on), sources (files, memory, workspace), minTextChars (a
+        onArrival (run when content arrives), stages (technical on; describe, classify, extract,
+        propose and profile off until you turn them on), sources (files, memory, workspace), minTextChars (a
         shorter memory record gets no facts on arrival), approval (ask, auto, or rule with
         approvalRule: how a proposed class or property is approved), onlineSignatureChecks, models
         and language.

@@ -27,7 +27,9 @@
  *     storage:read is refused on every content route;
  *   - the five MCP tools answer as the routes do, and refuse what the routes refuse;
  *   - a picture whose metadata read never ends leaves the node answering, and at the media read time
- *     limit its facts keep the format and size and name the limit and its setting.
+ *     limit its facts keep the format and size and name the limit and its setting;
+ *   - the fingerprint is off by default, needs ai:use, labels each section of a long text, answers
+ *     the tag and (asked) the sections, and stays the owner's own.
  *
  *   WHY IT OWNS ITS SERVER. The model addresses and loopback egress are boot-time settings. It
  *   follows the runner's backend: Postgres when the env file names it, a temporary SQLite file
@@ -35,6 +37,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-content-class.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-content-class.ts
  * @version-history
+ *   2026-11-02 — Test 12: the fingerprint (the profile step): off by default, ai:use to run it, the
+ *     tag and the sections on the facts answer, another owner refused, the MCP tools the same.
  *   2026-11-01 — Test 11: a HEIF whose box walk never ends does not hold the node; the facts name
  *     content_class.media_read_seconds (secaudit2026oct31w2 round 12).
  *   2026-10-31 — Test 9b: a correction whose fields are refused leaves the classes and the model's
@@ -510,6 +514,66 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(!!f, 'no facts after the time limit');
     assert(f.technical.kind === 'image' && f.technical.image?.format === 'heic' && f.technical.size === heifZeroBox().length, `image ${JSON.stringify(f.technical.image)}`);
     assert(/longer than the limit of 30 s.*content_class\.media_read_seconds/.test(f.technical.errors?.exif ?? ''), `errors ${JSON.stringify(f.technical.errors)}`);
+  });
+
+  await test('12. the fingerprint: off by default, written on request with ai:use, shown as a tag, its sections the owner\'s own', async () => {
+    const D = await setupOwner('d');
+    const filler = 'Tämä kappale jatkuu vielä useilla sanoilla, jotta osio on riittävän pitkä omaksi osiokseen eikä yhdisty seuraavaan osioon.';
+    const doc = [
+      '# Kaukolämpöraportti',
+      `## Hinnat\nKeskihinta nousi 38 % vuonna 2025. Lähde: https://example.org/raportti-2025. ${filler} ${filler}`,
+      `## Päätös\nKokouksessa päätettiin, että hintavertailu julkaistaan keväällä ja vastuuhenkilö kokoaa sen. ${filler} ${filler}`,
+      `## Näkemys\nKaukolämpö on aina paras ratkaisu kaikille kotitalouksille ja muuttaa koko alan suunnan. ${filler} ${filler}`,
+    ].join('\n\n');
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ key: 'notes.report.heat', value: doc, visibility: 'private' }) });
+    assert(w.status === 201, `memory ${w.status}`);
+    const src = { kind: 'memory', key: 'notes.report.heat' };
+    const s = await json('/v1/content/settings', { headers: auth(D.token) });
+    assert(s.body.data.settings.stages.profile === false, `profile is off by default ${JSON.stringify(s.body.data.settings.stages)}`);
+    // The owner's settings run nothing that calls a model: a plain inspect writes no profile.
+    const plain = await json('/v1/content/inspect', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ source: src }) });
+    assert(plain.status === 200 && !plain.body.data.facts.profile && !plain.body.data.ran.includes('profile'), `plain inspect ${JSON.stringify(plain.body?.data?.ran ?? plain.body?.error)}`);
+    // An agent without ai:use asking for the profile step on its own record is refused.
+    const reader = await connectAgent(D, `ccprof${Date.now()}`, ['storage:read', 'memory:read', 'memory:write']);
+    await json('/v1/memory', { method: 'POST', headers: auth(reader), body: JSON.stringify({ key: 'notes.agent.heat', value: doc, visibility: 'private' }) });
+    const noAi = await json('/v1/content/inspect', { method: 'POST', headers: auth(reader), body: JSON.stringify({ source: { kind: 'memory', key: 'notes.agent.heat' }, stages: ['profile'] }) });
+    assert(noAi.status === 403 && String(noAi.body.error?.message).includes('ai:use'), `profile without ai:use ${noAi.status} ${JSON.stringify(noAi.body?.error)}`);
+    // The owner asks for it.
+    const r = await json('/v1/content/inspect', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ source: src, stages: ['profile'] }) });
+    assert(r.status === 200 && r.body.data.ran.includes('profile'), `profile ${r.status} ${JSON.stringify(r.body?.data?.skipped ?? r.body?.error)}`);
+    const p = r.body.data.facts.profile;
+    assert(p && p.prompt === 'profile-4' && p.sections.length === 3 && typeof p.model === 'string' && p.model, `profile ${JSON.stringify(p)}`);
+    assert(JSON.stringify(p.sections.map((x: any) => x[3])) === '["+","~","?"]', `marks ${JSON.stringify(p.sections)}`);
+    assert(p.topics.length === 2 && Math.abs(p.topics.reduce((a: number, t: any) => a + t.share, 0) - 1) < 0.01, `topics ${JSON.stringify(p.topics)}`);
+    assert(typeof p.detailKey === 'string' && p.detailKey.startsWith('contentclass-profile/'), `detailKey ${p.detailKey}`);
+    // The facts answer carries the tag; with_profile adds the sections with their headings and claims.
+    const f = await json(`${factsPath('notes.report.heat', 'memory')}&with_profile=true`, { headers: auth(D.token) });
+    assert(f.status === 200, `facts ${f.status}`);
+    const tag = f.body.data.fingerprint;
+    assert(tag && tag.squares.length > 0 && tag.lines.some((l: string) => l.startsWith('Trust: + 33 %')) && tag.lines.some((l: string) => l.startsWith('Topics: ')), `tag ${JSON.stringify(tag)}`);
+    const secs = f.body.data.profile_sections;
+    assert(Array.isArray(secs) && secs.length === 3 && secs[0].heading === 'Hinnat' && secs[0].claim.includes('38 %') && secs[1].mark === '~', `sections ${JSON.stringify(secs)}`);
+    const noSecs = await json(factsPath('notes.report.heat', 'memory'), { headers: auth(D.token) });
+    assert(noSecs.body.data.fingerprint && !('profile_sections' in noSecs.body.data), 'sections only when asked');
+    // Another owner reaches neither the facts nor the sections file.
+    const other = await json(`${factsPath('notes.report.heat', 'memory', D.gaii)}&with_profile=true`, { headers: auth(B.token) });
+    assert(other.status === 404, `another owner ${other.status}`);
+    const file = await json(`/v1/storage/${encodeURIComponent(p.detailKey)}?owner=${encodeURIComponent(D.gaii)}`, { headers: auth(B.token) });
+    assert(file.status === 403 || file.status === 404, `another owner on the sections file ${file.status}`);
+    // A text too short to tell its kind: the step runs and says why it wrote nothing.
+    await json('/v1/memory', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ key: 'notes.short', value: 'Lyhyt muistiinpano.', visibility: 'private' }) });
+    const short = await json('/v1/content/inspect', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ source: { kind: 'memory', key: 'notes.short' }, stages: ['profile'] }) });
+    assert(short.status === 200 && !short.body.data.facts.profile && /too few words/.test(short.body.data.facts.stages.profile?.note ?? ''), `short ${JSON.stringify(short.body?.data?.facts?.stages)}`);
+    // The same over MCP, as the person's AI asks it: the agent's own record.
+    const agent = await connectAgent(D, `ccprofmcp${Date.now()}`, ['*']);
+    await json('/v1/memory', { method: 'POST', headers: auth(agent), body: JSON.stringify({ key: 'notes.mcp.heat', value: doc, visibility: 'private' }) });
+    const insp = await mcpCall(agent, 'aimeat_content_inspect', { kind: 'memory', key: 'notes.mcp.heat', stages: ['profile'] });
+    assert(!insp?.result?.isError && toolText(insp).includes('profile-4'), `inspect over MCP ${toolText(insp).slice(0, 200)}`);
+    const viaMcp = await mcpCall(agent, 'aimeat_content_facts', { kind: 'memory', key: 'notes.mcp.heat', with_profile: true });
+    const body = JSON.parse(toolText(viaMcp) || '{}');
+    assert(!viaMcp?.result?.isError && body.fingerprint?.lines?.length === 5 && body.profile_sections?.length === 3, `facts over MCP ${toolText(viaMcp).slice(0, 300)}`);
+    const listing = await mcpCall(agent, 'aimeat_content_facts', { with_profile: true });
+    assert(listing?.result?.isError === true && toolText(listing).includes('with_profile'), `with_profile on a listing ${toolText(listing).slice(0, 200)}`);
   });
 
   await stopServer(server);
