@@ -9,6 +9,8 @@
  * @structure registerConnectionFileTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerConnectionFileTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   v1.1.0 — 2026-11-02 — aimeat_files_get as 'store' hands the session's caller to the storage write
+ *     (secaudit2026nov02d round 13, drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer).
  *   v1.0.0 — 2026-11-02 — Initial (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -86,8 +88,9 @@ export function registerConnectionFileTools(
             const opened = await open(connection_id, 'read');
             if ('content' in opened) return opened;
             if (as === 'store') {
+                // The session's caller goes with the write, as aimeat_storage_upload hands it (secaudit2026nov02d round 13).
                 const out = await storeDriveFile(opened.ctx, { storage, config, emitResourceUpdated, emitResourceListChanged },
-                    principal(), opened.id, { drive_id, item_id, key });
+                    principal(), opened.id, { drive_id, item_id, key }, { caller: caller() });
                 if (!out.ok) return toolError(out.code, out.message);
                 return ok({ stored: { key: out.key }, source: out.source });
             }

@@ -19,6 +19,10 @@
  *   Phase 2 a file as text and kept · Phase 3 writing · Phase 4 refusals · Phase 5 over MCP
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=files-connections
  * @version-history
+ *   v1.1.0 — 2026-11-02 — Phase 6: keeping a file over a company's served page asks what every file
+ *     route asks (company:write or the owner's one press); every other key, the owner in person, an app
+ *     with company:write and an agent over MCP are unchanged (secaudit2026nov02d round 13,
+ *     drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer).
  *   v1.0.0 — 2026-11-02 — Initial (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-).
  */
 import { randomBytes } from 'node:crypto';
@@ -321,6 +325,74 @@ try {
     const rs = await openSession(BASE, reader.token, 'e2e-files-reader');
     const refused = await callTool(rs, 'aimeat_files_write', { connection_id: writeConn, what: 'folder', drive_id: DRIVE, name: 'x' });
     assert(refused.isError, `a reader wrote: ${refused.text.slice(0, 200)}`);
+  });
+
+  // secaudit2026nov02d round 13, drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer.
+  // Keeping a file names its caller to the storage write, so the company page key asks what every
+  // other file route asks (company:write, or the owner's one press). Every other key is unchanged.
+  console.log('\nPhase 6 — Keeping a file at the key a company page is served from');
+  const appHtml = '<!doctype html><html><head><meta charset="utf-8"><title>sp</title></head><body>sp</body></html>';
+  let keeper = '', pageKeeper = '', companyId = '', pageKey = '', pageAsk = '';
+  const ownerPage = '<!doctype html><html><head><meta charset="utf-8"><title>p</title></head><body>THE OWNERS PAGE</body></html>';
+  const pageNow = async () => {
+    const r = await fetch(`${BASE}/v1/storage/${pageKey}`, { headers: { Authorization: `Bearer ${owner.token}` } });
+    return `${r.status} ${await r.text()}`;
+  };
+  const keepAs = (bearer: string, key?: string) =>
+    api(`/v1/connections/${readConn}/files/store`, { bearer, body: { drive_id: DRIVE, item_id: FILE, ...(key ? { key } : {}) } });
+  await test('setup: a company with its own page, and two apps of the owner that keep SharePoint files', async () => {
+    const { appGrantToken } = await import('./helpers/purpose-kit.js');
+    keeper = await appGrantToken(owner, `spkeep${stamp}.html`, 'connections:read-through storage:read storage:write', appHtml, BASE);
+    pageKeeper = await appGrantToken(owner, `sppage${stamp}.html`, 'connections:read-through storage:read storage:write company:write', appHtml, BASE);
+    const co = await api('/v1/companies', { bearer: owner.token, body: { name: `Kansio Oy ${stamp}` } });
+    assert(co.status === 201, `company: ${co.status} ${JSON.stringify(co.data?.error)}`);
+    companyId = co.data.data.company.id;
+    pageKey = `company/${companyId}/index.html`;
+    const pub = await api(`/v1/companies/${companyId}/portfolio`, { method: 'PUT', bearer: owner.token, body: { html: ownerPage } });
+    assert(pub.status === 200, `company page: ${pub.status} ${JSON.stringify(pub.data?.error)}`);
+    assert((await pageNow()).includes('THE OWNERS PAGE'), 'the page was not stored');
+  });
+  await test('designed use: an app with file access keeps a file under its own key and under a key it names', async () => {
+    const plain = await keepAs(keeper);
+    assert(plain.status === 201 && String(plain.data.data.stored.key).startsWith('sharepoint/'), `no key: ${plain.status} ${JSON.stringify(plain.data.error)}`);
+    const named = await keepAs(keeper, `notes/${stamp}/minutes.txt`);
+    assert(named.status === 201 && named.data.data.stored.key === `notes/${stamp}/minutes.txt`, `named key: ${named.status} ${JSON.stringify(named.data.error)}`);
+    const beside = await keepAs(keeper, `company/${companyId}/minutes.txt`);
+    assert(beside.status === 201, `a key beside the page: ${beside.status} ${JSON.stringify(beside.data.error)}`);
+  });
+  await test('attack: an app without company:write cannot keep a file over the company page', async () => {
+    const r = await keepAs(keeper, pageKey);
+    assert(r.status === 403 && r.data.error?.code === 'FORBIDDEN', `keep over the page: ${r.status} ${JSON.stringify(r.data.error ?? r.data.data)}`);
+    assert(String(r.data.error?.message).includes(`PUT /v1/companies/${companyId}/portfolio`), `the refusal names the page route: ${r.data.error?.message}`);
+    const now = await pageNow();
+    assert(now.includes('THE OWNERS PAGE') && !now.includes('Board minutes'), `the page now: ${now.slice(0, 120)}`);
+  });
+  await test('the owner is asked once with one press', async () => {
+    const list = await api('/v1/publish-requests', { method: 'GET', bearer: owner.token });
+    const asked = ((list.data?.data?.requests ?? []) as any[]).filter((r) => r.kind === 'company-page-write' && r.state === 'awaiting_owner');
+    assert(asked.length === 1, `waiting questions: ${JSON.stringify(asked.map((r) => [r.id, r.kind]))}`);
+    pageAsk = asked[0].id;
+  });
+  await test('designed use: the owner in person, and an app holding company:write, keep a file over the page', async () => {
+    const own = await keepAs(owner.token, pageKey);
+    assert(own.status === 201, `owner in person: ${own.status} ${JSON.stringify(own.data.error)}`);
+    const pageApp = await keepAs(pageKeeper, pageKey);
+    assert(pageApp.status === 201, `company:write app: ${pageApp.status} ${JSON.stringify(pageApp.data.error)}`);
+    assert((await pageNow()).includes('Board minutes'), 'the page does not hold the kept file');
+  });
+  await test('designed use: once the owner allows it, the app\'s next keep lands', async () => {
+    const d = await api(`/v1/publish-requests/${pageAsk}/decision`, { bearer: owner.token, body: { decision: 'approve' } });
+    assert(d.status === 200 && d.data.data.request.state === 'approved', `decision: ${d.status} ${JSON.stringify(d.data.error ?? d.data.data?.request?.state)}`);
+    const r = await keepAs(keeper, pageKey);
+    assert(r.status === 201, `after the press: ${r.status} ${JSON.stringify(r.data.error)}`);
+  });
+  await test('designed use: an agent with storage:write keeps a file over MCP as before', async () => {
+    const agent = await makeAgent(BASE, owner, ['connections:read', 'connections:read-through', 'connections:read-as-owner', 'storage:write']);
+    const session = await openSession(BASE, agent.token, 'e2e-files-keeper');
+    const keep = await callTool(session, 'aimeat_files_get', { connection_id: readConn, drive_id: DRIVE, item_id: FILE, as: 'store' });
+    assert(!keep.isError && String(keep.data.stored.key).startsWith('sharepoint/'), `keep over MCP: ${keep.text.slice(0, 200)}`);
+    const named = await callTool(session, 'aimeat_files_get', { connection_id: readConn, drive_id: DRIVE, item_id: FILE, as: 'store', key: `company/${companyId}/index.html` });
+    assert(!named.isError, `an agent's own namespace holds no company page: ${named.text.slice(0, 200)}`);
   });
 } finally {
   globalThis.fetch = inner;

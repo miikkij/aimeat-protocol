@@ -70946,7 +70946,9 @@ paths:
         Needs `connections:read-through` and `storage:write`. The file becomes a private file of the
         caller's owner, up to the node's per-file limit and within the account's quota, tagged
         `sharepoint` and `sharepoint-item:<item id>`. `key` defaults to
-        `sharepoint/<item id>/<file name>`.
+        `sharepoint/<item id>/<file name>`. A `key` a page origin serves asks what `POST /v1/storage`
+        asks: `company/<id>/index.html` needs the owner in person, `company:write`, or the owner's
+        one-press answer to the request this files (kind `company-page-write`).
       tags: [Connections]
       security:
         - BearerAuth: []
@@ -70974,7 +70976,9 @@ paths:
         '201':
           description: "{ stored: { key }, source }"
         '403':
-          description: SCOPE_DENIED, READ_AS_OWNER_REQUIRED, MISSING_PERMISSION or REFUSED_BY_PROVIDER.
+          description: >
+            SCOPE_DENIED, READ_AS_OWNER_REQUIRED, MISSING_PERMISSION or REFUSED_BY_PROVIDER; FORBIDDEN
+            for a company page key the caller may not change (the message names the waiting request).
         '404':
           description: No such connection of yours.
         '413':

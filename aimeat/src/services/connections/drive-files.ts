@@ -19,8 +19,11 @@
  *   and when it last changed, and a stored copy carries the item in its tags, so a later read can ask
  *   the library's changes (`changes`, Graph's delta) whether the copy is stale.
  * @structure DriveFile · fetchDriveFile() · driveFileText() · storeDriveFile()
- * @usage const out = await storeDriveFile(ctx, deps, owner, connectionId, { drive_id, item_id });
+ * @usage const out = await storeDriveFile(ctx, deps, owner, connectionId, { drive_id, item_id }, { caller, app });
  * @version-history
+ *   v1.1.0 — 2026-11-02 — storeDriveFile takes the caller and hands it to the storage write, so keeping
+ *     a file at a key a page origin serves asks what the file routes ask (secaudit2026nov02d round 13,
+ *     drive-files.ts:storeDriveFile:company-page-key-unfenced-no-page-writer).
  *   v1.0.0 — 2026-11-02 — Initial (wish-sharepoint-liitin-tiedostot-luettaviksi-ja-kirjoitettaviksi-).
  */
 import type { ConnectContext } from './oauth.js';
@@ -28,6 +31,7 @@ import { readResource } from './read.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
 import { writeStorageFile, type StorageWriteDeps } from '../storage-file-write.js';
+import type { CallerContext } from '../caller-context.js';
 import { extractFileText } from '../file-text/index.js';
 import { pdfReadLimits } from '../file-text/pdf-bounded.js';
 import { logger } from '../../utils/logger.js';
@@ -150,10 +154,19 @@ function safeKeyName(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '').slice(0, 120) || 'file';
 }
 
-/** One file kept as a private file of `ownerGhii`, tagged with the item it came from. */
+/**
+ * One file kept as a private file of `ownerGhii`, tagged with the item it came from.
+ *
+ * `writer` is the caller the route or MCP tool serves, handed to the storage write as its
+ * `publishGate` the way the generic file routes hand it. A key a page origin serves
+ * (`company/<id>/index.html`, `portfolio/index.html`) then asks what those routes ask
+ * (services/storage-page-keys.ts): without a writer the fence reads the write as the node's own and
+ * asks nothing (secaudit2026nov02d round 13). The file is stored private either way.
+ */
 export async function storeDriveFile(
   ctx: ConnectContext, deps: StorageWriteDeps, ownerGhii: string, connectionId: string,
   input: { drive_id?: unknown; item_id?: unknown; key?: unknown },
+  writer: { caller: CallerContext; app?: string },
 ): Promise<{ ok: true; key: string; source: DriveSource } | { ok: false; status: number; code: string; message: string }> {
   const fileMax = deps.config.storageMaxFileSizeMb * 1024 * 1024;
   const got = await fetchDriveFile(ctx, connectionId, input, fileMax);
@@ -164,6 +177,7 @@ export async function storeDriveFile(
   const written = await writeStorageFile(deps, ownerGhii, {
     key, data: bytes, mimeType: source.mime_type, visibility: 'private',
     tags: ['sharepoint', `sharepoint-item:${safeKeyName(source.item_id)}`],
+    publishGate: writer,
   });
   if (!written.ok) return { ok: false, status: written.status, code: written.code, message: written.message };
   return { ok: true, key, source };
