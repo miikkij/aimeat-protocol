@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.18.0 -- 2026-11-02 -- An ecosystem app's call: the record names the app as who asked (aiAskerOf), and its modelRole is not an app role it never declared (secaudit2026nov02d round 13).
  *   v3.17.0 -- 2026-11-01 -- `requires.tools` reaches the route plan, so a region whose endpoint has no tool calling is passed over (ai.region_mode).
  *   v3.16.0 -- 2026-10-31 -- settleAiCall passes media.genRules to the record; a call with none states none, so a node-observed record never reads as an arrival.
  *   v3.15.1 -- 2026-10-27 -- prepareAiCall tells the owner once when a bare allowlist entry lets another author's app in (ai/app-name-notice.ts; secaudit2026oct26).
@@ -177,7 +178,7 @@ import type { AiCallOutcome, AiCallSettlement } from './call-outcome.js';
 import { textCallInputTokens } from './call-size.js';
 import { noticeBareNameMatch } from './app-name-notice.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from '../ai-usage-record.js';
-import { agentCapRefusal } from '../agent-ai-keys.js';
+import { agentCapRefusal, aiAskerOf } from '../agent-ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
 import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from '../ai-daily-budget.js';
 export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
@@ -432,7 +433,8 @@ async function planAiCall(
   let role: ResolvedRole | undefined;
   if (rolesRecord && !requested && !opts.provider) {
     const allRoles = rolesWithLegacy(rolesRecord, prefs, providers);
-    const name = opts.role ?? (opts.modelRole && allRoles[opts.modelRole]?.capabilities[capability]?.length ? opts.modelRole : undefined);
+    // An ecosystem app (`eco:<app>`) has no published meta, so it declares no role: its modelRole picks the model below, as it did while it paid as itself.
+    const name = opts.role ?? (opts.modelRole && !opts.verifiedApp?.startsWith('eco:') && allRoles[opts.modelRole]?.capabilities[capability]?.length ? opts.modelRole : undefined);
     if (name) {
       const declaredByApp = !!appMeta?.roles?.some((r) => r.name === name);
       const appCall = !!opts.verifiedApp || (!!opts.appId && declaredByApp);
@@ -529,7 +531,7 @@ export async function recordFailedAttempts(
   for (const f of failed) {
     await recordAiUsage(storage, gaii, plan.usage, {
       costUsd: f.costUsd, tokens: 0, appId: plan.appId ?? call.appId, model: f.candidate.model, provider: f.candidate.provider.id,
-      source: `${call.source}:failed-${f.error}`, apiKeyScope: f.candidate.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
+      source: `${call.source}:failed-${f.error}`, apiKeyScope: f.candidate.keyScope, ...(plan.agent ? { agent: plan.agent } : {}), ...(plan.appId ? { verifiedApp: plan.appId } : {}),
     }, config);
     if (f.candidate.keyScope === 'node' && f.costUsd > 0) await debitAllowance(storage, config, gaii, f.costUsd);
   }
@@ -559,7 +561,7 @@ export async function settleAiCall(
     ...(outcome.units?.seconds !== undefined ? { audioSeconds: outcome.units.seconds } : {}),
     model: outcome.model, provider: plan.provider,
     promptTokens: outcome.promptTokens, completionTokens: outcome.completionTokens,
-    source: outcome.source, apiKeyScope: plan.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
+    source: outcome.source, apiKeyScope: plan.keyScope, ...(plan.agent ? { agent: plan.agent } : {}), ...(plan.appId ? { verifiedApp: plan.appId } : {}),
     ...(outcome.priceRef ? { priceRef: outcome.priceRef } : {}),
   }, config);
   // Only the node's key draws down an allowance. An own key is the person's own account.
@@ -590,7 +592,7 @@ export async function settleAiCall(
         stampedBy: 'node',
         ownerGhii: gaii,
         // The payer is the human; WHO ASKED is still the agent, and attribution keeps the exact caller.
-        principal: plan.agent ? `${plan.agent}#${gaii}` : gaii,
+        principal: aiAskerOf(gaii, { ...(plan.agent ? { agent: plan.agent } : {}), ...(plan.appId ? { app: plan.appId } : {}) }),
         level: 'ai-generated',
         humanInvolvement: 'none',
         method: outcome.media?.method ?? 'fully-generated',

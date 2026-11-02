@@ -11,6 +11,8 @@
  * @structure UsageRecord · todayKey · getTodayUsage · recordAiUsage
  * @usage import { getTodayUsage, recordAiUsage, type UsageRecord } from './ai/completion.js';
  * @version-history
+ *   v1.4.0 — 2026-11-02 — `verifiedApp` on a call: the ledger names an ecosystem app as who asked
+ *     beside its owner who paid (aiAskerOf; secaudit2026nov02d round 13).
  *   v1.3.0 — 2026-10-03 — A call that names no app is filed under its endpoint (`source`) instead of
  *     `_unknown`, and `per_agent` splits each agent's spend by app or endpoint.
  *   v1.2.0 — 2026-09-28 — `priceRef` on a call: the ledger cites where a caller-priced cost came from
@@ -25,7 +27,7 @@ import { logger } from '../utils/logger.js';
 import { recordUsageEvent } from './usage-metering.js';
 import { recordAccountEvent } from './account-events.js';
 import { canonicalAiAppId, mergePerApp } from './ai-app-id.js';
-import { addAgentSpend } from './agent-ai-keys.js';
+import { addAgentSpend, aiAskerOf } from './agent-ai-keys.js';
 
 export interface UsageRecord {
   /** ISO date key (YYYY-MM-DD). */
@@ -138,6 +140,9 @@ async function appendAiUsage(
     apiKeyScope?: 'agent' | 'own' | 'node';
     /** The bare name of the owner's agent that asked, when one did. Feeds `per_agent`. */
     agent?: string;
+    /** The app the node identified (the plan's, never a body's app_id): an ecosystem app `eco:<app>`
+     *  is named in the ledger as who asked. */
+    verifiedApp?: string;
     /** What the ledger cites for `costUsd` when the caller priced it: a catalogue snapshot, `estimate`. */
     priceRef?: string;
   },
@@ -187,8 +192,8 @@ async function appendAiUsage(
   if (call.model) {
     try {
       await recordUsageEvent(storage, {
-        // The ledger names who asked beside who paid: an agent's call is paid by its owner.
-        agentGaii: call.agent ? `${call.agent}#${gaii}` : gaii,
+        // The ledger names who asked beside who paid: an agent's or an ecosystem app's call is paid by its owner.
+        agentGaii: aiAskerOf(gaii, { ...(call.agent ? { agent: call.agent } : {}), ...(call.verifiedApp ? { app: call.verifiedApp } : {}) }),
         ownerGhii: gaii,
         model: call.model,
         provider: call.provider,

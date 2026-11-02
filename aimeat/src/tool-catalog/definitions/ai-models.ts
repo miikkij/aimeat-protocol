@@ -7,6 +7,7 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   2026-11-02 — aimeat_ai_gen_rules_set: an exception may name an ecosystem app, eco:<name> (secaudit2026nov02d round 13).
  *   2026-10-31 — aimeat_ai_routing_set names rules.openrouterRegion and rules.openrouterRegionFallback, and
  *     aimeat_ai_providers its openrouter_region (Jouni, 2026-10-31).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -89,7 +90,7 @@ export const aiModelTools = [
     description: 'Change which generation rules apply to the owner\'s AI images and videos, with PROPOSE-THEN-CONFIRM. '
       + 'With gen_rules and no confirm_token: changes NOTHING and returns the current and proposed rules with a single-use '
       + 'token (10 min) bound to exactly that change; show it to the owner. With the same gen_rules plus the token: applies it. '
-      + 'gen_rules: { rules?: { "<rule id>": true | false | null }, exceptions?: [{ rule, app: "<owner>/<file>.html" | agent: '
+      + 'gen_rules: { rules?: { "<rule id>": true | false | null }, exceptions?: [{ rule, app: "<owner>/<file>.html" or an ecosystem app\'s "eco:<name>" | agent: '
       + '"<name>", reason }] }. rules is merged (null: follow the node again); exceptions, when given, replaces the list. A rule '
       + 'the node requires cannot be switched off or exempted. Read the rules first (aimeat_ai_gen_rules).',
     input: {

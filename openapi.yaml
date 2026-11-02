@@ -20472,7 +20472,7 @@ paths:
                         required: [rule, reason]
                         properties:
                           rule: { type: string }
-                          app: { type: string, description: '<owner>/<file>.html. Exactly one of app or agent.' }
+                          app: { type: string, description: '<owner>/<file>.html, or eco:<name> for an ecosystem app of the owner. Exactly one of app or agent.' }
                           agent: { type: string, description: 'An agent of the owner, by name.' }
                           reason: { type: string, maxLength: 300 }
                 confirm_token:

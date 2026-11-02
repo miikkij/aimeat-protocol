@@ -34,6 +34,8 @@
  *   const agent = agentNameOf(caller.principal, caller.gaii);
  *   const key = agent ? await readAgentKey(storage, config, caller.gaii, agent, 'decide') : null;
  * @version-history
+ *   v1.4.0 — 2026-11-02 — aiPayerOf: an ecosystem app is paid by its owner, as the owner's app
+ *     `eco:<app>`; aiAskerOf names who asked (secaudit2026nov02d round 13).
  *   v1.3.0 — 2026-10-18 — writeAgentKey and writeAgentCap merge into the record as stored, on its
  *     version (updatePrivateRecord), so two changes at the same moment both persist
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -50,7 +52,7 @@ import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
 import { updatePrivateRecord } from './private-record.js';
 import { UNCHANGED } from './record-cas.js';
 import { emitChange } from './event-bus.js';
-import { parseGAII, isValidAgentName } from '../utils/gaii.js';
+import { parseGAII, parseGEAI, isValidGEAI, isValidAgentName, ECO_PREFIX } from '../utils/gaii.js';
 
 /** The two models an agent may hold a key for. */
 export type AgentAiModel = 'decide' | 'openrouter';
@@ -86,11 +88,29 @@ export function agentNameOf(principal: string, ownerGhii: string): string | null
  * (routes/ai-voice.ts, ownerGhiiOf) already paid from the owner; this makes text the same, and the
  * order agent key, owner key, server key true on every AI door.
  *
- * Only an AGENT is moved. An ecosystem app (`eco:`) is not a GAII and keeps paying as itself.
+ * An ecosystem app (`eco:<app>#<owner>@<node>`) is paid by its owner too, as the owner's app
+ * `eco:<app>` (`ecoApp`): the owner's key, settings, app allowlist, per-app cap, daily budget and
+ * node-key allowance apply to it, and its spend shows on the owner's usage under that name. Until
+ * 2026-11-02 it paid as itself, from its own `eco:` namespace, outside the owner's settings and with
+ * a free starter allowance of its own per app (secaudit2026nov02d round 13). Storage is not moved:
+ * what the app keeps stays in its own namespace (utils/gaii.ts resolveIdentity).
  */
-export function aiPayerOf(principal: string): { payer: string; agent?: string } {
+export function aiPayerOf(principal: string): { payer: string; agent?: string; ecoApp?: string } {
   const p = parseGAII(principal);
-  return p ? { payer: `${p.owner}@${p.node}`, agent: p.agent } : { payer: principal };
+  if (p) return { payer: `${p.owner}@${p.node}`, agent: p.agent };
+  const e = parseGEAI(principal);
+  return e ? { payer: `${e.owner}@${e.node}`, ecoApp: `${ECO_PREFIX}${e.app}` } : { payer: principal };
+}
+
+/**
+ * Who asked for a call, as the provenance record and the usage ledger name it beside the payer: the
+ * agent's GAII, the ecosystem app's GEAI (`app` is `eco:<app>`, as aiPayerOf names it), or the payer.
+ * `app` is the app the node identified (the plan's verified app), never a request body's word.
+ */
+export function aiAskerOf(payer: string, who: { agent?: string; app?: string }): string {
+  if (who.agent) return `${who.agent}#${payer}`;
+  if (who.app?.startsWith(ECO_PREFIX) && isValidGEAI(`${who.app}#${payer}`)) return `${who.app}#${payer}`;
+  return payer;
 }
 
 export function agentKeyRecord(model: AgentAiModel, agent: string): string {

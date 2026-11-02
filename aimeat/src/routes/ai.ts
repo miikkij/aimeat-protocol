@@ -22,6 +22,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-11-02 — An ecosystem app's call is paid by its owner as the owner's app (aiPayerOf); its
+ *     picture stays in its own namespace (secaudit2026nov02d round 13).
  *   2026-10-31 — POST /v1/ai/image takes gen_rules_bypass (the owner in person only) and answers
  *     gen_rules: what each generation rule did (services/ai/gen-rules.ts).
  *   2026-10-21 — POST /v1/ai/image with public: true asks the node's publish gate as POST /v1/storage
@@ -401,8 +403,10 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       res.setTimeout(300_000);
 
       // Paid by the human, in the agent's name, like /v1/ai/complete; the picture lands in the
-      // payer's storage, which is where the MCP tool has always put it.
-      const { payer: gaii, agent } = aiPayerOf(resolve(req));
+      // payer's storage, which is where the MCP tool has always put it. An ecosystem app's picture
+      // stays in its own namespace, where it has always landed, while its owner pays.
+      const { payer: gaii, agent, ecoApp } = aiPayerOf(resolve(req));
+      const holder = ecoApp ? resolve(req) : gaii;
       const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback, role: roleField, reference_images, mask, gen_rules_bypass } = req.body as {
         prompt?: string; model?: string; size?: string; storage_key?: string;
         public?: boolean; app_id?: string; provider?: string; fallback?: boolean; role?: unknown;
@@ -422,7 +426,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         // No cancel on a client disconnect: the picture is stored and billed when it arrives, as it
         // always has been, because a provider may charge for a generation the node stopped reading.
         const r = await generateForOwner(storage, config, gaii, {
-          prompt: prompt ?? '', model, size, storageKey: storage_key,
+          prompt: prompt ?? '', model, size, storageKey: storage_key, ...(holder !== gaii ? { storeIn: holder } : {}),
           publicVisibility: isPublic === true, appId: app_id,
           // A public picture asks the node's publish gate as POST /v1/storage asks it for the same
           // bytes: a caller the owner is asked about gets it private, with a request (202 below).
@@ -441,7 +445,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         // for and an app holding only ai:use does not have. A signed address that loads without a
         // sign-in for an hour lets the caller show what it just paid for (System 2, V5).
         const download = r.visibility === 'private'
-          ? await generateDownloadToken({ sub: gaii, key: r.storageKey, mimeType: r.mime, size: r.sizeBytes, version: r.createdAt }, IMAGE_DOWNLOAD_TTL_SECONDS)
+          ? await generateDownloadToken({ sub: holder, key: r.storageKey, mimeType: r.mime, size: r.sizeBytes, version: r.createdAt }, IMAGE_DOWNLOAD_TTL_SECONDS)
           : null;
         // 202 when the picture was stored private and making it public waits for the owner, as the
         // storage upload answers it.

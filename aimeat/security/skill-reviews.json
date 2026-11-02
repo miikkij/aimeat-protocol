@@ -109,11 +109,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:0c43e49d702a84d6589266c4"
+      "digest": "sha256:2a8ef3e6955a388003f434ce"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-11-02",
@@ -294,13 +294,13 @@
       "digest": "sha256:e889ce5039a1ecdeff09bd30"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:1f11d34d798e7dd0cef775fc"
+      "digest": "sha256:5ad0707f9c990a8a8f97242d"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -312,14 +312,14 @@
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
     "node:aimeat-gen-rules": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-02",
       "watches": [
         "aimeat/src/services/ai/gen-rules.ts",
         "aimeat/src/services/ai/gen-rules-store.ts",
         "aimeat/src/routes/ai-gen-rules.ts",
         "aimeat/src/services/ai-image.ts"
       ],
-      "digest": "sha256:2d418558132de8fbc92e13f6"
+      "digest": "sha256:622dba3980dc13c20bec75c6"
     },
     "node:aimeat-extension-builder": {
       "reviewedOn": "2026-11-01",
@@ -551,7 +551,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "876de32badaa400b"
+      "aimeat/src/services/ai/completion.ts": "c32d059d7d28e112"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "4ed56ffc46c5c924",
@@ -657,7 +657,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "730fc1b3ae6e6311",
+      "aimeat/src/routes/ai.ts": "fdeb7962348bd8fd",
       "aimeat/src/routes/ai-providers.ts": "41e102a20bb078b2",
       "aimeat/src/services/ai/routing.ts": "3ab2ace7eeab4d80"
     },
@@ -822,10 +822,10 @@
       "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949"
     },
     "node:aimeat-gen-rules": {
-      "aimeat/src/services/ai/gen-rules.ts": "0f9bece086232cec",
+      "aimeat/src/services/ai/gen-rules.ts": "8cf30c2a05b14cbc",
       "aimeat/src/services/ai/gen-rules-store.ts": "34377e884aa25b71",
       "aimeat/src/routes/ai-gen-rules.ts": "012cd2933649f50b",
-      "aimeat/src/services/ai-image.ts": "107d839179362cae"
+      "aimeat/src/services/ai-image.ts": "53c0267de7433bf0"
     }
   }
 }
