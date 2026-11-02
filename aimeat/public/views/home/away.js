@@ -17,9 +17,12 @@
  *   without a card, and blocked storage only means no card.
  *
  *   ONLY ON A NODE THE STORE SOLD (site.js customerNode()), and only from the second visit.
- * @structure AwayCard() · useAgentNames(on) · internal: readVisit, noteVisit, AWAY_AFTER_MS, ROWS
+ * @structure AwayCard() · internal: readVisit, noteVisit, AWAY_AFTER_MS, ROWS
  * @usage html`<${AwayCard} />`
  * @version-history
+ *   v1.2.0 — 2026-11-02 — The row rules (shown names, the new-agent sentence, no cost line) live in
+ *     feed.js (shownLine, isBookkeeping) and useAgentNames in agent-names.js, so the Home feed follows
+ *     them too (commercial's crew64 round). The card is unchanged.
  *   v1.1.1 — 2026-11-02 — The day's AI cost (ai_spend_daily) is left out: bookkeeping in dollars, not
  *     news (commercial's crew61 test).
  *   v1.1.0 — 2026-11-02 — An agent is named by the name the person sees (GET /v1/agents), a title that
@@ -36,9 +39,9 @@ import { customerNode } from '/js/site.js';
 import { useShared } from '/views/surface/shared-read.js';
 import { Timeline, TimelineRow } from '/components/Timeline.js';
 import { Note } from '/components/Note.js';
-import { line, kindCategory } from './feed.js';
+import { kindCategory, shownLine, isBookkeeping } from './feed.js';
 import { titleOf } from '/js/services/notifications.js';
-import { getSession } from '/js/services/auth.js';
+import { useAgentNames } from './agent-names.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -81,47 +84,8 @@ function noteVisit(now = Date.now()) {
   return awaySince;
 }
 
-/**
- * The names the person sees for their agents, by short name (GET /v1/agents, as the Agents page), and
- * a function that gives the shown name for a short one. One key and one shape for every caller, since
- * useShared caches by key. The activity log reads it too.
- * @param {boolean} [on]
- * @returns {(short: string) => string}
- */
-export function useAgentNames(on = true) {
-  const owner = getSession()?.owner || '';
-  const { data: names } = useShared('agent-display-names', on && owner ? `/v1/agents?owner=${encodeURIComponent(owner)}` : null,
-    ['agents'], (d) => Object.fromEntries((d?.agents || d || []).map((a) => [a.name, a.display_name || a.displayName || a.name])));
-  return (short) => (names && names[short]) || short;
-}
-
-/**
- * Feed rows that are bookkeeping, not news for a person coming back: the day's AI cost in dollars
- * with an ISO date (commercial's crew61 test: "AI maksoi $0.0078 päivänä 2026-11-01." was the first
- * line). The feed's history keeps them.
- */
-const NOT_NEWS = new Set(['ai_spend_daily', 'agent_knocking']);
-
-/** The events whose `data.agent` is an agent's short name (services/agent-task-fanout.ts and friends). */
-const AGENT_KINDS = new Set(['agent_task_done', 'agent_task_failed', 'agent_task_declined']);
-
-/**
- * One feed row in the card's words. An agent is named by the name the person sees, not its short
- * name; a title that only repeats that name is left out; a new agent is said plainly, not as the
- * feed's "is home" (commercial's crew59 test: "morning-digest sai valmiiksi: Aamukatsaus" and
- * "morning-digest on kotona").
- */
-function awayLine(item, shownName) {
-  const d = item.data || {};
-  if (item.kind === 'agent_connected') {
-    const name = shownName(d.name || d.agent || '');
-    return name ? tr('home.away.agentNew', 'A new agent is at work: {name}').replace('{name}', name) : '';
-  }
-  if (!AGENT_KINDS.has(item.kind)) return line(item);
-  const agent = shownName(d.agent || '');
-  const title = String(d.title || '').trim().toLowerCase() === agent.toLowerCase() ? '' : d.title;
-  return line({ ...item, data: { ...d, agent, title } });
-}
+/** Rows that are not news for a person coming back: the live "agent knocking" state. */
+const NOT_NEWS = new Set(['agent_knocking']);
 
 /** A notification's own address when it is a page of this node, else the Notifications page. */
 const notifHref = (n) => (typeof n?.link === 'string' && n.link.startsWith('/') && !n.link.startsWith('//') ? n.link : '/v1/profile?tab=notifications');
@@ -137,8 +101,8 @@ export function AwayCard() {
 
   const after = Date.parse(since);
   const rows = [
-    ...feed.filter((it) => Date.parse(it.at) > after && !NOT_NEWS.has(it.kind))
-      .map((it) => ({ at: it.at, category: kindCategory(it.kind), href: it.link, text: awayLine(it, shownName) }))
+    ...feed.filter((it) => Date.parse(it.at) > after && !NOT_NEWS.has(it.kind) && !isBookkeeping(it))
+      .map((it) => ({ at: it.at, category: kindCategory(it.kind), href: it.link, text: shownLine(it, shownName) }))
       .filter((r) => r.text),
     ...notes.filter((n) => Date.parse(n.createdAt) > after && titleOf(n))
       .map((n) => ({ at: n.createdAt, category: 'system', href: notifHref(n), text: titleOf(n) })),
