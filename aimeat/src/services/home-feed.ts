@@ -22,10 +22,12 @@
  *   K1: the feed is the account holder's own. Not public, so nothing here needs moderation,
  *   visibility rules or a way to take a row back. Making it public is a separate decision and a
  *   separate piece of work.
- * @structure readHomeFeed(storage, config, owner, opts) → FeedItem[]
+ * @structure readHomeFeed(storage, config, owner, opts) → FeedItem[] ·
+ *   homeFeedAnswer(storage, config, owner, reader) → { items, total, note? }
  * @usage
- *   import { readHomeFeed } from '../services/home-feed.js';
+ *   import { readHomeFeed, homeFeedAnswer } from '../services/home-feed.js';
  * @version-history
+ *   v2.2.0 — 2026-11-02 — homeFeedAnswer: the answer GET /v1/home/feed and aimeat_home_feed both give, with the live knocking row.
  *   v2.1.0 — 2026-10-22 — readHomeFeed takes the reader and projects each recorded row for them (services/account-event-view.ts): a task row's title and decline reason only for the owner in person, an app grant holding task:read and the task's own agent; every other reader keeps the row and its `withheld` fields are named (secaudit 2026-10, v89).
  *   v2.0.0 — 2026-08-17 — The derived path is gone. Every row but the live one comes from
  *     AccountEvent; onboarding records its own at the marker. backfillHomeFeed() converts an
@@ -38,7 +40,7 @@ import type { Storage, AccountEventKind } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { readAccountEvents, recordAccountEvent } from './account-events.js';
-import { projectAccountEvents, type AccountEventReader } from './account-event-view.js';
+import { projectAccountEvents, TASK_CONTENT_NOTE, type AccountEventReader } from './account-event-view.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
@@ -109,6 +111,19 @@ export async function readHomeFeed(
     }
 
     return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
+}
+
+/**
+ * The answer GET /v1/home/feed and aimeat_home_feed give: the feed with the live "an agent is
+ * knocking" row, for this reader, and the note when a task row's fields were taken out.
+ */
+export async function homeFeedAnswer(
+    storage: Storage, config: AimeatConfig, owner: string, reader: AccountEventReader,
+): Promise<{ items: FeedItem[]; total: number; note?: string }> {
+    const pending = await storage.listPendingDeviceAuthByOwner(owner);
+    const items = await readHomeFeed(storage, config, owner, { pendingAgents: pending.length, reader });
+    const withheld = items.some(i => !!i.withheld);
+    return { items, total: items.length, ...(withheld ? { note: TASK_CONTENT_NOTE } : {}) };
 }
 
 /** Which marker becomes which row, for an account that predates the recorded feed. */

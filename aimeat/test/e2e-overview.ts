@@ -11,6 +11,7 @@
  *   without organism:read sees the organisms but not the workspace names inside them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=overview
  * @version-history
+ *   v1.1.0 — 2026-11-02 — aimeat_home_feed: the home's rows over MCP, and its refusal without memory:read.
  *   v1.0.0 — 2026-10-31 — Initial (wish-kokonaiskuva-koneet-agentit-sovellukset-tieto-ja-tarjoukset-).
  */
 import * as ed from '@noble/ed25519';
@@ -217,6 +218,28 @@ const overview = (tok: string, q = '') => json(`/v1/overview${q}`, { headers: au
         assert(!f.isError && JSON.parse(f.text).items.some((i: any) => i.id === 'agent:scribe'), `focus: ${f.text.slice(0, 200)}`);
         const nf = await call('aimeat_overview', { focus: 'app:nothing.html' });
         assert(nf.isError && nf.text.includes('NOT_FOUND'), `unknown focus: ${nf.text.slice(0, 200)}`);
+    });
+
+    // FAILED FIRST: before src/mcp/home-feed.ts there was no such tool, and the person's chat said
+    // the home page showed nothing (c9's round on crew68, 2.11).
+    await test('MCP: aimeat_home_feed answers the rows GET /v1/home/feed gives the page, to an agent with memory:read', async () => {
+        const rest = await json('/v1/home/feed', { headers: auth(blind.token) });
+        assert(rest.status === 200, `REST ${rest.status}: ${JSON.stringify(rest.body?.error)}`);
+        const call = await mcpSession(blind.token);
+        const m = await call('aimeat_home_feed', {});
+        assert(!m.isError, `call: ${m.text.slice(0, 200)}`);
+        const v = JSON.parse(m.text);
+        assert(v.total === rest.body.data.total && v.total > 0, `MCP ${v.total} rows, REST ${rest.body.data.total}`);
+        const kinds = (rows: any[]) => rows.map(r => `${r.kind}@${r.at}`).join(',');
+        assert(kinds(v.items) === kinds(rest.body.data.items), `rows differ: ${kinds(v.items)} vs ${kinds(rest.body.data.items)}`);
+    });
+
+    await test('DENIAL: aimeat_home_feed is refused to an agent without memory:read, as the route is', async () => {
+        const rest = await json('/v1/home/feed', { headers: auth(reader.token) });
+        assert(rest.status === 403, `REST ${rest.status}`);
+        const call = await mcpSession(reader.token);
+        const m = await call('aimeat_home_feed', {});
+        assert(m.isError, `MCP answered: ${m.text.slice(0, 200)}`);
     });
 
     await test('an anonymous caller is refused', async () => {
