@@ -10,6 +10,8 @@
  *   paths (prepublishOnly and the nightly pack-smoke job) write the shrinkwrap before packing.
  * @usage pnpm exec vitest run test/unit/npm-shrinkwrap.test.ts
  * @version-history
+ *   v1.1.0 -- 2026-11-03 -- The good tree carries minimatch 11.0.4 and the parent rule pins ^11.0.1
+ *     (GHSA-g3hv-75wg-m249); a case holds the new floor for every minimatch 10.x.
  *   v1.0.0 -- 2026-10-29 -- Initial (secaudit2026oct26 round 8c, operator-01).
  */
 import { createHash } from 'node:crypto';
@@ -39,7 +41,7 @@ function goodTree(): Record<string, Entry> {
         'node_modules/zod': at('4.6.7'),
         'node_modules/cbor-x': at('1.6.8'),
         'node_modules/readdir-glob': at('3.0.0', { dependencies: { minimatch: '^10.2.2' } }),
-        'node_modules/minimatch': at('10.2.5'),
+        'node_modules/minimatch': at('11.0.4'),
         'node_modules/multimatch/node_modules/minimatch': at('3.1.5'),
         'node_modules/qs': at('6.16.1'),
     };
@@ -93,9 +95,18 @@ describe('overrideViolations: a shrinkwrap version that breaks an override is re
     });
 
     it('a parent rule: what readdir-glob@3 resolves (its own nested copy first) must be the pinned minimatch', () => {
-        const tree = { ...goodTree(), 'node_modules/readdir-glob/node_modules/minimatch': at('10.2.6') };
+        // 12.0.0 is outside the parent rule and outside the plain minimatch rule's selector, so only the
+        // parent rule speaks.
+        const tree = { ...goodTree(), 'node_modules/readdir-glob/node_modules/minimatch': at('12.0.0') };
         expect(overrideViolations(tree, OVERRIDES)).toEqual([
-            'node_modules/readdir-glob reaches node_modules/readdir-glob/node_modules/minimatch 10.2.6; override "readdir-glob@3>minimatch" requires 10.2.5',
+            'node_modules/readdir-glob reaches node_modules/readdir-glob/node_modules/minimatch 12.0.0; override "readdir-glob@3>minimatch" requires ^11.0.1',
+        ]);
+    });
+
+    it('a minimatch 10.x anywhere in the tree breaks the advisory floor (GHSA-g3hv-75wg-m249)', () => {
+        const tree = { ...goodTree(), 'node_modules/@eslint/config-array/node_modules/minimatch': at('10.2.6') };
+        expect(overrideViolations(tree, OVERRIDES)).toEqual([
+            'node_modules/@eslint/config-array/node_modules/minimatch is 10.2.6; override "minimatch@>=10.0.0 <11.0.1" requires ^11.0.1',
         ]);
     });
 
