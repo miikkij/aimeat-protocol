@@ -21,6 +21,8 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.14.0 — 2026-11-03 — serveSpa() sets the session hint cookie on a request that carries the refresh
+ *     cookie and no hint (restoreSessionHint), so a session from before the hint restores at boot.
  *   v1.13.0 — 2026-10-31 — A step of signing in (data/sign-in-steps.ts) is served with the static footer
  *     hidden on every node: the store's sign-in window showed the developer links (v27 follow-up B).
  *   v1.12.0 — 2026-10-30 — The static footer follows site.dev_links (devLinksShown()): 'auto' keeps
@@ -65,6 +67,7 @@ import { findPublicPage, type PublicPage } from '../data/public-pages.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { injectPageBody } from '../utils/page-body.js';
 import { signedInOnly } from '../config-visibility.js';
+import { restoreSessionHint } from '../services/owner-session.js';
 import { buildGlossaryBody } from './glossary.js';
 import { SIGN_IN_STEP_PATHS } from '../data/sign-in-steps.js';
 
@@ -137,6 +140,8 @@ export function serveSpa(
    */
   liveMarkdown?: string,
 ): void {
+  // A session from before the hint cookie gets it on this page load, so the shell restores it at boot.
+  if (res.req) restoreSessionHint(res.req, res, config);
   // A node that shows its content to its own accounts only: the shell is served to everybody (a page
   // load carries no session), so it carries no person, app or live list. The page reads its content
   // through the API, which refuses a stranger (middleware/content-access-gate.ts).

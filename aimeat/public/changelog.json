@@ -222,7 +222,7 @@
       },
       "body": {
         "en": "A public data product has its own page with its columns, freshness, licence, how it was made and the steps for Excel, Power BI, DuckDB, Python and your own AI. The node also lists public tables in a DCAT catalogue that open data portals such as avoindata.fi and data.europa.eu can read, in its sitemap and in search, and its ODPS description says who may read it.",
-        "fi": "Julkisella datatuotteella on oma sivu. Siinä ovat sarakkeet, tuoreus, lisenssi, tieto siitä, miten taulukko tehtiin, ja ohjeet Exceliin, Power BI:hin, DuckDB:hen, Pythoniin ja omalle tekoälylle. Node listaa julkiset taulukot myös DCAT-katalogiin, jonka avoimen datan portaalit kuten avoindata.fi ja data.europa.eu voivat lukea, sekä sivukarttaan ja hakuun. ODPS-kuvaus kertoo, kuka taulukkoa saa lukea."
+        "fi": "Julkisella datatuotteella on oma sivu. Siinä ovat sarakkeet, ajantasaisuus, lisenssi, tieto siitä, miten taulukko tehtiin, ja ohjeet Exceliin, Power BI:hin, DuckDB:hen, Pythoniin ja omalle tekoälylle. Node listaa julkiset taulukot myös DCAT-katalogiin, jonka avoimen datan portaalit kuten avoindata.fi ja data.europa.eu voivat lukea, sekä sivukarttaan ja hakuun. ODPS-kuvaus kertoo, kuka taulukkoa saa lukea."
       }
     },
     {
@@ -266,7 +266,7 @@
       },
       "body": {
         "en": "Each data product is up to date, late, out of date or without a schedule, measured against what it promised, and a product is as fresh as its oldest source; its EXCHANGE listing and public page show the same state. You get one notice when one goes out of date, and a reader gets an e-mail when a table they read is withdrawn. A version someone still reads under a share is never removed. For the operator, a new setting says whether this node runs a data intermediation service under the EU Data Governance Act, and section 12 of the Compliance page lists what could count as one, the Article 12 conditions and the notification record.",
-        "fi": "Jokainen datatuote on ajan tasalla, myöhässä, vanhentunut tai ilman ajastusta sen mukaan, mitä se lupasi, ja tuote on yhtä tuore kuin sen vanhin lähde. EXCHANGE-tarjous ja julkinen sivu näyttävät saman tilan. Saat yhden ilmoituksen, kun tuote vanhentuu, ja lukija saa sähköpostin, kun hänen lukemansa taulukko vedetään pois. Versiota, jota joku vielä lukee jaon kautta, ei poisteta. Ylläpitäjälle tuli uusi asetus: välittääkö tämä node dataa EU:n datanhallinta-asetuksen mukaisena datanvälityspalveluna. Compliance-sivun osio 12 näyttää, mikä voisi olla välitystä, 12 artiklan ehdot ja ilmoituksen tiedot."
+        "fi": "Jokainen datatuote on ajan tasalla, myöhässä, vanhentunut tai ilman ajastusta sen mukaan, mitä se lupasi, ja tuote on yhtä tuore kuin sen vanhin lähde. EXCHANGE-tarjous ja julkinen sivu näyttävät saman tilan. Saat yhden ilmoituksen, kun tuote vanhentuu, ja lukija saa sähköpostin, kun hänen lukemansa taulukko vedetään pois. Versiota, jota joku vielä lukee jaon kautta, ei poisteta. Ylläpitäjälle tuli uusi asetus: välittääkö tämä node dataa EU:n datanhallinta-asetuksen mukaisena datan välityspalveluna. Compliance-sivun osio 12 näyttää, mikä voisi olla välitystä, 12 artiklan ehdot ja ilmoituksen tiedot."
       }
     },
     {

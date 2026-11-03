@@ -28,6 +28,8 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-03 — publishPackage checks provenance.i18n (normaliseI18n) and provenance.attribution
+ *     (text) for every caller, so POST /v1/datapackages refuses what the data product path refuses.
  *   2026-11-01 — WP10e: `licenses[]` names the deed and the licence's name (./licences.ts); a version's
  *     row count and bytes in the history are the sum over its resources, not the first one's; a publish
  *     that points the package back at bytes it had earlier records that return (./version-returns.ts).
@@ -126,6 +128,7 @@ import { pruneOldVersions } from './retention.js';
 import { noticeSuperseded } from './share-notices.js';
 import { emitChange } from '../event-bus.js';
 import { DATAPACKAGES_DOMAIN } from './contract.js';
+import { normaliseI18n } from '../dataproduct/definition.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
 
@@ -197,6 +200,19 @@ export async function publishPackage(
     if (!Array.isArray(input.resources) || input.resources.length === 0) {
         return { ok: false, code: 'INVALID_INPUT', message: 'a package needs at least one resource', issues: [] };
     }
+    // Who to credit and the words per language go into the content hash, so they are checked here,
+    // on every caller, with the data product's own rule (dataproduct/definition.ts normaliseI18n).
+    const i18n = normaliseI18n(input.provenance?.i18n);
+    if (typeof i18n === 'string') return { ok: false, code: 'INVALID_INPUT', message: i18n, issues: [] };
+    const attribution: unknown = input.provenance?.attribution;
+    if (attribution !== undefined && typeof attribution !== 'string') {
+        return { ok: false, code: 'INVALID_INPUT', message: 'provenance.attribution must be text.', issues: [] };
+    }
+    const provenance = { ...(input.provenance ?? {}) };
+    delete provenance.i18n;
+    delete provenance.attribution;
+    if (attribution?.trim()) provenance.attribution = attribution.trim();
+    if (i18n) provenance.i18n = i18n;
     // Who reads it, checked before anything is written: an organism the publisher is not in is
     // refused (services/audience-write.ts). When not named, the node's starting level (plan V5.6),
     // public unless the operator chose otherwise, as every package was before.
@@ -319,7 +335,7 @@ export async function publishPackage(
             producedBy: { gaii: producedBy.gaii, ...(producedBy.run ? { run: producedBy.run } : {}), at: now },
             schemaSource,
             ...(input.parameters ? { parameters: input.parameters } : {}),
-            ...(input.provenance ?? {}),
+            ...provenance,
             ...(supersedes ? { supersedes } : {}),
             ...(input.retentionPolicy ? { retentionPolicy: input.retentionPolicy } : {}),
         },

@@ -4308,7 +4308,7 @@
         "modeText": {
           "di-mode-report": "Mitään ei hylätä. Osio luettelee, mikä tässä asennuksessa voisi olla datanvälitystä, ja ihminen päättää.",
           "di-mode-none": "Tämä asennus ei välitä dataa. Dataa toimittavaa tarjousta ei näytetä kaikille, ja data menee vain nimetyille vastaanottajille.",
-          "di-mode-node": "Ylläpitäjä tarjoaa datanvälityspalvelun ja kirjaa ilmoituksen tiedot alle.",
+          "di-mode-node": "Ylläpitäjä tarjoaa datan välityspalvelun ja kirjaa ilmoituksen tiedot alle.",
           "di-mode-owners": "Asennus on työkalu. Omistaja tai organismi, joka on ilmoittautunut palvelun tarjoajaksi, voi pitää avointa datamarkkinapaikkaa. Muille pätee sama kuin tilassa Ei välitystä."
         },
         "changeSetting": "Muuta asetusta",
@@ -4351,7 +4351,7 @@
           },
           "di-notification-missing": {
             "title": "Ilmoitusta ei ole kirjattu.",
-            "whyNode": "Asennus on asetettu tarjoamaan datanvälityspalvelua. Palvelun tarjoaja tekee ilmoituksen toimivaltaiselle viranomaiselle ennen kuin se aloittaa.",
+            "whyNode": "Asennus on asetettu tarjoamaan datan välityspalvelua. Palvelun tarjoaja tekee ilmoituksen toimivaltaiselle viranomaiselle ennen kuin se aloittaa.",
             "whyOwners": "Asennus antaa ilmoittautuneiden tarjoajien pitää markkinapaikkoja, mutta yksikään omistaja tai organismi ei ole ilmoittautunut."
           },
           "di-node-ai-reads-exchanged": {
@@ -4438,7 +4438,7 @@
           "notifiedOn": "ilmoitettu {date}",
           "record": "Kirjaa ilmoitus",
           "edit": "Muuta ilmoitusta",
-          "formTitle": "Datanvälityspalvelun ilmoitus",
+          "formTitle": "Datan välityspalvelun ilmoitus",
           "formLead": "Kirjaa ilmoitus, jonka palvelun tarjoaja teki Traficomille ennen kuin palvelu alkoi.",
           "legalName": "Oikeushenkilö",
           "businessId": "Y-tunnus",
@@ -5791,7 +5791,7 @@
       "chipOld": "{n} vanhentunutta",
       "chipOld_one": "{n} vanhentunut",
       "colName": "Nimi",
-      "colFresh": "Tuoreus",
+      "colFresh": "Ajantasaisuus",
       "colWho": "Kuka saa käyttää",
       "colReads": "Lukijat",
       "rows": "{n} riviä",
@@ -6009,7 +6009,7 @@
       "catalogue": "Datakatalogi",
       "noDescription": "Taulukko, jonka voit avata Excelissä, Power BI:ssä tai omalla koodillasi.",
       "maker": "Tekijä",
-      "freshness": "Tuoreus",
+      "freshness": "Ajantasaisuus",
       "noFresh": "Ei kerrottu",
       "updated": "päivitetty viimeksi {date}",
       "size": "Koko",
@@ -6079,7 +6079,7 @@
       "howBrowserHint": "Avaa sähköpostiin tulevan linkin ja näkee rivit.",
       "howDataspace": "Data-avaruudesta",
       "howDataspaceHint": "Organisaation liitin Dataspace Protocolilla.",
-      "howAimeat": "Toiselta AIMEATilta",
+      "howAimeat": "Toisesta AIMEATista",
       "howAimeatHint": "Käyttää omaa tiliään vierailijana.",
       "account": "Hänen AIMEAT-tilinsä",
       "accountPlaceholder": "matti@hanen-palvelimensa.fi",
@@ -6145,9 +6145,9 @@
       "notePlaceholder": "esimerkiksi: ei markkinointiin",
       "mode": {
         "report": "Tällä palvelimella datanvälitys on tilassa seuranta. Myynti näkyy ylläpitäjän Compliance-sivulla havaintona.",
-        "none": "Tämä palvelin ei toimi datanvälityspalveluna. Datan myynti voidaan hylätä, ja vastaus kertoo syyn.",
-        "node": "Tämän palvelimen ylläpitäjä tarjoaa datanvälityspalvelun ja on tehnyt siitä ilmoituksen viranomaiselle. Myyntisi kulkee sen kautta.",
-        "owners": "Tällä palvelimella jokainen dataa myyvä omistaja tarjoaa oman datanvälityspalvelunsa ja ilmoittaa siitä viranomaiselle. Ilman ilmoitusta myynti hylätään."
+        "none": "Tämä palvelin ei toimi datan välityspalveluna. Datan myynti voidaan hylätä, ja vastaus kertoo syyn.",
+        "node": "Tämän palvelimen ylläpitäjä tarjoaa datan välityspalvelun ja on tehnyt siitä ilmoituksen viranomaiselle. Myyntisi kulkee sen kautta.",
+        "owners": "Tällä palvelimella jokainen dataa myyvä omistaja tarjoaa oman datan välityspalvelunsa ja ilmoittaa siitä viranomaiselle. Ilman ilmoitusta myynti hylätään."
       },
       "submit": "Listaa EXCHANGEen",
       "update": "Tallenna myynti",
@@ -6319,7 +6319,7 @@
       "package": "Datatuote",
       "resource": "Taulu",
       "resourceHint": "Tyhjänä ensimmäinen taulu",
-      "provenance": "Jokaisen lähteen alkuperä, tuoreus ja henkilötiedot tarkistetaan erikseen, ja ne kirjataan paketin tietoihin. Datatuote on yhtä tuore kuin sen vanhin lähde."
+      "provenance": "Jokaisen lähteen alkuperä, ajantasaisuus ja henkilötiedot tarkistetaan erikseen, ja ne kirjataan paketin tietoihin. Datatuote on yhtä tuore kuin sen vanhin lähde."
     },
     "cols": {
       "sourceField": "Lähteen kenttä",
@@ -15201,7 +15201,7 @@
     "cfg_consent_share_max_days": "Ulkopuolisen osapuolen jaon pisin kesto (pv)",
     "cfg_consent_party_reads_per_minute": "Ulkopuolisen osapuolen lukukerrat minuutissa",
     "cfg_consent_party_purchases_per_hour": "Yhdestä osoitteesta aloitetut ostot tunnissa",
-    "cfg_consent_data_intermediation": "Datanvälityspalvelu (EU 2022/868)",
+    "cfg_consent_data_intermediation": "Datan välityspalvelu (EU 2022/868)",
     "cfg_consent_party_self_registration": "Sovelluksiin rekisteröidytään ilman tiliä",
     "cfg_consent_app_party_signups_per_hour": "Rekisteröitymiset sovelluksiin samasta osoitteesta tunnissa",
     "cfg_consent_app_party_pending_hours": "Vahvistamaton rekisteröityminen pitää paikkansa (tuntia)",
@@ -30185,9 +30185,9 @@
     "config": {
       "consent": {
         "data_intermediation": {
-          "title": "Datanvälityspalvelu",
-          "short": "Tarjoaako tämä palvelin datanvälityspalvelua EU:n datanhallinta-asetuksen (2022/868) mukaan, ja kuka sen tarjoaa. Seuranta ei estä mitään, vaan näyttää havainnot Compliance-sivulla.",
-          "what": "Datanvälityspalvelu yhdistää datan haltijoita ja datan käyttäjiä kaupallisesti. Esimerkki on markkinapaikka, jolla kuka tahansa tarjoaa dataa ja kuka tahansa ostaa sitä. Tällä palvelimella asetus päättää yhden asian: saako EXCHANGEn tarjouksen, joka toimittaa dataa, listata kaikille. ”Seuranta” ja ”Asennus välittää” eivät estä mitään. ”Ei välitystä” estää tällaisen listauksen. Silloin data menee vain nimetyille vastaanottajille nimetyllä jaolla ulkopuoliselle osapuolelle. ”Omistajat välittävät” toimii samoin, mutta sallii listauksen omistajalle, joka hallitsee organismia, jolla on oma ilmoitus kirjattuna. Palvelin tarkistaa asian, kun listaus tehdään. Ennen muutosta tehty listaus pysyy, ja Compliance-sivu näyttää sen havaintona, josta ihminen päättää. Compliance-sivun osio 12 näyttää havainnot ja 12 artiklan ehdot kaikissa tiloissa.",
+          "title": "Datan välityspalvelu",
+          "short": "Tarjoaako tämä palvelin datan välityspalvelua EU:n datanhallinta-asetuksen (2022/868) mukaan, ja kuka sen tarjoaa. Seuranta ei estä mitään, vaan näyttää havainnot Compliance-sivulla.",
+          "what": "Datan välityspalvelu yhdistää datan haltijoita ja datan käyttäjiä kaupallisesti. Esimerkki on markkinapaikka, jolla kuka tahansa tarjoaa dataa ja kuka tahansa ostaa sitä. Tällä palvelimella asetus päättää yhden asian: saako EXCHANGEn tarjouksen, joka toimittaa dataa, listata kaikille. ”Seuranta” ja ”Asennus välittää” eivät estä mitään. ”Ei välitystä” estää tällaisen listauksen. Silloin data menee vain nimetyille vastaanottajille nimetyllä jaolla ulkopuoliselle osapuolelle. ”Omistajat välittävät” toimii samoin, mutta sallii listauksen omistajalle, joka hallitsee organismia, jolla on oma ilmoitus kirjattuna. Palvelin tarkistaa asian, kun listaus tehdään. Ennen muutosta tehty listaus pysyy, ja Compliance-sivu näyttää sen havaintona, josta ihminen päättää. Compliance-sivun osio 12 näyttää havainnot ja 12 artiklan ehdot kaikissa tiloissa.",
           "range": "Yksi neljästä: ”Seuranta” (koodin oletus), ”Ei välitystä”, ”Asennus välittää” tai ”Omistajat välittävät”. Kun aimeat init asentaa palvelimen, asetus on aluksi ”Ei välitystä”.",
           "ex1": "Ei välitystä: yrityksen tai henkilön palvelin, joka jakaa dataa vain nimetyille kumppaneille.",
           "ex2": "Asennus välittää: palvelin, jonka ylläpitäjä on tehnyt ilmoituksen viranomaiselle ja pitää avointa datan markkinapaikkaa.",

@@ -8,6 +8,7 @@
  *   host-locked, so a same-site app origin could write a Domain cookie of the same name that the apex
  *   read first (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  * @version-history
+ *   2026-11-03 — restoreSessionHint: the page load that carries a refresh cookie and no hint sets it.
  *   2026-11-01 — The session hint cookie is set and cleared with the refresh cookie, readable by the
  *     page and holding no token (WP10e B15).
  *   2026-10-25 — https nodes: `__Host-aimeat_rt` with Path=/ and Secure; the old name inside the window
@@ -18,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import type { Request, Response } from 'express';
 import {
   readRefreshCookie, setRefreshCookie, clearRefreshCookie, legacyRefreshCookieAccepted,
-  settleRefreshCookieWindowAtStart, REFRESH_COOKIE, LEGACY_REFRESH_COOKIE, SESSION_HINT_COOKIE,
+  settleRefreshCookieWindowAtStart, restoreSessionHint, REFRESH_COOKIE, LEGACY_REFRESH_COOKIE, SESSION_HINT_COOKIE,
 } from '../../src/services/owner-session.js';
 import type { AimeatConfig } from '../../src/config.js';
 
@@ -125,6 +126,25 @@ describe('setRefreshCookie / clearRefreshCookie', () => {
       clearRefreshCookie(withCookie(undefined, secure), c.res);
       expect(c.cleared.map(x => x.name)).toContain(SESSION_HINT_COOKIE);
     }
+  });
+
+  // A session signed in before the hint existed holds the refresh cookie and no hint, so its page did
+  // not restore at boot until the next sign-in. The page load that carries the cookie sets the hint.
+  it('restoreSessionHint sets the hint on a request that carries the refresh cookie and no hint', () => {
+    const r = recorder();
+    restoreSessionHint(withCookie(`${REFRESH_COOKIE}=h1.abc`, true), r.res, cfg);
+    const hint = r.set.find(c => c.name === SESSION_HINT_COOKIE);
+    expect(hint?.value).toBe('1');
+    expect(hint?.opts).toMatchObject({ path: '/', httpOnly: false, secure: true, sameSite: 'lax' });
+  });
+
+  it('restoreSessionHint sets nothing with no refresh cookie, or when the hint is already there', () => {
+    const none = recorder();
+    restoreSessionHint(withCookie('other=1', true), none.res, cfg);
+    expect(none.set).toEqual([]);
+    const already = recorder();
+    restoreSessionHint(withCookie(`${REFRESH_COOKIE}=h1.abc; ${SESSION_HINT_COOKIE}=1`, true), already.res, cfg);
+    expect(already.set).toEqual([]);
   });
 });
 

@@ -20,6 +20,8 @@
  *   file, and cannot read, run or delete A's definition; an agent without memory:write is refused; an
  *   agent with the words defines and previews over MCP.
  * @version-history
+ *   v1.3.0 — 2026-11-03 — W6: a direct POST /v1/datapackages refuses a malformed i18n or attribution and
+ *     stores the words normalised (before, that route passed both through unchecked).
  *   v1.2.0 — 2026-11-01 — WP10e: the words per language, the licence and the attribution reach the
  *     version, DCAT (language-tagged, the EU licence IRI), ODPS and schema.org; a malformed i18n is
  *     refused; the public dataset page answers 404 for no package; the history sums every table and
@@ -527,6 +529,20 @@ await test('W5 MCP: aimeat_dataproduct define takes i18n and attribution', async
     const def = await callTool(s, 'aimeat_dataproduct', { action: 'define', name: N('mcpwords'), sources: [{ kind: 'memory', key: 'dpr.pop' }],
         attribution: 'Credit me', i18n: { fi: { title: 'Suomeksi' } } });
     assert(!def.isError && def.data?.definition?.i18n?.fi?.title === 'Suomeksi' && def.data.definition.attribution === 'Credit me', `define: ${def.text.slice(0, 300)}`);
+});
+
+await test('W6 a direct POST /v1/datapackages checks i18n and attribution as the data product path does', async () => {
+    const post = (provenance: Body) => call('/v1/datapackages', { token: A.token, body: { name: N('direct'), changes: 'words', visibility: 'private',
+        resources: [{ name: 'rows', rows: [{ k: 'a', n: 1 }] }], provenance } });
+    for (const [provenance, what] of [[{ i18n: { fin: { title: 'x' } } }, 'code'], [{ i18n: { fi: { name: 'x' } } }, 'field'], [{ attribution: 5 }, 'attribution']] as const) {
+        const r = await post(provenance);
+        assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `${what}: ${show(r)}`);
+    }
+    assert((await call(`/v1/datapackages/${A.name}/${N('direct')}`, { token: A.token })).status === 404, 'nothing stored');
+    const ok = await post({ attribution: '  Credit me  ', i18n: { fi: { title: ' Suomeksi ' }, en: {} } });
+    assert(ok.status === 201, `well-formed words: ${show(ok)}`);
+    const a = (await descriptorOf(A.token, A.name, N('direct')))?.aimeat;
+    assert(a?.attribution === 'Credit me' && a?.i18n?.fi?.title === 'Suomeksi' && !a?.i18n?.en, `stored as normalised: ${JSON.stringify(a?.i18n)} ${a?.attribution}`);
 });
 
 console.log(`\n=== Data products: ${passed} passed, ${failed} failed ===\n`);

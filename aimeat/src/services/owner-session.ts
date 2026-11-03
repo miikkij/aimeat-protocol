@@ -12,6 +12,8 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-11-03 — restoreSessionHint(): a page load that carries the refresh cookie and no hint sets
+ *     the hint, so a session from before the hint restores at boot (serveSpa; WP10e B15 follow-up).
  *   2026-11-02 — The required two-step test moved into checkRefreshSession (reason
  *     'two-step-setup-required', with the config passed), so the app-grant silent bridge refuses the
  *     session the refresh ends; the refresh answers as before (secaudit2026nov02d round 13,
@@ -188,6 +190,18 @@ export function setRefreshCookie(req: Request, res: Response, config: AimeatConf
   if (cookieValues(req.headers.cookie, LEGACY_REFRESH_COOKIE).length) {
     res.clearCookie(LEGACY_REFRESH_COOKIE, { httpOnly: true, secure: true, sameSite: 'strict', path: LEGACY_COOKIE_PATH });
   }
+}
+
+/**
+ * Set the session hint on a request that carries a refresh cookie and no hint. A session signed in
+ * before the hint existed has the refresh cookie only, and its page did not restore at boot until the
+ * next sign-in. The token is not checked here: the hint grants nothing, and a refused refresh clears it.
+ * Only the `__Host-` cookie (Path=/) reaches a page load; the old name is sent to /v1/auth only.
+ */
+export function restoreSessionHint(req: Request, res: Response, config: AimeatConfig): void {
+  if (cookieValues(req.headers.cookie, SESSION_HINT_COOKIE).length) return;
+  if (!readRefreshCookie(req, config)) return;
+  res.cookie(SESSION_HINT_COOKIE, '1', { httpOnly: false, secure: cookieSecure(req), sameSite: 'lax', path: '/', maxAge: config.refreshAbsoluteDays * DAY_MS });
 }
 
 /** Clear the refresh cookie (logout / revocation / invalid token): both names on https. */
