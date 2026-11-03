@@ -30,7 +30,11 @@
  *   READING THE SOURCE. Python: every `.get(` / `.post(` / `.patch(` / `.put(` / `.delete(` whose first
  *   argument is a string or f-string containing `/v1/` or `/local/`, every standalone `"/local/..."`
  *   literal, and every standalone `"aimeat_..."` literal (not a ContextVar name), across every .py file
- *   of the package. Node: every `app.<method>('/local/...')` under src/cli/connect/mcp/ and every
+ *   of the package. Read as well, and compared with openapi.yaml only: every REST helper call whose
+ *   method string comes before the path (`_call(node, "get", "/v1/...")` in decide.py, ai.py and
+ *   crew_llm.py, `_group_call(api, "post", "/v1/...")` in messaging.py), and every other `/v1/`
+ *   literal (a path chosen into a variable, a default argument), which must be a route or the base
+ *   of routes there. Node: every `app.<method>('/local/...')` under src/cli/connect/mcp/ and every
  *   `<client>.<method>('/v1/...')`, `postToNode(_, '/v1/...')`, `forward('M', ... '/v1/...')` and
  *   `fetch(`...\/v1/...`)` under src/cli/connect/. Its documented limit: a path held in a variable and
  *   passed to the call later is not seen (skill-bundle.ts builds its url first, tui/index.ts a base).
@@ -46,6 +50,9 @@
  * @usage import { daemonFindings } from './inventory/python-daemon.js';
  * @version-history
  *   v1.0.0 — 2026-10-18 — Initial (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
+ *   v1.1.0 — 2026-11-04 — codebase analysis 2026-11-03, item A14: the REST helper calls (_call,
+ *     _group_call) and the remaining `/v1/` literals are read and compared with openapi.yaml; 28 node
+ *     calls the check did not see before. The connector comparison and the allowlist are unchanged.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -59,8 +66,12 @@ import { parse as parseYaml } from 'yaml';
 export const DAEMON_CEILING = 41;
 export const DAEMON_ALLOWLIST = 'security/python-daemon-parity.json';
 
-/** One call or route: `METHOD path`, the method `*` when the source does not show it. */
-export interface Endpoint { method: string; path: string; where: string }
+/**
+ * One call or route: `METHOD path`, the method `*` when the source does not show it. `contractOnly`:
+ * a Python call read through one of the package's REST helper functions, or a bare `/v1/` literal;
+ * it is compared with openapi.yaml only, not with the connector's own calls (see pythonCalls).
+ */
+export interface Endpoint { method: string; path: string; where: string; contractOnly?: boolean }
 
 const key = (e: Endpoint): string => `${e.method} ${e.path}`;
 
@@ -111,6 +122,22 @@ export function pythonCalls(src: string): Endpoint[] {
         for (const m of text.matchAll(/(["'])(\/local\/[A-Za-z0-9_/{}-]+)\1/g)) {
             const path = normalizePath(m[2]);
             if (!out.some(e => e.path === path)) out.push({ method: '*', path, where: `${rel}:${lineOf(text, m.index)}` });
+        }
+        // The package's REST helpers take the method as a string before the path: decide.py
+        // `_call(node, "get", "/v1/ai/decide/rules")` (also used by ai.py and crew_llm.py) and
+        // messaging.py `_group_call(api, "post", "/v1/messages/groups", ...)`. These are wrappers for
+        // a crew's own code, which the connector's agents reach as MCP tools, so they are compared
+        // with openapi.yaml only (codebase analysis 2026-11-03, item A14: 24 such calls were unread).
+        const helper = /\b_\w*call\(\s*[\w.]+\s*,\s*(["'])(get|post|put|patch|delete)\1\s*,\s*f?(["'])((?:(?!\3).)*?\/v1\/(?:(?!\3).)*)\3/g;
+        for (const m of text.matchAll(helper)) {
+            out.push({ method: m[2].toUpperCase(), path: normalizePath(m[4]), where: `${rel}:${lineOf(text, m.index)}`, contractOnly: true });
+        }
+        // Any other `/v1/` literal (a path chosen into a variable first, a default argument): the
+        // method is not shown, and it must still be a route or the base of routes in openapi.yaml.
+        for (const m of text.matchAll(/f?(["'])(\/v1\/(?:(?!\1)[^\n])*)\1/g)) {
+            const where = `${rel}:${lineOf(text, m.index)}`;
+            const path = normalizePath(m[2]);
+            if (!out.some(e => e.path === path)) out.push({ method: '*', path, where, contractOnly: true });
         }
     }
     return out;
@@ -197,14 +224,18 @@ export function daemonFindings(input: DaemonInput): Map<string, string> {
     const out = new Map<string, string>();
     const add = (id: string, where: string): void => { if (!out.has(id)) out.set(id, where); };
     const pyLocal = input.python.filter(e => e.path.startsWith('/local/'));
-    const pyRest = input.python.filter(e => e.path.startsWith('/v1/'));
+    const pyRestAll = input.python.filter(e => e.path.startsWith('/v1/'));
+    const pyRest = pyRestAll.filter(e => !e.contractOnly);
+    // A bare literal with no method shown may be the base the package builds routes on (`/v1/mcp`, `/v1/llm`).
+    const inContract = (e: Endpoint): boolean => input.contract.some(r => matches(e, r)
+        || (e.contractOnly === true && e.method === '*' && r.path.startsWith(`${e.path}/`)));
 
     for (const e of pyLocal) if (!input.localRoutes.some(r => matches(e, r))) add(`local.python-only:${key(e)}`, e.where);
     for (const r of input.localRoutes) if (!pyLocal.some(e => matches(e, r))) add(`local.connector-only:${key(r)}`, r.where);
 
     for (const e of pyRest) if (!input.connectorRest.some(r => matches(e, r))) add(`rest.python-only:${key(e)}`, e.where);
     for (const r of input.connectorRest) if (!pyRest.some(e => matches(e, r))) add(`rest.connector-only:${key(r)}`, r.where);
-    for (const e of pyRest) if (!input.contract.some(r => matches(e, r))) add(`rest.not-in-openapi:${key(e)}`, e.where);
+    for (const e of pyRestAll) if (!inContract(e)) add(`rest.not-in-openapi:${key(e)}`, e.where);
 
     for (const [name, where] of input.pythonTools) if (!input.connectorTools.has(name)) add(`tool.not-on-connector:${name}`, where);
     return out;

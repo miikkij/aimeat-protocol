@@ -14,6 +14,11 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  unreleased -- 2026-11-04 -- codebase analysis 2026-11-03, item A14: a task the owner paused (or sent
+    back to planning) between the poll and the kickoff is held, not cancelled. It is not failed and
+    not added to done_ids, so the daemon runs it when the owner starts it again; before, it never ran
+    again until the process restarted. Only an ended status (done, failed, declined) or a cancel
+    marker cancels (`_pre_kickoff_check`, `_gate_before_kickoff`).
   unreleased -- 2026-10-31 -- A dm.inbound wake marked readable false (an agent without messages:read,
     node 4.2, secaudit2026oct31w2 round 10) starts no crew run; the daemon prints one line. A caller's
     on_dm still gets the event.
@@ -758,34 +763,88 @@ def _fetch_max_concurrent(api: _Api) -> int:
     return 1
 
 
-def _is_cancelled(api: _Api, task_id: str) -> bool:
-    """Cooperative cancellation check, run just before a (blocking) kickoff.
+#: The statuses a task ends in. The node's list is TERMINAL_TASK_STATUSES in
+#: aimeat/src/storage/types/agents-messaging.ts; the node schema wins on any mismatch.
+_ENDED_TASK_STATUSES = frozenset({"done", "failed", "declined"})
 
-    A subtask counts as cancelled when EITHER:
-      * its status is no longer active/stalled (e.g. the owner paused/deleted it
-        from the UI, or it was already failed/completed), OR
-      * its id appears in any `agents.cancel.*` memory marker visible to this
-        owner. A coordinator (agent) or the owner writes a memory entry with key
-        prefix `agents.cancel.` whose value is a list of cancelled task ids;
-        we read them across the whole owner namespace (owner_scope=true) so a
-        marker written by ANY same-owner agent, or by the owner, is honoured.
-        This is what lets one agent cancel work it delegated to another.
+#: The statuses the EXECUTE phase runs. Every other open status (queued, revision_requested, paused,
+#: draft) waits for the owner: the task is not run now and not cancelled either.
+_RUNNABLE_TASK_STATUSES = frozenset({"active", "stalled"})
 
-    On a transient read error we return False (don't drop a task on a hiccup).
+
+def _pre_kickoff_check(api: _Api, task_id: str) -> tuple[str, str | None]:
+    """What to do with a task right before its (blocking) kickoff: ("run" | "hold" | "cancelled", status).
+
+    The task list the daemon dispatches from was fetched at the start of the cycle, so the status is
+    read again here.
+      * An ended status (done, failed, declined) is "cancelled": the task left the queue.
+      * Another status that is not active or stalled is "hold": the owner paused the task, or sent it
+        back to planning. It is not run now, and it is not cancelled, so the daemon runs it when the
+        owner starts it again (codebase analysis 2026-11-03, item A14: until then a paused task was
+        read as cancelled and this daemon never ran it again until the process restarted).
+      * Active or stalled, or a status the read did not give, goes on to the cancel markers: a task
+        id in any `agents.cancel.*` memory marker visible to this owner is "cancelled". A coordinator
+        (agent) or the owner writes a memory entry with key prefix `agents.cancel.` whose value is a
+        list of cancelled task ids; we read them across the whole owner namespace (owner_scope=true)
+        so a marker written by ANY same-owner agent, or by the owner, is honoured. This is what lets
+        one agent cancel work it delegated to another. A paused task with a marker is held, and is
+        cancelled when it is started again.
+
+    On a transient read error the answer is "run" (don't drop a task on a hiccup).
     """
-    # 1) status re-check (catches owner-side pause/delete)
+    status: str | None = None
+    # 1) status re-check (catches an owner-side pause, and a task that already ended)
     try:
         r = api.get(f"/v1/agents/{api.agent_name}/tasks/{task_id}")
         if r.status_code == 200:
-            status = (r.json().get("data", {}).get("task", {}) or {}).get("status")
-            if status not in ("active", "stalled"):
-                return True
+            read = (r.json().get("data", {}).get("task", {}) or {}).get("status")
+            status = read if isinstance(read, str) and read else None
+            if status in _ENDED_TASK_STATUSES:
+                return ("cancelled", status)
+            if status is not None and status not in _RUNNABLE_TASK_STATUSES:
+                return ("hold", status)
     except Exception:  # noqa: BLE001, S110 -- the status read failed; the cancel markers below are the second opinion
         pass
-    # 2) coordinator-written cancellations. New connectors get these PUSHED over the tunnel
-    #    (task.cancelled) and the serve daemon holds the set — a FREE loopback read, no more
-    #    owner-scoped `agents.cancel.*` memory scan (100 records) before every dispatch. Fall back to
-    #    the legacy scan only if the serve daemon is too old to expose /local/cancelled (404).
+    return ("cancelled" if _has_cancel_marker(api, task_id) else "run", status)
+
+
+def _is_cancelled(api: _Api, task_id: str) -> bool:
+    """Cooperative cancellation check: True when the task ended or carries a cancel marker.
+
+    A paused task is not cancelled (`_pre_kickoff_check` holds it). On a transient read error we
+    return False (don't drop a task on a hiccup).
+    """
+    return _pre_kickoff_check(api, task_id)[0] == "cancelled"
+
+
+def _gate_before_kickoff(api: _Api, task_id: str, done_ids: set[str]) -> bool:
+    """The main loop's check before it starts (serial) or submits (concurrent) an EXECUTE task.
+
+    True: start it. A cancelled task is failed on the node and added to `done_ids`, so it is never
+    dispatched again by this process. A held task (paused, or back in planning) is left out of
+    `done_ids`, so the next cycle that lists it as active runs it.
+    """
+    verdict, status = _pre_kickoff_check(api, task_id)
+    if verdict == "cancelled":
+        print(f"[daemon:{api.agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
+        _fail_cancelled(api, task_id)
+        done_ids.add(task_id)
+        return False
+    if verdict == "hold":
+        print(
+            f"[daemon:{api.agent_name}] EXECUTE task {task_id} is {status} -- not starting it now; "
+            "it runs when the owner starts it again"
+        )
+        return False
+    return True
+
+
+def _has_cancel_marker(api: _Api, task_id: str) -> bool:
+    """True when a coordinator or the owner cancelled `task_id` with a cancel marker."""
+    # New connectors get these PUSHED over the tunnel (task.cancelled) and the serve daemon holds
+    # the set — a FREE loopback read, no more owner-scoped `agents.cancel.*` memory scan
+    # (100 records) before every dispatch. Fall back to the legacy scan only if the serve daemon
+    # is too old to expose /local/cancelled (404).
     try:
         r = api.get("/local/cancelled", params={"agent": api.gaii}, timeout=10)
         if r.status_code == 200:
@@ -1918,7 +1977,8 @@ def run_crew_daemon(
         stdio MCP can't be driven by parallel kickoffs" constraint is gone).
         Cooperative cancellation is re-checked just before kickoff. On crash
         the task is marked failed server-side. Returns (task_id, status)
-        where status is "ok" | "cancelled" | "error".
+        where status is "ok" | "cancelled" | "held" | "error". "held" is a task
+        the owner paused (or sent back to planning) after it was submitted.
         """
         task_id = task.get("id", "(unknown id)")
         title = task.get("title", "(no title)")
@@ -1931,10 +1991,17 @@ def run_crew_daemon(
                 tool_filter_if_offered=resolved_if_offered,
                 llm=llm,
             ) as worker_liaison:
-                if _is_cancelled(api, task_id):
+                verdict, task_status = _pre_kickoff_check(api, task_id)
+                if verdict == "cancelled":
                     print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
                     _fail_cancelled(api, task_id)
                     return (task_id, "cancelled")
+                if verdict == "hold":
+                    print(
+                        f"[daemon:{agent_name}] EXECUTE task {task_id} is {task_status} -- not starting it now; "
+                        "it runs when the owner starts it again"
+                    )
+                    return (task_id, "held")
                 started = _run_started_iso()
                 crew = build_crew(task, worker_liaison)
                 with usage_run(task_id, agent_name):
@@ -1971,7 +2038,8 @@ def run_crew_daemon(
             # ok/cancelled leave the active queue for good -> guard against
             # re-dispatch. "error" already POSTed /fail (so the task is no longer
             # active); mirror the serial path and DON'T add it, so a transient
-            # /fail failure still lets the next cycle retry.
+            # /fail failure still lets the next cycle retry. "held" (paused) is
+            # not added either, so the task runs when the owner starts it again.
             if status in ("ok", "cancelled"):
                 done_ids.add(tid)
 
@@ -2216,12 +2284,11 @@ def run_crew_daemon(
                                 # on speculative branches, or the owner paused it) is
                                 # still in that list. This guard stops abandoned work
                                 # from ever starting -- circuit breaker for the
-                                # "coordinator over-delegated to one crew" case.
-                                if _is_cancelled(api, task_id):
-                                    print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
-                                    _fail_cancelled(api, task_id)
-                                    done_ids.add(task_id)
-                                    dispatched_this_cycle = True
+                                # "coordinator over-delegated to one crew" case. A task
+                                # the owner paused is held, not cancelled: it stays out of
+                                # done_ids and runs when the owner starts it again.
+                                if not _gate_before_kickoff(api, task_id, done_ids):
+                                    dispatched_this_cycle = dispatched_this_cycle or task_id in done_ids
                                     continue
                                 ok = _dispatch("EXECUTE", task, build_crew)
                                 if ok:
@@ -2241,11 +2308,8 @@ def run_crew_daemon(
                                 # building a per-task liaison + MCP session for work
                                 # that's already been cancelled. The worker re-checks
                                 # again just before its kickoff (authoritative).
-                                if _is_cancelled(api, task_id):
-                                    print(f"[daemon:{agent_name}] EXECUTE task {task_id} cancelled before start -- skipping")
-                                    _fail_cancelled(api, task_id)
-                                    done_ids.add(task_id)
-                                    dispatched_this_cycle = True
+                                if not _gate_before_kickoff(api, task_id, done_ids):
+                                    dispatched_this_cycle = dispatched_this_cycle or task_id in done_ids
                                     continue
                                 fut = executor.submit(_execute_worker, task)
                                 futures[fut] = task_id
