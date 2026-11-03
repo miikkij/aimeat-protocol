@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-04 — outbox-sweep: webhook and mail retries kept in the stored outbox are resumed (services/outbox.ts;
+ *     codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — datapackage-freshness: the owners of data packages that turned stale are told once
  *     (services/datapackage/freshness-sweep.ts; plan doc-mvwxcas3dom3, D6.2).
  *   2026-10-28 — compliance-ask-makers: the makers of apps that use AI and leave the EU AI Act
@@ -137,6 +139,12 @@ export function registerCoreHandlers(
   }
   // The classification audit log and the exceptions list age on every node, consent on or off.
   scheduler.registerCoreHandler('classification-audit-prune', () => runClassificationAuditPruneJob(config, storage));
+  // Webhook and mail retries kept in the stored outbox whose holder stopped or died: resumed here,
+  // each one claimed on its version so only one process sends it (services/outbox.ts).
+  scheduler.registerCoreHandler('outbox-sweep', async () => {
+    const { resumeOutbox } = await import('./outbox.js');
+    await resumeOutbox(storage, config.nodeId);
+  });
   // Apps open to the internet on a closed node: end dates, reminders, lapsed requests.
   scheduler.registerCoreHandler('internet-opening-sweep', async () => {
     const { sweepOpenings } = await import('./internet-opening/opening-version.js');

@@ -18,6 +18,8 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-04 — flushProcessBuffers releases this process's claims in the stored outbox (services/outbox.ts;
+ *     codebase analysis 2026-11-03, item HA 1.5).
  *   2026-11-04 — flushProcessBuffers marks the running AI jobs first, so the next start queues them again
  *     (codebase analysis 2026-11-03, item HA 1.4).
  *   2026-11-01 — startBuildWithYou: the usage listener that opens the build offer, and the status sweep.
@@ -136,6 +138,11 @@ export async function flushProcessBuffers(): Promise<void> {
   const { getActiveAiJobService } = await import('../services/ai-jobs/service.js');
   await getActiveAiJobService()?.markStoppingJobs()
     .catch(err => logger.warn('process-buffers: marking the running AI jobs failed', { error: String(err) }));
+  // The webhook and mail retries this process holds in the stored outbox: no further attempt here,
+  // and the claims freed so the next start resumes them when due (services/outbox.ts).
+  const { releaseOutbox } = await import('../services/outbox.js');
+  await releaseOutbox()
+    .catch(err => logger.warn('process-buffers: releasing the outbox failed', { error: String(err) }));
   const { shutdownTelemetryBuffer } = await import('../services/telemetry-buffer.js');
   await shutdownTelemetryBuffer();
   const { shutdownUsageBuffer } = await import('../services/usage/usage-buffer.js');

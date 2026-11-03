@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-04 — createEmailService gets storage, so mail retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — buildWithYouRouter (routes/build-with-you.ts): "Rakennamme kanssasi", the place's trail and the operator's relay.
  *   2026-11-01 — The data package and OData mounts moved to routes-loader-data.ts, which mounts the data product routes beside them (plan doc-mvwxcas3dom3, D9).
  *   2026-10-29 — fileStoreRouter (routes/file-store.ts): where stored files keep their bytes, the node's and a person's own.
@@ -624,7 +625,7 @@ export async function mountRoutes(
   app.use(publicStatsRouter(config, storage));
   app.use(publicEventsRouter(config, storage));
   // Phase 1.1 — Email service for verification and magic links
-  const emailService = createEmailService(config);
+  const emailService = createEmailService(config, storage);
 
   // Push notification service — Phase 3.1
   const pushService = createPushService(config, storage);

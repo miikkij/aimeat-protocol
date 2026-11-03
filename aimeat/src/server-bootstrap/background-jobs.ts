@@ -27,6 +27,8 @@
  *     (runAsNode, utils/gaii.ts), so it reacts as this node when another node in the same process
  *     writes. What this file starts already runs as this node: createServer runs all of it inside
  *     runAsNode. One node per process in production, so nothing there changes.
+ *   v1.3.0 — 2026-11-04 — Boot resumes the stored outbox's webhook and mail retries (services/outbox.ts;
+ *     codebase analysis 2026-11-03, HA 1.5).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -50,6 +52,7 @@ import { seedCoreScheduledJobs } from '../services/job-seeding.js';
 import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.js';
 import { backfillDependencyMap } from '../services/dependency-map.js';
 import { backfillComponentVersions } from '../services/component-versions.js';
+import { resumeOutbox } from '../services/outbox.js';
 
 export interface BackgroundJobDeps {
   config: AimeatConfig;
@@ -90,6 +93,11 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
   // workflow engine's resumeInflight() one line above.
   aiJobService.reconcileAfterRestart()
     .catch(err => logger.error('AI job restart reconciliation failed', { error: String(err) }));
+
+  // Webhook and mail retries the previous process kept in the stored outbox (services/outbox.ts):
+  // resumed now rather than at the first minute of core:outbox-sweep. Each is claimed on its version.
+  resumeOutbox(storage, config.nodeId)
+    .catch(err => logger.error('Outbox resume failed', { error: String(err) }));
 
   // Start the scheduler (loads enabled jobs from storage). The backfill runs FIRST and is awaited:
   // an extension job stored before its owner scope was stamped refuses at run time, and the first
