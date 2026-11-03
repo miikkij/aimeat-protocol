@@ -59,4 +59,31 @@ describe('the connect pages', () => {
     expect(html).not.toContain('/v1/ghii/magic-link');
     expect(html).toContain('location.replace(signInAddress(');
   });
+
+  it.each(['oauth-consent.html', 'agent-consent.html'])('%s says which account is signed in and offers another', (name) => {
+    const html = page(name);
+    expect(html).toContain('accountLineHtml()');
+    expect(html).toContain('useAnotherAccount(');
+  });
+
+  it('the device page reads the session for each press, not a stored token', () => {
+    const html = page('agent-consent.html');
+    expect(html).not.toContain("localStorage.getItem('aimeat_session')");
+    expect(html.match(/const jwt = await freshJwt\(\);/g)?.length).toBe(2);
+  });
+});
+
+describe('what an AI reads before it connects', () => {
+  const bootstrap = readFileSync(join(__dirname, '..', '..', 'src', 'routes', 'bootstrap.ts'), 'utf-8');
+
+  it('says to leave a command-line login running, and never to ask for a password in chat', () => {
+    expect(bootstrap).toContain('choose_the_path');
+    expect(bootstrap).toContain('Never ask the person for a password');
+    expect(bootstrap).toContain('that program stops with the command');
+    expect(bootstrap).toContain('browser_cannot_reach_127_0_0_1');
+  });
+
+  it('no longer tells a person to copy credentials from a page that shows none', () => {
+    expect(bootstrap).not.toContain('copy my credentials from the approval page');
+  });
 });

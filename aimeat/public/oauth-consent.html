@@ -13,7 +13,8 @@
       which signs in or registers the way the node is configured and returns here with the request
       in its address. The form here could not register anyone, and a person with no account waited
       for a mail that never came (Jouni, 2026-11-04). The boundary sentences moved to the view for a
-      person with no agents yet, who used to read them on the sign-in form.
+      person with no agents yet, who used to read them on the sign-in form. The page says which account
+      is signed in and offers another.
     v1.11.0 — 2026-11-04 — An app whose redirect is a loopback address is described in words ("runs on
       your own computer", approve only if you started it), not as 127.0.0.1:58627 and "check the
       address above", which a person cannot do. A request refused with 401 renews the access token
@@ -241,6 +242,8 @@
     .theme-switch button { border:none; background:transparent; color:var(--muted);
       padding:.3rem .6rem; font-size:.9rem; line-height:1; cursor:pointer; }
     .theme-switch button[aria-pressed="true"] { color:var(--accent); background:var(--surface); }
+    .account-line { margin:.75rem 0 0; font-size:.85rem; color:var(--muted); }
+    .account-switch { background:none; border:0; padding:0; font:inherit; color:var(--accent); text-decoration:underline; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -251,7 +254,7 @@
 
   <script type="module">
     import { copyToClipboard } from '/js/utils.js';
-    import { signInAddress, refreshedSession } from '/js/sign-in-return.js';
+    import { signInAddress, refreshedSession, useAnotherAccount } from '/js/sign-in-return.js';
     import { loadTranslations, t as translate, getLocale } from '/js/i18n.js';
     import { getTheme, setTheme } from '/js/theme.js';
     import { scopeSentence, areaLine, presetSummary, boundaryLines } from '/js/consent-vocab.js';
@@ -589,6 +592,17 @@
       }
     }
 
+    /** Which account this approval lands on, and the way to another one. */
+    const accountLineHtml = () => `
+      <p class="account-line">${escHtml(t('signedInAs', { name: getOwnerName() }))}
+        <button type="button" class="account-switch" id="accountSwitch">${escHtml(t('useAnotherAccount'))}</button></p>`;
+
+    function wireAccountLine() {
+      document.getElementById('accountSwitch').addEventListener('click', () => {
+        void useAnotherAccount(session?.jwt || session?.token || '', location.pathname + location.search, params.get('lang') || '');
+      });
+    }
+
     function renderCreateForm(container, onCreated) {
       // The name given at home is filled in rather than asked again — unless an agent already
       // carries it, in which case the list above is where that name lives.
@@ -737,10 +751,12 @@
           <p class="select-agent-title">${escHtml(t('noAgentsCreate', { client: aiInline }))}</p>
           <div id="createContainer"></div>
           ${boundaryHtml()}
+          ${accountLineHtml()}
           <div class="btn-row">
             <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
           </div>
         `;
+        wireAccountLine();
         document.getElementById('denyBtn').addEventListener('click', deny);
         renderCreateForm(document.getElementById('createContainer'), selectCreatedAgent);
         return;
@@ -785,6 +801,7 @@
         <div id="inlineCreateContainer" class="hidden"></div>
         <div id="scopeArea">${selectedAgent ? scopeSectionHtml() : ''}</div>
         ${boundaryHtml()}
+        ${accountLineHtml()}
         <div id="pacingSlot">${pacingHtml()}</div>
         <div id="approveError" class="error-msg"></div>
         <div class="btn-row">
@@ -792,6 +809,8 @@
           <button class="btn btn-approve" id="approveBtn" ${selectedAgent ? '' : 'disabled'}>${escHtml(t('approveBtn'))}</button>
         </div>
       `;
+
+      wireAccountLine();
 
       // Agent selection — the permission section describes the SELECTED agent, so switching
       // re-seeds it (back to "keep", custom list from the new agent's real scopes).

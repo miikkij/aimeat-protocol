@@ -9,10 +9,12 @@
     diverge from the SPA's AgentConsent panel again.
   @version-history
     2026-11-04 — The page signs nobody in, and reads the session from the refresh cookie as
-        oauth-consent.html does. A stored token could be expired, and the approval then failed with no
-        way to sign in. An owner with no session goes to the front page, which signs in or registers
-        the way the node is configured and returns here with the code in its address. The password
-        form here had no emailed link, no passkey, no SSO and no registration (Jouni, 2026-11-04).
+        oauth-consent.html does, again on each press. A stored token could be expired, and the approval
+        then failed on "Invalid or expired owner token" with no way to sign in. An owner with no session
+        goes to the front page, which signs in or registers the way the node is configured and returns
+        here with the code in its address. The password form here had no emailed link, no passkey, no
+        SSO and no registration (Jouni, 2026-11-04). The page says which account is signed in and offers
+        another, and a request for another account says what to do about it.
     2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
     2026-10-25 — A request for an existing agent that did not prove it is coming back
         (`return_proven: false` on /verify/info) says plainly that a new device is taking the agent
@@ -153,6 +155,8 @@
     .polling-hint code { font-family:'Courier New',monospace; color:var(--accent);
       background:var(--accent-soft-strong); padding:.1rem .35rem; border-radius:.25rem; }
     .msg-muted { color:var(--muted); }
+    .account-line { margin:.75rem 0 0; font-size:.85rem; color:var(--muted); }
+    .account-switch { background:none; border:0; padding:0; font:inherit; color:var(--accent); text-decoration:underline; cursor:pointer; }
     .boundary-list { margin:.75rem 0 0; padding-left:1.1rem; font-size:.82rem; color:var(--muted); }
     .boundary-list li { margin-bottom:.3rem; }
     .scope-token { font-size:.72rem; color:var(--muted); font-family:'Courier New',monospace; }
@@ -184,7 +188,7 @@
     import { getTheme, setTheme } from '/js/theme.js';
     import { scopeSentence, presetSummary, requestedSummary, boundaryLines } from '/js/consent-vocab.js';
     import { SCOPE_TEMPLATES, SCOPE_DOMAINS } from '/views/profile/agents/scope-model.js';
-    import { signInAddress, refreshedSession } from '/js/sign-in-return.js';
+    import { signInAddress, refreshedSession, useAnotherAccount } from '/js/sign-in-return.js';
 
     const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -269,6 +273,43 @@
 
     function renderError(msg) {
       app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg error-msg-spaced">${escHtml(msg)}</p>`;
+    }
+
+    const hereAddress = () => location.pathname + location.search;
+    const pageLang = () => params.get('lang') || '';
+    const sendToSignIn = () => location.replace(signInAddress(hereAddress(), pageLang()));
+
+    /**
+     * A token for one press. An access token lasts minutes and this page can stay open longer, so each
+     * press reads the session again. Without a session the person signs in on the front page and comes
+     * back here; a stale token used to end in "Invalid or expired owner token" with no way forward.
+     */
+    async function freshJwt() {
+      const fresh = await refreshedSession();
+      if (fresh) {
+        session = fresh;
+        return fresh.jwt;
+      }
+      sendToSignIn();
+      return null;
+    }
+
+    /** Which account this approval lands on, and the way to another one. */
+    const accountLineHtml = () => `
+      <p class="account-line">${escHtml(translate('oauthConsent.signedInAs', { name: session?.owner || '' }))}
+        <button type="button" class="account-switch" id="accountSwitch">${escHtml(translate('oauthConsent.useAnotherAccount'))}</button></p>`;
+
+    function wireAccountLine() {
+      document.getElementById('accountSwitch').addEventListener('click', () => {
+        void useAnotherAccount(session?.jwt || session?.token || '', hereAddress(), pageLang());
+      });
+    }
+
+    /** The request names an account other than the one signed in. Both ways on are offered. */
+    function renderMismatch() {
+      renderError(t('errorOwnerMismatch', { name: session?.owner || '' }));
+      app.insertAdjacentHTML('beforeend', `<p class="account-line"><button type="button" class="account-switch" id="accountSwitch">${escHtml(translate('oauthConsent.useAnotherAccount'))}</button></p>`);
+      wireAccountLine();
     }
 
     function getSelectedScopes() {
@@ -358,6 +399,7 @@
           </div>
         </div>
         ${boundaryHtml()}
+        ${accountLineHtml()}
         ${takeover ? `<label class="endothers"><input type="checkbox" id="endOthers" checked />
           <span>${escHtml(t('profile.agents.pendingRequests.endOtherSessions', { name: info.agent_name }))}</span></label>` : ''}
         <div id="consentError" class="error-msg"></div>
@@ -366,6 +408,8 @@
           <button class="btn btn-approve" id="approveBtn">${escHtml(t('approveBtn'))}</button>
         </div>
       `;
+
+      wireAccountLine();
 
       // Scope radio handlers
       document.querySelectorAll('input[name="scopePreset"]').forEach(radio => {
@@ -391,7 +435,8 @@
         const btn = document.getElementById('denyBtn');
         btn.disabled = true;
         try {
-          const jwt = session.jwt || session.token;
+          const jwt = await freshJwt();
+          if (!jwt) return;
           await fetch('/v1/agents/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -420,7 +465,8 @@
         }
 
         try {
-          const jwt = session.jwt || session.token;
+          const jwt = await freshJwt();
+          if (!jwt) return;
           const r = await fetch('/v1/agents/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -505,7 +551,7 @@
       // somebody else's. The same list says what the agent asked for.
       const own = await fetchOwnRequest(code);
       if (own.listed === false) {
-        renderError(t('errorOwnerMismatch'));
+        renderMismatch();
         return;
       }
       requestedScopes = own.scopes;
@@ -528,7 +574,7 @@
         } else {
           // Signing in or registering is the front page's job, by this node's settings. The code
           // stays in the address the front page returns to, and this page shows it for checking.
-          location.replace(signInAddress(location.pathname + location.search, params.get('lang') || ''));
+          sendToSignIn();
         }
       }
     }

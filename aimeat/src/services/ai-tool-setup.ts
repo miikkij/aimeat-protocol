@@ -44,6 +44,9 @@
  *   (aliases, resolveAiClient, decideBranch, the question options) is in ai-tool-branch.ts.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.11.0 — 2026-11-04 — Codex: `codex mcp add` starts the sign-in itself and waits for it, and the
+ *     sign-in dies with the command (measured with codex-cli 0.166.0), so the steps say to run it in
+ *     a terminal of one's own and leave it running. mcp.troubleshooting says what each failure means.
  *   v1.10.0 — 2026-10-30 — The sources last checked 2026-07-31 checked again: Claude's instructions are
  *     under Settings > Your Claude, thinking is always on in Opus 5.5 and Fable 5.1, ChatGPT's model is
  *     GPT-6 at a thinking level, VS Code's scope is Global > Copilot Global and its tools are under
@@ -169,6 +172,8 @@ export interface AiTool {
         /** A caution that belongs to the tool, not to us. */
         warn?: string;
         note?: string;
+        /** What a person or their AI sees when the sign-in goes wrong, and what to do about it. */
+        troubleshooting?: string[];
     };
     instructions: {
         where: string;
@@ -395,12 +400,20 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
             mcp: {
                 docs: 'https://developers.openai.com/codex/mcp',
                 steps: [
-                    s(l, 'Run the command below in a terminal. It writes the server into ~/.codex/config.toml.',
-                        'Aja alla oleva komento terminaalissa. Se kirjoittaa palvelimen tiedostoon ~/.codex/config.toml.'),
-                    s(l, 'Run codex mcp login aimeat and complete the sign-in in the browser.',
-                        'Aja codex mcp login aimeat ja vie kirjautuminen loppuun selaimessa.'),
+                    s(l, 'Run the command below in a terminal of your own. It writes the server into ~/.codex/config.toml and opens the approval in your browser.',
+                        'Aja alla oleva komento omassa terminaalissasi. Se kirjoittaa palvelimen tiedostoon ~/.codex/config.toml ja avaa hyväksynnän selaimeesi.'),
+                    s(l, 'Sign in if the browser asks, approve, and leave the terminal running until it reports the login. If the browser opens nothing, run codex mcp login aimeat.',
+                        'Kirjaudu, jos selain pyytää, hyväksy ja jätä terminaali käyntiin, kunnes se kertoo kirjautumisen onnistuneen. Jos selain ei avaudu, aja codex mcp login aimeat.'),
                     s(l, 'Run codex mcp list and check that the node is listed.',
                         'Aja codex mcp list ja tarkista että node on listalla.'),
+                ],
+                troubleshooting: [
+                    s(l, 'The browser says it cannot reach 127.0.0.1: the command stopped before you approved. Nothing is lost. Run codex mcp login aimeat again and leave it running.',
+                        'Selain sanoo, ettei se saa yhteyttä osoitteeseen 127.0.0.1: komento pysähtyi ennen hyväksyntää. Mitään ei menetetty. Aja codex mcp login aimeat uudelleen ja jätä se käyntiin.'),
+                    s(l, 'Codex runs on another machine than your browser: run codex mcp login aimeat --no-browser, open the address it prints, approve, and paste the address your browser ends on back into the terminal.',
+                        'Codex toimii eri koneella kuin selaimesi: aja codex mcp login aimeat --no-browser, avaa sen tulostama osoite, hyväksy ja liitä lopuksi selaimen osoiterivin osoite takaisin terminaaliin.'),
+                    s(l, `The browser shows invalid_target: your Codex is an older one that sends no resource. Update Codex, or set oauth_resource = "${mcpUrl}" under [mcp_servers.aimeat] in the config file.`,
+                        `Selain näyttää virheen invalid_target: Codexisi on vanha eikä lähetä resurssia. Päivitä Codex tai aseta oauth_resource = "${mcpUrl}" kohtaan [mcp_servers.aimeat] konfiguraatiotiedostossa.`),
                 ],
                 command: `codex mcp add aimeat --url ${mcpUrl}`,
                 params: [

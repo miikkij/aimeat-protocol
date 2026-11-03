@@ -16346,7 +16346,8 @@ paths:
         persistent instructions field. Steps are written as things to click or type with the
         literal UI label; every field a form asks for is listed with the value to put in it,
         including the ones to leave empty (`value: ""` means leave the field blank on purpose,
-        not "unknown"). Each tool carries its vendor's own documentation URL.
+        not "unknown"). Each tool carries its vendor's own documentation URL. `mcp.troubleshooting`,
+        when present, lists what a person or their AI sees when the sign-in goes wrong and what to do.
 
         Every tool here can speak MCP — that is why it is in the table — so `mcp.capability` says
         only which condition the vendor puts on it: `yes` (the free tier is enough, the default when

@@ -22,12 +22,16 @@ It returns an up-to-date JSON map of this node: identity, capabilities, the gett
 - Endpoint: `{{node_url}}/v1/mcp` · Auth: OAuth 2.1 (no API keys, no stdio proxy).
 - Add the node as an MCP connector; the AIMEAT tools become available immediately.
 - Claude Code, one line: `claude mcp add aimeat --transport http {{node_url}}/v1/mcp`
+- Codex, one line: `codex mcp add aimeat --url {{node_url}}/v1/mcp`. It starts the sign-in by itself and waits for the person to approve in the browser. If the command stops first, the browser cannot reach 127.0.0.1 at the end. Ask the person to run it in their own terminal and leave it running. Later logins: `codex mcp login aimeat`.
+- `GET {{node_url}}/v1/ai-tools` has the exact steps per tool.
+- Never ask for a password, a sign-in link or an emailed code in chat. The person signs in only in their own browser. A person who is not signed in goes from the approval page to the front page, signs in or registers there, and comes back to the approval.
+- Choose one path and finish it. `GET {{node_url}}/` (`for_ai_agents.when_it_goes_wrong`) says what each failure means.
 - Available in ChatGPT via Developer mode. The Gemini consumer app connects a custom MCP server on its web app in the United States (Settings > Connected Apps > Add a custom app); outside the United States, and for Microsoft Copilot, use the copy-prompt path below.
 
 ### B) Agent via Device Authorization (RFC 8628) — for a real agent/fleet
 The human owner approves every agent, so the flow below waits on them:
 1. `POST /v1/agents/device-authorize` `{ agent_name, owner, node, mode }` → `{ user_code, verification_uri, device_code, interval }`.
-2. Show the owner the `user_code`; they approve in the profile **Agents** tab and pick the agent's scopes.
+2. Give the owner `verification_uri_complete` and show them the `user_code`; they approve on that page or in the profile **Agents** tab and pick the agent's scopes.
 3. Poll `POST /v1/agents/device-token` `{ device_code }` → returns a JWT once approved.
 4. Use `Authorization: Bearer <jwt>` on all requests; refresh via `POST /v1/auth/refresh`.
 

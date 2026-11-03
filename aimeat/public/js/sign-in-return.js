@@ -22,7 +22,7 @@
  *   No imports: the standalone connect pages load this file with no importmap, and the unit test
  *   loads it in node. The SPA passes its auth service in.
  * @structure signInAddress(path, lang) · signInReturnTarget(search, origin) · refreshedSession() ·
- *   startSignInReturn(deps)
+ *   useAnotherAccount(jwt, path, lang) · startSignInReturn(deps)
  * @usage import { signInAddress, refreshedSession } from '/js/sign-in-return.js';
  * @version-history
  *   v1.0.0 — 2026-11-04 — Initial.
@@ -90,6 +90,32 @@ export async function refreshedSession() {
     console.warn('[aimeat] the session could not be read:', err);
     return null;
   }
+}
+
+/**
+ * End this browser's session and go to the front page to sign in with another account, returning to
+ * the same connect page. The refresh cookie goes first: the front page reads it at boot.
+ * @param {string} jwt
+ * @param {string} path the connect page's own path and query
+ * @param {string} [lang]
+ * @returns {Promise<void>}
+ */
+export async function useAnotherAccount(jwt, path, lang) {
+  try {
+    await fetch('/v1/auth/revoke', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+    });
+  } catch (err) {
+    console.warn('[aimeat] signing out could not reach the node:', err);
+  }
+  try {
+    localStorage.removeItem('aimeat_session');
+  } catch (err) {
+    console.warn('[aimeat] the stored session could not be removed:', err);
+  }
+  location.replace(signInAddress(path, lang));
 }
 
 function markSent(target) {

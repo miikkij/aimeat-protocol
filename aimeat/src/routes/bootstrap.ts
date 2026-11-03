@@ -8,6 +8,10 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-04 — for_ai_agents says which connection path to take, the rules of the sign-in and what
+ *     each failure means: a Codex session wandered between OAuth and the device flow, asked about a
+ *     mail that could not come, and read none of it here (Jouni, 2026-11-04). option_b_manual told the
+ *     person to copy credentials from a page that shows none.
  *   2026-11-02 — A static front page goes Finnish when the browser lists Finnish anywhere, not only
  *     first, and a language picked on this device beats the browser (Jouni, 2.11).
  *   2026-11-01 — The explore path names the public data packages in discovery and the DCAT data catalogue
@@ -473,6 +477,24 @@ export function bootstrapRouter(
           if_no: `Direct them to register at ${base}/v1/portal. After registration, come back to connection_flow.`,
           if_unknown: `Try asking: 'What is your username on this AIMEAT node?' If they do not know what that means, they need to register first at ${base}/v1/portal.`,
         },
+        choose_the_path: {
+          mcp_first: `If your tool is an MCP client (Claude, Claude Code, Codex, Cursor, VS Code and others), add ${base}/v1/mcp as an MCP server and sign in with OAuth. GET ${base}/v1/ai-tools has the exact steps per tool. You do not need the account name for this.`,
+          device_flow: 'Use connection_flow below when your tool has no MCP client, or when it runs where the person\'s browser cannot reach it and the tool has no way to take the callback by hand.',
+          stay_on_one: 'Choose one path and finish it. When a step fails, read what failed in when_it_goes_wrong before you try another path. Changing path after each failure is what leaves a person with half-finished connections.',
+        },
+        connection_rules: [
+          'Never ask the person for a password, an emailed sign-in link, a code from their email or a token in chat. They sign in in their own browser, and only there.',
+          `The approval page does not sign anyone in. A person who is not signed in goes to the front page (${base}/v1/portal), signs in or registers there in the way this node is set up, and returns to the same approval by themselves. Say this to them before you give them the address.`,
+          'A command-line MCP login, such as codex mcp login or codex mcp add, runs a small program on a 127.0.0.1 address that receives the result from the browser, and that program stops with the command. Ask the person to run it in their own terminal. Run it yourself only when your command can keep running until the person has approved, and never in a call with a time limit shorter than that.',
+          'Ask the person to tell you when they have approved. Do not start the login again while they are still on the approval page.',
+        ],
+        when_it_goes_wrong: {
+          browser_cannot_reach_127_0_0_1: 'The login command stopped before the person approved. Nothing is lost and the agent stays. Start the login once more and keep it running; each run has its own address, so an older approval page no longer works. The person closes the old page and chooses the same agent on the new one.',
+          invalid_target_resource_is_required: `The client sent no resource parameter (RFC 8707), and this node requires it. Update the client. In Codex you can also set oauth_resource = "${base}/v1/mcp" under [mcp_servers.<name>] in its config file.`,
+          no_sign_in_mail_arrives: 'A sign-in link goes only to an address verified on an account here, and the page answers the same way for any address so that it does not tell who has an account. No mail usually means that this address has no account here. The person creates an account on the front page, or uses the address their account has.',
+          request_names_another_account: 'The device request named an account other than the one signed in. Ask the person for the account name the page shows and start the device flow again with that name.',
+          code_expired_or_not_found: 'Device codes expire. Start the device flow again and give the person the new address.',
+        },
         connection_flow: {
           step_1_request_access: {
             description: 'Request device authorization. Choose a name for yourself.',
@@ -494,8 +516,7 @@ export function bootstrapRouter(
             },
             option_b_manual: {
               when: 'You cannot poll (most chat-based AIs like ChatGPT, Gemini chat)',
-              instruction: 'Tell the user: \'I cannot poll automatically. Please approve the request in your browser, then copy my credentials from the approval page and paste them here.\'',
-              user_pastes: '{ "gaii": "...", "privateKey": "...", "token": "..." }',
+              instruction: `This path cannot finish without polling: the approval page shows no credentials, and they come only from the device-token endpoint. Connect through the chat's own MCP connector if it has one (GET ${base}/v1/ai-tools). If it has none, say so: the person uses the ready-made prompts on ${base}/v1/portal, runs them in this chat and brings the results back.`,
             },
           },
           step_4_store_credentials: {
