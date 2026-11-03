@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.38.0 — 2026-11-03 — mcpCapabilityUseApproval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL, default operators; secaudit2026nov02d round 13b).
  *   v1.37.0 — 2026-11-01 — buildCode (AIMEAT_SITE_BUILD_CODE, config-site-contacts.ts): the store's build code for a place.
  *   v1.36.0 — 2026-10-29 — fileStoreDefaults() (config-file-store.ts): where stored files keep their bytes; the x402 lines move to config-x402.ts unchanged (max-file-lines).
  *   v1.35.0 -- 2026-10-27 -- The default profile comes from defaultSecurityProfile (config-private-host.ts): never local when AIMEAT_BIND_HOST is beyond this computer (secaudit2026oct26).
@@ -120,6 +121,7 @@ import { updateCheckDefaults } from './config-update-check.js';
 import { themesDefaults } from './config-themes.js';
 import { federationDefaults } from './config-federation.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
+import { mcpCapabilityUseApprovalFrom } from './config-types-agent-access.js';
 import { seoDefaults } from './config-site-presence.js';
 import { runtimeConfigFromEnv, siteKvFromEnv } from './config-runtime.js';
 import { extensionLoadDefaults } from './config-extension-load.js';
@@ -639,6 +641,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // A slow tools/call of a client that declares the MCP Tasks extension becomes a task after this
     // long (mcp/tasks-extension.ts). 0 answers every such call with a task at once.
     mcpTaskAfterMs: Math.min(600_000, Math.max(0, parseInt(process.env.AIMEAT_MCP_TASK_AFTER_MS ?? '10000', 10) || 0)),
+    mcpCapabilityUseApproval: mcpCapabilityUseApprovalFrom(process.env.AIMEAT_MCP_CAPABILITY_USE_APPROVAL),
 
     // Ecosystem application (GEAI) scope bounds. Defaults lean read + deposit (ecosystem apps mostly
     // deposit refined data into owner areas). Events/capability scopes are deferred to later chunks.

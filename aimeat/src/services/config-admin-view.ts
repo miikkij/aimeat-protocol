@@ -17,6 +17,8 @@
  * @usage const view = buildConfigView({ config, storage, provenance });
  *        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, changes);
  * @version-history
+ *   2026-11-03 — mcp.capability_use_approval: a change that asks fewer people (ask to operators to off) is
+ *     refused to an AI credential with PERSON_REQUIRED, before anything is applied (secaudit2026nov02d round 13b).
  *   2026-11-02 — auth.sign_in_lockout: switching it off is refused to an AI credential, like the two below.
  *   2026-11-02 — The sign-in policy: a change that weakens auth.two_step_required or
  *     auth.password_sign_in is refused to an AI credential with PERSON_REQUIRED, and
@@ -46,6 +48,7 @@ import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
     TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, SIGN_IN_LOCKOUT_PATH, TOTP_ENABLED_PATH, signInPolicyChangeRefusal, passwordOffLockoutRefusal, twoStepWithoutTotpRefusal,
 } from './sign-in-policy.js';
+import { CAPABILITY_USE_APPROVAL_PATH, capabilityUseApprovalChangeRefusal } from './mcp-client/capability-use-setting.js';
 
 export interface ConfigViewDeps { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance }
 
@@ -247,6 +250,16 @@ export async function changeNodeSettings(deps: ConfigViewDeps, caller: SwitchCal
     if (policyAt[PASSWORD_SIGN_IN_PATH] === 'off' && config.passwordSignIn !== 'off') {
         const lockout = await passwordOffLockoutRefusal(storage, config.nodeId);
         if (lockout) return { ok: false, status: lockout.status, code: lockout.code, message: `${lockout.message} Nothing in this request was applied.` };
+    }
+    // Who is asked before another account's capability uses a person's own sign-in on an MCP server
+    // (services/mcp-client/capability-use-setting.ts): a change that asks fewer people is refused to
+    // an AI credential, each change from the value the one before it leaves, as the sign-in policy.
+    let approvalAt: unknown = config.mcpCapabilityUseApproval;
+    for (const change of changes as Array<{ path?: unknown; value?: unknown }>) {
+        if (change?.path !== CAPABILITY_USE_APPROVAL_PATH) continue;
+        const refusal = capabilityUseApprovalChangeRefusal(caller, approvalAt, change.value);
+        if (refusal) return { ok: false, status: refusal.status, code: refusal.code, details: refusal.details, message: `${refusal.message} Nothing in this request was applied.` };
+        if (MUTABLE_CONFIG_MAP[CAPABILITY_USE_APPROVAL_PATH]?.validate(change.value)) approvalAt = change.value;
     }
 
     // The loop that checks, persists and applies each change: services/config-apply.ts, shared with

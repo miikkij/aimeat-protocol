@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.2.0 (commit b4e3837a4) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit c3de08026) on 2026-11-03. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -71,6 +71,7 @@ The same code runs a single-user laptop node and a multi-user public node. The d
 | Two-step sign-in (TOTP) | `AIMEAT_TOTP_ENABLED` | available; each person turns it on | yes, to offer it | `aimeat/src/config-types-account-security.ts` |
 | Required two-step sign-in | `AIMEAT_TWO_STEP_REQUIRED` | `off`: required for nobody | **no** on an organisation node. Set `operators`, or `everyone` | `aimeat/src/services/sign-in-policy.ts` |
 | Password sign-in | `AIMEAT_PASSWORD_SIGN_IN` | `on`: every account may use a password | decide it. With an IdP, `operators` keeps the password as the operators' way in when the IdP fails | `aimeat/src/services/sign-in-policy.ts` |
+| Another account's tool on a person's own sign-in | `AIMEAT_MCP_CAPABILITY_USE_APPROVAL` | `operators`: a capability an operator account published over an MCP server where each person signs in with their own account runs unasked; every other account's asks the person once | decide it. Set `ask` when each such use should be confirmed by the person, the operator's own included | `aimeat/src/services/mcp-client/capability-use-setting.ts` |
 | AI provenance | (none) | recorded; a `public` node refuses to switch it off | yes | `aimeat/src/config-posture.ts`, [AI transparency](../ai-transparency.md) |
 | Version check | `AIMEAT_UPDATE_CHECK` | on: the node asks npm for a newer version when an operator opens a page | decide it. It sends nothing about the node | `aimeat/.env.example` |
 

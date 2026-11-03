@@ -5,11 +5,29 @@
  * @description The settings that bound what an agent, an ecosystem app or an app may reach, mixed
  *   into AimeatConfig. Moved out of config-types.ts unchanged when that file reached the 800-line
  *   ceiling, in the change that added appOriginSignInRefuse.
- * @structure AgentAccessConfig
+ * @structure MCP_CAPABILITY_USE_APPROVAL_VALUES · McpCapabilityUseApproval · mcpCapabilityUseApprovalFrom ·
+ *   AgentAccessConfig
  * @usage import type { AgentAccessConfig } from './config-types-agent-access.js';
  * @version-history
+ *   v1.1.0 — 2026-11-03 — mcpCapabilityUseApproval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL: off, operators,
+ *     ask; default operators), secaudit2026nov02d round 13b.
  *   v1.0.0 — 2026-10-04 — Moved from config-types.ts (a pure move), with appOriginSignInRefuse added.
  */
+
+/**
+ * Whether another account's capability over an MCP server where each person signs in with their own
+ * account asks the caller's account first (services/mcp-client/capability-consent.ts). Ordered from
+ * open to strict: off (nothing asks), operators (a capability of an operator account runs unasked,
+ * every other account's asks once), ask (every other account's asks once).
+ */
+export const MCP_CAPABILITY_USE_APPROVAL_VALUES = ['off', 'operators', 'ask'] as const;
+export type McpCapabilityUseApproval = typeof MCP_CAPABILITY_USE_APPROVAL_VALUES[number];
+
+/** The environment's value when it is one of the values, `operators` otherwise. */
+export function mcpCapabilityUseApprovalFrom(raw: string | undefined): McpCapabilityUseApproval {
+  const v = (raw ?? '').trim().toLowerCase();
+  return (MCP_CAPABILITY_USE_APPROVAL_VALUES as readonly string[]).includes(v) ? v as McpCapabilityUseApproval : 'operators';
+}
 
 export interface AgentAccessConfig {
   // Scoped Agent Capabilities (REQ-006)
@@ -32,6 +50,9 @@ export interface AgentAccessConfig {
   /** MCP Tasks extension (mcp/tasks-extension.ts): a tools/call from a client that declares the
    *  extension and has not finished after this many ms answers with a task handle. 0 = at once. */
   mcpTaskAfterMs: number;
+  /** Another account's capability on a personal sign-in MCP server: off · operators (default) · ask.
+   *  Read on every call (services/mcp-client/capability-consent.ts). */
+  mcpCapabilityUseApproval: McpCapabilityUseApproval;
 
   // Ecosystem application (GEAI) scope bounds — parallel to the agent knobs above, so an operator
   // can bound ecosystem connections independently of agents.

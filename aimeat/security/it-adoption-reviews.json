@@ -81,15 +81,16 @@
       "digest": "sha256:6fa688b45c8a057d593bd92e"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/config-posture.ts",
         "aimeat/src/middleware/cors.ts",
         "aimeat/src/utils/env-validator.ts",
         "docs/security/verification-matrix.md",
-        "aimeat/src/services/sign-in-policy.ts"
+        "aimeat/src/services/sign-in-policy.ts",
+        "aimeat/src/services/mcp-client/capability-use-setting.ts"
       ],
-      "digest": "sha256:9246e5793f5d051d3a395013"
+      "digest": "sha256:836debd8511668438b3fa11b"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -135,13 +136,15 @@
       "digest": "sha256:3d9c7b9517edaeaa75f51cbc"
     },
     "13-apps-agents-endpoints.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/cli/connect/command-trust.ts",
         "aimeat/src/routes/connect-install.ts",
-        "aimeat/src/services/mcp-client/personal-sign-in.ts"
+        "aimeat/src/services/mcp-client/personal-sign-in.ts",
+        "aimeat/src/services/mcp-client/capability-consent.ts",
+        "aimeat/src/services/mcp-client/capability-use-setting.ts"
       ],
-      "digest": "sha256:6525bb32a721a5d074358271"
+      "digest": "sha256:bbeb2c43cd62b8ed7de797aa"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-02",
@@ -305,7 +308,8 @@
       "aimeat/src/middleware/cors.ts": "0f742801d6902ab5",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
-      "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105"
+      "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105",
+      "aimeat/src/services/mcp-client/capability-use-setting.ts": "0b4b9dfb4fd267a7"
     },
     "08-threat-model.md": {
       "docs/security/threat-model.md": "211b04c0cc93e8fe",
@@ -333,7 +337,9 @@
     "13-apps-agents-endpoints.md": {
       "aimeat/src/cli/connect/command-trust.ts": "7efcc9beee90a0ce",
       "aimeat/src/routes/connect-install.ts": "9cccc922cd24769b",
-      "aimeat/src/services/mcp-client/personal-sign-in.ts": "fd79749d63cbfc91"
+      "aimeat/src/services/mcp-client/personal-sign-in.ts": "fd79749d63cbfc91",
+      "aimeat/src/services/mcp-client/capability-consent.ts": "0c5c747d1d1aafc7",
+      "aimeat/src/services/mcp-client/capability-use-setting.ts": "0b4b9dfb4fd267a7"
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance-derived.ts": "4d499cfdd1a5a761",

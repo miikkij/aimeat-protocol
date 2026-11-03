@@ -25,6 +25,11 @@
  *   grants. Don't allow, or no answer before the request expires: nothing runs, and a later call asks
  *   again. A capability whose publisher, server or tool changed is a new question.
  *
+ *   THE SETTING mcp.capability_use_approval (capability-use-setting.ts), read on every call: `off` asks
+ *   nobody and the capability runs on the caller's own sign-in; `operators` (default) lets a capability
+ *   whose publisher holds the operator role now run unasked; `ask` asks for every other account's. A
+ *   refusal names the setting in `details`, and its message names the setting's label on the Config tab.
+ *
  *   THE RECORD is service-owned (utils/reserved-keys.ts `mcp-capability-consents.`), in the caller's
  *   account: { uses: { <publisher>|<server id>|<tool>: { allowedAt } | { waiting: { requestId, at } } } }.
  * @structure MCP_CAPABILITY_CONSENTS_PREFIX · MCP_CAPABILITY_USE_KIND · CapabilityUseCall ·
@@ -33,12 +38,17 @@
  *   const refused = await personalSignInCapabilityRefusal(ctx, { capability, publisherOwner, callerOwner, server, tool, requester });
  *   if (refused) throw Object.assign(new Error(refused.message), refused);
  * @version-history
+ *   v1.1.0 — 2026-11-03 — The node setting mcp.capability_use_approval decides who is asked (off,
+ *     operators by default, ask); the refusal names it (secaudit2026nov02d round 13b).
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
 import type { Storage, CapabilityRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { McpServerRecord } from '../../models/mcp-server-schemas.js';
-import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
+import type { McpCapabilityUseApproval } from '../../config-types-agent-access.js';
+import { localAccountName, localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { CAPABILITY_USE_APPROVAL_PATH, CAPABILITY_USE_APPROVAL_LABEL } from './capability-use-setting.js';
 import { logger } from '../../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { fileAsk } from '../publish-requests/ask.js';
@@ -68,8 +78,20 @@ export interface CapabilityUseCall {
   requester: PublishRequester;
 }
 
-/** The refusal, shaped as invokeCapability throws it. */
-export interface CapabilityUseRefusal { statusCode: 403; code: 'MCP_CAPABILITY_NEEDS_APPROVAL'; message: string; requestId?: string }
+/** The refusal, shaped as invokeCapability throws it. `details` names the setting that asked. */
+export interface CapabilityUseRefusal {
+  statusCode: 403; code: 'MCP_CAPABILITY_NEEDS_APPROVAL'; message: string; requestId?: string;
+  details: { setting: typeof CAPABILITY_USE_APPROVAL_PATH; value: McpCapabilityUseApproval; requestId?: string };
+}
+
+/** The setting's value for this call, read on every call so a change applies at once. */
+const approvalOf = (config: AimeatConfig): McpCapabilityUseApproval => config.mcpCapabilityUseApproval ?? 'operators';
+
+/** Whether the capability's publisher is an account of this node with the operator role, read now. */
+async function publishedByOperator(ctx: Ctx, publisherOwner: string): Promise<boolean> {
+  const name = localAccountOf(publisherOwner);
+  return !!name && isOperatorAccount(await ctx.storage.getOwner(name));
+}
 
 const recordKey = (capabilityId: string) => `${MCP_CAPABILITY_CONSENTS_PREFIX}${capabilityId}`;
 const bindingOf = (publisher: string, serverId: string, tool: string) => `${publisher}|${serverId}|${tool}`;
@@ -82,13 +104,18 @@ async function writeConsents(ctx: Ctx, ownerGhii: string, capabilityId: string, 
   await updateRecord(ctx.storage, ownerGhii, recordKey(capabilityId), parseConsents, mutate, { tag: 'mcp', visibility: 'private' });
 }
 
-function refusal(call: CapabilityUseCall, tail: string, requestId?: string): CapabilityUseRefusal {
+function refusal(call: CapabilityUseCall, value: McpCapabilityUseApproval, tail: string, requestId?: string): CapabilityUseRefusal {
   const name = call.capability.name || call.capability.id;
+  const who = value === 'operators'
+    ? 'This node asks first for a tool from any account other than an operator\'s'
+    : 'This node asks first for a tool from any other account';
   return {
     statusCode: 403, code: 'MCP_CAPABILITY_NEEDS_APPROVAL', ...(requestId ? { requestId } : {}),
+    details: { setting: CAPABILITY_USE_APPROVAL_PATH, value, ...(requestId ? { requestId } : {}) },
     message: `"${name}" from ${localAccountName(call.publisherOwner)} runs the tool "${call.tool}" on "${call.server.slug}", `
       + `where everyone signs in with their own account, so it would run with your own sign-in there. `
-      + `Nothing was sent. ${tail}`,
+      + `Nothing was sent. ${tail} ${who}; the node's operator can change that under Admin, Config, `
+      + `with the setting "${CAPABILITY_USE_APPROVAL_LABEL}".`,
   };
 }
 
@@ -98,11 +125,16 @@ function refusal(call: CapabilityUseCall, tail: string, requestId?: string): Cap
  * throws: a failure to decide refuses, and nothing is sent.
  */
 export async function personalSignInCapabilityRefusal(ctx: Ctx, call: CapabilityUseCall): Promise<CapabilityUseRefusal | null> {
+  // The node's setting, read now (capability-use-setting.ts): off asks nobody; operators lets an
+  // operator account's capability run unasked; ask asks for every other account's.
+  const value = approvalOf(ctx.config);
+  if (value === 'off') return null;
   const binding = bindingOf(call.publisherOwner, call.server.id, call.tool);
-  const asked = (id: string) => refusal(call, `Your account has been asked to allow it with one press (request ${id}, `
+  const asked = (id: string) => refusal(call, value, `Your account has been asked to allow it with one press (request ${id}, `
     + `${approveUrl(ctx.config.baseUrl)}). If you are an AI, give the person that address in their own language, `
     + 'and call again once they allow it.', id);
   try {
+    if (value === 'operators' && await publishedByOperator(ctx, call.publisherOwner)) return null;
     const state = parseConsents((await ctx.storage.getMemory(call.callerOwner, recordKey(call.capability.id)))?.value).uses[binding] ?? {};
     if (state.allowedAt) return null;
     if (state.waiting) {
@@ -129,7 +161,7 @@ export async function personalSignInCapabilityRefusal(ctx: Ctx, call: Capability
         i18n: { key: 'approval_mcp_capability_use', vars: { capability: name, publisher, tool: call.tool, server: call.server.slug } },
       },
     });
-    if (!filed.ok) return refusal(call, `Your account could not be asked now: ${filed.message}`);
+    if (!filed.ok) return refusal(call, value, `Your account could not be asked now: ${filed.message}`);
     const requestId = filed.request.id;
     await writeConsents(ctx, call.callerOwner, call.capability.id, cur => {
       const s = cur.uses[binding];
@@ -141,7 +173,7 @@ export async function personalSignInCapabilityRefusal(ctx: Ctx, call: Capability
     logger.warn('mcp capability consent: whether the call may use the caller\'s sign-in could not be decided; refused', {
       capability: call.capability.id, server: call.server.slug, error: String(err),
     });
-    return refusal(call, 'Whether your account allowed it could not be decided now. Try again.');
+    return refusal(call, value, 'Whether your account allowed it could not be decided now. Try again.');
   }
 }
 

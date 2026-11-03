@@ -15,6 +15,10 @@
  *   switching it off makes every agent's scopes advisory, which whoever runs the node decides.
  * @structure ACCESS_CONFIG_FIELDS
  * @version-history
+ *   v1.4.0 — 2026-11-03 — mcp.capability_use_approval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL: off, operators,
+ *     ask; default operators), mutable, read on every call. A change that loosens it is refused to an AI
+ *     credential (services/mcp-client/capability-use-setting.ts, asked by config-admin-view.ts).
+ *     secaudit2026nov02d round 13b.
  *   v1.3.0 — 2026-11-02 — auth.sign_in_lockout (AIMEAT_SIGN_IN_LOCKOUT: off, on), off by default (Jouni, 08.02).
  *   v1.2.0 — 2026-11-02 — auth.two_step_required (AIMEAT_TWO_STEP_REQUIRED: off, operators, everyone) and
  *     auth.password_sign_in (AIMEAT_PASSWORD_SIGN_IN: on, operators, off), mutable, read on every
@@ -31,6 +35,7 @@
 import type { ConfigFieldShape } from './config-field-def.js';
 import { isEmptyOrHttpUrl, oneOf } from './config-schema-validators.js';
 import { TWO_STEP_REQUIRED_VALUES, PASSWORD_SIGN_IN_VALUES, SIGN_IN_LOCKOUT_VALUES } from '../config-types-account-security.js';
+import { MCP_CAPABILITY_USE_APPROVAL_VALUES } from '../config-types-agent-access.js';
 
 const whole = (min: number) => (v: unknown): boolean => typeof v === 'number' && Number.isInteger(v) && v >= min;
 const bool = (v: unknown): boolean => typeof v === 'boolean';
@@ -43,7 +48,7 @@ type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' 
   | 'entraOAuthEnabled' | 'entraOAuthTenant' | 'entraOAuthClientId' | 'entraOAuthClientSecret' | 'entraOAuthRedirectUri'
   | 'casdoorOAuthEnabled' | 'casdoorOAuthEndpoint' | 'casdoorOAuthClientId' | 'casdoorOAuthClientSecret' | 'casdoorOAuthRedirectUri'
   | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes' | 'mcpTaskAfterMs'
-  | 'twoStepRequired' | 'passwordSignIn' | 'signInLockout';
+  | 'mcpCapabilityUseApproval' | 'twoStepRequired' | 'passwordSignIn' | 'signInLockout';
 
 export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Token lifetimes ──
@@ -84,5 +89,6 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   { key: 'maxEcoScopes', dotPath: 'scopes.max_eco_scopes', envVar: 'AIMEAT_MAX_ECO_SCOPES', type: 'object', list: true, validate: words, immutable: false, description: 'The most an ecosystem app may be granted; * allows any permission the owner approves' },
   { key: 'sameOwnerAutoApprove', dotPath: 'agents.same_owner_auto_approve', envVar: 'AIMEAT_SAME_OWNER_AUTO_APPROVE', type: 'boolean', validate: bool, immutable: false, description: 'An agent connected by its own owner, or by one of the owner\'s agents, is approved without a second press. Never across owners, never with more permissions' },
   { key: 'mcpEnforceScopes', dotPath: 'mcp.enforce_scopes', envVar: 'AIMEAT_MCP_ENFORCE_SCOPES', type: 'boolean', validate: bool, immutable: true, description: 'Refuse an MCP tool an agent holds no permission for. Off only logs the call, so every agent can use every tool. Set by whoever runs the node, in the environment' },
+  { key: 'mcpCapabilityUseApproval', dotPath: 'mcp.capability_use_approval', envVar: 'AIMEAT_MCP_CAPABILITY_USE_APPROVAL', type: 'string', ...oneOf(...MCP_CAPABILITY_USE_APPROVAL_VALUES), immutable: false, description: 'Whether a capability another account published asks first when it runs a tool on an MCP server where each person signs in with their own account, where it acts as the person who uses it. ask: the first use of every other account\'s capability asks that person once, with one press; it costs a press for each new one, the operator\'s own included. operators (default): a capability of an account with the operator role runs without asking and every other account\'s asks once; the operator already holds every right on the node, so this gives no protection away. off: nothing asks, and another account\'s capability runs on the person\'s own sign-in there; it costs the person their say over which tool acts as them. Read on every call. An AI cannot lower it' },
   { key: 'mcpTaskAfterMs', dotPath: 'mcp.task_after_ms', envVar: 'AIMEAT_MCP_TASK_AFTER_MS', type: 'number', validate: v => whole(0)(v) && (v as number) <= 600000, immutable: false, description: 'A tool call from an AI client that supports MCP tasks and runs longer than this many milliseconds answers at once with a task the client checks later (0 = every such call)', range: '0-600000' },
 ];

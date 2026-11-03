@@ -34,6 +34,11 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-11-03 — Phase 5f: the node setting mcp.capability_use_approval reads operators by default; the
+ *     round-13 tests run with it set to ask (their publisher is an operator); under ask the operator's
+ *     capability asks too, under operators it runs unasked while another owner's asks, under off nothing
+ *     asks; an agent holding operator:admin makes it stricter and is refused a looser value
+ *     (secaudit2026nov02d round 13b).
  *   2026-11-02 — Phase 5f: another owner's capability over a server each person signs in to waits for
  *     the caller's one press before it runs on the caller's own sign-in; the caller's own capability
  *     runs unasked, an allowed one runs for the caller's agent too, and Don't allow asks again later
@@ -2253,6 +2258,30 @@ await test('designed use: an owner\'s own capability over that server runs on th
   assert((await capabilityUseAsks(plain.token)).length === 0, 'the owner\'s own capability filed a question');
 });
 
+// secaudit2026nov02d round 13b: who is asked is the node setting mcp.capability_use_approval (off,
+// operators by default, ask). This phase's publisher (the second owner) holds the operator role, so the
+// round-13 tests below run with the node set to ask, as a company sets it; the operator in person sets
+// it, and the tests after Don't allow put it back to the default.
+const APPROVAL_PATH = 'mcp.capability_use_approval';
+async function approvalSetting(): Promise<unknown> {
+  const r = await json('/v1/admin/config', { headers: ownerAuth() });
+  return r.body?.data?.schema?.[APPROVAL_PATH]?.value;
+}
+async function setApproval(bearer: string, ...values: string[]) {
+  return json('/v1/admin/config', {
+    method: 'PUT', headers: { Authorization: `Bearer ${bearer}` },
+    body: JSON.stringify({ changes: values.map((value) => ({ path: APPROVAL_PATH, value })) }),
+  });
+}
+
+await test('the node\'s setting reads operators by default, and the operator in person sets ask for this phase', async () => {
+  const before = await approvalSetting();
+  assert(before === 'operators', `the default: ${JSON.stringify(before)}`);
+  const set = await setApproval(ownerToken, 'ask');
+  assert(set.status === 200, `set ask: ${set.status} ${JSON.stringify(set.body?.error)}`);
+  assert(await approvalSetting() === 'ask', 'the value did not move');
+});
+
 await test('attack: another owner\'s capability over that server does not run on the caller\'s own sign-in unasked', async () => {
   strangerPersonalCap = await personalCapability(strangerToken, `whoami-borrowed-${Date.now()}`, 'teamjira/whoami');
   const r = await json(`/v1/capabilities/${strangerPersonalCap}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
@@ -2295,6 +2324,73 @@ await test('Don\'t allow: nothing runs, and a later call asks again', async () =
   assert(later.status === 403 && later.body.error?.code === 'MCP_CAPABILITY_NEEDS_APPROVAL', `later: ${later.status} ${later.body.error?.code}`);
   const again = await capabilityUseAsks(plain.token);
   assert(again.length === 1 && again[0].id !== asked.id, `a new question: ${JSON.stringify(again.map((r) => r.id))}`);
+});
+
+let operatorAskedCap = '';
+let plainPublisher = { name: '', token: '' };
+
+await test('under ask, the operator\'s own capability asks too, and the refusal names the setting', async () => {
+  const me = await json('/v1/admin/config', { headers: strangerAuth() });
+  assert(me.status === 200, `the publisher of this phase is an operator: ${me.status}`);
+  operatorAskedCap = await personalCapability(strangerToken, `whoami-operator-${Date.now()}`, 'teamjira/whoami');
+  const r = await json(`/v1/capabilities/${operatorAskedCap}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(r.status === 403 && r.body.error?.code === 'MCP_CAPABILITY_NEEDS_APPROVAL', `under ask: ${r.status} ${JSON.stringify(r.body.error)}`);
+  assert(r.body.error?.details?.setting === APPROVAL_PATH && r.body.error?.details?.value === 'ask',
+    `details: ${JSON.stringify(r.body.error?.details)}`);
+  assert(String(r.body.error?.message).includes('Admin, Config'), `the message names where it is set: ${r.body.error?.message}`);
+});
+
+await test('DENIAL: an agent of the operator holding operator:admin cannot ask fewer people (PERSON_REQUIRED), alone or behind a stricter change', async () => {
+  const agent = await agentWithScopes({ name: ownerName, token: ownerToken }, `cfgapproval${Date.now().toString(36)}`, ['operator:admin']);
+  for (const value of ['operators', 'off']) {
+    const r = await setApproval(agent.token, value);
+    assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED', `ask to ${value}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(r.body.error?.details?.setting === APPROVAL_PATH, `details: ${JSON.stringify(r.body.error?.details)}`);
+  }
+  assert(await approvalSetting() === 'ask', 'a refused change moved the value');
+});
+
+await test('under operators, the operator\'s capability runs with no question and another owner\'s still asks', async () => {
+  const set = await setApproval(ownerToken, 'operators');
+  assert(set.status === 200, `the operator in person sets operators: ${set.status} ${JSON.stringify(set.body?.error)}`);
+  const waiting = (await capabilityUseAsks(plain.token)).length;
+  const fresh = await personalCapability(strangerToken, `whoami-operator-fresh-${Date.now()}`, 'teamjira/whoami');
+  for (const cap of [operatorAskedCap, fresh]) {
+    const r = await json(`/v1/capabilities/${cap}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+    assert(r.status === 200 && JSON.stringify(r.body.data).includes('signed-in'), `the operator's capability: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  }
+  assert((await capabilityUseAsks(plain.token)).length === waiting, 'the operator\'s capability filed a question');
+  plainPublisher = await plainOwner('mcppub');
+  // A non-operator publishes with visibility owner: on this node only the operator offers a public one
+  // unasked (capability_publishing self_only), and owner opens it by id to another account all the same.
+  const theirs = await personalCapability(plainPublisher.token, `whoami-member-${Date.now()}`, 'teamjira/whoami', 'owner');
+  const r = await json(`/v1/capabilities/${theirs}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(r.status === 403 && r.body.error?.code === 'MCP_CAPABILITY_NEEDS_APPROVAL' && r.body.error?.details?.value === 'operators',
+    `another owner's under operators: ${r.status} ${JSON.stringify(r.body.error)}`);
+  assert(!JSON.stringify(r.body).includes('signed-in'), 'the far side answered before the caller allowed it');
+});
+
+await test('under off, nothing asks: another owner\'s capability runs on the caller\'s own sign-in', async () => {
+  const set = await setApproval(ownerToken, 'off');
+  assert(set.status === 200, `the operator in person sets off: ${set.status} ${JSON.stringify(set.body?.error)}`);
+  const waiting = (await capabilityUseAsks(plain.token)).length;
+  const theirs = await personalCapability(plainPublisher.token, `whoami-member-off-${Date.now()}`, 'teamjira/whoami', 'owner');
+  const r = await json(`/v1/capabilities/${theirs}/invoke`, { method: 'POST', headers: plainAuth(), body: JSON.stringify({ input: {} }) });
+  assert(r.status === 200 && JSON.stringify(r.body.data).includes('signed-in'), `under off: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  assert((await capabilityUseAsks(plain.token)).length === waiting, 'a question was filed under off');
+});
+
+await test('an agent of the operator may make it stricter (off to operators to ask), and the operator in person sets the default back', async () => {
+  const agent = await agentWithScopes({ name: ownerName, token: ownerToken }, `cfgstrict${Date.now().toString(36)}`, ['operator:admin']);
+  const tighter = await setApproval(agent.token, 'operators');
+  assert(tighter.status === 200 && await approvalSetting() === 'operators', `off to operators: ${tighter.status} ${JSON.stringify(tighter.body?.error)}`);
+  const strictest = await setApproval(agent.token, 'ask');
+  assert(strictest.status === 200 && await approvalSetting() === 'ask', `operators to ask: ${strictest.status} ${JSON.stringify(strictest.body?.error)}`);
+  const batch = await setApproval(agent.token, 'ask', 'off');
+  assert(batch.status === 403 && batch.body?.error?.code === 'PERSON_REQUIRED' && await approvalSetting() === 'ask',
+    `a loosening behind a stricter change in one request: ${batch.status} ${JSON.stringify(batch.body?.error)}`);
+  const back = await setApproval(ownerToken, 'operators');
+  assert(back.status === 200 && await approvalSetting() === 'operators', `back to the default: ${back.status} ${JSON.stringify(back.body?.error)}`);
 });
 
 await test('an owner the server does not admit cannot start a sign-in on it', async () => {
