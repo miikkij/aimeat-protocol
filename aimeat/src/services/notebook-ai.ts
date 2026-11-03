@@ -46,7 +46,7 @@ import { completeForOwner, prepareAiCall, AiCompletionError, type CompleteForOwn
 import { getEncryptionKey } from './encryption.js';
 import { hasOwnAiKey } from './own-key-coverage.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
-import { nodeAiProviders, PROVIDER_PREFIX } from './ai/providers.js';
+import { nodeAiProviders } from './ai/providers.js';
 
 /** Raised with a stable `code` so routes can map it to the right HTTP status + envelope. */
 export class NotebookAiError extends Error {
@@ -98,10 +98,9 @@ export async function resolveOwnerModel(
     // only place a key is set). Another key may still pay: the node's shared key from the person's
     // allowance, an operator's provider. The one place that decides it is asked, as chat asks it
     // (chat-session.ts chatRefusal), and the plan is discarded: the completion plans again.
-    // With no provider of the node's and none of the person's (a keyless local one needs no key),
-    // nothing can pay, and the answer is known without planning.
-    if (nodeAiProviders(config).length === 0
-      && (await storage.listMemoryMeta(gaii, { prefix: PROVIDER_PREFIX })).length === 0) throw noKeyError();
+    // With no provider of the node's, nothing but the person's own key could pay, and the answer is
+    // known without planning (as before this check asked the planner).
+    if (nodeAiProviders(config).length === 0) throw noKeyError();
     try {
       await prepareAiCall(storage, config, gaii, { appId, caller: OWNER_CALLER.caller });
     } catch (e) {
