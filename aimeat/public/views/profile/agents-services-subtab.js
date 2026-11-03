@@ -9,6 +9,9 @@
  *   - AgentServicesSubtab (default export) -- main component
  *   - ServiceCard -- individual service display card
  * @version-history
+ *   v1.11.0 -- 2026-11-04 -- Unpublish goes through unpublishAgentService (api.js), which sends the
+ *     session's token; the tab sent `session.token`, which the session does not carry, so every press
+ *     answered 401 since v1.0.0 (codebase analysis 2026-11-03, item A5).
  *   2026-10-15 — The list is the agent's own by exact GAII; visibility, status and calls come from the server and are left out when it does not send them (they showed public, active and 0 as defaults); Unpublish names the agent as the provider, so the owner's call no longer answers 404 (feature-list audit #80).
  *   v1.10.0 -- 2026-10-11 -- A service's price line is its money price (or Free) and its pacing amount (pricing.toll_morsels, 3.x base_morsels or cost as fallback); a morsel count is not a price.
  *   v1.9.0 -- 2026-09-26 -- A service is the List's row (page group G1a): the state dot before its name,
@@ -35,7 +38,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { getAgentServices } from '/js/services/agent-services.js';
+import { getAgentServices, unpublishAgentService } from '/js/services/agent-services.js';
 import { priceAndPacing, pacingOf } from '/js/format.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
@@ -79,7 +82,7 @@ function ServiceCard({ service, onUnpublish }) {
   `;
 }
 
-export default function AgentServicesSubtab({ agentName, agentGaii, session, showToast }) {
+export default function AgentServicesSubtab({ agentName, agentGaii, showToast }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -98,19 +101,9 @@ export default function AgentServicesSubtab({ agentName, agentGaii, session, sho
     try {
       const actionId = service.action_id || service.id;
       // The action is the agent's, so the owner names the agent as its provider.
-      const provider = service.provider_gaii || agentGaii;
-      const resp = await fetch(`/v1/actions/${encodeURIComponent(actionId)}?provider=${encodeURIComponent(provider)}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session?.token}` },
-      });
-      if (resp.ok) {
-        showToast(t('profile.agents.services.unpublished'));
-        loadServices();
-      } else {
-        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error already being reported
-        const body = await resp.json().catch(() => ({}));
-        showToast(body.error?.message || t('profile.agents.services.unpublishError'), true);
-      }
+      await unpublishAgentService(actionId, service.provider_gaii || agentGaii);
+      showToast(t('profile.agents.services.unpublished'));
+      loadServices();
     } catch (err) {
       showToast(err.message || t('profile.agents.services.unpublishError'), true);
     }

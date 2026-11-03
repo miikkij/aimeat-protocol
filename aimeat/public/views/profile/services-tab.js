@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for publishing/managing services and browsing the catalogue.
  * @version-history
+ *   v1.20.0 -- 2026-11-04 -- My services lists the services the owner published, by the owner's GHII, and
+ *     the tab's service count follows. It listed the first 20 services of the whole node, each with a
+ *     Delete that answered "not owned by you" (codebase analysis 2026-11-03, item A6).
  *   v1.19.0 -- 2026-10-11 -- A service shows its money price (or Free) and its pacing amount, "Free · pacing
  *     5 morsels", read from toll_morsels with price_morsels / pricing.base_morsels as the 3.x fallback; the
  *     publish form's number is the pacing amount (sent as toll_morsels), never a price.
@@ -68,6 +71,7 @@ import { Select } from '/components/Select.js';
 import { Space } from '/components/Layout.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
 import { apiGet } from '/js/api.js';
+import { getNodeId } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
 import { dateTime as fmtDateTime, priceAndPacing } from '/js/format.js';
 
@@ -196,7 +200,9 @@ export default function ServicesTab({ session, showToast, onStats }) {
 
   async function loadMyData() {
     try {
-      const list = await listMyServices(session.owner);
+      // A service published here is filed under the owner's GHII (POST /v1/catalogue).
+      const me = session.ghii || (session.owner && getNodeId() ? `${session.owner}@${getNodeId()}` : '');
+      const list = me ? await listMyServices(me) : [];
       setMyServices(list);
       onStats?.({ services: list.length });
     } catch (err) { swallowed('services-tab', err); setMyServices([]); }
