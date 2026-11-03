@@ -2,7 +2,7 @@
   "about": "When each page of docs/it-adoption/ was last read against the code it describes, and which files that code is. pnpm check:it-adoption fails when a watched file changes after the review, so whoever changed the code re-reads the page an organisation's IT signs off against. The watches are the few files where a change most likely changes what IT is told; that a named setting or MCP tool still exists is checked separately on every page. Re-stamp after reading with: pnpm check:it-adoption --record <page>. Reasoning: aimeat/scripts/check-it-adoption.ts.",
   "pages": {
     "00-go-live-checklist.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/routes/setup.ts",
         "aimeat/src/services/setup-code.ts",
@@ -13,7 +13,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/routes/admin/setup-register.ts"
       ],
-      "digest": "sha256:4f7b59cbfc7ea573b4d8fa81"
+      "digest": "sha256:5cacb9d241186223bd8b7928"
     },
     "01-overview.md": {
       "reviewedOn": "2026-11-02",
@@ -260,7 +260,7 @@
       "aimeat/src/services/config-schema-seo.ts": "b88168360d49fb08",
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
       "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105",
-      "aimeat/src/routes/admin/setup-register.ts": "3f588fa2c4fd8b18"
+      "aimeat/src/routes/admin/setup-register.ts": "1a37cc4a1707f7dd"
     },
     "01-overview.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",

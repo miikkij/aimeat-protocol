@@ -29,6 +29,8 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.4.0 — 2026-11-04 — Rule admin-password: the admin password is read only by its one check, its
+ *     generation at boot and its masked display (codebase analysis 2026-11-03, item A12).
  *   v1.3.0 — 2026-11-04 — Rule ai-key-record: the legacy AI key record is read by hand only where the
  *     baseline says why (codebase analysis 2026-11-03, item A10).
  *   v1.2.0 — 2026-10-05 — Rules agent-role, wildcard-test and caller-built: the caller is the
@@ -144,6 +146,11 @@ const RULES: Rule[] = [
     label: 'Whose key pays for an AI call is asked of prepareAiCall (services/ai/completion.ts), which knows the node\'s key, its allowance and the free model; the legacy key record read by hand is how six notebook features refused a person the node would have paid for (codebase analysis 2026-11-03, A10)',
     pattern: /getMemory\([^)]*['"]openrouter\.apikey['"]\)/,
     skipDirs: ['src/services/ai/', 'src/services/secret-records.ts'],
+  },
+  {
+    id: 'admin-password',
+    label: 'The node\'s admin password is checked only by checkAdminPassword (services/admin-password.ts), with one count of wrong passwords per address for every route that takes it (codebase analysis 2026-11-03, A12)',
+    pattern: /\bconfig\.adminPassword\b/,
   },
   {
     id: 'request-caller-built',

@@ -11,6 +11,8 @@
 //   4. An owner's trail is their own account's; the operator's activity is the whole node's.
 //   5. notify-owner tells the owner once per code.
 //
+// v1.2.0 -- 2026-11-04 -- After the lockout, seed-examples and the setup sign-in refuse the same
+//   address too: one count of wrong admin passwords for every route (codebase analysis 2026-11-03, A12).
 // v1.1.0 -- 2026-11-01 -- With a build code a submit before connecting is BUILD_CONNECT_FIRST; the
 //   place's own send is test/e2e-build-with-you-send.ts.
 // v1.0.0 -- 2026-11-01 -- Initial ("Rakennamme kanssasi"; Jouni, 1.11 16.22).
@@ -316,6 +318,19 @@ try {
         assert(right.status === 429 && right.body.error?.code === 'RATE_LIMITED', `right ${right.status} ${right.text}`);
         const jwt = await json('/v1/operator/activity', bearer(operatorToken));
         assert(jwt.status === 200, `the operator's JWT still works: ${jwt.status}`);
+    });
+
+    // After the lockout above: every route that takes the admin password counts in one count
+    // (services/admin-password.ts; codebase analysis 2026-11-03, item A12). Seed-examples had only the
+    // node's global limit, and the setup pages a count of their own, so their budgets added up.
+    await test('the same address is refused the admin password on seed-examples and the setup sign-in too, and the operator JWT still seeds', async () => {
+        const seed = await json('/v1/admin/seed-examples', admin({ method: 'POST' }));
+        assert(seed.status === 429 && seed.body.error?.code === 'RATE_LIMITED', `seed-examples with the right password: ${seed.status} ${seed.text.slice(0, 300)}`);
+        assert(Number(seed.body.error?.details?.retry_after_seconds) > 0, `it says when to try again: ${JSON.stringify(seed.body.error?.details)}`);
+        const setup = await json('/v1/admin/setup/auth', admin({ method: 'POST', body: '{}' }));
+        assert(setup.status === 429, `setup sign-in with the right password: ${setup.status} ${setup.text.slice(0, 300)}`);
+        const byJwt = await json('/v1/admin/seed-examples', bearer(operatorToken, { method: 'POST' }));
+        assert(byJwt.body.error?.code !== 'UNAUTHORIZED' && byJwt.status !== 429, `the operator's JWT is not counted: ${byJwt.status} ${byJwt.text.slice(0, 300)}`);
     });
 } finally {
     await setQueue('').catch(() => undefined);
