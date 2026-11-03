@@ -111,3 +111,18 @@ describe('consentMatchPattern keeps matching the same keys', () => {
     }
   });
 });
+
+// CodeQL js/loop-bound-injection (alert 1776): the matcher sizes its position table by key.length, so a
+// key that reached it from parsed JSON as an object with a huge length would allocate that table.
+describe('consentMatchPattern takes strings only', () => {
+  it('answers false, without allocating, for a key or pattern that is not a string', () => {
+    const forged = { length: 2 ** 31 } as unknown as string;
+    expect(consentMatchPattern('a.*', forged)).toBe(false);
+    expect(consentMatchPattern(['a', '*'] as unknown as string, 'a.b')).toBe(false);
+  });
+
+  it('use kept: a string key and pattern still match as before', () => {
+    expect(consentMatchPattern('a.*', 'a.b')).toBe(true);
+    expect(consentMatchPattern('packages/p1/*', 'packages/p1/manifest')).toBe(true);
+  });
+});

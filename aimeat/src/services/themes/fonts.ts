@@ -29,6 +29,8 @@
  * @structure FontError · FontInput · FontEntry · FontService · isWoff2
  * @usage const fonts = new FontService(config, storage, () => themes.listAll()); await fonts.load();
  * @version-history
+ *   v1.0.1 — 2026-11-03 — fontSlug trims the edge hyphens with a scan instead of /^-+|-+$/ (CodeQL
+ *     js/polynomial-redos, alert 1780); every name gets the same address as before.
  *   v1.0.0 — 2026-10-03 — Initial (font manager).
  */
 import { createHash } from 'node:crypto';
@@ -87,8 +89,17 @@ interface ThemeLike {
 export const isWoff2 = (data: Buffer): boolean => data.length >= 4 && data.readUInt32BE(0) === 0x774F4632;
 
 /** A family's address: lower case letters, digits and hyphens. */
-export const fontSlug = (name: string): string =>
-    name.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+const slugBody = (name: string): string =>
+    name.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-');
+
+/** The slug without hyphens at either end, at most 60 characters. A scan, not /^-+|-+$/ (CodeQL alert 1780). */
+export const fontSlug = (name: string): string => {
+    const s = slugBody(name);
+    let a = 0, b = s.length;
+    while (a < b && s[a] === '-') a++;
+    while (b > a && s[b - 1] === '-') b--;
+    return s.slice(a, b).slice(0, 60);
+};
 
 const FAMILY_RE = /^[\p{L}\p{N}][\p{L}\p{N} -]{0,59}$/u;
 const WEIGHT_RE = /^([1-9]\d{0,3})( ([1-9]\d{0,3}))?$/;

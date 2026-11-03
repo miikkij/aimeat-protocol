@@ -10,6 +10,8 @@
  * @usage
  *   import { consentMatchPattern } from '../storage/pattern-utils.js';
  * @version-history
+ *   v1.3.1 -- 2026-11-03 -- consentMatchPattern answers false for a pattern or key that is not a string,
+ *     before it sizes anything by key.length (CodeQL js/loop-bound-injection, alert 1776).
  *   v1.3.0 -- 2026-10-31 -- consentMatchPattern evaluates the same pattern meaning as a set of
  *     reachable key positions instead of a compiled RegExp, so a pattern with many '**' segments ends
  *     in bounded time (secaudit2026oct31w2 round 10). Every pattern matches the same keys as before.
@@ -97,6 +99,9 @@ export function consentMatchPattern(pattern: string, key: string): boolean {
   // anything else literal). It is evaluated as a set of reachable key positions, one token at a
   // time, so a pattern with many '**' segments costs O(pattern length * key length) instead of
   // backtracking through every placement of the separators (secaudit2026oct31w2 round 10).
+  // Strings only: the position table is sized by key.length, and a value parsed from JSON may be an
+  // object whose length is whatever its sender wrote (CodeQL js/loop-bound-injection, alert 1776).
+  if (typeof pattern !== 'string' || typeof key !== 'string') return false;
   const n = key.length;
   let cur = new Uint8Array(n + 1);
   cur[0] = 1;
