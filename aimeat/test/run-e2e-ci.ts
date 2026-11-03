@@ -1799,6 +1799,8 @@ const ALL_SUITES = [
     'test/e2e-maintenance-cli.ts',
     // The liveness and readiness probes, and /v1/health as before (codebase analysis 2026-11-03, HA stage 1).
     'test/e2e-health-probes.ts',
+    // A stop drains first: a request in flight finishes, readiness 503, live streams end, exit 0 (HA stage 1).
+    'test/e2e-graceful-shutdown.ts',
     'test/e2e-package-update-widening.ts',
     'test/e2e-memory-bin-purge.ts',
     'test/e2e-docsign-caller-refusals.ts',

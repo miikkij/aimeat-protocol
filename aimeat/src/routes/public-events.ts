@@ -13,6 +13,8 @@
  * @structure publicEventsRouter(config, storage) -> Router
  * @usage app.use(publicEventsRouter(config, storage)); client: EventSource('/v1/public/events')
  * @version-history
+ *   v1.1.0 — 2026-11-04 — A stop ends the stream at once (services/node-lifecycle.ts endOnDrain), so the
+ *     server closes and the process exits 0 (codebase analysis 2026-11-03, HA stage 1).
  *   v1.0.0 — 2026-06-16 — Initial: public landing activity feed + SSE.
  */
 import { Router } from 'express';
@@ -25,6 +27,7 @@ import type { PublicActivityEvent } from '../services/event-bus.js';
 import { readPublicActivity } from '../services/public-activity.js';
 import type { PublicActivityCategory } from '../services/public-activity.js';
 import { logger } from '../utils/logger.js';
+import { endOnDrain } from '../services/node-lifecycle.js';
 
 const VALID_CATEGORIES = new Set<PublicActivityCategory>(['apps', 'organisms', 'agents']);
 const MAX_SSE_CONNECTIONS = 200; // cap concurrent public streams
@@ -79,6 +82,8 @@ export function publicEventsRouter(config: AimeatConfig, storage: Storage): Rout
       'X-Accel-Buffering': 'no',
     });
     res.flushHeaders();
+    // A stop ends this stream at once, so the server can close; the page reconnects by itself.
+    endOnDrain(res);
     const flush = () => { (res as unknown as { flush?: () => void }).flush?.(); };
 
     // Initial comment so proxies open the stream immediately.

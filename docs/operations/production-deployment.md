@@ -166,9 +166,13 @@ server {
   The image's `HEALTHCHECK` calls `/v1/health/ready` on 127.0.0.1 every 30 s, after a 120 s start
   period; a node bound to another address (`AIMEAT_BIND_HOST`) needs its own.
 
-On `SIGTERM` or `SIGINT` the node flushes its buffered counters and audit rows, closes its tunnels and
-exits; it gives itself a few seconds before it exits anyway. Give the process manager a stop timeout
-longer than that (the systemd unit uses 30 seconds).
+On `SIGTERM` or `SIGINT` the node drains first: `GET /v1/health/ready` answers 503, the listening
+socket closes so a new connection is refused, the live streams end (browsers reconnect by themselves),
+and the requests in flight get up to 5 seconds to finish; one still running then is cut. Scheduled
+runs get 4 seconds beside that. Then the node writes its buffered counters and audit rows, closes its
+tunnels and exits with code 0. It exits with code 1 after 25 seconds whatever happens, and at once on
+a second signal. Give the process manager a stop timeout longer than that (the systemd unit uses 30
+seconds).
 
 ## Health checks
 

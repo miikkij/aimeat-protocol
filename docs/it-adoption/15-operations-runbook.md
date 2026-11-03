@@ -1,6 +1,6 @@
 # 15 Operations runbook
 
-> Checked against AIMEAT node 4.2.0 (commit 2914ee4b0) on 2026-11-03. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 06d6a1782) on 2026-11-03. Maintained with the code: see the README for how.
 
 How an AIMEAT node is installed, configured and run day to day, what to do when a common symptom appears, and who is responsible for what. It is for the operator (the account with the node's admin role, `docs/coding-guidelines/identity-model.md`) and for the IT and security staff behind that account. The order of first-time steps is on [00 Go-live checklist](00-go-live-checklist.md); this page is what comes after, plus the short install sequence.
 

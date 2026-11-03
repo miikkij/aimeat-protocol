@@ -32,9 +32,10 @@
         "aimeat/Dockerfile",
         "aimeat/src/services/ai/openrouter-region.ts",
         "docs/operations/production-deployment.md",
-        "aimeat/src/services/connections/providers-files.ts"
+        "aimeat/src/services/connections/providers-files.ts",
+        "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:e5f9d7f5a059accadd85da1f"
+      "digest": "sha256:f049fc2f41a94a51a0750c88"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -160,7 +161,7 @@
         "docs/operations/production-deployment.md",
         "aimeat/deploy/aimeat.service"
       ],
-      "digest": "sha256:bce9fe8b04038b04519ee707"
+      "digest": "sha256:aab0d95b1c239dcfa7c72809"
     },
     "16-known-limitations.md": {
       "reviewedOn": "2026-11-02",
@@ -272,8 +273,9 @@
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "a730e25abfdcb643",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
-      "docs/operations/production-deployment.md": "47059a6cdab2448a",
-      "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0"
+      "docs/operations/production-deployment.md": "e86dc068075dc404",
+      "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",
+      "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1"
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
@@ -346,7 +348,7 @@
       "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
     },
     "15-operations-runbook.md": {
-      "docs/operations/production-deployment.md": "47059a6cdab2448a",
+      "docs/operations/production-deployment.md": "e86dc068075dc404",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577"
     },
     "16-known-limitations.md": {

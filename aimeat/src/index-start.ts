@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The stop drains first (server-bootstrap/drain.ts): readiness 503, no new connection,
+ *     live streams ended, requests in flight finished within 5 s, then the background work and the
+ *     buffers, and exit 0; a 25 s last resort and a second signal exit 1 (codebase analysis
+ *     2026-11-03, HA stage 1).
  *   2026-11-02 — At start, AIMEAT_PASSWORD_SIGN_IN=off with no operator account that has a passkey or an
  *     identity provider link logs a SECURITY warning; the node still starts (services/sign-in-policy.ts).
  *     So does AIMEAT_TWO_STEP_REQUIRED other than off with AIMEAT_TOTP_ENABLED=false.
@@ -88,9 +92,14 @@ import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-
 import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
 import { signedInOnly } from './config-visibility.js';
 import { passwordOffLockoutWarning, twoStepWithoutTotpWarning } from './services/sign-in-policy.js';
+import { trackRequests, drainServer } from './server-bootstrap/drain.js';
 
-/** How long shutdown waits for scheduled runs in progress; the process exits 5 s after server.close. */
+/** How long shutdown waits for scheduled runs in progress; it runs beside the request drain. */
 const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
+/** How long the stop waits for the requests in flight before it cuts them; the old hard exit's 5 s. */
+const SHUTDOWN_DRAIN_MS = 5000;
+/** The stop's own last resort, under systemd's TimeoutStopSec=30 (deploy/aimeat.service). */
+const SHUTDOWN_HARD_EXIT_MS = 25_000;
 
 /**
  * Start an AIMEAT node. Runs the post-upgrade asset self-heal, launches the HTTP
@@ -301,6 +310,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       }
     }).catch(err => { logger.warn('vis: ignore', { error: String(err) }); });
   });
+  // The request counter the stop's drain reads, attached in the same tick as listen(), so it sees
+  // every request (server-bootstrap/drain.ts).
+  const requestTracker = trackRequests(server);
 
   // WebSocket upgrade handling for personal node tunnels + realtime P2P + connector forward tunnel
   if (tunnelManager || realtimeManager || connectTunnelManager) {
@@ -543,36 +555,56 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     if (connectTunnelManager) logger.info('WebSocket upgrade handler registered for /v1/connect/tunnel');
   }
 
-  // Graceful shutdown handler -- flush stats and close connections
+  // Graceful shutdown: drain first, then stop the background work, write the buffers and exit 0.
   const { getStats: getStatsInstance } = await import('./services/stats.js');
+  let stopping = false;
   const handleShutdown = async (signal: string) => {
-    logger.info(`Received ${signal}, shutting down...`);
-    // The chat agent is a child of this process; it goes when we go, or it is orphaned.
-    const { shutdownChat } = await import('./services/chat-session.js');
-    shutdownChat();
+    // A second signal during the stop is a person who does not want to wait: leave at once.
+    if (stopping) { logger.warn(`Received ${signal} again during the stop; exiting now`); process.exit(1); }
+    stopping = true;
+    setTimeout(() => {
+      logger.error(`The stop did not finish within ${SHUTDOWN_HARD_EXIT_MS / 1000} s; exiting`);
+      process.exit(1);
+    }, SHUTDOWN_HARD_EXIT_MS).unref();
+    logger.info(`Received ${signal}: taking no new requests, finishing the ones in flight...`);
     // No new scheduled fire and no workflow sweep from here on; the runs in progress get a bounded
-    // wait, and one still going after it is written to its run log as cut off (Scheduler.shutdown).
+    // wait beside the request drain, and one still going after it is written to its run log as cut
+    // off (Scheduler.shutdown).
     const { getActiveScheduler } = await import('./services/scheduler.js');
     const { getActiveWorkflowEngine } = await import('./services/workflow/engine.js');
     getActiveWorkflowEngine()?.stop();
-    await getActiveScheduler()?.shutdown(SCHEDULER_SHUTDOWN_GRACE_MS)
+    const schedulerStopped = getActiveScheduler()?.shutdown(SCHEDULER_SHUTDOWN_GRACE_MS)
       .catch(err => logger.warn('index-start: scheduler shutdown failed', { error: String(err) }));
+    // Readiness 503, no new connection, live streams ended, requests in flight finished
+    // (server-bootstrap/drain.ts).
+    const drained = await drainServer(server, requestTracker, { timeoutMs: SHUTDOWN_DRAIN_MS });
+    logger.info(`Stop: ${drained.endedStreams} live stream(s) ended, requests drained in ${drained.waitedMs} ms`
+      + (drained.cut > 0 ? `, ${drained.cut} cut at the ${SHUTDOWN_DRAIN_MS / 1000} s limit` : ''));
+    await schedulerStopped;
+    // The chat agent is a child of this process; it goes when we go, or it is orphaned. After the
+    // drain, so a chat turn in flight could finish.
+    const { shutdownChat } = await import('./services/chat-session.js');
+    shutdownChat();
     const statsInstance = getStatsInstance();
     if (statsInstance) await statsInstance.shutdown();
     // Every write buffer, the agent refusal notes included (server-bootstrap/process-buffers.ts).
     const { flushProcessBuffers } = await import('./server-bootstrap/process-buffers.js');
     await flushProcessBuffers();
+    logger.info('Stop: buffered rows written');
     const { shutdownCache } = await import('./services/cache.js');
     shutdownCache();
     if (tunnelManager) await tunnelManager.shutdown();
     if (connectTunnelManager) await connectTunnelManager.shutdown();
     if (realtimeManager) await realtimeManager.shutdown();
-    server.close(() => {
-      logger.info('Server closed');
-      process.exit(0);
-    });
-    setTimeout(() => process.exit(1), 5000);
+    logger.info('Server closed');
+    process.exit(0);
   };
   process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
   process.on('SIGINT', () => void handleShutdown('SIGINT'));
+  // Windows has no stop signal a process can catch (process.kill ends it at once), so a test node
+  // started by a parent with an IPC channel takes the same stop as a message from that parent
+  // (test/e2e-graceful-shutdown.ts). Only in test mode, and only the parent can send it.
+  if (config.testMode && typeof process.send === 'function') {
+    process.on('message', (msg) => { if (msg === 'aimeat:stop') void handleShutdown('the test stop message'); });
+  }
 }

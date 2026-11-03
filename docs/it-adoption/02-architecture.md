@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.2.0 (commit 2914ee4b0) on 2026-11-03. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 06d6a1782) on 2026-11-03. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
@@ -172,7 +172,7 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 | V8 heap ceiling, Docker | 2048 MB; keep it under the container's memory limit | `aimeat/Dockerfile` |
 | Measured resident memory | 250 to 450 MB steady state with jemalloc, in one recorded trace | `aimeat/Dockerfile` |
 | Database versions tested | PostgreSQL 16 and 17 | `aimeat/src/storage/providers/postgres-kysely/server-version.ts` |
-| Restart policy | Restart after 5 s; stop after five starts in five minutes; 30 s stop timeout | `aimeat/deploy/aimeat.service` |
+| Restart policy | Restart after 5 s; stop after five starts in five minutes; 30 s stop timeout. On a stop signal the node refuses new connections, answers readiness 503, gives requests in flight up to 5 s, writes its buffers and exits 0 ([production deployment](../operations/production-deployment.md#process-manager)) | `aimeat/deploy/aimeat.service`, `aimeat/src/server-bootstrap/drain.ts` |
 
 The repository documents no minimum CPU, memory or disk size.
 
