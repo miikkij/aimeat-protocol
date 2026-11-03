@@ -20,6 +20,8 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-11-04 — check:python-daemon refuses a renamed route the package calls through decide.py
+ *     _call, messaging.py _group_call or a path held in a variable (codebase analysis 2026-11-03, item A14).
  *   2026-11-01 — check:open-writes resolves a guard array in the route file that spreads it: its own
  *     declaration, then a named import, then a name one file alone declares; two files declaring the
  *     same name no longer overwrite each other (46a96ad53).
@@ -423,6 +425,19 @@ describe('check:python-shapes and check:python-daemon refuse a difference nobody
         const r = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy(), AIMEAT_PARITY_DAEMON_ALLOWLIST: allowlistWithout('python-daemon-parity.json', 'rest.connector-only:POST /v1/agents/{}/tasks/{}/complete') });
         expect(r.code).toBe(1);
         expect(r.out).toContain('rest.connector-only:POST /v1/agents/{}/tasks/{}/complete');
+    });
+    it('check:python-daemon refuses a route openapi.yaml lacks when the package calls it through its REST helpers or holds it in a variable', () => {
+        // Codebase analysis 2026-11-03, item A14: decide.py _call, messaging.py _group_call and a path
+        // chosen into a variable (files.py) were not read, so a renamed route there left the gate green.
+        const decide = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'decide.py', from: '"/v1/ai/decide/settings"', to: '"/v1/ai/decide/setting"' }) });
+        expect(decide.code).toBe(1);
+        expect(decide.out).toContain('rest.not-in-openapi:GET /v1/ai/decide/setting');
+        const group = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'messaging.py', from: '"/v1/messages/groups/invitations"', to: '"/v1/messages/group-invitations"' }) });
+        expect(group.code).toBe(1);
+        expect(group.out).toContain('rest.not-in-openapi:GET /v1/messages/group-invitations');
+        const held = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'files.py', from: 'f"/v1/pub/', to: 'f"/v1/public/' }) });
+        expect(held.code).toBe(1);
+        expect(held.out).toContain('rest.not-in-openapi:* /v1/public/{}/{}');
     });
     it('stays blind to what a field means (its documented limit): a change to the manifest key of _space_contract passes', () => {
         // The kind of difference of incident incident-aimeat-crewai-the-contract-engagement-gate-never-finds-a-spa-mv5fhg3s: no name the check reads changes.
