@@ -13,6 +13,9 @@
  *   listOwnerNotificationRecords and listOwnerNotifications (the shared owner-exact reads)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.4.0 -- 2026-11-04 -- Both passes claim before they send: the held marks are cleared on their version and
+ *     only the cleared ones are pushed; the digest bookmark moves before the email, on the value read, and goes
+ *     back when the email fails. Two processes no longer send twice (codebase analysis 2026-11-03, HA stage 1).
  *   v1.3.0 — 2026-10-18 — The digest puts messages first, then what the owner's apps sent, then the
  *     rest (digestSectionOf), and the 20 lines it has room for are taken in that order, so a message
  *     is never the one left out. Each line is said in the recipient's email language when the
@@ -119,7 +122,23 @@ export async function sweepHeldPushes(storage: Storage, _config: AimeatConfig, p
     if (!quietJustEnded(settings, windowMinutes)) continue;
     owners++;
     try {
-      const held = (await listOwnerNotifications(storage, ghii)).filter(n => n.value.held);
+      const marked = (await listOwnerNotifications(storage, ghii)).filter(n => n.value.held);
+      if (!marked.length) continue;
+      // CLAIM FIRST, THEN SEND. Each held mark is cleared on the version that was read, and only the
+      // notifications whose mark THIS run cleared are pushed: a second process running the same
+      // sweep (both start their timers at boot) finds the marks gone or loses the write, and sends
+      // nothing. The marks were cleared after the push before, so two processes pushed twice. A
+      // failed push leaves the marks cleared, as it did.
+      const now = new Date().toISOString();
+      const held: typeof marked = [];
+      for (const n of marked) {
+        const record = {
+          key: n.key, ownerGaii: ghii, value: { ...n.value, held: false }, visibility: 'private' as const, tags: ['notif'],
+          ttlHours: 24 * 90, version: n.version + 1, createdAt: n.createdAt, updatedAt: now,
+        };
+        const won = storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(record, n.version) : await storage.setMemory(record);
+        if (won) held.push(n);
+      }
       if (!held.length) continue;
       const first = held[0].value;
       const ok = await push.sendNotification(localAccountName(ghii), {
@@ -129,13 +148,6 @@ export async function sweepHeldPushes(storage: Storage, _config: AimeatConfig, p
         tag: 'notif:quiet-summary',
       });
       if (ok) pushed++;
-      const now = new Date().toISOString();
-      for (const n of held) {
-        await storage.setMemory({
-          key: n.key, ownerGaii: ghii, value: { ...n.value, held: false }, visibility: 'private', tags: ['notif'],
-          ttlHours: 24 * 90, version: n.version + 1, createdAt: n.createdAt, updatedAt: now,
-        });
-      }
     } catch (err) { logger.warn('notification sweep: held pushes are best-effort', { ghii, error: String(err) }); }
   }
   return { owners, pushed };
@@ -179,14 +191,27 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
         })),
         pageUrl: `${config.baseUrl}/v1/profile?tab=notifications`,
       }, prefs.locale ?? undefined);
+      // CLAIM FIRST, THEN SEND. The bookmark moves before the email goes out, and only when it still
+      // says what this run read: of two processes running the sweep at once (both start their
+      // timers at boot), one moves it and sends, the other finds it moved and sends nothing. It was
+      // moved after the send before, so both sent. Only the bookmark is written, on top of the
+      // record as it is NOW, so a save the owner made meanwhile stays (docs/pitfalls.md §84).
+      const lastDigestAt = new Date(now).toISOString();
+      const readAt = settings.lastDigestAt ?? null;
+      let claimed = false;
+      await updateNotificationSettings(storage, ghii, current => {
+        claimed = (current.lastDigestAt ?? null) === readAt;
+        return claimed ? { ...current, lastDigestAt } : current;
+      });
+      if (!claimed) continue;
       const ok = await email.sendRaw(g.notificationEmail, subject, html, text);
       if (ok) {
         sent++;
-        // Only the bookmark, on top of the record as it is NOW. `settings` was read before the email
-        // went out, and writing it back would undo whatever the owner saved in the meantime.
-        const lastDigestAt = new Date(now).toISOString();
-        await updateNotificationSettings(storage, ghii, current => ({ ...current, lastDigestAt }));
         await appendMailLog(storage, ghii, { kind: 'digest', subject });
+      } else {
+        // Not sent: the batch goes back, so the next run mails it, unless a later run moved it on.
+        await updateNotificationSettings(storage, ghii, current =>
+          current.lastDigestAt === lastDigestAt ? { ...current, lastDigestAt: readAt } : current);
       }
     } catch (err) { logger.warn('notification sweep: digest is best-effort', { ghii, error: String(err) }); }
   }
