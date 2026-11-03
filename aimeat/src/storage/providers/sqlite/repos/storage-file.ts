@@ -2,126 +2,23 @@
  * @file src/storage/providers/sqlite/repos/storage-file.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description SQLite (better-sqlite3) repository functions for binary storage files, chunked uploads,
- *   and micro-memory. Handles row (de)serialization of file blobs, tags, access codes, and the federate
- *   flag, keyed by (ownerGaii, key).
+ * @description SQLite (better-sqlite3) helper for binary storage files that methods/files.ts calls:
+ *   the byte and file totals of many owner identities in one query. The storage-file methods and the
+ *   chunked uploads live in methods/files.ts (the uploads in the shared ChunkedUploadStore).
  *
  * @structure
- *   - Storage files: create/get/list/delete + updateFileTagsByKey
- *   - Chunked uploads: records backing the presigned/multipart upload flow
- *   - Micro-memory: small per-agent key/value storage rows
+ *   - sumStorageBytesForOwners: total bytes and file count across many owner identities
  *
  * @version-history
+ *   v1.1.0 — 2026-11-04 — createStorageFile, getStorageFile, listStorageFiles, deleteStorageFile,
+ *     updateFileTagsByKey, updateFileVisibility, createChunkedUpload, getChunkedUpload, addChunk and
+ *     deleteChunkedUpload deleted, and the comment of a micro-memory function deleted earlier: nothing
+ *     imported them, methods/files.ts holds the live copies since M8, and this listStorageFiles still
+ *     read every file's bytes, the read methods/files.ts had fixed (codebase analysis 2026-11-03,
+ *     item A15).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
-import type { StorageFileRecord, ChunkedUploadRecord } from '../../../interface.js';
-
-// ── Storage Files ──
-
-export function createStorageFile(db: Database.Database, file: StorageFileRecord): StorageFileRecord {
-  db.prepare(
-    `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, mimeType, size, data, tags, createdAt, federate)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    file.ownerGaii, file.key, file.visibility, file.groupId ?? null,
-    file.mimeType, file.size, file.data,
-    JSON.stringify(file.tags || []), file.createdAt,
-    file.federate ? 1 : 0,
-  );
-  return file;
-}
-
-export function getStorageFile(db: Database.Database, ownerGaii: string, key: string): StorageFileRecord | null {
-  const row = db.prepare('SELECT * FROM storage_files WHERE ownerGaii = ? AND key = ?').get(ownerGaii, key) as Record<string, unknown> | undefined;
-  if (!row) return null;
-  const record: StorageFileRecord = {
-    key: row.key as string,
-    ownerGaii: row.ownerGaii as string,
-    visibility: row.visibility as StorageFileRecord['visibility'],
-    mimeType: row.mimeType as string,
-    size: row.size as number,
-    data: row.data as Buffer,
-    tags: row.tags ? JSON.parse(row.tags as string) : [],
-    createdAt: row.createdAt as string,
-  };
-  if (row.groupId) record.groupId = row.groupId as string;
-  record.federate = row.federate === 1;
-  return record;
-}
-
-export function listStorageFiles(db: Database.Database, ownerGaii: string): StorageFileRecord[] {
-  const rows = db.prepare('SELECT * FROM storage_files WHERE ownerGaii = ?').all(ownerGaii) as Record<string, unknown>[];
-  return rows.map(r => {
-    const record: StorageFileRecord = {
-      key: r.key as string,
-      ownerGaii: r.ownerGaii as string,
-      visibility: r.visibility as StorageFileRecord['visibility'],
-      mimeType: r.mimeType as string,
-      size: r.size as number,
-      data: r.data as Buffer,
-      tags: r.tags ? JSON.parse(r.tags as string) : [],
-      createdAt: r.createdAt as string,
-    };
-    if (r.groupId) record.groupId = r.groupId as string;
-    record.federate = r.federate === 1;
-    return record;
-  });
-}
-
-export function deleteStorageFile(db: Database.Database, ownerGaii: string, key: string): boolean {
-  const result = db.prepare('DELETE FROM storage_files WHERE ownerGaii = ? AND key = ?').run(ownerGaii, key);
-  return result.changes > 0;
-}
-
-export function updateFileTagsByKey(db: Database.Database, ownerGaii: string, key: string, tags: string[]): StorageFileRecord | null {
-  const result = db.prepare(
-    'UPDATE storage_files SET tags = ? WHERE ownerGaii = ? AND key = ?'
-  ).run(JSON.stringify(tags), ownerGaii, key);
-  if (result.changes === 0) return null;
-  return getStorageFile(db, ownerGaii, key);
-}
-
-export function updateFileVisibility(db: Database.Database, ownerGaii: string, key: string, visibility: StorageFileRecord['visibility']): StorageFileRecord | null {
-  const result = db.prepare(
-    'UPDATE storage_files SET visibility = ? WHERE ownerGaii = ? AND key = ?'
-  ).run(visibility, ownerGaii, key);
-  if (result.changes === 0) return null;
-  return getStorageFile(db, ownerGaii, key);
-}
-
-// ── Chunked Uploads (in-memory) ──
-
-export function createChunkedUpload(chunkedUploads: Map<string, ChunkedUploadRecord>, record: ChunkedUploadRecord): ChunkedUploadRecord {
-  chunkedUploads.set(record.uploadId, record);
-  return record;
-}
-
-export function getChunkedUpload(chunkedUploads: Map<string, ChunkedUploadRecord>, uploadId: string): ChunkedUploadRecord | null {
-  const record = chunkedUploads.get(uploadId) ?? null;
-  if (record && new Date(record.expiresAt).getTime() < Date.now()) {
-    chunkedUploads.delete(uploadId);
-    return null;
-  }
-  return record;
-}
-
-export function addChunk(chunkedUploads: Map<string, ChunkedUploadRecord>, uploadId: string, chunkIndex: number, data: Buffer): boolean {
-  const record = chunkedUploads.get(uploadId);
-  if (!record) return false;
-  if (new Date(record.expiresAt).getTime() < Date.now()) {
-    chunkedUploads.delete(uploadId);
-    return false;
-  }
-  record.receivedChunks.set(chunkIndex, data);
-  return true;
-}
-
-export function deleteChunkedUpload(chunkedUploads: Map<string, ChunkedUploadRecord>, uploadId: string): boolean {
-  return chunkedUploads.delete(uploadId);
-}
-
-// ── Micro-Memory ──
 
 /** Total storage bytes + file count across MANY owner identities in ONE SQL query — the owner-scope
  *  footprint for the usage summary (replaces one listStorageFiles-then-sum per identity). */
@@ -131,6 +28,3 @@ export function sumStorageBytesForOwners(db: Database.Database, ownerGaiis: stri
   const row = db.prepare(`SELECT COALESCE(SUM(size), 0) AS bytes, COUNT(*) AS count FROM storage_files WHERE ownerGaii IN (${ph})`).get(...ownerGaiis) as { bytes: number; count: number };
   return { bytes: row.bytes, count: row.count };
 }
-
-/** Total micro-memory bytes + set count across MANY identities in ONE query (deprecated subsystem;
- *  this keeps the usage summary off a per-identity fan-out over it). */
