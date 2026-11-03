@@ -108,6 +108,15 @@ try {
         assert(r.body.error?.message === CLI_MESSAGE, `the CLI's message: ${short(r.body)}`);
     });
 
+    await test('A plain owner can neither end the CLI\'s stop nor read it (403), and the stop holds', async () => {
+        const end = await json('/v1/admin/maintenance', { method: 'POST', token: plain.token, body: JSON.stringify({ enabled: false }) });
+        assert(end.status === 403, `plain owner POST during the CLI stop: ${end.status} ${short(end.body)}`);
+        const read = await json('/v1/admin/maintenance', { token: plain.token });
+        assert(read.status === 403, `plain owner GET during the CLI stop: ${read.status} ${short(read.body)}`);
+        const still = await json(DATA_ROUTE, { token: plain.token });
+        assert(still.status === 503, `the stop went off after a refused request: ${still.status}`);
+    });
+
     await test('The operator still passes the stop the CLI made', async () => {
         const r = await json(DATA_ROUTE, { token: operator.token });
         assert(r.status === 200, `operator during the CLI stop: ${r.status} ${short(r.body)}`);
