@@ -14,6 +14,11 @@
  * @structure PublicWorkspaceViewer (default export)
  * @usage route /v1/publicworkspaceviewer?org=<id>&ws=<ws>[&type=<space>&id=<docId>[&view=page]]
  * @version-history
+ *   v1.7.0 — 2026-11-03 — A share for an organism's members refuses a signed-in outsider with 403
+ *     SHARE_MEMBERS_ONLY, and the view showed "HTTP 403" in red. It now says who is signed in and that
+ *     this account is not a member. A private node's 401 SIGN_IN_REQUIRED opens the sign-in state, not
+ *     the password form; only SHARE_PASSWORD_REQUIRED opens that. Any other failure says in words that
+ *     the documents did not open and offers Try again (Jouni, 2026-11-03).
  *   v1.6.0 — 2026-10-17 — `&view=page` shows one HTML page alone in the whole browser window, with only
  *     its AI label at the bottom-left, as full screen does; the frame's strip copies that address
  *     (Jouni, 2026-10-17: a link to share that opens only the page).
@@ -46,7 +51,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { swallowed } from '/js/swallowed.js';
-import { authHeaders } from '/js/services/auth.js';
+import { authHeaders, getOwner } from '/js/services/auth.js';
 import { HtmlPageFrame } from '/components/HtmlPageFrame.js';
 import { AiLabel } from '/components/ai-label.js';
 
@@ -109,8 +114,8 @@ export default function PublicWorkspaceViewer() {
   const { org, ws, type, id, alone } = parseParams();
   const [docs, setDocs] = useState(undefined); // undefined = loading, [] = none/unavailable, array = loaded
   const [selected, setSelected] = useState(null);
-  const [error, setError] = useState(null);
-  const [gate, setGate] = useState(null);      // null | 'password' | 'account' — 401 gate from the share's access mode
+  const [error, setError] = useState(false);   // true when the read failed for a reason no gate below names
+  const [gate, setGate] = useState(null);      // null | 'password' | 'account' | 'members' — the refusal from the share's access mode
   const [pw, setPw] = useState('');
   const [unlockErr, setUnlockErr] = useState(null);
   const [unlockBusy, setUnlockBusy] = useState(false);
@@ -144,17 +149,16 @@ export default function PublicWorkspaceViewer() {
 
   const load = useCallback(async () => {
     if (!org || !ws) { setDocs([]); return; }
-    setError(null);
+    setError(false);
     try {
       const headers = readHeaders();
       const res = await fetch(`/v1/organisms/${encodeURIComponent(org)}/workspace/public/documents?ws=${encodeURIComponent(ws)}`, { headers });
       if (res.status === 404) { setDocs([]); setGate(null); return; }
-      if (res.status === 401) {
+      if (res.status === 401 || res.status === 403) {
         const body = await res.json().catch(err => { swallowed('public-workspace-viewer', err); return null; });
-        const code = body?.error?.code;
-        setGate(code === 'SHARE_ACCOUNT_REQUIRED' ? 'account' : 'password');
-        setDocs([]);
-        return;
+        // SIGN_IN_REQUIRED is a private node's own refusal of a signed-out visitor (index-start.ts).
+        const next = ({ SHARE_PASSWORD_REQUIRED: 'password', SHARE_ACCOUNT_REQUIRED: 'account', SIGN_IN_REQUIRED: 'account', SHARE_MEMBERS_ONLY: 'members' })[body?.error?.code];
+        if (next) { setGate(next); setDocs([]); return; }
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json();
@@ -167,7 +171,9 @@ export default function PublicWorkspaceViewer() {
           : (list[0] ? docKey(list[0]) : null),
       );
     } catch (e) {
-      setError((e && e.message) || 'Failed to load');
+      swallowed('public-workspace-viewer: load', e);
+      setGate(null);
+      setError(true);
       setDocs([]);
     }
   }, [org, ws, type, id, readHeaders]);
@@ -266,8 +272,31 @@ export default function PublicWorkspaceViewer() {
     return html`<div class="pwv-container"><div class="pwv-state">${t('pwv.loading') || 'Loading…'}</div></div>`;
   }
 
+  const retry = () => { setDocs(undefined); setGate(null); load(); };
+
   if (error) {
-    return html`<div class="pwv-container"><div class="pwv-state pwv-error">${error}</div></div>`;
+    return html`
+      <div class="pwv-container">
+        <div class="pwv-empty pwv-gate">
+          <h2>${t('pwv.errorTitle')}</h2>
+          <p>${t('pwv.errorDesc')}</p>
+          <button class="btn-primary btn-sm" onClick=${retry}>${t('pwv.errorRetry')}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (gate === 'members') {
+    const who = getOwner();
+    return html`
+      <div class="pwv-container">
+        <div class="pwv-empty pwv-gate">
+          <h2>${t('pwv.membersTitle')}</h2>
+          <p>${who ? t('pwv.membersDescAs', { name: who }) : t('pwv.membersDesc')}</p>
+          <button class="btn-outline btn-sm" onClick=${retry}>${t('pwv.membersRetry')}</button>
+        </div>
+      </div>
+    `;
   }
 
   if (gate === 'password') {
@@ -299,7 +328,7 @@ export default function PublicWorkspaceViewer() {
           <div class="pwv-empty-icon">👤</div>
           <h2>${t('pwv.accountTitle') || 'Sign in to view this share'}</h2>
           <p>${t('pwv.accountDesc') || 'The owner shares these documents with signed-in users only. Sign in from the top-right corner of this page, then try again.'}</p>
-          <button class="btn-primary btn-sm" onClick=${() => { setDocs(undefined); setGate(null); load(); }}>
+          <button class="btn-primary btn-sm" onClick=${retry}>
             ${t('pwv.accountRetry') || 'I signed in — try again'}
           </button>
         </div>

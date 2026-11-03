@@ -25012,7 +25012,14 @@
     "passwordTooMany": "Liian monta yritystä — yritä uudelleen muutaman minuutin päästä.",
     "accountTitle": "Kirjaudu sisään nähdäksesi tämän jaon",
     "accountDesc": "Omistaja jakaa nämä dokumentit vain kirjautuneille käyttäjille. Kirjaudu sisään sivun oikeasta yläkulmasta ja yritä sitten uudelleen.",
-    "accountRetry": "Kirjauduin sisään — yritä uudelleen"
+    "accountRetry": "Kirjauduin sisään — yritä uudelleen",
+    "membersTitle": "Vain tämän yhteisen paikan jäsenet voivat avata nämä dokumentit",
+    "membersDescAs": "Olet kirjautunut käyttäjänä {name}, mutta tämä tili ei ole sen yhteisen paikan jäsen, johon dokumentit kuuluvat. Pyydä linkin lähettäjää lisäämään sinut jäseneksi ja yritä sitten uudelleen.",
+    "membersDesc": "Tämä tili ei ole sen yhteisen paikan jäsen, johon dokumentit kuuluvat. Pyydä linkin lähettäjää lisäämään sinut jäseneksi ja yritä sitten uudelleen.",
+    "membersRetry": "Yritä uudelleen",
+    "errorTitle": "Dokumentit eivät avautuneet",
+    "errorDesc": "Dokumenttien lataus epäonnistui. Yritä uudelleen. Jos virhe toistuu, kerro siitä linkin lähettäjälle.",
+    "errorRetry": "Yritä uudelleen"
   },
   "readme": {
     "editTitle": "Muokkaa README:ta",

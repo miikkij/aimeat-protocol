@@ -22905,7 +22905,14 @@
     "passwordTooMany": "Demasiados intentos. Inténtalo dentro de unos minutos.",
     "accountTitle": "Inicia sesión para ver esto",
     "accountDesc": "Quien lo comparte solo lo abre a personas con sesión iniciada. Entra desde la esquina de arriba a la derecha de esta página y vuelve a intentarlo.",
-    "accountRetry": "Ya entré, inténtalo otra vez"
+    "accountRetry": "Ya entré, inténtalo otra vez",
+    "membersTitle": "Solo los miembros de este lugar compartido pueden abrir estos documentos",
+    "membersDescAs": "Has iniciado sesión como {name}, pero esta cuenta no es miembro del lugar compartido al que pertenecen estos documentos. Pide a quien te envió el enlace que te añada y vuelve a intentarlo.",
+    "membersDesc": "Esta cuenta no es miembro del lugar compartido al que pertenecen estos documentos. Pide a quien te envió el enlace que te añada y vuelve a intentarlo.",
+    "membersRetry": "Inténtalo otra vez",
+    "errorTitle": "Los documentos no se abrieron",
+    "errorDesc": "Algo falló al cargar los documentos. Inténtalo otra vez. Si vuelve a pasar, avisa a quien te envió el enlace.",
+    "errorRetry": "Inténtalo otra vez"
   },
   "readme": {
     "editTitle": "Editar el README",
