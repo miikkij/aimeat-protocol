@@ -8,6 +8,13 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.11.0 — 2026-11-04 — An app whose redirect is a loopback address is described in words ("runs on
+      your own computer", approve only if you started it), not as 127.0.0.1:58627 and "check the
+      address above", which a person cannot do. A request refused with 401 renews the access token
+      from the refresh cookie and runs once more: the token lasts fifteen minutes on a shipped node,
+      the page read it once at load, and Create or Approve on a page left open answered "The access
+      token on this request has expired". The first agent a person creates here is selected: since
+      v1.10.2 the no-agents path reopened the create form with Approve disabled.
     v1.10.2 — 2026-11-02 — Nothing is preselected unless the person named the agent at home or an
       agent already carries the connecting AI's name: the create form opens, the list stays a choice,
       and Approve waits for one (an agent the node made, such as a morning digest, was preselected).
@@ -330,13 +337,18 @@
     function identityHtml() {
       if (!verified) return '';
       const lines = [];
-      if (verified.redirect_ok && verified.redirect_host) {
+      const local = verified.redirect_ok && verified.redirect_local === true;
+      if (local) {
+        lines.push(escHtml(t('localApp')));
+      } else if (verified.redirect_ok && verified.redirect_host) {
         lines.push(`${escHtml(t('codeGoesTo'))} <strong>${escHtml(verified.redirect_host)}</strong>`);
       } else {
         lines.push(escHtml(t('redirectUnchecked')));
       }
       if (verified.client_id_host) {
         lines.push(`${escHtml(t('identityHost'))} <strong>${escHtml(verified.client_id_host)}</strong>`);
+      } else if (local) {
+        lines.push(escHtml(declaredName ? t('localAppNameUnchecked', { client: declaredName }) : t('localAppStartedByYou')));
       } else if (verified.self_declared && declaredName) {
         lines.push(escHtml(t('nameSelfDeclared', { client: declaredName })));
       }
@@ -486,6 +498,32 @@
       return null;
     }
 
+    /** An Error that keeps the HTTP status, so withFreshToken can tell an expired token from a refusal. */
+    const httpError = (status, message) => Object.assign(new Error(message), { status });
+
+    /**
+     * Runs a signed-in request with the session's access token. The token was read when the page
+     * loaded and lasts fifteen minutes on a shipped node, so a page left open sends an expired one. On
+     * a 401 this renews it from the refresh cookie and runs the request once more. When the cookie
+     * no longer works, or now belongs to another account, the sign-in view takes over.
+     */
+    async function withFreshToken(action) {
+      try {
+        return await action(session.jwt || session.token);
+      } catch (err) {
+        if (err.status !== 401) throw err;
+        const owner = getOwnerName();
+        const renewed = await checkSession();
+        if (!renewed || renewed.owner !== owner) {
+          session = null;
+          renderLogin();
+          throw err;
+        }
+        session = renewed;
+        return action(renewed.jwt);
+      }
+    }
+
     async function doLogin(username, password, totp) {
       const body = { username, password };
       if (totp) body.totp_code = totp;
@@ -539,7 +577,7 @@
         body: JSON.stringify({ name, owner: ownerName, display_name: displayName || name }),
       });
       const d = await r.json();
-      if (!d.ok) throw new Error(d.error?.message || 'Failed to create agent');
+      if (!d.ok) throw httpError(r.status, d.error?.message || 'Failed to create agent');
       return d.data?.agent;
     }
 
@@ -556,7 +594,7 @@
         body: JSON.stringify({ scopes }),
       });
       const d = await r.json();
-      if (!d.ok) throw new Error(d.error?.message || t('scopeSaveFailed'));
+      if (!d.ok) throw httpError(r.status, d.error?.message || t('scopeSaveFailed'));
     }
 
     function deny() {
@@ -696,10 +734,9 @@
         btn.disabled = true;
         btn.textContent = '...';
         try {
-          const jwt = session.jwt || session.token;
           const ownerName = getOwnerName();
-          const newAgent = await createAgent(nameVal, displayVal || nameVal, jwt, ownerName);
-          agents = await fetchAgents(ownerName, jwt);
+          const newAgent = await withFreshToken((jwt) => createAgent(nameVal, displayVal || nameVal, jwt, ownerName));
+          agents = await fetchAgents(ownerName, session.jwt || session.token);
           onCreated(newAgent);
         } catch (err) {
           errEl.textContent = err.message;
@@ -795,6 +832,13 @@
       });
     }
 
+    /** The agent the person just created is the one they meant: select it and show the approval. */
+    function selectCreatedAgent(newAgent) {
+      selectedAgent = agents.find(a => a.gaii === newAgent?.gaii) || agents[agents.length - 1];
+      selectedPreset = 'keep';
+      renderApproval();
+    }
+
     function renderApproval() {
       if (agents.length === 0) {
         app.innerHTML = `
@@ -806,7 +850,7 @@
           </div>
         `;
         document.getElementById('denyBtn').addEventListener('click', deny);
-        renderCreateForm(document.getElementById('createContainer'), () => renderApproval());
+        renderCreateForm(document.getElementById('createContainer'), selectCreatedAgent);
         return;
       }
 
@@ -877,12 +921,7 @@
         document.getElementById('showCreateBtn').classList.add('hidden');
         const container = document.getElementById('inlineCreateContainer');
         container.classList.remove('hidden');
-        renderCreateForm(container, (newAgent) => {
-          // Re-render with new agent auto-selected
-          selectedAgent = agents.find(a => a.gaii === newAgent?.gaii) || agents[agents.length - 1];
-          selectedPreset = 'keep';
-          renderApproval();
-        });
+        renderCreateForm(container, selectCreatedAgent);
       });
       // Nothing chosen: the create form is the first thing in view, once. Its Cancel leaves the list
       // and the "+" row, so the person can pick an existing agent instead.
@@ -909,30 +948,33 @@
         btn.disabled = true;
         btn.textContent = t('approving');
         try {
-          const jwt = session.jwt || session.token;
-          // Refuse before you write, in order: the permission change lands first, and a failure
-          // there stops the approval — otherwise the connector would be minted a token carrying
-          // an access level the owner just declined.
-          if (chosen) {
-            await saveScopes(selectedAgent.name, chosen, jwt);
-            selectedAgent.default_scopes = chosen;
-          }
-          const r = await fetch('/v1/mcp/authorize-consent', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              client_id: clientId,
-              client_name: clientName || undefined,
-              redirect_uri: redirectUri,
-              state,
-              gaii: selectedAgent.gaii,
-              owner_token: jwt,
-              code_challenge: codeChallenge || undefined,
-              code_challenge_method: codeChallengeMethod || undefined,
-              resource: resources.length ? resources : undefined,
-            }),
+          const d = await withFreshToken(async (jwt) => {
+            // Refuse before you write, in order: the permission change lands first, and a failure
+            // there stops the approval — otherwise the connector would be minted a token carrying
+            // an access level the owner just declined.
+            if (chosen) {
+              await saveScopes(selectedAgent.name, chosen, jwt);
+              selectedAgent.default_scopes = chosen;
+            }
+            const r = await fetch('/v1/mcp/authorize-consent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                client_id: clientId,
+                client_name: clientName || undefined,
+                redirect_uri: redirectUri,
+                state,
+                gaii: selectedAgent.gaii,
+                owner_token: jwt,
+                code_challenge: codeChallenge || undefined,
+                code_challenge_method: codeChallengeMethod || undefined,
+                resource: resources.length ? resources : undefined,
+              }),
+            });
+            const body = await r.json();
+            if (r.status === 401) throw httpError(401, body.error_description || t('errorGeneric'));
+            return body;
           });
-          const d = await r.json();
           if (d.redirect_url) {
             location.href = d.redirect_url;
           } else if (d.code) {

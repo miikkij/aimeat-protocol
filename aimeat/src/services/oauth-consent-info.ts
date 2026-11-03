@@ -16,9 +16,14 @@
  *     place that identifies it;
  *   - `redirect_ok` and `redirect_host`: whether the redirect is one the client registered, and its
  *     host. The page shows the host and sends a Deny only to a redirect this checked.
+ *   - `redirect_local`: whether that redirect is a loopback address (RFC 8252), which reaches a program
+ *     on the computer the browser runs on. The page then says so in words, because `127.0.0.1:58627`
+ *     tells a person nothing and any program on that computer can answer on it (developer decision
+ *     2026-11-04).
  * @structure OAuthConsentInfo · oauthConsentInfo(storage, clientId, redirectUri)
- * @usage const info = await oauthConsentInfo(storage, clientId, redirectUri, redirectUriRegistered); if (!info) 404
+ * @usage const info = await oauthConsentInfo(storage, clientId, redirectUri, redirectUriRegistered, isLoopbackRedirect); if (!info) 404
  * @version-history
+ *   v1.1.0 — 2026-11-04 — `redirect_local`.
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import type { Storage } from '../storage/interface.js';
@@ -26,6 +31,8 @@ import { resolveClientIdMetadata } from './oauth-client-metadata.js';
 
 /** The OAuth routes' own redirect test (mcp/oauth-redirect.ts redirectUriRegistered), handed in: a service does not import mcp/. */
 export type RedirectMatcher = (registered: readonly string[], requested: string) => boolean;
+/** The OAuth routes' own loopback test (mcp/oauth-redirect.ts isLoopbackRedirect), handed in for the same reason. */
+export type LoopbackTest = (uri: string) => boolean;
 
 export interface OAuthConsentInfo {
   client_id: string;
@@ -35,6 +42,7 @@ export interface OAuthConsentInfo {
   redirect_ok: boolean;
   redirect_uri?: string;
   redirect_host?: string | null;
+  redirect_local?: boolean;
 }
 
 const hostOf = (url: string): string | null => (URL.canParse(url) ? new URL(url).host || null : null);
@@ -42,6 +50,7 @@ const hostOf = (url: string): string | null => (URL.canParse(url) ? new URL(url)
 /** The checked facts, or null when this server knows no such client. */
 export async function oauthConsentInfo(
   storage: Pick<Storage, 'getOAuthClient'>, clientId: string, asked: string, redirectUriRegistered: RedirectMatcher,
+  isLoopbackRedirect: LoopbackTest,
 ): Promise<OAuthConsentInfo | null> {
   const client = await storage.getOAuthClient(clientId);
   const viaUrl = client ? null : await resolveClientIdMetadata(clientId);
@@ -56,6 +65,6 @@ export async function oauthConsentInfo(
     self_declared: !!client,
     ...(viaUrl ? { client_id_host: hostOf(clientId) } : {}),
     redirect_ok: redirectOk,
-    ...(redirectOk ? { redirect_uri: redirect, redirect_host: hostOf(redirect) } : {}),
+    ...(redirectOk ? { redirect_uri: redirect, redirect_host: hostOf(redirect), redirect_local: isLoopbackRedirect(redirect) } : {}),
   };
 }
