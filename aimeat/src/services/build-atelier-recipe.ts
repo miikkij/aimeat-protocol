@@ -24,6 +24,8 @@
  *   import { renderCustomisation, renderLiving, renderPatterns } from './build-atelier-recipe.js';
  *   body += renderCustomisation() + renderLiving(base) + renderPatterns();
  * @version-history
+ *   v1.10.0 — 2026-11-03 — The variants line names fingerprint (`dense` and `plain`, kit 0.69.0),
+ *     and the token count says seventy-five: fingerprint's nine colour and zone tokens.
  *   v1.9.0 — 2026-10-03 — The variants line names the board family (`fill` and `plain` on board,
  *     `compact` on requestPanel, `dense` and `plain` on shelf) and the handbook (`dense`), and the
  *     token count says sixty-six: the board family's six widths and the handbook's one.
@@ -79,11 +81,12 @@ export function renderCustomisation(): string {
     + 'listDetail; `wide` on cardGrid; `lined` on table; `tall`, `compact` and `center` on hero; '
     + '`compact`, `trend` and `plain` on statRow; `compact` and `center` on figure; `compact` on '
     + 'rating, aiTask, aiChat and requestPanel; `plain` on doc and board; `fill` on board; '
-    + '`dense` on tabs, bottomNav, segmented, members, workspacePicker, workflowInput and handbook; `pill` on tabs; '
+    + '`dense` on tabs, bottomNav, segmented, members, workspacePicker, workflowInput and handbook; '
+    + '`dense` and `plain` on fingerprint; `pill` on tabs; '
     + '`quiet` on section; `ghost` on stateButton; `table` on members and workspaceTeam. An unknown name '
     + 'is refused with a console line naming the real ones.\n'
     + '4. **Per-component tokens.** `--ak-list-aside-size`, `--ak-stat-figure-size`, '
-    + '`--ak-card-aspect`, `--ak-hero-title-size` and sixty-six more, each defaulting to the '
+    + '`--ak-card-aspect`, `--ak-hero-title-size` and seventy-five more, each defaulting to the '
     + 'value the component already had. Set one on YOUR OWN element and exactly that part '
     + 'changes, in every look and both modes.\n\n'
     + 'A statRow tile and a figure also take `unit` (what the number is measured in) and '

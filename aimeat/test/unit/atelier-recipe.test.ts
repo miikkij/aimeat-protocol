@@ -20,6 +20,8 @@
  *   variant table is held to atelier's.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-recipe.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-03 — A token name may carry capitals (fingerprint's --ak-fp-F … --ak-fp-K):
+ *     the lowercase-only pattern read those six as one name, `--ak-fp-`. The count reads "seventy".
  *   v1.2.0 — 2026-10-03 — The token count reads "sixty" words too (sixty-one to sixty-eight): the
  *     board family and the handbook took it past fifty-nine.
  *   v1.1.0 — 2026-09-05 — The living section and the sixth pattern (the living document, stage
@@ -64,7 +66,7 @@ function declaredVariants(): Map<string, Set<string>> {
 
 /** Every `--ak-*` custom property the generated file declares, per component. */
 function declaredTokens(): Set<string> {
-  return new Set([...DESCRIBE_SRC.matchAll(/--ak-[a-z0-9-]+/g)].map((m) => m[0]));
+  return new Set([...DESCRIBE_SRC.matchAll(/--ak-[a-zA-Z0-9-]+/g)].map((m) => m[0]));
 }
 
 describe('the customisation section is held to describe-data.js', () => {
@@ -109,7 +111,7 @@ describe('the customisation section is held to describe-data.js', () => {
 
   it('every per-component token it names is one the kit declares', () => {
     const tokens = declaredTokens();
-    const named = [...text.matchAll(/--ak-[a-z0-9-]+/g)].map((m) => m[0]);
+    const named = [...text.matchAll(/--ak-[a-zA-Z0-9-]+/g)].map((m) => m[0]);
     expect(named.length).toBeGreaterThanOrEqual(4);
     expect(named.filter((t) => !tokens.has(t))).toEqual([]);
   });
@@ -120,7 +122,7 @@ describe('the customisation section is held to describe-data.js', () => {
     // belong to the shell and the theme, not to a component's own sizes.
     const CONTRACT = new Set(['--ak-chrome-bottom', '--ak-hero-image', '--ak-scrim']);
     const perComponent = [...declaredTokens()].filter((t) => !CONTRACT.has(t));
-    const named = new Set([...text.matchAll(/--ak-[a-z0-9-]+/g)].map((m) => m[0]));
+    const named = new Set([...text.matchAll(/--ak-[a-zA-Z0-9-]+/g)].map((m) => m[0]));
     const WORDS: Record<string, number> = {
       'thirty-one': 31, 'thirty-two': 32, 'thirty-three': 33, 'thirty-four': 34, 'thirty-five': 35,
       // The workbench pieces added nine on 2026-09-28.
@@ -134,8 +136,10 @@ describe('the customisation section is held to describe-data.js', () => {
       // The board family added six and the handbook one on 2026-10-03.
       'sixty-one': 61, 'sixty-two': 62, 'sixty-three': 63, 'sixty-four': 64, 'sixty-five': 65,
       'sixty-six': 66, 'sixty-seven': 67, 'sixty-eight': 68,
+      // The fingerprint added nine on 2026-11-02.
+      'seventy-five': 75, 'seventy-six': 76, 'seventy-seven': 77,
     };
-    const said = [...text.matchAll(/and ((?:thirty|forty|fifty|sixty)(?:-[a-z]+)?) more/g)].map((m) => WORDS[m[1]]);
+    const said = [...text.matchAll(/and ((?:thirty|forty|fifty|sixty|seventy)(?:-[a-z]+)?) more/g)].map((m) => WORDS[m[1]]);
     expect(said.length).toBe(1);
     expect(named.size + said[0]).toBe(perComponent.length);
   });
