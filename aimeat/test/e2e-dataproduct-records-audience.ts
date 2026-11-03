@@ -18,6 +18,7 @@
  *         audience builds, and C reads its rows.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-dataproduct-records-audience
  * @version-history
+ *   v1.0.1 — 2026-11-03 — R1: the refusal says who can widen the workspace (secaudit2026nov02d round 13b).
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -101,6 +102,7 @@ await test('R1. B (a viewer) defines a product over the restricted workspace at 
     }
     assert(d.status === 409 && d.body.error?.code === 'AUDIENCE_WIDER_THAN_SOURCE', `define: ${show(d)}`);
     assert(d.text.includes('"private"'), `the refusal names the audience allowed: ${show(d)}`);
+    assert(d.text.includes('creator or an organism admin'), `the refusal says who can widen the workspace: ${show(d)}`);
     const c = await rowsOf(C.token, B.name, N('wide'));
     assert(!c.text.includes(SECRET), `C reads the restricted record: ${show(c)}`);
     // C, who does not read the workspace, builds no product from it at any audience.

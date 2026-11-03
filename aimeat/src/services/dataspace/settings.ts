@@ -17,6 +17,8 @@
  *   PackageDspSettings · OwnerDspSettings · readOwnerSettings · writeOwnerSettings · autoAgreeFor
  * @usage if (tckModeOn(config)) …;  const did = nodeParticipantId(config);
  * @version-history
+ *   v1.1.1 — 2026-11-03 — Both refusals say why the limit exists, and PARTICIPANT_BUSY names the Config
+ *     label the operator raises (secaudit2026nov02d round 13b).
  *   v1.1.0 — 2026-11-02 — maxProcessesPerParticipant and processRoomRefusal: one participant's share of an
  *     owner's process room, and the refusal that names the setting (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8).
@@ -27,7 +29,7 @@ import type { Storage } from '../../storage/interface.js';
 import { DEFAULT_MAX_PROCESSES_PER_PARTICIPANT, parseDataspaceAuth, type DataspaceAuthMethod } from '../../config-dataspace.js';
 import { isLoopbackBaseUrl } from '../../utils/test-money-guard.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
-import { SETTINGS_KEY } from './contract.js';
+import { MAX_LIVE_PROCESSES, SETTINGS_KEY } from './contract.js';
 import { processRoom } from './store.js';
 
 type Cfg = Pick<AimeatConfig, 'baseUrl'> & Partial<Pick<AimeatConfig,
@@ -113,10 +115,12 @@ export async function processRoomRefusal(
     const limit = maxProcessesPerParticipant(config);
     const room = await processRoom(storage, ownerGhii, participantId, limit);
     if (!room) return null;
-    if (room.full === 'provider') return { code: 'PROVIDER_BUSY', reason: `This provider holds too many open ${what}. Try again later.` };
+    if (room.full === 'provider') return { code: 'PROVIDER_BUSY', reason: `This provider holds the most open negotiations and transfers one account may hold at a time (${MAX_LIVE_PROCESSES}), so it takes no new ${what} now. Try again later: ended ones leave the count as they finish.` };
     return {
         code: 'PARTICIPANT_BUSY',
-        reason: `You hold ${room.live} open negotiations and transfers with this provider, the most one participant may (AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT is ${limit} on this server). Complete or terminate one first, or ask the operator of this server to raise that setting.`,
+        reason: `You hold ${room.live} open negotiations and transfers with this provider, the most one participant may (AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT is ${limit} on this server). `
+            + 'The limit keeps room for the provider\'s other participants. Complete or terminate one first, or ask the operator of this server to raise '
+            + '"Open negotiations and transfers one participant may hold" in the admin settings, under Config.',
     };
 }
 

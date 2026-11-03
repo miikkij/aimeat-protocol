@@ -8,9 +8,11 @@
  *   agent its name, an owner session is the owner), and hands the record to notify(), which
  *   applies the owner's settings. Self-targeted only: the recipient is always the owner behind the
  *   caller's session; there is no surface for pushing at arbitrary owners.
- * @structure NotificationCreateError · createPrincipalNotification · mailOwnerFrom
+ * @structure NotificationCreateError · createPrincipalNotification · mailOwnerFrom · ownerMailLimitReached
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.4.1 — 2026-11-03 — ownerMailLimitReached: whether a sender has used today's mail limit, read
+ *     without counting (secaudit2026nov02d round 13b).
  *   v1.4.0 — 2026-11-02 — mailOwnerFrom is the one mail path for a principal's words to its owner: the
  *     node's delivery of a scheduled task's result counts against the same per-sender daily limit, and
  *     the limit is the setting email.reports_per_sender_day (default 10, 0 no limit). The verified
@@ -69,6 +71,18 @@ function underEmailLimit(key: string, now: number, limit: number): boolean {
   const recent = (emailsSent.get(key) ?? []).filter(at => now - at < 86_400_000);
   emailsSent.set(key, recent);
   return recent.length < limit;
+}
+
+/**
+ * The daily limit `sender` (`kind:id`) has already reached for mail to `ghii`, or 0 while it may still
+ * mail. Reads the count without taking from it, so a caller can tell the owner in the bell entry why
+ * the mail did not come (task-result-delivery.ts).
+ */
+export function ownerMailLimitReached(config: AimeatConfig, ghii: string, sender: string): number {
+  const limit = emailPerDay(config);
+  if (limit <= 0) return 0;
+  const recent = (emailsSent.get(`${ghii} ${sender}`) ?? []).filter(at => Date.now() - at < 86_400_000);
+  return recent.length < limit ? 0 : limit;
 }
 
 /** The per-sender daily mail limit in force: the setting, else EMAIL_PER_DAY. */

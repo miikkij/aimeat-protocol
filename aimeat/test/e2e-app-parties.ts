@@ -17,6 +17,7 @@
  *     whose signup is open and that sells.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-parties
  * @version-history
+ *   v1.1.1 — 2026-11-03 — The signup 429 names the limit and the Config setting (secaudit2026nov02d round 13b).
  *   v1.1.0 — 2026-11-01 — D4.3 over MCP: aimeat_admin_app_party_registrations lists and decides for the
  *     operator and refuses an owner's agent (WP9b; the tool did not exist, so the test fails on the old code).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4).
@@ -385,6 +386,8 @@ async function run(): Promise<void> {
             else assert(s.status === 202, `signup ${i}: ${show(s)}`);
         }
         assert(refused && codeOf(refused) === 'RATE_LIMITED' && /app_party_signups_per_hour/.test(refused.text), `the refusal: ${refused ? show(refused) : 'none'}`);
+        assert(refused.text.includes('made 2 signups') && refused.text.includes('Signups to apps from one address in an hour'),
+            `the refusal says the limit and the Config setting that raises it: ${show(refused)}`);
         assert((await setConfig('consent.app_party_signups_per_hour', 0)).status === 200, 'no limit');
         const free = await call(P('/parties/signup'), { body: { email: `rlfree-${stamp}@example.test` } });
         assert(free.status === 202, `with no limit: ${show(free)}`);

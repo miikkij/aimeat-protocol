@@ -17,6 +17,8 @@
  *   still reach a verified address.
  * @usage pnpm exec vitest run test/unit/task-result-delivery-guard.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-03 — Past the daily limit, the bell entry says why the result was not mailed
+ *     (secaudit2026nov02d round 13b).
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -148,6 +150,23 @@ describe('who decides that the node delivers a task result', () => {
         const open = { ...config, emailReportsPerSenderDay: 0 } as AimeatConfig;
         await deliverTaskResult(storage, open, task(agent, { parentTaskId: job.id }), 'First item.');
         expect(sendNotification).toHaveBeenCalledTimes(11);
+    });
+
+    it('past the daily mail limit the bell says the result was not mailed, the limit and the setting; under it, no such line', async () => {
+        await owner(true);
+        const agent = agentGaii();
+        const job = await schedule(agent, 'owner');
+        await deliverTaskResult(storage, config, task(agent, { parentTaskId: job.id }), 'First item.');
+        expect((await bell())[0]?.body).toBe('First item.');
+        const auth = { owner: 'alice', sub: agent, roles: ['agent'] };
+        for (let i = 0; i < 9; i++) await createPrincipalNotification(storage, config, auth, { title: `Report ${i}`, email: true });
+        expect(sendNotification).toHaveBeenCalledTimes(10);
+        await deliverTaskResult(storage, config, task(agent, { parentTaskId: job.id }), 'Second item.');
+        const limited = (await bell()).find(r => r.body.startsWith('Second item.'));
+        expect(limited?.body).toContain('Not emailed');
+        expect(limited?.body).toContain('10 emails today');
+        expect(limited?.body).toContain('Emails per agent or app in a day');
+        expect(sendNotification).toHaveBeenCalledTimes(10);
     });
 });
 

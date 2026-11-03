@@ -17,6 +17,7 @@
  *       participant still gets in, and a negotiation that ended stops counting.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dsp-agreements
  * @version-history
+ *   v1.0.1 — 2026-11-03 — PARTICIPANT_BUSY names the Config label (secaudit2026nov02d round 13b).
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
 import { createServer, type Server } from 'node:http';
@@ -309,6 +310,7 @@ async function run(): Promise<void> {
         }
         assert(refused, `Z took ${zPids.length} process slots of one owner without a refusal`);
         assert(String(refused.body.reason?.[0] ?? '').includes('AIMEAT_DATASPACE_MAX_PROCESSES_PER_PARTICIPANT'), `the refusal names the setting: ${show(refused)}`);
+        assert(String(refused.body.reason?.[0] ?? '').includes('Open negotiations and transfers one participant may hold'), `the refusal names the Config label: ${show(refused)}`);
     });
 
     await test('Another participant still opens a negotiation with owner B', async () => {

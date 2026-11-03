@@ -29,6 +29,9 @@
  *   deliveringSchedule(storage, task) · deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
+ *   v1.1.1 — 2026-11-03 — When the agent has used today's mail limit, the bell entry says the result was
+ *     not mailed, what the limit is and which Config setting the operator changes (secaudit2026nov02d
+ *     round 13b).
  *   v1.1.0 — 2026-11-02 — The schedule's record decides delivery, not the task's scope entry, which the
  *     task's agent may write. The bell entry is the agent's (its mute applies), and the email goes only
  *     to a verified address within the per-sender daily limit (mailOwnerFrom); an unverified address
@@ -46,7 +49,7 @@ import { memoryTarget } from './classification/labels.js';
 import type { AimeatConfig } from '../config.js';
 import { notify } from './notify.js';
 import { getActiveEmailService } from './email.js';
-import { mailOwnerFrom } from './notification-create.js';
+import { mailOwnerFrom, ownerMailLimitReached } from './notification-create.js';
 import { notificationEmailUnverified } from './owner-mail-address.js';
 import { displayPrefsFor, formatForPerson, type DisplayPrefs } from './display-prefs.js';
 import { logger } from '../utils/logger.js';
@@ -188,6 +191,16 @@ const UNVERIFIED_LINE: Record<string, string> = {
   es: 'No se envió por correo: confirma tu dirección en la página Correo de tu perfil.',
 };
 
+/** The line the bell adds when the agent has already used today's mail limit (email.reports_per_sender_day). */
+const LIMIT_LINE: Record<string, (agent: string, n: number) => string> = {
+  en: (agent, n) => `Not emailed: ${agent} has already sent ${n} emails today, the most this server sends from one agent in a day. `
+    + 'Every result still comes here. The server\'s operator can change the limit under Admin, Config: "Emails per agent or app in a day" (0 means no limit).',
+  fi: (agent, n) => `Tätä ei lähetetty sähköpostilla: ${agent} on lähettänyt tänään jo ${n} sähköpostia, ja tämä palvelin lähettää yhdeltä agentilta enintään sen verran päivässä. `
+    + 'Jokainen tulos tulee silti tänne. Palvelimen ylläpitäjä voi muuttaa rajaa ylläpidon asetuksista (Config): "Sähköposteja agenttia tai sovellusta kohden päivässä" (0 poistaa rajan).',
+  es: (agent, n) => `No se envió por correo: ${agent} ya envió ${n} correos hoy, el máximo que este servidor envía de un agente en un día. `
+    + 'Cada resultado sigue llegando aquí. El operador del servidor puede cambiar el límite en Admin, Config: "Correos por agente o aplicación al día" (0 quita el límite).',
+};
+
 /** Hand a scheduled task's result to its owner, when its schedule said so. Never throws. */
 export async function deliverTaskResult(
   storage: Storage, config: AimeatConfig, task: AgentTaskRecord, message?: string,
@@ -221,9 +234,14 @@ export async function deliverTaskResult(
     // owner's settings for that agent apply, mute included, as they do to its own notices.
     const agentName = task.agentGaii.includes('#') ? task.agentGaii.split('#')[0] : task.agentGaii;
     const source = { kind: 'agent' as const, name: agentName, id: task.agentGaii };
+    // A mail this result would have caused past the agent's daily limit: the bell says so and why.
+    const limitHit = !!mail?.enabled && !unverified && !!ghii?.notificationEmail
+      ? ownerMailLimitReached(config, ownerGhii, `${source.kind}:${source.id}`) : 0;
+    const note = unverified ? (UNVERIFIED_LINE[locale] ?? UNVERIFIED_LINE.en)
+      : limitHit ? (LIMIT_LINE[locale] ?? LIMIT_LINE.en)(agentName, limitHit) : '';
     const told = await notify(storage, ownerGhii, {
       type: 'agent_result', title: heading,
-      body: unverified ? `${excerpt}\n\n${UNVERIFIED_LINE[locale] ?? UNVERIFIED_LINE.en}` : excerpt,
+      body: note ? `${excerpt}\n\n${note}` : excerpt,
       link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
       source,
     });

@@ -22,6 +22,8 @@
  *   - POST   /v1/admin/app-party-registrations/:owner/:filename   approve or refuse (operator)
  * @usage router.use(appPartiesRouter(config, storage))
  * @version-history
+ *   v1.2.1 — 2026-11-03 — The signup 429 says what the limit is, why it exists, when to try again and
+ *     which Config setting the operator raises (secaudit2026nov02d round 13b).
  *   v1.2.0 — 2026-11-02 — secaudit2026nov02d round 13: POST .../parties/signup takes
  *     consent.app_party_signups_per_hour signups an hour from one network address (30 by default, 0 = no
  *     limit); past it 429 RATE_LIMITED names the setting.
@@ -76,7 +78,9 @@ export function appPartiesRouter(config: AimeatConfig, storage: Storage): Router
         res.setHeader('Retry-After', t.retryAfterSec);
         res.setHeader('Cache-Control', 'no-store');
         res.status(429).json(error(config.nodeId, 'RATE_LIMITED',
-            `Too many signups from your network in the last hour. Try again in ${Math.ceil(t.retryAfterSec / 60)} minutes, or ask the server's operator to raise the limit.`,
+            `Your network has made ${max} signups to apps on this server in the last hour, which is the most this server takes from one network in an hour. `
+            + `The limit stops one network from filling the apps with signups. Try again in ${Math.ceil(t.retryAfterSec / 60)} minutes. `
+            + 'Many people behind one network, for example a school, can ask the operator of this server to raise "Signups to apps from one address in an hour" in the admin settings, under Config.',
             429, { limit: max, retry_after_seconds: t.retryAfterSec, setting: 'consent.app_party_signups_per_hour', env: 'AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR' }));
     };
 
