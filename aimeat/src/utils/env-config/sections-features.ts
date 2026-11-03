@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Indexing, personal-node, site, consent, push, email, TOTP, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-11-04 — AIMEAT_SMTP_CONNECT_TIMEOUT_MS and AIMEAT_SMTP_SOCKET_TIMEOUT_MS in the email section (codebase analysis 2026-11-03, HA stage 1).
  *   v1.6.0 — 2026-11-02 — AIMEAT_EMAIL_REPORTS_PER_SENDER_DAY in the email section (secaudit2026nov02d round 13).
  *   v1.5.0 — 2026-11-01 — AIMEAT_DATA_INTERMEDIATION in the consent section (plan doc-mvwxcas3dom3, D7.1).
  *   v1.4.0 — 2026-10-31 — AIMEAT_SMTP_REPLY_TO in the email section.
@@ -256,6 +257,18 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'Reject unauthorized TLS certificates',
           value: config.smtpRejectUnauthorized ? 'true' : 'false',
           defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_SMTP_CONNECT_TIMEOUT_MS',
+          description: 'Time for the mail server to connect and to greet, each, in ms (0: 2 minutes)',
+          value: String(config.smtpConnectTimeoutMs),
+          defaultVal: '10000',
+        },
+        {
+          envVar: 'AIMEAT_SMTP_SOCKET_TIMEOUT_MS',
+          description: 'Silence allowed on an open mail server connection, in ms (0: 10 minutes)',
+          value: String(config.smtpSocketTimeoutMs),
+          defaultVal: '60000',
         },
         {
           envVar: 'AIMEAT_EMAIL_CONFIRMATION_REQUIRED',

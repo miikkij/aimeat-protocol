@@ -9,6 +9,7 @@
  *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendInvite, sendKeyInvite, sendKeyCredentials, sendRaw, sendWithAttachments)
  *   - withRetry() exponential backoff helper
  *   - createDisabledService() stub for when SMTP is not configured
+ *   - smtpTransportOptions() the transport options, with the time limits
  *   - createEmailService() factory (configures nodemailer transport)
  * @usage
  *   import { createEmailService } from '../services/email.js';
@@ -36,6 +37,9 @@
  *     body are escaped and line breaks kept (secaudit2026oct22).
  *   2026-10-31 -- sendNotification() takes `replyTo`, which the owner's report mail sets from
  *     email.reply_to (Jouni, 2026-10-31 20.14).
+ *   2026-11-04 -- smtpTransportOptions(): the connect and socket time limits
+ *     (email.smtp_connect_timeout_ms, email.smtp_socket_timeout_ms; codebase analysis 2026-11-03,
+ *     HA stage 1).
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -126,17 +130,22 @@ function createDisabledService(): EmailService {
   };
 }
 
-// ── Factory ──────────────────────────────────────────────
+// ── Transport options ────────────────────────────────────
 
-export function createEmailService(config: AimeatConfig): EmailService {
-  // The operator's own mail foot, read from the live config at each render (operator.email_footer).
-  setNodeEmailFooter(() => config.operator?.emailFooter ?? '');
-  if (!config.emailEnabled) {
-    logger.info('Email service disabled (no SMTP host configured)');
-    return createDisabledService();
-  }
+type SmtpConfig = Pick<AimeatConfig, 'smtpHost' | 'smtpPort' | 'smtpSecure' | 'smtpUser' | 'smtpPass'
+  | 'smtpRejectUnauthorized' | 'smtpConnectTimeoutMs' | 'smtpSocketTimeoutMs'>;
 
-  const transporter: Transporter = createTransport({
+/**
+ * The node's SMTP transport, for this service and the personal-node mail notice
+ * (mailbox-notification.ts). The time limits bound how long one attempt can hold its caller: the
+ * mail library's own are 2 minutes to connect and 10 minutes of silence, so a mail server that
+ * accepted the connection and then said nothing held a request that long, three times over with
+ * the retries. 0 leaves the library's own limit in place.
+ */
+export function smtpTransportOptions(config: SmtpConfig) {
+  const connect = config.smtpConnectTimeoutMs > 0 ? config.smtpConnectTimeoutMs : undefined;
+  const socket = config.smtpSocketTimeoutMs > 0 ? config.smtpSocketTimeoutMs : undefined;
+  return {
     host: config.smtpHost!,
     port: config.smtpPort,
     secure: config.smtpSecure,
@@ -147,7 +156,24 @@ export function createEmailService(config: AimeatConfig): EmailService {
     tls: {
       rejectUnauthorized: config.smtpRejectUnauthorized,
     },
-  });
+    // The TCP connection, then the server's greeting, each within the connect limit.
+    ...(connect ? { connectionTimeout: connect, greetingTimeout: connect } : {}),
+    // Silence on an open connection.
+    ...(socket ? { socketTimeout: socket } : {}),
+  };
+}
+
+// ── Factory ──────────────────────────────────────────────
+
+export function createEmailService(config: AimeatConfig): EmailService {
+  // The operator's own mail foot, read from the live config at each render (operator.email_footer).
+  setNodeEmailFooter(() => config.operator?.emailFooter ?? '');
+  if (!config.emailEnabled) {
+    logger.info('Email service disabled (no SMTP host configured)');
+    return createDisabledService();
+  }
+
+  const transporter: Transporter = createTransport(smtpTransportOptions(config));
 
   const from = config.smtpFrom;
 
