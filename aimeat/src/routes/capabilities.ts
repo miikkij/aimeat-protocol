@@ -10,6 +10,7 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   v1.6.4 — 2026-11-03 — Invoke passes a thrown refusal's details, so MCP_CAPABILITY_NEEDS_APPROVAL names the node setting that asked (secaudit2026nov02d round 13b).
  *   v1.6.3 — 2026-10-27 — Invoke passes the acting principal (callerPrincipal) beside the caller's authority, so a remote MCP server's grant for an app narrows that app here too (secaudit2026oct26).
  *   2026-10-26 — GET /:id and invoke serve a private capability, one with an unknown visibility word, and
  *     a draft, pending_review or rejected one to the owner, the owner's agents and apps, and the operator
@@ -348,14 +349,16 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
 
       res.json(success(config.nodeId, result));
     } catch (err) {
-      const e = err as { statusCode?: number; code?: string; message?: string };
+      const e = err as { statusCode?: number; code?: string; message?: string; details?: unknown };
       const statusCode = e.statusCode || 500;
       const code = e.code || 'INVOKE_FAILED';
       const message = err instanceof Error ? err.message : String(err);
 
       await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: false, message });
 
-      res.status(statusCode).json(error(config.nodeId, code, message));
+      // This refusal names the node setting that asked in details; other throws keep their old shape.
+      res.status(statusCode).json(error(config.nodeId, code, message, undefined,
+        code === 'MCP_CAPABILITY_NEEDS_APPROVAL' ? e.details : undefined));
     }
   });
 

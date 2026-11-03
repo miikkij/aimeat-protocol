@@ -35592,6 +35592,11 @@ paths:
         `auth.password_sign_in` = `off` is refused whole with 409 `OPERATOR_LOCKOUT` while no
         operator account has a passkey or an identity provider link.
 
+        `mcp.capability_use_approval` (off, operators, ask) is guarded the same way: a change to a
+        more open value (ask to operators, operators to off) is refused WHOLE to an AI credential with
+        403 `PERSON_REQUIRED`, `details` naming the setting; a stricter value applies from anyone who
+        may change settings.
+
         Pacing settings. `morsel_policy.burn_rate` (0.0 to 1.0) is the share of every pacing charge
         that burns; the provider gets the rest, after the flow's own operator share
         (`commerce.fee_percent`, `marketplace.tx_fee_percent`) where the flow has one. The pacing
@@ -35641,6 +35646,8 @@ paths:
           description: >-
             Config persistence unavailable (`READONLY_CONFIG`), or a path in the request was sealed
             by the node's host (`SEALED_CONFIG`) — in which case nothing in the request was applied.
+            Also `PERSON_REQUIRED` when an AI credential makes the sign-in policy or
+            `mcp.capability_use_approval` more open; nothing in the request was applied then either.
           $ref: '#/components/responses/Forbidden'
 
   /v1/admin/roles/grant:
@@ -62042,6 +62049,13 @@ paths:
         MCP_CAPABILITY_NEEDS_APPROVAL, nothing is sent, and the message names the request (kind
         `mcp-capability-use`, on GET /v1/publish-requests) and the address where the account holder
         allows it.
+
+
+        Who is asked is the node setting `mcp.capability_use_approval`
+        (AIMEAT_MCP_CAPABILITY_USE_APPROVAL), read on every call: `ask` asks for every other account's
+        capability; `operators` (default) lets a capability whose publisher holds the operator role run
+        without asking and asks for every other account's; `off` asks nobody. The refusal carries
+        `details: { setting: "mcp.capability_use_approval", value, requestId }`.
       security:
         - BearerAuth: []
       parameters:
@@ -62067,7 +62081,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '403':
-          description: MCP_CAPABILITY_NEEDS_APPROVAL (another account's capability over a server where each person signs in with their own account waits for the caller's account to allow it; the message names the request), MCP_CAPABILITY_NOT_YOURS, or another refusal the remote call gives.
+          description: MCP_CAPABILITY_NEEDS_APPROVAL (another account's capability over a server where each person signs in with their own account waits for the caller's account to allow it, as the node setting mcp.capability_use_approval decides; the message names the request and the setting's label on the admin Config page, and details names the setting and its value), MCP_CAPABILITY_NOT_YOURS, or another refusal the remote call gives.
         '404':
           description: NOT_FOUND (no such capability, or one this caller may not reach, such as another owner's private one or draft), or EXTENSION_NOT_FOUND (the extension or the action its ref names is not installed).
 
