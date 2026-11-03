@@ -29713,7 +29713,10 @@ paths:
         ends or 14 days pass, whichever is first; a new link for the same share replaces an unused one.
         Only the SHA-256 of the code is stored. Answers `{ sent, to, link, invite_id, share, expires_at,
         note }`: `sent` is false when this node sends no mail, and the owner passes `link` on another
-        way. Same as aimeat_party action send_link.
+        way. A link that will be mailed draws on the account's mail allowance (30 a minute for the
+        owner and all their agents), the same count as POST /v1/outbound/send; past it the answer is
+        429 RATE_LIMITED with `details.retry_after_sec`, and nothing is written or sent. Same as
+        aimeat_party action send_link.
       tags: [Parties]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -29733,6 +29736,7 @@ paths:
         '403': { description: 'SCOPE_DENIED (party:manage) or FORBIDDEN' }
         '404': { description: NOT_FOUND (the party or the share) }
         '409': { description: 'PARTY_STOPPED, SHARE_ENDED, or INVALID_INPUT for a data space participant' }
+        '429': { description: 'RATE_LIMITED: the account sent its mail allowance for this minute; `details.retry_after_sec`, `limit`, `window_sec`' }
   /v1/parties/invites/preview:
     post:
       operationId: previewPartyInvite

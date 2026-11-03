@@ -17,11 +17,15 @@
  *     (410 SHARE_ENDED), another owner's name on the code (404), a link replaced by a newer one (404),
  *     another owner and an agent without party:manage sending a link (404, 403), no address (400).
  *   - aimeat_party "share" with email and "send_link" over MCP.
+ *   - A share link counts against the account's mail allowance (30 a minute, takeMailSend): the 31st
+ *     answers 429 RATE_LIMITED with when to try again, and writes and mails nothing.
  *   - The automatic engine reads of the Power-BI-Excel board: DuckDB reads the CSV and the Frictionless
  *     descriptor's relative path with a bearer secret, pandas reads the rows a page at a time and an
  *     earlier version (through `uv run`; counted as SKIPPED when uv is not on this machine).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=party-invite
  * @version-history
+ *   v1.2.0 — 2026-11-04 — The share link counts against the account's mail allowance (codebase
+ *     analysis 2026-11-03, item A11).
  *   v1.1.0 — 2026-11-01 — The preview carries the licence's deed, the attribution and the words per
  *     language; the connection file's password is the key; a used link's recipient changes the key with
  *     the key itself (WP10e A2, A3, B4, B12).
@@ -292,6 +296,33 @@ async function run(): Promise<void> {
         assert(mail.subject.includes('ha compartido contigo'), `Spanish mail: ${mail.subject}`);
         const again = await callTool(s, 'aimeat_party', { action: 'send_link', name: 'chat' });
         assert(!again.isError && again.data?.sent === true && again.data.share === out.data.share.id, `send_link: ${again.text.slice(0, 400)}`);
+    });
+
+    // Codebase analysis 2026-11-03, item A11: the link mails an address the caller names, so it counts
+    // against the account's mail allowance (services/account-limits.ts takeMailSend, 30 a minute), as
+    // POST /v1/outbound/send and aimeat_mail_send do.
+    await test('A share link counts against the account\'s mail allowance: 30 a minute go out, the 31st is refused with when to try again', async () => {
+        const c = await registerOwner(BASE, `ivc${stamp}`);
+        const pkg = `lim${stamp}`;
+        const p = await call('/v1/datapackages', { token: c.token, body: { name: pkg, title: 'Limit', changes: 'one', visibility: 'private', resources: [{ name: 'items', rows: rows(3, 'x') }] } });
+        assert(p.status === 201, `publish: ${show(p)}`);
+        const s = await call('/v1/parties/share', { token: c.token, body: { package: pkg, purpose: 'Raportointi', days: 30, name: 'loop', kind: 'person' } });
+        assert(s.status === 201, `share: ${show(s)}`);
+        let last = '';
+        for (let i = 0; i < 30; i++) {
+            const r = await call('/v1/parties/loop/invite', { token: c.token, body: { email: `loop${i}-${stamp}@example.test` } });
+            assert(r.status === 201 && r.body.data.sent === true, `send ${i + 1}: ${show(r)}`);
+            last = r.body.data.link;
+        }
+        const over = await call('/v1/parties/loop/invite', { token: c.token, body: { email: `loop-over-${stamp}@example.test` } });
+        assert(over.status === 429 && codeOf(over) === 'RATE_LIMITED' && typeof over.body.error?.details?.retry_after_sec === 'number', `the 31st: ${show(over)}`);
+        assert(/Try again in \d+ seconds/.test(over.body.error?.message ?? ''), `the refusal says when: ${show(over)}`);
+        const lastCode = decodeURIComponent(/invite=([^&]+)/.exec(last)?.[1] ?? '');
+        assert((await call('/v1/parties/invites/preview', { body: { code: lastCode } })).status === 200, 'the refused send replaced no link: the 30th still opens');
+        assert(smtp!.mailTo(`loop-over-${stamp}@example.test`).length === 0, 'nothing reached the 31st address');
+        // A different account keeps its own allowance.
+        const own = await call('/v1/parties/liisa/invite', { token: A.token, body: {} });
+        assert(own.status === 201 && own.body.data.sent === true, `another account still sends: ${show(own)}`);
     });
 
     await test('The party declines the share with the token the redemption gave', async () => {

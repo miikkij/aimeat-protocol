@@ -30,6 +30,9 @@
  *   // Registered as core handler 'inactivity-nudge' in services/core-jobs.ts.
  *   await runInactivityNudgeJob(config, storage);
  * @version-history
+ *   v1.0.3 — 2026-11-04 — Mails only an address owner-mail-address.ts provenOwnerAddress proves, not
+ *     any address of an account at level 1 or above: a change of address leaves the level (codebase
+ *     analysis 2026-11-03, item A9).
  *   v1.0.2 — 2026-10-18 — The marker is written before the email, on the version the pass read
  *     (createMemoryIfAbsent / setMemoryIfVersion), and marked delivered after a send that worked.
  *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
@@ -41,6 +44,7 @@ import type { GHIIRecord } from '../storage/types/identity.js';
 import { getActiveEmailService } from './email.js';
 import { outboundEmailHtml } from './email-templates.js';
 import { readNotificationSettings, appendMailLog } from './notification-settings.js';
+import { provenOwnerAddress } from './owner-mail-address.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { buildWelcomeMatPrompt } from './welcome-mat-prompt.js';
 import { logger } from '../utils/logger.js';
@@ -191,8 +195,10 @@ export async function runInactivityNudgeJob(
     let considered = 0;
 
     for (const g of ghiis) {
-        // Verified email only: an unverified notificationEmail can be somebody else's address.
-        if (!g.notificationEmail || g.verificationLevel < 1) continue;
+        // Proven address only: an unproven notificationEmail can be somebody else's address, and the
+        // account's level stays when the address changes (owner-mail-address.ts).
+        const to = provenOwnerAddress(g);
+        if (!to) continue;
         if (g.username.startsWith('uxtest-')) continue;   // measurement accounts stay out of this
 
         const seen = await lastSeenAt(storage, g);
@@ -247,7 +253,7 @@ export async function runInactivityNudgeJob(
             : (storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(claim, marker.version) : (await storage.setMemory(claim), true));
         if (!landed) continue;
 
-        const ok = await email.sendRaw(g.notificationEmail, c.subject, html, text).catch(err => {
+        const ok = await email.sendRaw(to, c.subject, html, text).catch(err => {
             logger.warn('inactivity-nudge: send failed', { owner: g.ownerName, error: String(err) });
             return false;
         });

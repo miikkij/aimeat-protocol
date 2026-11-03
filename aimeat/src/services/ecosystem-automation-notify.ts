@@ -42,11 +42,13 @@
  *     (owner-mail-address.ts); with an unconfirmed one the in-app record carries
  *     `emailSkipped: 'address_not_verified'` (secaudit2026nov02d round 13,
  *     notifyAutomationTaskComplete:mails-unverified-notification-address).
+ *   v1.3.1 — 2026-11-04 — The address is asked of provenOwnerAddress, which also compares it with the
+ *     proven hash (codebase analysis 2026-11-03, item A9).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { getActiveEmailService } from './email.js';
-import { verifiedNotificationEmail, notificationEmailUnverified } from './owner-mail-address.js';
+import { provenOwnerAddress, notificationEmailUnverified } from './owner-mail-address.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -282,7 +284,7 @@ export async function notifyAutomationTaskComplete(
       // Only an address the owner proved (owner-mail-address.ts): any principal of the owner holding
       // memory:write-reserved may set notification_email, and a new one arrives unverified.
       const ghii = await storage.getGHII(ownerGhii);
-      ownerEmail = verifiedNotificationEmail(ghii);
+      ownerEmail = provenOwnerAddress(ghii);
       unverified = notificationEmailUnverified(ghii);
     } catch (err) {
       logger.warn('automation report: owner GHII lookup failed', { owner: ownerName, error: String(err) });

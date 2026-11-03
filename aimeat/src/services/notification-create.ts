@@ -8,9 +8,13 @@
  *   agent its name, an owner session is the owner), and hands the record to notify(), which
  *   applies the owner's settings. Self-targeted only: the recipient is always the owner behind the
  *   caller's session; there is no surface for pushing at arbitrary owners.
- * @structure NotificationCreateError · createPrincipalNotification · mailOwnerFrom · ownerMailLimitReached
+ * @structure NotificationCreateError · createPrincipalNotification · MailOwnerOptions · mailOwnerFrom ·
+ *   ownerMailLimitReached
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.5.0 — 2026-11-04 — mailOwnerFrom asks provenOwnerAddress (the flag and the hash) and takes the
+ *     mail log's kind and the caller's own mail service, so the workflow-end report goes through it
+ *     (codebase analysis 2026-11-03, items A2 and A9).
  *   v1.4.1 — 2026-11-03 — ownerMailLimitReached: whether a sender has used today's mail limit, read
  *     without counting (secaudit2026nov02d round 13b).
  *   v1.4.0 — 2026-11-02 — mailOwnerFrom is the one mail path for a principal's words to its owner: the
@@ -37,9 +41,9 @@ import { notify } from './notify.js';
 import type { NotifSource } from './notification-settings.js';
 import { emitChange } from './event-bus.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
-import { getActiveEmailService } from './email.js';
-import { appendMailLog } from './notification-settings.js';
-import { verifiedNotificationEmail } from './owner-mail-address.js';
+import { getActiveEmailService, type EmailService } from './email.js';
+import { appendMailLog, type MailLogKind } from './notification-settings.js';
+import { provenOwnerAddress } from './owner-mail-address.js';
 import { logger } from '../utils/logger.js';
 
 export class NotificationCreateError extends Error {
@@ -178,19 +182,29 @@ async function mailOwner(
   return mailOwnerFrom(storage, config, ghii, sender, title, text || title);
 }
 
+/** What a caller of mailOwnerFrom may set besides the mail. */
+export interface MailOwnerOptions {
+  /** The kind the Email page's mail log names the mail by; `notification` when absent. */
+  logKind?: MailLogKind;
+  /** The mail service to send with, when the caller holds its own (the workflow engine); null is none. */
+  email?: EmailService | null;
+}
+
 /**
- * Mail `text` under `subject` to the owner's verified address on behalf of `sender` (`kind:id`, the
+ * Mail `text` under `subject` to the owner's proven address on behalf of `sender` (`kind:id`, the
  * key the bell's sender settings use), within that sender's daily limit. The one path for a mail a
- * principal's words reach the owner by: the agent's own notice above, and the node's delivery of a
- * scheduled task's result (task-result-delivery.ts), so both count against the same limit. The caller
+ * principal's words reach the owner by: the agent's own notice above, the node's delivery of a
+ * scheduled task's result (task-result-delivery.ts) and a workflow's end report
+ * (workflow/engine-steps.ts, sender `workflow:<id>`), so all count against the same limit. The caller
  * has already honoured the owner's mute (notify() answered `muted`).
  */
 export async function mailOwnerFrom(
   storage: Storage, config: AimeatConfig, ghii: string, sender: string, subject: string, text: string,
+  opts: MailOwnerOptions = {},
 ): Promise<NotificationEmailOutcome> {
-  const email = getActiveEmailService();
+  const email = 'email' in opts ? opts.email : getActiveEmailService();
   if (!email?.enabled) return 'mail_off';
-  const to = verifiedNotificationEmail(await storage.getGHII(ghii));
+  const to = provenOwnerAddress(await storage.getGHII(ghii));
   if (!to) return 'no_address';
   const now = Date.now();
   const key = `${ghii} ${sender}`;
@@ -201,7 +215,7 @@ export async function mailOwnerFrom(
     if (!ok) return 'failed';
     // Counted only while a limit is in force (underEmailLimit made the entry).
     emailsSent.get(key)?.push(now);
-    await appendMailLog(storage, ghii, { kind: 'notification', subject });
+    await appendMailLog(storage, ghii, { kind: opts.logKind ?? 'notification', subject });
     return 'sent';
   } catch (err) {
     logger.warn('notification email: not sent', { ghii, error: String(err) });

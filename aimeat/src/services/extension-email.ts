@@ -9,6 +9,8 @@
  * @structure buildExtensionEmail() · MULTI_RECIPIENT_REFUSAL · isSingleRecipient() · unavailableEmail()
  * @usage email: buildExtensionEmail({ storage, config, extName, extConfig, ownerName, emailService })
  * @version-history
+ *   v1.1.2 — 2026-11-04 — The owner's own address is asked of owner-mail-address.ts provenOwnerAddress,
+ *     which also compares it with the proven hash (codebase analysis 2026-11-03, item A9).
  *   v1.1.1 — 2026-10-27 — isSingleRecipient also asks the transport's own parser (nodemailer
  *     addressparser) for exactly one recipient, so a quote inside a comment no longer hides a list
  *     (secaudit2026oct26).
@@ -29,6 +31,7 @@ import type { EmailService } from './email.js';
 import addressparser from 'nodemailer/lib/addressparser';
 import { logger } from '../utils/logger.js';
 import { extensionConsentHolds } from './extension-consent.js';
+import { provenOwnerAddress } from './owner-mail-address.js';
 import { rateBuckets } from './rate-buckets.js';
 import { EXT_EMAIL_PER_HOUR_DEFAULT } from '../config-extension-load.js';
 
@@ -69,8 +72,8 @@ export function buildExtensionEmail(deps: {
         if (extConfig?.emailPolicy === 'unrestricted') {
             return send(to, subject, body);
         }
-        const ghiiRec = await storage.getGHII(ownerGhii);
-        if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
+        const own = provenOwnerAddress(await storage.getGHII(ownerGhii));
+        if (own && own === to) {
             return send(to, subject, body);
         }
         // A consent to the extension installed under this name now, unexpired: an earlier install's

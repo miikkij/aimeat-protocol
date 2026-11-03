@@ -8,8 +8,12 @@
  *   this month, and the whole feature switched off.
  * @usage cd aimeat && pnpm exec vitest run test/unit/inactivity-nudge.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-04 — The verified fixture carries the flag and the hash the code-confirm paths
+ *     write with level 1; an address that changed, an unproven address at level 3 and an address the
+ *     hash does not name get no mail (codebase analysis 2026-11-03, item A9).
  *   v1.0.0 — 2026-08-07 — Initial.
  */
+import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const sendRaw = vi.hoisted(() => vi.fn(async () => true));
@@ -29,13 +33,23 @@ const config = {
     nodeId: 'node-1', baseUrl: 'https://example.test', inactivityNudge: true,
 } as never as import('../../src/config.js').AimeatConfig;
 
+const hashOf = (a: string) => createHash('sha256').update(a.toLowerCase().trim()).digest('hex');
+
 function ghii(over: Record<string, unknown> = {}) {
-    return {
+    const rec: Record<string, unknown> = {
         ghii: 'quiet@node-1', username: 'quiet', ownerName: 'quiet', displayName: 'Quiet Person',
         notificationEmail: 'quiet@example.test', verificationLevel: 1, locale: 'en',
         createdAt: iso(NOW - 200 * DAY), lastLoginAt: iso(NOW - 30 * DAY),
         ...over,
     };
+    // A verified account as the code-confirm paths write it (routes/ghii/web-verify.ts, recovery.ts,
+    // services/owner-provisioning.ts): level 1, the flag and the address's hash land together. A case
+    // that names the flag itself describes a record those paths did not write whole.
+    if ((rec.verificationLevel as number) >= 1 && typeof rec.notificationEmail === 'string' && !('emailVerifiedAt' in over)) {
+        rec.emailVerifiedAt = iso(NOW - 200 * DAY);
+        rec.emailHash = hashOf(rec.notificationEmail);
+    }
+    return rec;
 }
 
 /**
@@ -184,6 +198,26 @@ describe('runInactivityNudgeJob', () => {
 
     it('never mails an unverified address', async () => {
         const r = await run(fakeStorage({ listGHIIs: async () => [ghii({ verificationLevel: 0 })] }));
+        expect(r.sent).toBe(0);
+    });
+
+    // Codebase analysis 2026-11-03, item A9: a change of address clears the flag and leaves the
+    // account's level, so the level does not say the address the account names now is proven.
+    it('never mails an address that changed after the account was verified (the level stays, the flag is gone)', async () => {
+        const r = await run(fakeStorage({ listGHIIs: async () => [ghii({ notificationEmail: 'someone-else@example.test', emailVerifiedAt: null })] }));
+        expect(r.sent).toBe(0);
+        expect(sendRaw).not.toHaveBeenCalled();
+    });
+
+    it('never mails an unproven address of an account a bank ID raised to level 3', async () => {
+        const r = await run(fakeStorage({ listGHIIs: async () => [ghii({ verificationLevel: 3, emailVerifiedAt: null })] }));
+        expect(r.sent).toBe(0);
+    });
+
+    it('never mails an address other than the one the flag proved', async () => {
+        const r = await run(fakeStorage({ listGHIIs: async () => [ghii({
+            notificationEmail: 'someone-else@example.test', emailVerifiedAt: iso(NOW - 100 * DAY), emailHash: hashOf('quiet@example.test'),
+        })] }));
         expect(r.sent).toBe(0);
     });
 

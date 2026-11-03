@@ -26,10 +26,15 @@
  *   THE MAIL. Plain text through the node's mail service, in the language the owner's page asks for
  *   (en, fi, es): who shared what, until when, for what, and the link. When the node sends no mail the
  *   answer says `sent: false` and carries the link, so the owner can pass it on another way. The owner
- *   always gets the link back: they could make a key for the party themselves anyway.
+ *   always gets the link back: they could make a key for the party themselves anyway. A link that
+ *   will be mailed draws on the account's mail allowance (account-limits.ts takeMailSend, 30 a minute
+ *   for the owner and all their agents), the same count POST /v1/outbound/send draws on; past it the
+ *   answer is 429 RATE_LIMITED with when to try again, and nothing is written or sent.
  * @structure INVITE_TTL_DAYS · inviteLinkOf · sendShareLink · shareAndSend · previewInvite · redeemInvite
  * @usage const out = await sendShareLink(ctx, 'matti', { share, email, locale });
  * @version-history
+ *   v1.2.0 — 2026-11-04 — sendShareLink (and so shareAndSend) counts a mailed link with takeMailSend
+ *     before anything is written (codebase analysis 2026-11-03, item A11).
  *   v1.1.0 — 2026-11-01 — The page's package carries the licence's deed (`licence_url`), the
  *     attribution and the words per language (`i18n`) (WP10e A2, A3).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b).
@@ -41,6 +46,7 @@ import type { CallerContext } from '../caller-context.js';
 import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { getActiveEmailService } from '../email.js';
+import { takeMailSend, MAIL_SEND_LIMIT } from '../account-limits.js';
 import { logger } from '../../utils/logger.js';
 import { EMAIL_RE } from '../datapackage/share-notices.js';
 import { packageFreshness } from '../datapackage/freshness-read.js';
@@ -139,6 +145,20 @@ export async function sendShareLink(
         return refuse(400, 'EMAIL_REQUIRED', 'Give the e-mail address the link goes to (email), or set it as the party\'s contact.');
     }
     const locale: Locale = body.locale === 'fi' || body.locale === 'es' ? body.locale : 'en';
+    // The mail goes to an address the caller names, so it draws on the account's mail allowance, the
+    // one POST /v1/outbound/send and aimeat_mail_send draw on (account-limits.ts takeMailSend;
+    // codebase analysis 2026-11-03, item A11). Asked before the write, and only when a mail will go.
+    const mail = getActiveEmailService();
+    if (mail?.enabled) {
+        const turn = takeMailSend(c.ownerGhii);
+        if (!turn.ok) {
+            return {
+                ok: false, status: 429, code: turn.code,
+                message: `${turn.message} No new link was made and nothing was sent; a link sent earlier for this share keeps working.`,
+                details: { retry_after_sec: turn.retryAfterSec, limit: MAIL_SEND_LIMIT.max, window_sec: MAIL_SEND_LIMIT.windowMs / 1000 },
+            };
+        }
+    }
 
     const code = `${c.owner}.${randomBytes(32).toString('base64url')}`;
     const now = Date.now();
@@ -167,7 +187,6 @@ export async function sendShareLink(
         until: day(share.expires), purpose: share.purpose, link, linkUntil: day(expiresAt),
     };
     let sent = false;
-    const mail = getActiveEmailService();
     if (mail?.enabled) {
         try {
             sent = await mail.sendNotification(email, MAIL[locale].subject(facts), MAIL[locale].body(facts));

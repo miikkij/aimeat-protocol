@@ -25,6 +25,8 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.5.3 — 2026-11-04 — The rescue mails only an address provenOwnerAddress proves, not any address
+ *     of an account at level 1 or above (codebase analysis 2026-11-03, item A9).
  *   v1.5.2 — 2026-10-18 — writeMarkerOnce creates the marker with createMemoryIfAbsent and answers
  *     whether this call created it; the AI detection and the welcome-mat count write with
  *     updateRecord; the rescue pass writes its marker before the email, not after.
@@ -61,6 +63,7 @@ import type { Storage } from '../storage/interface.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
 import { getActiveEmailService } from './email.js';
 import { outboundEmailHtml } from './email-templates.js';
+import { provenOwnerAddress } from './owner-mail-address.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import type { AccountEventKind } from '../storage/interface.js';
@@ -733,9 +736,10 @@ export async function runMcpOnboardingRescueJob(
     let sent = 0;
 
     for (const g of ghiis) {
-        // Verified email only: notificationEmail alone can be someone else's unverified address,
-        // and mailing it would let a registration spam an arbitrary inbox.
-        if (!g.notificationEmail || g.verificationLevel < 1) continue;
+        // Proven address only (owner-mail-address.ts): notificationEmail alone can be someone else's
+        // address, and the account's level stays when the address changes.
+        const to = provenOwnerAddress(g);
+        if (!to) continue;
         if (g.username.startsWith('uxtest-')) continue; // measurement test accounts stay out of funnels
         const created = Date.parse(g.createdAt);
         if (!Number.isFinite(created) || created < epoch) continue;
@@ -778,7 +782,7 @@ export async function runMcpOnboardingRescueJob(
         // become a retry loop against an address that bounces, and of two passes at once (a manual
         // run beside a scheduled one) only the one whose marker landed sends.
         if (!await writeMarkerOnce(storage, g.ghii, MCP_RESCUE_SENT_KEY, { at: new Date().toISOString(), delivered: false })) continue;
-        const ok = await email.sendRaw(g.notificationEmail, c.subject, html, text).catch(err => {
+        const ok = await email.sendRaw(to, c.subject, html, text).catch(err => {
             logger.warn('onboarding-funnel: rescue email send failed', { owner: g.ownerName, error: String(err) });
             return false;
         });

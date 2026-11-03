@@ -27,6 +27,8 @@
  * @structure AgreementEvent · tellAgreement()
  * @usage const told = await tellAgreement(deps, agreement, 'sent', { pdf });
  * @version-history
+ *   v1.0.2 — 2026-11-04 — The account's address is asked of provenOwnerAddress, which also compares it
+ *     with the proven hash (codebase analysis 2026-11-03, item A9).
  *   v1.0.1 — 2026-11-02 — A counterparty account's own address is used only when it is verified
  *     (owner-mail-address.ts); `contactEmail` is unchanged (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D4.3).
@@ -36,7 +38,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { notify } from './notify.js';
 import { getActiveEmailService } from './email.js';
-import { verifiedNotificationEmail } from './owner-mail-address.js';
+import { provenOwnerAddress } from './owner-mail-address.js';
 import { wrapHtml, esc } from './email-templates.js';
 import { displayPrefsFor, formatForPerson } from './display-prefs.js';
 import { inForce, newest } from './compliance-agreements.js';
@@ -157,7 +159,7 @@ function changedSubprocessors(a: Agreement, lang: Lang): string[] {
  */
 async function emailOf(storage: Storage, account: string | undefined): Promise<string | null> {
   if (!account) return null;
-  return verifiedNotificationEmail(await storage.getGHII(account));
+  return provenOwnerAddress(await storage.getGHII(account));
 }
 
 function html(lang: Lang, subject: string, lines: string[], link: string | null, linkText: string, a: Agreement): { html: string; text: string } {
