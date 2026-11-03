@@ -11,6 +11,11 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.13.0 — 2026-11-03 — An address whose node part is not a node id is refused RECIPIENT_NOT_FOUND
+ *     before anything is counted, read or written (local-identity.ts nodePartRefusal). A DM to
+ *     `heidileskinen@aimeat.io` was answered `queued` for a node that cannot exist; the reason now
+ *     names the address on this node when the name is here. An address on a well-formed node id this
+ *     node has not met is still handed to federation (e2e-agent-dm test 30).
  *   v1.12.0 — 2026-10-27 — A named conversation id is bound to the sender (message-thread-binding.ts):
  *     a message naming another pair's thread lands in the pair's own thread, so no sender places a
  *     message inside a thread between other accounts, and no agent under its owner's thread with
@@ -73,7 +78,7 @@ import { notify } from './notify.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
 import { duplicateMessageAttachments } from './attachment-duplication.js';
-import { localIdentityExists, missingIdentityReason } from './local-identity.js';
+import { localIdentityExists, missingIdentityReason, nodePartRefusal } from './local-identity.js';
 import { checkSendLimit, type SendLimitMark } from './message-send-limit.js';
 import { boundConversationId } from './message-thread-binding.js';
 
@@ -253,6 +258,11 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   const { senderGhii, recipientGhii, body, replyToId, subject, interactive, broadcastId, respondable, kind, aiProvenanceId } = input;
   // Which agent sent this in the sender's name: on every copy written below, and in the payload.
   const sentBy = input.sentByAgent ? { sentByAgent: input.sentByAgent, sentByAgentName: input.sentByAgentName } : {};
+
+  // An address no node can answer to (a web or mail host where the node id goes) is refused before it
+  // takes a turn of the send limit; it used to be queued for a node called e.g. `aimeat.io`.
+  const badNode = await nodePartRefusal(storage, config, recipientGhii);
+  if (badNode) return { ok: false, code: 'RECIPIENT_NOT_FOUND', reason: badNode };
 
   // The account's send limit, before anything is read or written. Every door reaches delivery
   // through here, so a send nobody counted yet is counted now.

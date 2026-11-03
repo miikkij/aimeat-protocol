@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-03 — aimeat_dm_send, _send_as_owner, _ask and _broadcast say what the node part of an address is
+ *     (the node id, never its web address) and where to read it; an agent had sent to heidileskinen@aimeat.io.
  *   2026-11-02 — aimeat_home_feed: what the person's home lists as having happened (GET /v1/home/feed), on all three surfaces.
  *   2026-10-31 — aimeat_overview: the account's overview (GET /v1/overview), on all three surfaces.
  *   2026-10-31 — aimeat_agent_propose takes `schedule` (v31 K47); aimeat_notify takes `email` (v31 K46).
@@ -85,6 +87,10 @@ import { agentEverywhere, connectorOnly } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { agentV2Tools } from './agent-v2.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
+
+/** The address shapes a message tool takes, and what the node part is. An agent wrote this node's web
+ *  host where the node id goes (`heidileskinen@aimeat.io`) because "owner@node" did not say which. */
+const RECIPIENT_ADDRESS = 'owner@node-id, agent#owner@node-id, or eco:app#owner@node-id. The node-id is the node\'s id (lowercase words joined by hyphens, no dots, such as aimeat-fi-001-genesis), never its web address: for this node it is the part after @ in your own identity, and aimeat_contact_list gives each contact\'s full address.';
 
 export const agentMessagingTools = [
     {
@@ -507,7 +513,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_dm_send',
-        description: 'Send a direct message across the AIMEAT federation FROM this agent TO any person (owner@node), agent (agent#owner@node) or app (eco:app#owner@node) — this is the federation-wide inbox ("Postilaatikko"), NOT the agent↔owner channel (that is aimeat_message_send). The recipient sees it is from you, the agent. A message to an agent/app is delivered to that identity\'s owner inbox. First contact lands in the recipient\'s requests until they accept. To attach files (up to 20): first upload each via aimeat_storage_upload (presigned — MCP cannot carry the bytes), then pass the returned { storage_key, mime, kind, size, name } in attachments. Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Send a direct message across the AIMEAT federation FROM this agent TO any person (owner@node-id), agent (agent#owner@node-id) or app (eco:app#owner@node-id), where node-id is the node\'s id and never its web address (see `to`) — this is the federation-wide inbox ("Postilaatikko"), NOT the agent↔owner channel (that is aimeat_message_send). The recipient sees it is from you, the agent. A message to an agent/app is delivered to that identity\'s owner inbox. First contact lands in the recipient\'s requests until they accept. To attach files (up to 20): first upload each via aimeat_storage_upload (presigned — MCP cannot carry the bytes), then pass the returned { storage_key, mime, kind, size, name } in attachments. Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Send Federated Direct Message', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -517,7 +523,7 @@ export const agentMessagingTools = [
         surfaces: ['agent'],
         input: {
             ...aiProvenanceCatalogInput,
-            to: { type: 'string', description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.', zod: z.string().min(3).max(256) },
+            to: { type: 'string', description: `Recipient: ${RECIPIENT_ADDRESS}`, zod: z.string().min(3).max(256) },
             body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach ≥1 file.', zod: z.string().max(50000) },
             reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the same thread).', zod: z.string().uuid() },
             subject: { type: 'string', description: 'Open a NEW topic thread with this title, instead of one endless thread with the recipient. Give one when you write to support@operators, so the operators see what the thread is about.', zod: z.string().min(1).max(200) },
@@ -534,7 +540,7 @@ export const agentMessagingTools = [
         scope: 'messages:send',
         input: {
             ...aiProvenanceCatalogInput,
-            to: { type: 'array', description: 'Recipient identities (owner@node, agent#owner@node, eco:app#owner@node), up to 500.', zod: z.array(z.string().min(3).max(256)).max(500) },
+            to: { type: 'array', description: `Recipient identities, up to 500, each one of: ${RECIPIENT_ADDRESS}`, zod: z.array(z.string().min(3).max(256)).max(500) },
             group_id: { type: 'string', description: 'A Share Group whose members are the audience — a reusable distribution list.', zod: z.string().min(1).max(64) },
             audience: { type: 'string', description: '"node-users" (every human on this node) or "federation-users" (that plus every owner on each active peer). OPERATOR ONLY.', zod: z.enum(['node-users', 'federation-users']) },
             mode: { type: 'string', description: '"broadcast" (default, each recipient can reply) or "announcement" (read-only, replies disabled).', zod: z.enum(['broadcast', 'announcement']) },
@@ -562,7 +568,7 @@ export const agentMessagingTools = [
         surfaces: ['agent'],
         input: {
             ...aiProvenanceCatalogInput,
-            to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.', zod: z.string().min(3).max(256) },
+            to: { type: 'string', required: true, description: `Recipient: ${RECIPIENT_ADDRESS}`, zod: z.string().min(3).max(256) },
             body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach ≥1 file.', zod: z.string().max(50000) },
             reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the same thread).', zod: z.string().uuid() },
             subject: { type: 'string', description: 'Open a NEW topic thread with this title (else the default thread / conversation_id).', zod: z.string().min(1).max(200) },
@@ -660,7 +666,7 @@ export const agentMessagingTools = [
         surfaces: ['agent'],
         input: {
             ...aiProvenanceCatalogInput,
-            to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.', zod: z.string().min(3).max(256) },
+            to: { type: 'string', required: true, description: `Recipient: ${RECIPIENT_ADDRESS}`, zod: z.string().min(3).max(256) },
             questions: { type: 'array', required: true, description: '1–20 questions, each { id, header (short chip), prompt, options:[{id,label}], multiSelect?, allowOther? (default true), required? }.', zod: z.array(InteractiveQuestionSchema).min(1).max(20) },
             body: { type: 'string', description: 'Optional intro text shown above the questions (GFM markdown).', zod: z.string().max(50000) },
             subject: { type: 'string', description: 'Open a NEW topic thread with this title (else the default thread / conversation_id).', zod: z.string().min(1).max(200) },

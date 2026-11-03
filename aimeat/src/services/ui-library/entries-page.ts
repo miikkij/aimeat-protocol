@@ -9,6 +9,8 @@
  * @structure PAGE_ENTRIES
  * @usage import { PAGE_ENTRIES } from './entries-page.js';
  * @version-history
+ *   v1.8.1 — 2026-11-03 — PageStart's example identity ends in a node id (alice@aimeat-fi-001-genesis), not
+ *     a web host: an identity is name@node-id, and an agent copying alice@aimeat.io sent a DM nowhere.
  *   v1.8.0 — 2026-10-03 — PageStart: what a page is for, what to do first and what happens next (guidance part B).
  *   v1.7.0 — 2026-09-27 — SettingsStack's SettingsSection and SwatchPicker's pattern (the home's settings dialog
  *     passes meanings, not classes).
@@ -191,7 +193,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         },
         useFor: ['The home, the Settings overview and any page that belongs to one person.'],
         variants: [],
-        example: { avatarSvg: '<svg…/>', name: 'Alice', identity: 'alice@aimeat.io', children: 'Settings' },
+        example: { avatarSvg: '<svg…/>', name: 'Alice', identity: 'alice@aimeat-fi-001-genesis', children: 'Settings' },
     },
     {
         id: 'link-line', name: 'LinkLine', kind: 'component', status: 'active',

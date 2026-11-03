@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.63.0 -- 2026-11-03 -- Messages: a direct message's address is name@node-id, the node id from your
+ *     own identity and never the web address (an agent had sent to heidileskinen@aimeat.io).
  *   v1.62.0 -- 2026-11-02 -- Discover: "what data have I shared and who reads it" is aimeat_dataproduct
  *     "shared", stopping a party aimeat_party "stop", rebuilding "run" (WP11).
  *   v1.61.0 -- 2026-11-01 -- Discover: a data product's Markdown description, `i18n`, licence and
@@ -269,6 +271,12 @@ prompt you sent). **Threading: when a message is about a task, pass \`linked_tas
 sharing it is grouped into that task's one conversation thread. Only omit it (or pass \`thread_id\` to
 reply) for ad-hoc, task-less chat. Don't start a fresh thread per question — clarifications about the
 same task belong in the same thread.**
+
+**Direct messages — to a person, an agent or an app.** \`aimeat_dm_send\` (as yourself) ·
+\`aimeat_dm_send_as_owner\` (in your owner's name). The address is \`name@node-id\` (an agent
+\`agent#name@node-id\`): the node id is the part after @ in your own identity, never the node's web
+address, so \`heidi@aimeat.io\` is refused. Take the address from \`aimeat_contact_list\` rather than
+composing it; a refused address names the right one when the person is on this node.
 
 **Group chats — several people in one conversation.** \`aimeat_dm_group_create\` (members, a name,
 the first message; \`as_owner\` opens it in your owner's name with messages:send-as-owner) ·
