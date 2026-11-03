@@ -11,9 +11,11 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial, with the gate.
  *   v1.1.0 — 2026-10-23 — takeFirstWithoutLimit, with the getApp read that stalled aimeat.io as a fixture.
+ *   v1.2.0 — 2026-11-04 — contentListReads and compareContentLists, with listAppVersions as a fixture
+ *     (codebase analysis 2026-11-03, item A1).
  */
 import { describe, it, expect } from 'vitest';
-import { unboundedMethods, wholeTableCalls, takeFirstWithoutLimit, compare, type Baseline } from '../../scripts/check-unbounded-lists.js';
+import { unboundedMethods, wholeTableCalls, takeFirstWithoutLimit, contentListReads, compare, compareContentLists, type Baseline } from '../../scripts/check-unbounded-lists.js';
 import { storageRepositories } from '../../scripts/inventory/storage-methods.js';
 
 const repos = [{
@@ -69,6 +71,52 @@ describe('check:unbounded-lists', () => {
             "// q.orderBy('v').executeTakeFirst() in a comment",
         ].join('\n');
         expect(takeFirstWithoutLimit('x.ts', source)).toEqual([2, 4]);
+    });
+
+    it('finds an app list that reads the content in both providers, the version list\'s own shape included, and passes named columns and by-key reads', () => {
+        const pg = [
+            'export const m = {',
+            '  async listAppVersions(this: S, o: string, f: string) {',
+            "    const rows = await this.db.selectFrom('App').selectAll().where('ownerGaii', '=', o).orderBy('versionNumber', 'desc').execute();",
+            '  },',
+            '  async listAppsWithContent(this: S) {',
+            "    let q = this.db.selectFrom('App').selectAll().distinctOn(['ownerGaii', 'filename']);",
+            "    q = q.where('ownerGaii', '=', 'x');",
+            "    const rows = await q.orderBy('ownerGaii').execute();",
+            '  },',
+            '  async listAppVersionSummaries(this: S, o: string) {',
+            "    const rows = await this.db.selectFrom('App').select(['versionNumber', 'size']).where('ownerGaii', '=', o).execute();",
+            '  },',
+            '  async getApp(this: S, o: string) {',
+            "    return this.db.selectFrom('App').selectAll().where('ownerGaii', '=', o).limit(1).executeTakeFirst();",
+            '  },',
+            '  async listOther(this: S) {',
+            "    return this.db.selectFrom('Memory').selectAll().execute();",
+            '  },',
+            '};',
+        ].join('\n');
+        expect(contentListReads('pg.ts', pg)).toEqual([
+            { method: 'listAppVersions', line: 3 },
+            { method: 'listAppsWithContent', line: 8 },
+        ]);
+        const sqlite = [
+            'export const m = {',
+            '  async listAppVersions(this: S, o: string, f: string) {',
+            "    return this.db.prepare('SELECT * FROM apps WHERE ownerGaii = ? ORDER BY versionNumber DESC').all(o);",
+            '  },',
+            '  async getApp(this: S, o: string) {',
+            "    return this.db.prepare('SELECT * FROM apps WHERE ownerGaii = ? LIMIT 1').get(o);",
+            '  },',
+            '  async listAppVersionSizes(this: S, o: string) {',
+            "    return this.db.prepare('SELECT versionNumber, size FROM apps WHERE ownerGaii = ?').all(o);",
+            '  },',
+            '};',
+        ].join('\n');
+        expect(contentListReads('sqlite.ts', sqlite)).toEqual([{ method: 'listAppVersions', line: 3 }]);
+        const reads = [{ at: 'pg.ts:3', method: 'listAppVersions' }, { at: 'pg.ts:8', method: 'listAppsWithContent' }];
+        expect(compareContentLists(reads, { listAppsWithContent: 'the copy scan' }).refused).toEqual([reads[0]]);
+        expect(compareContentLists(reads, { listAppsWithContent: 'x', listAppVersions: 'y', listGone: 'z' }).stale).toEqual(['listGone']);
+        expect(compareContentLists(reads, { listAppsWithContent: ' ', listAppVersions: 'y' }).emptyReasons).toEqual(['listAppsWithContent']);
     });
 
     it('reads the real Storage composite: every repository, and the two lists the audit named among the whole-table ones', () => {

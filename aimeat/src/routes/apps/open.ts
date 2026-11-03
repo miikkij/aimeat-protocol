@@ -15,9 +15,12 @@
  *
  *   signInGateRefused() is the same decision for GET /v1/apps/:owner/:filename (routes/apps/read.ts),
  *   which also takes a grant this route handed out, so the apex inline address works the same way.
- * @structure signInGateRefused() · screenshotFollowsAccess() · screenshotGateRefused() · listedScreenshotUrl() · registerAppOpenRoutes()
+ * @structure signInGateRefused() · appReaderOf() · screenshotFollowsAccess() · screenshotGateRefused() · listedScreenshotUrl() · registerAppOpenRoutes()
  * @usage registerAppOpenRoutes(router, config, storage, canonicalOwner)   // from appsRouter
  * @version-history
+ *   2026-11-04 — signInGateRefused() asks signInGateOf() (services/app-read-gate.ts), the same decision
+ *     moved unchanged, so the version list answers as the app read does; appReaderOf() builds its
+ *     caller (codebase analysis 2026-11-03, item A1).
  *   2026-10-31 — screenshotGateRefused(): the screenshot of an app that needs a sign-in answers as the
  *     app does, unless its owner shows it to everyone; a listing's screenshot grant passes, and the
  *     answer is cached `private` (secaudit2026oct31w2 round 10, W2-12).
@@ -33,6 +36,7 @@ import type { Storage, AppRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { appNeedsSignIn, mayOpenApp } from '../../services/app-access.js';
+import { signInGateOf, SIGN_IN_REFUSAL, type AppReader } from '../../services/app-read-gate.js';
 import { isNodeAccount } from '../../services/audience.js';
 import { appIsPaced } from '../../services/app-pacing.js';
 import { appAccessGranted, appShotGranted, generateAppAccessToken, generateAppShotToken } from '../../services/app-access-token.js';
@@ -56,22 +60,32 @@ export async function signInGateRefused(
   req: Request, res: Response, config: AimeatConfig, storage: Storage,
   app: AppRecord, current: AppRecord, canonicalOwner: CanonicalOwner, operatorReads: () => Promise<boolean>,
 ): Promise<boolean> {
-  if (!appNeedsSignIn(config, current)) return false;
-  if (await appAccessGranted(req.query.access, app.ownerName, app.filename)) return false;
-  const account = isNodeAccount(req.auth);
-  if (account) {
-    const { owner: viewerOwner } = await canonicalOwner(req);
-    if (isSameAccount(viewerOwner, app.ownerName) || await mayOpenApp(storage, config, current, req.auth) || await operatorReads()) return false;
-  }
-  if (!account && (req.headers.accept ?? '').includes('text/html')) {
+  const gate = await signInGateOf(storage, config, app, current, appReaderOf(req, canonicalOwner, operatorReads, app));
+  if (!gate) return false;
+  if (!gate.account && (req.headers.accept ?? '').includes('text/html')) {
     res.setHeader('Cache-Control', 'no-store');
     res.redirect(302, appOpenPage(app));
     return true;
   }
-  res.status(account ? 403 : 401).json(error(config.nodeId, account ? 'ACCESS_DENIED' : 'SIGN_IN_REQUIRED', account
-    ? 'This app opens for the people its owner chose, and you are not among them.'
-    : 'This app opens for signed-in people only. Sign in and open it again.'));
+  const refusal = gate.account ? SIGN_IN_REFUSAL.account : SIGN_IN_REFUSAL.none;
+  res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
   return true;
+}
+
+/**
+ * The caller of an apex app read, for services/app-read-gate.ts. `app` names the app whose opening
+ * grant (`?access=`) counts; without it no grant is read.
+ */
+export function appReaderOf(
+  req: Request, canonicalOwner: CanonicalOwner, operatorReads: () => Promise<boolean>,
+  app?: Pick<AppRecord, 'ownerName' | 'filename'>,
+): AppReader {
+  return {
+    auth: req.auth,
+    viewerOwner: async () => (await canonicalOwner(req)).owner,
+    operatorReads,
+    ...(app ? { accessGranted: () => appAccessGranted(req.query.access, app.ownerName, app.filename) } : {}),
+  };
 }
 
 /** The app fields the screenshot decisions read; a listing row (AppSummaryRecord) carries them. */

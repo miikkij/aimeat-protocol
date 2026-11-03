@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-storage-file-parity.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-05 — Initial, with the gate (secaudit 2026-10, M8).
+ *   v1.1.0 — 2026-11-04 — A SQLite repo function whose storage method runs its own SQL is a twin
+ *     (codebase analysis 2026-11-03, item A15).
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
@@ -109,6 +111,25 @@ describe('check:storage-file-parity', () => {
       [`${SQ}/methods/b.ts`]: `import { more } from './more.js';\nexport const bMethods = {\n  ...more,\n  getB() { return null; },\n  setB() { return null; },\n};\n`,
     }));
     expect(spread.problems.some(p => p.includes('a spread in bMethods hides which file defines its methods'))).toBe(true);
+  });
+
+  it('fails on a SQLite repo function whose storage method runs its own SQL, and passes a method that calls the repo', () => {
+    const repo = "export function getB(db: any) { return db.prepare('SELECT * FROM b').get(); }\n"
+      + "export function countB(db: any) { return db.prepare('SELECT COUNT(*) FROM b').get(); }\n";
+    const ownSql = "import * as repo from '../repos/b.js';\nexport const bMethods = {\n"
+      + "  getB() { return this.db.prepare('SELECT * FROM b').get(); },\n"
+      + '  setB() { return null; },\n'
+      + '  countAll() { return repo.countB(this.db); },\n};\n';
+    const twin = fileParity(tree({ ...matching, [`${SQ}/repos/b.ts`]: repo, [`${SQ}/methods/b.ts`]: ownSql,
+      [`${PG}/methods/b.ts`]: group('bMethods', ['getB', 'setB', 'countAll']) }));
+    expect(twin.problems).toEqual([
+      `${SQ}/repos/b.ts:1 exports getB, and ${SQ}/methods/b.ts runs its own SQL for the method of that name: keep one copy (the method calls the repo, or the repo function goes)`,
+    ]);
+    const delegates = "import * as repo from '../repos/b.js';\nexport const bMethods = {\n"
+      + '  getB() { return repo.getB(this.db); },\n  setB() { return null; },\n  countAll() { return repo.countB(this.db); },\n};\n';
+    const ok = fileParity(tree({ ...matching, [`${SQ}/repos/b.ts`]: repo, [`${SQ}/methods/b.ts`]: delegates,
+      [`${PG}/methods/b.ts`]: group('bMethods', ['getB', 'setB', 'countAll']) }));
+    expect(ok.problems).toEqual([]);
   });
 
   it('passes on the real tree', () => {

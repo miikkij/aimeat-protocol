@@ -23,6 +23,9 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-11-04 — action versions answers what the app read answers for the session: a hidden app is
+ *     NOT_FOUND to another account, an app that needs a sign-in is refused to a caller it does not open
+ *     for (services/app-read-gate.ts; codebase analysis 2026-11-03, item A1).
  *   2026-10-30 — ui_get on an app not published yet answers the catalogue with no layout, as GET .../ui does.
  *   2026-10-25 — subdomain_set passes `origin` to the update (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -77,6 +80,7 @@ import { ownerAppLegal } from '../services/app-legal.js';
 import { ownerAppAudit } from '../services/app-audit.js';
 import { ownerAppSettings, SETTINGS_FIELDS, SETTINGS_OFFERING_FIELDS } from '../services/app-settings.js';
 import { listAppVersionsView } from '../services/app-versions.js';
+import { callerAppReader } from '../services/app-read-gate.js';
 import { collectAppLineage } from '../services/app-lineage.js';
 import { captureAppScreenshot } from '../services/screenshot-capture.js';
 import { storeAppScreenshot, clearAppScreenshot } from '../services/app-screenshot-store.js';
@@ -216,7 +220,8 @@ export function registerAppManageTool(
                 });
             }
             case 'versions': {
-                const out = await listAppVersionsView(storage, config, appOwner, filename);
+                // The app read's gates for this session: a hidden app is NOT_FOUND to another account.
+                const out = await listAppVersionsView(storage, config, appOwner, filename, callerAppReader(storage, config, caller(), filename));
                 if (!out.ok) return refusalText(out);
                 return answer({ ...out.data, ...(out.provenance ? { provenance: out.provenance } : {}) });
             }

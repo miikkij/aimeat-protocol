@@ -48,8 +48,10 @@
  *     (null anyone, 'signed-in', 'organism:<id>'). Migration 0104.
  *   2026-10-31 — updateAppMeta takes `screenshotPublic` (true sets it, false or null takes it off):
  *     the owner shows the screenshot of an access-limited app to everyone (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-04 — Add listAppVersionSummaries(): the version list without the content (codebase
+ *     analysis 2026-11-03, item A1).
  */
-import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppListing } from '../interface.js';
+import type { AppRecord, AppSummaryRecord, AppVersionSize, AppVersionSummary, AppDraftRecord, AppListOptions, AppForkRecord, AppListing } from '../interface.js';
 
 export interface AppRepository {
     createApp(record: AppRecord): Promise<AppRecord>;
@@ -95,6 +97,13 @@ export interface AppRepository {
      * bytes to compare three numbers is a gigabyte of I/O per publish.
      */
     listAppVersionSizes(ownerGaii: string, filename: string): Promise<AppVersionSize[]>;
+    /**
+     * The version line as the version list shows it, newest first: the size line plus the
+     * manifest's version string and the provenance id, no payload. GET .../versions answers
+     * anybody, so it must not read every version's bytes; listAppVersions stays for the backup
+     * export, which needs them.
+     */
+    listAppVersionSummaries(ownerGaii: string, filename: string): Promise<AppVersionSummary[]>;
     getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number>;
     deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean>;
     updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean>;

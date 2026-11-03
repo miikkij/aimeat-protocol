@@ -29,10 +29,15 @@
  *   IT FAILS ON: a method in a different file than its twin; a method one provider has and the other
  *   does not; a methods file with no twin file; a method defined in two files of one provider; a
  *   spread or computed member, which hides from a reader which file defines what; and a gone, double
- *   or two-sided provider-specific member.
- * @structure PROVIDER_SPECIFIC · readMethodFiles() · readInterface() · main()
+ *   or two-sided provider-specific member; and a SQLite repos/ function exported under the name of a
+ *   storage method that runs its own SQL (`.prepare(`) instead of calling it, which is two copies of
+ *   one query (repoTwins).
+ * @structure PROVIDER_SPECIFIC · readMethodFiles() · sqliteMethodsWithOwnSql() · repoTwins() · readInterface() · main()
  * @usage pnpm check:storage-file-parity
  * @version-history
+ *   v1.1.0 — 2026-11-04 — repoTwins(): a SQLite repo function with an own-SQL storage method of the same
+ *     name fails. Twelve such copies stayed behind M8, and repos/storage-file.ts listStorageFiles still
+ *     read every file's bytes (codebase analysis 2026-11-03, item A15).
  *   v1.0.1 — 2026-10-16 — The Postgres internals reason names _writeMemoryRow (QA audit D4-10).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M8).
  */
@@ -111,6 +116,54 @@ function readMethodFiles(root: string, provider: Provider, problems: string[]): 
         }
     }
     return { files, defined };
+}
+
+/** The SQLite storage methods whose own body runs SQL (`.prepare(`), by name. */
+function sqliteMethodsWithOwnSql(root: string): Map<string, string> {
+    const dir = join(root, PROVIDERS.sqlite, 'methods');
+    const out = new Map<string, string>();
+    for (const f of readdirSync(dir).filter(n => n.endsWith('.ts'))) {
+        const path = join(dir, f);
+        const sf = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+        const visit = (n: ts.Node): void => {
+            if (ts.isObjectLiteralExpression(n)) {
+                for (const prop of n.properties) {
+                    if (!(ts.isMethodDeclaration(prop) || ts.isPropertyAssignment(prop)) || !prop.name || !ts.isIdentifier(prop.name)) continue;
+                    if (/\.prepare\s*\(/.test(prop.getText(sf))) out.set(prop.name.text, f.slice(0, -3));
+                }
+            }
+            ts.forEachChild(n, visit);
+        };
+        visit(sf);
+    }
+    return out;
+}
+
+/**
+ * A SQLite repos/ function that a methods file has an own-SQL twin of: the repo exports `name`, and
+ * the storage method `name` runs its own statement instead of calling the repo. Two copies of one
+ * query drift; on 2026-11-03 repos/storage-file.ts listStorageFiles still read every file's bytes,
+ * the read methods/files.ts had fixed (codebase analysis 2026-11-03, item A15).
+ */
+export function repoTwins(root: string): string[] {
+    const dir = join(root, PROVIDERS.sqlite, 'repos');
+    const own = sqliteMethodsWithOwnSql(root);
+    const problems: string[] = [];
+    let files: string[];
+    try { files = readdirSync(dir).filter(n => n.endsWith('.ts')).sort(); } catch { return problems; }
+    for (const f of files) {
+        const path = join(dir, f);
+        const sf = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+        for (const st of sf.statements) {
+            if (!ts.isFunctionDeclaration(st) || !st.name || !st.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
+            const twin = own.get(st.name.text);
+            if (twin !== undefined) {
+                problems.push(`${PROVIDERS.sqlite}/repos/${f}:${sf.getLineAndCharacterOfPosition(st.getStart(sf)).line + 1} exports ${st.name.text}, `
+                    + `and ${PROVIDERS.sqlite}/methods/${twin}.ts runs its own SQL for the method of that name: keep one copy (the method calls the repo, or the repo function goes)`);
+            }
+        }
+    }
+    return problems;
 }
 
 /** The member names an interface declares, read from its file. */
@@ -198,6 +251,7 @@ export function fileParity(root: string): FileParity {
             }
         }
     }
+    problems.push(...repoTwins(root));
     // A method reported from both sides as "in the wrong file" is one finding.
     const unique = [...new Set(problems)].filter((line, i, list) => {
         const m = /^(\S+) is in (\S+) but in (\S+):/.exec(line);

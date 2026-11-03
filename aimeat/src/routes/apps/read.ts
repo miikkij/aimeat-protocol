@@ -9,6 +9,10 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-11-04 — The version list reads the caller and answers what the app read answers for them: a
+ *     hidden app 404, an app that needs a sign-in 401 or 403 (services/app-read-gate.ts, whose
+ *     hiddenFromReader() the app read asks too, unchanged); it reads no content (codebase analysis
+ *     2026-11-03, item A1).
  *   2026-10-31 — The screenshot of an app that needs a sign-in answers as the app does (screenshotGateRefused)
  *     and is cached `private`, unless its owner shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-31 — The served marks (the AI label, the AI-use and info marks) take their language from
@@ -156,7 +160,8 @@ import { isOperatorCaller, operatorOverride } from '../../services/operator-over
 import { callerOf } from '../../middleware/caller.js';
 import { appIsPaced, appToll } from '../../services/app-pacing.js';
 import { appNeedsSignIn } from '../../services/app-access.js';
-import { signInGateRefused, screenshotGateRefused, screenshotFollowsAccess } from './open.js';
+import { signInGateRefused, screenshotGateRefused, screenshotFollowsAccess, appReaderOf } from './open.js';
+import { hiddenFromReader } from '../../services/app-read-gate.js';
 import { accessCodeUnlockPage } from './access-code-page.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
@@ -179,9 +184,15 @@ export function registerReadRoutes(
     };
 
     // GET /v1/apps/:owner/:filename/versions — List all versions
-    // The owner segment, the lookup and the list are services/app-versions.ts, shared with MCP.
-    router.get('/v1/apps/:owner/:filename/versions', async (req, res) => {
-        const out = await listAppVersionsView(storage, config, req.params.owner as string, req.params.filename as string);
+    // The owner segment, the lookup, the gates and the list are services/app-versions.ts, shared with
+    // MCP. The caller is read (optionalAuth) so the app's owner, an account the app opens for and an
+    // operator pass the gates the app read asks (services/app-read-gate.ts).
+    router.get('/v1/apps/:owner/:filename/versions', optionalAuth(), async (req, res) => {
+        const filename = req.params.filename as string;
+        let operatorRead: boolean | undefined;
+        const reader = (ownerOf: string) => appReaderOf(req, canonicalOwner, async () => (operatorRead ??= await operatorOverride(
+            storage, config, req.auth, { ownerOf, area: 'app', action: 'read', subject: filename })), { ownerName: ownerOf, filename });
+        const out = await listAppVersionsView(storage, config, req.params.owner as string, filename, reader);
         if (!out.ok) {
             res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
@@ -480,16 +491,9 @@ export function registerReadRoutes(
         const operatorReads = async (): Promise<boolean> => (operatorRead ??= await operatorOverride(
             storage, config, req.auth, { ownerOf: appOwnerName, area: 'app', action: 'read', subject: filename }));
 
-        if (current.operatorHidden) {
-            let isOwner = false;
-            if (req.auth) {
-                const { owner: viewerOwner } = await canonicalOwner(req);
-                isOwner = isSameAccount(viewerOwner, app.ownerName);
-            }
-            if (!isOwner && !(await operatorReads())) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
-                return;
-            }
+        if (await hiddenFromReader(current, app.ownerName, appReaderOf(req, canonicalOwner, operatorReads))) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
+            return;
         }
 
         if (current.accessCode && current.accessCode !== code) {

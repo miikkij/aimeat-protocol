@@ -34,12 +34,14 @@
  *   v1.8.1 — 2026-10-23 — getApp, getAppByOwnerName, getLatestVersionNumber and updateAppMeta read
  *     with LIMIT 1. executeTakeFirst() adds no LIMIT, so each read fetched every version row with its
  *     content: 503 versions and 1 041 MB for one app, which stalled aimeat.io at 06:56 that day.
+ *   2026-11-04 — listAppVersionSummaries: the version list without the content; GET .../versions
+ *     read every version's payload through listAppVersions (codebase analysis 2026-11-03, item A1).
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
 import type { Selectable } from 'kysely';
 import type {
-  AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection, AppSeo,
+  AppRecord, AppSummaryRecord, AppVersionSize, AppVersionSummary, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection, AppSeo,
   AppMarks, AppAuthorship, AppAuthorshipLogEntry, AppLegalKind, AppLegalDoc, AppListing,
 } from '../../../interface.js';
 import type { App, AppDraft, AppFork } from '../db-types.js';
@@ -311,6 +313,23 @@ export const appMethods = {
       versionNumber: r.versionNumber,
       size: Number(r.size),
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    }));
+  },
+
+  async listAppVersionSummaries(this: PostgresKyselyStorage, ownerGaii: string, filename: string): Promise<AppVersionSummary[]> {
+    // The columns the version list shows, by name, and the manifest's version string out of the
+    // JSONB in SQL. GET .../versions answers anybody; listAppVersions read every version's payload
+    // for it (codebase analysis 2026-11-03, item A1).
+    const rows = await this.db.selectFrom('App')
+      .select(['versionNumber', 'size', 'createdAt', 'aiProvenanceId', sql<unknown>`"manifest"->'version'`.as('manifestVersion')])
+      .where('ownerGaii', '=', ownerGaii).where('filename', '=', filename)
+      .orderBy('versionNumber', 'desc').execute();
+    return rows.map(r => ({
+      versionNumber: r.versionNumber,
+      size: Number(r.size),
+      createdAt: iso(r.createdAt),
+      version: (r.manifestVersion ?? undefined) as string | undefined,
+      aiProvenanceId: r.aiProvenanceId ?? undefined,
     }));
   },
 

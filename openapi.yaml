@@ -77163,10 +77163,20 @@ paths:
       tags: [Apps]
       summary: List all published versions of an app
       description: >
-        Public. Returns every published version of the given app in the owner's canonical bucket.
-        Each version carries its own `ai_provenance_id` (each publish is its own content), and
-        `meta.provenance` carries the LIVE version's record. Null/absent means UNSTATED, never
-        "a human wrote it".
+        Returns every published version of the given app in the owner's canonical bucket, newest
+        first, without the content. The list answers what GET /v1/apps/{owner}/{filename} answers for
+        the same caller: anybody reads the list of an app anyone may open (a parked app included); an
+        app an operator hid answers 404 to everyone but its owner and an operator, with the message a
+        missing app gets; an app that needs a sign-in (its `open_to`, or a node set to signed-in
+        content access) answers 401 SIGN_IN_REQUIRED to a caller with no account and 403
+        ACCESS_DENIED to an account it does not open for. The owner, the owner's agents, an account
+        the app's setting admits, a grant from POST .../open in `access`, and an operator pass. Each
+        version carries its own `ai_provenance_id` (each publish is its own content), and
+        `meta.provenance` carries the LIVE version's record. Null/absent means UNSTATED, never "a
+        human wrote it".
+      security:
+        - BearerAuth: []
+        - {}
       parameters:
         - name: owner
           in: path
@@ -77176,6 +77186,11 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: access
+          in: query
+          required: false
+          schema: { type: string }
+          description: The opening grant from POST /v1/apps/{owner}/{filename}/open, for an app that needs a sign-in.
       responses:
         '200':
           description: App versions
@@ -77201,6 +77216,10 @@ paths:
                                 size: { type: integer }
                                 created_at: { type: string }
                           total: { type: integer }
+        '401':
+          description: SIGN_IN_REQUIRED. The app opens for signed-in people only, and the caller has no account here.
+        '403':
+          description: ACCESS_DENIED. The app opens for the people its owner chose, and the caller is not among them.
         '404':
           $ref: '#/components/responses/NotFound'
   # ── Generator ──────────────────────────

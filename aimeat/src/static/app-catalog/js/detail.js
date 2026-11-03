@@ -8,6 +8,9 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-11-04 — The version list is read with the session (versionsFetchInit): the node answers a
+ *     hidden app's list, or the list of an app that opens for signed-in people, only to whom the app
+ *     opens for (codebase analysis 2026-11-03, item A1).
  *   2026-10-27 — The version rows' View button takes the address through jsArg (secaudit2026oct26).
  *   2026-10-26 — skillSetBinding reads SKILL.md alone (body_only) and republishes with keep_files, so
  *     an attach or detach keeps every other file of the skill, an image as its bytes.
@@ -1711,11 +1714,18 @@ function versionSpanHtml(versions) {
     '<div class="version-span-hint">' + escapeHtml(t('versions.chartHint')) + '</div>';
 }
 
+// The version list is read with the session when there is one: the node answers a hidden app's list,
+// or the list of an app that opens for signed-in people, only to whom the app opens for.
+function versionsFetchInit() {
+  var token = getCortexOwnerToken();
+  return token ? { headers: { 'Authorization': 'Bearer ' + token } } : {};
+}
+
 function detailLoadVersions(owner, filename) {
   var config = loadConfig();
   if (!config.aimeatUrl) return;
   var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
-  fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/versions')
+  fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/versions', versionsFetchInit())
     .then(function(resp) { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.json(); })
     .then(function(json) {
       var listEl = document.getElementById('detail-versions-list');
@@ -2431,7 +2441,7 @@ function showVersionsModal(owner, filename) {
   listEl.innerHTML = '';
   openDlg('versions-overlay');
 
-  fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/versions')
+  fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename) + '/versions', versionsFetchInit())
     .then(function(resp) {
       if (!resp.ok) throw new Error('Server returned ' + resp.status);
       return resp.json();

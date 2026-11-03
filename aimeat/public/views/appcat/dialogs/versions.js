@@ -19,6 +19,9 @@
  *   { text, tone }: a line to show in place of the count, as the fork dialog's result); onDone
  *   (optional: called after a restore, e.g. the detail's reload).
  * @version-history
+ *   v1.1.1 — 2026-11-04 — The list is read with the session: the node answers a hidden app's list, or
+ *     the list of an app that opens for signed-in people, only to whom the app opens for (codebase
+ *     analysis 2026-11-03, item A1).
  *   v1.1.0 — 2026-09-27 — Parity: the filename after the title in the typewriter face (titleRef), the
  *     help and status lines in the old sizes and greys (a refusal in coral), the rows the old versions
  *     list (List tone 'releases').
@@ -33,7 +36,7 @@ import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Stack } from '/components/Layout.js';
 import { List, Row, Name, Doors } from '/components/List.js';
-import { getSession } from '/js/services/auth.js';
+import { getSession, authHeaders } from '/js/services/auth.js';
 import { useCatalog, reloadCatalog, notice } from '/views/appcat/store.js';
 import { dateTime } from '/js/format.js';
 import { x } from '/views/appcat/i18n.js';
@@ -56,7 +59,9 @@ export default function VersionsDialog({ owner, filename, manifest, app, status:
   const load = useCallback(async () => {
     if (!keep.current) setStatus({ text: x('detail.loadingVersions'), tone: 'busy' });
     try {
-      const resp = await fetch(appUrl(owner, filename, 'versions'));
+      // With the session: the list of a hidden app, or one that opens for signed-in people, answers
+      // its owner and the accounts it opens for, as the app itself does.
+      const resp = await fetch(appUrl(owner, filename, 'versions'), { headers: authHeaders() });
       if (!resp.ok) throw new Error(x('io.serverReturned', { status: resp.status }));
       const json = await resp.json();
       const list = (json.data && json.data.versions) || [];

@@ -11803,11 +11803,15 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     }
     return '<div class="version-span">' + escapeHtml(parts.join(" · ")) + "</div>" + versionChartHtml(sittings) + '<div class="version-span-hint">' + escapeHtml(t("versions.chartHint")) + "</div>";
   }
+  function versionsFetchInit() {
+    var token = getCortexOwnerToken2();
+    return token ? { headers: { "Authorization": "Bearer " + token } } : {};
+  }
   function detailLoadVersions(owner, filename) {
     var config = loadConfig();
     if (!config.aimeatUrl) return;
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions", versionsFetchInit()).then(function(resp) {
       if (!resp.ok) throw new Error("HTTP " + resp.status);
       return resp.json();
     }).then(function(json) {
@@ -12510,7 +12514,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     statusEl.style.color = "var(--text-muted)";
     listEl.innerHTML = "";
     openDlg("versions-overlay");
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions").then(function(resp) {
+    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/versions", versionsFetchInit()).then(function(resp) {
       if (!resp.ok) throw new Error("Server returned " + resp.status);
       return resp.json();
     }).then(function(json) {
