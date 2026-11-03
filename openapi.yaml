@@ -21427,6 +21427,12 @@ paths:
         An image or a transcription job carries neither.
 
 
+        A job that was running when the node stopped (a deploy or a restart) goes back to `queued`
+        once at the next start and runs again; its record then carries `requeued_after_stop` (the
+        number of times that happened). A job the node stops a second time, or one left running by a
+        process that ended without stopping, is `failed` with error code `node_restarted`.
+
+
         Requires an owner session or a token carrying `ai:use`.
       tags: [Memory]
       security:

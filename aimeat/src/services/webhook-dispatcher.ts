@@ -11,7 +11,8 @@
  * @structure
  *   - createWebhookDispatcher({ config, storage }) -- factory, returns { dispatchWebhookEvent }
  *   - dispatchWebhookEvent(agentGaii, event, data) -- main entry point
- *   - fireWithRetry(url, body, secret, attempt) -- recursive retry with backoff
+ *   - fireOnce(delivery, attemptNo) -- one signed POST; the retries run in the stored outbox (outbox.ts)
+ *   - recordFinalFailure(delivery, attempts) -- every attempt failed
  *   - onSuccess(agentGaii) -- resets fail counter
  *   - onFailure(agentGaii, failCount) -- increments counter, auto-disables at threshold
  *   - logDelivery(agentGaii, event, payload, result) -- persists + prunes
@@ -58,6 +59,9 @@
  *   See: docs/superpowers/specs/2026-05-23-agent-integration-architecture-design.md, Appendix A
  *
  * @version-history
+ *   v1.4.0 -- 2026-11-04 -- The retries are kept in the stored outbox (services/outbox.ts), so a restart
+ *     resumes them and a second process does not send them twice; schedule, log lines and delivery log
+ *     unchanged (codebase analysis 2026-11-03, HA stage 1 item 1.5).
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.0 -- 2026-10-11 -- A stopped agent gets no task.queued, task.approved or message.inbound
  *     (./agent-stop-rules.ts); events about work in flight still go out.
@@ -74,6 +78,7 @@ import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { type WebhookEventType, buildWebhookEnvelope } from '../models/webhook-schemas.js';
 import { isStopped, isWakeWebhookEvent } from './agent-stop-rules.js';
+import { deliverWithRetries, registerOutboxHandler } from './outbox.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -89,7 +94,23 @@ const DELIVERY_LOG_KEEP = 50;
 /** HTTP timeout for each delivery attempt */
 const FETCH_TIMEOUT_MS = 10_000;
 
+/** How long one claimed attempt may take before another process may take a stored retry over. */
+const WEBHOOK_LEASE_MS = FETCH_TIMEOUT_MS + 50_000;
+
 // ── Types ──────────────────────────────────────────────────────────────
+
+/** One delivery: what the outbox stores (agent, event, data, URL, body) and two in-memory fields. */
+interface WebhookDelivery {
+  agentGaii: string;
+  event: WebhookEventType;
+  data: Record<string, unknown>;
+  url: string;
+  body: string;
+  /** The secret read at dispatch. Not stored: a resumed attempt reads the agent's current one. */
+  secret?: string;
+  /** The last failed attempt, for the final delivery-log row. Not stored. */
+  last?: { errorMessage: string; httpStatus?: number; latencyMs: number };
+}
 
 export interface DispatchOptions {
   config: AimeatConfig;
@@ -191,118 +212,114 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
     const envelope = buildWebhookEnvelope(event, config.nodeId, agentGaii, data);
     const body = JSON.stringify(envelope);
 
-    // Fire with retry (async, does not block the caller's response)
-    fireWithRetry(agentGaii, agent.webhookUrl, body, agent.webhookSecret, event, data, 0);
+    // Fire with retry (async, does not block the caller's response). The retries are kept in the
+    // stored outbox (services/outbox.ts), so a restart inside the 2.5-minute window resumes them.
+    void deliverWithRetries<WebhookDelivery>(storage, config.nodeId, 'webhook', {
+      agentGaii, event, data, url: agent.webhookUrl, body, secret: agent.webhookSecret,
+    }).catch((err: unknown) => {
+      logger.error('Webhook delivery bookkeeping failed after the request finished', {
+        agentGaii, event, error: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   /**
-   * Fire HTTP POST with exponential backoff retry.
-   * Each attempt has a 10s timeout. Retries are scheduled via setTimeout
-   * so the caller is not blocked.
+   * One HTTP POST, signed, with a 10 s timeout, and its bookkeeping on success. The retry schedule
+   * (5 s, 30 s, 2 min) and the final failure are the outbox handler's (registered below). The secret
+   * is the one read when the event was dispatched; an attempt resumed after a restart reads the
+   * agent's current one, because the outbox does not store secrets.
    */
-  function fireWithRetry(
-    agentGaii: string,
-    url: string,
-    body: string,
-    secret: string,
-    event: WebhookEventType,
-    data: Record<string, unknown>,
-    attempt: number,
-  ): void {
+  async function fireOnce(d: WebhookDelivery, attemptNo: number): Promise<boolean> {
     const startMs = Date.now();
+    const { agentGaii, event, data, url, body } = d;
+    const secret = d.secret ?? (await storage.getAgent(agentGaii))?.webhookSecret;
+    if (!secret) {
+      d.last = { errorMessage: 'The agent has no webhook secret any more', latencyMs: 0 };
+      logger.warn('Webhook delivery failed (no secret)', { agentGaii, event, attempt: attemptNo });
+      return false;
+    }
 
     // HMAC-SHA256 signature
     const signature = createHmac('sha256', secret).update(body).digest('hex');
 
-    // safeFetch re-validates every redirect hop so the webhook URL can't bounce to an internal target.
-    safeFetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-AIMEAT-Signature': `sha256=${signature}`,
-        'X-AIMEAT-Event': event,
-        'X-AIMEAT-Delivery': randomUUID(),
-      },
-      body,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
-      .then(async (response) => {
-        const latencyMs = Date.now() - startMs;
-
-        if (response.ok) {
-          // Success (2xx)
-          logger.info('Webhook delivered', { agentGaii, event, attempt: attempt + 1, httpStatus: response.status, latencyMs });
-          await onSuccess(agentGaii);
-          await logDelivery(agentGaii, event, data, {
-            status: 'success',
-            httpStatus: response.status,
-            attemptCount: attempt + 1,
-            latencyMs,
-          });
-        } else {
-          // Non-2xx response -- treat as failure
-          const errorMessage = `HTTP ${response.status} ${response.statusText}`;
-          logger.warn('Webhook delivery failed (non-2xx)', { agentGaii, event, attempt: attempt + 1, httpStatus: response.status });
-          await handleRetryOrFail(agentGaii, url, body, secret, event, data, attempt, errorMessage, response.status, latencyMs);
-        }
-      })
-      .catch(async (err: unknown) => {
-        const latencyMs = Date.now() - startMs;
-        const errorMessage = err instanceof Error ? err.message : String(err);
-        logger.warn('Webhook delivery failed (network)', { agentGaii, event, attempt: attempt + 1, error: errorMessage });
-        await handleRetryOrFail(agentGaii, url, body, secret, event, data, attempt, errorMessage, undefined, latencyMs);
-      })
-      // THE BOOKKEEPING CAN FAIL TOO. Both handlers above are async and nothing awaited the promise
-      // they return, so a throw inside onSuccess, logDelivery or handleRetryOrFail — every one of
-      // them a database write — was an unhandled rejection with no line anywhere about a delivery
-      // whose outcome was never recorded.
-      .catch((err: unknown) => {
+    try {
+      // safeFetch re-validates every redirect hop so the webhook URL can't bounce to an internal target.
+      const response = await safeFetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AIMEAT-Signature': `sha256=${signature}`,
+          'X-AIMEAT-Event': event,
+          'X-AIMEAT-Delivery': randomUUID(),
+        },
+        body,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      const latencyMs = Date.now() - startMs;
+      if (!response.ok) {
+        // Non-2xx response -- treat as failure
+        d.last = { errorMessage: `HTTP ${response.status} ${response.statusText}`, httpStatus: response.status, latencyMs };
+        logger.warn('Webhook delivery failed (non-2xx)', { agentGaii, event, attempt: attemptNo, httpStatus: response.status });
+        return false;
+      }
+      // Success (2xx)
+      logger.info('Webhook delivered', { agentGaii, event, attempt: attemptNo, httpStatus: response.status, latencyMs });
+      // THE BOOKKEEPING CAN FAIL TOO. Each step is a database write; a throw here is caught and
+      // logged below rather than counted as a failed delivery, which would send the event again.
+      try {
+        await onSuccess(agentGaii);
+        await logDelivery(agentGaii, event, data, { status: 'success', httpStatus: response.status, attemptCount: attemptNo, latencyMs });
+      } catch (err) {
         logger.error('Webhook delivery bookkeeping failed after the request finished', {
-          agentGaii, event, attempt: attempt + 1, error: err instanceof Error ? err.message : String(err),
+          agentGaii, event, attempt: attemptNo, error: err instanceof Error ? err.message : String(err),
         });
-      });
-  }
-
-  /**
-   * Decide whether to retry or record final failure.
-   */
-  async function handleRetryOrFail(
-    agentGaii: string,
-    url: string,
-    body: string,
-    secret: string,
-    event: WebhookEventType,
-    data: Record<string, unknown>,
-    attempt: number,
-    errorMessage: string,
-    httpStatus: number | undefined,
-    latencyMs: number,
-  ): Promise<void> {
-    if (attempt < RETRY_DELAYS_MS.length) {
-      // Schedule retry
-      const delayMs = RETRY_DELAYS_MS[attempt]!;
-      logger.info('Webhook retry scheduled', { agentGaii, event, attempt: attempt + 1, nextAttempt: attempt + 2, delayMs });
-      setTimeout(() => {
-        fireWithRetry(agentGaii, url, body, secret, event, data, attempt + 1);
-      }, delayMs);
-    } else {
-      // All retries exhausted
-      logger.error('Webhook delivery failed permanently', { agentGaii, event, totalAttempts: attempt + 1 });
-
-      // Load current fail count (may have changed during retries)
-      const agent = await storage.getAgent(agentGaii);
-      const currentFailCount = agent?.webhookFailCount ?? 0;
-      await onFailure(agentGaii, currentFailCount);
-
-      await logDelivery(agentGaii, event, data, {
-        status: 'failed',
-        httpStatus,
-        errorMessage,
-        attemptCount: attempt + 1,
-        latencyMs,
-      });
+      }
+      return true;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      d.last = { errorMessage, latencyMs: Date.now() - startMs };
+      logger.warn('Webhook delivery failed (network)', { agentGaii, event, attempt: attemptNo, error: errorMessage });
+      return false;
     }
   }
+
+  /** All retries exhausted: count the failure against the webhook and log the last attempt. */
+  async function recordFinalFailure(d: WebhookDelivery, attempts: number): Promise<void> {
+    const { agentGaii, event, data } = d;
+    logger.error('Webhook delivery failed permanently', { agentGaii, event, totalAttempts: attempts });
+
+    // Load current fail count (may have changed during retries)
+    const agent = await storage.getAgent(agentGaii);
+    const currentFailCount = agent?.webhookFailCount ?? 0;
+    await onFailure(agentGaii, currentFailCount);
+
+    await logDelivery(agentGaii, event, data, {
+      status: 'failed',
+      httpStatus: d.last?.httpStatus,
+      errorMessage: d.last?.errorMessage ?? 'failed',
+      attemptCount: attempts,
+      latencyMs: d.last?.latencyMs ?? 0,
+    });
+  }
+
+  registerOutboxHandler<WebhookDelivery>('webhook', {
+    delays: RETRY_DELAYS_MS,
+    leaseMs: WEBHOOK_LEASE_MS,
+    attempt: fireOnce,
+    onRetry: (d, attemptNo, delayMs) => logger.info('Webhook retry scheduled', {
+      agentGaii: d.agentGaii, event: d.event, attempt: attemptNo, nextAttempt: attemptNo + 1, delayMs,
+    }),
+    onExhausted: recordFinalFailure,
+    // The secret and the last result stay in memory; the delivery log already keeps `data`.
+    seal: ({ agentGaii, event, data, url, body }) => ({ agentGaii, event, data, url, body }),
+    open: (stored) => {
+      const s = stored as Partial<WebhookDelivery>;
+      if (!s || typeof s.agentGaii !== 'string' || typeof s.url !== 'string' || typeof s.body !== 'string' || typeof s.event !== 'string') {
+        throw new Error('not a webhook delivery');
+      }
+      return { agentGaii: s.agentGaii, event: s.event as WebhookEventType, data: (s.data ?? {}) as Record<string, unknown>, url: s.url, body: s.body };
+    },
+  });
 
   /**
    * Handle successful delivery: reset fail counter and record timestamp.

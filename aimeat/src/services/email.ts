@@ -7,7 +7,7 @@
  *   magic links, notifications, invitations, access keys and raw HTML emails.
  * @structure
  *   - EmailService interface (sendVerificationCode, sendMagicLink, sendNotification, sendInvite, sendKeyInvite, sendKeyCredentials, sendRaw, sendWithAttachments)
- *   - withRetry() exponential backoff helper
+ *   - the retries: services/email-outbox.ts createMailSender (stored outbox, unchanged schedule)
  *   - createDisabledService() stub for when SMTP is not configured
  *   - createEmailService() factory (configures nodemailer transport)
  * @usage
@@ -36,13 +36,17 @@
  *     body are escaped and line breaks kept (secaudit2026oct22).
  *   2026-10-31 -- sendNotification() takes `replyTo`, which the owner's report mail sets from
  *     email.reply_to (Jouni, 2026-10-31 20.14).
+ *   2026-11-04 -- createEmailService(config, storage): with storage, a mail whose first attempt failed
+ *     keeps its retries in the stored outbox, so a restart resumes them (email-outbox.ts; codebase
+ *     analysis 2026-11-03, HA stage 1 item 1.5). withRetry moved there unchanged in schedule.
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { getStats } from './stats.js';
+import type { Storage } from '../storage/interface.js';
 import { setNodeEmailFooter } from './email-templates.js';
+import { createMailSender } from './email-outbox.js';
 import {
   verificationEmailHtml,
   magicLinkEmailHtml,
@@ -55,11 +59,9 @@ import {
   keyCredentialsEmailSubject,
 } from './email-templates.js';
 
-export interface EmailAttachment {
-  filename: string;
-  content: Buffer;
-  contentType: string;
-}
+// Declared beside the sender that stores it (email-outbox.ts), so the two files do not import each other.
+export type { EmailAttachment } from './email-outbox.js';
+import type { EmailAttachment } from './email-outbox.js';
 
 export interface EmailService {
   readonly enabled: boolean;
@@ -84,27 +86,10 @@ let _activeEmailService: EmailService | null = null;
 export function setActiveEmailService(svc: EmailService): void { _activeEmailService = svc; }
 export function getActiveEmailService(): EmailService | null { return _activeEmailService; }
 
-// ── Retry helper ─────────────────────────────────────────
-
-const RETRY_DELAYS = [1_000, 3_000, 9_000]; // exponential backoff: 1s, 3s, 9s
-
-async function withRetry<T>(fn: () => Promise<T>, label: string, emailType?: string): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (attempt < RETRY_DELAYS.length) {
-        const delay = RETRY_DELAYS[attempt];
-        logger.warn(`Email send failed (${label}), retry ${attempt + 1}/${RETRY_DELAYS.length} in ${delay}ms`);
-        if (emailType) getStats()?.incrementTyped('email_retried', emailType);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-  throw lastError;
-}
+// ── Retries ──────────────────────────────────────────────
+// The retry schedule is unchanged (1 s, 3 s, 9 s; four attempts). The retries run through the stored
+// outbox (services/email-outbox.ts) when the service has storage and the node an encryption key, so
+// a restart inside the 13 s resumes them; otherwise in memory as before.
 
 // ── Disabled service (returned when SMTP is not configured) ──
 
@@ -128,7 +113,7 @@ function createDisabledService(): EmailService {
 
 // ── Factory ──────────────────────────────────────────────
 
-export function createEmailService(config: AimeatConfig): EmailService {
+export function createEmailService(config: AimeatConfig, storage?: Storage | null): EmailService {
   // The operator's own mail foot, read from the live config at each render (operator.email_footer).
   setNodeEmailFooter(() => config.operator?.emailFooter ?? '');
   if (!config.emailEnabled) {
@@ -151,23 +136,11 @@ export function createEmailService(config: AimeatConfig): EmailService {
 
   const from = config.smtpFrom;
 
+  // One attempt, its retries and their log lines and counters (services/email-outbox.ts).
+  const sendMail = createMailSender(transporter, { config, storage });
+
   async function send(to: string, subject: string, html: string, text: string, type: string, replyTo?: string | null): Promise<boolean> {
-    try {
-      await withRetry(
-        () => transporter.sendMail({ from, to, subject, html, text, ...(replyTo ? { replyTo } : {}) }),
-        subject,
-        type,
-      );
-      // Never log email addresses (privacy)
-      logger.info(`Email sent successfully: ${subject}`);
-      getStats()?.incrementTyped('email_sent', type);
-      return true;
-    } catch (err) {
-      // Never log email addresses (privacy)
-      logger.error(`Email send failed after retries: ${subject}`, { error: (err as Error).message });
-      getStats()?.incrementTyped('email_failed', type);
-      return false;
-    }
+    return sendMail({ from, to, subject, html, text, type, ...(replyTo ? { replyTo } : {}) });
   }
 
   return {
@@ -214,33 +187,20 @@ export function createEmailService(config: AimeatConfig): EmailService {
     },
 
     async sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string; headers?: Record<string, string> }): Promise<boolean> {
-      try {
-        // Display name is quoted-escaped; the address itself is always the node's configured from.
-        const fromHeader = opts?.fromName ? `"${opts.fromName.replaceAll('"', "'")}" <${from}>` : from;
-        await withRetry(
-          () => transporter.sendMail({
-            from: fromHeader, to, subject, html, text,
-            replyTo: opts?.replyTo,
-            // The disclosure header rides here. It was accepted in the signature and dropped before
-            // the wire until 2026-09-08, so a caller that declared AI authorship on the outbound
-            // door got a message with no mark on it, and the two other send paths (a person's own
-            // mailbox, a company's SMTP) carried the same header correctly. A disclosure that
-            // appears on some paths and not others is worse than none, because it makes the
-            // messages without it look human-written.
-            ...(opts?.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
-            attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
-          }),
-          subject,
-          'outbound',
-        );
-        logger.info(`Email sent successfully: ${subject}`);   // never log addresses (privacy)
-        getStats()?.incrementTyped('email_sent', 'outbound');
-        return true;
-      } catch (err) {
-        logger.error(`Email send failed after retries: ${subject}`, { error: (err as Error).message });
-        getStats()?.incrementTyped('email_failed', 'outbound');
-        return false;
-      }
+      // Display name is quoted-escaped; the address itself is always the node's configured from.
+      const fromHeader = opts?.fromName ? `"${opts.fromName.replaceAll('"', "'")}" <${from}>` : from;
+      return sendMail({
+        from: fromHeader, to, subject, html, text, type: 'outbound',
+        ...(opts?.replyTo ? { replyTo: opts.replyTo } : {}),
+        // The disclosure header rides here. It was accepted in the signature and dropped before
+        // the wire until 2026-09-08, so a caller that declared AI authorship on the outbound
+        // door got a message with no mark on it, and the two other send paths (a person's own
+        // mailbox, a company's SMTP) carried the same header correctly. A disclosure that
+        // appears on some paths and not others is worse than none, because it makes the
+        // messages without it look human-written.
+        ...(opts?.headers && Object.keys(opts.headers).length ? { headers: opts.headers } : {}),
+        attachments,
+      });
     },
   };
 }

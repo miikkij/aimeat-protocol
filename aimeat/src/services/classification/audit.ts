@@ -11,7 +11,12 @@
  *   BOUNDED FROM THE START, because the earlier per-read audit (services/consent-audit-buffer.ts)
  *   grew production to 1.2 million rows. Three limits:
  *   1. Recording is synchronous and returns void. It never awaits and never throws, so a slow
- *      database cannot slow a read. Rows wait in memory and are flushed in batches every 60 s.
+ *      database cannot slow a read. Rows wait in memory and are flushed in one batch within a second
+ *      of the first one (a 60 s interval retries a failed write). Measured on 2026-11-04 (SQLite
+ *      file, 500 rows): an awaited write costs 0.12 ms median, 0.39 ms p95, against 0.005 ms for
+ *      the record; on PostgreSQL it is a round trip and a commit per row, on every AI read of
+ *      audited content. So the row is not written on the read, and a process that ends without
+ *      stopping loses at most the last second; it lost up to 60 s before 2026-11-04.
  *   2. The same reader, the same item and the same action in the same minute is ONE row with a
  *      count. The queue merges on that address as events arrive, so the queue stays small too, and
  *      storage adds the count to a row that an earlier flush already wrote.
@@ -21,7 +26,7 @@
  *   A reader of the log gets the stored rows and the not-yet-flushed ones together
  *   (listClassificationAuditMerged), so an event is visible at once rather than after the flush.
  *   A failed flush puts its rows back for the next window, bounded by the queue cap; a hard kill
- *   loses at most one window.
+ *   loses at most the last second.
  *
  *   EVIDENCE IS NEVER EVICTED (review of 2026-09-29). The buffer keeps two lists: routine rows
  *   (shown, used) and evidence (refused, changed, exception). Past the cap the oldest ROUTINE row goes; evidence
@@ -43,6 +48,8 @@
  *   recordClassificationAudit({ scope, ownerGaii, kind: 'memory', key, label: 'luottamuksellinen',
  *     reader: 'claude#alice@node', readerKind: 'ai', action: 'used', purpose: 'chat:anthropic/claude' });
  * @version-history
+ *   v1.3.0 -- 2026-11-04 -- A recorded row is written within a second (flushSoon), not up to 60 s later
+ *     (codebase analysis 2026-11-03, HA stage 1 item 1.6).
  *   v1.2.0 — 2026-09-30 — The action `exception` (an entry of the exceptions list made, used or
  *     withdrawn): evidence, never evicted, and to the millisecond like a change.
  *   v1.1.0 — 2026-09-29 — Review fixes: evidence (refused, changed) is never evicted and flushes
@@ -74,8 +81,11 @@ export interface ClassificationAuditEvent {
   count?: number;
 }
 
-/** Flush cadence. The stored log is at most this far behind; the merged read never is. */
+/** The safety net: retries a failed write. The merged read is never behind. */
 const FLUSH_INTERVAL_MS = 60_000;
+/** How soon a recorded row is written: the most a process that ends without stopping can lose (a
+ *  stop loses nothing). Rows recorded within it are merged and go in one flush. */
+const FLUSH_SOON_MS = 1_000;
 /** Rows per storage call. A failed call puts back only its own rows, so no row is counted twice. */
 const FLUSH_CHUNK = 500;
 /** Hard cap on distinct rows waiting, so a stuck database cannot grow the queue without bound. */
@@ -85,6 +95,7 @@ const MAX_EVIDENCE = 50_000;
 
 let storageRef: Storage | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+let soonTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
 /** Waiting rows, by address, in insertion order (a Map keeps it), so the oldest go first.
  *  `routine` holds shown and used, `evidence` holds refused and changed. */
@@ -97,6 +108,13 @@ const isEvidence = (a: ClassificationAuditAction) => a === 'refused' || a === 'c
 /** An event recorded to the millisecond and never merged into another (a change, an exception). */
 const isEvent = (a: ClassificationAuditAction) => a === 'changed' || a === 'exception';
 const waitingRows = (): ClassificationAuditRow[] => [...evidence.values(), ...routine.values()];
+
+/** Write what waits within FLUSH_SOON_MS, once: rows arriving meanwhile merge into that flush. */
+function flushSoon(): void {
+  if (!storageRef || soonTimer) return;
+  soonTimer = setTimeout(() => { soonTimer = null; void flushClassificationAudit(); }, FLUSH_SOON_MS);
+  soonTimer.unref?.();
+}
 
 /** The ISO timestamp of the minute `at` falls in, in UTC. An unreadable `at` counts as now. */
 export function minuteOf(at: string): string {
@@ -164,6 +182,7 @@ export function recordClassificationAudit(e: ClassificationAuditEvent): void {
     if (!e || !e.reader || !e.scope || !e.key || !e.action) return;
     const at = e.at && !Number.isNaN(new Date(e.at).getTime()) ? new Date(e.at).toISOString() : new Date().toISOString();
     const count = typeof e.count === 'number' && Number.isFinite(e.count) && e.count >= 1 ? Math.floor(e.count) : 1;
+    flushSoon();
     enqueue({
       id: randomUUID(),
       // A change or an exception is an event, not a count: to the millisecond, so a second one is a
@@ -242,6 +261,8 @@ export async function flushClassificationAudit(): Promise<void> {
       for (const r of arrived) enqueue(r);
     }
     flushing = false;
+    // What arrived during this flush goes soon too; a failed write waits for the interval.
+    if (failed.length === 0 && routine.size + evidence.size > 0) flushSoon();
   }
 }
 
@@ -256,6 +277,7 @@ export function initClassificationAudit(storage: Storage): void {
 /** Stop the interval and flush once more. Called from graceful shutdown. */
 export async function shutdownClassificationAudit(): Promise<void> {
   if (flushTimer) { clearInterval(flushTimer); flushTimer = null; }
+  if (soonTimer) { clearTimeout(soonTimer); soonTimer = null; }
   await flushClassificationAudit();
 }
 
@@ -307,6 +329,7 @@ export async function pruneClassificationAuditOlderThan(storage: Storage, days: 
 
 /** Test seam: drop everything waiting and forget the storage. Not used by the running node. */
 export function resetClassificationAudit(): void {
+  if (soonTimer) { clearTimeout(soonTimer); soonTimer = null; }
   routine = new Map();
   evidence = new Map();
   dropped = 0;

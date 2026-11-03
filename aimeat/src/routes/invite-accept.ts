@@ -24,6 +24,7 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-11-04 — createEmailService gets storage, so the code mail's retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-02 — Accepting with a new account and a password answers 403 PASSWORD_SIGN_IN_OFF when the
  *     password sign-in policy refuses a new password (services/sign-in-policy.ts; IT review); the
  *     invitation stays unspent.
@@ -318,7 +319,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       emitChange('ghii');
       // The invited address, unverified until its code comes back (POST /v1/ghii/email/verify).
       await storage.updateGHII(`${ownerName}@${config.nodeId}`, { notificationEmail: inv.email.toLowerCase().trim() });
-      await startRegistrationEmailVerification(storage, createEmailService(config), ownerName, inv.email,
+      await startRegistrationEmailVerification(storage, createEmailService(config, storage), ownerName, inv.email,
         typeof locale === 'string' ? locale : undefined)
         .catch(err => logger.warn('invite accept: the verification code could not be sent', { error: String(err) }));
     }

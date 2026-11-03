@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-11-04 — Seed core:outbox-sweep (every minute): stored webhook and mail retries resumed (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — Seed core:datapackage-freshness (hourly at :47): owners of stale data packages are told once (plan D6.2).
  *   2026-10-28 — Seed core:compliance-ask-makers (daily 08:15): the makers of AI apps with EU AI Act questions open are asked.
  *   2026-10-25 — Seed core:held-label-release (daily 05:41; secaudit2026oct22, app-label-recycled-after-delete).
@@ -169,6 +170,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // closes, its owner is reminded a week before, a request nobody decided lapses. Hourly at :12, on
   // every node; a node with no opening reads one key prefix and stops.
   jobs.push({ id: 'core:internet-opening-sweep', name: 'Internet Opening Sweep', coreHandler: 'internet-opening-sweep', cron: '12 * * * *' });
+  // Webhook and mail retries kept in the stored outbox (services/outbox.ts) whose process stopped or
+  // died: every minute, claimed per fire, on every node; a node with nothing waiting reads one prefix.
+  jobs.push({ id: 'core:outbox-sweep', name: 'Outbox Retry Sweep', coreHandler: 'outbox-sweep', cron: '* * * * *' });
 
   const now = new Date().toISOString();
   for (const def of jobs) {

@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.18.0 -- 2026-11-04 -- A stopping node marks its running jobs (markStoppingJobs) and the next start queues a marked
+ *     job again once (restart.ts); writeResult moved to write-result.ts unchanged (codebase analysis 2026-11-03, item HA 1.4).
  *   v1.17.2 -- 2026-10-27 -- The per-owner queue brake and the slot pool's lane count the account (ownerGhiiOf), not the
  *     calling principal; visibleToViewer moved to types.ts unchanged (secaudit2026oct26, per-owner-queue-brake-keyed-on-principal).
  *   v1.17.1 -- 2026-10-25 -- An on_done callback names the account's own extension through services/component-address.ts, own
@@ -98,15 +100,14 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
-import { CAS_ATTEMPTS } from '../record-cas.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
 import { AiCompletionError } from '../ai/completion.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
-import { jobReader, jobWriter, jobReadViewer, starterMayInvokeExtensions, onDoneScopeRefusal } from './starter.js';
-import { writeMemoryRecord } from '../memory-write.js';
+import { jobReader, jobReadViewer, starterMayInvokeExtensions, onDoneScopeRefusal } from './starter.js';
+import { writeJobResult } from './write-result.js';
 import { resultWriteRefusal } from './result-precheck.js';
 import { warningsNote } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';
@@ -117,6 +118,7 @@ import { fileJobPictureRequest } from './picture-request.js';
 import { takeAiCall } from '../account-limits.js';
 import { emitAiJobFinished } from './finished-listeners.js';
 import { findExtension, namespacedName } from '../component-address.js';
+import { restartDecision, markStopped } from './restart.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
     readActiveIndex, addToActiveIndex, removeFromActiveIndex,
@@ -150,6 +152,8 @@ export class AiJobService implements AiJobStarter {
     private readonly emailService?: EmailService;
     private readonly pool: SlotPool;
     private readonly live = new Map<string, LiveEntry>();
+    /** Set by markStoppingJobs: the process is ending, so no job starts a model call. */
+    private stopping = false;
 
     constructor(config: AimeatConfig, storage: Storage, emailService?: EmailService) {
         this.config = config;
@@ -411,6 +415,8 @@ export class AiJobService implements AiJobStarter {
 
         try {
             await this.pool.acquire(owner, { signal: entry.controller.signal });
+            // A stopping node starts nothing: the job stays queued in storage and the next start runs it.
+            if (this.stopping) { this.pool.release(owner); return; }
         } catch (err) {
             if (err instanceof SlotAbortedError) {
                 await this.finish(jobId, { state: 'cancelled' });
@@ -465,7 +471,7 @@ export class AiJobService implements AiJobStarter {
                 return;
             }
 
-            const written = await this.writeResult(entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
+            const written = await writeJobResult({ storage: this.storage, config: this.config }, entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
             await filePicture(written.requestId);
             // Before the callback, so readResult already hands the answer to the on_done action.
             // Stored too, not only kept in this process: a restart during on_done folds the stored
@@ -514,68 +520,6 @@ export class AiJobService implements AiJobStarter {
         } finally {
             this.pool.release(owner);
         }
-    }
-
-    /** Land the answer where the caller said it should go. `parseJson` is set for a text answer
-     *  the job asked JSON of; an image record and a transcription arrive in their final shape.
-     *  Answers with the value stored, the version it was stored at and the visibility it got. */
-    private async writeResult(
-        job: AiJobRecord, answer: unknown, parseJson: boolean, provenanceId?: string,
-    ): Promise<{ value: unknown; version: number; visibility: AiJobRecord['result_visibility']; requestId?: string }> {
-        let value: unknown = answer;
-        if (parseJson) {
-            // Parsed HERE when the job asked for JSON, so a malformed answer fails at the job rather
-            // than becoming a string every downstream reader has to re-parse and none of them checks.
-            const content = typeof answer === 'string' ? answer : '';
-            const m = /\{[\s\S]*\}|\[[\s\S]*\]/.exec(content);
-            if (!m) throw new Error('The job asked for json and the answer contained none.');
-            value = JSON.parse(m[0]);
-        }
-
-        // THROUGH THE SHARED MEMORY WRITE, as the job's starter (starter.ts jobWriter). A raw storage
-        // write here stored the answer at whatever visibility the caller asked: an agent without
-        // publish:public made its answer public with no request to the owner, past the closed-node
-        // level and the label audience cap, and wrote an `organism.*` key the organism namespace
-        // rule refuses it on POST /v1/memory (secaudit 2026-10). `gatePublic` asks the publish gate,
-        // which keeps the record at the level it had and files the request; the job records what
-        // was stored. `ai:use` is the word this write answers to, the one the start already asked.
-        //
-        // Written on the version read, so the version the job records (result_version) is the one
-        // its answer holds: a concurrent writer makes this read again instead of being overwritten
-        // under a version number that then names two different values.
-        const writer = jobWriter(job);
-        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
-            const existing = await this.storage.getMemory(job.owner, job.result_key);
-            const written = await writeMemoryRecord({ storage: this.storage, config: this.config }, writer, {
-                key: job.result_key,
-                value,
-                visibility: job.result_visibility,
-                tags: ['ai', 'ai-job-result'],
-                ttlHours: null,
-                expectedVersion: existing?.version ?? 0,
-                authorisingScope: 'ai:use',
-                gatePublic: true,
-                // As before the answer came through here: it starts no workflow trigger, Tracked
-                // Response, connector push, ecosystem push or automation recipe. A chain of work
-                // after a job is what on_done is for.
-                noTriggers: true,
-                pipeline: `ai-job:${job.id}`,
-                // TARGET-058: the completion already minted an observed record — the node watched the
-                // model produce these exact bytes — so it is CARRIED here rather than re-derived. Nobody
-                // read the substance on this path, so `humanInvolvement: 'none'` stands untouched.
-                ...(provenanceId ? { declaredProvenanceId: provenanceId } : {}),
-            });
-            if (written.ok) {
-                return {
-                    value, version: written.record.version, visibility: written.record.visibility,
-                    // The record's own publish request, which a picture's request joins as a part.
-                    ...(written.publishRequest ? { requestId: written.publishRequest.request_id } : {}),
-                };
-            }
-            if (written.code === 'VERSION_CONFLICT') continue;
-            throw new AiJobError(written.code, written.status, written.message);
-        }
-        throw new Error(`The record at "${job.result_key}" changed under every one of ${CAS_ATTEMPTS} attempts to write the answer.`);
     }
 
     /**
@@ -707,9 +651,26 @@ export class AiJobService implements AiJobStarter {
     // ── restart ───────────────────────────────────────────────────────────────
 
     /**
-     * Job records outlive the process. Anything left `running` has no worker any more and would sit
-     * "running" for ever in every view, so it is failed with a named reason; anything left `queued`
-     * never started and goes back into the pool.
+     * The node is stopping (a deploy or a restart, flushProcessBuffers at SIGTERM): start no more
+     * work, and mark each running job whose answer is not written, so the next start queues it again
+     * once (restart.ts). Nothing is aborted: a job that finishes before the process ends is done.
+     */
+    async markStoppingJobs(): Promise<number> {
+        this.stopping = true;
+        let marked = 0;
+        for (const entry of this.live.values()) {
+            const job = markStopped(entry.job);
+            if (!job) continue;
+            entry.job = job;
+            await writeJob(this.storage, job).then(() => { marked++; }, err => logger.warn(`[ai-jobs] could not mark ${job.id} as stopped`, { error: String(err) }));
+        }
+        return marked;
+    }
+
+    /**
+     * Job records outlive the process. A job left `running` has no worker any more: one the stopping
+     * process marked goes back into the queue once, any other is failed with a named reason
+     * (restart.ts). A job left `queued` never started and goes back into the pool.
      *
      * The same shape as WorkflowEngine.resumeInflight(), and for the same reason: a state that only
      * a live process can advance has to be reconciled by the process that replaces it.
@@ -719,22 +680,23 @@ export class AiJobService implements AiJobStarter {
         let failed = 0, requeued = 0;
 
         for (const ref of refs) {
-            const job = await readJob(this.storage, ref.ownerGhii, ref.jobId);
+            let job = await readJob(this.storage, ref.ownerGhii, ref.jobId);
             if (!job) { await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId); continue; }
 
             if (job.state === 'running') {
-                // With result_version the answer was written and only the on_done action was cut
-                // off: the answer stays readable (ctx.ai.result), so the message must not say lost.
-                const message = job.result_version !== undefined
-                    ? 'The node restarted while this job\'s on_done action was running. The answer was written and can be read; the action did not finish.'
-                    : 'The node restarted while this job was running, so its answer was lost. Start it again.';
-                await foldIntoLog(this.storage, {
-                    ...job, state: 'failed', finished_at: new Date().toISOString(),
-                    error: { code: 'node_restarted', message },
-                });
-                await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId);
-                failed++;
-                continue;
+                const decision = restartDecision(job);
+                if (decision.action === 'requeue') {
+                    job = decision.job;
+                    await writeJob(this.storage, job);
+                } else {
+                    await foldIntoLog(this.storage, {
+                        ...job, state: 'failed', finished_at: new Date().toISOString(),
+                        error: { code: 'node_restarted', message: decision.message },
+                    });
+                    await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId);
+                    failed++;
+                    continue;
+                }
             }
 
             if (job.state === 'queued') {

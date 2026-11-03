@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-04 — createEmailService gets storage, so mail retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — The schedule kinds handed to the Scheduler moved to ./schedule-kinds.ts, which adds dataproduct (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-29 — The peer registry is made with peerRegistry(config.nodeId), so gatePeer refuses this node's own id at every door (secaudit2026oct26 round 8c).
  *   2026-10-27 — A stored peer with this node's own id is not loaded into the peer registry, with a log line (secaudit2026oct26).
@@ -217,7 +218,8 @@ export async function initializeServices(
   }
 
   // Internal Scheduler System — centralized cron-based job scheduler
-  const emailService = createEmailService(config);
+  // With storage, a mail whose first attempt failed keeps its retries in the stored outbox (services/outbox.ts).
+  const emailService = createEmailService(config, storage);
   setActiveEmailService(emailService);
   const scheduler = new Scheduler(config, storage, emailService);
   setActiveScheduler(scheduler);

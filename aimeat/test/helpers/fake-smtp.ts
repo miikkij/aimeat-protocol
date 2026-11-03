@@ -12,7 +12,7 @@
  *   at it, and reads the message back is testing the node's own transport and templates rather than
  *   a stub of them.
  *
- *   IT ANSWERS EVERY COMMAND, ALWAYS. `withRetry` in email.ts retries four times with 1/3/9 second
+ *   IT ANSWERS EVERY COMMAND, ALWAYS. The mail sender (src/services/email-outbox.ts) tries four times with 1/3/9 second
  *   delays, so a command this server leaves unanswered costs the calling suite thirteen seconds per
  *   message rather than failing outright. The default branch is 250 for that reason.
  *
@@ -38,6 +38,7 @@
  *   const mail = await smtp.waitForMail('alice@aimeat.test', /\b\d{6}\b/);
  *   await smtp.close();
  * @version-history
+ *   2026-11-04 -- The comment names the retry's new home (email-outbox.ts).
  *   v1.0.0 -- 2026-09-08 -- Lifted from the inline sink in test/e2e-magic-link-refusal.ts (which
  *     keeps its own copy) and grown a MIME parser, dot-unstuffing and an optional AUTH round.
  */

@@ -18,6 +18,10 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-04 — flushProcessBuffers releases this process's claims in the stored outbox (services/outbox.ts;
+ *     codebase analysis 2026-11-03, item HA 1.5).
+ *   2026-11-04 — flushProcessBuffers marks the running AI jobs first, so the next start queues them again
+ *     (codebase analysis 2026-11-03, item HA 1.4).
  *   2026-11-01 — startBuildWithYou: the usage listener that opens the build offer, and the status sweep.
  *   2026-10-31 — The refusal listener passes the refused call on (secaudit2026oct31w2 round 10).
  *   2026-10-25 — The usage and tally buffers take their flush intervals from the config, and the usage
@@ -55,6 +59,7 @@ import { initAgentRefusals } from '../services/agent-refusals.js';
 import { sendPermissionAsk } from '../services/permission-ask-notice.js';
 import { initScopeUse } from '../services/scope-use.js';
 import { startBuildWithYou } from '../services/build-with-you.js';
+import { logger } from '../utils/logger.js';
 
 export interface ProcessBuffers {
   webhookDispatcher: ReturnType<typeof createWebhookDispatcher>;
@@ -128,6 +133,16 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
  * process stopped (feature-list audit #30).
  */
 export async function flushProcessBuffers(): Promise<void> {
+  // First, so no AI job starts a model call while the buffers flush: the running jobs are marked as
+  // stopped by the node, and the next start queues each one again once (services/ai-jobs/restart.ts).
+  const { getActiveAiJobService } = await import('../services/ai-jobs/service.js');
+  await getActiveAiJobService()?.markStoppingJobs()
+    .catch(err => logger.warn('process-buffers: marking the running AI jobs failed', { error: String(err) }));
+  // The webhook and mail retries this process holds in the stored outbox: no further attempt here,
+  // and the claims freed so the next start resumes them when due (services/outbox.ts).
+  const { releaseOutbox } = await import('../services/outbox.js');
+  await releaseOutbox()
+    .catch(err => logger.warn('process-buffers: releasing the outbox failed', { error: String(err) }));
   const { shutdownTelemetryBuffer } = await import('../services/telemetry-buffer.js');
   await shutdownTelemetryBuffer();
   const { shutdownUsageBuffer } = await import('../services/usage/usage-buffer.js');
