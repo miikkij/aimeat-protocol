@@ -11,8 +11,14 @@
  *   webhook this is, and completion then reads the payment back from Stripe (the handler's collect),
  *   so the delivery is a reason to look, never the proof. A checkout that is already complete is the
  *   normal case when the person did come back, and is answered as such.
+ *
+ *   A card page the node opened for an outside buyer's purchase of a data package names that purchase
+ *   (`pp_…`) instead of a checkout; it is completed by the same rule through
+ *   services/exchange-party-buy.ts completePartyPurchaseFromStripe.
  * @structure completeFromStripeCheckout
  * @version-history
+ *   v1.2.0 — 2026-11-03 — A party purchase's card page completes that purchase (secaudit2026nov02d
+ *     round 13b, party-buy: the webhook did not complete a party purchase whose buyer never came back).
  *   v1.1.0 — 2026-10-27 — Completes only from a card page the node opened for the checkout
  *     (session.cardPages), when the checkout records them (secaudit2026oct26,
  *     commerce/stripe-checkout-complete:seller-paid-session-records-buyer-adult).
@@ -22,6 +28,7 @@ import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
 import { getSession, completeSession } from './session-service.js';
 import { STRIPE_CHECKOUT_HANDLER_ID } from './stripe-checkout.js';
+import { isPartyPurchaseId, completePartyPurchaseFromStripe } from '../services/exchange-party-buy.js';
 import { logger } from '../utils/logger.js';
 
 export async function completeFromStripeCheckout(
@@ -31,6 +38,8 @@ export async function completeFromStripeCheckout(
   const id = String(meta.aimeat_session ?? '');
   const buyer = String(meta.aimeat_buyer ?? '');
   const cs = typeof object.id === 'string' ? object.id : '';
+  // An outside buyer's purchase of a data package: the same completion as the buyer's own return.
+  if (isPartyPurchaseId(id)) return completePartyPurchaseFromStripe({ storage, config }, sellerGhii, id, cs);
   const session = id && buyer ? await getSession(storage, buyer, id, config) : null;
   if (!session || session.sellerGhii !== sellerGhii || !cs) return 'checkout_not_found';
   if (session.status !== 'open') return 'checkout_already_closed';

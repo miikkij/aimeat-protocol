@@ -18,6 +18,10 @@
  *   v1.1.0 — 2026-11-02 — secaudit2026nov02d round 13: an opening without a party key counts against
  *     the address's hourly limit (consent.party_purchases_per_hour, 0 = no limit); a party buying
  *     again with its key is not counted.
+ *   v1.1.1 — 2026-11-03 — secaudit2026nov02d round 13b: the 429 TOO_MANY_OPENINGS says what the limit
+ *     is, that this address reached it, when to try again, that a party key is not counted, and where
+ *     the operator changes it on the Config tab; the setting's name, the limit and the wait are in
+ *     `details`.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -59,10 +63,17 @@ export function exchangePartyBuyRouter(config: AimeatConfig, storage: Storage): 
         if (!renewal && perHour > 0) {
             const counted = takeOpening(ipRateKey(req.ip ?? req.socket.remoteAddress), perHour);
             if (!counted.ok) {
+                // What the limit is, that this address reached it, what to do now, and who sets it where.
+                const minutes = Math.max(1, Math.ceil(counted.retryAfterSec / 60));
+                const wait = minutes === 1 ? '1 minute' : `${minutes} minutes`;
+                const at = new Date(counted.resetAt).toISOString();
                 res.setHeader('Retry-After', counted.retryAfterSec);
                 res.status(429).json(error(config.nodeId, 'TOO_MANY_OPENINGS',
-                    `This server takes ${perHour} purchases an hour from one address without a party key. Try again after ${new Date(counted.resetAt).toISOString()}, `
-                    + 'or buy again with your party key, which is not counted. The server\'s operator sets this number (consent.party_purchases_per_hour).'));
+                    `You started ${perHour} purchases this hour from this address, which is this server's limit. Try again in ${wait}. `
+                    + `A buyer who already has a party key can buy again with it now: those purchases are not counted. `
+                    + `The limit is ${perHour} purchases an hour from one address without a party key, and it keeps one address from holding a seller's purchases without paying. `
+                    + `The server's operator can change it under Admin, Config, Identity and access, Consent: "Purchases one address may start an hour" (consent.party_purchases_per_hour).`,
+                    undefined, { setting: 'consent.party_purchases_per_hour', limit: perHour, retry_after_seconds: counted.retryAfterSec, retry_at: at }));
                 return;
             }
         }
