@@ -1418,6 +1418,19 @@
       },
       "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the owner's own contentclass.settings record."
     },
+    "src/services/content/shared-profile.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-03 (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan), the node's own read: the shared fingerprint records of a workspace (organism.<org>.w.<ws>.meta.fingerprint.*), held by the node's own system@ identity and kept only when that identity owns the row. They are read after the document they describe passed the reader: openWorkspaceDoc asks decideWorkspaceRead and then reader.show on the document's record, and listSharedProfiles keeps only the documents loadWorkspaceContent's reader showed, answering a fingerprint only beside its shown document."
+    },
+    "src/services/content/shared-profile-settings.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-03 (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan), the node's own read: one boolean setting (autoProfile) of a workspace or an organism, held by the node's system@ identity. No content of an item."
+    },
     "src/services/contribution-proofs.ts": {
       "reads": {
         "getMemory": 1
@@ -3172,9 +3185,9 @@
     },
     "src/services/workspace-write.ts": {
       "reads": {
-        "listAllMemory": 2
+        "listAllMemory": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Write and edit paths only, and a delete scan."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Write and edit paths only, and a delete scan. 2026-11-03: the third reads the workspace's shared fingerprint rows after a document's delete, to remove the one whose document is gone; it shows and sends nothing."
     },
     "src/services/write-guards.ts": {
       "reads": {

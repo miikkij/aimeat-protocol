@@ -18,6 +18,9 @@
  * @structure CONTENT_CLASSES_SKILL_ENTRY
  * @usage import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
  * @version-history
+ *   v1.3.0 — 2026-11-03 — "A workspace document has one fingerprint, shared": who sees and makes it,
+ *     stale, the listing by prefix, the setting on publication, and a person's correction
+ *     (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan).
  *   v1.2.0 — 2026-11-02 — "The fingerprint": the profile step, the tag aimeat_content_facts answers
  *     and how to say it to the person (wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse).
  *   v1.1.1 — 2026-10-29 — A PDF's facts may carry textNotRead (the node's PDF read limit;
@@ -153,6 +156,27 @@ marks the sections and the fingerprint model writes only the headings, claims an
 does all of it. The fingerprint model is DeepSeek V4 Pro unless the operator chose another;
 \`models.profile\` in the settings picks the person's own. A profile is the model's reading and can be wrong; it says which model made it. The marks
 judge what the text shows, not whether its claims are true.
+
+### A workspace document has one fingerprint, shared
+
+A published workspace document's key (\`organism.<org>.w.<ws>.<namespace>.<id>.latest\`) has ONE
+fingerprint, the same for everyone who may read the document; nobody else sees it. The facts answer
+then carries \`shared\`: \`made_by\` (who asked for it and paid), \`corrected_by\`, and \`stale\` (a
+newer version was published since, so it describes older words; say so). Making it
+(\`aimeat_content_inspect { kind: "memory", key, stages: ["profile"] }\`) spends the asker's own AI
+key: anyone who may read the document makes a missing or stale one; a current one is answered as it
+is, and making it again with \`force\` needs the right to edit the document. To see a whole
+workspace at once, \`aimeat_content_facts { prefix: "organism.<org>.w.<ws>.", has_profile: true }\`
+lists its documents with their fingerprints (without sections), up to 1000 a call; \`has_profile:
+false\` lists the ones that have none yet. Whether documents get theirs when they are published is
+the workspace's setting, off by default: \`aimeat_content_settings { organism_id, ws }\` reads it,
+and its creator or an organism admin changes it with \`patch: { autoProfile: true }\`; even then it
+is made only on a publisher whose own settings run the profile step, on their key.
+
+A person may correct a section: \`aimeat_content_correct { kind, key, profile: { sections: [{ n: 3,
+mark: "+" }] } }\` (\`genre\` for its kind of text). The fingerprint then names who corrected it, and
+a later run on the same words keeps the correction. On a workspace document that changes what every
+reader sees, so it takes the right to edit the document.
 
 ## When something is wrong: correct it
 

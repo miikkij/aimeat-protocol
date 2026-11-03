@@ -31,6 +31,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.0.1 — 2026-11-02 — A removed file's profile sections file goes with its facts.
+ *   v1.1.0 — 2026-11-03 — A published workspace document gets its shared fingerprint on arrival when
+ *     its workspace or organism turned that on and the publisher's own settings run the profile step.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -43,6 +45,9 @@ import { setStorageFileHooks } from '../storage-file-write.js';
 import { inspectSource, memoryValueText } from './pipeline.js';
 import { readSettings } from './settings.js';
 import { getFacts, deleteFacts, deleteText, deleteProfileDetail, sourceIdOf } from './facts-store.js';
+import { makeSharedProfile } from './shared-profile.js';
+import { autoProfileOn } from './shared-profile-settings.js';
+import { workspaceDocOfKey } from './shared-profile-key.js';
 import type { ContentSource } from './types.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -98,8 +103,24 @@ async function inspectOne(item: Pending): Promise<void> {
     const name = localAccountName(ownerGhii);
     const caller = callerFromAuth({ sub: name, owner: name, roles: ['owner'], scopes: [] }, deps.config.nodeId, deps.storage);
     await inspectSource(deps, caller, source, { automatic: true });
+    if (isWs && settings.stages.profile) await sharedProfileOnPublish(deps, caller, source.key);
   } catch (e) {
     logger.warn('contentclass: inspecting an arrived item failed; the write stands', { kind: source.kind, key: source.key, error: String((e as Error)?.message ?? e) });
+  }
+}
+
+/**
+ * A published workspace document gets its shared fingerprint when the workspace (or its organism)
+ * turned that on AND the publisher's own settings run the profile step: the publisher's key pays,
+ * with their own consent (shared-profile-settings.ts). A current fingerprint is left as it is.
+ */
+async function sharedProfileOnPublish(deps: Deps, caller: ReturnType<typeof callerFromAuth>, key: string): Promise<void> {
+  const at = workspaceDocOfKey(key);
+  if (!at || !(await autoProfileOn(deps.storage, deps.config.nodeId, at.organismId, at.ws))) return;
+  try {
+    await makeSharedProfile(deps, caller, key, { automatic: true });
+  } catch (e) {
+    logger.warn('contentclass: the shared fingerprint of a published document was not made; the write stands', { key, error: String((e as Error)?.message ?? e) });
   }
 }
 

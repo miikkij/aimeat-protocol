@@ -10,6 +10,9 @@
  * @structure contentRouter(config, storage)
  * @usage app.use(contentRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-11-03 — A published workspace document's fingerprint is its one shared fingerprint;
+ *     GET /v1/content/facts takes prefix and has_profile; POST /v1/content/correct takes profile;
+ *     GET and PUT /v1/content/settings take organism_id and ws for the fingerprint on publication.
  *   v1.2.0 — 2026-11-02 — GET /v1/content/facts for one item answers the fingerprint tag when the item
  *     has a profile, and its sections with with_profile=true.
  *   v1.1.0 — 2026-10-21 — POST /v1/content/correct: a person or their AI corrects an item's classes and
@@ -110,12 +113,15 @@ export function contentRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, { scan: scanStatusFor(deps, callerOf(req, config.nodeId, storage), req.params.id as string) }));
   }));
 
-  // ── GET / PUT /v1/content/settings ── the owner's choices; PUT takes a partial patch.
+  // ── GET / PUT /v1/content/settings ── the owner's choices; PUT takes a partial patch. With
+  //    ?organism_id= (and &ws=) the shared fingerprint settings of that organism or workspace.
+  const targetOf = (req: Request) => (typeof req.query.organism_id === 'string'
+    ? { organismId: req.query.organism_id, ws: typeof req.query.ws === 'string' ? req.query.ws : undefined } : null);
   router.get('/v1/content/settings', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
-    res.json(success(config.nodeId, { settings: await settingsFor(deps, callerOf(req, config.nodeId, storage)) }));
+    res.json(success(config.nodeId, { settings: await settingsFor(deps, callerOf(req, config.nodeId, storage), targetOf(req)) }));
   }));
   router.put('/v1/content/settings', requireAuth(), requireScope('storage:read'), run(async (req, res) => {
-    res.json(success(config.nodeId, { settings: await updateSettingsFor(deps, callerOf(req, config.nodeId, storage), req.body ?? {}) }));
+    res.json(success(config.nodeId, { settings: await updateSettingsFor(deps, callerOf(req, config.nodeId, storage), req.body ?? {}, targetOf(req)) }));
   }));
 
   // ── GET /v1/content/classes ── the built-in and the owner's content classes.

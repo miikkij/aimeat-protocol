@@ -34,11 +34,14 @@
  *   topics (PROFILE_TEXT_INSTRUCTION). Otherwise, or when the decision service refuses, the text
  *   model does all of it (PROFILE_INSTRUCTION). The profile says which (`labels`).
  * @structure PROFILE_PROMPT · PROFILE_TEXT_PROMPT · PROFILE_INSTRUCTION · PROFILE_TEXT_INSTRUCTION ·
- *   segmentText() · profileItem() · readTextAnswer() · fingerprintTag()
+ *   segmentText() · profileItem() · readTextAnswer() · withSections() · correctSections() · keepCorrections() · fingerprintTag()
  * @usage
  *   const { profile, sections } = await profileItem(ctx, item, 'Report.pdf');
  *   const tag = fingerprintTag(profile);
  * @version-history
+ *   v1.2.0 — 2026-11-03 — withSections() and correctSections(): a person corrects a section's kind of
+ *     text or mark, the compact profile is built again from the sections, and the tag names who
+ *     corrected it.
  *   v1.0.0 — 2026-11-02 — Initial: instruction version 4 of the measurement.
  *   v1.1.0 — 2026-11-02 — The decision model labels when the node lets it (profile-labels.ts), the
  *     text model writes; the owner's or the node's fingerprint model; 24 000 output tokens.
@@ -326,6 +329,69 @@ export async function profileItem(
 }
 
 /**
+ * The compact profile built again from its sections: the per-section tuples, the topics' shares,
+ * kinds and marks, and the item's leaning. The topic names stay; a topic no section has any more
+ * goes, as profileItem drops it.
+ */
+export function withSections(p: ContentProfile, sections: ProfileSection[]): { profile: ContentProfile; sections: ProfileSection[] } {
+  const secs = sections.map((s) => ({ ...s, axes: { ...s.axes } }));
+  const topics = buildTopics(p.topics.map((t) => t.name), secs);
+  return {
+    profile: { ...p, topics, sections: secs.map((s) => [s.genre, s.words, s.certainty, s.mark, s.topic]), axes: meanAxes(secs) },
+    sections: secs,
+  };
+}
+
+const correctionRefused = (message: string) => Object.assign(new Error(message), { code: 'INVALID_INPUT', status: 400 });
+
+/**
+ * A person's correction of sections: `asked` is a list of `{ n, genre?, mark? }`. The profile
+ * records who corrected which sections, added to any earlier correction, and is built again.
+ * Throws INVALID_INPUT naming the first entry it cannot take.
+ */
+export function correctSections(
+  p: ContentProfile, sections: ProfileSection[], asked: unknown, by: string, at = new Date().toISOString(),
+): { profile: ContentProfile; sections: ProfileSection[] } {
+  if (!Array.isArray(asked) || !asked.length || asked.length > sections.length) {
+    throw correctionRefused(`profile.sections is a list of 1 to ${sections.length} corrections, each { n, genre?, mark? }.`);
+  }
+  const next = sections.map((s) => ({ ...s }));
+  const touched = new Set(p.corrected?.sections ?? []);
+  for (const [i, raw] of asked.entries()) {
+    const c = (raw && typeof raw === 'object' ? raw : {}) as { n?: unknown; genre?: unknown; mark?: unknown };
+    const s = next.find((x) => x.n === c.n);
+    if (!s) throw correctionRefused(`profile.sections[${i}].n names no section; the sections are 1 to ${sections.length}.`);
+    if (c.genre === undefined && c.mark === undefined) throw correctionRefused(`profile.sections[${i}] changes nothing: give genre, mark or both.`);
+    if (c.genre !== undefined && !(GENRES as readonly unknown[]).includes(c.genre)) throw correctionRefused(`profile.sections[${i}].genre is one of ${GENRES.join(', ')}.`);
+    if (c.mark !== undefined && !(MARKS as readonly unknown[]).includes(c.mark)) throw correctionRefused(`profile.sections[${i}].mark is one of ${MARKS.join(' ')}.`);
+    if (c.genre !== undefined) s.genre = c.genre as ProfileGenre;
+    if (c.mark !== undefined) s.mark = c.mark as ProfileMark;
+    touched.add(s.n);
+  }
+  const rebuilt = withSections(p, next);
+  return { profile: { ...rebuilt.profile, corrected: { by, at, sections: [...touched].sort((a, b) => a - b) } }, sections: rebuilt.sections };
+}
+
+/**
+ * A new run of the model on the same words keeps what a person corrected: the corrected sections
+ * take the person's kind of text and mark again. Sections are cut from the words alone
+ * (segmentText), so the same words give the same sections.
+ */
+export function keepCorrections(
+  prev: { profile: ContentProfile; sections: ProfileSection[] },
+  next: { profile: ContentProfile; sections: ProfileSection[] },
+): { profile: ContentProfile; sections: ProfileSection[] } {
+  const c = prev.profile.corrected;
+  if (!c || !c.sections.length || prev.sections.length !== next.sections.length) return next;
+  const secs = next.sections.map((s) => {
+    const was = c.sections.includes(s.n) ? prev.sections.find((x) => x.n === s.n) : undefined;
+    return was ? { ...s, genre: was.genre, mark: was.mark } : s;
+  });
+  const rebuilt = withSections(next.profile, secs);
+  return { profile: { ...rebuilt.profile, corrected: c }, sections: rebuilt.sections };
+}
+
+/**
  * The text model's headings, claims and topics laid over the decision model's labels. A section
  * the text model left out keeps its given heading and an empty claim; it still has its labels.
  */
@@ -396,7 +462,8 @@ export function fingerprintTag(p: ContentProfile): {
     `Topics: ${topicLine}`,
     `Trust: ${markLine}  (${MARKS.filter((m) => marks[m]).map((m) => `${m} ${MARK_NAME[m]}`).join(', ')})`,
     `Leaning: ${leaning.join(' · ')}`,
-    `${p.labels === 'decide' && p.labelModel ? `Marked by ${p.labelModel}, written by ${p.model}` : `Profiled by ${p.model}`} on ${p.at.slice(0, 10)}${p.truncatedAt ? `, from the first ${p.truncatedAt} characters` : ''}`,
+    `${p.labels === 'decide' && p.labelModel ? `Marked by ${p.labelModel}, written by ${p.model}` : `Profiled by ${p.model}`} on ${p.at.slice(0, 10)}${p.truncatedAt ? `, from the first ${p.truncatedAt} characters` : ''}`
+      + (p.corrected ? `; ${p.corrected.sections.length} ${p.corrected.sections.length === 1 ? 'section' : 'sections'} corrected by ${p.corrected.by} on ${p.corrected.at.slice(0, 10)}` : ''),
   ];
   return { squares, lines, text: [squares, ...lines].join('\n'), genres, marks, leaning };
 }

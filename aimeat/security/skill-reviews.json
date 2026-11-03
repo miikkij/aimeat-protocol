@@ -32,15 +32,17 @@
       "digest": "sha256:9adfb54260e4452e2417f5e2"
     },
     "node:aimeat-content-classes": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/services/content/pipeline.ts",
         "aimeat/src/services/content/ai-stages.ts",
         "aimeat/src/services/content/service.ts",
         "aimeat/src/services/content/settings.ts",
-        "aimeat/src/data/content-classes.ts"
+        "aimeat/src/data/content-classes.ts",
+        "aimeat/src/services/content/shared-profile.ts",
+        "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:8a57e1c6dad0e4dbe222474e"
+      "digest": "sha256:a1a807a155d389d91da0a754"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-01",
@@ -815,11 +817,13 @@
       "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
     },
     "node:aimeat-content-classes": {
-      "aimeat/src/services/content/pipeline.ts": "d6f2c35f3256748a",
+      "aimeat/src/services/content/pipeline.ts": "be69920564ede3d9",
       "aimeat/src/services/content/ai-stages.ts": "67fafd3ace404451",
-      "aimeat/src/services/content/service.ts": "4fb445f866d5be6d",
+      "aimeat/src/services/content/service.ts": "bb1d56c827f5ca46",
       "aimeat/src/services/content/settings.ts": "75ca4524dd531ba0",
-      "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949"
+      "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949",
+      "aimeat/src/services/content/shared-profile.ts": "85aadbe640835bee",
+      "aimeat/src/services/content/shared-profile-settings.ts": "c9a4420ccadd1aed"
     },
     "node:aimeat-gen-rules": {
       "aimeat/src/services/ai/gen-rules.ts": "8cf30c2a05b14cbc",

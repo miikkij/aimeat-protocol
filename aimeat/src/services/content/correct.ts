@@ -16,11 +16,16 @@
  *     They are merged onto the extracted values, the entity is built again with the class's
  *     properties (classes.ts entityFor), and the entity records which properties a person set
  *     (`corrected`). Extracting the class again keeps those values (pipeline.ts).
+ *   - THE FINGERPRINT. `profile.sections` lists `{ n, genre?, mark? }`: the kind of text and the
+ *     mark of a section as the person says they are. A workspace document's shared fingerprint is
+ *     corrected in shared-profile.ts, which asks for the right to edit the document.
  *   - `extract: true` extracts the classes that have no entity yet (a class the person just added),
  *     which calls a model and so needs ai:use (service.ts asks it).
  * @structure CorrectInput · correctFacts
  * @usage const { facts, review } = await correctFacts(deps, caller, source, { classes: ['invoice'] });
  * @version-history
+ *   v1.1.0 — 2026-11-03 — `profile`: a person corrects a section's kind of text or mark in the
+ *     fingerprint; the profile names who corrected which sections (profile.ts correctSections).
  *   v1.0.1 — 2026-10-31 — The model's decision is reviewed after the fields are checked and the facts
  *     are stored, not as soon as the classes are: a call whose fields were refused left the decision
  *     record saying a person had overridden the classes (secaudit 2026-10-31 inv-16).
@@ -32,16 +37,19 @@ import type { CallerContext } from '../caller-context.js';
 import { reviewDecision } from '../decide/service.js';
 import { emitChange } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { getFacts, putFacts, sourceIdOf } from './facts-store.js';
+import { getFacts, putFacts, getProfileDetail, putProfileDetail, sourceIdOf } from './facts-store.js';
 import { listClasses, entityFor } from './classes.js';
 import { ContentError } from './pipeline.js';
 import { fieldsOf } from './correct-fields.js';
-import type { ContentFacts, ContentSource, ContentClass, ClassMembership } from './types.js';
+import { correctSections } from './profile.js';
+import type { ContentFacts, ContentSource, ContentClass, ClassMembership, ProfileSection } from './types.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type FieldValue = string | number | boolean | null;
 
 export interface CorrectInput {
+  /** The fingerprint: `{ sections: [{ n, genre?, mark? }] }`, each section by its number. */
+  profile?: unknown;
   classes?: string[];
   fields?: Record<string, Record<string, FieldValue>>;
 }
@@ -88,7 +96,7 @@ async function reviewModelDecision(
 export async function correctFacts(
   deps: Deps, caller: CallerContext, source: ContentSource, input: CorrectInput,
 ): Promise<{ facts: ContentFacts; review: unknown }> {
-  if (input.classes === undefined && input.fields === undefined) throw bad('Send classes, fields, or both.');
+  if (input.classes === undefined && input.fields === undefined && input.profile === undefined) throw bad('Send classes, fields, profile, or any of them.');
   const sourceId = sourceIdOf(source);
   const found = await getFacts(deps.storage, caller.ownerGhii, sourceId);
   if (!found) throw new ContentError('NOT_FOUND', 404, `Nothing has been read from ${source.kind} "${source.key}" yet. Inspect it first.`);
@@ -136,8 +144,27 @@ export async function correctFacts(
     }
   }
 
+  // The fingerprint: a section's kind of text or mark as the person says it is (profile.ts).
+  let profileSections: ProfileSection[] | null = null;
+  if (input.profile !== undefined) {
+    const p = facts.profile;
+    const stored = p?.detailKey ? await getProfileDetail(deps.storage, caller.ownerGhii, p.detailKey) : null;
+    if (!p || !stored) throw new ContentError('NOT_FOUND', 404, `${source.kind} "${source.key}" has no fingerprint to correct yet.`);
+    const asked = (input.profile && typeof input.profile === 'object' ? input.profile : {}) as { sections?: unknown };
+    try {
+      const c = correctSections(p, stored, asked.sections, caller.principal, now);
+      facts.profile = { ...c.profile, detailKey: p.detailKey };
+      profileSections = c.sections;
+    } catch (err) {
+      const e = err as { code?: string; message?: string };
+      if (e.code === 'INVALID_INPUT') throw bad(String(e.message));
+      throw err;
+    }
+  }
+
   facts.updatedAt = now;
   const writer = { principal: caller.ownerGhii, ownerGhii: caller.ownerGhii, scopes: [] as string[], roles: ['owner'] };
+  if (profileSections) await putProfileDetail(deps, writer, sourceId, profileSections);
   await putFacts(deps, writer, facts);
   const review = classesBefore ? await reviewModelDecision(deps, caller, classesBefore, facts.classes ?? []) : null;
   emitChange('contentclass', caller.ownerGhii);

@@ -18,6 +18,10 @@
  *   ontologyFor · overviewFor · listFactsFor · RESERVED_WORD
  * @usage const out = await inspectFor(deps, caller, { source: { kind: 'file', key: 'a.pdf' } });
  * @version-history
+ *   v1.3.0 — 2026-11-03 — A published workspace document's fingerprint is its one shared fingerprint
+ *     (shared-profile.ts) in factsViewFor, inspectFor and correctFor (`profile`); listFactsFor takes
+ *     `prefix` and `has_profile` and answers compact items; the settings calls take a workspace or an
+ *     organism for its fingerprint on publication (shared-profile-settings.ts).
  *   v1.2.0 — 2026-11-02 — factsViewFor: one item's facts with its fingerprint tag, and on request
  *     the profile's sections; the stage list is types.ts STAGE_NAMES.
  *   v1.1.0 — 2026-10-21 — correctFor: a person or their AI corrects an item's classes and extracted
@@ -31,15 +35,20 @@ import { ownerGhiiOf } from '../../utils/gaii.js';
 import { inspectSource, stagesToRun, ContentError, type InspectResult } from './pipeline.js';
 import { startScan, getScan, runningScanOf, type ScanOptions, type ScanState } from './scan.js';
 import { correctFacts } from './correct.js';
-import { getFacts, getText, getProfileDetail, listFacts, coverage, sourceIdOf, type FactsFilter } from './facts-store.js';
+import { getFacts, getText, getProfileDetail, listFacts, coverage, sourceIdOf, isStale, type FactsFilter } from './facts-store.js';
 import { readSettings, writeSettings } from './settings.js';
 import { fingerprintTag } from './profile.js';
+import {
+  isWorkspaceDocKey, sharedViewFor, makeSharedProfile, correctSharedProfile, listSharedProfiles,
+  type SharedMeta, type SharedListItem,
+} from './shared-profile.js';
+import { sharedSettingsFor, updateSharedSettingsFor, type SharedProfileSettings } from './shared-profile-settings.js';
 import {
   listClasses, setOwnerClass, removeOwnerClass, listProposals, decideProposal, owlOntology, ContentClassError,
 } from './classes.js';
 import {
   AI_STAGES, STAGE_NAMES, type ContentFacts, type ContentSource, type ContentSettings, type ContentClass, type ClassProposal,
-  type StageName, type ContentKind, type ProfileSection,
+  type StageName, type ContentKind, type ProfileSection, type ContentProfile,
 } from './types.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -86,6 +95,18 @@ export function parseSource(caller: CallerContext, input: unknown): ContentSourc
 
 function readWord(source: ContentSource): string { return source.kind === 'file' ? 'storage:read' : 'memory:read'; }
 
+/**
+ * A published workspace document named as a source, checked: its fingerprint is the shared one
+ * (shared-profile.ts), read with the document's own read rule. Null for any other source.
+ */
+function workspaceSourceOf(deps: Deps, caller: CallerContext, sourceInput: unknown, why: string): ContentSource | null {
+  assertOn(deps); assertLocal(caller);
+  const source = parseSource(caller, sourceInput);
+  if (source.kind !== 'memory' || !isWorkspaceDocKey(source.key)) return null;
+  requireWord(caller, readWord(source), why);
+  return source;
+}
+
 /** The stages a request asks for, checked. Absent: undefined (the owner's settings). */
 function parseStages(v: unknown): StageName[] | undefined {
   if (v === undefined || v === null) return undefined;
@@ -112,7 +133,9 @@ export async function factsFor(deps: Deps, caller: CallerContext, sourceInput: u
  */
 export async function factsViewFor(
   deps: Deps, caller: CallerContext, sourceInput: unknown, opts: { withProfile?: boolean } = {},
-): Promise<{ facts: ContentFacts; fingerprint?: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null }> {
+): Promise<{ facts: ContentFacts; fingerprint?: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null; shared?: SharedMeta }> {
+  const ws = workspaceSourceOf(deps, caller, sourceInput, 'Reading what is known about an item');
+  if (ws) return sharedViewFor(deps, caller, ws.key, opts.withProfile === true);
   const facts = await factsFor(deps, caller, sourceInput);
   if (!facts.profile) return { facts };
   const out: { facts: ContentFacts; fingerprint: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null } = {
@@ -133,14 +156,36 @@ export async function textFor(deps: Deps, caller: CallerContext, sourceInput: un
 }
 
 /** Inspect one item now, as the caller. A stage that calls a model needs ai:use. */
-export async function inspectFor(deps: Deps, caller: CallerContext, input: { source?: unknown; stages?: unknown; force?: unknown }, appRef?: string): Promise<InspectResult> {
+export async function inspectFor(
+  deps: Deps, caller: CallerContext, input: { source?: unknown; stages?: unknown; force?: unknown }, appRef?: string,
+): Promise<InspectResult & { shared?: SharedMeta }> {
   assertOn(deps); assertLocal(caller);
   const source = parseSource(caller, input.source);
   requireWord(caller, readWord(source), 'Inspecting an item');
   const stages = parseStages(input.stages);
   const effective = stagesToRun(await readSettings(deps.storage, caller.ownerGhii), stages, false);
   if (effective.some((s) => (AI_STAGES as readonly string[]).includes(s))) requireWord(caller, 'ai:use', 'A stage that calls an AI model');
-  return inspectSource(deps, caller, source, { ...(stages ? { stages } : {}), force: input.force === true, ...(appRef ? { appRef } : {}) });
+  const force = input.force === true;
+  if (!(source.kind === 'memory' && isWorkspaceDocKey(source.key) && effective.includes('profile'))) {
+    return inspectSource(deps, caller, source, { ...(stages ? { stages } : {}), force, ...(appRef ? { appRef } : {}) });
+  }
+  // A workspace document: the profile step makes its one shared fingerprint, and any other step
+  // reads the caller's own copy as before, when they have one.
+  const shared = await makeSharedProfile(deps, caller, source.key, { force, ...(appRef ? { appRef } : {}) });
+  const rest = effective.filter((s) => s !== 'profile');
+  if (!rest.length) return shared;
+  let own: InspectResult;
+  try {
+    own = await inspectSource(deps, caller, source, { stages: rest, force, ...(appRef ? { appRef } : {}) });
+  } catch (err) {
+    if (err instanceof ContentError && err.code === 'NOT_FOUND') return shared;
+    throw err;
+  }
+  return {
+    facts: { ...own.facts, ...(shared.facts.profile ? { profile: shared.facts.profile } : {}) },
+    ran: [...own.ran, ...shared.ran], skipped: { ...own.skipped, ...shared.skipped }, proposals: own.proposals,
+    ...(shared.shared ? { shared: shared.shared } : {}),
+  };
 }
 
 /**
@@ -149,20 +194,33 @@ export async function inspectFor(deps: Deps, caller: CallerContext, input: { sou
  * extracts the classes again (a model step, ai:use), keeping the corrected values.
  */
 export async function correctFor(
-  deps: Deps, caller: CallerContext, input: { source?: unknown; classes?: unknown; fields?: unknown; extract?: unknown }, appRef?: string,
-): Promise<{ facts: ContentFacts; review: unknown }> {
+  deps: Deps, caller: CallerContext,
+  input: { source?: unknown; classes?: unknown; fields?: unknown; extract?: unknown; profile?: unknown }, appRef?: string,
+): Promise<{ facts: ContentFacts; review: unknown; fingerprint?: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null; shared?: SharedMeta }> {
   assertOn(deps); assertLocal(caller);
   const source = parseSource(caller, input.source);
   requireWord(caller, readWord(source), 'Correcting what is known about an item');
   requireWord(caller, 'memory:write', 'Correcting what is known about an item');
   if (input.extract === true) requireWord(caller, 'ai:use', 'Extracting the fields again');
-  const out = await correctFacts(deps, caller, source, {
+  const asked = {
     ...(input.classes !== undefined ? { classes: input.classes as string[] } : {}),
     ...(input.fields !== undefined ? { fields: input.fields as Record<string, Record<string, string | number | boolean | null>> } : {}),
-  });
-  if (input.extract !== true) return out;
-  const again = await inspectSource(deps, caller, source, { stages: ['extract'], force: true, ...(appRef ? { appRef } : {}) });
-  return { facts: again.facts, review: out.review };
+  };
+  // A workspace document's fingerprint is the shared one; the rest of the call corrects the
+  // caller's own facts, as it always has.
+  const wsProfile = input.profile !== undefined && source.kind === 'memory' && isWorkspaceDocKey(source.key);
+  let shared: Awaited<ReturnType<typeof correctSharedProfile>> | null = null;
+  if (wsProfile) {
+    const p = (input.profile && typeof input.profile === 'object' ? input.profile : {}) as { sections?: unknown };
+    shared = await correctSharedProfile(deps, caller, source.key, p.sections);
+    if (input.classes === undefined && input.fields === undefined && input.extract !== true) return { ...shared, review: null };
+  }
+  const out = await correctFacts(deps, caller, source, { ...asked, ...(!wsProfile && input.profile !== undefined ? { profile: input.profile } : {}) });
+  const facts = input.extract === true
+    ? (await inspectSource(deps, caller, source, { stages: ['extract'], force: true, ...(appRef ? { appRef } : {}) })).facts
+    : out.facts;
+  if (shared) return { ...shared, facts: { ...facts, ...(shared.facts.profile ? { profile: shared.facts.profile } : {}) }, review: out.review };
+  return { facts, review: out.review, ...(facts.profile ? { fingerprint: fingerprintTag(facts.profile) } : {}) };
 }
 
 /** Start a scan of the caller's account. */
@@ -191,14 +249,23 @@ export function scanStatusFor(deps: Deps, caller: CallerContext, id: string): Sc
   return s;
 }
 
-export async function settingsFor(deps: Deps, caller: CallerContext): Promise<ContentSettings> {
+/** A workspace or an organism named for its shared fingerprint settings; null for the owner's own. */
+type SettingsTarget = { organismId?: unknown; ws?: unknown } | null | undefined;
+
+export async function settingsFor(deps: Deps, caller: CallerContext): Promise<ContentSettings>;
+export async function settingsFor(deps: Deps, caller: CallerContext, target: SettingsTarget): Promise<ContentSettings | SharedProfileSettings>;
+export async function settingsFor(deps: Deps, caller: CallerContext, target?: SettingsTarget): Promise<ContentSettings | SharedProfileSettings> {
   assertOn(deps); assertLocal(caller);
+  if (target?.organismId !== undefined) return sharedSettingsFor(deps, caller, target);
   return readSettings(deps.storage, caller.ownerGhii);
 }
 
-export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown): Promise<ContentSettings> {
+export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown): Promise<ContentSettings>;
+export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target: SettingsTarget): Promise<ContentSettings | SharedProfileSettings>;
+export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target?: SettingsTarget): Promise<ContentSettings | SharedProfileSettings> {
   assertOn(deps); assertLocal(caller);
   requireWord(caller, RESERVED_WORD, 'Changing what runs, and what spends your AI key,');
+  if (target?.organismId !== undefined) return updateSharedSettingsFor(deps, caller, target, patch);
   return writeSettings(deps, writerOf(caller), patch);
 }
 
@@ -252,19 +319,55 @@ export async function overviewFor(deps: Deps, caller: CallerContext): Promise<Re
   return { coverage: cov, settings, pending_proposals: pending.length, scan: runningScanOf(caller.ownerGhii) };
 }
 
-/** A page of facts, newest first, filtered. Facts only of items the caller may read. */
-export async function listFactsFor(deps: Deps, caller: CallerContext, q: Record<string, unknown>): Promise<{ items: ContentFacts[]; total: number; next?: string }> {
+/** One item of a listing by key prefix: the compact fingerprint, without its sections. */
+export interface CompactFactsItem {
+  key: string;
+  kind: ContentKind | null;
+  profile: ContentProfile | null;
+  stale: boolean | null;
+}
+
+const boolOf = (v: unknown): boolean | undefined => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : undefined);
+
+/**
+ * A page of facts, newest first, filtered. Facts only of items the caller may read. With `prefix`
+ * the page is compact (the key, the fingerprint without its sections, and whether it is stale), and
+ * a workspace's prefix (`organism.<org>.w.<ws>.`) lists that workspace's documents with their
+ * shared fingerprints, read with the workspace's read rule (shared-profile.ts).
+ */
+export async function listFactsFor(
+  deps: Deps, caller: CallerContext, q: Record<string, unknown>,
+): Promise<{ items: ContentFacts[]; total: number; next?: string } | { items: Array<CompactFactsItem | SharedListItem>; total: number; next?: string }> {
   assertOn(deps); assertLocal(caller);
+  const prefix = typeof q.prefix === 'string' ? q.prefix.trim() : '';
+  if (prefix.length > KEY_MAX) refuse('INVALID_INPUT', 400, `prefix is at most ${KEY_MAX} characters.`);
+  const hasProfile = boolOf(q.has_profile);
+  const limit = Number.isInteger(Number(q.limit)) && Number(q.limit) > 0 ? Math.min(1000, Number(q.limit)) : undefined;
+  const after = typeof q.after === 'string' && q.after ? q.after : undefined;
+  if (prefix.startsWith('organism.')) {
+    requireWord(caller, 'memory:read', 'Listing the fingerprints of a workspace');
+    return listSharedProfiles(deps, caller, prefix, { ...(hasProfile !== undefined ? { hasProfile } : {}), ...(limit ? { limit } : {}), ...(after ? { after } : {}) });
+  }
   requireWord(caller, 'storage:read', 'Listing what is known about your items');
   const filter: FactsFilter = {
     ...((KINDS as readonly unknown[]).includes(q.kind) ? { kind: q.kind as ContentKind } : {}),
     ...(typeof q.class === 'string' && q.class ? { classId: q.class } : {}),
     ...(q.stale === true || q.stale === 'true' ? { stale: true } : {}),
-    ...(Number.isInteger(Number(q.limit)) && Number(q.limit) > 0 ? { limit: Math.min(1000, Number(q.limit)) } : {}),
-    ...(typeof q.after === 'string' && q.after ? { after: q.after } : {}),
+    ...(prefix ? { keyPrefix: prefix } : {}),
+    ...(hasProfile !== undefined ? { hasProfile } : {}),
+    ...(limit ? { limit } : {}),
+    ...(after ? { after } : {}),
   };
   const page = await listFacts(deps.storage, caller.ownerGhii, filter);
   // An agent sees the facts of its own items; the account holder sees all of theirs.
   const items = caller.inPerson ? page.items : page.items.filter((f) => f.source.owner === caller.principal);
-  return { ...page, items };
+  if (!prefix) return { ...page, items };
+  return {
+    ...page,
+    items: items.map((f): CompactFactsItem => {
+      const profile: ContentProfile | null = f.profile ? { ...f.profile } : null;
+      if (profile) delete profile.detailKey;
+      return { key: f.source.key, kind: f.technical?.kind ?? null, profile, stale: f.profile ? isStale(f) : null };
+    }),
+  };
 }

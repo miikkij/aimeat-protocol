@@ -25,6 +25,8 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.4.0 — 2026-11-03 — A published workspace document's profile stage is not run here: its
+ *     fingerprint is one and shared (shared-profile.ts).
  *   v1.3.0 — 2026-11-02 — The profile stage (profile.ts): the item's fingerprint into its facts, its
  *     sections into a private file.
  *   v1.2.0 — 2026-10-29 — An automatic read of a PDF whose text reached the node's PDF read limit
@@ -48,6 +50,7 @@ import { measureText } from './extract-text.js';
 import { aiMarksOf } from './provenance-read.js';
 import { getFacts, putFacts, putText, getText, putProfileDetail, sourceIdOf } from './facts-store.js';
 import { profileItem, MIN_PROFILE_CHARS } from './profile.js';
+import { workspaceDocOfKey } from './shared-profile-key.js';
 import { readSettings } from './settings.js';
 import { listClasses, addProposal, decideProposal, entityFor } from './classes.js';
 import { fieldsOf } from './correct-fields.js';
@@ -210,7 +213,10 @@ export async function inspectSource(
   const automatic = opts.automatic === true;
   const reader = automatic ? systemReader(deps, ownerGhii) : readerFor(deps, caller.auth);
   const settings = await readSettings(deps.storage, ownerGhii);
-  const stages = stagesToRun(settings, opts.stages, automatic);
+  // A published workspace document has one fingerprint, shared by everyone who reads it
+  // (shared-profile.ts); it is never kept in one reader's own facts.
+  const wsDoc = source.kind === 'memory' && !!workspaceDocOfKey(source.key);
+  const stages = stagesToRun(settings, opts.stages, automatic).filter((s) => !(wsDoc && s === 'profile'));
   const item = await loadItem(deps, reader, source);
   const hash = hashOf(item);
   const sourceId = sourceIdOf(source);
@@ -224,6 +230,9 @@ export async function inspectSource(
   const ran: StageName[] = [];
   const skipped: Partial<Record<StageName, string>> = {};
   const proposals: ClassProposal[] = [];
+  if (wsDoc && !automatic && opts.stages?.includes('profile')) {
+    skipped.profile = 'A workspace document has one fingerprint, shared by its readers; it is made by inspecting its key with the profile step alone.';
+  }
 
   // ── technical ── always for fresh facts; again only when asked with force.
   let text: string | null = item.memoryText;

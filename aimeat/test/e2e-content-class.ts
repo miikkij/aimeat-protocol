@@ -37,6 +37,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-content-class.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-content-class.ts
  * @version-history
+ *   2026-11-03 — Test 13: a workspace document's shared fingerprint: one for every reader, read with
+ *     the document's read rule, listed by prefix, made again or corrected only by an editor, stale
+ *     after a new version, made on publication when the workspace turned it on, gone with the document.
  *   2026-11-02 — Test 12: the fingerprint (the profile step): off by default, ai:use to run it, the
  *     tag and the sections on the facts answer, another owner refused, the MCP tools the same.
  *   2026-11-01 — Test 11: a HEIF whose box walk never ends does not hold the node; the facts name
@@ -130,6 +133,17 @@ async function invoicePdf(): Promise<Buffer> {
     doc.text('Myyjä: Acme Oy. Eräpäivä: 2026-10-31. Yhteensä: 248,00 EUR.');
     doc.end();
   });
+}
+
+/** A report of three sections the fake model marks + ~ ? (scripts/lib/fake-content-model.ts). */
+function fingerprintDoc(extra = ''): string {
+  const filler = 'Tämä kappale jatkuu vielä useilla sanoilla, jotta osio on riittävän pitkä omaksi osiokseen eikä yhdisty seuraavaan osioon.';
+  return [
+    '# Kaukolämpöraportti',
+    `## Hinnat\nKeskihinta nousi 38 % vuonna 2025. Lähde: https://example.org/raportti-2025. ${filler} ${filler}`,
+    `## Päätös\nKokouksessa päätettiin, että hintavertailu julkaistaan keväällä ja vastuuhenkilö kokoaa sen. ${filler} ${filler}`,
+    `## Näkemys\nKaukolämpö on aina paras ratkaisu kaikille kotitalouksille ja muuttaa koko alan suunnan. ${filler} ${filler}${extra}`,
+  ].join('\n\n');
 }
 
 // ── the node under test ───────────────────────────────────────────────────────
@@ -518,13 +532,7 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
 
   await test('12. the fingerprint: off by default, written on request with ai:use, shown as a tag, its sections the owner\'s own', async () => {
     const D = await setupOwner('d');
-    const filler = 'Tämä kappale jatkuu vielä useilla sanoilla, jotta osio on riittävän pitkä omaksi osiokseen eikä yhdisty seuraavaan osioon.';
-    const doc = [
-      '# Kaukolämpöraportti',
-      `## Hinnat\nKeskihinta nousi 38 % vuonna 2025. Lähde: https://example.org/raportti-2025. ${filler} ${filler}`,
-      `## Päätös\nKokouksessa päätettiin, että hintavertailu julkaistaan keväällä ja vastuuhenkilö kokoaa sen. ${filler} ${filler}`,
-      `## Näkemys\nKaukolämpö on aina paras ratkaisu kaikille kotitalouksille ja muuttaa koko alan suunnan. ${filler} ${filler}`,
-    ].join('\n\n');
+    const doc = fingerprintDoc();
     const w = await json('/v1/memory', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ key: 'notes.report.heat', value: doc, visibility: 'private' }) });
     assert(w.status === 201, `memory ${w.status}`);
     const src = { kind: 'memory', key: 'notes.report.heat' };
@@ -581,6 +589,123 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(!viaMcp?.result?.isError && body.fingerprint?.lines?.length === 5 && body.profile_sections?.length === 3, `facts over MCP ${toolText(viaMcp).slice(0, 300)}`);
     const listing = await mcpCall(agent, 'aimeat_content_facts', { with_profile: true });
     assert(listing?.result?.isError === true && toolText(listing).includes('with_profile'), `with_profile on a listing ${toolText(listing).slice(0, 200)}`);
+  });
+
+  await test('13. a workspace document has one shared fingerprint: every reader sees the same one, a new version makes it stale, only an editor makes it again or corrects it', async () => {
+    const [W, V, N, X] = [await setupOwner('w'), await setupOwner('v'), await setupOwner('n'), await setupOwner('x')];
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(W.token),
+      body: JSON.stringify({ name: `Fingerprint ${Date.now()}`, description: 'x', type: 'project', join_policy: 'open', visibility: 'private' }) });
+    assert(o.status === 201, `organism ${o.status} ${JSON.stringify(o.body?.error)}`);
+    const org = o.body.data.organism.id as string;
+    for (const m of [V, N]) {
+      const j = await json(`/v1/organisms/${org}/join`, { method: 'POST', headers: auth(m.token), body: '{}' });
+      assert(j.status === 201, `join ${j.status} ${JSON.stringify(j.body?.error)}`);
+    }
+    const w = await json(`/v1/organisms/${org}/workspaces`, { method: 'POST', headers: auth(W.token), body: JSON.stringify({ name: 'Muistiot', manifest: {
+      manifestVersion: '1', name: 'Muistiot', kind: 'project',
+      objectTypes: [{ name: 'page', namespace: 'shared.pages', mode: 'document', backing: 'memory', writeRole: 'member', schemaRef: 'schema:page@1' }],
+    } }) });
+    assert(w.status === 201, `workspace ${w.status} ${JSON.stringify(w.body?.error)}`);
+    const ws = w.body.data.ws as string;
+    // V reads the workspace; N is a member who may not; X is no member at all.
+    const g = await json(`/v1/organisms/${org}/workspace-access/grant`, { method: 'POST', headers: auth(W.token), body: JSON.stringify({ ws, grantee: V.name, role: 'viewer' }) });
+    assert(g.status === 200, `grant ${g.status} ${JSON.stringify(g.body?.error)}`);
+    const publish = async (id: string, markdown: string) => {
+      const d = await json(`/v1/organisms/${org}/workspace/drafts`, { method: 'POST', headers: auth(W.token), body: JSON.stringify({ ws, space: 'page', id, value: { title: id, markdown } }) });
+      assert(d.status === 200, `draft ${id} ${d.status} ${JSON.stringify(d.body?.error)}`);
+      const p = await json(`/v1/organisms/${org}/publish`, { method: 'POST', headers: auth(W.token), body: JSON.stringify({ ws, namespace: 'shared.pages', id }) });
+      assert(p.status === 200, `publish ${id} ${p.status} ${JSON.stringify(p.body?.error)}`);
+    };
+    await publish('fp1', fingerprintDoc());
+    await publish('fp2', fingerprintDoc(' Toinen sivu.'));
+    const key = `organism.${org}.w.${ws}.shared.pages.fp1.latest`;
+    const src = { kind: 'memory', key };
+    const facts = (who: Owner, sections = true) => json(`${factsPath(key, 'memory')}${sections ? '&with_profile=true' : ''}`, { headers: auth(who.token) });
+    const inspect = (who: Owner, force = true) => json('/v1/content/inspect', { method: 'POST', headers: auth(who.token), body: JSON.stringify({ source: src, stages: ['profile'], force }) });
+    const list = (who: Owner, extra = '') => json(`/v1/content/facts?prefix=${encodeURIComponent(`organism.${org}.w.${ws}.`)}${extra}`, { headers: auth(who.token) });
+
+    assert((await facts(V)).status === 404, 'a fingerprint before anyone made one');
+    // A reader makes it, on the reader's own key; the writer sees the same one, sections and all.
+    const made = await inspect(V);
+    assert(made.status === 200 && made.body.data.ran.includes('profile') && made.body.data.shared?.made_by === V.gaii, `the reader makes it ${made.status} ${JSON.stringify(made.body?.data?.skipped ?? made.body?.error)}`);
+    const byW = await facts(W);
+    const byV = await facts(V);
+    assert(byW.status === 200 && byW.body.data.facts.profile?.at === made.body.data.facts.profile?.at && byW.body.data.shared.stale === false, `the writer sees the reader's one ${JSON.stringify(byW.body?.data?.shared ?? byW.body?.error)}`);
+    assert(JSON.stringify(byW.body.data.facts.profile) === JSON.stringify(byV.body.data.facts.profile) && byW.body.data.profile_sections?.length === 3, 'two readers, two fingerprints');
+    assert(!byW.body.data.facts.profile.detailKey && byW.body.data.fingerprint?.lines?.length === 5, `the tag ${JSON.stringify(byW.body.data.fingerprint)}`);
+    // Who may not read the document gets what a missing one gets, on every route.
+    for (const who of [N, X]) {
+      assert((await facts(who)).status === 404, 'a fingerprint for someone who may not read the document');
+      assert((await inspect(who)).status === 404, 'a fingerprint made by someone who may not read the document');
+    }
+    // A current one is not made again by a reader; asked without force it is answered as it is.
+    const again = await inspect(V);
+    assert(again.status === 403 && again.body.error?.code === 'ACCESS_DENIED', `a reader replaces the current one ${again.status}`);
+    const asIs = await inspect(V, false);
+    assert(asIs.status === 200 && /already has/.test(asIs.body.data.skipped?.profile ?? '') && !asIs.body.data.ran.length, `without force ${JSON.stringify(asIs.body?.data)}`);
+    // The workspace's fingerprints in one call: compact, both documents, filtered by has_profile.
+    const all = await list(V, '&limit=1000');
+    assert(all.status === 200 && all.body.data.total === 2, `listing ${all.status} ${JSON.stringify(all.body?.data ?? all.body?.error)}`);
+    const one = all.body.data.items.find((i: any) => i.id === 'fp1');
+    const none = all.body.data.items.find((i: any) => i.id === 'fp2');
+    assert(one?.profile?.sections?.length === 3 && one.stale === false && one.made_by === V.gaii && !JSON.stringify(one).includes('claim'), `fp1 ${JSON.stringify(one)}`);
+    assert(none && none.profile === null && none.stale === null, `fp2 ${JSON.stringify(none)}`);
+    const withOnly = await list(W, '&has_profile=true');
+    const withoutOnly = await list(W, '&has_profile=false');
+    assert(withOnly.body.data.items.map((i: any) => i.id).join() === 'fp1' && withoutOnly.body.data.items.map((i: any) => i.id).join() === 'fp2', 'has_profile');
+    const barred = await list(N);
+    assert(barred.status === 403 && barred.body.error?.code === 'ACCESS_DENIED', `a member who may not read the workspace lists it ${barred.status}`);
+    assert((await list(X)).status === 403, 'a non-member lists the workspace');
+    // The fingerprint stays out of the workspace read.
+    const read = await json(`/v1/organisms/${org}/workspace?ws=${ws}`, { headers: auth(V.token) });
+    assert(read.status === 200 && !JSON.stringify(read.body).includes('meta.fingerprint'), 'the workspace read hands out the fingerprint record');
+    // A correction takes the right to edit the document; the corrector is named, and every reader sees it.
+    const correct = (who: Owner) => json('/v1/content/correct', { method: 'POST', headers: auth(who.token), body: JSON.stringify({ source: src, profile: { sections: [{ n: 3, mark: '+' }] } }) });
+    const byReader = await correct(V);
+    assert(byReader.status === 403 && byReader.body.error?.code === 'ACCESS_DENIED', `a reader corrects ${byReader.status}`);
+    const byWriter = await correct(W);
+    assert(byWriter.status === 200 && byWriter.body.data.facts.profile.corrected?.by === W.gaii, `the writer corrects ${byWriter.status} ${JSON.stringify(byWriter.body?.error)}`);
+    const seen = await facts(V);
+    assert(seen.body.data.facts.profile.sections[2][3] === '+' && seen.body.data.profile_sections[2].mark === '+' && seen.body.data.shared.corrected_by === W.gaii, 'the reader sees the correction');
+    assert(seen.body.data.fingerprint.lines[4].includes(`corrected by ${W.gaii}`), `the tag names the corrector ${seen.body.data.fingerprint.lines[4]}`);
+    const badFix = await json('/v1/content/correct', { method: 'POST', headers: auth(W.token), body: JSON.stringify({ source: src, profile: { sections: [{ n: 9, mark: '+' }] } }) });
+    assert(badFix.status === 400 && String(badFix.body.error?.message).includes('sections[0].n'), `a section that is not there ${badFix.status} ${JSON.stringify(badFix.body?.error)}`);
+    // The writer making it again on the same words keeps the correction.
+    const remade = await inspect(W);
+    assert(remade.status === 200 && remade.body.data.facts.profile.sections[2][3] === '+' && remade.body.data.facts.profile.corrected?.by === W.gaii, `the correction kept ${JSON.stringify(remade.body?.data?.facts?.profile?.sections ?? remade.body?.error)}`);
+    // A new version makes it stale, and it stays visible; a reader may then make it again.
+    await publish('fp1', fingerprintDoc(' Lisätty lause uuteen versioon.'));
+    const stale = await facts(V);
+    assert(stale.status === 200 && stale.body.data.shared.stale === true && !!stale.body.data.facts.profile, `stale ${JSON.stringify(stale.body?.data?.shared)}`);
+    const fresh = await inspect(V);
+    assert(fresh.status === 200 && fresh.body.data.shared.stale === false && !fresh.body.data.facts.profile.corrected, `remade on the new words ${JSON.stringify(fresh.body?.data?.shared ?? fresh.body?.error)}`);
+    // Over MCP, as a reader's AI asks: the same listing.
+    const vAgent = await connectAgent(V, `ccfpmcp${Date.now()}`, ['*']);
+    const viaMcp = JSON.parse(toolText(await mcpCall(vAgent, 'aimeat_content_facts', { prefix: `organism.${org}.w.${ws}.`, has_profile: true })) || '{}');
+    assert(viaMcp.page?.items?.length === 1 && viaMcp.page.items[0].id === 'fp1', `listing over MCP ${JSON.stringify(viaMcp).slice(0, 300)}`);
+    // On publication: off by default; the workspace's creator turns it on; it runs on the publisher's key when their settings run the step.
+    const setPath = `/v1/content/settings?organism_id=${org}&ws=${ws}`;
+    const off = await json(setPath, { headers: auth(V.token) });
+    assert(off.status === 200 && off.body.data.settings.effective === false && off.body.data.settings.from === 'default', `default ${JSON.stringify(off.body?.data ?? off.body?.error)}`);
+    const byViewer = await json(setPath, { method: 'PUT', headers: auth(V.token), body: JSON.stringify({ autoProfile: true }) });
+    assert(byViewer.status === 403, `a reader turns it on ${byViewer.status}`);
+    const on = await json(setPath, { method: 'PUT', headers: auth(W.token), body: JSON.stringify({ autoProfile: true }) });
+    assert(on.status === 200 && on.body.data.settings.effective === true && on.body.data.settings.from === 'workspace', `on ${JSON.stringify(on.body?.data ?? on.body?.error)}`);
+    await json('/v1/content/settings', { method: 'PUT', headers: auth(W.token), body: JSON.stringify({ stages: { profile: true }, minTextChars: 200 }) });
+    await publish('fp3', fingerprintDoc(' Kolmas sivu.'));
+    let auto: any = null;
+    for (let i = 0; i < 120 && !auto; i++) {
+      auto = (await list(V, '&has_profile=true')).body.data?.items?.find((x: any) => x.id === 'fp3') ?? null;
+      if (!auto) await sleep(250);
+    }
+    assert(auto?.made_by === W.gaii, `made on publication by the publisher ${JSON.stringify(auto)}`);
+    // The fingerprint goes with its document.
+    const wAgent = await connectAgent(W, `ccfpdel${Date.now()}`, ['*']);
+    const del = await mcpCall(wAgent, 'aimeat_workspace_object_delete', { organism_id: org, ws, namespace: 'shared.pages', id: 'fp1' });
+    assert(!del?.result?.isError, `delete ${toolText(del).slice(0, 200)}`);
+    assert((await facts(W)).status === 404, 'the fingerprint of a deleted document');
+    const left = await list(W);
+    assert(left.body.data.items.every((i: any) => i.id !== 'fp1'), `the listing after the delete ${JSON.stringify(left.body.data.items.map((i: any) => i.id))}`);
   });
 
   await stopServer(server);

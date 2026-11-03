@@ -14,6 +14,8 @@
  *   - exportWorkspace(storage, config, { orgId, ws, exporterGaii, callerSub, exportedAt }) -> { buffer, filename }
  * @usage import { exportWorkspace } from '../services/workspace-export.js';
  * @version-history
+ *   2026-11-03 -- The shared fingerprints (`meta.fingerprint.*`) and their setting (`meta.contentclass`)
+ *     are not exported: the node's own rows, derived from the documents.
  *   2026-10-20 -- `callerSub`, the CALLER's resolved principal, which is not always the identity the
  *     export reads as: the organism bundle exports as the member's owner GHII. An ecosystem app is
  *     held to its owner-granted read data-areas on the workspace manifest, the gate the live read
@@ -221,6 +223,9 @@ export async function collectWorkspace(
     if (single.has(rel)) continue;
     if (rel.startsWith('meta.sections.')) { out.sections[rel.slice('meta.sections.'.length)] = r.value; continue; }
     if (rel.startsWith('access.')) continue;   // access requests are not workspace content
+    // The shared fingerprints and their setting are the node's own, derived from the documents
+    // (services/content/shared-profile.ts); the node an export lands on makes its own.
+    if (rel.startsWith('meta.fingerprint.') || rel === 'meta.contentclass') continue;
 
     // An object instance: <namespace…>.<id>[.draft|.latest|.version.N]
     const parts = rel.split('.');

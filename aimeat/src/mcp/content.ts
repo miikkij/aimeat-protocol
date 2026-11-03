@@ -18,6 +18,9 @@
  * @structure registerContentTools(mcp, storage, config, caller)
  * @usage registerContentTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.3.0 — 2026-11-03 — aimeat_content_facts lists by prefix and has_profile (a workspace's shared
+ *     fingerprints); aimeat_content_correct takes profile; aimeat_content_settings takes organism_id
+ *     and ws for the fingerprint on publication.
  *   v1.2.0 — 2026-11-02 — aimeat_content_facts for one item answers the fingerprint tag when the item
  *     has a profile, and its sections with with_profile (services/content/service.ts factsViewFor).
  *   v1.1.1 — 2026-10-21 — Tools register with mcp.registerTool and the MCP SDK v2 server types, the
@@ -66,7 +69,7 @@ export function registerContentTools(
     async (args) => {
       const checked = checkContentInput('aimeat_content_facts', args);
       if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
-      const { kind, key, owner, with_text, with_profile, of_kind, class: classId, stale, limit, after } = args;
+      const { kind, key, owner, with_text, with_profile, of_kind, class: classId, stale, limit, after, prefix, has_profile } = args;
       try {
         const who = caller();
         if (checked.mode === 'one') {
@@ -83,8 +86,8 @@ export function registerContentTools(
           return ok({ ...view, text: text?.text ?? null, text_from: text?.from ?? null });
         }
         // No filter at all: the overview rides along, as GET /v1/content answers it.
-        const filtered = [of_kind, classId, stale, limit, after].some((v) => v !== undefined && v !== null);
-        const page = await listFactsFor(deps, who, { kind: of_kind, class: classId, stale, limit, after });
+        const filtered = [of_kind, classId, stale, limit, after, prefix, has_profile].some((v) => v !== undefined && v !== null);
+        const page = await listFactsFor(deps, who, { kind: of_kind, class: classId, stale, limit, after, prefix, has_profile });
         if (filtered) return ok({ page });
         return ok({ overview: await overviewFor(deps, who), page });
       } catch (err) { return fail(err); }
@@ -100,9 +103,9 @@ export function registerContentTools(
 
   mcp.registerTool('aimeat_content_correct', { description: descriptionFor('aimeat_content_correct'), inputSchema: zodShapeFor('aimeat_content_correct'),
     annotations: annotationsFor('aimeat_content_correct') },
-    async ({ kind, key, owner, classes, fields, extract }) => {
+    async ({ kind, key, owner, classes, fields, extract, profile }) => {
       try {
-        return ok(await correctFor(deps, caller(), { source: { kind, key, owner }, classes, fields, extract }));
+        return ok(await correctFor(deps, caller(), { source: { kind, key, owner }, classes, fields, extract, profile }));
       } catch (err) { return fail(err); }
     });
 
@@ -147,11 +150,12 @@ export function registerContentTools(
 
   mcp.registerTool('aimeat_content_settings', { description: descriptionFor('aimeat_content_settings'), inputSchema: zodShapeFor('aimeat_content_settings'),
     annotations: annotationsFor('aimeat_content_settings') },
-    async ({ patch }) => {
+    async ({ patch, organism_id, ws }) => {
       try {
         const who = caller();
-        if (patch === undefined) return ok({ settings: await settingsFor(deps, who) });
-        return ok({ settings: await updateSettingsFor(deps, who, patch) });
+        const target = organism_id !== undefined ? { organismId: organism_id, ws } : null;
+        if (patch === undefined) return ok({ settings: await settingsFor(deps, who, target) });
+        return ok({ settings: await updateSettingsFor(deps, who, patch, target) });
       } catch (err) { return fail(err); }
     });
 }

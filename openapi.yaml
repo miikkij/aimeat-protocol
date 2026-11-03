@@ -5586,6 +5586,19 @@ components:
           description: >
             Connected accounts created with this app. They can only be renewed by it, so this is
             also how many would stop renewing if it were removed.
+    ContentSharedFingerprint:
+      type: object
+      description: >
+        About a published workspace document's one shared fingerprint (src/services/content/shared-profile.ts),
+        beside the profile itself in facts.profile.
+      properties:
+        stale: { type: boolean, description: A newer version of the document was published since it was made. }
+        made_by: { type: string, description: Who asked for it, and whose AI key paid. }
+        made_at: { type: string, format: date-time }
+        doc_version: { type: integer, description: The document version it was made from; 0 when not known. }
+        read_from: { type: string, description: The sha256 of the document text it was made from. }
+        corrected_by: { type: string }
+        corrected_at: { type: string, format: date-time }
     ContentFacts:
       type: object
       description: >
@@ -5657,8 +5670,15 @@ components:
                   axes: { type: object, additionalProperties: { type: number } }
             sections: { type: array, items: { type: array, items: {} } }
             axes: { type: object, additionalProperties: { type: number } }
-            detailKey: { type: string }
+            detailKey: { type: string, description: Absent on a workspace document's shared fingerprint, whose sections are kept with it. }
             truncatedAt: { type: integer, description: Set when only the first part of a long text was profiled. }
+            corrected:
+              type: object
+              description: Set when a person corrected sections (POST /v1/content/correct with profile). A later run on the same words keeps it.
+              properties:
+                by: { type: string, description: The corrector's identity. }
+                at: { type: string, format: date-time }
+                sections: { type: array, items: { type: integer }, description: The corrected sections by number. }
         entities:
           type: object
           description: Per content class id, the JSON-LD entity extracted with that class's properties.
@@ -68960,10 +68980,19 @@ paths:
         class). An item with a profile (the profile step) also answers `fingerprint`: the profile as
         a row of coloured squares and a few lines of text a chat shows as they are, with the genre
         and mark shares; with `with_profile=true` also `profile_sections`, each section's heading,
-        one-sentence claim, genre, mark, certainty, topic and axes. Without `key`: a page of facts,
-        newest first. Needs storage:read (memory:read for a memory record). The account holder may
-        name one of their agents as `owner`; anything else answers 404, as an item that does not
-        exist does.
+        one-sentence claim, genre, mark, certainty, topic and axes. The key of a published workspace
+        document (organism.<org>.w.<ws>.<namespace>.<id>.latest) answers its one shared fingerprint,
+        the same for everyone who may read the document (the workspace read's own rule; anyone else
+        gets 404), with `shared`: who made it, who corrected it, the document version and text hash
+        it was made from, and `stale` when a newer version was published since; no `owner` is needed.
+        Without `key`: a page of facts, newest first. With `prefix` the page is compact (each item's
+        key, the fingerprint without its sections, and stale); a workspace's prefix
+        (organism.<org>.w.<ws>., optionally followed by a namespace) lists every published document
+        of that workspace in key order with its shared fingerprint or null, up to 1000 a page, and
+        `has_profile` keeps those with (true) or without (false) one; it needs memory:read and the
+        right to read the workspace (403 ACCESS_DENIED otherwise). Needs storage:read (memory:read for
+        a memory record). The account holder may name one of their agents as `owner`; anything else
+        answers 404, as an item that does not exist does.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -68976,6 +69005,8 @@ paths:
         - { name: stale, in: query, schema: { type: boolean } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000 } }
         - { name: after, in: query, schema: { type: string }, description: The cursor the previous page answered as next. }
+        - { name: prefix, in: query, schema: { type: string, maxLength: 1024 }, description: 'Without key: only items whose key starts with this, answered compact. A workspace''s prefix lists its published documents with their shared fingerprints.' }
+        - { name: has_profile, in: query, schema: { type: boolean }, description: 'Without key: true keeps the items with a fingerprint, false those without one.' }
       responses:
         '200':
           description: The facts of one item, or a page.
@@ -69015,13 +69046,35 @@ paths:
                                 certainty: { type: number }
                                 topic: { type: integer }
                                 axes: { type: object, additionalProperties: { type: number } }
-                          items: { type: array, items: { $ref: '#/components/schemas/ContentFacts' } }
+                          shared: { $ref: '#/components/schemas/ContentSharedFingerprint' }
+                          items:
+                            type: array
+                            description: Full facts without prefix; with prefix the compact items, and for a workspace's prefix its documents.
+                            items:
+                              oneOf:
+                                - $ref: '#/components/schemas/ContentFacts'
+                                - type: object
+                                  description: A compact item (with prefix). A workspace document also carries namespace, id, title, version, updated_at, made_by and corrected_by.
+                                  properties:
+                                    key: { type: string }
+                                    kind: { type: string, nullable: true }
+                                    namespace: { type: string }
+                                    id: { type: string }
+                                    title: { type: string }
+                                    version: { type: integer }
+                                    updated_at: { type: string, format: date-time }
+                                    profile: { type: object, nullable: true, additionalProperties: true, description: 'The compact profile, as ContentFacts.profile, without its sections'' headings and claims; null when there is none.' }
+                                    stale: { type: boolean, nullable: true, description: The fingerprint was made from an older version; null when there is none. }
+                                    made_by: { type: string, nullable: true }
+                                    corrected_by: { type: string, nullable: true }
                           total: { type: integer }
                           next: { type: string }
+        '400':
+          description: A prefix under organism. that does not name one workspace (INVALID_INPUT).
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: A token without storage:read (or memory:read), or a visitor from another node.
+          description: A token without storage:read (or memory:read), a visitor from another node, or a workspace the caller may not read (ACCESS_DENIED).
         '404':
           description: No such item of yours, nothing read from it yet, or content classes are off.
   /v1/content/text:
@@ -69061,7 +69114,11 @@ paths:
         is off until the owner turns it on. A stage that calls a model needs ai:use and spends the
         owner's AI allowance. A stage that fails is answered in `skipped` with its reason; the others
         still run. When the item's sensitivity label keeps it from a model, every model stage is
-        skipped and the technical facts are kept.
+        skipped and the technical facts are kept. On a published workspace document the profile
+        stage makes its one shared fingerprint, on the caller's AI key, and the answer carries
+        `shared` (ContentSharedFingerprint): anyone who may read the document makes a missing or
+        stale one; a current one is answered as it is (`skipped.profile` says so), and making it
+        again with `force` needs the right to edit the document (403 ACCESS_DENIED otherwise).
       tags: [ContentClasses]
       security:
         - BearerAuth: []
@@ -69098,9 +69155,9 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
-          description: A token without the permission that reads the item, or without ai:use for a model stage.
+          description: A token without the permission that reads the item, or without ai:use for a model stage; a current shared fingerprint made again by someone who may not edit the document (ACCESS_DENIED).
         '404':
-          description: No such item of yours, or content classes are off.
+          description: No such item of yours, a workspace document the caller may not read, or content classes are off.
   /v1/content/correct:
     post:
       operationId: correctContentFacts
@@ -69111,7 +69168,11 @@ paths:
         values. The model's decision is then reviewed on its decision record: confirmed when you kept
         exactly its classes, overridden with your list otherwise. `fields` sets, per class, property
         values (null removes one); the corrected values are kept when the class is extracted again.
-        `extract: true` extracts the classes again afterwards. Needs storage:read and memory:write;
+        `extract: true` extracts the classes again afterwards. `profile.sections` lists
+        `{ n, genre?, mark? }`: a fingerprint section's kind of text or mark as you say it is; the
+        fingerprint then names you in `corrected`, and a later run on the same words keeps it. On a
+        published workspace document that is the one shared fingerprint, so it needs the right to
+        edit the document (403 ACCESS_DENIED otherwise). Needs storage:read and memory:write;
         `extract` also ai:use.
       tags: [ContentClasses]
       security:
@@ -69141,6 +69202,20 @@ paths:
                     additionalProperties: true
                 extract:
                   type: boolean
+                profile:
+                  type: object
+                  properties:
+                    sections:
+                      type: array
+                      minItems: 1
+                      maxItems: 24
+                      items:
+                        type: object
+                        required: [n]
+                        properties:
+                          n: { type: integer, minimum: 1 }
+                          genre: { type: string, enum: [F, A, M, O, P, K] }
+                          mark: { type: string, enum: ['+', '~', '?', x] }
       responses:
         '200':
           description: The facts as stored, and the decision record after its review (null when there was none).
@@ -69233,10 +69308,17 @@ paths:
         shorter memory record gets no facts on arrival), approval (ask, auto, or rule with
         approvalRule: how a proposed class or property is approved), onlineSignatureChecks, models
         (text, vision and profile; an empty profile model means the node's content_class.profile_model)
-        and language.
+        and language. With `organism_id` (and `ws`) instead: whether documents published in that
+        organism or workspace get their shared fingerprint (`auto_profile`, this level's own choice or
+        null; `effective` and `from`, workspace, organism or default off). It spends nobody's key by
+        itself: a document gets it on the publisher's key, and only when the publisher's own settings
+        run the profile step. Any member who may read the workspace reads it.
       tags: [ContentClasses]
       security:
         - BearerAuth: []
+      parameters:
+        - { name: organism_id, in: query, schema: { type: string }, description: The organism whose fingerprint setting to read. }
+        - { name: ws, in: query, schema: { type: string }, description: With organism_id, the workspace. }
       responses:
         '200':
           description: The settings.
@@ -69251,10 +69333,16 @@ paths:
       summary: Change your content class settings
       description: >
         A partial patch, merged onto the current settings; an unknown key is refused with its name.
-        Needs memory:write-reserved, because the settings decide what spends your AI key.
+        Needs memory:write-reserved, because the settings decide what spends your AI key. With
+        `organism_id` (and `ws`) the body is `{ autoProfile: true | false | null }` (null follows the
+        level above), changed by the workspace's creator or an organism creator or admin
+        (403 ACCESS_DENIED otherwise).
       tags: [ContentClasses]
       security:
         - BearerAuth: []
+      parameters:
+        - { name: organism_id, in: query, schema: { type: string }, description: The organism whose fingerprint setting to change. }
+        - { name: ws, in: query, schema: { type: string }, description: With organism_id, the workspace. }
       requestBody:
         required: true
         content:

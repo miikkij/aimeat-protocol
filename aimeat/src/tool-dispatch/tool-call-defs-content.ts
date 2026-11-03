@@ -14,6 +14,8 @@
  * @structure contentCliTools
  * @usage import { contentCliTools } from './tool-call-defs-content.js';
  * @version-history
+ *   v1.3.0 — 2026-11-03 — aimeat_content_facts forwards prefix and has_profile, aimeat_content_correct
+ *     profile, aimeat_content_settings organism_id and ws.
  *   v1.2.0 — 2026-11-02 — aimeat_content_facts forwards with_profile to GET /v1/content/facts.
  *   v1.1.0 — 2026-10-21 — aimeat_content_correct, a proxy over POST /v1/content/correct.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings
@@ -58,6 +60,7 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
             const filter = {
                 kind: optionalString(input, 'of_kind'), class: optionalString(input, 'class'),
                 stale: optionalBoolean(input, 'stale'), limit: optionalNumber(input, 'limit'), after: optionalString(input, 'after'),
+                prefix: optionalString(input, 'prefix'), has_profile: optionalBoolean(input, 'has_profile'),
             };
             const page = await client.get(`/v1/content/facts${query(filter)}`);
             if (!page.ok || Object.values(filter).some((v) => v !== undefined)) return page.ok ? { ...page, data: { page: page.data } } : page;
@@ -91,6 +94,7 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
             const classes = optionalArray(input, 'classes');
             const fields = optionalRecord(input, 'fields');
             const extract = optionalBoolean(input, 'extract');
+            const profile = optionalRecord(input, 'profile');
             return client.post('/v1/content/correct', {
                 source: {
                     key: requiredString(input, 'key'),
@@ -100,6 +104,7 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
                 ...(classes ? { classes } : {}),
                 ...(fields ? { fields } : {}),
                 ...(extract !== undefined ? { extract } : {}),
+                ...(profile ? { profile } : {}),
             });
         },
     },
@@ -154,11 +159,13 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
         },
     },
     {
-        // → GET /v1/content/settings, or PUT /v1/content/settings with the patch.
+        // → GET /v1/content/settings, or PUT /v1/content/settings with the patch; ?organism_id&ws for
+        //   the shared fingerprint setting of an organism or a workspace.
         name: 'aimeat_content_settings',
         handler: ({ client }, input) => {
             const patch = optionalRecord(input, 'patch');
-            return patch ? client.put('/v1/content/settings', patch) : client.get('/v1/content/settings');
+            const path = `/v1/content/settings${query({ organism_id: optionalString(input, 'organism_id'), ws: optionalString(input, 'ws') })}`;
+            return patch ? client.put(path, patch) : client.get(path);
         },
     },
 ];

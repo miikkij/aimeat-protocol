@@ -35,6 +35,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
  *   v1.1.0 — 2026-11-02 — The profile's sections as a private file (putProfileDetail and its kin).
+ *   v1.2.0 — 2026-11-03 — listFacts filters by `keyPrefix` and `hasProfile`; `isStale` is exported.
  */
 import { createHash } from 'node:crypto';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -130,13 +131,18 @@ export interface FactsFilter {
   classId?: string;
   /** true: only facts the AI stages have not caught up with (readFrom differs from technical.contentHash). */
   stale?: boolean;
+  /** Only items whose key starts with this. */
+  keyPrefix?: string;
+  /** true: only items with a fingerprint; false: only items without one. */
+  hasProfile?: boolean;
   /** 1 to 1000, default 100. */
   limit?: number;
   /** The `next` cursor of the previous page. */
   after?: string;
 }
 
-const isStale = (f: ContentFacts): boolean => !!f.technical?.contentHash && f.readFrom !== f.technical.contentHash;
+/** The facts were read from another version of the item than its technical facts name. */
+export const isStale = (f: ContentFacts): boolean => !!f.technical?.contentHash && f.readFrom !== f.technical.contentHash;
 const cursorOf = (f: ContentFacts): string => `${f.updatedAt}|${f.sourceId}`;
 
 /** The owner's facts, newest first, filtered; `next` is the cursor of the following page when there is one. */
@@ -146,6 +152,8 @@ export async function listFacts(storage: Storage, ownerGhii: string, filter: Fac
     .filter((f) => !filter.kind || f.technical?.kind === filter.kind)
     .filter((f) => !filter.classId || (f.classes ?? []).some((c) => c.id === filter.classId))
     .filter((f) => filter.stale === undefined || isStale(f) === filter.stale)
+    .filter((f) => !filter.keyPrefix || (f.source?.key ?? '').startsWith(filter.keyPrefix))
+    .filter((f) => filter.hasProfile === undefined || !!f.profile === filter.hasProfile)
     .sort((a, b) => (a.updatedAt === b.updatedAt ? (a.sourceId < b.sourceId ? -1 : 1) : (a.updatedAt < b.updatedAt ? 1 : -1)));
   let start = 0;
   if (filter.after) {

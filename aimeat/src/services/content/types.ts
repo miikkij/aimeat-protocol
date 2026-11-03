@@ -35,6 +35,7 @@
  *   v1.3.0 — 2026-11-02 — The `profile` stage and ContentFacts.profile: the fingerprint (wish
  *     wish-aineiston-sormenj-lki-millaista-aineisto-on-yhdell-silm-ykse). STAGE_NAMES is the one
  *     list of stages the settings, the service and the tool catalog read.
+ *   v1.4.0 — 2026-11-03 — ContentProfile.corrected: a person's correction of sections, and who made it.
  */
 
 /** Where an item lives. The source id (sourceIdOf) is stable for the same item. */
@@ -106,6 +107,12 @@ export interface ContentProfile {
   detailKey?: string;
   /** Set when only the first part of a long text was profiled. */
   truncatedAt?: number;
+  /**
+   * Set when a person corrected sections (correct.ts, shared-profile.ts): who, when, and which
+   * sections by `n`. A person's correction wins over the model's, and a run of the model on the
+   * same words keeps it.
+   */
+  corrected?: { by: string; at: string; sections: number[] };
 }
 
 /** One piece of a text as profile.ts cut it, before anything labelled it. */

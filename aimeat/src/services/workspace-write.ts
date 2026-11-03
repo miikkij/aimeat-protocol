@@ -37,6 +37,8 @@
  *   const prev = await findWorkspaceRecord(storage, key);
  *   await writeWorkspaceRecord({ storage, config }, { key, value, owner: ownerGhii, prev });
  * @version-history
+ *   v1.4.0 — 2026-11-03 — deleteWorkspaceInstance also removes the document's shared fingerprint
+ *     once no copy of its published version is left (services/content/shared-profile.ts).
  *   v1.3.0 — 2026-09-29 — A landed record is scheduled for write-time classification
  *     (services/classify-on-write.ts, TARGET-082 V3).
  *   v1.2.0 — 2026-09-24 — `onLanded`: what the caller stores only if the record lands, run after the
@@ -56,6 +58,7 @@ import { afterMemoryWrite } from './memory-write.js';
 import { emitChange } from './event-bus.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { classifyAfterWrite } from './classify-on-write.js';
+import { workspaceDocOfKey, sharedProfilePrefixOf, systemOwnerOf } from './content/shared-profile-key.js';
 
 export interface WorkspaceWriteDeps {
     storage: Storage;
@@ -226,5 +229,23 @@ export async function deleteWorkspaceInstance(
             if (await storage.deleteMemory(r.ownerGaii, r.key)) deleted++;
         }
     }
+    if (deleted) await dropSharedFingerprint(storage, callerGhii.slice(callerGhii.lastIndexOf('@') + 1), base);
     return deleted;
+}
+
+/**
+ * The shared fingerprint of a document goes when no copy of its published version is left
+ * (services/content/shared-profile.ts). Keyed by namespace and id, which the base alone cannot
+ * split, so the fingerprints of the workspace are read and matched on the document key they name.
+ */
+async function dropSharedFingerprint(storage: Storage, nodeId: string, base: string): Promise<void> {
+    const latest = `${base}.latest`;
+    const at = workspaceDocOfKey(latest);
+    if (!at || await findWorkspaceRecord(storage, latest)) return;
+    const owner = systemOwnerOf(nodeId);
+    const { items } = await storage.listAllMemory({ prefix: sharedProfilePrefixOf(at.organismId, at.ws), limit: 5000 });
+    for (const r of items) {
+        const doc = (r.value as { doc?: { key?: unknown } } | null)?.doc;
+        if (r.ownerGaii === owner && doc?.key === latest) await storage.deleteMemory(owner, r.key);
+    }
 }
