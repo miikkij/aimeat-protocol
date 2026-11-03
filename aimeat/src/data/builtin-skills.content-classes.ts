@@ -18,6 +18,8 @@
  * @structure CONTENT_CLASSES_SKILL_ENTRY
  * @usage import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
  * @version-history
+ *   v1.3.1 — 2026-11-03 — "Model steps: ask first": a refused permission carries the address where
+ *     the person allows it; hand them that.
  *   v1.3.0 — 2026-11-03 — "A workspace document has one fingerprint, shared": who sees and makes it,
  *     stale, the listing by prefix, the setting on publication, and a person's correction
  *     (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan).
@@ -92,8 +94,11 @@ turn a model step on, and never pass \`stages\` naming one, without the person s
 conversation**: it spends their AI allowance on every item that arrives. When they say yes for one
 file, pass \`stages\` on that inspect only; when they want it for everything from now on, change the
 setting (\`aimeat_content_settings { patch: { stages: { describe: true } } }\`, which needs
-memory:write-reserved; without it, tell the person to switch it in their Data Wallet,
-\`/profile?tab=dataWallet\`, section "What is known about your content").
+memory:write-reserved). Without a permission a call needs, the refusal (SCOPE_DENIED) carries the
+address where the person allows it, in \`details.allow_url\` on REST and in the text over MCP: give
+them that address in their own words, without naming the permission, and call again once they have
+allowed it. They can also switch the step themselves in their Data Wallet,
+\`/profile?tab=dataWallet\`, section "What is known about your content".
 
 An item whose sensitivity label keeps it from AI models gets its technical facts only; the inspect
 answers the model steps in \`skipped\` with the reason. Tell the person that, in their words.

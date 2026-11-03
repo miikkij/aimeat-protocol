@@ -37,6 +37,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-content-class.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-content-class.ts
  * @version-history
+ *   2026-11-03 — Tests 4 and 9: an agent refused a permission by the content service gets the address
+ *     where its person allows it, on REST (`details.allow_url` and a next action) and over MCP.
  *   2026-11-03 — Test 13: a workspace document's shared fingerprint: one for every reader, read with
  *     the document's read rule, listed by prefix, made again or corrected only by an editor, stale
  *     after a new version, made on publication when the workspace turned it on, gone with the document.
@@ -310,15 +312,29 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
   });
 
   await test('4. a model step needs ai:use, and the settings need memory:write-reserved', async () => {
-    const reader = await connectAgent(A, `ccnoai${Date.now()}`, ['storage:read', 'storage:write']);
+    const readerName = `ccnoai${Date.now()}`;
+    const reader = await connectAgent(A, readerName, ['storage:read', 'storage:write']);
     await json('/v1/storage', { method: 'POST', headers: auth(reader),
       body: JSON.stringify({ key: 'agent/own.pdf', data: pdf.toString('base64'), mime_type: 'application/pdf' }) });
     const r = await json('/v1/content/inspect', { method: 'POST', headers: auth(reader),
       body: JSON.stringify({ source: { kind: 'file', key: 'agent/own.pdf' }, stages: ['describe'] }) });
     assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED' && String(r.body.error.message).includes('ai:use'), `no ai:use ${r.status} ${JSON.stringify(r.body?.error)}`);
-    const all = await connectAgent(A, `ccall${Date.now()}`, ['*']);
+    // The refusal hands the agent the address where its person allows the word, as a route's
+    // requireScope does (auth/deny.ts): the one-press page, or the agent's page for a word that
+    // needs its own tick.
+    const allowsAt = (body: any, agentName: string, word: string) => {
+      const d = body?.error?.details ?? {};
+      const url = String(d.allow_url ?? '');
+      const where = d.one_press === true ? url.includes('/v1/allow?') && url.includes(`need=${encodeURIComponent(word)}`) : url.includes('/v1/profile?tab=agents');
+      return where && url.includes(`agent=${agentName}`) && JSON.stringify(d.needed) === JSON.stringify([word])
+        && (body?.hints?.next_actions ?? []).some((a: any) => a.url === url);
+    };
+    assert(allowsAt(r.body, readerName, 'ai:use'), `no allow address for ai:use ${JSON.stringify(r.body?.error)} ${JSON.stringify(r.body?.hints)}`);
+    const allName = `ccall${Date.now()}`;
+    const all = await connectAgent(A, allName, ['*']);
     const s = await json('/v1/content/settings', { method: 'PUT', headers: auth(all), body: JSON.stringify({ stages: { describe: true } }) });
     assert(s.status === 403 && String(s.body.error?.message).includes('memory:write-reserved'), `settings by an agent ${s.status} ${JSON.stringify(s.body?.error)}`);
+    assert(allowsAt(s.body, allName, 'memory:write-reserved'), `no allow address for the settings ${JSON.stringify(s.body?.error)}`);
     const bad = await json('/v1/content/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ stages: { nonsense: true } }) });
     assert(bad.status === 400 && String(bad.body.error?.message).includes('nonsense'), `unknown setting ${bad.status} ${JSON.stringify(bad.body?.error)}`);
   });
@@ -425,7 +441,8 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
   });
 
   await test('9. the MCP tools answer as REST does, and refuse what REST refuses', async () => {
-    const agent = await connectAgent(A, `ccmcp${Date.now()}`, ['*']);
+    const mcpName = `ccmcp${Date.now()}`;
+    const agent = await connectAgent(A, mcpName, ['*']);
     await json('/v1/storage', { method: 'POST', headers: auth(agent),
       body: JSON.stringify({ key: 'mcp/own.pdf', data: pdf.toString('base64'), mime_type: 'application/pdf' }) });
     const insp = await mcpCall(agent, 'aimeat_content_inspect', { kind: 'file', key: 'mcp/own.pdf' });
@@ -442,6 +459,8 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(!settings?.result?.isError && toolText(settings).includes('onArrival'), `settings ${toolText(settings).slice(0, 200)}`);
     const change = await mcpCall(agent, 'aimeat_content_settings', { patch: { stages: { describe: true } } });
     assert(change?.result?.isError === true && toolText(change).includes('memory:write-reserved'), `settings change over MCP ${toolText(change).slice(0, 200)}`);
+    assert(toolText(change).startsWith('SCOPE_DENIED') && toolText(change).includes(`agent=${mcpName}`)
+      && /\/v1\/(allow\?|profile\?tab=agents)/.test(toolText(change)), `no allow address over MCP ${toolText(change).slice(0, 400)}`);
     const approve = await mcpCall(agent, 'aimeat_content_classes', { action: 'approve', id: 'prop-none' });
     assert(approve?.result?.isError === true && toolText(approve).includes('memory:write-reserved'), `approve over MCP ${toolText(approve).slice(0, 200)}`);
   });

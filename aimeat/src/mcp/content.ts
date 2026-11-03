@@ -18,6 +18,9 @@
  * @structure registerContentTools(mcp, storage, config, caller)
  * @usage registerContentTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.3.1 — 2026-11-03 — A permission the service refuses an agent is answered as every tool's
+ *     SCOPE_DENIED is (mcp/scope-denied-answer.ts): what it may not do yet and the address where its
+ *     person allows it.
  *   v1.3.0 — 2026-11-03 — aimeat_content_facts lists by prefix and has_profile (a workspace's shared
  *     fingerprints); aimeat_content_correct takes profile; aimeat_content_settings takes organism_id
  *     and ws for the fingerprint on publication.
@@ -37,6 +40,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { withCaughtError } from './tool-fault.js';
+import { scopeDeniedText } from './scope-denied-answer.js';
 import { checkContentInput } from '../tool-catalog/definitions/content.js';
 import {
   factsViewFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
@@ -59,7 +63,13 @@ export function registerContentTools(
 ): void {
   const deps = { storage, config };
   const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
-  const fail = (err: unknown) => {
+  const fail = (err: unknown, tool: string) => {
+    // A permission an agent's person can allow: the answer every tool's SCOPE_DENIED gives
+    // (mcp/scope-denied-answer.ts), with the address the person allows it at.
+    const needed = err instanceof ContentError && err.code === 'SCOPE_DENIED' ? err.details?.needed : undefined;
+    if (Array.isArray(needed)) {
+      return { content: [{ type: 'text' as const, text: scopeDeniedText(tool, needed.map(String), { baseUrl: config.baseUrl, agentGaii: caller().principal }) }], isError: true as const };
+    }
     if (isRefusal(err)) return toolError(err.code, err.message);
     return withCaughtError(toolError('INTERNAL_ERROR', 'The content class request failed on the node.'), err);
   };
@@ -90,7 +100,7 @@ export function registerContentTools(
         const page = await listFactsFor(deps, who, { kind: of_kind, class: classId, stale, limit, after, prefix, has_profile });
         if (filtered) return ok({ page });
         return ok({ overview: await overviewFor(deps, who), page });
-      } catch (err) { return fail(err); }
+      } catch (err) { return fail(err, 'aimeat_content_facts'); }
     });
 
   mcp.registerTool('aimeat_content_inspect', { description: descriptionFor('aimeat_content_inspect'), inputSchema: zodShapeFor('aimeat_content_inspect'),
@@ -98,7 +108,7 @@ export function registerContentTools(
     async ({ kind, key, owner, stages, force }) => {
       try {
         return ok(await inspectFor(deps, caller(), { source: { kind, key, owner }, stages, force }));
-      } catch (err) { return fail(err); }
+      } catch (err) { return fail(err, 'aimeat_content_inspect'); }
     });
 
   mcp.registerTool('aimeat_content_correct', { description: descriptionFor('aimeat_content_correct'), inputSchema: zodShapeFor('aimeat_content_correct'),
@@ -106,7 +116,7 @@ export function registerContentTools(
     async ({ kind, key, owner, classes, fields, extract, profile }) => {
       try {
         return ok(await correctFor(deps, caller(), { source: { kind, key, owner }, classes, fields, extract, profile }));
-      } catch (err) { return fail(err); }
+      } catch (err) { return fail(err, 'aimeat_content_correct'); }
     });
 
   mcp.registerTool('aimeat_content_scan', { description: descriptionFor('aimeat_content_scan'), inputSchema: zodShapeFor('aimeat_content_scan'),
@@ -119,7 +129,7 @@ export function registerContentTools(
         if (scan_id) return ok({ scan: scanStatusFor(deps, caller(), scan_id) });
         const { scan, already } = await scanFor(deps, caller(), input);
         return ok({ scan, already_running: already, next: `Follow it with aimeat_content_scan { scan_id: "${scan.id}" }.` });
-      } catch (err) { return fail(err); }
+      } catch (err) { return fail(err, 'aimeat_content_scan'); }
     });
 
   mcp.registerTool('aimeat_content_classes', { description: descriptionFor('aimeat_content_classes'), inputSchema: zodShapeFor('aimeat_content_classes'),
@@ -145,7 +155,7 @@ export function registerContentTools(
           case 'ontology': return ok({ ontology: await ontologyFor(deps, who) });
           default: return toolError('INVALID_INPUT', 'action is list, set, remove, proposals, approve, reject or ontology.');
         }
-      } catch (err) { return fail(err); }
+      } catch (err) { return fail(err, 'aimeat_content_classes'); }
     });
 
   mcp.registerTool('aimeat_content_settings', { description: descriptionFor('aimeat_content_settings'), inputSchema: zodShapeFor('aimeat_content_settings'),
@@ -156,6 +166,6 @@ export function registerContentTools(
         const target = organism_id !== undefined ? { organismId: organism_id, ws } : null;
         if (patch === undefined) return ok({ settings: await settingsFor(deps, who, target) });
         return ok({ settings: await updateSettingsFor(deps, who, patch, target) });
-      } catch (err) { return fail(err); }
+      } catch (err) { return fail(err, 'aimeat_content_settings'); }
     });
 }

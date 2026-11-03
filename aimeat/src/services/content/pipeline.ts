@@ -25,6 +25,7 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.4.1 — 2026-11-03 — ContentError carries `details` for the error envelope.
  *   v1.4.0 — 2026-11-03 — A published workspace document's profile stage is not run here: its
  *     fingerprint is one and shared (shared-profile.ts).
  *   v1.3.0 — 2026-11-02 — The profile stage (profile.ts): the item's fingerprint into its facts, its
@@ -70,7 +71,8 @@ const VIDEO_FRAMES = 4;
 const VIDEO_AUDIO_SECONDS = 600;
 
 export class ContentError extends Error {
-  constructor(public code: string, public status: number, message: string) { super(message); }
+  /** `details` rides into the error envelope: a SCOPE_DENIED to an agent carries `allow_url` there. */
+  constructor(public code: string, public status: number, message: string, public details?: Record<string, unknown>) { super(message); }
 }
 
 export interface InspectOptions {

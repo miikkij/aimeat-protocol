@@ -22,11 +22,13 @@
  *   (config-posture.ts POWERFUL_AGENT_SCOPES). A word outside every wildcard (utils/scope-coverage.ts)
  *   is a decision the person makes on its own tick on the agent's page, so for those the AI hands the
  *   agent's page instead; the operator's words never reach a person's page at all.
- * @structure OPERATOR_WORDS · isOneClickWord · oneClickWords · allowUrl · agentPageUrl · plainPermission ·
- *   scopesBehindRecord · permissionAskText
+ * @structure OPERATOR_WORDS · isOneClickWord · oneClickWords · allowUrl · agentPageUrl · allowAddressFor ·
+ *   plainPermission · scopesBehindRecord · permissionAskText
  * @usage
  *   const text = permissionAskText({ baseUrl: config.baseUrl, agentGaii, tool: 'aimeat_dm_send', words: ['messages:send'] });
  * @version-history
+ *   v1.2.0 — 2026-11-03 — allowAddressFor: the address for a refusal a service writes (the content
+ *     service's permission words).
  *   v1.1.0 — 2026-10-18 — OPERATOR_WORDS, the words the refusal notice for the agent's page leaves out
  *     on an account that does not run the node (services/permission-ask-notice.ts).
  *   v1.0.0 — 2026-10-17 — Initial (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
@@ -74,6 +76,18 @@ export function allowUrl(baseUrl: string, agentName: string, words: readonly str
 export function agentPageUrl(baseUrl: string, agentName: string): string {
   const q = new URLSearchParams({ tab: 'agents', agent: agentName });
   return `${trimBase(baseUrl)}/v1/profile?${q.toString()}`;
+}
+
+/**
+ * Where an agent's person allows `words`, for a refusal that a service writes rather than a route's
+ * requireScope (auth/deny.ts builds the same for that one): the one-press page when every word may be
+ * given that way, otherwise the agent's page. Null when the principal is not an agent.
+ */
+export function allowAddressFor(baseUrl: string, principal: string, words: readonly string[]): { allow_url: string; one_press: boolean } | null {
+  const agentName = parseGaiiLoose(principal).agent;
+  if (!agentName || words.length === 0) return null;
+  const onePress = oneClickWords(words);
+  return { allow_url: onePress ? allowUrl(baseUrl, agentName, words) : agentPageUrl(baseUrl, agentName), one_press: onePress };
 }
 
 /**

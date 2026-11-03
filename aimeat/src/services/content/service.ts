@@ -18,6 +18,8 @@
  *   ontologyFor · overviewFor · listFactsFor · RESERVED_WORD
  * @usage const out = await inspectFor(deps, caller, { source: { kind: 'file', key: 'a.pdf' } });
  * @version-history
+ *   v1.3.1 — 2026-11-03 — A permission refusal to an agent carries `details.allow_url`, the address
+ *     where its person allows the word, and is noted on the agent's card, as a route's refusal is.
  *   v1.3.0 — 2026-11-03 — A published workspace document's fingerprint is its one shared fingerprint
  *     (shared-profile.ts) in factsViewFor, inspectFor and correctFor (`profile`); listFactsFor takes
  *     `prefix` and `has_profile` and answers compact items; the settings calls take a workspace or an
@@ -32,6 +34,8 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
+import { allowAddressFor } from '../permission-ask.js';
+import { noteAgentRefusal } from '../agent-refusals.js';
 import { inspectSource, stagesToRun, ContentError, type InspectResult } from './pipeline.js';
 import { startScan, getScan, runningScanOf, type ScanOptions, type ScanState } from './scan.js';
 import { correctFacts } from './correct.js';
@@ -72,8 +76,18 @@ function assertLocal(caller: CallerContext): void {
   if (caller.visitor) refuse('LOCAL_ACCOUNT_REQUIRED', 403, 'Content facts belong to a local account; a visitor from another node has none here.');
 }
 
-function requireWord(caller: CallerContext, word: string, why: string): void {
-  if (!caller.has(word)) refuse('SCOPE_DENIED', 403, `${why} needs the permission ${word}.`);
+/**
+ * The permission check this service asks beyond the route's own. An agent refused here gets what
+ * auth/deny.ts gives a route's refusal: `details.allow_url`, the address where its person allows the
+ * word (services/permission-ask.ts), and the note on its card and open tasks (agent-refusals.ts).
+ */
+function requireWord(deps: Deps, caller: CallerContext, word: string, why: string): void {
+  if (caller.has(word)) return;
+  const message = `${why} needs the permission ${word}.`;
+  if (caller.kind !== 'agent') refuse('SCOPE_DENIED', 403, message);
+  noteAgentRefusal(caller.auth, [word], false, `content: ${why}`);
+  const ask = allowAddressFor(deps.config.baseUrl, caller.principal, [word]);
+  throw new ContentError('SCOPE_DENIED', 403, message, ask ? { needed: [word], ...ask } : undefined);
 }
 
 /**
@@ -103,7 +117,7 @@ function workspaceSourceOf(deps: Deps, caller: CallerContext, sourceInput: unkno
   assertOn(deps); assertLocal(caller);
   const source = parseSource(caller, sourceInput);
   if (source.kind !== 'memory' || !isWorkspaceDocKey(source.key)) return null;
-  requireWord(caller, readWord(source), why);
+  requireWord(deps, caller,readWord(source), why);
   return source;
 }
 
@@ -120,7 +134,7 @@ function parseStages(v: unknown): StageName[] | undefined {
 export async function factsFor(deps: Deps, caller: CallerContext, sourceInput: unknown): Promise<ContentFacts> {
   assertOn(deps); assertLocal(caller);
   const source = parseSource(caller, sourceInput);
-  requireWord(caller, readWord(source), 'Reading what is known about an item');
+  requireWord(deps, caller,readWord(source), 'Reading what is known about an item');
   const f = await getFacts(deps.storage, caller.ownerGhii, sourceIdOf(source));
   if (!f) refuse('NOT_FOUND', 404, `Nothing has been read from ${source.kind} "${source.key}" yet. Inspect it first.`);
   return f;
@@ -161,10 +175,10 @@ export async function inspectFor(
 ): Promise<InspectResult & { shared?: SharedMeta }> {
   assertOn(deps); assertLocal(caller);
   const source = parseSource(caller, input.source);
-  requireWord(caller, readWord(source), 'Inspecting an item');
+  requireWord(deps, caller,readWord(source), 'Inspecting an item');
   const stages = parseStages(input.stages);
   const effective = stagesToRun(await readSettings(deps.storage, caller.ownerGhii), stages, false);
-  if (effective.some((s) => (AI_STAGES as readonly string[]).includes(s))) requireWord(caller, 'ai:use', 'A stage that calls an AI model');
+  if (effective.some((s) => (AI_STAGES as readonly string[]).includes(s))) requireWord(deps, caller,'ai:use', 'A stage that calls an AI model');
   const force = input.force === true;
   if (!(source.kind === 'memory' && isWorkspaceDocKey(source.key) && effective.includes('profile'))) {
     return inspectSource(deps, caller, source, { ...(stages ? { stages } : {}), force, ...(appRef ? { appRef } : {}) });
@@ -199,9 +213,9 @@ export async function correctFor(
 ): Promise<{ facts: ContentFacts; review: unknown; fingerprint?: ReturnType<typeof fingerprintTag>; profile_sections?: ProfileSection[] | null; shared?: SharedMeta }> {
   assertOn(deps); assertLocal(caller);
   const source = parseSource(caller, input.source);
-  requireWord(caller, readWord(source), 'Correcting what is known about an item');
-  requireWord(caller, 'memory:write', 'Correcting what is known about an item');
-  if (input.extract === true) requireWord(caller, 'ai:use', 'Extracting the fields again');
+  requireWord(deps, caller,readWord(source), 'Correcting what is known about an item');
+  requireWord(deps, caller,'memory:write', 'Correcting what is known about an item');
+  if (input.extract === true) requireWord(deps, caller,'ai:use', 'Extracting the fields again');
   const asked = {
     ...(input.classes !== undefined ? { classes: input.classes as string[] } : {}),
     ...(input.fields !== undefined ? { fields: input.fields as Record<string, Record<string, string | number | boolean | null>> } : {}),
@@ -227,10 +241,10 @@ export async function correctFor(
 export async function scanFor(deps: Deps, caller: CallerContext, input: Record<string, unknown>): Promise<{ scan: ScanState; already: boolean }> {
   assertOn(deps); assertLocal(caller);
   const memoryPrefix = typeof input.memory_prefix === 'string' ? input.memory_prefix.trim() : '';
-  requireWord(caller, memoryPrefix ? 'memory:read' : 'storage:read', 'A scan');
+  requireWord(deps, caller,memoryPrefix ? 'memory:read' : 'storage:read', 'A scan');
   const stages = parseStages(input.stages);
   const effective = stagesToRun(await readSettings(deps.storage, caller.ownerGhii), stages, false);
-  if (effective.some((s) => (AI_STAGES as readonly string[]).includes(s))) requireWord(caller, 'ai:use', 'A scan with a stage that calls an AI model');
+  if (effective.some((s) => (AI_STAGES as readonly string[]).includes(s))) requireWord(deps, caller,'ai:use', 'A scan with a stage that calls an AI model');
   const keys = Array.isArray(input.keys) ? (input.keys as unknown[]).filter((k): k is string => typeof k === 'string' && !!k && k.length <= KEY_MAX) : undefined;
   const kinds = Array.isArray(input.kinds) ? (input.kinds as unknown[]).filter((k): k is ContentKind => (KINDS as readonly unknown[]).includes(k)) : undefined;
   const limit = Number.isInteger(input.limit) ? Number(input.limit) : undefined;
@@ -264,7 +278,7 @@ export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch
 export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target: SettingsTarget): Promise<ContentSettings | SharedProfileSettings>;
 export async function updateSettingsFor(deps: Deps, caller: CallerContext, patch: unknown, target?: SettingsTarget): Promise<ContentSettings | SharedProfileSettings> {
   assertOn(deps); assertLocal(caller);
-  requireWord(caller, RESERVED_WORD, 'Changing what runs, and what spends your AI key,');
+  requireWord(deps, caller,RESERVED_WORD, 'Changing what runs, and what spends your AI key,');
   if (target?.organismId !== undefined) return updateSharedSettingsFor(deps, caller, target, patch);
   return writeSettings(deps, writerOf(caller), patch);
 }
@@ -280,13 +294,13 @@ export async function classesFor(deps: Deps, caller: CallerContext): Promise<Con
 
 export async function setClassFor(deps: Deps, caller: CallerContext, cls: unknown): Promise<ContentClass> {
   assertOn(deps); assertLocal(caller);
-  requireWord(caller, RESERVED_WORD, 'Changing a content class');
+  requireWord(deps, caller,RESERVED_WORD, 'Changing a content class');
   return setOwnerClass(deps, { ...writerOf(caller), principal: caller.ownerGhii, roles: ['owner'] }, cls);
 }
 
 export async function removeClassFor(deps: Deps, caller: CallerContext, id: string): Promise<void> {
   assertOn(deps); assertLocal(caller);
-  requireWord(caller, RESERVED_WORD, 'Removing a content class');
+  requireWord(deps, caller,RESERVED_WORD, 'Removing a content class');
   await removeOwnerClass(deps, { ...writerOf(caller), principal: caller.ownerGhii, roles: ['owner'] }, id);
 }
 
@@ -298,7 +312,7 @@ export async function proposalsFor(deps: Deps, caller: CallerContext, status?: s
 
 export async function decideProposalFor(deps: Deps, caller: CallerContext, id: string, decision: unknown): Promise<ClassProposal> {
   assertOn(deps); assertLocal(caller);
-  requireWord(caller, RESERVED_WORD, 'Approving or rejecting a proposed class');
+  requireWord(deps, caller,RESERVED_WORD, 'Approving or rejecting a proposed class');
   if (decision !== 'approve' && decision !== 'reject') refuse('INVALID_INPUT', 400, 'decision is "approve" or "reject".');
   return decideProposal(deps, { ...writerOf(caller), principal: caller.ownerGhii, roles: ['owner'] }, id, decision, caller.principal);
 }
@@ -345,10 +359,10 @@ export async function listFactsFor(
   const limit = Number.isInteger(Number(q.limit)) && Number(q.limit) > 0 ? Math.min(1000, Number(q.limit)) : undefined;
   const after = typeof q.after === 'string' && q.after ? q.after : undefined;
   if (prefix.startsWith('organism.')) {
-    requireWord(caller, 'memory:read', 'Listing the fingerprints of a workspace');
+    requireWord(deps, caller,'memory:read', 'Listing the fingerprints of a workspace');
     return listSharedProfiles(deps, caller, prefix, { ...(hasProfile !== undefined ? { hasProfile } : {}), ...(limit ? { limit } : {}), ...(after ? { after } : {}) });
   }
-  requireWord(caller, 'storage:read', 'Listing what is known about your items');
+  requireWord(deps, caller,'storage:read', 'Listing what is known about your items');
   const filter: FactsFilter = {
     ...((KINDS as readonly unknown[]).includes(q.kind) ? { kind: q.kind as ContentKind } : {}),
     ...(typeof q.class === 'string' && q.class ? { classId: q.class } : {}),
