@@ -11,6 +11,8 @@
  *   TOTP and open the session with the link's return address. A covered account with TOTP keeps the
  *   code step it had; an uncovered account keeps its session from the link.
  * @version-history
+ *   v1.2.0 — 2026-11-04 — The operator's owner-level PAT may loosen the policy, as the person in person
+ *     may (Jouni, 2026-11-04; codebase analysis 2026-11-03, PAT ruling); the agent is still refused.
  *   v1.1.0 — 2026-11-02 — Two-step required with totp.enabled false: the save refusal and the start warning.
  *   v1.0.0 — 2026-11-02 — Initial (IT review: required two-step sign-in, password sign-in off).
  */
@@ -73,7 +75,8 @@ describe('the sign-in policy rules', () => {
     const pat = { roles: ['owner', 'operator'], via: 'pat' };
     const agent = { roles: ['agent'] };
     const person = { roles: ['owner', 'operator'] };
-    expect(signInPolicyChangeRefusal(pat, TWO_STEP_REQUIRED_PATH, 'everyone', 'off')?.code).toBe('PERSON_REQUIRED');
+    // An owner-level PAT is the person (Jouni, 2026-11-04; codebase analysis 2026-11-03, PAT ruling).
+    expect(signInPolicyChangeRefusal(pat, TWO_STEP_REQUIRED_PATH, 'everyone', 'off')).toBeNull();
     expect(signInPolicyChangeRefusal(agent, PASSWORD_SIGN_IN_PATH, 'off', 'on')?.code).toBe('PERSON_REQUIRED');
     expect(signInPolicyChangeRefusal(pat, TWO_STEP_REQUIRED_PATH, 'off', 'everyone')).toBeNull();
     expect(signInPolicyChangeRefusal(person, TWO_STEP_REQUIRED_PATH, 'everyone', 'off')).toBeNull();

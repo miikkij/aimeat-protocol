@@ -6,6 +6,8 @@
  *   suite test/e2e-mcp-proxy.ts Phase 5f drives the same rule through PUT /v1/admin/config and the
  *   invoke route.
  * @version-history
+ *   v1.1.0 — 2026-11-04 — The operator's owner-level PAT is the person and may change the setting either
+ *     way (Jouni, 2026-11-04; codebase analysis 2026-11-03, PAT ruling); the agent is still refused.
  *   v1.0.0 — 2026-11-03 — Initial (secaudit2026nov02d round 13b).
  */
 import { describe, it, expect } from 'vitest';
@@ -33,7 +35,9 @@ describe('mcp.capability_use_approval', () => {
   });
 
   it('refuses an AI credential a more open value with PERSON_REQUIRED, naming the setting in details', () => {
-    for (const caller of [agent, pat]) {
+    // The owner-level PAT is the person since 2026-11-04 (Jouni; codebase analysis 2026-11-03, PAT
+    // ruling): it is asserted below with the person.
+    for (const caller of [agent]) {
       const r = capabilityUseApprovalChangeRefusal(caller, 'ask', 'operators');
       expect(r?.status).toBe(403);
       expect(r?.code).toBe('PERSON_REQUIRED');
@@ -47,6 +51,7 @@ describe('mcp.capability_use_approval', () => {
     expect(capabilityUseApprovalChangeRefusal(agent, 'off', 'operators')).toBeNull();
     expect(capabilityUseApprovalChangeRefusal(agent, 'operators', 'ask')).toBeNull();
     expect(capabilityUseApprovalChangeRefusal(person, 'ask', 'off')).toBeNull();
+    expect(capabilityUseApprovalChangeRefusal(pat, 'ask', 'off')).toBeNull();
   });
 
   it('reads the environment, operators when unset or unknown', () => {

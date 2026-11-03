@@ -21,6 +21,10 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   2026-11-04 — The operator's access token is the person (Jouni, 2026-11-04; codebase analysis
+ *     2026-11-03, PAT ruling): the switch's REST denial is proven with the operator's agent holding
+ *     operator:admin, which passes the operator gate as the token did, and a new case proves the token
+ *     loosens the switch.
  *   2026-10-22 — Section 11, memory:read-as-owner on classification metadata (secaudit 2026-10, v76
  *     and v77): an agent without the word scans, lists, reads in the audit log and the exceptions,
  *     and reads the label of no private record of its owner or a sibling, and is told which
@@ -264,24 +268,34 @@ await test('NODE MCP: the operator\'s agent may not turn it off or back to owner
   assert(await modeNow(op.token) === 'all', 'the switch stayed at all');
 });
 
-await test('DENIAL: on the Config endpoint, the operator\'s agent without operator:admin and the operator\'s access token do not loosen the switch; the operator in person does', async () => {
+await test('DENIAL: on the Config endpoint, the operator\'s agent without operator:admin and the operator\'s agent with it do not loosen the switch; the operator in person does', async () => {
   const plain = await agent(op, 'clsopplain', ['*']);
   const byAgent = await setSwitchInPerson(plain.token, 'off');
   assert(byAgent.status === 403, `the agent without operator:admin: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
-  // An operator-level personal access token carries the operator role (services/access-token.ts)
-  // and passes requireRole('operator'), so the switch guard itself is what refuses it.
-  const pat = await json('/v1/access/tokens', { method: 'POST', headers: auth(op.token), body: JSON.stringify({ label: `cls switch ${stamp}`, grant_operator: true }) });
-  assert(pat.status === 201 && typeof pat.body?.data?.token === 'string', `mint the operator's token: ${pat.status} ${JSON.stringify(pat.body?.error)}`);
+  // The operator's agent holding operator:admin passes the operator gate (requireOperator), so the
+  // switch guard itself is what refuses it. Until 2026-11-04 the operator's access token stood here;
+  // it is the person since then (Jouni; codebase analysis 2026-11-03, PAT ruling), proven below.
   for (const mode of ['off', 'owner']) {
-    const r = await setSwitchInPerson(pat.body.data.token, mode);
+    const r = await setSwitchInPerson(opAgent.token, mode);
     assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED' && /Nothing in this request was applied/.test(r.body.error.message ?? ''),
-      `the operator's token, ${mode}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+      `the operator's agent, ${mode}: ${r.status} ${JSON.stringify(r.body?.error)}`);
   }
   assert(await modeNow(op.token) === 'all', 'the switch stayed at all');
   const down = await setSwitchInPerson(op.token, 'owner');
   assert(down.status === 200 && await modeNow(op.token) === 'owner', `POSITIVE CONTROL, the operator in person: ${down.status} ${JSON.stringify(down.body?.error)}`);
   const up = await setSwitchInPerson(op.token, 'all');
   assert(up.status === 200 && await modeNow(op.token) === 'all', `and back to all: ${up.status}`);
+});
+
+// An owner-level personal access token is the person (Jouni, 2026-11-04; codebase analysis
+// 2026-11-03, PAT ruling): the operator's own token loosens the switch as the operator in person does.
+await test('the operator\'s access token is the person: it loosens the switch on the Config endpoint, and it is back at all after', async () => {
+  const pat = await json('/v1/access/tokens', { method: 'POST', headers: auth(op.token), body: JSON.stringify({ label: `cls switch ${stamp}`, grant_operator: true }) });
+  assert(pat.status === 201 && typeof pat.body?.data?.token === 'string', `mint the operator's token: ${pat.status} ${JSON.stringify(pat.body?.error)}`);
+  const down = await setSwitchInPerson(pat.body.data.token, 'owner');
+  assert(down.status === 200 && await modeNow(op.token) === 'owner', `the operator's token, owner: ${down.status} ${JSON.stringify(down.body?.error)}`);
+  const up = await setSwitchInPerson(pat.body.data.token, 'all');
+  assert(up.status === 200 && await modeNow(op.token) === 'all', `and back to all: ${up.status} ${JSON.stringify(up.body?.error)}`);
 });
 
 await test('REST: the operator in person moves it both ways on the Config endpoint and on /v1/classification/switch', async () => {

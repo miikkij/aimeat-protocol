@@ -17,6 +17,8 @@
  *      remove records, and a month with a person's exception in force stays.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exceptions.test.ts
  * @version-history
+ *   v1.4.0 — 2026-11-04 — The owner's owner-level PAT makes an exception as the person (Jouni,
+ *     2026-11-04; codebase analysis 2026-11-03, PAT ruling); the agent is still refused.
  *   v1.3.1 — 2026-10-18 — A left-behind item carries `from` (plan doc-mvdipuyqraas, L1.3).
  *   v1.3.0 — 2026-10-10 — An app's AI call refused for another item records no automatic 'ai-send'
  *     exception (secaudit 2026-10-10 I10).
@@ -147,7 +149,9 @@ describe('classification exceptions and apps (decided 2026-09-30)', () => {
     });
 
     it('is refused for an AI credential, needs a reason and a known action, and refuses another owner', async () => {
-      for (const ai of [agent, pat]) {
+      // The owner-level PAT is the person since 2026-11-04 (Jouni; codebase analysis 2026-11-03, PAT
+      // ruling): it is asserted at the end of this case.
+      for (const ai of [agent]) {
         await expect(makeException(deps(), ai, { key: DOC, action: 'leave', reason: 'x' })).rejects.toMatchObject({ code: 'PERSON_REQUIRED', status: 403 });
       }
       await expect(makeException(deps(), alice, { key: DOC, action: 'leave' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
@@ -165,6 +169,9 @@ describe('classification exceptions and apps (decided 2026-09-30)', () => {
       await expect(removeException(deps(), agent, e.id)).rejects.toMatchObject({ code: 'PERSON_REQUIRED' });
       // The owner's agent reads the owner's list, as it reads the owner's audit log.
       expect((await readExceptions(deps(), agent, 'owner', null)).exceptions.map(x => x.id)).toEqual([e.id]);
+      // The owner's own owner-level PAT makes one, as the owner in person does.
+      await expect(makeException(deps(), pat, { key: 'notes.mine-too', action: 'leave', reason: 'Mine to send too.' }))
+        .resolves.toMatchObject({ scope: ALICE, ownerGaii: ALICE, target: { key: 'notes.mine-too' } });
     });
   });
 

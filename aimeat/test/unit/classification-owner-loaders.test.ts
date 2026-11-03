@@ -10,6 +10,9 @@
  *   what is hidden from AI; the owner in their own session does.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-owner-loaders.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-04 — The AI reader is an unattended run in alice's data space, not her owner-level
+ *     PAT, which is the person since 2026-11-04 (Jouni; codebase analysis 2026-11-03, PAT ruling). The
+ *     assertions are unchanged.
  *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
  *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
@@ -37,9 +40,11 @@ const HIDDEN = 'erittain-luottamuksellinen';   // hidden from AI on this node (h
 const WARNING = 'luottamuksellinen';            // shown to AI with a warning
 const config = { nodeId: N, classificationMode: 'all', chatMaxLiveThreads: 50 } as unknown as AimeatConfig;
 const ownerAuth: ReaderAuth = { sub: 'alice', owner: 'alice', roles: ['owner'] };
-// The owner's credential made from a personal access token: a program reading, so an AI reader
-// acting in alice's own data space.
-const patAuth = { sub: 'alice', owner: 'alice', roles: ['owner'], via: 'pat' } as ReaderAuth;
+// An AI reader acting in alice's own data space. Until 2026-11-04 this was the owner's credential made
+// from a personal access token; an owner-level PAT is the person since then (Jouni; codebase analysis
+// 2026-11-03, PAT ruling), so the AI reader is an unattended run of alice's (role operator alone, as
+// an extension's scheduled run or a workflow step reads), which acts in her own data space too.
+const patAuth = { sub: ALICE, owner: 'alice', roles: ['operator'] } as ReaderAuth;
 
 describe('owner-content loaders pass the classification check', () => {
   let storage: SqliteStorage;

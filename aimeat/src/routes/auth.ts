@@ -470,7 +470,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         const patToken = await issueJWT({
           sub: r.sub, owner: r.owner, node: config.nodeId, roles: r.roles,
           ...(includeScopes ? { scopes: r.scopes } : {}),
-          // Made from a PAT: classification reads it as an AI (reader-kind.ts). Grants nothing.
+          // Made from a PAT: the mark auth/middleware.ts sets on a raw PAT. Grants nothing.
           via: 'pat',
           // The PAT row it stands on, checked on every request (auth/credential-revoked.ts).
           pat: r.patId,
