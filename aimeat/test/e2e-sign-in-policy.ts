@@ -35,7 +35,8 @@
  * @version-history
  *   2026-11-04 — The operator's access token is the person and loosens the policy (Jouni, 2026-11-04;
  *     codebase analysis 2026-11-03, PAT ruling). The DENIAL case that refused it is replaced by that
- *     case; the AI refusal is proven in test/unit/pat-is-person.test.ts.
+ *     case, and so is the case that refused it switching the lockout off; the AI refusal is proven in
+ *     test/unit/pat-is-person.test.ts.
  *   2026-11-02 — The silent app bridge under the required two-step policy (secaudit2026nov02d round 13).
  *   v1.1.0 — 2026-11-02 — Two-step required and totp.enabled false are refused together (TWO_STEP_NEEDS_TOTP).
  *   v1.0.0 — 2026-11-02 — Initial (IT review: required two-step sign-in, password sign-in off).
@@ -460,9 +461,14 @@ async function main() {
             assert(held.status === 429 && held.body?.error?.code === 'PASSWORD_LOCKED', `the right password while locked: ${held.status} ${held.body?.error?.code}`);
         });
 
-        await test('DENIAL: an AI credential does not switch the lockout off (PERSON_REQUIRED)', async () => {
+        // Until 2026-11-04 the token was refused here (PERSON_REQUIRED). An owner-level PAT is the person
+        // since then (Jouni; codebase analysis 2026-11-03, PAT ruling): it switches the lockout off, and
+        // on again so the next case still starts from on.
+        await test('the operator\'s access token is the person: it switches the lockout off, and on again', async () => {
             const r = await setPolicy(opPat, [{ path: 'auth.sign_in_lockout', value: 'off' }]);
-            assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED', `off by AI: ${r.status} ${r.body?.error?.code}`);
+            assert(r.status === 200, `off by the token: ${r.status} ${r.body?.error?.code}`);
+            const on = await setPolicy(opPat, [{ path: 'auth.sign_in_lockout', value: 'on' }]);
+            assert(on.status === 200, `on again: ${on.status} ${on.body?.error?.code}`);
         });
 
         await test('LOCKOUT off again: the operator in person switches it off, and the lock it set no longer holds', async () => {
