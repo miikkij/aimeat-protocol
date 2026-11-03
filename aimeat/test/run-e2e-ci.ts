@@ -1795,6 +1795,8 @@ const ALL_SUITES = [
     // shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
     'test/e2e-app-screenshot-access.ts',
     'test/e2e-maintenance-access.ts',
+    // A maintenance stop made by the CLI (another process) reaches the running node (codebase analysis 2026-11-03, A8).
+    'test/e2e-maintenance-cli.ts',
     'test/e2e-package-update-widening.ts',
     'test/e2e-memory-bin-purge.ts',
     'test/e2e-docsign-caller-refusals.ts',

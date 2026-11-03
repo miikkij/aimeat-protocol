@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-04 — The maintenance state is services/maintenance-cache.ts: re-read from storage, so a CLI stop reaches the running node (codebase analysis 2026-11-03, item A8).
  *   2026-11-01 — The schedule kinds handed to the Scheduler moved to ./schedule-kinds.ts, which adds dataproduct (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-29 — The peer registry is made with peerRegistry(config.nodeId), so gatePeer refuses this node's own id at every door (secaudit2026oct26 round 8c).
  *   2026-10-27 — A stored peer with this node's own id is not loaded into the peer registry, with a log line (secaudit2026oct26).
@@ -111,7 +112,8 @@
  *     applied install set names a repository (services/install-set-trust.ts).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MaintenanceState } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
+import { loadMaintenanceCache, type MaintenanceCache } from '../services/maintenance-cache.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { generateKeyPair } from '../auth/keypair.js';
@@ -180,8 +182,7 @@ import { sealPlaintextTotpSecrets } from '../services/totp.js';
 import { sealPlaintextConfigSecrets } from '../services/config-at-rest-rows.js';
 
 export interface ServiceInitResult {
-  maintenanceCache: MaintenanceState;
-  setMaintenanceCache: (state: MaintenanceState) => void;
+  maintenance: MaintenanceCache;
   directoryService: DirectoryService;
   peers: Map<string, PeerInfo>;
   networkDirectory: Map<string, ServiceSummary>;
@@ -202,11 +203,9 @@ export async function initializeServices(
   config: AimeatConfig,
   storage: Storage,
 ): Promise<ServiceInitResult> {
-  // Maintenance mode cache — loaded once from storage, updated on toggle
-  let maintenanceCache: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
-  try {
-    maintenanceCache = await storage.getMaintenanceMode();
-  } catch (err) { logger.warn('initializeServices: default to disabled', { error: String(err) }); }
+  // Maintenance mode: read at boot, set by the operator's switch, and re-read from storage so a stop
+  // the CLI or another process made reaches this one (services/maintenance-cache.ts).
+  const maintenance = await loadMaintenanceCache(storage);
 
   // Initialize node keys asynchronously
   initializeNode(config, storage);
@@ -706,8 +705,7 @@ export async function initializeServices(
   }
 
   return {
-    maintenanceCache,
-    setMaintenanceCache: (state: MaintenanceState) => { Object.assign(maintenanceCache, state); },
+    maintenance,
     directoryService,
     peers,
     networkDirectory,

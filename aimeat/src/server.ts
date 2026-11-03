@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-04 — The guard and the admin route share services.maintenance, which re-reads storage (codebase analysis 2026-11-03, item A8).
  *   2026-11-01 — trailRecorder() after optionalAuth: every authenticated REST change is a line in the
  *     place's trail ("Rakennamme kanssasi", part C).
  *   2026-10-27 — inputJunkGuard() before idempotency(): a NUL or a lone surrogate in the body, the query
@@ -355,7 +356,7 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // ── Middleware Guards (maintenance, relay/mirror, first-run wizard) ──
   const invalidateHasOwnersCache = () => { /* no-op initially */ };
   const guards = setupGuards(app, config, storage,
-    { get: () => services.maintenanceCache },
+    services.maintenance,
     invalidateHasOwnersCache,
   );
 
@@ -370,10 +371,7 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   const { realtimeManager } = await mountRoutes(app, config, storage, {
     rejectForRelay: guards.rejectForRelay,
     mirrorReadOnly: guards.mirrorReadOnly,
-    maintenanceState: {
-      get: () => services.maintenanceCache,
-      set: services.setMaintenanceCache,
-    },
+    maintenanceState: services.maintenance,
     provenance,
     consulService,
     directoryService: services.directoryService,
