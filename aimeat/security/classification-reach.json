@@ -869,9 +869,15 @@
     },
     "src/services/ai-jobs/service.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-18: readResult hands a job's answer to the extension that started it, through presentMemory with the job's own reader (starter.ts jobReader)."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-18: readResult hands a job's answer to the extension that started it, through presentMemory with the job's own reader (starter.ts jobReader). 2026-11-04: the version read before the answer's write moved to write-result.ts."
+    },
+    "src/services/ai-jobs/write-result.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-04 (moved unchanged from ai-jobs/service.ts writeResult), serves a write: the version of the result record is read so the job's answer is written on it (expectedVersion); nothing read is handed to a caller."
     },
     "src/services/ai-jobs/store.ts": {
       "reads": {
@@ -2431,6 +2437,12 @@
         "searchText": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/services/outbox.ts": {
+      "reads": {
+        "listMemory": 2
+      },
+      "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, HA 1.5), the node's own read: the stored outbox entries in system@<node> (webhook and mail retries the node itself wrote), listed to resume them at boot and to free this process's claims at shutdown; nothing is handed to a caller."
     },
     "src/services/outbound/outbound-service.ts": {
       "reads": {

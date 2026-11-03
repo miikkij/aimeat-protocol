@@ -182,7 +182,7 @@
       "digest": "sha256:4a124591b51f02e11c124e14"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -198,7 +198,7 @@
         "docs/operations/federation.md",
         "docs/coding-guidelines/environment-configs.md"
       ],
-      "digest": "sha256:783df77e5f8b7f2bcdba16fd"
+      "digest": "sha256:89200184b2d088c3fbe8038b"
     },
     "README.md": {
       "reviewedOn": "2026-11-02",
@@ -390,7 +390,7 @@
       "aimeat/src/mcp/legacy-sessions.ts": "9307c49d8f8d3ff6",
       "aimeat/src/services/passkeys.ts": "57fd388e3fb070ef",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "acf25fba1b6088c2",
+      "aimeat/src/services/ai-jobs/service.ts": "2f42b114f3d2e845",
       "aimeat/src/services/config-apply.ts": "d4d3534332d03a4c",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",

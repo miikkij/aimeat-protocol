@@ -59,11 +59,9 @@ import {
   keyCredentialsEmailSubject,
 } from './email-templates.js';
 
-export interface EmailAttachment {
-  filename: string;
-  content: Buffer;
-  contentType: string;
-}
+// Declared beside the sender that stores it (email-outbox.ts), so the two files do not import each other.
+export type { EmailAttachment } from './email-outbox.js';
+import type { EmailAttachment } from './email-outbox.js';
 
 export interface EmailService {
   readonly enabled: boolean;

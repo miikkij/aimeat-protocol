@@ -11,7 +11,7 @@
  *   it is stored only as ciphertext bound to its outbox entry (encryption.ts encryptBound), and only
  *   while it waits: the entry is deleted when the mail is sent or the last attempt failed. A node
  *   without an encryption key, or a service made without storage, retries in memory as before.
- * @structure MailPayload · createMailSender
+ * @structure EmailAttachment · MailPayload · createMailSender
  * @usage
  *   const sendMail = createMailSender(transporter, { config, storage });
  *   const ok = await sendMail({ from, to, subject, html, text, type: 'notification' });
@@ -21,7 +21,6 @@
 import type { Transporter } from 'nodemailer';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { EmailAttachment } from './email.js';
 import { logger } from '../utils/logger.js';
 import { getStats } from './stats.js';
 import { encryptBound, decryptBound, getEncryptionKey } from './encryption.js';
@@ -31,6 +30,13 @@ const RETRY_DELAYS = [1_000, 3_000, 9_000]; // exponential backoff: 1s, 3s, 9s
 
 /** Long enough for nodemailer's own timeouts on one attempt, so a slow send is not taken over. */
 const MAIL_LEASE_MS = 3 * 60_000;
+
+/** A file attached to a mail (services/email.ts sendWithAttachments re-exports this type). */
+export interface EmailAttachment {
+    filename: string;
+    content: Buffer;
+    contentType: string;
+}
 
 export interface MailPayload {
     from: string;
