@@ -159,6 +159,28 @@ describe('the compact pill is the default wherever the pill is mounted', () => {
   });
 });
 
+describe('the name in a signed-in pill', () => {
+  const signedIn = () => fakeAuth({ getSession: () => SESSION });
+
+  it('is a link when the page names an address, and the link says where it goes', () => {
+    const pill = mount(signedIn(), { compact: false, nameHref: '/v1/home?settings=1' });
+    expect(pill.innerHTML).toContain('<a class="aimeat-auth-ghii" href="/v1/home?settings=1" title="Home settings">Alice Doe</a>');
+  });
+
+  it('stays plain text in an app, which names no address', () => {
+    const pill = mount(signedIn(), { compact: false });
+    expect(pill.innerHTML).toContain('<span class="aimeat-auth-ghii">Alice Doe</span>');
+    expect(pill.innerHTML).not.toContain('<a class="aimeat-auth-ghii"');
+  });
+
+  it('escapes the address and the name', () => {
+    const auth = fakeAuth({ getSession: () => ({ ...SESSION, displayName: '<b>Al</b>' }) });
+    const pill = mount(auth, { compact: false, nameHref: '/x"y' });
+    expect(pill.innerHTML).toContain('href="/x&quot;y"');
+    expect(pill.innerHTML).toContain('>&lt;b&gt;Al&lt;/b&gt;</a>');
+  });
+});
+
 describe('the pill\'s Sign In', () => {
   it('goes through auth.signIn() with the pill\'s own options, less its onLogin', async () => {
     const auth = fakeAuth();

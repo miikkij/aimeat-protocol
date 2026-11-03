@@ -993,10 +993,10 @@
      "slug": "g-5-home-in-one-press",
      "cells": [
       "<strong>Home in one press</strong>",
-      "While the top bar's links are folded into the menu (a phone, or a window too narrow for them), a cabin button beside the menu takes you to your home, marked while you are there. The bar's buttons say their name when the pointer rests on them.",
+      "While the top bar's links are folded into the menu (a phone, or a window too narrow for them), a cabin button beside the menu takes you to your home, marked while you are there. The bar's buttons say their name when the pointer rests on them. Where the top bar shows your name, pressing the name takes you to your home and opens Home settings; the address <code>/v1/home?settings=1</code> does the same. In an app the name stays plain text.",
       "Top bar"
      ],
-     "plain": "Home in one press While the top bar's links are folded into the menu (a phone, or a window too narrow for them), a cabin button beside the menu takes you to your home, marked while you are there. The bar's buttons say their name when the pointer rests on them. Top bar"
+     "plain": "Home in one press While the top bar's links are folded into the menu (a phone, or a window too narrow for them), a cabin button beside the menu takes you to your home, marked while you are there. The bar's buttons say their name when the pointer rests on them. Where the top bar shows your name, pressing the name takes you to your home and opens Home settings; the address /v1/home?settings=1 does the same. In an app the name stays plain text. Top bar"
     },
     {
      "slug": "g-5-find-a-place-in-the-menus",

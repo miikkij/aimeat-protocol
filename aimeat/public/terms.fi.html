@@ -273,7 +273,7 @@
     var open = menu.classList.toggle('open');
     burger.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
-  if (window.AIMEAT && AIMEAT.auth && AIMEAT.auth.mountLoginButton) AIMEAT.auth.mountLoginButton('#sp-pill', {});
+  if (window.AIMEAT && AIMEAT.auth && AIMEAT.auth.mountLoginButton) AIMEAT.auth.mountLoginButton('#sp-pill', { nameHref: '/v1/home?settings=1' });
 })();
 </script>
 

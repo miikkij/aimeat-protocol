@@ -8,6 +8,7 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-11-04 — The name in the login pill links to the home's settings dialog.
  *   2026-10-27 — The version rows' View button takes the address through jsArg (secaudit2026oct26).
  *   2026-10-26 — skillSetBinding reads SKILL.md alone (body_only) and republishes with keep_files, so
  *     an attach or detach keeps every other file of the skill, an image as its bytes.
@@ -367,6 +368,7 @@ async function mountLoginPill() {
       try { await window.AIMEAT.auth.login(); } catch (e) { /* not logged in yet */ }
       if (window.AIMEAT.auth.mountLoginButton) {
         window.AIMEAT.auth.mountLoginButton('#headerAuth', {
+          nameHref: '/v1/home?settings=1',
           onLogin: onAuthChanged,
           onLogout: onAuthChanged,
           i18n: {

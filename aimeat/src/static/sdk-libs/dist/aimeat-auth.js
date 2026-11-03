@@ -363,6 +363,8 @@
       "background:var(--aimeat-pill-live,var(--success,#10B981))}",
       ".aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;" + labelCase + "}",
       ".aimeat-auth-ghii{font-weight:800;font-size:13px;color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
+      "a.aimeat-auth-ghii,a.aimeat-auth-ghii:visited{text-decoration:none;color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
+      "a.aimeat-auth-ghii:hover,a.aimeat-auth-ghii:focus-visible{text-decoration:underline;color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
       ".aimeat-auth-fed{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.04em;",
       "padding:1px 6px;border:" + frame + frameCur + "}",
       ".aimeat-auth-gear{appearance:none;background:none;border:" + frame + frameCur + ";color:inherit;border-radius:0;",
@@ -663,7 +665,8 @@
       modeOnly: "only",
       chooseLook: "Choose look",
       switchLanguage: "Language",
-      pageSettings: "Settings"
+      pageSettings: "Settings",
+      homeSettings: "Home settings"
     },
     fi: {
       loggedIn: "kirjautuneena",
@@ -685,7 +688,8 @@
       modeOnly: "vain",
       chooseLook: "Valitse tyyli",
       switchLanguage: "Kieli",
-      pageSettings: "Asetukset"
+      pageSettings: "Asetukset",
+      homeSettings: "Kodin asetukset"
     },
     es: {
       loggedIn: "sesión iniciada",
@@ -707,7 +711,8 @@
       modeOnly: "solo",
       chooseLook: "Elige el aspecto",
       switchLanguage: "Idioma",
-      pageSettings: "Ajustes"
+      pageSettings: "Ajustes",
+      homeSettings: "Configuración del hogar"
     }
   };
   function pillStrings(lang) {
@@ -1104,7 +1109,8 @@
       i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
       const stored = auth2.getSession() || load("session");
       if (stored) {
-        var pillHtml = '<div class="aimeat-auth-pill" title="' + escHtml(i.loggedIn || "logged in") + '"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
+        var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
+        var pillHtml = '<div class="aimeat-auth-pill" title="' + escHtml(i.loggedIn || "logged in") + '"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + "</span>" + (opts.nameHref ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || "Home settings") + '">' + nameText + "</a>" : '<span class="aimeat-auth-ghii">' + nameText + "</span>") + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
         ensureAuthPillStyles();
         if (useCompact) {
           var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);

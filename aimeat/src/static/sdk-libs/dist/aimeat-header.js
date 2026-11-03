@@ -313,6 +313,7 @@
             pillI18n.themeToDark = t["nav.themeToDark"] || NAV_FALLBACK["nav.themeToDark"];
             pillI18n.themeToLight = t["nav.themeToLight"] || NAV_FALLBACK["nav.themeToLight"];
             window.AIMEAT.auth.mountLoginButton("#headerAuth", {
+              nameHref: nodeHref("/v1/home?settings=1"),
               onLogin: function() {
                 window.dispatchEvent(new Event("aimeat-auth-change"));
               },

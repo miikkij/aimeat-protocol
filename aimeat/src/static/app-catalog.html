@@ -10816,6 +10816,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         }
         if (window.AIMEAT.auth.mountLoginButton) {
           window.AIMEAT.auth.mountLoginButton("#headerAuth", {
+            nameHref: "/v1/home?settings=1",
             onLogin: onAuthChanged,
             onLogout: onAuthChanged,
             i18n: {

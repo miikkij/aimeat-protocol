@@ -9,6 +9,8 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.9.1 — 2026-11-04 — The name as a link (pill.js opts.nameHref) looks like the plain name, and
+ *     underlines on hover and on keyboard focus.
  *   v1.9.0 — 2026-10-31 — aimeatReadTheme() is light when nothing is chosen; the OS preference
  *     counts only when the stored choice is 'auto' (Jouni, v31 K65). The mode switch has a third
  *     button, "Auto", which stores 'auto' and follows the device, live; aimeatThemeChoice() reads the
@@ -269,6 +271,8 @@ export function ensureAuthPillStyles() {
       'background:var(--aimeat-pill-live,var(--success,#10B981))}',
     '.aimeat-auth-label{display:inline-flex;align-items:center;font-size:11px;font-weight:800;' + labelCase + '}',
     '.aimeat-auth-ghii{font-weight:800;font-size:13px;color:var(--aimeat-pill-name,var(--accent,#E8564A))}',
+    'a.aimeat-auth-ghii,a.aimeat-auth-ghii:visited{text-decoration:none;color:var(--aimeat-pill-name,var(--accent,#E8564A))}',
+    'a.aimeat-auth-ghii:hover,a.aimeat-auth-ghii:focus-visible{text-decoration:underline;color:var(--aimeat-pill-name,var(--accent,#E8564A))}',
     '.aimeat-auth-fed{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.04em;',
       'padding:1px 6px;border:' + frame + frameCur + '}',
     '.aimeat-auth-gear{appearance:none;background:none;border:' + frame + frameCur + ';color:inherit;border-radius:0;',

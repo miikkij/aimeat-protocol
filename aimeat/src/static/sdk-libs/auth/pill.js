@@ -14,6 +14,8 @@
  *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.8.0 — 2026-11-04 — opts.nameHref makes the name a link: the node's own pages pass the Home
+ *     settings address (Jouni, 2026-11-04). An app passes nothing, and its name stays plain text.
  *   v1.7.3 — 2026-11-01 — The signed-in pill carries a title ("kirjautuneena"), so its green dot is
  *     explained under the pointer where a page hides the label (Jouni's review of v33).
  *   v1.7.2 — 2026-10-31 — On a page that names fewer than two languages the labels choose among the
@@ -132,10 +134,13 @@ export function mountPill(auth, selector, opts = {}) {
       // ink on paper here, light on a dark page, and whatever a palette says elsewhere.
       // The pill says in words what its green dot means, also where a page hides the label beside
       // it (Jouni's review of v33: an unexplained green square in the top bar).
+      var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
       var pillHtml = '<div class="aimeat-auth-pill" title="' + escHtml(i.loggedIn || 'logged in') + '">'
         + '<span class="aimeat-auth-dot" aria-hidden="true"></span>'
         + '<span class="aimeat-auth-label">' + escHtml(i.loggedIn || 'logged in') + '</span>'
-        + '<span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + '</span>'
+        + (opts.nameHref
+          ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || 'Home settings') + '">' + nameText + '</a>'
+          : '<span class="aimeat-auth-ghii">' + nameText + '</span>')
         + (stored.federated ? '<span class="aimeat-auth-fed">\u{1F310} ' + escHtml(i.federated || 'Federated') + '</span>' : '')
         // Permissions gear — only for an EXTERNAL app (a grant the user gave, not their own app).
         + ((stored._appOrigin && stored._app && !stored._own)
