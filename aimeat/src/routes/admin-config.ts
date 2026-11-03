@@ -18,6 +18,8 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-11-03 -- DELETE refuses an AI credential PERSON_REQUIRED for a setting it may only make stricter
+ *     (resetNodeSettingRefusal), as PUT does for a looser value (secaudit2026nov02d round 13b).
  *   2026-10-25 -- GET's list and PUT's checks moved to services/config-admin-view.ts unchanged, so the
  *     MCP tools aimeat_admin_config and aimeat_admin_config_set read and change settings through the
  *     same code. GET serves `appliesAt: 'restart'` on a row that takes effect at the next start and
@@ -69,7 +71,7 @@ import { success, error } from '../middleware/envelope.js';
 import { MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV } from '../services/config-schema.js';
 import { planConsulExport } from '../services/consul-export.js';
 import { sealSettingForStorage } from '../services/config-at-rest-rows.js';
-import { buildConfigView, changeNodeSettings } from '../services/config-admin-view.js';
+import { buildConfigView, changeNodeSettings, resetNodeSettingRefusal } from '../services/config-admin-view.js';
 import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
@@ -132,6 +134,13 @@ export function adminConfigRouter(
         if (!field) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
                 `Unknown or immutable config path: ${path}`));
+            return;
+        }
+        // A setting an AI may only make stricter is not reset by an AI either: the value it falls back to
+        // can be less strict (services/config-admin-view.ts resetNodeSettingRefusal).
+        const personOnly = resetNodeSettingRefusal(req.auth!, path);
+        if (personOnly) {
+            res.status(personOnly.status).json(error(config.nodeId, personOnly.code, personOnly.message, undefined, personOnly.details));
             return;
         }
 

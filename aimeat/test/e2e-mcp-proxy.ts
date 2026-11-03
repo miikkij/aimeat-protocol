@@ -34,6 +34,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-11-03 — Phase 5f: an agent holding operator:admin cannot remove the saved value of a setting it
+ *     may only make stricter (DELETE /v1/admin/config/:path, PERSON_REQUIRED); the operator in person can.
  *   2026-11-03 — Phase 5f: the node setting mcp.capability_use_approval reads operators by default; the
  *     round-13 tests run with it set to ask (their publisher is an operator); under ask the operator's
  *     capability asks too, under operators it runs unasked while another owner's asks, under off nothing
@@ -2391,6 +2393,18 @@ await test('an agent of the operator may make it stricter (off to operators to a
     `a loosening behind a stricter change in one request: ${batch.status} ${JSON.stringify(batch.body?.error)}`);
   const back = await setApproval(ownerToken, 'operators');
   assert(back.status === 200 && await approvalSetting() === 'operators', `back to the default: ${back.status} ${JSON.stringify(back.body?.error)}`);
+});
+
+await test('DENIAL: an agent of the operator cannot remove the saved value of a setting it may only make stricter (PERSON_REQUIRED); the operator in person can', async () => {
+  const agent = await agentWithScopes({ name: ownerName, token: ownerToken }, `cfgreset${Date.now().toString(36)}`, ['operator:admin']);
+  for (const path of [APPROVAL_PATH, 'auth.two_step_required', 'auth.password_sign_in']) {
+    const r = await json(`/v1/admin/config/${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${agent.token}` } });
+    assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED' && r.body.error?.details?.setting === path,
+      `the agent's reset of ${path}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  }
+  const mine = await json(`/v1/admin/config/${APPROVAL_PATH}`, { method: 'DELETE', headers: ownerAuth() });
+  assert(mine.status === 200 && mine.body?.data?.deleted === APPROVAL_PATH, `the operator's own reset: ${mine.status} ${JSON.stringify(mine.body?.error)}`);
+  assert(await approvalSetting() === 'operators', 'the reset moved the value before a restart');
 });
 
 await test('an owner the server does not admit cannot start a sign-in on it', async () => {

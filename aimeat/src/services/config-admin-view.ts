@@ -13,10 +13,14 @@
  *   A secret row is shown as whether it is set (`<path>_configured`), never with its value. It names
  *   the path that sets it (`set_path`) when the operator may set it, so a key can be replaced from
  *   the Config tab or from chat and still never be read back.
- * @structure ConfigViewEntry · buildConfigView(deps) · changeNodeSettings(deps, caller, changes)
+ * @structure ConfigViewEntry · buildConfigView(deps) · changeNodeSettings(deps, caller, changes) ·
+ *   resetNodeSettingRefusal(caller, path)
  * @usage const view = buildConfigView({ config, storage, provenance });
  *        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, changes);
  * @version-history
+ *   2026-11-03 — resetNodeSettingRefusal: an AI credential does not remove the saved value of a setting
+ *     it may only make stricter (classification.mode, the sign-in policy, mcp.capability_use_approval),
+ *     because the value then falls back to the file or the default (secaudit2026nov02d round 13b).
  *   2026-11-03 — mcp.capability_use_approval: a change that asks fewer people (ask to operators to off) is
  *     refused to an AI credential with PERSON_REQUIRED, before anything is applied (secaudit2026nov02d round 13b).
  *   2026-11-02 — auth.sign_in_lockout: switching it off is refused to an AI credential, like the two below.
@@ -49,6 +53,28 @@ import {
     TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, SIGN_IN_LOCKOUT_PATH, TOTP_ENABLED_PATH, signInPolicyChangeRefusal, passwordOffLockoutRefusal, twoStepWithoutTotpRefusal,
 } from './sign-in-policy.js';
 import { CAPABILITY_USE_APPROVAL_PATH, capabilityUseApprovalChangeRefusal } from './mcp-client/capability-use-setting.js';
+import { readerKindOf } from './classification/reader-kind.js';
+
+/**
+ * The settings an AI credential may only make stricter (the checks in changeNodeSettings below). Their
+ * saved value removed falls back to the file, the environment or the default, which can be less strict,
+ * so the removal is the operator's own act (resetNodeSettingRefusal).
+ */
+const PERSON_ONLY_LOOSENING = new Set<string>([
+    CLASSIFICATION_MODE_PATH, TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, SIGN_IN_LOCKOUT_PATH, CAPABILITY_USE_APPROVAL_PATH,
+]);
+
+/**
+ * The refusal an AI credential gets for removing the saved value of a setting it may only make stricter,
+ * or null. DELETE /v1/admin/config/:path asks it before storage is touched. The AI may still set a
+ * stricter value with PUT; a person's own session is never refused here.
+ */
+export function resetNodeSettingRefusal(caller: SwitchCaller, path: string): { status: number; code: string; message: string; details: Record<string, unknown> } | null {
+    if (!PERSON_ONLY_LOOSENING.has(path) || readerKindOf(caller) === 'human') return null;
+    return { status: 403, code: 'PERSON_REQUIRED', details: { setting: path },
+        message: `Removing the saved value of ${path} puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. `
+            + 'An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves.' };
+}
 
 export interface ConfigViewDeps { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance }
 

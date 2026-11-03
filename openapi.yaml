@@ -79844,7 +79844,11 @@ paths:
         dotted path, reverting the value to file/env/default on next restart. Returns 403 when the
         storage backend does not support config persistence (`READONLY_CONFIG`, in-memory), and 403
         `SEALED_CONFIG` when the path was sealed by the node's host — removing an override moves the
-        value, so it is a write like any other.
+        value, so it is a write like any other. An AI credential (an agent, an app grant, a personal
+        access token) gets 403 `PERSON_REQUIRED` for a setting it may only make stricter
+        (`classification.mode`, `auth.two_step_required`, `auth.password_sign_in`,
+        `auth.sign_in_lockout`, `mcp.capability_use_approval`), because the value it falls back to can
+        be less strict; it may still set a stricter value with PUT /v1/admin/config.
       security:
         - BearerAuth: []
       parameters:
