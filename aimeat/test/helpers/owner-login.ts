@@ -28,6 +28,8 @@
  *   const tok = await ownerSignIn(BASE, name, 'TheSuitesOwnPw1');        // { status, body } like json()
  *   const token = await ownerToken(BASE, name);                          // the token, or a throw naming why
  * @version-history
+ *   v1.2.0 — 2026-11-03 — setupOperator takes an optional setupCode: from 2026-11-02 the admin setup
+ *     route asks the first operator of a node with a public base URL for the one-time code.
  *   v1.1.0 — 2026-10-23 — setupOperator: an operator from POST /v1/admin/setup/register with a password,
  *     signed in with it; POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.0.0 — 2026-10-12 — Initial (wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po).
@@ -131,13 +133,19 @@ export async function setupOperator(
     base: string,
     adminPassword: string,
     username: string,
-    opts: { password?: string; displayName?: string } = {},
+    opts: { password?: string; displayName?: string; setupCode?: string } = {},
 ): Promise<RegisteredOwner> {
     const password = opts.password ?? OWNER_PASSWORD;
+    // A node whose base URL is not loopback asks the first operator for the one-time setup code from
+    // its start log (services/setup-code.ts); a suite starting such a node passes it here.
     const send = () => fetch(`${base}/v1/admin/setup/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
-        body: JSON.stringify({ name: username, password, ...(opts.displayName ? { display_name: opts.displayName } : {}) }),
+        body: JSON.stringify({
+            name: username, password,
+            ...(opts.displayName ? { display_name: opts.displayName } : {}),
+            ...(opts.setupCode ? { setupCode: opts.setupCode } : {}),
+        }),
     });
     // The setup routes share a limiter of five a minute per address; a suite is not testing it.
     let res = await send();

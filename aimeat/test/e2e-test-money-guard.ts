@@ -12,6 +12,9 @@
  *   URL, the way the E2E runner and `pnpm sandbox` start a node: test.money works and nothing warns.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=test-money-guard
  * @version-history
+ *   v2.0.2 — 2026-11-03 — The first operator of each public node sends the one-time setup code from
+ *     the node's start log: from 2026-11-02 the admin setup route asks for it (4fc091e8d), and the
+ *     suite stopped at its first registration with 403 SETUP_CODE_REQUIRED.
  *   v2.0.1 — 2026-10-23 — owner() uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -40,7 +43,8 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
-interface Node { proc: ChildProcess; base: string; dbPath: string }
+/** `setupCode` is the one-time code from the start log, until the first operator has used it. */
+interface Node { proc: ChildProcess; base: string; dbPath: string; log: string; setupCode?: string }
 
 /** Start a node on loopback, with `publicUrl` as the address it believes others reach it at. */
 async function startNode(port: string, publicUrl: string, label: string, testMoney: boolean): Promise<Node> {
@@ -58,13 +62,25 @@ async function startNode(port: string, publicUrl: string, label: string, testMon
       AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '5000',
       AIMEAT_RL_ADMIN_SETUP: '1000', AIMEAT_ADMIN_AUTH_RATE_LIMIT_MAX: '1000',
       AIMEAT_ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      // The run's env file sets error; the setup code is a warn line.
+      AIMEAT_LOG_LEVEL: 'warn',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  proc.stdout?.on('data', () => {}); proc.stderr?.on('data', () => {});
-  const base = `http://localhost:${port}`;
+  const node: Node = { proc, base: `http://localhost:${port}`, dbPath, log: '' };
+  // The setup code is a logger.warn line, which may go to either stream.
+  proc.stdout?.on('data', (d: Buffer) => { node.log += d.toString(); });
+  proc.stderr?.on('data', (d: Buffer) => { node.log += d.toString(); });
   for (let i = 0; i < 60; i++) {
-    try { const r = await fetch(`${base}/v1/spec`); if (r.ok) return { proc, base, dbPath }; } catch { /* not up yet */ }
+    try {
+      const r = await fetch(`${node.base}/v1/spec`);
+      if (r.ok) {
+        // A node with a public base URL prints the one-time setup code its first operator needs
+        // (services/setup-code.ts); the loopback node prints none and needs none.
+        node.setupCode = /Setup code: ([0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4})/.exec(node.log)?.[1];
+        return node;
+      }
+    } catch { /* not up yet */ }
     await new Promise(r => setTimeout(r, 1000));
   }
   proc.kill();
@@ -86,7 +102,9 @@ async function json(node: Node, path: string, opts: RequestInit = {}) {
 
 /** An account through the admin setup route, and a token for it. The first one is the operator. */
 async function owner(node: Node, name: string): Promise<string> {
-  return (await setupOperator(node.base, ADMIN_PW, name)).token;
+  const setupCode = node.setupCode;
+  node.setupCode = undefined;
+  return (await setupOperator(node.base, ADMIN_PW, name, { setupCode })).token;
 }
 
 const handlerIds = async (node: Node) =>

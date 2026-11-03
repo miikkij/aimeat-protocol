@@ -20,6 +20,8 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-11-03 — POST /v1/ghii/login/two-step/start and /finish are open: the two-step setup a covered
+ *     account finishes mid sign-in, on the setup token the password step gave (4fc091e8d).
  *   2026-11-01 — GET /v1/dataset/{}/{} is open: the public dataset page's shell, which in this mode carries
  *     no dataset head (WP9b; services/datapackage/landing-page.ts).
  *   2026-10-31 — A route the open list leaves out by name stays closed in other letters
@@ -85,6 +87,9 @@ const OPEN_CODE_ROUTES = new Set<string>([
     'POST /v1/auth/refresh', 'POST /v1/auth/revoke', 'POST /v1/auth/token', 'POST /v1/auth/token/exchange',
     'POST /v1/ghii', 'POST /v1/owners', 'POST /v1/ghii/register-web', 'POST /v1/ghii/verify-email', 'GET /v1/ghii/username-available',
     'POST /v1/ghii/login', 'POST /v1/ghii/login/attach-email', 'POST /v1/ghii/login/passkey/options', 'POST /v1/ghii/login/passkey/verify',
+    // The two-step setup a covered account goes through mid sign-in; each call carries the setup token
+    // the password step answered with, and nothing else (routes/ghii/login-two-step.ts).
+    'POST /v1/ghii/login/two-step/start', 'POST /v1/ghii/login/two-step/finish',
     'GET /v1/ghii/login/pending', 'GET /v1/ghii/login/{}', 'GET /v1/ghii/login/{}/callback', 'POST /v1/ghii/login/{}/finalize',
     'GET /v1/ghii/login/saml/{}', 'POST /v1/ghii/login/saml/{}/acs', 'POST /v1/ghii/login/saml/{}/finalize',
     'POST /v1/ghii/magic-link', 'GET /v1/ghii/magic-link/open', 'GET /v1/ghii/magic-link/verify', 'POST /v1/ghii/magic-link/second-factor',

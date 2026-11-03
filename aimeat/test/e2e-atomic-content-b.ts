@@ -22,6 +22,8 @@
  *   (helpers/own-node-db.ts).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=atomic-content-b
  * @version-history
+ *   v1.0.1 — 2026-11-03 — migrateLegacyOfferings is imported from exchange-projection-migrate.ts,
+ *     where it moved; the suite did not load and the nightly sweep listed it as DID NOT RUN.
  *   v1.0.0 — 2026-10-19 — Initial (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j, G6).
  */
 import { randomBytes } from 'node:crypto';
@@ -39,7 +41,7 @@ import { foldIntoLog, logKeyFor } from '../src/services/ai-jobs/store.js';
 import type { AiJobRecord } from '../src/services/ai-jobs/types.js';
 import { mergeJourneyProfile, JOURNEY_KEY } from '../src/services/journey-state.js';
 import { mergePortfolioConfig, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii } from '../src/services/portfolio-config.js';
-import { migrateLegacyOfferings } from '../src/services/exchange-projection.js';
+import { migrateLegacyOfferings } from '../src/services/exchange-projection-migrate.js';
 import { putOffering } from '../src/services/exchange-market.js';
 import { appToolsKey } from '../src/models/app-tool-schemas.js';
 import { installPackageAppTools } from '../src/services/packages/install/package-app-tools.js';
