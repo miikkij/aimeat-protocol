@@ -14,6 +14,8 @@
  *   StartAiJobInput · AiJobError · AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.13.0 -- 2026-11-04 -- `stopped_at` and `requeued_after_stop`: a job the node stopped is queued
+ *     again once at the next start (restart.ts; codebase analysis 2026-11-03, item HA 1.4).
  *   v1.12.1 -- 2026-10-27 -- visibleToViewer moved here from service.ts, unchanged (max-file-lines; secaudit2026oct26).
  *   v1.12.0 -- 2026-10-22 -- `read_as` on the record and `readAs` on the start context: the principal
  *     an extension's ctx.ai.start reads the owner scope as, when narrower than the owner (secaudit
@@ -148,6 +150,11 @@ export interface AiJobRecord {
     /** The warning-classified items the job gave its model: the prompt's records when the job was
      *  started, the audio when it ran. Absent when there were none. */
     classification_warnings?: AiJobClassificationWarnings;
+    /** When the node began to stop (a deploy or a restart) while this run was in flight. The next
+     *  start puts a marked job back in the queue once (restart.ts); the mark goes with the run. */
+    stopped_at?: string;
+    /** How many times a restart put this job back in the queue after the node stopped it. */
+    requeued_after_stop?: number;
 }
 
 /**
