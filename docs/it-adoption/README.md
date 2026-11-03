@@ -1,6 +1,6 @@
 # AIMEAT IT adoption package
 
-> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see "How this package stays current" below.
+> Checked against AIMEAT node 4.2.0 (commit a463a1e3b) on 2026-11-03. Maintained with the code: see "How this package stays current" below.
 
 What an organisation's IT and information security need to evaluate, approve, install and run AIMEAT as their own internal system. AIMEAT is open-source software (MIT) that the organisation runs on its own server: people and their AI agents keep their knowledge there and share it through MCP, the protocol that AI tools such as Claude, Claude Code, Codex, Cursor and VS Code connect with, without a migration between AI vendors. Nothing here is specific to one organisation. Every claim names its source in the repository (a file, a setting or an MCP tool), and what the repository does not answer is listed under [Open questions](#open-questions). The limits are stated as plainly as the features: [16 Known limitations](16-known-limitations.md) collects them.
 
@@ -157,7 +157,7 @@ What the repository does not answer. Each one names who can answer it; most are 
 
 ### [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md)
 
-- OPEN: Has the project run one node as several processes on one PostgreSQL database behind a load balancer, or as an active process with a standby, under load, and with which load balancer rules? The maintainer named in `.github/SECURITY.md` can answer.
+- OPEN: Has the project run one node as an active process with a standby, under load, and with which load balancer rules? The maintainer named in `.github/SECURITY.md` can answer.
 - OPEN: Will the short sign-in steps (MCP OAuth codes, app grant codes, passkey ceremonies, WebSocket tickets), the replay cache and the start-up reconciliation of AI jobs and workflow runs move to the database, so that several processes can serve without routing the sign-in paths to one process? The maintainer can answer.
 - OPEN: Can a person signed in from a peer node through cross-node sign-in be a member of an organism on this node, and which workspace operations are open to such a member? The maintainer can answer.
 

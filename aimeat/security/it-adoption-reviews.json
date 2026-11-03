@@ -16,7 +16,7 @@
       "digest": "sha256:794c4e46d13b4eb231394e3c"
     },
     "01-overview.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         ".github/SECURITY.md",
         "docs/coding-guidelines/environment-configs.md",
@@ -35,7 +35,7 @@
         "aimeat/src/services/connections/providers-files.ts",
         "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:f049fc2f41a94a51a0750c88"
+      "digest": "sha256:bce6eeddda4db5d405e93fa4"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -161,10 +161,10 @@
         "docs/operations/production-deployment.md",
         "aimeat/deploy/aimeat.service"
       ],
-      "digest": "sha256:aab0d95b1c239dcfa7c72809"
+      "digest": "sha256:8ebc0a60039c62ef6118c2a3"
     },
     "16-known-limitations.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "docs/known_gaps.md",
         "docs/security/threat-model.md",
@@ -183,7 +183,7 @@
       "digest": "sha256:4a124591b51f02e11c124e14"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -197,12 +197,17 @@
         "aimeat/src/services/operator-access-audit.ts",
         "aimeat/src/config-private-host.ts",
         "docs/operations/federation.md",
-        "docs/coding-guidelines/environment-configs.md"
+        "docs/coding-guidelines/environment-configs.md",
+        "aimeat/security/process-local-baseline.json",
+        "aimeat/src/storage/providers/postgres-kysely/migrate.ts",
+        "aimeat/src/services/maintenance-cache.ts",
+        "aimeat/src/server-bootstrap/drain.ts",
+        "aimeat/src/services/notification-sweeps.ts"
       ],
-      "digest": "sha256:783df77e5f8b7f2bcdba16fd"
+      "digest": "sha256:d9ecff94ee879c8c4ef93c5a"
     },
     "README.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "docs/operations/README.md"
       ],
@@ -273,7 +278,7 @@
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "a730e25abfdcb643",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
-      "docs/operations/production-deployment.md": "e86dc068075dc404",
+      "docs/operations/production-deployment.md": "1b871ac99c027b8a",
       "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1"
     },
@@ -348,7 +353,7 @@
       "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
     },
     "15-operations-runbook.md": {
-      "docs/operations/production-deployment.md": "e86dc068075dc404",
+      "docs/operations/production-deployment.md": "1b871ac99c027b8a",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577"
     },
     "16-known-limitations.md": {
@@ -397,7 +402,12 @@
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
-      "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961"
+      "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
+      "aimeat/security/process-local-baseline.json": "3f9aeb820cb6ded1",
+      "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "0674971f4a490dd3",
+      "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
+      "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
+      "aimeat/src/services/notification-sweeps.ts": "30af346f130739bd"
     }
   }
 }
