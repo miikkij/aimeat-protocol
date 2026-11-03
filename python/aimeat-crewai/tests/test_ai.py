@@ -320,3 +320,50 @@ def test_capabilities_names_a_missing_node_url(monkeypatch) -> None:
     monkeypatch.delenv("AIMEAT_NODE_URL", raising=False)
     with pytest.raises(AiError, match="node_url"):
         capabilities(agent_token=TOKEN)
+
+
+# ── usage telemetry and the node's LLM (codebase analysis 2026-11-03, item A14) ───────────────
+#
+# The node records its own usage row for every /v1/llm call (settleAiCall -> recordAiUsage ->
+# recordUsageEvent). A telemetry row from the package for the same call was a second ledger row,
+# named after the placeholder model and read as the owner's own money although the node paid.
+# These run the real CrewAI event bus, so what is tested is the event CrewAI really emits.
+
+
+def _usage_rows_for(llm: Any) -> list[tuple[Any, dict[str, Any]]]:
+    from crewai.events.event_bus import crewai_event_bus
+    from crewai.events.types.llm_events import LLMCallCompletedEvent
+
+    from aimeat_crewai.usage_telemetry import _make_handler, usage_run
+
+    rows: list[tuple[Any, dict[str, Any]]] = []
+    with crewai_event_bus.scoped_handlers():
+        crewai_event_bus.on(LLMCallCompletedEvent)(
+            _make_handler(lambda agent, payload: rows.append((agent, payload)), default_agent="worker"),
+        )
+        with usage_run("task-1", "worker"):
+            llm.call("hi")
+        crewai_event_bus.flush(timeout=10)
+    return rows
+
+
+def test_a_call_through_node_llm_sends_no_second_usage_row(node: _Node) -> None:
+    node.answers[("POST", "/v1/llm/chat/completions")] = (200, _completion())
+    assert _usage_rows_for(node_llm(node_url=node.url, agent_token=TOKEN)) == []
+    assert _usage_rows_for(node_llm(model="mistralai/mistral-small", node_url=node.url, agent_token=TOKEN)) == []
+
+
+def test_a_call_on_the_crews_own_provider_is_still_reported(node: _Node) -> None:
+    from crewai import LLM
+
+    # The crew's own OpenAI-compatible provider: the node never sees this call, so the package's
+    # telemetry row is the only record of it, as before.
+    node.answers[("POST", "/provider/v1/chat/completions")] = (200, _completion("gpt-4o-mini"))
+    llm = LLM(model="openai/gpt-4o-mini", base_url=f"{node.url}/provider/v1", api_key="own-key")
+    rows = _usage_rows_for(llm)
+    assert len(rows) == 1, rows
+    agent, payload = rows[0]
+    assert agent == "worker"
+    assert payload["type"] == "llm_call"
+    assert payload["task_id"] == "task-1"
+    assert payload["data"]["model"] == "gpt-4o-mini"

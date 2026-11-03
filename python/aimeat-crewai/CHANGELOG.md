@@ -14,6 +14,16 @@ What each release gives you as a user of the package. Releases up to 0.27.1 are 
   owner gets a one-press question to allow it. The daemon now prints one line for such a message
   instead of starting a crew run titled "Direct message from None". An `on_dm` handler of your own
   still receives the event.
+- **A task you pause runs when you start it again.** When the owner paused a task after the daemon
+  had listed it, the daemon read the pause as a cancel and did not run that task again until the
+  daemon restarted. Now the daemon waits: it does not start the task and does not mark it failed,
+  and it runs the task when the owner starts it again. A task that ended (done, failed, declined)
+  or carries a cancel marker is still skipped, as before.
+- **Your node's AI is counted once.** The node records the usage of every call a crew makes through
+  `node_llm()`, with the model that ran and the key that paid. The package's usage telemetry also
+  sent a row for the same call, so the usage page showed it twice, the second time under the
+  placeholder model `aimeat-node-chooses` and as your own spend. Now it sends no row for a call to
+  the node's `/v1/llm` route. A call on your crew's own provider is reported as before.
 
 ## 0.39.0 - 2026-10-26
 

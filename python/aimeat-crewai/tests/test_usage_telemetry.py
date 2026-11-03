@@ -154,6 +154,48 @@ def test_handler_skips_empty_or_missing_model() -> None:
     assert got == []
 
 
+class _Llm:
+    """Duck-typed stand-in for the LLM CrewAI passes as the event's source."""
+
+    def __init__(self, base_url: str | None = None, api_base: str | None = None) -> None:
+        self.base_url = base_url
+        self.api_base = api_base
+
+
+def test_handler_skips_a_call_the_node_meters_itself() -> None:
+    # Codebase analysis 2026-11-03, item A14: a call through the node's /v1/llm route already has
+    # the node's own ledger row; a second row from here would count it twice.
+    got, sink = _collect()
+    handler = _make_handler(sink, default_agent="agent-x")
+    usage = {"prompt_tokens": 3, "completion_tokens": 4}
+    with usage_run("task-x", "agent-x"):
+        handler(_Llm(base_url="http://127.0.0.1:40050/v1/llm"), _Event("llm_call", "aimeat-node-chooses", usage))
+        handler(_Llm(base_url="https://node.example/v1/llm/"), _Event("llm_call", "mistralai/mistral-small", usage))
+        handler(_Llm(api_base="https://node.example/v1/llm"), _Event("llm_call", "openai/aimeat-node-chooses", usage))
+        # The package's placeholder model names only a node_llm() call, whatever the source says.
+        handler(None, _Event("llm_call", "openai/aimeat-node-chooses", usage))
+    assert got == []
+
+
+def test_the_placeholder_model_is_the_one_node_llm_sends() -> None:
+    from aimeat_crewai.ai import NODE_CHOOSES_MODEL
+    from aimeat_crewai.usage_telemetry import _NODE_CHOOSES_MODEL
+
+    assert _NODE_CHOOSES_MODEL == NODE_CHOOSES_MODEL
+
+
+def test_handler_still_reports_a_call_on_the_crews_own_provider() -> None:
+    got, sink = _collect()
+    handler = _make_handler(sink, default_agent="agent-x")
+    usage = {"prompt_tokens": 3, "completion_tokens": 4}
+    with usage_run("task-x", "agent-x"):
+        handler(_Llm(base_url="https://openrouter.ai/api/v1"), _Event("llm_call", "openrouter/z-ai/glm-5.2", usage))
+        handler(_Llm(), _Event("llm_call", "gpt-4o", usage))
+        # A path that only contains the node's route name is not the node's route.
+        handler(_Llm(base_url="https://proxy.example/v1/llm/openai"), _Event("llm_call", "gpt-4o", usage))
+    assert [p["data"]["model"] for _, p in got] == ["z-ai/glm-5.2", "gpt-4o", "gpt-4o"]
+
+
 def test_handler_swallows_sender_errors() -> None:
     def boom(_agent, _payload) -> None:
         raise RuntimeError("node down")

@@ -46,6 +46,11 @@ Changelog:
     text-LLM calls unpriced, + model-id normalization (strip a known routing prefix into
     data.provider) so one model = one ledger row. No litellm pricing (it can't price these
     models); no double-count (cost goes into the existing report).
+  unreleased -- 2026-11-04 -- codebase analysis 2026-11-03, item A14: a call through the node's
+    /v1/llm route (`node_llm()`, or any LLM pointed at that route) sends no telemetry row. The node
+    records that call's usage itself, with the model that ran and the key that paid; the package's
+    row was a second ledger row, named after the placeholder model and read as the owner's own spend.
+    Calls on the crew's own provider are reported as before.
 """
 from __future__ import annotations
 
@@ -114,6 +119,28 @@ def _normalize_model(model: str) -> tuple[str, str | None]:
     return m, None
 
 
+# The node's OpenAI-compatible route. A call to it is metered by the node itself (llm-proxy.ts ->
+# settleAiCall -> recordAiUsage -> recordUsageEvent), with the model that ran and the key that paid.
+_NODE_LLM_PATH = "/v1/llm"
+# ai.NODE_CHOOSES_MODEL, the placeholder node_llm() sends when the crew names no model. A copy, so
+# this module keeps importing nothing from the package; tests/test_usage_telemetry.py holds the two equal.
+_NODE_CHOOSES_MODEL = "aimeat-node-chooses"
+
+
+def _node_metered(source: Any, model: str) -> bool:
+    """True when the completed call went through the node's /v1/llm route (a `node_llm()` LLM, or
+    any LLM a crew pointed at that route), so the node has already written its usage row.
+
+    `source` is the LLM CrewAI emitted the event from: its `base_url` (native providers) or
+    `api_base` (LiteLLM) ends with /v1/llm. The placeholder model name is a second signal for an
+    emitter that passes no LLM."""
+    for attr in ("base_url", "api_base"):
+        url = getattr(source, attr, None)
+        if isinstance(url, str) and url.rstrip("/").endswith(_NODE_LLM_PATH):
+            return True
+    return _normalize_model(model)[0] == _NODE_CHOOSES_MODEL
+
+
 def build_llm_call_payload(model: str, usage: dict[str, Any], run_id: str | None) -> dict[str, Any]:
     """Telemetry POST body for one LLM call. data.model is CANONICAL (routing prefix stripped),
     the routing provider in data.provider, OpenRouter's authoritative data.cost_usd when the caller
@@ -148,7 +175,8 @@ def _make_handler(
     whose crew emitted the call), falling back to `default_agent` (the install-time agent) for
     direct kickoffs outside run_crew_daemon. NB the event's own agent_role/agent_id are the
     in-crew role, not the AIMEAT agent, so they can't drive attribution -- the ContextVar can.
-    Filters out tool calls and model-less events; never raises."""
+    Filters out tool calls, model-less events and calls the node meters itself (a `node_llm()`
+    call: the node's own row names the model that ran and who paid); never raises."""
 
     def _on_llm_completed(source: Any, event: Any) -> None:
         try:
@@ -160,6 +188,8 @@ def _make_handler(
             model = (getattr(event, "model", None) or "").strip()
             if not model:
                 return  # no model -> the node can't price it; don't record a ledger row
+            if _node_metered(source, model):
+                return  # the node wrote this call's ledger row itself; a second one counts it twice
             usage = getattr(event, "usage", None) or {}
             agent_name = _current_agent_name.get() or default_agent
             enqueue(agent_name, build_llm_call_payload(model, usage, _current_run_id.get()))
