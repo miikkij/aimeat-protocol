@@ -107,7 +107,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 460 npm packages that travel inside the `aimeat` package. Build and test
+The 461 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -137,6 +137,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@inversifyjs/plugin](https://inversify.io) | 0.2.0 | MIT |
 | [@inversifyjs/prototype-utils](https://inversify.io) | 0.1.3 | MIT |
 | [@inversifyjs/reflect-metadata-utils](https://inversify.io) | 1.4.1 | MIT |
+| @isaacs/nonrecursive-glob-match | 1.0.3 | BlueOak-1.0.0 |
 | [@javascript-obfuscator/escodegen](http://github.com/estools/escodegen) | 2.4.2 | BSD-2-Clause |
 | [@javascript-obfuscator/estraverse](https://github.com/estools/estraverse) | 5.4.0 | BSD-2-Clause |
 | [@jitl/quickjs-ffi-types](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
@@ -398,7 +399,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [mimic-fn](https://github.com/sindresorhus/mimic-fn#readme) | 2.1.0 | MIT |
 | [minidenticons](https://laurentpayot.github.io/minidenticons) | 4.2.1 | MIT |
 | [minimalistic-assert](https://github.com/calvinmetcalf/minimalistic-assert) | 1.0.1 | ISC |
-| [minimatch](https://github.com/isaacs/minimatch#readme) | 10.2.5 | BlueOak-1.0.0 |
+| [minimatch](https://github.com/isaacs/minimatch#readme) | 11.0.4 | BlueOak-1.0.0 |
 | [minimatch](https://github.com/isaacs/minimatch#readme) | 3.1.5 | ISC |
 | [minimist](https://github.com/minimistjs/minimist) | 1.2.8 | MIT |
 | [ms](https://github.com/vercel/ms#readme) | 2.0.0 | MIT |
@@ -963,6 +964,66 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### @isaacs/nonrecursive-glob-match 1.0.3, sax 1.6.1
+
+```text
+# Blue Oak Model License
+
+Version 1.0.0
+
+## Purpose
+
+This license gives everyone as much permission to work with
+this software as possible, while protecting contributors
+from liability.
+
+## Acceptance
+
+In order to receive this license, you must agree to its
+rules.  The rules of this license are both obligations
+under that agreement and conditions to your license.
+You must not do anything with this software that triggers
+a rule that you cannot or will not follow.
+
+## Copyright
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe that contributor's
+copyright in it.
+
+## Notices
+
+You must ensure that everyone who gets a copy of
+any part of this software from you, with or without
+changes, also gets the text of this license or a link to
+<https://blueoakcouncil.org/license/1.0.0>.
+
+## Excuse
+
+If anyone notifies you in writing that you have not
+complied with [Notices](#notices), you can keep your
+license by taking all practical steps to comply within 30
+days after the notice.  If you do not do so, your license
+ends immediately.
+
+## Patent
+
+Each contributor licenses you to do everything with this
+software that would otherwise infringe any patent claims
+they can license or become able to license.
+
+## Reliability
+
+No contributor can revoke this license.
+
+## No Liability
+
+***As far as the law allows, this software comes as is,
+without any warranty or condition, and no contributor
+will be liable to anyone for any damages related to this
+software or this license, under any kind of legal claim.***
 ```
 
 ### @javascript-obfuscator/escodegen 2.4.2
@@ -8913,7 +8974,7 @@ OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 ```
 
-### minimatch 10.2.5
+### minimatch 11.0.4
 
 ```text
 # Blue Oak Model License
@@ -11586,66 +11647,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
-### sax 1.6.1
-
-```text
-# Blue Oak Model License
-
-Version 1.0.0
-
-## Purpose
-
-This license gives everyone as much permission to work with
-this software as possible, while protecting contributors
-from liability.
-
-## Acceptance
-
-In order to receive this license, you must agree to its
-rules.  The rules of this license are both obligations
-under that agreement and conditions to your license.
-You must not do anything with this software that triggers
-a rule that you cannot or will not follow.
-
-## Copyright
-
-Each contributor licenses you to do everything with this
-software that would otherwise infringe that contributor's
-copyright in it.
-
-## Notices
-
-You must ensure that everyone who gets a copy of
-any part of this software from you, with or without
-changes, also gets the text of this license or a link to
-<https://blueoakcouncil.org/license/1.0.0>.
-
-## Excuse
-
-If anyone notifies you in writing that you have not
-complied with [Notices](#notices), you can keep your
-license by taking all practical steps to comply within 30
-days after the notice.  If you do not do so, your license
-ends immediately.
-
-## Patent
-
-Each contributor licenses you to do everything with this
-software that would otherwise infringe any patent claims
-they can license or become able to license.
-
-## Reliability
-
-No contributor can revoke this license.
-
-## No Liability
-
-***As far as the law allows, this software comes as is,
-without any warranty or condition, and no contributor
-will be liable to anyone for any damages related to this
-software or this license, under any kind of legal claim.***
 ```
 
 ### scimmy-routers 1.3.2, scimmy 1.3.5
