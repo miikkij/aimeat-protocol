@@ -29,6 +29,8 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.3.0 — 2026-11-04 — Rule verification-level-gate: an owner's address is proven by
+ *     provenOwnerAddress, not by the account's verification level (codebase analysis 2026-11-03, A9).
  *   v1.2.0 — 2026-10-05 — Rules agent-role, wildcard-test and caller-built: the caller is the
  *     CallerContext (services/caller-context.ts), and the remaining hand tests and hand-built callers
  *     only go down (secaudit 2026-10, C9).
@@ -136,6 +138,12 @@ const RULES: Rule[] = [
     label: 'A caller is the CallerContext (services/caller-context.ts), not an object built at the call site with a literal role: the MCP session\'s comes from register-all.ts, a request\'s from callerOf (C9)',
     pattern: /roles:\[['"]agent['"]\]/,
     skipDirs: ['src/services/caller-context.ts', 'src/auth/'],
+  },
+  {
+    id: 'verification-level-gate',
+    label: 'Whether an owner\'s address is proven is asked with provenOwnerAddress (services/owner-mail-address.ts), which compares the flag and the hash; the account\'s verificationLevel stays when the address changes, so a mail gate that compares it mails an unproven address (codebase analysis 2026-11-03, A9)',
+    // A comparison of the level with a number: `g.verificationLevel<1`, `(r.verificationLevel??0)>=1`.
+    pattern: /verificationLevel(\?\?\d+\))?(<|>|<=|>=|===|!==|==|!=)\d/,
   },
   {
     id: 'request-caller-built',

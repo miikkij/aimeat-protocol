@@ -617,6 +617,20 @@
         "count": 1,
         "why": "UNREVIEWED"
       }
+    },
+    "verification-level-gate": {
+      "src/routes/ghii/attach-email.ts": {
+        "count": 1,
+        "why": "Not a mail gate: an account already at level 1 or above has nothing to complete, so the sign-in's attach-email step answers ALREADY_VERIFIED. The code it sends goes to the address the person types in this request."
+      },
+      "src/routes/ghii/register-login.ts": {
+        "count": 1,
+        "why": "Not a mail gate: the sign-in refusal EMAIL_NOT_VERIFIED on a node that requires a confirmed address (email_confirmation_required) asks whether the account was ever verified; it sends no mail."
+      },
+      "src/services/login-link.ts": {
+        "count": 1,
+        "why": "Not a mail gate: after a sign-in link is spent, an account below level 1 is raised to level 1. The link opens only while the address it was mailed to is still the account's (stillTheirs)."
+      }
     }
   }
 }

@@ -6,8 +6,12 @@
  *   marks even a failed send so a bouncing address never becomes a retry loop. Storage and the
  *   email service are stubbed; the E2E suites cover the marker-writing half of the funnel.
  * @version-history
+ *   v1.1.0 — 2026-11-04 — The verified fixture carries the flag and the hash the code-confirm paths
+ *     write with level 1; an address that changed, an unproven address at level 3 and an address the
+ *     hash does not name get no mail (codebase analysis 2026-11-03, item A9).
  *   v1.0.0 — 2026-08-07 — Initial.
  */
+import { createHash } from 'node:crypto';
 import { describe, it, expect, afterEach } from 'vitest';
 import {
     runMcpOnboardingRescueJob,
@@ -28,8 +32,10 @@ const runJob = (storage: any) => runMcpOnboardingRescueJob(config, storage, { no
 
 const hoursAgo = (h: number) => new Date(NOW - h * 3600_000).toISOString();
 
+const hashOf = (a: string) => createHash('sha256').update(a.toLowerCase().trim()).digest('hex');
+
 function ghii(username: string, over: Record<string, unknown> = {}) {
-    return {
+    const rec = {
         username,
         ownerName: username,
         ghii: `${username}@${NODE}`,
@@ -43,6 +49,14 @@ function ghii(username: string, over: Record<string, unknown> = {}) {
         updatedAt: hoursAgo(30),
         ...over,
     } as any;
+    // A verified account as the code-confirm paths write it (routes/ghii/web-verify.ts, recovery.ts,
+    // services/owner-provisioning.ts): level 1, the flag and the address's hash land together. A case
+    // that names the flag itself describes a record those paths did not write whole.
+    if (rec.verificationLevel >= 1 && typeof rec.notificationEmail === 'string' && !('emailVerifiedAt' in over)) {
+        rec.emailVerifiedAt = hoursAgo(30);
+        rec.emailHash = hashOf(rec.notificationEmail);
+    }
+    return rec;
 }
 
 function makeStorage(ghiis: any[], memory: Record<string, Record<string, unknown>> = {}) {
@@ -113,6 +127,20 @@ describe('runMcpOnboardingRescueJob — who gets the one email', () => {
             ghii('toofresh', { createdAt: hoursAgo(2) }),
             ghii('toold', { createdAt: hoursAgo(24 * 8) }),
         ], { [connected.ghii]: { [FIRST_MCP_CALL_KEY]: { at: 'x' } } });
+        await runJob(storage);
+        expect(email.sent).toHaveLength(0);
+    });
+
+    // Codebase analysis 2026-11-03, item A9: a change of address clears the flag and leaves the
+    // account's level, so the level does not say the address the account names now is proven.
+    it('skips: an address that changed after the account was verified, and an address the hash does not name', async () => {
+        const email = makeEmail();
+        setActiveEmailService(email);
+        const storage = makeStorage([
+            ghii('changed', { notificationEmail: 'someone-else@example.com', emailVerifiedAt: null }),
+            ghii('banked', { verificationLevel: 3, emailVerifiedAt: null }),
+            ghii('stale', { notificationEmail: 'someone-else@example.com', emailVerifiedAt: hoursAgo(30), emailHash: hashOf('stale@example.com') }),
+        ]);
         await runJob(storage);
         expect(email.sent).toHaveLength(0);
     });

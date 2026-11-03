@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-11-04 — The workflow-end mail goes through notification-create.ts mailOwnerFrom:
+ *     only to a proven address, within the per-sender daily limit (email.reports_per_sender_day), and
+ *     still logged as workflow_end (codebase analysis 2026-11-03, item A2).
  *   v1.13.0 — 2026-10-27 — An ecosystem step's invoke frame names the agent or ecosystem app the run
  *     acts for; the owner's, an app grant's and an older run's frame name the owner as before
  *     (secaudit2026oct26, workflow/engine-steps:ecosystem-step-caller-is-owner-not-run-principal).
@@ -80,7 +83,8 @@ import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
 import { buildGAII, localAccountName } from '../../utils/gaii.js';
 import { notify } from '../notify.js';
-import { readNotificationSettings, appendMailLog } from '../notification-settings.js';
+import { readNotificationSettings } from '../notification-settings.js';
+import { mailOwnerFrom } from '../notification-create.js';
 import { logger } from '../../utils/logger.js';
 import { globToRegExp } from './signal-eval.js';
 import { collectSignalKeys, type ResolvedStep } from './store.js';
@@ -659,15 +663,17 @@ export async function onRunFinished(deps: StepDeps, ownerGhii: string, run: Work
     },
   });
 
-  // 2. Email — only when configured, the owner set a notification email, and they have not
-  //    switched the workflow email off on the Email page (notification-settings.ts, email.workflowEnd).
+  // 2. Email — only when configured and the owner has not switched the workflow email off on the
+  //    Email page (notification-settings.ts, email.workflowEnd). The name, the stop reason and the
+  //    step ids are text a principal with workflow:write wrote, so the mail takes the one path for a
+  //    principal's words to the owner: a proven address only, and the per-sender daily limit
+  //    (notification-create.ts mailOwnerFrom; codebase analysis 2026-11-03, item A2).
   try {
     if (deps.emailService?.enabled) {
-      const ghii = await deps.storage.getGHII(ownerGhii);
       const prefs = await readNotificationSettings(deps.storage, ownerGhii);
-      if (ghii?.notificationEmail && prefs.email.workflowEnd) {
-        const sent = await deps.emailService.sendNotification(ghii.notificationEmail, title, body);
-        if (sent) await appendMailLog(deps.storage, ownerGhii, { kind: 'workflow_end', subject: title });
+      if (prefs.email.workflowEnd) {
+        await mailOwnerFrom(deps.storage, deps.config, ownerGhii, `workflow:${run.workflowId}`, title, body,
+          { logKind: 'workflow_end', email: deps.emailService });
       }
     }
   } catch (err) {
