@@ -7,8 +7,14 @@
  *   on the request hot path — which both slowed every read and grew the collection without
  *   bound (1.2M+ rows in prod). We now (1) only audit the events worth keeping — access
  *   DENIALS and consent MUTATIONS (grant/revoke) — and (2) write them off the request path
- *   via this buffer, flushed in batches on an interval. A separate core job prunes old rows
- *   (config.consentAuditRetentionDays).
+ *   via this buffer, flushed in batches within a second of the first entry, with a 60 s interval
+ *   as the safety net. A separate core job prunes old rows (config.consentAuditRetentionDays).
+ *
+ *   WHY A SECOND AND NOT AT ONCE. Measured on 2026-11-04 (SQLite file, 500 rows): an awaited write
+ *   costs 0.045 ms median, 0.12 ms p95, against 0.005 ms for the in-memory record; on PostgreSQL it
+ *   is a network round trip and a commit per row. Writing within a second keeps the request free of
+ *   it and batches a burst, and a process that ends without stopping loses at most that second
+ *   instead of the 60 s it lost before (codebase analysis 2026-11-03, HA stage 1 item 1.6).
  * @structure
  *   - bufferConsentAudit(entry)      -- enqueue an entry (no DB write, never throws)
  *   - flushConsentAudit()            -- write the queued entries to storage
@@ -17,24 +23,38 @@
  * @usage
  *   import { bufferConsentAudit } from './consent-audit-buffer.js';
  * @version-history
+ *   v1.1.0 -- 2026-11-04 -- An entry is written within a second (flushSoon), not up to 60 s later, so a
+ *     crash loses at most that second (codebase analysis 2026-11-03, HA stage 1 item 1.6).
  *   v1.0.0 -- 2026-06-21 -- Initial: batched off-request-path consent-audit writes.
  */
 import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
-/** Flush cadence. Audit entries are durable within at most this delay (lost only on crash). */
+/** The safety net: retries a failed write and catches anything the soon-flush missed. */
 const FLUSH_INTERVAL_MS = 60_000;
+/** How soon a recorded entry is written. The most a process that ends without stopping can lose;
+ *  a stop (SIGTERM) loses nothing. Entries recorded within it go in one flush. */
+const FLUSH_SOON_MS = 1_000;
 /** Hard cap so a wedged DB can't grow the queue unbounded; oldest entries drop first. */
 const MAX_QUEUE = 10_000;
 
 let storageRef: Storage | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+let soonTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
 let queue: ConsentAuditEntry[] = [];
 let dropped = 0;
 
+/** Write what waits within FLUSH_SOON_MS, once: entries arriving meanwhile join that flush. */
+function flushSoon(): void {
+  if (!storageRef || soonTimer) return;
+  soonTimer = setTimeout(() => { soonTimer = null; void flushConsentAudit(); }, FLUSH_SOON_MS);
+  soonTimer.unref?.();
+}
+
 /** Enqueue a consent-audit entry. In-memory only — never blocks the request, never throws. */
 export function bufferConsentAudit(entry: ConsentAuditEntry): void {
+  flushSoon();
   queue.push(entry);
   if (queue.length > MAX_QUEUE) {
     queue.splice(0, queue.length - MAX_QUEUE);
@@ -93,6 +113,8 @@ export async function flushConsentAudit(): Promise<void> {
   } finally {
     if (failed.length > 0) queue.unshift(...failed);
     flushing = false;
+    // What arrived during this flush goes soon too; a failed write waits for the interval.
+    if (failed.length === 0 && queue.length > 0) flushSoon();
   }
 }
 
@@ -109,6 +131,10 @@ export async function shutdownConsentAuditBuffer(): Promise<void> {
   if (flushTimer) {
     clearInterval(flushTimer);
     flushTimer = null;
+  }
+  if (soonTimer) {
+    clearTimeout(soonTimer);
+    soonTimer = null;
   }
   await flushConsentAudit();
 }
