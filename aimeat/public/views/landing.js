@@ -24,6 +24,8 @@
  * @structure default export Landing({ navigate })
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v7.3.0 — 2026-11-04 — A sign-in on the way back to an agent connect page does not forward to the
+ *     start page: js/sign-in-return.js takes the person back to the approval.
  *   v7.2.0 — 2026-10-31 — A node the store sold shows its owner's start page (owner-start.js) instead of
  *     the demo floor, until the owner saves a front page layout of their own (Jouni v27 P3).
  *   v7.1.0 — 2026-10-16 — The layout's passages carry their records (freeformProvenance), for the AI label.
@@ -126,6 +128,7 @@ import { SignageShowcase } from './landing-v2-signage.js';
 import { storeHref, customerNode } from '/js/site.js';
 import { OwnerStart } from './owner-start.js';
 import { swallowed } from '/js/swallowed.js';
+import { signInReturnTarget } from '/js/sign-in-return.js';
 
 export default function Landing({ navigate }) {
   const surface = useSurfaceLayout('portal');
@@ -156,6 +159,8 @@ export default function Landing({ navigate }) {
       }
     };
     const check = () => {
+      // A person signing in on the way back to an agent connect page returns there, not to a start page.
+      if (signInReturnTarget(window.location.search, window.location.origin)) return true;
       try {
         const raw = localStorage.getItem('aimeat_session');
         if (raw && JSON.parse(raw)?.jwt) {

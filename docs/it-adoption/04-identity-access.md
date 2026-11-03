@@ -201,7 +201,7 @@ sequenceDiagram
   participant O as Owner (browser)
   A->>N: POST /v1/agents/device-authorize (asked scopes)
   N-->>A: user code and verification address
-  O->>N: opens the address, signs in, picks the scopes
+  O->>N: opens the address, signs in on the front page if needed, returns, picks the scopes
   O->>N: POST /v1/agents/verify (approve)
   A->>N: POST /v1/agents/device-token (polls)
   N-->>A: agent JWT with the approved scopes

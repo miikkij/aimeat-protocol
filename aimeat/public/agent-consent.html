@@ -2,11 +2,17 @@
 <!--
   @file agent-consent.html
   @description The standalone device-authorization consent page (/v1/agents/verify?code=…): the
-    owner confirms the code their AI showed, picks how much the agent may do, and approves or
-    denies. Standalone — not part of the SPA — but it reads the shared i18n runtime, the shared
-    scope model and the shared consent vocabulary, so its presets and sentences can never diverge
-    from the SPA's AgentConsent panel again.
+    signed-in owner confirms the code their AI showed, picks how much the agent may do, and approves
+    or denies. An owner with no session goes to the front page first and returns here
+    (js/sign-in-return.js). Standalone — not part of the SPA — but it reads the shared i18n runtime,
+    the shared scope model and the shared consent vocabulary, so its presets and sentences can never
+    diverge from the SPA's AgentConsent panel again.
   @version-history
+    2026-11-04 — The page signs nobody in, and reads the session from the refresh cookie as
+        oauth-consent.html does. A stored token could be expired, and the approval then failed with no
+        way to sign in. An owner with no session goes to the front page, which signs in or registers
+        the way the node is configured and returns here with the code in its address. The password
+        form here had no emailed link, no passkey, no SSO and no registration (Jouni, 2026-11-04).
     2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
     2026-10-25 — A request for an existing agent that did not prove it is coming back
         (`return_proven: false` on /verify/info) says plainly that a new device is taking the agent
@@ -153,7 +159,6 @@
     #loading { text-align:center; padding:2rem; color:var(--muted); }
     #loading p { margin-top:.75rem; }
     .error-msg-spaced { margin-top:1rem; }
-    .login-prompt { margin-bottom:1rem; font-size:.9rem; }
     .spinner { display:inline-block; width:1.5rem; height:1.5rem; border:2px solid var(--border);
       border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -179,6 +184,7 @@
     import { getTheme, setTheme } from '/js/theme.js';
     import { scopeSentence, presetSummary, requestedSummary, boundaryLines } from '/js/consent-vocab.js';
     import { SCOPE_TEMPLATES, SCOPE_DOMAINS } from '/views/profile/agents/scope-model.js';
+    import { signInAddress, refreshedSession } from '/js/sign-in-return.js';
 
     const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -228,31 +234,6 @@
       app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg">${escHtml(t('errorNoCode'))}</p>`;
     }
 
-    async function checkSession() {
-      // Read session from localStorage (same origin as SPA)
-      try {
-        const raw = localStorage.getItem('aimeat_session');
-        if (raw) {
-          const s = JSON.parse(raw);
-          if (s && s.jwt) return s;
-        }
-      } catch {}
-      return null;
-    }
-
-    async function doLogin(username, password, totp) {
-      const body = { username, password };
-      if (totp) body.totp_code = totp;
-      const r = await fetch('/v1/ghii/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const d = await r.json();
-      if (!d.ok) throw new Error(d.error?.message || 'Login failed');
-      return d.data;
-    }
-
     async function fetchRequestInfo(userCode) {
       const r = await fetch(`/v1/agents/verify/info/${encodeURIComponent(userCode)}`);
       const d = await r.json();
@@ -288,52 +269,6 @@
 
     function renderError(msg) {
       app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg error-msg-spaced">${escHtml(msg)}</p>`;
-    }
-
-    function renderLogin() {
-      app.innerHTML = `
-        <h1>${escHtml(t('title'))}</h1>
-        <p class="subtitle">${escHtml(t('consent.priming.device'))}</p>
-        <div class="user-code-display">
-          <div class="user-code-value">${escHtml(code)}</div>
-          <div class="user-code-hint">${escHtml(t('confirmHint'))}</div>
-        </div>
-        <p class="login-prompt">${escHtml(t('loginRequired'))}</p>
-        <form id="loginForm">
-          <label>${escHtml(t('usernameLabel'))}</label>
-          <input type="text" id="username" required autocomplete="username" maxlength="256" /><!-- js/input-limits.js id -->
-          <label>${escHtml(t('passwordLabel'))}</label>
-          <input type="password" id="password" required autocomplete="current-password" />
-          <label>${escHtml(t('totpLabel'))}</label>
-          <input type="text" id="totp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" />
-          <div id="loginError" class="error-msg"></div>
-          <div class="btn-row">
-            <button type="submit" class="btn btn-approve">${escHtml(t('loginBtn'))}</button>
-          </div>
-        </form>
-      `;
-      document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const errEl = document.getElementById('loginError');
-        errEl.textContent = '';
-        try {
-          session = await doLogin(
-            document.getElementById('username').value.trim(),
-            document.getElementById('password').value,
-            document.getElementById('totp').value.trim() || undefined,
-          );
-          // Persist session so SPA and future consent pages pick it up
-          try {
-            localStorage.setItem('aimeat_session', JSON.stringify({
-              owner: session.owner, jwt: session.jwt || session.token,
-              ghii: session.ghii || null, gaii: session.gaii || null,
-            }));
-          } catch {}
-          await loadAndRender();
-        } catch (err) {
-          errEl.textContent = err.message;
-        }
-      });
     }
 
     function getSelectedScopes() {
@@ -580,18 +515,20 @@
 
     // Boot
     if (code) {
-      session = await checkSession();
+      session = await refreshedSession();
       if (session) {
         await loadAndRender();
       } else {
-        // Fetch info first to show code, then show login
+        // A code that leads nowhere is said here, before anyone is asked to sign in for it.
         requestInfo = await fetchRequestInfo(code);
         if (!requestInfo) {
           renderError(t('errorNotFound'));
         } else if (requestInfo.status === 'expired') {
           renderExpired();
         } else {
-          renderLogin();
+          // Signing in or registering is the front page's job, by this node's settings. The code
+          // stays in the address the front page returns to, and this page shows it for checking.
+          location.replace(signInAddress(location.pathname + location.search, params.get('lang') || ''));
         }
       }
     }

@@ -13,6 +13,7 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.20.0 — 2026-11-04 — opts.line replaces the line under the headline on both tabs: why the person is here.
  *   v1.19.0 — 2026-11-02 — The operator's sign-in policy. With password sign-in off the dialog shows no
  *     password form and says which ways in remain; with `operators` the form stands under a line
  *     naming the operators; unless `on`, no register tab. TWO_STEP_SETUP_REQUIRED opens the two-step
@@ -243,9 +244,9 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : (((signInOnly || linkFirst) && i.loginLinkTitleFirst) || i.headlineReturning || 'Welcome back.'))
       + '</h2>'
       + '<p class="aimeat-line">'
-      + escHtml(isReg
+      + escHtml(opts.line || (isReg
         ? (i.lineNew || 'Pick a username and password.')
-        : (((signInOnly || linkFirst) && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.'))
+        : (((signInOnly || linkFirst) && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.')))
       + '</p>'
       // Two tabs, two jobs. Which one is showing decides what the body asks for.
       + (noRegister ? '' : '<div class="aimeat-tabs" role="tablist">'
