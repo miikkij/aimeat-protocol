@@ -17,7 +17,10 @@
  * @structure
  *   - SUPERSEDED: old file → the file that replaces it
  *   - runMigrations(pool): apply every file not applied yet, in lexical order
+ *   - takeBootLock(pool) / runMigrationsLocked(pool): the boot lock two booting processes share
  * @version-history
+ *   v1.3.0 — 2026-11-04 — The boot lock (pg_advisory_lock on a connection of its own) around the
+ *     migrations, and takeBootLock() for the boot seeding (codebase analysis 2026-11-03, HA stage 1).
  *   v1.2.1 — 2026-10-25 — The `superseded_by` column is added only when it is missing: the ALTER's lock
  *     waited behind the nightly pg_dump and a restart during the dump failed to boot.
  *   v1.2.0 — 2026-10-16 — A migration's transaction lifts the pool's statement and lock limits for
@@ -30,6 +33,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type pg from 'pg';
+import { logger } from '../../../utils/logger.js';
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
 
@@ -45,6 +49,69 @@ export const SUPERSEDED: Readonly<Record<string, string>> = {
 };
 
 const RECORD_SUPERSEDED = 'INSERT INTO "_kysely_migrations"(name, superseded_by) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING';
+
+/**
+ * The key of the boot lock: a PostgreSQL session advisory lock that one process of a node holds
+ * while it migrates, and again while it seeds at boot (server-bootstrap/service-init.ts). Advisory
+ * locks belong to one database, so nodes on other databases of the same server never meet it.
+ */
+export const BOOT_LOCK_KEY = 4_142_202_611;
+
+/** How long a booting process waits for another to give the boot lock back before it goes on without it. */
+export const BOOT_LOCK_WAIT_MS = 60_000;
+
+/**
+ * Take the boot lock on a connection of its own, waiting as long as another process holds it, and
+ * answer the function that gives it back. Two processes that boot together then migrate and seed one
+ * after the other instead of at once: without it both read the applied set, both ran the next file,
+ * and the second failed on the first's primary key and did not boot until it was restarted.
+ *
+ * The wait is bounded by `waitMs`. A holder whose host died keeps its session, and the lock, until
+ * the database notices the dead connection, which can take hours; so after the wait the process goes
+ * on without the lock, as every process did before the lock existed (a clash then fails one boot,
+ * and the process manager starts it again). The connection's own statement limit is back once the
+ * lock is held. A lock whose release fails goes with its connection, which is destroyed, and a
+ * process that ends releases it the same way.
+ */
+export async function takeBootLock(pool: pg.Pool, waitMs = BOOT_LOCK_WAIT_MS): Promise<() => Promise<void>> {
+  const client = await pool.connect();
+  try {
+    await client.query(`SET statement_timeout = ${Math.max(1, Math.floor(waitMs))}`);
+    await client.query('SELECT pg_advisory_lock($1)', [BOOT_LOCK_KEY]);
+    await client.query('RESET statement_timeout');
+  } catch (err) {
+    if ((err as { code?: string }).code === '57014') {
+      // query_canceled: the wait ran out. The connection is sound; it goes back without the lock.
+      await client.query('RESET statement_timeout').then(() => client.release(), (e: Error) => client.release(e));
+      logger.warn(`boot lock: another process held it for over ${Math.round(waitMs / 1000)} s; going on without it`);
+      return async () => { /* nothing was taken */ };
+    }
+    client.release(err as Error);
+    throw err;
+  }
+  let released = false;
+  return async () => {
+    if (released) return;
+    released = true;
+    try {
+      await client.query('SELECT pg_advisory_unlock($1)', [BOOT_LOCK_KEY]);
+      client.release();
+    } catch (err) {
+      // Destroying the connection ends its session, and the lock with it.
+      client.release(err as Error);
+    }
+  };
+}
+
+/** runMigrations under the boot lock, so a second process booting at the same time waits for this one. */
+export async function runMigrationsLocked(pool: pg.Pool): Promise<void> {
+  const release = await takeBootLock(pool);
+  try {
+    await runMigrations(pool);
+  } finally {
+    await release();
+  }
+}
 
 /** Apply every not-yet-applied migration file in lexical order, each in its own transaction. */
 export async function runMigrations(pool: pg.Pool): Promise<void> {
