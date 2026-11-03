@@ -214,6 +214,7 @@
     "check:suite-ports": "tsx scripts/check-suite-ports.ts",
     "check:unit-ports": "tsx scripts/check-unit-ports.ts",
     "check:unbounded-lists": "tsx scripts/check-unbounded-lists.ts",
+    "check:process-local": "tsx scripts/check-process-local.ts",
     "check:string-bounds": "tsx scripts/check-string-bounds.ts",
     "check:write-validation": "tsx scripts/check-write-validation.ts",
     "check:storage-conformance": "tsx scripts/check-storage-conformance.ts",
