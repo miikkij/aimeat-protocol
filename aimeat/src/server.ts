@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-04 — createServer marks the process ready (services/node-lifecycle.ts) after the routes are mounted, for GET /v1/health/ready (HA stage 1).
  *   2026-11-04 — The guard and the admin route share services.maintenance, which re-reads storage (codebase analysis 2026-11-03, item A8).
  *   2026-11-01 — trailRecorder() after optionalAuth: every authenticated REST change is a line in the
  *     place's trail ("Rakennamme kanssasi", part C).
@@ -98,6 +99,7 @@ import { systemFaultReporter } from './middleware/system-fault.js';
 import { hideInternalErrorText } from './middleware/internal-error-text.js';
 import { notFoundHandler, errorHandler } from './middleware/fallback-handlers.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
+import { markReady } from './services/node-lifecycle.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -389,6 +391,9 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // error handler, both built with the shared error() envelope (middleware/fallback-handlers.ts).
   app.use(notFoundHandler(config.nodeId));
   app.use(errorHandler(config.nodeId));
+
+  // The boot is done: GET /v1/health/ready answers 200 from here until a stop marks the process draining.
+  markReady();
 
   return {
     app,

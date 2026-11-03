@@ -43,6 +43,7 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.5 — 2026-11-04 — GET /v1/health/live and /v1/health/ready are open, as /v1/health is (codebase analysis 2026-11-03, HA stage 1).
  *   v1.4.4 — 2026-11-01 — The public dataset page /v1/dataset/{owner}/{name} and the share link page
  *     /v1/shared-data open as SPA page addresses (WP9b).
  *   v1.4.3 — 2026-10-31 — isOpenRoute tests the open patterns case-insensitively, as Express routes
@@ -153,7 +154,7 @@ export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; w
   { method: 'POST', path: /^\/v1\/federation\/.+$/, why: 'federation protocol messages (signed by the peer; the federation policy decides)' },
   { method: 'GET', path: /^\/v1\/federation\/(node-card|peer\/(introduce|request)\/[^/]+\/status)$/, why: 'federation handshake' },
   // ── The node describing itself to machines (no person, organism or app named) ──
-  { method: 'GET', path: /^\/v1\/(health|build)$/, why: 'health and build' },
+  { method: 'GET', path: /^\/v1\/(health|health\/live|health\/ready|build)$/, why: 'health, the liveness and readiness probes, and build' },
   { method: 'GET', path: /^\/v1\/spec$/, why: 'the API reference page (the contract, no content)' },
   { method: 'GET', path: /^\/(llms|llms-full)\.txt$/, why: 'the node\'s own agent guide' },
   { method: 'GET', path: /^\/(auth\.md|skill\.md|agents\.txt|openapi\.json|AGENTS\.md)$/, why: 'the node\'s own agent documents' },

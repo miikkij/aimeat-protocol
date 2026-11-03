@@ -163,7 +163,8 @@ server {
   `aimeat/docker-compose.sqlite.yml` (SQLite). **Neither compose file keeps the node's key directory
   on a volume.** Mount one at the key path, or set `AIMEAT_NODE_KEY_PATH` to a file on a volume, or a
   new container starts without the node's identity (see [backup and restore](backup-and-restore.md)).
-  The image has no `HEALTHCHECK`; add one that calls `/v1/health`.
+  The image's `HEALTHCHECK` calls `/v1/health/ready` on 127.0.0.1 every 30 s, after a 120 s start
+  period; a node bound to another address (`AIMEAT_BIND_HOST`) needs its own.
 
 On `SIGTERM` or `SIGINT` the node flushes its buffered counters and audit rows, closes its tunnels and
 exits; it gives itself a few seconds before it exits anyway. Give the process manager a stop timeout
@@ -173,10 +174,13 @@ longer than that (the systemd unit uses 30 seconds).
 
 | Route | Answers | Use it for |
 |---|---|---|
-| `GET /v1/health` | `status` (`healthy` or `degraded`), uptime, memory, a storage probe under `subsystems.storage`, and the running build | liveness and readiness. **It answers 200 even when degraded**: a check must read `status`, not only the HTTP code |
+| `GET /v1/health/live` | 200 `live` while the process runs; no storage read | the process manager's liveness check: restart only when this does not answer |
+| `GET /v1/health/ready` | 200 `ready`, or 503 `NOT_READY` while the process boots, while it drains after SIGTERM or SIGINT, and when one storage read fails or takes over 2 s | the load balancer's and Docker's readiness check: send traffic only on 200. The image's `HEALTHCHECK` calls it |
+| `GET /v1/health` | `status` (`healthy` or `degraded`), uptime, memory, a storage probe under `subsystems.storage`, and the running build | a person's or a monitor's view of the node. **It answers 200 even when degraded**: a check must read `status`, not only the HTTP code. With personal nodes on, each call reads two rows per personal node, so probe the two routes above instead |
 | `GET /v1/build` | the running version, when this process started (`build`, base-36 milliseconds), the commit, and whether the build matches its source | proving which code is live after a deploy; never cached |
 
-Both answer in maintenance mode, and neither needs a sign-in. Metrics for Prometheus are in the
+All four answer in maintenance mode, and none needs a sign-in. The two probes cost the same on every
+node. Metrics for Prometheus are in the
 [observability guide](../../aimeat/docs/observability-guide.md).
 
 ## Before the first public start

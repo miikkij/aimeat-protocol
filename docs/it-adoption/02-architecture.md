@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.2.0 (commit 2f3ff9d10) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 2914ee4b0) on 2026-11-03. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
@@ -72,7 +72,7 @@ Solid lines are always present. Dotted lines exist only when the setting in the 
 | Proxy trust | `AIMEAT_TRUST_PROXY`: a hop count or the proxy's address. The node reads `Host` as sent and does not trust `X-Forwarded-Host` | [Production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
 | WebSocket | `/v1/realtime/ws`, `/v1/connect/tunnel` (agents' connector tunnel), `/v1/personal/tunnel` (personal nodes). The node closes an upgrade on any other path. Use a long read timeout | [Production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through), [Connector forward tunnel](../connector-forward-tunnel.md) |
 | Streams (SSE and MCP) | `/v1/events`, `/v1/public/events`, `/v1/agui/...`, the chat turn, `/v1/llm/chat/completions`, `/v1/ai/stream`, `/v1/ai/speak`, and MCP at `/v1/mcp` and `/mcp`. Turn proxy buffering off and use a long read timeout | [Production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
-| Health | `GET /v1/health` (read `status`, it answers 200 also when degraded) and `GET /v1/build`, no sign-in | [Production deployment](../operations/production-deployment.md#health-checks) |
+| Health | `GET /v1/health/live` and `GET /v1/health/ready` (the probes, by HTTP code), `GET /v1/health` (read `status`, it answers 200 also when degraded) and `GET /v1/build`, no sign-in | [Production deployment](../operations/production-deployment.md#health-checks) |
 | Metrics | `GET /v1/metrics` for Prometheus, off by default (`AIMEAT_METRICS_ENABLED`), operator token by default (`AIMEAT_METRICS_ACCESS`) | [Observability guide](../../aimeat/docs/observability-guide.md) |
 | Cloud AI clients | A remote MCP connector in a cloud AI service connects from that vendor's servers, so a node that must serve such clients must be reachable from the internet. Local clients (Claude Code, VS Code, Cursor) connect from the workstation | [Anthropic: custom connectors using remote MCP](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) |
 | Browser-to-browser media | Browsers receive STUN servers from the node (`AIMEAT_STUN_SERVERS`, default `stun:stun.l.google.com:19302`) and contact them themselves; this is client egress, not node egress | `aimeat/src/config.ts` |
@@ -203,7 +203,7 @@ For availability, use a process manager restart, one active process with a stand
 - Two outbound calls are on by default on a fresh node: the new-version check to `registry.npmjs.org` and `unpkg.com`, and the weekly model catalogue refresh from `models.dev`, `openrouter.ai` and `raw.githubusercontent.com`.
 - Link previews let any signed-in person make the node fetch any public address, and the node reads the `client_id` URL that any MCP client presents; a host-only egress allowlist breaks these features for hosts not listed.
 - The code has no support for an outbound HTTP proxy; no proxy agent is configured for the node's own fetch calls.
-- The Docker image has no `HEALTHCHECK`, and neither compose file keeps the node key on a volume ([Production deployment](../operations/production-deployment.md#process-manager)).
+- Neither compose file keeps the node key on a volume, and the Docker image's `HEALTHCHECK` (`/v1/health/ready`) asks 127.0.0.1, so a node bound to another address needs its own ([Production deployment](../operations/production-deployment.md#process-manager)).
 - Calls to OpenRouter carry `HTTP-Referer: https://aimeat.io` and `X-Title: AIMEAT` (`aimeat/src/services/ai/adapters/sdk.ts`, `aimeat/src/services/openrouter.ts`): OpenRouter sees the software name, not the organisation.
 - The default STUN server handed to browsers is Google's (`stun:stun.l.google.com:19302`, `aimeat/src/config.ts`); change `AIMEAT_STUN_SERVERS` if browsers must not contact it.
 - No Docker image is published by the project; the image is built from `aimeat/Dockerfile`.

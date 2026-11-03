@@ -80,7 +80,7 @@ Marks used below:
 - [ ] **[change]** Run `aimeat validate` before every start after a configuration change. It checks the environment offline and exits 1 on an error, for example an invalid storage type, an app origin without a host, or neither `AIMEAT_ENCRYPTION_KEY` nor `AIMEAT_TOTP_ENCRYPTION_KEY` set. Dev mode, `http://` on a public host and a short admin password are warnings and do not change the exit code; read them too (`aimeat/src/utils/env-validator.ts`, dispatched from `aimeat/src/index.ts`).
 - [ ] **[change]** Read the startup self-check after every start: each `SECURITY:` line in the start log names one unsafe setting (`aimeat/src/config-posture.ts`).
 - [ ] **[change]** Open the admin Security page after every start and every update: `<node>/v1/admin?tab=security`, or ask an operator's AI with `aimeat_admin_security_overview`. Resolve open incidents (`aimeat_admin_incident_resolve`) ([Deployment checklist](../security/deployment-checklist.md)).
-- [ ] **[change]** Health check in the process manager or load balancer that reads `status` from `GET /v1/health`, not only the HTTP code ([Production deployment](../operations/production-deployment.md)).
+- [ ] **[change]** Health check in the process manager on `GET /v1/health/live` and in the load balancer on `GET /v1/health/ready`, which answer by HTTP code; a monitor that reads `GET /v1/health` reads `status`, not only the HTTP code ([Production deployment](../operations/production-deployment.md#health-checks)).
 
 ## Limits
 

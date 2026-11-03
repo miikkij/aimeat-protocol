@@ -69,7 +69,9 @@ The node has no syslog, OTLP or SIEM-specific exporter; a search of the node sou
 
 | Endpoint | Use | Note | Source |
 |---|---|---|---|
-| `GET /v1/health` | liveness and readiness | answers 200 also when `status` is `degraded`: read `status` and `subsystems.storage.healthy` | [Production deployment](../operations/production-deployment.md#health-checks), `aimeat/src/routes/health.ts` |
+| `GET /v1/health/live` | liveness | 200 while the process runs; no storage read | [Production deployment](../operations/production-deployment.md#health-checks), `aimeat/src/routes/health.ts` |
+| `GET /v1/health/ready` | readiness | 503 `NOT_READY` while booting, while draining after a stop signal, and when one storage read fails or takes over 2 s | [Production deployment](../operations/production-deployment.md#health-checks), `aimeat/src/routes/health.ts` |
+| `GET /v1/health` | the node's state for a person or a monitor | answers 200 also when `status` is `degraded`: read `status` and `subsystems.storage.healthy` | [Production deployment](../operations/production-deployment.md#health-checks), `aimeat/src/routes/health.ts` |
 | `GET /v1/build` | which version and commit run, and since when | never cached | [Production deployment](../operations/production-deployment.md#health-checks) |
 | `GET /v1/metrics` | Prometheus text format: HTTP requests and duration, tunnels, mailbox, the counters aimeat_auth_failures_total, aimeat_rate_limit_hits_total and aimeat_scope_denials_total, Node.js process metrics | off by default | `aimeat/src/services/prometheus.ts`, [observability guide](../../aimeat/docs/observability-guide.md) |
 | `GET /v1/stats` | JSON snapshot with daily history | `public` by default in code | [observability guide](../../aimeat/docs/observability-guide.md) |
@@ -112,7 +114,7 @@ The compliance register and records of processing are described in [Data classif
 - Allowed reads of records are not audited by the consent audit. The classification audit records shows and uses only for labels with audit on, and only while classification is on (off by default).
 - Every record listed is stored on the node itself, where an operator with host or database access can change it. Tamper resistance needs an export to a store outside the operator's reach.
 - No scheduled job deletes usage rows, so watch their growth. The operator deletes archived rows before a chosen date with `POST /v1/admin/usage/archive/prune` (`aimeat/src/routes/admin-usage.ts`). When to do that is the organisation's decision.
-- `/v1/health` answers 200 when degraded; a check that reads only the status code misses it.
+- `/v1/health` answers 200 when degraded; a check that reads only the status code misses it. `/v1/health/ready` answers 503 instead, but it checks only that the process takes requests and reaches its database.
 - No job was found that prunes kept compliance reports; they accumulate.
 
 ## Open questions

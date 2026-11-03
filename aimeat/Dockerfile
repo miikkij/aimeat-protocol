@@ -57,4 +57,11 @@ ENV AIMEAT_PORT=40050
 EXPOSE 40050
 
 USER node
+# Readiness, not /v1/health: GET /v1/health/ready answers 503 while the node boots, while it drains
+# after a stop signal and when its database does not answer, with one storage read whatever the
+# node holds; /v1/health answers 200 also when degraded. Node's own fetch, so the probe needs no
+# tool the image does not carry. A node bound to one address (AIMEAT_BIND_HOST) other than
+# 127.0.0.1 needs its own HEALTHCHECK naming that address.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.AIMEAT_PORT||40050)+'/v1/health/ready').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 CMD ["node", "dist/src/index.js", "start"]

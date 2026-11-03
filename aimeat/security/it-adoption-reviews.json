@@ -25,7 +25,7 @@
       "digest": "sha256:9823b75b60d5dd8f313cb74f"
     },
     "02-architecture.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/storage/storage-factory.ts",
         "aimeat/deploy/aimeat.service",
@@ -34,7 +34,7 @@
         "docs/operations/production-deployment.md",
         "aimeat/src/services/connections/providers-files.ts"
       ],
-      "digest": "sha256:bb838670e0031d31abe453f2"
+      "digest": "sha256:e5f9d7f5a059accadd85da1f"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -155,12 +155,12 @@
       "digest": "sha256:e9751f0e853fafe0054c79ca"
     },
     "15-operations-runbook.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "docs/operations/production-deployment.md",
         "aimeat/deploy/aimeat.service"
       ],
-      "digest": "sha256:60255f4da7f7db43f6d9710c"
+      "digest": "sha256:bce9fe8b04038b04519ee707"
     },
     "16-known-limitations.md": {
       "reviewedOn": "2026-11-02",
@@ -270,9 +270,9 @@
     "02-architecture.md": {
       "aimeat/src/storage/storage-factory.ts": "fd01b973fcdeec83",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
-      "aimeat/Dockerfile": "d2a16dcfe98bf7f5",
+      "aimeat/Dockerfile": "a730e25abfdcb643",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
-      "docs/operations/production-deployment.md": "f36fca30fbc34332",
+      "docs/operations/production-deployment.md": "47059a6cdab2448a",
       "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0"
     },
     "03-shared-responsibility.md": {
@@ -346,7 +346,7 @@
       "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
     },
     "15-operations-runbook.md": {
-      "docs/operations/production-deployment.md": "f36fca30fbc34332",
+      "docs/operations/production-deployment.md": "47059a6cdab2448a",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577"
     },
     "16-known-limitations.md": {

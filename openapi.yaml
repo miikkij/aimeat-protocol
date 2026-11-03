@@ -35777,11 +35777,54 @@ paths:
       description: >
         Liveness/readiness endpoint. No auth required. `data.build` says which code answers: the
         software `version` and the RunningBuild fields (`commit`, `commit_source`, `dirty`,
-        `built_at`, `state`), the same as GET /v1/build.
+        `built_at`, `state`), the same as GET /v1/build. It answers 200 also when `status` is
+        `degraded`. It reads storage once, and with personal nodes on it lists them and reads two
+        rows per personal node; a load balancer or process manager probes GET /v1/health/live and
+        GET /v1/health/ready instead, which cost the same on every node.
       tags: [Bootstrap]
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/health/live:
+    get:
+      operationId: getHealthLive
+      summary: Liveness probe
+      description: >
+        Whether this process runs and its event loop answers. No auth required, no storage read,
+        `Cache-Control: no-store`. A process manager restarts a process only when this does not
+        answer. Open during a maintenance stop and on a node that shows its content to signed-in
+        accounts only.
+      tags: [Bootstrap]
+      responses:
+        '200':
+          description: The process is alive. `data.status` is `live`, with `data.uptime_seconds`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/health/ready:
+    get:
+      operationId: getHealthReady
+      summary: Readiness probe
+      description: >
+        Whether this process should get traffic. No auth required, `Cache-Control: no-store`, one
+        keyed storage read with a 2-second limit whatever the node holds. 503 `NOT_READY` before
+        the boot has finished, while the process drains on its way out (SIGTERM or SIGINT), and when
+        the storage read fails or is late; `error.details.phase` is `starting`, `ready` or
+        `draining`. Open during a maintenance stop (the process is up and serves the maintenance
+        answer) and on a node that shows its content to signed-in accounts only.
+      tags: [Bootstrap]
+      responses:
+        '200':
+          description: The process takes requests. `data.status` is `ready`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '503':
+          $ref: '#/components/responses/AimeatError'
 
   # ── Chunked Upload ─────────────────────────────────────────
 
@@ -79196,9 +79239,12 @@ paths:
       tags: [Discovery]
       summary: Current build id and software version
       description: |
-        Return the running build identifier and software version. Used by the SPA auto-reload
-        watchdog to detect deploys. Response is a bare JSON object (not the AIMEAT envelope) and
-        is served with `Cache-Control: no-store`.
+        Return this process's own stamp and the software version. Two answers with different
+        `build` values came from two processes. The SPA's reload on new code does not read this:
+        the live stream's `hello` event names the pages' build, which a clean stamped build derives
+        from its commit and `built_at`, so a restart on the same build reloads no open page.
+        Response is a bare JSON object (not the AIMEAT envelope) and is served with
+        `Cache-Control: no-store`.
 
         It also answers "which code runs here": `commit` and `state`. A node started from a built
         `dist/` reports the commit that build was made from (`commit_source: stamp`). A node started
