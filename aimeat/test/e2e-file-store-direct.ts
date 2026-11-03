@@ -19,6 +19,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-file-store-direct.ts
  * @version-history
  *   v1.0.0 — 2026-10-31 — Initial (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
+ *   v1.0.1 — 2026-11-03 — The download after the 65 MB PUT opens a new connection once on ECONNRESET,
+ *     as the complete already did: a pooled connection past the node's keep-alive window was reset.
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
@@ -182,12 +184,14 @@ async function main() {
             const step = <T>(label: string, p: Promise<T>) => p.catch((err) => { throw new Error(`${label}: ${err.cause?.code ?? err.message}`); });
             const put = await step('PUT of 65 MB to the store', putTo(m.body.data.upload_url, m.body.data.upload_headers, big));
             assert(put.status === 200, `PUT: ${put.status}`);
-            // The 65 MB PUT outlasts the node's keep-alive window, so the pooled connection to the node
-            // may be closed under the next request; a client opens a new one, as this does once.
-            const done = await step('complete', call(m.body.data.complete_url, { method: 'POST' })
-                .catch((err) => err.cause?.code === 'ECONNRESET' ? call(m.body.data.complete_url, { method: 'POST' }) : Promise.reject(err)));
+            // The 65 MB PUT outlasts the node's keep-alive window, so a pooled connection to the node
+            // may be closed under the next request; a client opens a new one, as this does once for
+            // the complete and for the download (postgres sweep 41698406807 reset the download).
+            const onceMore = <T>(send: () => Promise<T>) => send()
+                .catch((err) => err.cause?.code === 'ECONNRESET' ? send() : Promise.reject(err));
+            const done = await step('complete', onceMore(() => call(m.body.data.complete_url, { method: 'POST' })));
             assert(done.status === 200, `complete: ${done.status} ${JSON.stringify(done.body)}`);
-            const r = await step('the download from the node', fetch(`${BASE}/v1/storage/${encodeURIComponent('big/sixty-five.img')}`, { headers: { Authorization: `Bearer ${A.token}` }, redirect: 'manual' }));
+            const r = await step('the download from the node', onceMore(() => fetch(`${BASE}/v1/storage/${encodeURIComponent('big/sixty-five.img')}`, { headers: { Authorization: `Bearer ${A.token}` }, redirect: 'manual' })));
             const where = r.headers.get('location') ?? '';
             assert(r.status === 302 && where.startsWith(s3.url) && where.includes('X-Amz-Signature='), `${r.status} ${where.slice(0, 80)}`);
             assert((r.headers.get('cache-control') ?? '').includes('no-store'), `cache-control: ${r.headers.get('cache-control')}`);
