@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-04 -- e2e-app-versions-access.ts joins the list (not the guard tier): an app's version list answers what the app's read answers for that caller, and carries no content (codebase analysis 2026-11-03, item A1).
  *   2026-11-02 -- e2e-dsp-agreements.ts joins the list (not the guard tier): what a Dataspace agreement grants and books, and the process room (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-ai-ecosystem-caller.ts joins the list (not the guard tier): an ecosystem app's AI calls, on its own node (:29397) (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-dataproduct-records-audience.ts joins the list (not the guard tier): a data product's records source allows the audience its workspace admits (secaudit2026nov02d round 13).
@@ -1794,6 +1795,9 @@ const ALL_SUITES = [
     // The screenshot of an app that opens for fewer people follows who may open it, unless its owner
     // shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
     'test/e2e-app-screenshot-access.ts',
+    // An app's version list answers what the app's read answers for that caller, and carries no
+    // content (codebase analysis 2026-11-03, item A1).
+    'test/e2e-app-versions-access.ts',
     'test/e2e-maintenance-access.ts',
     'test/e2e-package-update-widening.ts',
     'test/e2e-memory-bin-purge.ts',

@@ -38,10 +38,12 @@
  *     one write); createApp and both row readers carry `community`.
  *   v1.13.0 — 2026-10-17 — `access` (who may open the app): createApp writes it, both row readers
  *     carry it, and setAppAccess sets it on every version row.
+ *   2026-11-04 — listAppVersionSummaries: the version list without the content; GET .../versions
+ *     read every version's payload through listAppVersions (codebase analysis 2026-11-03, item A1).
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
-  AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppManifest, AppManifestCortex,
+  AppRecord, AppSummaryRecord, AppVersionSize, AppVersionSummary, AppDraftRecord, AppManifest, AppManifestCortex,
   AppListOptions, AppForkRecord, AppProtection, AppSeo, AppMarks, AppAuthorship, AppAuthorshipLogEntry,
   AppLegalKind, AppLegalDoc, AppListing,
 } from '../../../interface.js';
@@ -119,6 +121,25 @@ export const appMethods = {
       'SELECT versionNumber, size, createdAt FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC'
     ).all(ownerGaii, filename) as { versionNumber: number; size: number; createdAt: string }[];
     return rows.map(r => ({ versionNumber: r.versionNumber, size: Number(r.size), createdAt: String(r.createdAt) }));
+  },
+
+  async listAppVersionSummaries(this: SqliteStorage, ownerGaii: string, filename: string): Promise<AppVersionSummary[]> {
+    // The columns the version list shows, by name, and the manifest's version string out of the
+    // JSON in SQL. GET .../versions answers anybody; listAppVersions read every version's payload
+    // for it (codebase analysis 2026-11-03, item A1). json_valid keeps a broken manifest from
+    // failing the whole list.
+    const rows = this.db.prepare(
+      `SELECT versionNumber, size, createdAt, aiProvenanceId,
+              CASE WHEN json_valid(manifest) THEN json_extract(manifest, '$.version') END AS manifestVersion
+         FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC`
+    ).all(ownerGaii, filename) as { versionNumber: number; size: number; createdAt: string; aiProvenanceId: string | null; manifestVersion: unknown }[];
+    return rows.map(r => ({
+      versionNumber: r.versionNumber,
+      size: Number(r.size),
+      createdAt: String(r.createdAt),
+      version: (r.manifestVersion ?? undefined) as string | undefined,
+      aiProvenanceId: r.aiProvenanceId || undefined,
+    }));
   },
 
   async getLatestVersionNumber(this: SqliteStorage, ownerGaii: string, filename: string): Promise<number> {

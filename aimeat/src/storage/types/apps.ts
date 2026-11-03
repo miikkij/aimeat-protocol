@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — AppVersionSummary: one version as the version list shows it, without the content
+ *     (codebase analysis 2026-11-03, item A1). No column on either backend.
  *   2026-10-31 — AppManifest gains `screenshotPublic`: the owner shows the screenshot of an app that
  *     opens for fewer people to everyone (secaudit2026oct31w2 round 10, W2-12). Manifest JSON.
  *   v1.24.0 — 2026-10-27 — AppManifest gains `publishedByApp`, the app whose grant published the
@@ -517,6 +519,18 @@ export interface AppVersionSize {
   versionNumber: number;
   size: number;
   createdAt: string;
+}
+
+/**
+ * One published version as the version list shows it: the size line plus the manifest's own
+ * version string and the version's provenance record, never the content. GET
+ * /v1/apps/:owner/:filename/versions answers anybody, and reading 503 versions with their bytes
+ * for it is the read that stalled aimeat.io on 2026-10-23 (codebase analysis 2026-11-03, item A1).
+ */
+export interface AppVersionSummary extends AppVersionSize {
+  /** `manifest.version` of that version; undefined when the manifest carries none. */
+  version: string | undefined;
+  aiProvenanceId: string | undefined;
 }
 
 /**

@@ -13,6 +13,8 @@
  * @structure parseAppsBackup; inspectAppsBackup; restoreAppsBackup; types
  * @usage import { parseAppsBackup, restoreAppsBackup } from '../services/apps-backup-import.js';
  * @version-history
+ *   2026-11-04 — The preview counts an app's existing versions with listAppVersionSizes, not with every
+ *     version's content (codebase analysis 2026-11-03, item A1).
  *   2026-10-27 — A restored version keeps only the intake forms the caller manages; each form left out
  *     is named in errors (secaudit2026oct26, restoredManifest:archive-intake-declaration-kept).
  *   2026-10-17 — A restored version keeps the app's access setting (who may open it), as it keeps the listing.
@@ -186,7 +188,8 @@ export async function inspectAppsBackup(
       filename: app.filename,
       name: app.name,
       exists: latest > 0,
-      existing_versions: latest > 0 ? (await storage.listAppVersions(ownerGhii, app.filename)).length : 0,
+      // A count: the size line, never every version's content.
+      existing_versions: latest > 0 ? (await storage.listAppVersionSizes(ownerGhii, app.filename)).length : 0,
       versions: app.versions.map(v => ({
         version: v.version, size: v.size, created_at: v.createdAt, semver: v.manifest.version,
       })),

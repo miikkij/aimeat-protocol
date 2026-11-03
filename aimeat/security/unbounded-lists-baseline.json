@@ -14,6 +14,7 @@
     "listAppPurchasesBySeller": "DEBT: AppMarketplaceRepository.listAppPurchasesBySeller(sellerGaii) returns every match for its scope, with no limit or cursor",
     "listAppVersions": "DEBT: AppRepository.listAppVersions(ownerGaii, filename) returns every match for its scope, with no limit or cursor",
     "listAppVersionSizes": "DEBT: AppRepository.listAppVersionSizes(ownerGaii, filename) returns every match for its scope, with no limit or cursor",
+    "listAppVersionSummaries": "DEBT: AppRepository.listAppVersionSummaries(ownerGaii, filename) returns every version of one app, with no limit or cursor. Five named columns and no content (about 100 bytes a row), in place of listAppVersions on GET .../versions (codebase analysis 2026-11-03, item A1); no version pruning exists, so it grows with every publish",
     "listAutomationRecipesByOwner": "DEBT: EcosystemAppRepository.listAutomationRecipesByOwner(owner) returns every match for its scope, with no limit or cursor",
     "listBoardSubscriptions": "DEBT: BoardRepository.listBoardSubscriptions(boardId) returns every match for its scope, with no limit or cursor",
     "listCapabilitiesByOwner": "DEBT: CapabilityRepository.listCapabilitiesByOwner(ownerGhii) returns every match for its scope, with no limit or cursor",
@@ -376,5 +377,9 @@
     "src/utils/service-summary.ts": {
       "listAgents": 1
     }
+  },
+  "contentLists": {
+    "listAppsWithContent": "Reads the latest version of each app WITH its bytes, by design: the operator's copy scan compares apps' content (routes/apps/catalogue-admin.ts) and the one-time app scope allowance reads each app's code (services/app-scope-allowance.ts). Operator-only and boot-time callers, paged by limit; listApps is the catalogue's door without the bytes.",
+    "listAppVersions": "Reads every version of one app WITH its bytes, by design: the owner's backup export writes each version's content into the archive (services/apps-backup-export.ts). The version list reads listAppVersionSummaries and the import preview listAppVersionSizes (codebase analysis 2026-11-03, item A1)."
   }
 }

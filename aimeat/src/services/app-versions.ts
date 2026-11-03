@@ -8,12 +8,17 @@
  * @structure
  *   - AppVersionsRefusal — the refusal a caller renders (`CODE: message` on MCP, the envelope on REST)
  *   - AppVersionView / AppVersionsView — the answer, field for field what the route sends
- *   - listAppVersionsView() — resolve the app, list its versions, load the live version's provenance
+ *   - listAppVersionsView() — resolve the app, ask the app read's gates, list its versions, load the
+ *     live version's provenance
  * @usage
- *   const out = await listAppVersionsView(storage, config, ownerSegment, filename);
+ *   const out = await listAppVersionsView(storage, config, ownerSegment, filename, (ownerName) => reader);
  *   if (!out.ok) return refuse(out.status, out.code, out.message);
  *   // out.data is the envelope data; out.provenance goes to setProvenanceHeaders + envelopeMeta
  * @version-history
+ *   2026-11-04 — The list answers what the app read answers for the same caller (a hidden app 404, an
+ *     app that needs a sign-in 401 or 403; services/app-read-gate.ts), and it reads the summary
+ *     columns (listAppVersionSummaries) in place of every version with its content. It was open to
+ *     anybody and read 1 041 MB for one app (codebase analysis 2026-11-03, item A1).
  *   v1.0.0 — 2026-09-27 — Extracted from the route in src/routes/apps/read.ts, so the MCP tool can
  *     call the same code. The route's answer is unchanged. The former MCP tool aimeat_app_versions
  *     read storage directly and did not return ai_provenance_id or the live provenance.
@@ -22,6 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { loadServedProvenance, type ServedProvenance } from './ai-provenance-marks.js';
+import { appReadRefusal, type AppReader } from './app-read-gate.js';
 
 /** A refusal, with the HTTP status the REST route answers and the code both surfaces carry. */
 export interface AppVersionsRefusal {
@@ -61,19 +67,29 @@ export async function listAppVersionsView(
   config: AimeatConfig,
   owner: string,
   filename: string,
+  /** The caller, built for the app's owner name (the operator trail names it). */
+  reader: (appOwnerName: string) => AppReader,
 ): Promise<{ ok: true; data: AppVersionsView; provenance: ServedProvenance | undefined } | AppVersionsRefusal> {
   // Tolerate the legacy full-GHII owner segment (owner@node) in old links.
   const ownerName = localAccountName(owner);
+  const notFound = `App "${filename}" not found for owner "${ownerName}"`;
 
   // Apps live in the owner's canonical bucket (ownerGaii = owner@nodeId),
   // not under any agent GAII. Resolve the row by owner name, then list that
   // exact bucket so every published version is returned.
   const app = await storage.getAppByOwnerName(ownerName, filename);
   if (!app) {
-    return { ok: false, status: 404, code: 'NOT_FOUND', message: `App "${filename}" not found for owner "${ownerName}"` };
+    return { ok: false, status: 404, code: 'NOT_FOUND', message: notFound };
   }
 
-  const versions = await storage.listAppVersions(app.ownerGaii, filename);
+  // The app read's own gates, for the same caller: a hidden app answers as a missing one, an app that
+  // needs a sign-in answers 401 or 403. The latest row decides, as it does for the read.
+  const refusal = await appReadRefusal(storage, config, app, app, reader(app.ownerName), notFound);
+  if (refusal) return { ok: false, ...refusal };
+
+  // The summary columns only: this list answers anybody, and an app's versions with their bytes
+  // were 503 rows and 1 041 MB on aimeat.io (codebase analysis 2026-11-03, item A1).
+  const versions = await storage.listAppVersionSummaries(app.ownerGaii, filename);
   // TARGET-058: per version, because each publish is its own content and carries its own
   // statement; `meta.provenance` is the LIVE version's, on the one envelope carrier.
   const provenance = await loadServedProvenance(storage, config, app.aiProvenanceId);
@@ -84,7 +100,7 @@ export async function listAppVersionsView(
       filename,
       versions: versions.map(v => ({
         version_number: v.versionNumber,
-        version: v.manifest.version,
+        version: v.version,
         size: v.size,
         created_at: v.createdAt,
         ai_provenance_id: v.aiProvenanceId ?? null,
