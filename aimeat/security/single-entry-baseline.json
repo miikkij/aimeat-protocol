@@ -617,6 +617,20 @@
         "count": 1,
         "why": "UNREVIEWED"
       }
+    },
+    "ai-key-record": {
+      "src/routes/openrouter.ts": {
+        "count": 2,
+        "why": "The legacy settings route (GET /v1/openrouter/settings says whether the record holds a key, and the model list decrypts it to ask the provider's catalogue); neither decides who pays for a completion."
+      },
+      "src/services/notebook-ai.ts": {
+        "count": 1,
+        "why": "resolveOwnerModel reads the record only to say whether the person's own key pays and which model they chose; a person with no key of their own is asked of prepareAiCall."
+      },
+      "src/services/own-key-coverage.ts": {
+        "count": 1,
+        "why": "hasOwnAiKey, the one answer to whether a person has an AI key of their own: it reads the legacy record beside the provider keys."
+      }
     }
   }
 }

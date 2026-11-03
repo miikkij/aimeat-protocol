@@ -22,9 +22,9 @@
  *   - An agent's crew: the node cannot see it, so the proof is that the node says the own key does
  *     not reach it (`own_key.not_covered`), for the owner and for the agent.
  *
- *   WHAT IT CANNOT PROVE. The place key goes only to OpenRouter's own host (ai-allowance.ts
- *   isOpenRouterHost), so it cannot be pointed at a stand-in. Its road is the payer the node names
- *   (`pays: "allowance"`) and the unit tests of resolveAiKey.
+ *   WHAT IT CANNOT PROVE. The place key goes only to OpenRouter's own host (the node's provider has
+ *   a fixed address, services/ai/providers.ts), so it cannot be pointed at a stand-in. Its road is
+ *   the payer the node names (`pays: "allowance"`).
  *
  *   It runs its own nodes, like e2e-chat-agent, because the chat's configuration is process-wide.
  *   E2E_OWN_KEY_ROADS_PORT moves the set: the node route on it, the shared-key node one above, the

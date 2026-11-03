@@ -29,6 +29,8 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.3.0 — 2026-11-04 — Rule ai-key-record: the legacy AI key record is read by hand only where the
+ *     baseline says why (codebase analysis 2026-11-03, item A10).
  *   v1.2.0 — 2026-10-05 — Rules agent-role, wildcard-test and caller-built: the caller is the
  *     CallerContext (services/caller-context.ts), and the remaining hand tests and hand-built callers
  *     only go down (secaudit 2026-10, C9).
@@ -136,6 +138,12 @@ const RULES: Rule[] = [
     label: 'A caller is the CallerContext (services/caller-context.ts), not an object built at the call site with a literal role: the MCP session\'s comes from register-all.ts, a request\'s from callerOf (C9)',
     pattern: /roles:\[['"]agent['"]\]/,
     skipDirs: ['src/services/caller-context.ts', 'src/auth/'],
+  },
+  {
+    id: 'ai-key-record',
+    label: 'Whose key pays for an AI call is asked of prepareAiCall (services/ai/completion.ts), which knows the node\'s key, its allowance and the free model; the legacy key record read by hand is how six notebook features refused a person the node would have paid for (codebase analysis 2026-11-03, A10)',
+    pattern: /getMemory\([^)]*['"]openrouter\.apikey['"]\)/,
+    skipDirs: ['src/services/ai/', 'src/services/secret-records.ts'],
   },
   {
     id: 'request-caller-built',

@@ -15,19 +15,20 @@
  *   handed raw API access. Someone who wants unmetered use brings their own key, which is the
  *   recommended path and bypasses every line of this file.
  *
- *   Selection order, one place, no exceptions: the person's own key, then the node's key if they have
- *   allowance left, then nothing.
+ *   Which key pays is decided in one place, the AI planner (services/ai/route-plan.ts, reached through
+ *   prepareAiCall): the person's own key, then the node's key while nodeKeyStanding says it may pay.
  * @structure
- *   - AiKeyChoice — which key pays, and whether the allowance is spent
  *   - NodeKeyStanding / nodeKeyStanding() — may the node's key pay one more call: the allowance, then
  *     the operator's mode and daily limits once it is spent
- *   - resolveAiKey() — the order above, with the free starter grant applied lazily
- *   - isOpenRouterHost() — the one address the node's key may be sent to
  *   - debitAllowance() / grantAllowance() / readAllowance()
  * @usage
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.6.0 — 2026-11-04 — resolveAiKey, AiKeyChoice and isOpenRouterHost are removed: nothing has
+ *     called them since ae6f30957 (2026-09-28), when the planner took the decision, and a tested,
+ *     exported "which key pays" that production does not use misled readers (codebase analysis
+ *     2026-11-03, item A10).
  *   v1.5.2 — 2026-11-01 — The node's key is nodeOpenRouterKey: on the own-key choice (ai.region_mode own) no shared key pays.
  *   v1.5.1 — 2026-10-31 — debitAllowance drops the cached balance of the node's key
  *     (markNodeKeyUsed), so a page after the call shows what the call left (v28 finding 9).
@@ -55,12 +56,10 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { AiCompletionError, decryptOwnerKey } from './ai/completion.js';
-import { DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
+import { AiCompletionError } from './ai/completion.js';
 import { readSystem, updateSystem } from './classification/system-record.js';
 import { nodeKeySpent, markNodeKeyUsed } from './ai/node-key-balance.js';
 import { logger } from '../utils/logger.js';
-import { nodeOpenRouterKey } from './ai/node-openrouter-key.js';
 
 /**
  * One person's standing on the node's key. Lives under the reserved `ai-usage.` prefix, so an
@@ -103,17 +102,6 @@ export interface NodeKeyStanding {
   reason?: 'allowance-spent' | 'account-daily-limit' | 'node-daily-limit' | 'node-key-spent';
   /** The sentence the caller is told. */
   message?: string;
-}
-
-export interface AiKeyChoice {
-  /** The key to call with. Undefined only for a provider that needs none (a local model server). */
-  key: string | undefined;
-  /** Which pocket it comes from. Mirrors the ledger dimension of the same name. */
-  scope: 'own' | 'node';
-  /** Node key only: the allowance is used up. The caller decides whether to degrade or refuse. */
-  exhausted: boolean;
-  /** Node key only: what is left, in USD. */
-  remainingUsd: number;
 }
 
 const allowanceKey = (gaii: string) => `ai-usage.allowance.${gaii}`;
@@ -187,16 +175,6 @@ async function writeAllowance(storage: Storage, gaii: string, rec: AllowanceReco
   });
 }
 
-/** True when a provider address points at OpenRouter's own host over https, the only place the
- *  node's key may go. Compared against DEFAULT_BASE_URLS so there is one spelling of that host. */
-export function isOpenRouterHost(baseUrl: string): boolean {
-  // An address that does not parse is not OpenRouter's: that is the answer, not a failure.
-  if (typeof baseUrl !== 'string' || !URL.canParse(baseUrl)) return false;
-  const target = new URL(baseUrl);
-  const home = new URL(DEFAULT_BASE_URLS.openrouter);
-  return target.protocol === 'https:' && target.hostname.toLowerCase() === home.hostname && target.port === home.port;
-}
-
 /** What is left to spend on the node's key. Never negative: a call may overshoot by its own cost. */
 export function remainingOf(rec: AllowanceRecord): number {
   return Math.max(0, rec.granted_usd - rec.spent_usd);
@@ -254,58 +232,6 @@ export async function nodeKeyStanding(storage: Storage, config: AimeatConfig, ga
   }
   return { remainingUsd: 0, mayPay: true,
     headroomUsd: config.aiNodeKeyAccountDailyUsd - mine, nodeHeadroomUsd: config.aiNodeKeyNodeDailyUsd - nodeToday };
-}
-
-/**
- * Decide which key pays.
- *
- * The person's own key always wins when they have one, and no allowance applies to it: it is their
- * money, their provider account and their rate limits, which is exactly why bringing one is the
- * recommended path.
- */
-export async function resolveAiKey(
-  storage: Storage,
-  config: AimeatConfig,
-  gaii: string,
-  provider: ProviderType,
-  apiKeyRecordValue: unknown,
-  baseUrl: string,
-  opts: {
-    /** False when the node's key may not pay for this operation at all (nodeKeyPaysFor in
-     *  ai/completion.ts: an image or a transcription for which the operator named no default model). */
-    nodeKey?: boolean;
-  } = {},
-): Promise<AiKeyChoice> {
-  const hasOwn = !!(apiKeyRecordValue as { encrypted?: string } | undefined)?.encrypted;
-  if (hasOwn) {
-    return {
-      key: decryptOwnerKey(config, apiKeyRecordValue, provider),
-      scope: 'own', exhausted: false, remainingUsd: 0,
-    };
-  }
-
-  const instanceKey = nodeOpenRouterKey(config);
-  if (instanceKey && provider === 'openrouter' && opts.nodeKey !== false) {
-    // The node's key goes to OpenRouter's own host and nowhere else. The address comes from the
-    // person's saved settings, and a person with no key of their own saved an address they
-    // control: the node then sent its key there in the Authorization header. Their OWN key may
-    // still go anywhere they point it (a local model server is the ordinary case); this one is
-    // not theirs to point.
-    if (!isOpenRouterHost(baseUrl)) {
-      throw new AiCompletionError('NODE_KEY_HOST', 403,
-        'This node\'s shared AI key is sent only to OpenRouter. To use another address, add your own API key in your AI settings.');
-    }
-    const rec = await readAllowance(storage, config, gaii);
-    const remaining = remainingOf(rec);
-    return { key: instanceKey, scope: 'node', exhausted: remaining <= 0, remainingUsd: remaining };
-  }
-
-  // No own key, no node key: the existing refusal, unchanged. decryptOwnerKey words it and throws
-  // for openrouter, and returns undefined for a provider that legitimately needs no key.
-  return {
-    key: decryptOwnerKey(config, apiKeyRecordValue, provider),
-    scope: 'own', exhausted: false, remainingUsd: 0,
-  };
 }
 
 /**
