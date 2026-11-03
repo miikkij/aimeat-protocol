@@ -14,6 +14,9 @@
  *   DELETE /v1/open-items/:id
  * @usage app.use(openItemsRouter(config, storage))
  * @version-history
+ *   v1.1.1 — 2026-11-04 — A create, a change and a switch-off tell the owner's open pages as the
+ *     `memory` domain. The three calls passed the owner as the domain, so no page heard them
+ *     (codebase analysis 2026-11-03, item A4).
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: GET /v1/open-items reads through showItems with the caller's
  *     ContentReader. The count and the stats are numbers and read as before.
  *   v1.0.0 — 2026-08-09 — Replaces routes/intents.ts. One key instead of one record per item, and
@@ -25,7 +28,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitRecordChange } from '../services/event-bus.js';
 import {
     ITEM_KINDS, CLOSES_CHECKS, MAX_ITEMS, OpenItemsConflict,
     showItems, openCount, addItem, patchItem, closeItem, getItem, itemStats,
@@ -40,6 +43,12 @@ export function openItemsRouter(config: AimeatConfig, storage: Storage): Router 
     // Rule 10: the owner's GHII, resolved from the session — never req.auth!.sub, which is the bare
     // name for an owner token and would file every item under a namespace nothing reads back.
     const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
+
+    /**
+     * Tell the owner's open pages that the list changed. The record is owner-visible
+     * (services/open-items.ts writes it so), so the event goes to that owner's streams only.
+     */
+    const announce = (req: Express.Request) => emitRecordChange('memory', resolve(req), 'owner');
 
     /** A write conflict is a retry, not a server fault. Say so with the status that means that. */
     const onConflict = (res: Parameters<Parameters<Router['get']>[1]>[1], e: unknown) => {
@@ -128,7 +137,7 @@ export function openItemsRouter(config: AimeatConfig, storage: Storage): Router 
                     `the list holds at most ${MAX_ITEMS} items; switch something off first`, 409));
                 return;
             }
-            emitChange(req.auth!.owner, 'memory');
+            announce(req);
             res.status(201).json(success(config.nodeId, { item }));
         } catch (e) { onConflict(res, e); }
     });
@@ -172,7 +181,7 @@ export function openItemsRouter(config: AimeatConfig, storage: Storage): Router 
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such item'));
                 return;
             }
-            emitChange(req.auth!.owner, 'memory');
+            announce(req);
             res.json(success(config.nodeId, { item }));
         } catch (e) { onConflict(res, e); }
     });
@@ -193,7 +202,7 @@ export function openItemsRouter(config: AimeatConfig, storage: Storage): Router 
         }
         try {
             await closeItem(storage, ownerGhii, id, 'person');
-            emitChange(req.auth!.owner, 'memory');
+            announce(req);
             res.json(success(config.nodeId, { switched_off: id }));
         } catch (e) { onConflict(res, e); }
     });

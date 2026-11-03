@@ -14,6 +14,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=open-items
  * @version-history
+ *   v1.1.0 — 2026-11-04 — Phase 7: a create, a change and a switch-off each reach the owner's event
+ *     stream as the `memory` domain (codebase analysis 2026-11-03, item A4).
  *   v1.0.0 — 2026-08-09 — Replaces e2e-intents.ts. One key instead of one record per item, a
  *     flipped state instead of open→done, and the agent now WRITES the list rather than only
  *     reading it, so the conflict path is covered too.
@@ -463,6 +465,73 @@ await test('a stale write is refused rather than overwriting what somebody else 
     const after = await json('/v1/open-items', auth(ownerToken));
     assert(after.body.data.items.some((i: any) => i.title === 'added in between'),
         'the write that got there first must still be on the list');
+});
+
+console.log('\nPhase 7: the open page hears the change');
+
+/** The domains in every `data:` frame of an owner's event stream so far. */
+function domainsIn(text: string): string[] {
+    const out: string[] = [];
+    for (const line of text.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+            const parsed = JSON.parse(line.slice(6));
+            if (Array.isArray(parsed.domains)) out.push(...parsed.domains);
+        } catch { /* a frame still arriving */ }
+    }
+    return out;
+}
+
+await test('adding, changing and switching off an item each reach the owner\'s stream as "memory"', async () => {
+    const ticket = await json('/v1/events/ticket', auth(ownerToken, { method: 'POST' }));
+    assert(ticket.status === 200 && !!ticket.body.data?.ticket, `ticket ${ticket.status}`);
+    const ctrl = new AbortController();
+    const res = await fetch(`${BASE}/v1/events?ticket=${ticket.body.data.ticket}`, { signal: ctrl.signal });
+    assert(res.status === 200, `stream ${res.status}`);
+    let buf = '';
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    void (async () => {
+        try {
+            for (;;) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) buf += dec.decode(value, { stream: true });
+            }
+        } catch { /* aborted below */ }
+    })();
+    const memoryFrames = () => domainsIn(buf).filter(d => d === 'memory').length;
+    const waitForMore = async (before: number, what: string) => {
+        const deadline = Date.now() + 6_000;
+        while (Date.now() < deadline) {
+            if (memoryFrames() > before) return;
+            await new Promise(r => setTimeout(r, 50));
+        }
+        throw new Error(`no "memory" frame after ${what}; domains seen: ${JSON.stringify(domainsIn(buf))}`);
+    };
+    try {
+        await new Promise(r => setTimeout(r, 300));
+        let before = memoryFrames();
+        const made = await json('/v1/open-items', auth(ownerToken, {
+            method: 'POST', body: JSON.stringify({ title: 'heard live' }),
+        }));
+        assert(made.status === 201, `create ${made.status}`);
+        await waitForMore(before, 'the create');
+
+        before = memoryFrames();
+        const patched = await json(`/v1/open-items/${made.body.data.item.id}`, auth(ownerToken, {
+            method: 'PATCH', body: JSON.stringify({ status: 'working' }),
+        }));
+        assert(patched.status === 200, `patch ${patched.status}`);
+        await waitForMore(before, 'the patch');
+
+        before = memoryFrames();
+        const off = await json(`/v1/open-items/${made.body.data.item.id}`, auth(ownerToken, { method: 'DELETE' }));
+        assert(off.status === 200, `switch off ${off.status}`);
+        await waitForMore(before, 'the switch-off');
+    } finally {
+        ctrl.abort();
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
