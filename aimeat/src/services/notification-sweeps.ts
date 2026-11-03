@@ -13,6 +13,9 @@
  *   listOwnerNotificationRecords and listOwnerNotifications (the shared owner-exact reads)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.4.1 -- 2026-11-04 -- The digest's address comes from provenOwnerAddress (owner-mail-address.ts), the one
+ *     answer to "is this owner's address proven", which also checks the stored address hash (codebase
+ *     analysis 2026-11-03, item A9).
  *   v1.4.0 -- 2026-11-04 -- Both passes claim before they send: the held marks are cleared on their version and
  *     only the cleared ones are pushed; the digest bookmark moves before the email, on the value read, and goes
  *     back when the email fails. Two processes no longer send twice (codebase analysis 2026-11-03, HA stage 1).
@@ -38,6 +41,7 @@ import type { PushService } from './push.js';
 import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
 import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
+import { provenOwnerAddress } from './owner-mail-address.js';
 import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email-templates-digest.js';
 import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
 import { createT, toLocale } from '../i18n.js';
@@ -167,7 +171,8 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
     owners++;
     try {
       const g = await storage.getGHII(ghii);
-      if (!g?.notificationEmail || !g.emailVerifiedAt) continue;
+      const to = provenOwnerAddress(g);
+      if (!g || !to) continue;
       const cutoff = now - settings.emailDigest.afterHours * 3_600_000;
       const since = settings.lastDigestAt ? new Date(settings.lastDigestAt).getTime() : 0;
       const due = (await listOwnerNotifications(storage, ghii))
@@ -204,7 +209,7 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
         return claimed ? { ...current, lastDigestAt } : current;
       });
       if (!claimed) continue;
-      const ok = await email.sendRaw(g.notificationEmail, subject, html, text);
+      const ok = await email.sendRaw(to, subject, html, text);
       if (ok) {
         sent++;
         await appendMailLog(storage, ghii, { kind: 'digest', subject });
