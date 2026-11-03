@@ -14,6 +14,7 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-04 — GET /v1/build answers the process stamp (PROCESS_BUILD_ID) as before; the pages' stamp names the code (codebase analysis 2026-11-03, item A7).
  *   2026-11-01 — /v1/dataset/:owner/:name answers 404 (same page body) when no public package is
  *     there, not 200 with noindex (WP10e C1).
  *   2026-11-02 — On a node the store sold, a browser asking for /v1/connect (any language) is sent to
@@ -126,7 +127,7 @@ import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { mcpInstallLink } from '../services/mcp-install.js';
 // Shell serving and public-file lookup live in the sibling; re-exported because bootstrap.ts and
 // static-files.ts have imported them from here since before the split.
-import { BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
+import { PROCESS_BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
 import { localAccountName } from '../utils/gaii.js';
 import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
@@ -376,10 +377,10 @@ const PLATFORMS: AIPlatform[] = [
 export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  // Build-id probe: the SPA polls this and auto-reloads the open tab when the server restarts
-  // with new code (BUILD_ID changes on every process start) — so you never serve stale ES modules
-  // and never need a manual hard refresh. Public, uncached, tiny. See the auto-reload script
-  // injected by serveSpa().
+  // Process probe: `build` is THIS process's start stamp (PROCESS_BUILD_ID), so two answers that
+  // differ came from two processes. The pages' own stamp, which the open SPA compares on its live
+  // stream to reload on new code, is BUILD_ID in portal-spa.ts and names the code instead. Public,
+  // uncached, tiny.
   //
   // It also says WHICH CODE runs: the commit, and whether the build is behind the source on disk
   // (utils/build-stamp.ts runningBuild). Until 2026-10-11 it gave only the restart time, and "is
@@ -388,8 +389,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/build', (_req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({
-      build: BUILD_ID, version: getSoftwareVersion(),
-      started_at: new Date(parseInt(BUILD_ID, 36)).toISOString(),
+      build: PROCESS_BUILD_ID, version: getSoftwareVersion(),
+      started_at: new Date(parseInt(PROCESS_BUILD_ID, 36)).toISOString(),
       ...runningBuild(),
     });
   });
