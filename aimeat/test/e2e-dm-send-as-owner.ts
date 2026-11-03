@@ -372,5 +372,18 @@ await test('10. To support@operators it reaches the group thread, and the operat
     assert(m?.senderGhii === bob.ghii && m?.sentByAgent === bobbot.gaii, `the operator's copy ${JSON.stringify(m && { s: m.senderGhii, a: m.sentByAgent })}`);
 });
 
+await test('11. To a web host where the node id goes, it is refused with the address on this node, and nothing goes out', async () => {
+    // 2026-11-03: this tool sent `heidileskinen@aimeat.io` and answered `queued` for a node that
+    // cannot exist. The refusal now gives the address the person has here.
+    const client = await connectMcp(sendbot.gaii, sendbot.key);
+    const { ok, body } = await client.call('aimeat_dm_send_as_owner', { to: `${bobName}@aimeat.io`, body: 'web host as node' });
+    const text = String(body.result?.content?.[0]?.text ?? '');
+    assert(!ok && body.result?.isError === true, `the call must be refused: ${JSON.stringify(body).slice(0, 300)}`);
+    const res = JSON.parse(text);
+    assert(res.code === 'RECIPIENT_NOT_FOUND' && String(res.error).includes(bob.ghii), `the refusal names ${bob.ghii}: ${text}`);
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(!(convs.body.data.conversations as any[]).some(c => c.peerGhii === `${bobName}@aimeat.io`), 'a refused send left a conversation');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

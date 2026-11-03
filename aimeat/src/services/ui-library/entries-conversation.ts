@@ -8,6 +8,8 @@
  * @structure CONVERSATION_ENTRIES
  * @usage import { CONVERSATION_ENTRIES } from './entries-conversation.js';
  * @version-history
+ *   v1.6.1 — 2026-11-03 — The AI status example's agent identity ends in a node id, not a web host
+ *     (an identity is name#owner@node-id).
  *   v1.6.0 — 2026-09-27 — What the chat and the admin pages added: ConversationCopy and ConversationCap ways,
  *     AiNotice main, Panes framed (the admin's Panes folded in).
  *   v1.5.0 — 2026-09-27 — Messages on components: Message, MessageFile, MessageQuestions, MessageComposer,
@@ -72,7 +74,7 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         },
         useFor: ['In the rail of a conversation. The payer comes from the node, never from the page.'],
         variants: [],
-        example: { status: { agent_name: 'chat#alice@aimeat.io', pays: 'node', has_own_key: false, allowance_remaining_usd: 1.5, model: 'claude-sonnet-5' } },
+        example: { status: { agent_name: 'chat#alice@aimeat-fi-001-genesis', pays: 'node', has_own_key: false, allowance_remaining_usd: 1.5, model: 'claude-sonnet-5' } },
     },
     {
         id: 'rail-action', name: 'RailAction', kind: 'component', status: 'active',

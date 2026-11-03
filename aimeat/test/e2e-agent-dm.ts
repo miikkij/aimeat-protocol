@@ -517,6 +517,32 @@ await test('30. A recipient on another node is still handed to federation, not r
     assert(body.data.message.status !== 'delivered', `a queued send must not claim delivery, got ${body.data.message.status}`);
 });
 
+// 2026-11-03: an agent sent its owner's message to `heidileskinen@aimeat.io`, the node's web host where
+// the node id goes. It was answered `queued` for a node called `aimeat.io`, which no node can be (a node
+// id has no dots), and it would have been retried for the seven days of the retry window while the
+// person sat on this node under `heidileskinen@<node id>`.
+await test('31. An address with a web host for its node is 404, names the address on this node, and writes nothing', async () => {
+    const wrong = `${bobName}@aimeat.io`;
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: wrong, body: 'Verkko-osoite palvelimen tunnuksen paikalla.' }),
+    });
+    assert(status === 404 && body.error?.code === 'RECIPIENT_NOT_FOUND', `expected 404 RECIPIENT_NOT_FOUND, got ${status}: ${JSON.stringify(body)}`);
+    const msg: string = body.error?.message ?? '';
+    assert(msg.includes('"aimeat.io" is not a node id') && msg.includes(bob.ghii), `the reason must say what is wrong and give ${bob.ghii}: ${msg}`);
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(!(convs.body.data.conversations ?? []).some((c: any) => c.peerGhii === wrong), 'a refused send must leave no conversation behind');
+});
+
+await test('32. A web-host address for a name not on this node is 404 and says how addresses here end', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: `nobody${stamp}@gmail.com`, body: 'Sähköpostiosoite.' }),
+    });
+    assert(status === 404 && body.error?.code === 'RECIPIENT_NOT_FOUND', `expected 404 RECIPIENT_NOT_FOUND, got ${status}: ${JSON.stringify(body)}`);
+    assert((body.error?.message ?? '').includes(`end in @${NODE_ID}`), `the reason names this node's id: ${body.error?.message}`);
+});
+
 // ── Phase E (2026-10-17): the agent's conversation is the owner's to answer, and it is one conversation ──
 // decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis. The agent's sent copies live under
 // the agent and the other side's replies under the owner, so the owner had two rows and half a thread,

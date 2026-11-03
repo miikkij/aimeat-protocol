@@ -20,7 +20,8 @@
  *   under that owner, including the ones that do not exist. Each kind has its own record, and that
  *   record is what is asked for here.
  * @structure IdentityKind; MAIL_PREFIX; identityKind(id); isIdentityShaped(id);
- *   localIdentityExists(storage, config, id) → true | false | null
+ *   localIdentityExists(storage, config, id) → true | false | null;
+ *   nodePartRefusal(storage, config, id) → reason | null
  * @usage
  *   const exists = await localIdentityExists(storage, config, recipientGhii);
  *   if (exists === false) return { ok: false, code: 'RECIPIENT_NOT_FOUND' };
@@ -30,10 +31,15 @@
  *     `<name>#<owner>@<node>` where the owner existed and the agent never had.
  *   v1.0.1 — 2026-09-26 — The account a local GHII names comes from localAccountName, the one cut of an
  *     identity to an account name (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-11-03 — nodePartRefusal: the direct-message send path asks whether the node part of
+ *     an address is a node id at all. A DM to `heidileskinen@aimeat.io` (this node's web host, not its
+ *     id) was accepted as a message for a node called `aimeat.io`, answered `queued`, and retried for
+ *     the seven days of the retry window with no peer to send it to, while the person it was meant
+ *     for sat on this node under `heidileskinen@aimeat-finland-001-genesis`.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose, isValidGAII, isValidGEAI, isValidGHII, localAccountName } from '../utils/gaii.js';
+import { parseGaiiLoose, isValidGAII, isValidGEAI, isValidGHII, localAccountName, validateNodeId } from '../utils/gaii.js';
 
 /** The four things an address can be. `mail` is a person this node has no identity for. */
 export type IdentityKind = 'geai' | 'gaii' | 'ghii' | 'mail';
@@ -107,4 +113,31 @@ export function missingIdentityReason(id: string): string {
       + `The account exists; this ${what} does not. Check the name — one person can have many, and none of them is the account itself.`;
   }
   return `No account named "${owner}" on ${node}.`;
+}
+
+/**
+ * Why an address cannot be sent to because its node part is not a node id, or `null` when it is one.
+ *
+ * Existence on another node stays "not ours to judge" (see localIdentityExists), so an address on a
+ * node this one has never met is still handed to federation. The node part's GRAMMAR is ours to
+ * judge: hyphen-separated lowercase words, two at minimum, no dots. A web host or a mail host
+ * (`aimeat.io`, `gmail.com`) does not fit it, and no node can ever answer to one, so a message
+ * addressed there can only wait out the retry window and expire. When the same name exists on this
+ * node, the reason gives that address, because a person who wrote this node's web host meant it.
+ */
+export async function nodePartRefusal(
+  storage: Storage, config: AimeatConfig, id: string,
+): Promise<string | null> {
+  const { agent, owner, node } = parseGaiiLoose(id);
+  if (node === config.nodeId || (node && validateNodeId(node) === null)) return null;
+  const shape = `An address is name@node-id, and a node id is lowercase words joined by hyphens, with no dots, such as ${config.nodeId}.`;
+  const lead = node
+    ? `"${node}" is not a node id${node.includes('.') ? ' but a web or mail address' : ''}, so nothing was sent. ${shape}`
+    : `"${id}" names no node, so nothing was sent. ${shape}`;
+  if (owner) {
+    // The same identity with this node's id in the node part: eco:app#owner, agent#owner or owner.
+    const here = `${id.startsWith('eco:') ? 'eco:' : ''}${agent ? `${agent}#` : ''}${owner}@${config.nodeId}`;
+    if (await localIdentityExists(storage, config, here) === true) return `${lead} On this node the address is ${here}.`;
+  }
+  return `${lead} Addresses on this node end in @${config.nodeId}; an address on another node ends in that node's id.`;
 }
