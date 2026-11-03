@@ -29,8 +29,12 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
- *   v1.3.0 — 2026-11-04 — Rule verification-level-gate: an owner's address is proven by
+ *   v1.5.0 — 2026-11-04 — Rule verification-level-gate: an owner's address is proven by
  *     provenOwnerAddress, not by the account's verification level (codebase analysis 2026-11-03, A9).
+ *   v1.4.0 — 2026-11-04 — Rule admin-password: the admin password is read only by its one check, its
+ *     generation at boot and its masked display (codebase analysis 2026-11-03, item A12).
+ *   v1.3.0 — 2026-11-04 — Rule ai-key-record: the legacy AI key record is read by hand only where the
+ *     baseline says why (codebase analysis 2026-11-03, item A10).
  *   v1.2.0 — 2026-10-05 — Rules agent-role, wildcard-test and caller-built: the caller is the
  *     CallerContext (services/caller-context.ts), and the remaining hand tests and hand-built callers
  *     only go down (secaudit 2026-10, C9).
@@ -144,6 +148,17 @@ const RULES: Rule[] = [
     label: 'Whether an owner\'s address is proven is asked with provenOwnerAddress (services/owner-mail-address.ts), which compares the flag and the hash; the account\'s verificationLevel stays when the address changes, so a mail gate that compares it mails an unproven address (codebase analysis 2026-11-03, A9)',
     // A comparison of the level with a number: `g.verificationLevel<1`, `(r.verificationLevel??0)>=1`.
     pattern: /verificationLevel(\?\?\d+\))?(<|>|<=|>=|===|!==|==|!=)\d/,
+  },
+  {
+    id: 'ai-key-record',
+    label: 'Whose key pays for an AI call is asked of prepareAiCall (services/ai/completion.ts), which knows the node\'s key, its allowance and the free model; the legacy key record read by hand is how six notebook features refused a person the node would have paid for (codebase analysis 2026-11-03, A10)',
+    pattern: /getMemory\([^)]*['"]openrouter\.apikey['"]\)/,
+    skipDirs: ['src/services/ai/', 'src/services/secret-records.ts'],
+  },
+  {
+    id: 'admin-password',
+    label: 'The node\'s admin password is checked only by checkAdminPassword (services/admin-password.ts), with one count of wrong passwords per address for every route that takes it (codebase analysis 2026-11-03, A12)',
+    pattern: /\bconfig\.adminPassword\b/,
   },
   {
     id: 'request-caller-built',

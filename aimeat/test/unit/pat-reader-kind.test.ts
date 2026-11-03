@@ -2,15 +2,19 @@
  * @file test/unit/pat-reader-kind.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A personal access token is an AI reader (TARGET-082 V4, decided 2026-09-29): a PAT is
- *   what a program or an AI client uses, and a person reads in their own session.
+ * @description How a personal access token reads. Decided 2026-09-29 (TARGET-082 V4): every PAT is an
+ *   AI reader. Ruled again 2026-11-04 (Jouni, "ihmiseksi"): an owner-level PAT is the person, as
+ *   isOwnerInPerson already answered; a PAT narrower than owner level (role agent) stays an AI.
  *
- *   What this pins: readerKindOf reads `via: 'pat'` as an AI whatever the roles; the auth middleware
+ *   What this pins: readerKindOf reads an owner-level PAT as the person and a narrower one as an AI;
+ *   the auth middleware
  *   marks an identity resolved from a raw PAT, so a PAT issued before the mark existed is covered;
  *   the `via` claim survives issueJWT and verifyJWT, and a claim with any other value is dropped; the
  *   mark changes neither the roles nor the scopes the PAT resolves to.
  * @usage cd aimeat && pnpm exec vitest run test/unit/pat-reader-kind.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-04 — An owner-level PAT reads as the person (Jouni, 2026-11-04; codebase analysis
+ *     2026-11-03, PAT ruling). The three assertions that pinned it as an AI now pin the ruling.
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V4).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -88,9 +92,9 @@ async function authOf(bearer: string): Promise<Request['auth'] | null> {
 }
 
 describe('readerKindOf and the PAT mark', () => {
-    it('reads an owner-level PAT as an AI, and the same roles without the mark as a person', () => {
-        expect(readerKindOf({ roles: ['owner'], via: 'pat' })).toBe('ai');
-        expect(readerKindOf({ roles: ['owner', 'operator'], via: 'pat' })).toBe('ai');
+    it('reads an owner-level PAT as the person (ruling 2026-11-04), a narrower PAT as an AI, and the same roles without the mark as a person', () => {
+        expect(readerKindOf({ roles: ['owner'], via: 'pat' })).toBe('human');
+        expect(readerKindOf({ roles: ['owner', 'operator'], via: 'pat' })).toBe('human');
         expect(readerKindOf({ roles: ['agent'], via: 'pat' })).toBe('ai');
         expect(readerKindOf({ roles: ['owner'] })).toBe('human');
     });
@@ -104,7 +108,7 @@ describe('the auth middleware marks a raw PAT', () => {
     it('marks an owner-level PAT and leaves its roles and scopes as they were', async () => {
         const auth = await authOf('aimeat_pat_owner');
         expect(auth).toMatchObject({ sub: 'ada', owner: 'ada', roles: ['owner'], scopes: [], via: 'pat' });
-        expect(readerKindOf(auth)).toBe('ai');
+        expect(readerKindOf(auth)).toBe('human');
     });
 
     it('marks an agent-level PAT too, with its own scopes', async () => {
@@ -126,7 +130,7 @@ describe('the via claim', () => {
         const token = await j.issueJWT({ sub: 'ada', owner: 'ada', node: NODE, roles: ['owner'], scopes: [], via: 'pat' }, 3600);
         const v = await j.verifyJWT(token);
         expect(v).toMatchObject({ roles: ['owner'], via: 'pat' });
-        expect(readerKindOf(v)).toBe('ai');
+        expect(readerKindOf(v)).toBe('human');
     });
 
     it('is absent on a token minted without it', async () => {

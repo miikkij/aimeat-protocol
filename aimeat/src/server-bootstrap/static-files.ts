@@ -11,6 +11,9 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.16.0 -- 2026-11-04 -- The node's own pages allow scripts from the node only: cdnjs.cloudflare.com
+ *     and cdn.jsdelivr.net leave script-src, since no node page loads from them (codebase analysis
+ *     2026-11-03, item A13). The App Catalog's own policy is unchanged.
  *   v1.15.1 -- 2026-10-31 -- A .md file under public/ is no-cache with an ETag like JS, CSS and
  *     HTML: the help page's text stayed a week old in the browser after an update.
  *   v1.15.0 -- 2026-10-31 -- /locales is no-cache with an ETag, as the JS and CSS are: a reload
@@ -258,7 +261,10 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       res.locals.cspNonce = nonce;
       res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net`,
+        // No script host but the node: no page of the node loads a script from a CDN, and a CDN that
+        // serves any npm or GitHub content would let one injected tag load a stranger's script past
+        // the nonce (codebase analysis 2026-11-03, item A13). Apps and HTML pages set their own CSP.
+        `script-src 'self' 'nonce-${nonce}'`,
         // Every face the node serves is self-hosted under /lib/fonts (2026-08-29); no page links a
         // font CDN any more, so the policy no longer allows one.
         "style-src 'self' 'unsafe-inline'",

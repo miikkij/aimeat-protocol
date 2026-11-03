@@ -81390,7 +81390,10 @@ paths:
         latest published version gets a new version and the old one is archived; an unchanged
         package is left alone. The node runs the same step at every startup. Authenticated by an
         operator JWT (Bearer) OR the admin password via the `X-Admin-Password` header /
-        `admin_session` cookie. System-seeded packages are authored as `system`.
+        `admin_session` cookie. System-seeded packages are authored as `system`. A wrong admin password
+        counts in the one count of wrong admin passwords per address that every admin-password route
+        shares (`security.admin_auth_rate_limit_max` in `security.admin_auth_rate_limit_window_ms`);
+        an address over it gets 429 for every admin password until the window ends.
       security:
         - BearerAuth: []
       responses:
@@ -81427,6 +81430,7 @@ paths:
                             items: { type: string }
                             description: Names of packages that already match this build.
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
         '500': { $ref: '#/components/responses/AimeatError' }
   /v1/admin/setup/auth:
     post:

@@ -7,9 +7,8 @@
  *   What it proves, in the order it runs:
  *   - Defaults: both settings read off / on, a password sign-in works as before, and the auth library
  *     tells the sign-in dialog the policy.
- *   - Who changes it: a non-operator is refused; an AI credential (the operator's personal access
- *     token) may tighten either setting and is refused a loosening with PERSON_REQUIRED, also when
- *     the loosening rides in a batch behind a tightening; the operator in person loosens.
+ *   - Who changes it: a non-operator is refused; the operator's personal access token is the person
+ *     (ruling 2026-11-04) and tightens and loosens either setting; the operator in person loosens.
  *   - Two-step required needs TOTP on: requiring it while totp.enabled is false, and switching
  *     totp.enabled off while it is required, are refused with TWO_STEP_NEEDS_TOTP; one request may
  *     switch TOTP on and require it.
@@ -34,6 +33,10 @@
  *   The setup token's expiry is proven in test/unit/sign-in-policy.test.ts, which can move time.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=sign-in-policy
  * @version-history
+ *   2026-11-04 — The operator's access token is the person and loosens the policy (Jouni, 2026-11-04;
+ *     codebase analysis 2026-11-03, PAT ruling). The DENIAL case that refused it is replaced by that
+ *     case, and so is the case that refused it switching the lockout off; the AI refusal is proven in
+ *     test/unit/pat-is-person.test.ts.
  *   2026-11-02 — The silent app bridge under the required two-step policy (secaudit2026nov02d round 13).
  *   v1.1.0 — 2026-11-02 — Two-step required and totp.enabled false are refused together (TWO_STEP_NEEDS_TOTP).
  *   v1.0.0 — 2026-11-02 — Initial (IT review: required two-step sign-in, password sign-in off).
@@ -167,7 +170,7 @@ async function main() {
             assert((await policyNow(op.token)).twoStep === 'off', 'nothing moved');
         });
 
-        await test('an AI credential (the operator\'s access token) tightens both settings', async () => {
+        await test('the operator\'s access token tightens both settings', async () => {
             const pat = await post('/v1/access/tokens', { label: `policy ${stamp}`, grant_operator: true }, auth(op.token));
             assert(pat.status === 201 && typeof pat.body?.data?.token === 'string', `mint: ${pat.status} ${JSON.stringify(pat.body?.error)}`);
             opPat = pat.body.data.token;
@@ -177,15 +180,19 @@ async function main() {
             assert(p.twoStep === 'operators' && p.password === 'operators', `tightened: ${JSON.stringify(p)}`);
         });
 
-        await test('DENIAL: the AI credential loosens neither setting (PERSON_REQUIRED), alone or behind a tightening in one batch', async () => {
-            for (const change of [{ path: 'auth.two_step_required', value: 'off' }, { path: 'auth.password_sign_in', value: 'on' }]) {
-                const r = await setPolicy(opPat, [change]);
-                assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED', `${change.path}=${change.value}: ${r.status} ${JSON.stringify(r.body?.error)}`);
-            }
-            const batch = await setPolicy(opPat, [{ path: 'auth.two_step_required', value: 'everyone' }, { path: 'auth.two_step_required', value: 'off' }]);
-            assert(batch.status === 403 && batch.body?.error?.code === 'PERSON_REQUIRED', `batch: ${batch.status} ${JSON.stringify(batch.body?.error)}`);
+        // Until 2026-11-04 the token was refused a loosening (PERSON_REQUIRED). An owner-level personal
+        // access token is the person since then (Jouni, 2026-11-04; codebase analysis 2026-11-03, PAT
+        // ruling); the refusal an AI credential gets is proven in test/unit/pat-is-person.test.ts and in
+        // e2e-classification with the operator's agent.
+        await test('the operator\'s access token is the person: it loosens both settings, and tightens them back', async () => {
+            const r = await setPolicy(opPat, [{ path: 'auth.two_step_required', value: 'off' }, { path: 'auth.password_sign_in', value: 'on' }]);
+            assert(r.status === 200, `loosen: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            const loose = await policyNow(op.token);
+            assert(loose.twoStep === 'off' && loose.password === 'on', `loosened: ${JSON.stringify(loose)}`);
+            const back = await setPolicy(opPat, [{ path: 'auth.two_step_required', value: 'operators' }, { path: 'auth.password_sign_in', value: 'operators' }]);
+            assert(back.status === 200, `tighten back: ${back.status} ${JSON.stringify(back.body?.error)}`);
             const p = await policyNow(op.token);
-            assert(p.twoStep === 'operators' && p.password === 'operators', `nothing in the refused requests applied: ${JSON.stringify(p)}`);
+            assert(p.twoStep === 'operators' && p.password === 'operators', `tightened back: ${JSON.stringify(p)}`);
         });
 
         await test('the operator in person loosens both back to the defaults', async () => {
@@ -454,9 +461,14 @@ async function main() {
             assert(held.status === 429 && held.body?.error?.code === 'PASSWORD_LOCKED', `the right password while locked: ${held.status} ${held.body?.error?.code}`);
         });
 
-        await test('DENIAL: an AI credential does not switch the lockout off (PERSON_REQUIRED)', async () => {
+        // Until 2026-11-04 the token was refused here (PERSON_REQUIRED). An owner-level PAT is the person
+        // since then (Jouni; codebase analysis 2026-11-03, PAT ruling): it switches the lockout off, and
+        // on again so the next case still starts from on.
+        await test('the operator\'s access token is the person: it switches the lockout off, and on again', async () => {
             const r = await setPolicy(opPat, [{ path: 'auth.sign_in_lockout', value: 'off' }]);
-            assert(r.status === 403 && r.body?.error?.code === 'PERSON_REQUIRED', `off by AI: ${r.status} ${r.body?.error?.code}`);
+            assert(r.status === 200, `off by the token: ${r.status} ${r.body?.error?.code}`);
+            const on = await setPolicy(opPat, [{ path: 'auth.sign_in_lockout', value: 'on' }]);
+            assert(on.status === 200, `on again: ${on.status} ${on.body?.error?.code}`);
         });
 
         await test('LOCKOUT off again: the operator in person switches it off, and the lock it set no longer holds', async () => {

@@ -33,14 +33,20 @@
  *     (own-key-coverage.ts hasOwnAiKey), not only the legacy openrouter.apikey record. From node 4.0.0
  *     the providers are the only place a key is set, so AI sorting answered NO_OPENROUTER_KEY to every
  *     owner who set one there (the 4.0.0 sweep).
+ *   v1.4.0 — 2026-11-04 — A person with no key of their own is asked of prepareAiCall, the question
+ *     every other AI call asks, instead of being refused NO_OPENROUTER_KEY: the node's shared key pays
+ *     from their allowance as it does for chat. No model is named for such a call, so the plan
+ *     chooses it and a spent allowance falls back to the free model. A person with their own key keeps
+ *     the model chosen here, as before (codebase analysis 2026-11-03, item A10).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { CompletionOptions } from './openrouter.js';
-import { completeForOwner, AiCompletionError, type CompleteForOwnerResult } from './ai/completion.js';
+import { completeForOwner, prepareAiCall, AiCompletionError, type CompleteForOwnerResult } from './ai/completion.js';
 import { getEncryptionKey } from './encryption.js';
 import { hasOwnAiKey } from './own-key-coverage.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
+import { nodeAiProviders } from './ai/providers.js';
 
 /** Raised with a stable `code` so routes can map it to the right HTTP status + envelope. */
 export class NotebookAiError extends Error {
@@ -53,8 +59,9 @@ export interface OwnerModel {
   config: AimeatConfig;
   /** The owner GHII whose settings, budget and ledger the completion belongs to. */
   gaii: string;
-  /** The model this feature will ask for, from the owner's own settings. */
-  model: string;
+  /** The model this feature will ask for, from the owner's own settings when the owner's own key
+   *  pays. Absent when another key pays: the plan chooses, as it does for chat. */
+  model?: string;
   /** Per-feature attribution, so the owner's usage breakdown says which feature spent what. */
   appId: string;
 }
@@ -87,12 +94,42 @@ export async function resolveOwnerModel(
       throw new NotebookAiError('ENCRYPTION_NOT_CONFIGURED', 'Encryption key not configured on this node.', 503);
     }
   } else if (provider === 'openrouter' && !(await hasOwnAiKey(storage, gaii))) {
-    // A key set on one of the owner's providers counts too: from node 4.0.0 that is the only place a
-    // key can be set (the legacy settings route is removed), so a legacy-only check refused everyone.
-    throw new NotebookAiError('NO_OPENROUTER_KEY', 'No OpenRouter API key configured. Add one in the OpenRouter settings to use AI sorting.', 400);
+    // No key of the person's own (a key on one of their providers counts: from node 4.0.0 that is the
+    // only place a key is set). Another key may still pay: the node's shared key from the person's
+    // allowance, an operator's provider. The one place that decides it is asked, as chat asks it
+    // (chat-session.ts chatRefusal), and the plan is discarded: the completion plans again.
+    // With no provider of the node's, nothing but the person's own key could pay, and the answer is
+    // known without planning (as before this check asked the planner).
+    if (nodeAiProviders(config).length === 0) throw noKeyError();
+    try {
+      await prepareAiCall(storage, config, gaii, { appId, caller: OWNER_CALLER.caller });
+    } catch (e) {
+      throw notebookErrorOf(e);
+    }
+    // No model is named, so the plan chooses it as it does for chat: the person's setting, the
+    // node's default, and the free model when the allowance is spent.
+    return { storage, config, gaii, appId };
   }
   const model = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'openrouter/free';
   return { storage, config, gaii, model, appId };
+}
+
+/** The refusal for a person no key can pay for. The code is the one clients branch on. */
+function noKeyError(message?: string): NotebookAiError {
+  return new NotebookAiError('NO_OPENROUTER_KEY',
+    message || 'No AI key can pay for this. Add your own key on the AI settings page, or ask the operator to give this node a shared key.', 400);
+}
+
+/** A chokepoint refusal as this surface's stable codes: NO_API_KEY keeps its long-standing name. */
+function notebookErrorOf(e: unknown): NotebookAiError {
+  if (e instanceof AiCompletionError) {
+    // The person's own sentence when the chokepoint wrote one (ai/ai-fix-words.ts withPersonFix).
+    const fix = (e.details as { fix?: unknown } | undefined)?.fix;
+    const message = typeof fix === 'string' && fix ? fix : e.message;
+    if (e.code === 'NO_API_KEY') return noKeyError(message);
+    return new NotebookAiError(e.code === 'PROVIDER_ERROR' ? 'OPENROUTER_ERROR' : e.code, message, e.status);
+  }
+  return new NotebookAiError('OPENROUTER_ERROR', (e as Error).message, 502);
 }
 
 /**

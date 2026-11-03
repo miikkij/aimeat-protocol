@@ -10,6 +10,8 @@
  *   was handed: that reader's kind is the evidence. The model call is mocked too.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-starter.test.ts
  * @version-history
+ *   2026-11-04 — A job started with an owner-level PAT reads as the person, a narrower PAT as an AI
+ *     (Jouni, 2026-11-04; codebase analysis 2026-11-03, PAT ruling).
  *   2026-10-25 — The stub answers getOwner (no account), which scheduleActor now asks (secaudit2026oct22).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V4).
  */
@@ -99,7 +101,9 @@ describe('a started job reads its inputs as its starter', () => {
     it.each([
         ['a person', person(), 'human'],
         ['an agent', agent(), 'ai'],
-        ['an owner-level personal access token', startedByOf({ owner: 'alice', roles: ['owner'], scopes: [], via: 'pat' }, OWNER), 'ai'],
+        // The person since 2026-11-04 (Jouni; codebase analysis 2026-11-03, PAT ruling).
+        ['an owner-level personal access token', startedByOf({ owner: 'alice', roles: ['owner'], scopes: [], via: 'pat' }, OWNER), 'human'],
+        ['a personal access token narrower than owner level', startedByOf({ owner: 'alice', roles: ['agent'], scopes: ['ai:use', 'memory:read'], via: 'pat' }, AGENT), 'ai'],
         ['nobody recorded', undefined, 'ai'],
     ])('%s', async (_label, startedBy, kind) => {
         const { storage } = memoryStorage();
@@ -185,7 +189,12 @@ describe('jobReader', () => {
         const deps = { storage: {} as Storage, config };
         const s = startedByOf({ owner: 'alice', roles: ['owner'], scopes: [], via: 'pat' }, OWNER);
         expect(s.via).toBe('pat');
-        expect(jobReader(deps, { owner: OWNER, started_by: s }).kind).toBe('ai');
+        // An owner-level PAT reads as the person since 2026-11-04 (Jouni; codebase analysis 2026-11-03,
+        // PAT ruling); a narrower PAT, which holds role agent, as an AI.
+        expect(jobReader(deps, { owner: OWNER, started_by: s }).kind).toBe('human');
+        const narrow = startedByOf({ owner: 'alice', roles: ['agent'], scopes: ['ai:use'], via: 'pat' }, AGENT);
+        expect(narrow.via).toBe('pat');
+        expect(jobReader(deps, { owner: OWNER, started_by: narrow }).kind).toBe('ai');
         expect(jobReader(deps, { owner: OWNER, started_by: person() }).kind).toBe('human');
     });
 });

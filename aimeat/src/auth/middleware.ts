@@ -238,8 +238,9 @@ async function resolvePatToken(token: string): Promise<VerifiedToken | null> {
     roles: r.roles,
     scopes: r.scopes,
     exp: r.expiresAt ? Math.floor(Date.parse(r.expiresAt) / 1000) : Math.floor(Date.now() / 1000) + 3600,
-    // Classification reads a PAT as an AI (services/classification/reader-kind.ts). Set here, where
-    // the token is resolved, so every PAT carries it without being issued again. Grants nothing.
+    // The mark of a credential made from a PAT (document signing reads it). Classification read it as
+    // an AI until 2026-11-04; an owner-level PAT is the person since then (reader-kind.ts). Set here,
+    // where the token is resolved, so every PAT carries it without being issued again. Grants nothing.
     via: 'pat',
   };
 }

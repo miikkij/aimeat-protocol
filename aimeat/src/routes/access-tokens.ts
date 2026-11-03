@@ -197,8 +197,8 @@ export function accessTokensRouter(config: AimeatConfig, storage: Storage): Rout
         node: config.nodeId,
         roles: r.roles,
         ...(includeScopes ? { scopes: r.scopes } : {}),
-        // The mark the auth middleware sets on a raw PAT, carried into the JWT made from it, so
-        // classification reads this session as an AI (reader-kind.ts). It grants nothing.
+        // The mark the auth middleware sets on a raw PAT, carried into the JWT made from it, so the
+        // session reads as the raw PAT does (reader-kind.ts, docsign). It grants nothing.
         via: 'pat',
         // The PAT row this JWT stands on: credentialRevoked reads it on every request, so revoking
         // the PAT ends this JWT at once (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).

@@ -8,6 +8,10 @@
  *   must behave exactly as it did before this file existed, because that is every node today.
  * @usage cd aimeat && pnpm vitest run test/unit/ai-allowance.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-04 — The resolveAiKey cases are removed with the function, which production had
+ *     not called since 2026-09-28; which key pays is the AI planner's (services/ai/route-plan.ts), and
+ *     the node key's address rule is proven on the live path by e2e-ai-provider-stub and
+ *     e2e-own-key-roads (codebase analysis 2026-11-03, item A10).
  *   v1.2.0 — 2026-10-05 — nodeKeyStanding: refuse pays nothing past the allowance; limits pays up to
  *     the account's and the node's caps for the UTC day (secaudit 2026-10, AI-1).
  *   v1.1.0 — 2026-09-16 — the node key goes only to OpenRouter's own address; an own key still goes
@@ -20,19 +24,10 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import {
-  resolveAiKey, readAllowance, debitAllowance, grantAllowance, remainingOf, nodeKeyStanding,
+  readAllowance, debitAllowance, grantAllowance, remainingOf, nodeKeyStanding,
 } from '../../src/services/ai-allowance.js';
-import { encrypt } from '../../src/services/encryption.js';
 
-/** A key encrypted the way the settings route stores one, so the own-key branch runs for real.
- *  encrypt() takes the raw 32 bytes; config carries the same key as 64 hex characters. */
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1';
-const LMSTUDIO_URL = 'http://localhost:1234/v1';
 const TEST_ENC_KEY_HEX = 'a'.repeat(64);
-const TEST_ENC_KEY = Buffer.from(TEST_ENC_KEY_HEX, 'hex');
-function encryptedOwnKey(): string {
-  return encrypt('sk-or-the-persons-own-key', TEST_ENC_KEY);
-}
 
 const NODE = 'node-test';
 const GAII = `alice@${NODE}`;
@@ -63,105 +58,6 @@ async function freshStorage(): Promise<Storage> {
   await storage.createGHII(ghii);
   return storage as unknown as Storage;
 }
-
-describe('resolveAiKey', () => {
-  it('leaves a node with no key of its own exactly as it was: no key means the old refusal', async () => {
-    const storage = await freshStorage();
-    await expect(resolveAiKey(storage, cfg(), GAII, 'openrouter', undefined, OPENROUTER_URL))
-      .rejects.toThrow(/NO_API_KEY|No OpenRouter API key/);
-    storage.close?.();
-  });
-
-  it('the person\'s OWN key wins, even on a node that has one, and is never metered', async () => {
-    // The property that matters most here. Their key is their provider account and their rate
-    // limits; a node that quietly counted their spend against a local balance would be inventing a
-    // limit nobody agreed to, and would eventually refuse them for spending their own money.
-    const storage = await freshStorage();
-    const config = cfg({ openrouterInstanceKey: 'sk-node', chatFreeAllowanceUsd: 5 });
-    // An encrypted own key. The value only has to be shaped like one; decryptOwnerKey is exercised
-    // where encryption itself is tested.
-    const own = { encrypted: encryptedOwnKey() };
-
-    const choice = await resolveAiKey(storage, config, GAII, 'openrouter', own, OPENROUTER_URL);
-
-    assert(choice.scope === 'own', `scope is own, got ${choice.scope}`);
-    assert(choice.key !== 'sk-node', 'the node key was NOT used');
-    assert(choice.exhausted === false, 'an own key is never exhausted');
-
-    // And nothing was drawn down: the allowance is untouched, not even seeded.
-    const rec = await readAllowance(storage, cfg({ chatFreeAllowanceUsd: 0 }), GAII);
-    assert(rec.spent_usd === 0, `nothing spent, got ${rec.spent_usd}`);
-
-    storage.close?.();
-  });
-
-  it('uses the node key when the person has none, and reports the allowance', async () => {
-    const storage = await freshStorage();
-    const config = cfg({ openrouterInstanceKey: 'sk-node', chatFreeAllowanceUsd: 2 });
-
-    const choice = await resolveAiKey(storage, config, GAII, 'openrouter', undefined, OPENROUTER_URL);
-
-    assert(choice.key === 'sk-node', `the node key is used, got ${choice.key}`);
-    assert(choice.scope === 'node', `scope is node, got ${choice.scope}`);
-    assert(choice.exhausted === false, 'a fresh allowance is not exhausted');
-    assert(choice.remainingUsd === 2, `two dollars remain, got ${choice.remainingUsd}`);
-
-    storage.close?.();
-  });
-
-  it('says exhausted once the allowance is spent, rather than refusing here', async () => {
-    // The decision of what to do about it belongs to the caller: the chat path degrades to a free
-    // model and says so, while transcription and image generation refuse, because there is no
-    // free equivalent to degrade to.
-    const storage = await freshStorage();
-    const config = cfg({ openrouterInstanceKey: 'sk-node', chatFreeAllowanceUsd: 1 });
-
-    await debitAllowance(storage, config, GAII, 1.5);
-    const choice = await resolveAiKey(storage, config, GAII, 'openrouter', undefined, OPENROUTER_URL);
-
-    assert(choice.exhausted === true, 'overspent means exhausted');
-    assert(choice.remainingUsd === 0, `remaining never goes negative, got ${choice.remainingUsd}`);
-    assert(choice.key === 'sk-node', 'the key is still returned; refusing is the caller\'s call');
-
-    storage.close?.();
-  });
-
-  it('a person with no node key configured still gets the plain refusal', async () => {
-    const storage = await freshStorage();
-    await expect(resolveAiKey(storage, cfg({ chatFreeAllowanceUsd: 5 }), GAII, 'openrouter', undefined, OPENROUTER_URL))
-      .rejects.toThrow(/NO_API_KEY|No OpenRouter API key/);
-    storage.close?.();
-  });
-
-  it('a provider that needs no key is not turned into a refusal', async () => {
-    // A local model server is the case: no key, and none required.
-    const storage = await freshStorage();
-    const choice = await resolveAiKey(storage, cfg(), GAII, 'lmstudio', undefined, LMSTUDIO_URL);
-    assert(choice.key === undefined, 'no key, and that is fine');
-    assert(choice.scope === 'own', 'nothing of the node was spent');
-    storage.close?.();
-  });
-
-  it('THE LEAK: the node key never goes to an address the person chose', async () => {
-    // A person with no key of their own saved baseUrl=https://attacker.example/ and the node sent
-    // its own key there in the Authorization header. Any registered user could take it.
-    const storage = await freshStorage();
-    const config = cfg({ openrouterInstanceKey: 'sk-node', chatFreeAllowanceUsd: 5 });
-    for (const url of ['https://attacker.example/api/v1', 'http://localhost:1234/v1', 'https://openrouter.ai.attacker.example/api/v1', 'not a url']) {
-      await expect(resolveAiKey(storage, config, GAII, 'openrouter', undefined, url))
-        .rejects.toThrow(/NODE_KEY_HOST|only to OpenRouter/);
-    }
-    storage.close?.();
-  });
-
-  it('the person\'s own key still goes to any address they chose, localhost included', async () => {
-    const storage = await freshStorage();
-    const config = cfg({ openrouterInstanceKey: 'sk-node', chatFreeAllowanceUsd: 5 });
-    const choice = await resolveAiKey(storage, config, GAII, 'openrouter', { encrypted: encryptedOwnKey() }, 'http://localhost:1234/v1');
-    assert(choice.scope === 'own' && choice.key !== 'sk-node', `own key, got ${choice.scope}`);
-    storage.close?.();
-  });
-});
 
 describe('the allowance itself', () => {
   it('applies the free grant once, not once per read', async () => {

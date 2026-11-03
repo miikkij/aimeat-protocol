@@ -31,6 +31,9 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.4.1 — 2026-11-04 — The usage record names an ecosystem app's call as the app's (actor kind
+ *     `eco`): the recorder tested a role `eco` no token carries, so the call was recorded as the
+ *     owner's (codebase analysis 2026-11-03, item A3).
  *   v1.4.0 — 2026-11-01 — An outside party's call (caller `party:<owner>/<name>@<node>`) is settled
  *     inside what it paid in advance, with no pacing; one that would charge again answers
  *     `prepaid_ended` (plan doc-mvwxcas3dom3, D5.4).
@@ -150,7 +153,9 @@ function appIdOfCoordinate(coordExt: string): string {
 function actorKindOf(session?: { roles: string[] } | null): UsageActorKind {
   const roles = session?.roles ?? [];
   if (roles.includes('app')) return 'app';
-  if (roles.includes('eco')) return 'eco';
+  // An ecosystem app's session carries the role `ecosystem` (auth/middleware.ts); `eco` is the usage
+  // stream's name for that kind.
+  if (roles.includes('ecosystem')) return 'eco';
   if (roles.includes('agent')) return 'agent';
   return 'owner';
 }

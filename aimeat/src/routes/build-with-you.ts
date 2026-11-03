@@ -12,7 +12,8 @@
  *   THE OPERATOR'S CREDENTIAL. An operator JWT (isOperatorCaller: the operator in person, or the
  *   operator's agent holding operator:admin), or the node's admin password in X-Admin-Password, as
  *   /v1/admin/seed-examples takes it: the store's fleet service holds each sold place's admin password
- *   and no account on it. Wrong passwords are counted per address at the admin sign-in's rate.
+ *   and no account on it. Wrong passwords are counted per address in the one count the admin setup
+ *   pages and seed-examples share (services/admin-password.ts).
  * @structure buildWithYouRouter(config, storage)
  *   - GET  /v1/build-with-you/request       the offer and the request, as they stand (owner, memory:read)
  *   - POST /v1/build-with-you/request       send the place's one request (owner, memory:write)
@@ -23,10 +24,13 @@
  *   - POST /v1/operator/notify-owner        one notice to the owners, once per code (operator)
  * @usage app.use(buildWithYouRouter(config, storage));   // server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-11-04 — The admin password is checked by checkAdminPassword (services/admin-password.ts),
+ *     whose count of wrong passwords per address the admin setup pages and seed-examples share; this
+ *     route's own counter and compare are gone, and the 429 says when to try again (codebase analysis
+ *     2026-11-03, item A12).
  *   v1.1.0 — 2026-11-01 — POST /v1/build-with-you/request takes the four fields flat or under `spec`.
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi", parts B, C and D).
  */
-import { timingSafeEqual } from 'node:crypto';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -39,6 +43,7 @@ import { INPUT_LIMITS } from '../models/input-limits.js';
 import { BuildError, operatorHandOp, operatorPendingOp, readOp, submitOp } from '../services/build-with-you.js';
 import { readOwnTrail, readTrail, TrailError } from '../services/place-trail.js';
 import { NotifyOwnerError, notifyOwnerOnce } from '../services/operator-notify-owner.js';
+import { checkAdminPassword, adminPasswordLimitedMessage } from '../services/admin-password.js';
 
 const field = z.string().trim().min(1).max(INPUT_LIMITS.line);
 // The four fields flat or under `spec` (the shape GET's `send` shows); submitOp names a missing one.
@@ -63,13 +68,6 @@ const NotifyOwnerBody = z.object({
   link: z.string().trim().max(INPUT_LIMITS.url).optional(),
 });
 
-function passwordMatches(input: string, expected: string): boolean {
-  if (!expected || !input) return false;
-  const a = Buffer.from(input);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 const iso = (v: unknown): string | undefined => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined);
 const int = (v: unknown): number | undefined => (typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : undefined);
 
@@ -91,30 +89,22 @@ export function buildWithYouRouter(config: AimeatConfig, storage: Storage): Rout
     } catch (err) { fail(res, err); }
   };
 
-  // WRONG PASSWORDS ARE COUNTED, per address, at the admin sign-in's rate. A right one is not, so the
-  // fleet service can read a place as often as it needs; while an address is over the count every
-  // password is refused, the right one too, so guessing gains nothing from the window.
-  const misses = new Map<string, { count: number; until: number }>();
+  // WRONG PASSWORDS ARE COUNTED, per address, in the one count every admin-password route shares
+  // (services/admin-password.ts). A right one is not, so the fleet service can read a place as often
+  // as it needs; while an address is over the count every password is refused, the right one too, so
+  // guessing gains nothing from the window.
   /** The node's admin password in X-Admin-Password, or else `gate`: the operator gate every operator route takes. */
   const passwordOr = (gate: (req: Request, res: Response, next: NextFunction) => unknown) => (req: Request, res: Response, next: NextFunction): void => {
-    const pw = req.headers['x-admin-password'];
-    if (typeof pw === 'string' && pw) {
-      const ip = req.ip ?? '';
-      const now = Date.now();
-      const seen = misses.get(ip);
-      if (seen && seen.until > now && seen.count >= config.adminAuthRateLimitMax) {
-        res.setHeader('Retry-After', String(Math.ceil((seen.until - now) / 1000)));
-        res.status(429).json(error(config.nodeId, 'RATE_LIMITED', 'Too many wrong admin passwords from this address. Try again later.'));
-        return;
-      }
-      if (config.adminPassword && passwordMatches(pw, config.adminPassword)) { next(); return; }
-      const fresh = !seen || seen.until <= now;
-      if (misses.size > 10_000) for (const [k, v] of misses) if (v.until <= now) misses.delete(k);
-      misses.set(ip, { count: fresh ? 1 : seen.count + 1, until: fresh ? now + config.adminAuthRateLimitWindowMs : seen.until });
-      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'The admin password is not right.'));
+    const check = checkAdminPassword(config, req.ip ?? '', req.headers['x-admin-password']);
+    if (check.kind === 'missing') { void gate(req, res, next); return; }
+    if (check.kind === 'ok') { next(); return; }
+    if (check.kind === 'limited') {
+      res.setHeader('Retry-After', String(check.retryAfterSec));
+      res.status(429).json(error(config.nodeId, 'RATE_LIMITED', adminPasswordLimitedMessage(check), undefined,
+        { setting: 'security.admin_auth_rate_limit_max', max_wrong: check.max, window_seconds: check.windowSec, retry_after_seconds: check.retryAfterSec }));
       return;
     }
-    void gate(req, res, next);
+    res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'The admin password is not right.'));
   };
 
   const fleetOrOperator = [passwordOr(requireOperator(storage))];

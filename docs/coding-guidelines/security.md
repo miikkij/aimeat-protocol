@@ -156,7 +156,7 @@ The node's own pages get this policy, with a new nonce per request (`res.locals.
 
 ```
 default-src 'self'
-script-src 'self' 'nonce-<per request>' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net
+script-src 'self' 'nonce-<per request>'
 style-src 'self' 'unsafe-inline'
 connect-src 'self' wss: ws:
 img-src 'self' data: blob:
@@ -172,7 +172,7 @@ Exceptions, each set in its own handler:
 - `/app-silent.html` drops `X-Frame-Options` and sets `frame-ancestors` to the app, portfolio and company host families, so an app origin can frame it for sign-in.
 - Published apps get their own CSP from the routes under `src/routes/apps/`.
 
-**Pitfall:** a script from a new CDN origin on the node's own pages is blocked until that origin is in `script-src`. Fonts are self-hosted under `/lib/fonts`, so the policy allows no font CDN.
+**Pitfall:** the node's own pages load scripts only from the node. A library they need is vendored under `public/lib/` (with its licence, skill `aimeat-library-authoring`), never loaded from a CDN: until 2026-11-04 the policy also allowed cdnjs.cloudflare.com and cdn.jsdelivr.net, which no page used, and jsDelivr serves any npm or GitHub content, so one injected tag could have loaded a stranger's script past the nonce. Fonts are self-hosted under `/lib/fonts`, so the policy allows no font CDN.
 
 ---
 
