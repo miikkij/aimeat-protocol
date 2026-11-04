@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-04 — The service_records step erases the person's service namespace (services/service-records.ts),
+ *     and the log names it only when it held records (codebase analysis 2026-11-03, item B6).
  *   2026-11-02 — The mcp_user_credentials step erases the person's own sign-ins on shared MCP servers.
  *   2026-10-29 — The app_builder_records step erases the app plans too (services/app-plan.ts).
  *   2026-10-27 — The app_builder_records step erases the design specs and roadmaps of the person's apps,
@@ -93,6 +95,8 @@ import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 import { uninstallExtension } from './extension-lifecycle.js';
 import { appendRequest, removeAppDocsOfOwner } from './compliance-docs.js';
 import { eraseNameBoundGrants } from './name-bound-grants-erasure.js';
+import { serviceNamespaceOf } from '../utils/service-namespace.js';
+import { isValidGHII } from '../utils/gaii.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -196,6 +200,13 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
 
     // 2. GHII-level data the per-identity cascade does not reach.
     await step('ghii_memory', async () => { await storage.deleteAllMemory(ghii); return 'ghii_memory'; }, deletionLog, storage);
+    // The records this node's services keep for the person in their service namespace
+    // (services/service-records.ts). Named in the log only when there were some.
+    await step('service_records', async () => {
+      if (!isValidGHII(ghii)) return null;
+      const removed = await storage.deleteAllMemory(serviceNamespaceOf(ghii));
+      return removed ? `service_records:${removed}` : null;
+    }, deletionLog, storage);
     // The person's classification exceptions are records of system@<node>, keyed by their GHII.
     await step('classification_exceptions', async () => {
       await purgeExceptions(storage, nodeId, { owner: ghii });
