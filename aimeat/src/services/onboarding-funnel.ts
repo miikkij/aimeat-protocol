@@ -25,6 +25,7 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   2026-11-04 — The mail service is read from nodeContext() (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No plain setMemory for a storage without createMemoryIfAbsent: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.5.4 — 2026-11-04 — The rescue goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
@@ -64,7 +65,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { outboundEmailHtml } from './email-templates.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { sendMail } from './mail-gate.js';
@@ -729,7 +730,7 @@ export async function runMcpOnboardingRescueJob(
     /** Test seam: freeze the clock and the epoch. Production callers pass nothing. */
     opts: { now?: number; epoch?: number } = {},
 ): Promise<void> {
-    const email = getActiveEmailService();
+    const email = nodeContext().email;
     if (!email || !email.enabled) return;
 
     const epoch = opts.epoch ?? Date.parse(RESCUE_FEATURE_EPOCH);

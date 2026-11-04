@@ -24,13 +24,15 @@
  * @structure sendAgentV2Message() · deliverToPushTargets() · MESSAGE_DELIVERY_KIND
  * @usage const msg = await sendAgentV2Message(storage, { owner, from, to, role, parts, ... });
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.1.0 — 2026-10-11 — A stopped recipient's push targets are not called; the turn is stored (agent-stop-rules.ts).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage, AgentV2MessageRecord, AgentV2PushConfigRecord, MessagePart } from '../storage/interface.js';
 import { MESSAGE_SPEC, type MessageRole } from '../models/agent-v2-message.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { emitDelivery } from './event-bus.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
@@ -93,7 +95,7 @@ export async function sendAgentV2Message(storage: Storage, input: SendAgentV2Mes
 
   // A socket, if the recipient is holding one. Not awaited on purpose: it is a notification.
   try {
-    if (getActiveConnectTunnelManager()?.isConnected(message.to)) {
+    if (nodeContext().tunnel?.isConnected(message.to)) {
       emitDelivery({ target: message.to, kind: MESSAGE_DELIVERY_KIND, id: message.messageId, payload: envelope(message) });
     }
   } catch (err) {

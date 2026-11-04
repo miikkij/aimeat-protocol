@@ -11,6 +11,9 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-04 — The mail service, scheduler, workflow engine, AI job service and connector tunnel manager go into the node
+ *     context (services/node-context.ts provideNodeService) at the same points the five set*Active* handles were set
+ *     (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The federation book, the memory bin, the lapsed memberships, the AI-disclosure sweep and both notification
  *     sweeps run in one node process per round (services/process-lease.ts claimedSweep; codebase analysis 2026-11-03,
  *     item HA 2.7). One process runs each of them exactly as before.
@@ -131,7 +134,7 @@ import { presence } from '../services/presence.js';
 import { assembleBook, pullBook } from '../services/federation-book.js';
 import { performKeyExchange } from '../routes/federation.js';
 import { TunnelManager } from '../services/personal-tunnel.js';
-import { ConnectTunnelManager, setActiveConnectTunnelManager } from '../services/connect-tunnel.js';
+import { ConnectTunnelManager } from '../services/connect-tunnel.js';
 import { startPendingEnrolment } from '../services/agent-pending-enrolment.js';
 import { startConnectorRegistry } from '../services/connector-registry.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
@@ -161,12 +164,13 @@ import { seedBuiltinSkills } from '../services/skill-seeds.js';
 import { DirectoryService, registerDirectoryNotifier } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
-import { Scheduler, setActiveScheduler } from '../services/scheduler.js';
-import { WorkflowEngine, setActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { Scheduler } from '../services/scheduler.js';
+import { WorkflowEngine } from '../services/workflow/engine.js';
 import { setStepMemoryWrite } from '../services/workflow/step-write.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
-import { AiJobService, setActiveAiJobService } from '../services/ai-jobs/index.js';
-import { createEmailService, setActiveEmailService } from '../services/email.js';
+import { AiJobService } from '../services/ai-jobs/index.js';
+import { createEmailService } from '../services/email.js';
+import { provideNodeService } from '../services/node-context.js';
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
@@ -227,15 +231,16 @@ export async function initializeServices(
 
   // Internal Scheduler System — centralized cron-based job scheduler
   // With storage, a mail whose first attempt failed keeps its retries in the stored outbox (services/outbox.ts).
+  // Each service goes into the node context (services/node-context.ts) as it is made, in this order.
   const emailService = createEmailService(config, storage);
-  setActiveEmailService(emailService);
+  provideNodeService('email', emailService);
   const scheduler = new Scheduler(config, storage, emailService);
-  setActiveScheduler(scheduler);
+  provideNodeService('scheduler', scheduler);
 
   // Agent Workflows engine — the deterministic run loop; advanced by the scheduler (kind 'workflow'),
   // task-terminal events (agent-tasks route), and its own watchdog sweep.
   const workflowEngine = new WorkflowEngine(config, storage);
-  setActiveWorkflowEngine(workflowEngine);
+  provideNodeService('workflow', workflowEngine);
   // A step's answer to an `organism.*` key goes through the shared memory write (step-write.ts),
   // handed in here because memory-write.ts imports the engine.
   setStepMemoryWrite(writeMemoryRecord);
@@ -244,7 +249,7 @@ export async function initializeServices(
   // because the QUEUE is process-wide: the routes, the MCP tools and the sandbox's ctx.ai must all
   // be talking to the same wait line, or each of them enforces its own idea of "full".
   const aiJobService = new AiJobService(config, storage, emailService);
-  setActiveAiJobService(aiJobService);
+  provideNodeService('aiJobs', aiJobService);
 
   // Register core job handlers
   registerCoreHandlers(scheduler, config, storage);
@@ -665,7 +670,7 @@ export async function initializeServices(
   if (config.connectTunnelEnabled) {
     connectTunnelManager = new ConnectTunnelManager(config, storage);
     connectTunnelManager.startHeartbeatMonitor();
-    setActiveConnectTunnelManager(connectTunnelManager);
+    provideNodeService('tunnel', connectTunnelManager);
     // An agent approved while the owner's connector was down gets its key when the connector connects.
     startPendingEnrolment({ config, storage });
     // Each connector is recorded for its owner as it connects and disconnects (services/connector-registry.ts).

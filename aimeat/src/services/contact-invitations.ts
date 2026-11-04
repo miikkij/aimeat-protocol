@@ -12,6 +12,8 @@
  * @structure ContactInvitationError · createContactInvitation · pendingContactInvitation
  * @usage const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, { inviterName, email, message });
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.1.1 — 2026-11-04 — The invitation mail goes through mail-gate.ts sendMail as a third-party mail
  *     bounded by the address-lookup count (codebase analysis 2026-11-03, item B3).
  *   v1.1.0 — 2026-09-26 — An invitation counts as an address lookup against the inviter's account
@@ -24,7 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { hashInviteToken, inviteEmailHash, INVITE_DEFAULT_EXPIRY_DAYS } from './invitations.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
 import { contactInviteEmail } from './email-templates.js';
 import { takeEmailLookup } from './email-lookup-limit.js';
@@ -139,7 +141,7 @@ export async function createContactInvitation(
   const inviter = await storage.getGHII(inviterGhii);
   const inviterName = inviter?.displayName || input.inviterName;
 
-  const emailSvc = getActiveEmailService();
+  const emailSvc = nodeContext().email;
   let emailSent = false;
   if (emailSvc?.enabled) {
     const { subject, html, text } = contactInviteEmail({

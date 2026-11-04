@@ -317,10 +317,6 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/ai-jobs/service.ts :: let :: _activeAiJobService": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/services/ai-voice.ts :: map :: speechPrices": {
       "count": 1,
       "reason": "DEBT"
@@ -621,10 +617,6 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/connect-tunnel.ts :: let :: _active": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/services/connections/media-handoff.ts :: map :: held": {
       "count": 1,
       "reason": "DEBT"
@@ -893,10 +885,6 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/email.ts :: let :: _activeEmailService": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/services/encryption.ts :: map :: fallbackKeys": {
       "count": 1,
       "reason": "DEBT"
@@ -1053,6 +1041,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/node-context.ts :: let :: context": {
+      "count": 1,
+      "reason": "The services this process runs (scheduler, mail transport, AI job queue, workflow engine, connector tunnel sockets); each process makes its own at boot. It replaces the five getActive* handles, which were five entries here (codebase analysis 2026-11-03, D-i)."
+    },
     "src/services/node-lifecycle.ts :: let :: phase": {
       "count": 1,
       "reason": "Each process answers its own readiness; nothing to share."
@@ -1206,10 +1198,6 @@
       "reason": "This process's own Express app and listening server per port: a request the node makes to itself goes to the process that makes it, which a second process changes nothing in."
     },
     "src/services/saml-sp.ts :: map :: instanceCache": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/scheduler.ts :: let :: _activeScheduler": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -1530,10 +1518,6 @@
       "reason": "DEBT"
     },
     "src/services/workflow/engine.ts :: interval :: start": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/workflow/engine.ts :: let :: _active": {
       "count": 1,
       "reason": "DEBT"
     },

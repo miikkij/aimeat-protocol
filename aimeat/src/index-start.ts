@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The stop reaches the workflow engine and the scheduler through nodeContext()
+ *     (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The stop releases this process's lease just before it closes the event bus, so another
  *     process takes over what it held at once (services/process-lease.ts; codebase analysis 2026-11-03,
  *     item HA 2.5).
@@ -581,10 +583,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     // No new scheduled fire and no workflow sweep from here on; the runs in progress get a bounded
     // wait beside the request drain, and one still going after it is written to its run log as cut
     // off (Scheduler.shutdown).
-    const { getActiveScheduler } = await import('./services/scheduler.js');
-    const { getActiveWorkflowEngine } = await import('./services/workflow/engine.js');
-    getActiveWorkflowEngine()?.stop();
-    const schedulerStopped = getActiveScheduler()?.shutdown(SCHEDULER_SHUTDOWN_GRACE_MS)
+    const { nodeContext } = await import('./services/node-context.js');
+    nodeContext().workflow?.stop();
+    const schedulerStopped = nodeContext().scheduler?.shutdown(SCHEDULER_SHUTDOWN_GRACE_MS)
       .catch(err => logger.warn('index-start: scheduler shutdown failed', { error: String(err) }));
     // Readiness 503, no new connection, live streams ended, requests in flight finished
     // (server-bootstrap/drain.ts).

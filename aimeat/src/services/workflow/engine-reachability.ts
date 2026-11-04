@@ -6,6 +6,8 @@
  *   isAgentReachable / isAgentStep / anyAgentReachable + the reachability constants. Extracted from
  *   engine.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.2.0 — 2026-10-11 — A stopped agent is not reachable for a workflow step (agent-stop-rules.ts).
  *   v1.1.0 — 2026-09-06 — A live connector socket is a third door into reachability, and it is the
  *     one a SPAWN agent answers on. lastSeen dates an agent's last WORK, not whether a wake would
@@ -16,7 +18,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { buildGAII } from '../../utils/gaii.js';
-import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
+import { nodeContext } from '../node-context.js';
 import type { WorkflowStep } from '../../models/workflow-schemas.js';
 
 // ── agent reachability (agent-offline fast-fail) ──────────────────────────────────
@@ -69,7 +71,7 @@ export async function anyAgentReachable(storage: Storage, config: AimeatConfig, 
   const now = Date.now();
   // Null on a node that runs without the connector tunnel, and then the other two doors decide
   // exactly as they did before.
-  const tunnels = getActiveConnectTunnelManager();
+  const tunnels = nodeContext().tunnel;
   for (const name of agents) {
     const gaii = buildGAII(name, ownerName, config.nodeId);
     const agent = await storage.getAgent(gaii);

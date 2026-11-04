@@ -9,6 +9,8 @@
  * @structure registerRekeyRoute(router, config, storage)
  * @usage registerRekeyRoute(router, config, storage) inside registerManagementRoutes (./management.ts).
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-25 — Moved out of ./management.ts (max-file-lines). The rotation now ends the agent's MCP
  *     OAuth grant: it stamps credentialsValidAfter and deletes the agent's OAuth refresh tokens, and
  *     the answer says that each AI connected as the agent asks the owner to approve it once more
@@ -22,7 +24,7 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { emitChange } from '../../services/event-bus.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { nodeContext } from '../../services/node-context.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { logger } from '../../utils/logger.js';
 
@@ -59,7 +61,7 @@ export function registerRekeyRoute(router: Router, config: AimeatConfig, storage
     // A tunnel verifies its bearer once, at upgrade, so a connector holding the old token kept its
     // live socket after the rotation. It is cut here, as agent delete does, without a reason the
     // connector would read as "forget this agent" (QA audit F03b-01).
-    try { getActiveConnectTunnelManager()?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('rekey: tunnel close failed', { gaii, error: String(err) }); }
+    try { nodeContext().tunnel?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('rekey: tunnel close failed', { gaii, error: String(err) }); }
     // An open MCP session is the same shape of long-lived socket, and it was left standing: the
     // transport verified its bearer once, at initialize. Closed here, so the client re-initializes
     // with a credential this node reads again (mcp/session-registry.ts).

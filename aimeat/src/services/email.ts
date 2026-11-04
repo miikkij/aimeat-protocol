@@ -43,11 +43,14 @@
  *   2026-11-04 -- smtpTransportOptions(): the connect and socket time limits
  *     (email.smtp_connect_timeout_ms, email.smtp_socket_timeout_ms; codebase analysis 2026-11-03,
  *     HA stage 1).
+ *   2026-11-04 -- The active mail service is held by services/node-context.ts; set/getActiveEmailService
+ *     write and read it there (codebase analysis 2026-11-03, item D-i).
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { nodeContext, provideNodeService } from './node-context.js';
 import type { Storage } from '../storage/interface.js';
 import { setNodeEmailFooter } from './email-templates.js';
 import { createMailSender } from './email-outbox.js';
@@ -82,13 +85,12 @@ export interface EmailService {
 }
 
 /**
- * Process-wide handle to the active EmailService, set once during service init. Lets per-request
- * surfaces that aren't threaded the instance (e.g. the agent-task completion hook, B6) reuse the
- * single configured transport instead of constructing a parallel one. Mirrors getActiveScheduler().
+ * The node's mail service is `nodeContext().email` (services/node-context.ts), set once during service
+ * init. These two stay for the unit and E2E tests that put a test transport in its place, and for the
+ * one caller a unit test reaches by mocking this module (services/inactivity-nudge.ts).
  */
-let _activeEmailService: EmailService | null = null;
-export function setActiveEmailService(svc: EmailService): void { _activeEmailService = svc; }
-export function getActiveEmailService(): EmailService | null { return _activeEmailService; }
+export function setActiveEmailService(svc: EmailService): void { provideNodeService('email', svc); }
+export function getActiveEmailService(): EmailService | null { return nodeContext().email; }
 
 // ── Retries ──────────────────────────────────────────────
 // The retry schedule is unchanged (1 s, 3 s, 9 s; four attempts). The retries run through the stored

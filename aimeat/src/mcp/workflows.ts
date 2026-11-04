@@ -11,6 +11,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-11-04 — The running scheduler and workflow engine are read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler, getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — aimeat_workflow_save clears the workflow's open trigger refusal, as PUT
@@ -57,8 +59,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
-import { getActiveScheduler } from '../services/scheduler.js';
-import { getActiveWorkflowEngine, HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
+import { nodeContext } from '../services/node-context.js';
+import { HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import {
   saveWorkflow, getWorkflow, listWorkflows, listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
@@ -142,7 +144,7 @@ export function registerWorkflowTools(
       // owner's list, which reads as the save having failed.
       emitChange('workflows');
       if (!result.ok) return err(`Validation failed:\n- ${(result.errors ?? []).join('\n- ')}`);
-      const scheduler = getActiveScheduler();
+      const scheduler = nodeContext().scheduler;
       if (scheduler) await syncWorkflowTriggers(storage, scheduler, config.nodeId, result.def!, ownerGhii, agentGaii);
       // This definition replaces the one an open refusal pinned, so that refusal is over, as on the
       // REST save: the next refusal is told anew, and "Run as me" on the old one refuses
@@ -191,7 +193,7 @@ export function registerWorkflowTools(
         annotations: annotationsFor('aimeat_workflow_run'),
     },
     async (a) => {
-      const engine = getActiveWorkflowEngine();
+      const engine = nodeContext().workflow;
       if (!engine) return err('Workflow engine not started');
       // Same mapping POST /v1/workflows/:id/run makes, because a chat session and an HTTP caller
       // asking for the same trial must get the same run. `target` is meaningless without a full
@@ -253,7 +255,7 @@ export function registerWorkflowTools(
         annotations: annotationsFor('aimeat_workflow_answer'),
     },
     async (a) => {
-      const engine = getActiveWorkflowEngine();
+      const engine = nodeContext().workflow;
       if (!engine) return err('Workflow engine not started');
       const result = await engine.onHumanAnswer(ownerGhii, a.workflow_id, a.run_id, a.step_id, {
         picks: a.picks, other: a.other, by: agentGaii,

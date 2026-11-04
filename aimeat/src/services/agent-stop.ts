@@ -39,6 +39,8 @@
  * @usage
  *   const out = await setAgentStopped({ storage, config }, req.auth!.owner, principal, name, true);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-10-28 — releaseWaitingTasks decides on the agent record as it is: the node no longer
  *     narrows an agent holding `*` by itself (Jouni, 2026-10-28).
  *   v1.2.0 — 2026-10-18 — releaseWaitingTasks reads the agent through startFactsOf
@@ -56,7 +58,7 @@ import { decideTaskStart, autoStartEvent } from './agent-task-rules.js';
 import { readAgentDmInbox } from './agent-dm-reads.js';
 import { messagePreview } from '../utils/messaging.js';
 import { recordTaskStarted } from './activity-recorder.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { isStopped } from './agent-stop-rules.js';
 import { createWebhookDispatcher } from './webhook-dispatcher.js';
@@ -67,7 +69,7 @@ import { logger } from '../utils/logger.js';
  * without a query; an agent with no socket here is read from its record.
  */
 export async function agentIsStopped(storage: AgentWriteDeps['storage'], gaii: string): Promise<boolean> {
-  const live = getActiveConnectTunnelManager()?.stoppedOf(gaii);
+  const live = nodeContext().tunnel?.stoppedOf(gaii);
   if (live !== undefined) return live;
   return isStopped(await storage.getAgent(gaii));
 }
@@ -198,7 +200,7 @@ export async function setAgentStopped(
     : { stoppedAt: null, stoppedBy: null });
   if (!updated) return { ok: false, code: 'UPDATE_FAILED', message: `The agent could not be ${stop ? 'stopped' : 'started'}.` };
 
-  const tunnels = getActiveConnectTunnelManager();
+  const tunnels = nodeContext().tunnel;
   let released = 0;
   if (stop) {
     tunnels?.setStopped(gaii, true);

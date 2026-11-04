@@ -14,6 +14,8 @@
  *   readNotificationInbox and findOwnerNotificationsByIds (the bell's page and the by-id lookup)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.5.0 -- 2026-11-04 -- readNotificationInbox: the bell's page and its unread and total counts, read in
@@ -47,7 +49,7 @@ import type { MemoryRecord, Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
 import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './notification-settings.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { sendMail } from './mail-gate.js';
 import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email-templates-digest.js';
@@ -201,7 +203,7 @@ export async function sweepHeldPushes(storage: Storage, _config: AimeatConfig, p
  * the unread notifications older than their chosen number of hours that have not been mailed yet.
  */
 export async function sweepNotificationDigests(storage: Storage, config: AimeatConfig): Promise<{ owners: number; sent: number }> {
-  const email = getActiveEmailService();
+  const email = nodeContext().email;
   if (!email?.enabled) return { owners: 0, sent: 0 };
   let owners = 0, sent = 0;
   const now = Date.now();

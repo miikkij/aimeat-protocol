@@ -33,6 +33,8 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-27 — setAgentMode takes the caller's principal; when an agent changes an agent's mode, or
  *     its own platform report moves it to workstation, the owner gets a notice naming the agent
  *     (secaudit2026oct26, goals:person-step-answer-via-self-set-workstation-mode; decision 2026-10-27).
@@ -71,7 +73,7 @@ import type { AgentRecord, AgentTechnicalCapability, Storage } from '../storage/
 import { buildGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
 import { emitChange } from './event-bus.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { emitToolListChanged } from './resource-events.js';
 import { deriveStepsForMode } from '../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
@@ -380,7 +382,7 @@ export async function setAgentProfile(
     // the half-working kind, and this was at one of THREE.
     if (normalised.updates.defaultScopes) {
       emitToolListChanged(target.gaii);
-      getActiveConnectTunnelManager()?.notifyScopesChanged(target.gaii);
+      nodeContext().tunnel?.notifyScopesChanged(target.gaii);
     }
 
     emitChange('agents');

@@ -30,6 +30,8 @@
  * @structure AppPartyCtx · signUp · signIn · verifyLink · partyMe · signOut · appPartyFromRequest · signInWith
  * @usage const out = await signUp(deps, { owner, filename }, body);
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-11-04 — The link mail goes through mail-gate.ts sendMail as sign-in mail (codebase
  *     analysis 2026-11-03, item B3).
  *   v1.2.0 — 2026-11-02 — secaudit2026nov02d round 13: a pending signup past
@@ -45,7 +47,7 @@ import type { AimeatConfig } from '../../config.js';
 import { UNCHANGED } from '../record-cas.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { escapeHtml } from '../../utils/html-escape.js';
-import { getActiveEmailService } from '../email.js';
+import { nodeContext } from '../node-context.js';
 import { sendMail } from '../mail-gate.js';
 import { resolveAppUrls } from '../app-urls.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
@@ -103,7 +105,7 @@ function linkMail(lang: string, app: string, url: string, signin: boolean): { su
 
 /** Mail a fresh link to `email` for `party` and store its hash. False when the mail did not leave. */
 async function sendLink(deps: Deps, ref: AppRef, ownerGhii: string, appId: string, party: AppPartyRecord, email: string, lang: string): Promise<boolean> {
-    const mail = getActiveEmailService();
+    const mail = nodeContext().email;
     if (!mail?.enabled) return false;
     // One mail a minute per person: a signup repeated for somebody else's address does not flood it.
     if (party.link && Date.parse(party.link.expiresAt) - LINK_TTL_MS + RESEND_MS > Date.now()) return false;
@@ -147,7 +149,7 @@ export async function signUp(deps: Deps, ref: AppRef, body: Record<string, unkno
     if (!signupOpen(deps.config, record.registration)) return refuse(403, 'PARTY_REGISTRATION_CLOSED', 'This app does not take new registrations now.');
     const email = typeof body.email === 'string' ? body.email.trim() : '';
     if (!isValidEmail(email)) return refuse(400, 'INVALID_INPUT', 'Give the e-mail address the sign-in link goes to.');
-    if (!getActiveEmailService()?.enabled) return refuse(503, 'MAIL_NOT_CONFIGURED', 'This server sends no mail, so the sign-in link cannot reach you. Ask the app\'s owner.');
+    if (!nodeContext().email?.enabled) return refuse(503, 'MAIL_NOT_CONFIGURED', 'This server sends no mail, so the sign-in link cannot reach you. Ask the app\'s owner.');
     const lang = typeof body.lang === 'string' ? body.lang.slice(0, 2) : 'en';
     const hash = emailHashOf(email);
     let party = record.parties.find(p => p.emailHash === hash);
@@ -191,7 +193,7 @@ export async function signIn(deps: Deps, ref: AppRef, body: Record<string, unkno
     if (registrationMode(deps.config) === 'off') return refuse(403, 'PARTY_REGISTRATION_OFF', 'This server does not let people sign in to its apps without an account.');
     const email = typeof body.email === 'string' ? body.email.trim() : '';
     if (!isValidEmail(email)) return refuse(400, 'INVALID_INPUT', 'Give the e-mail address you registered with.');
-    if (!getActiveEmailService()?.enabled) return refuse(503, 'MAIL_NOT_CONFIGURED', 'This server sends no mail, so the sign-in link cannot reach you. Ask the app\'s owner.');
+    if (!nodeContext().email?.enabled) return refuse(503, 'MAIL_NOT_CONFIGURED', 'This server sends no mail, so the sign-in link cannot reach you. Ask the app\'s owner.');
     const party = (await readAppParties(deps.storage, app.ownerGhii, app.appId)).parties.find(p => p.emailHash === emailHashOf(email));
     if (party && party.status !== 'stopped') await sendLink(deps, ref, app.ownerGhii, app.appId, party, email, typeof body.lang === 'string' ? body.lang.slice(0, 2) : 'en');
     return SENT('signin');

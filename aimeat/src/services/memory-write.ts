@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The ceilings take the record this write already read, and the kept totals instead of
@@ -140,7 +142,7 @@ import { emitChange, emitRecordChange } from './event-bus.js';
 import { enqueueMemoryReplication } from './memory-replication.js';
 import { emitMemoryWritten } from './event-bus.js';
 import { reconcileAfterSourceWrite } from './exchange-projection.js';
-import { getActiveWorkflowEngine } from './workflow/engine.js';
+import { nodeContext } from './node-context.js';
 import { emitEcosystemMemoryWrite } from './ecosystem-events.js';
 import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
 import { logger } from '../utils/logger.js';
@@ -623,7 +625,7 @@ export async function afterMemoryWrite(
 
     // A write to an owner key may start a workflow. The engine matches the owner-GHII namespace, so
     // an agent-namespace write does not fire owner-keyed triggers.
-    if (!noTriggers) getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
+    if (!noTriggers) nodeContext().workflow?.onMemoryWrite(gaii, key)
         .catch(e => logger.error('workflow event trigger (memory.write) failed', { key, error: String(e) }));
 
     // Push memory.write to any subscribed ecosystem app of this owner.

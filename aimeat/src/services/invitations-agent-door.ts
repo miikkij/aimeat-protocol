@@ -20,6 +20,8 @@
  *   createRegistrationInvitation
  * @usage const result = await createRegistrationInvitation(storage, config, { email, agent, observed });
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The invitation mail goes through mail-gate.ts sendMail as a third-party mail (codebase analysis 2026-11-03, item B3).
  *   2026-10-16 — A send that fails on a node with mail cancels the invitation it wrote and returns sendFailed, so the route can say nothing was sent and the address is not locked out of a retry for 24 hours (QA audit F02a-04).
  *   2026-10-15 — A node whose email service is disabled writes no invitation and returns mailUnavailable, so the route can say nothing was sent (feature-list audit #23).
@@ -31,7 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { hashInviteToken, inviteEmailHash, InvitationError } from './invitations.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
 import { registrationInviteEmail } from './email-templates.js';
 import { isValidEmail } from '../utils/email-validator.js';
@@ -106,7 +108,7 @@ export async function createRegistrationInvitation(
     // A node without mail cannot deliver the link, and the raw token exists nowhere else, so an
     // invitation written here could never be accepted. Refuse before the write and say so: the
     // answer is the same for every address, so it reveals nothing about any of them.
-    const emailSvc = getActiveEmailService();
+    const emailSvc = nodeContext().email;
     if (!emailSvc?.enabled) {
         return { invitation: null, acceptUrl: null, emailSent: false, suppressed: null, mailUnavailable: true, sendFailed: false };
     }

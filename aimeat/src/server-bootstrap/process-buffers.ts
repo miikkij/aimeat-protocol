@@ -18,6 +18,8 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-04 — The running AI job service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveAiJobService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The cache listener's rule moves to services/cache-invalidation.ts, where a memory
  *     change only its owner reads keeps the `domain:memory` entries computed from records others read
  *     (codebase analysis 2026-11-03, item C4).
@@ -135,8 +137,8 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
 export async function flushProcessBuffers(): Promise<void> {
   // First, so no AI job starts a model call while the buffers flush: the running jobs are marked as
   // stopped by the node, and the next start queues each one again once (services/ai-jobs/restart.ts).
-  const { getActiveAiJobService } = await import('../services/ai-jobs/service.js');
-  await getActiveAiJobService()?.markStoppingJobs()
+  const { nodeContext } = await import('../services/node-context.js');
+  await nodeContext().aiJobs?.markStoppingJobs()
     .catch(err => logger.warn('process-buffers: marking the running AI jobs failed', { error: String(err) }));
   // The webhook and mail retries this process holds in the stored outbox: no further attempt here,
   // and the claims freed so the next start resumes them when due (services/outbox.ts).

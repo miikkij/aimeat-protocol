@@ -36,6 +36,8 @@
  *   const rows = await listConnectors({ config, storage }, owner);
  *   const hit = await findConnector({ config, storage }, owner, 'Kotikone');
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.3.0 — 2026-10-31 — A connector's row keeps the programs it may start for its agents and the
  *     owner's decision on each (connector-programs.ts), and the listing shows them with their age;
  *     a forgotten connector takes them with it (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
@@ -51,7 +53,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { connectedDaemons } from './basic-agents.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { onTunnelSocketOpened, onTunnelSocketClosed, type TunnelSocketOpened } from './connect-tunnel-hooks.js';
 import { INSTALL_NAME_MAX } from './connect-tunnel-roster.js';
 import { emitChange } from './event-bus.js';
@@ -289,7 +291,7 @@ export async function connectorListAnswer(ctx: RegistryContext, owner: string): 
   connectors: ConnectorView[]; online: number; tunnel_enabled: boolean;
 }> {
   const connectors = await listConnectors(ctx, owner);
-  return { connectors, online: connectors.filter(c => c.online).length, tunnel_enabled: getActiveConnectTunnelManager() !== null };
+  return { connectors, online: connectors.filter(c => c.online).length, tunnel_enabled: nodeContext().tunnel !== null };
 }
 
 /**

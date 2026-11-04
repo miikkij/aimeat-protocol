@@ -24,6 +24,7 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-11-04 — The mail service is read from nodeContext() (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The send allowance is counted in the node's storage (takeMailSendOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 — The node transport sends through mail-gate.ts sendMail with the account turn (codebase analysis 2026-11-03, item B3).
  *   2026-10-16 — A campaign email carries the sender footer from the owner's (or the company's)
@@ -74,7 +75,8 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { OutboundContactRecord, OutboundContactLink, OutboundKind, OutboundMessageRecord, OutboundStatus, OutboundChannel } from '../../models/outbound-schemas.js';
-import { getActiveEmailService, type EmailAttachment } from '../email.js';
+import type { EmailAttachment } from '../email.js';
+import { nodeContext } from '../node-context.js';
 import { inviteEmailHash } from '../invitations.js';
 import { sendDirectMessage } from '../message-send.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -672,7 +674,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     if (!result.ok) error = result.code;
   } else {
     channel = 'email';
-    const emailSvc = getActiveEmailService();
+    const emailSvc = nodeContext().email;
     // A company with its own SMTP does not need the node's shared transport configured:
     // "the node cannot send" and "this company cannot send" are different facts.
     const companySender = sender

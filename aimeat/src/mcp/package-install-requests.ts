@@ -18,6 +18,8 @@
  * @structure registerPackageInstallRequestTools(mcp, storage, config, getAgentGaii, sessionScopes, caller)
  * @usage registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes, caller);  // register-all.ts
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -33,7 +35,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { listRequestsFor, readRequestFor, decideInstallRequest } from '../services/packages/install/package-install-requests.js';
-import { getActiveScheduler } from '../services/scheduler.js';
+import { nodeContext } from '../services/node-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
@@ -50,7 +52,7 @@ export function registerPackageInstallRequestTools(
         // Every MCP session is an agent's. The owner it acts for comes from its identity, never input:
         // the session caller.
         const who = caller().auth;
-        const deps = { storage, config, scheduler: getActiveScheduler() ?? undefined };
+        const deps = { storage, config, scheduler: nodeContext().scheduler ?? undefined };
 
         if (decision !== undefined) {
             if (!request_id) return { ...toolError('INVALID_INPUT', 'Name the request to decide with request_id. List them by calling this tool with no arguments.') };

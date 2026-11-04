@@ -35,6 +35,8 @@
  *   const out = await offerEnrolment({ config, storage }, owner, candidates, { installId });
  *   if (!out.ok) res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.4.0 — 2026-10-13 — enrolTarget: the offer goes to a daemon principal that holds agent:write when
  *     the daemon has one. POST /v1/agents/v2/enrol asks that word from 4.0.0 and the basic agents hold
  *     none, so a daemon whose first principal was a basic agent did not take on an approved proposal
@@ -55,7 +57,7 @@ import type { Storage } from '../storage/interface.js';
 import type { EnrolmentGrantKind } from '../storage/types/identity.js';
 import { connectedDaemons } from './basic-agents.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { recordPlacement } from './connector-registry.js';
 import { cardUri, jwksUri } from '../routes/agents-v2/card.js';
 import { logger } from '../utils/logger.js';
@@ -228,7 +230,7 @@ async function offerOnDaemon(
 
   let enrolResult: { ok: boolean; result: unknown };
   try {
-    enrolResult = await getActiveConnectTunnelManager()!.invokeOnPrincipal(
+    enrolResult = await nodeContext().tunnel!.invokeOnPrincipal(
       chosen.target,
       { capability: ENROL_CAPABILITY, input: offer, caller: `${owner}@${config.nodeId}` },
       ENROL_INVOKE_TIMEOUT_MS,

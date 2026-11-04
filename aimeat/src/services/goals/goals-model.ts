@@ -22,6 +22,8 @@
  * @structure runModelWork() · settleModelJob() · checkModelWorks()
  * @usage runModelWork(deps, ownerGhii, goalId, workId);   // goals-advance.ts; settleModelJob from goals-sweep.ts's job listener
  * @version-history
+ *   2026-11-04 — The running AI job service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveAiJobService (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-10-31 — The take holds the model to the records the reach check read: a record named,
  *     or a work opened, between the check and the take runs the check again (up to CHECK_ROUNDS) instead
  *     of reaching the model unchecked (secaudit 2026-10-31 inv-21a).
@@ -34,7 +36,7 @@
  *     goals:model-work-runs-as-owner-without-requesting-agent-authority).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
-import { getActiveAiJobService } from '../ai-jobs/service.js';
+import { nodeContext } from '../node-context.js';
 import type { AiJobRecord, AiJobLogEntry } from '../ai-jobs/types.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
@@ -122,7 +124,7 @@ export async function runModelWork(deps: GoalDeps, ownerGhii: string, goalId: st
   const work = taken.works.find(w => w.id === workId);
   if (!work || work.status !== 'claimed' || work.claimedBy !== MODEL_TAKER || work.claimedAt !== claimedAt) return;
 
-  const service = getActiveAiJobService();
+  const service = nodeContext().aiJobs;
   try {
     if (!service) throw new Error('This node runs no background model jobs.');
     const body = taskBody(taken, work, true);
@@ -234,7 +236,7 @@ export async function settleModelJob(deps: GoalDeps, job: AiJobRecord | AiJobLog
  * restart) is settled from its record; a job the node no longer knows goes back to open work.
  */
 export async function checkModelWorks(deps: GoalDeps, ownerGhii: string, goal: GoalRecord, now: number): Promise<void> {
-  const service = getActiveAiJobService();
+  const service = nodeContext().aiJobs;
   for (const w of goal.works.filter(x => x.status === 'claimed' && x.claimedBy === MODEL_TAKER)) {
     const late = !!w.claimedAt && now - Date.parse(w.claimedAt) > goal.limits.claimMinutes * 60_000;
     const job = w.jobId && service ? await service.getJob(ownerGhii, w.jobId) : null;

@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description One import for the AI-jobs service: a background model call with a handle.
  * @structure re-exports of types.ts, service.ts and the extension capability builder
- * @usage import { AiJobService, AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
+ * @usage import { AiJobService, AiJobError } from '../services/ai-jobs/index.js';
  * @version-history
+ *   v1.2.1 — 2026-11-04 — getActiveAiJobService is gone: the running service is nodeContext().aiJobs
+ *     (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   v1.2.0 — 2026-10-20 — re-exports AiJobViewer, which the MCP tools pass to the three reads
  *     (secaudit 2026-10, jobs-keyed-by-owner-ghii).
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: re-exports the op rule (op.ts) and the AiJobOp type.
@@ -16,7 +18,7 @@ export {
     type AiJobOp, type AiJobState, type AiJobRecord, type AiJobLogEntry, type AiJobChainStop, type AiJobOnDone,
     type StartAiJobInput, type StartAiJobContext, type StartAiJobResult, type AiJobStarter, type AiJobViewer,
 } from './types.js';
-export { AiJobService, setActiveAiJobService, getActiveAiJobService } from './service.js';
+export { AiJobService, setActiveAiJobService } from './service.js';
 export { buildExtensionAi, maybeExtensionAi, type ExtensionAiDeps } from './ext-capability.js';
 export { AI_JOB_KEY_PREFIX, AI_JOB_LOG_PREFIX } from './store.js';
 export { AI_OPS, aiOpOf, aiOpRefusal } from './op.js';

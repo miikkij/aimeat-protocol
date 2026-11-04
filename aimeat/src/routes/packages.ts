@@ -21,6 +21,8 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-31 — The three package reads pass `config`, so the operator's read of a sold package is
  *     written to the operator trail in the author's account (services/packages/compose/package-read.ts).
  *   2026-10-31 — A package its author sells to accounts (services/packages/sale/package-account-sale.ts):
@@ -96,7 +98,7 @@ import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
 } from '../services/packages/compose/package-read.js';
 import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
-import { getActiveScheduler } from '../services/scheduler.js';
+import { nodeContext } from '../services/node-context.js';
 import { packageSheet } from '../services/packages/compose/package-sheet.js';
 import { importParsedPackage, upstreamFromZip } from '../services/packages/compose/package-import.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -678,7 +680,7 @@ export function packagesRouter(
   // that has it, with a reason (services/packages/compose/package-withdrawals.ts). The author or an operator.
   router.post('/v1/packages/:groupId/versions/:version/withdraw', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
-    const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() },
+    const out = await withdrawVersion({ storage, config, scheduler: nodeContext().scheduler },
       { owner: req.auth!.owner, isOperator: await isOperatorCaller(storage, req.auth) },
       { groupId, version: req.params.version as string, reason: (req.body ?? {}).reason });
     if (!out.ok) {

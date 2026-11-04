@@ -784,6 +784,12 @@
         "count": 3,
         "why": "The owner's access token at sign-in and at the two refresh-cookie steps: the owner's current roles, no scopes."
       }
+    },
+    "service-locator": {
+      "src/services/inactivity-nudge.ts": {
+        "count": 1,
+        "why": "runInactivityNudgeJob reads the mail service with getActiveEmailService, which returns nodeContext().email. test/unit/inactivity-nudge.test.ts replaces services/email.js with a mock that provides only this function, so reading nodeContext() here would bypass the test's mail service; tests are the contract, so the call stays until that test's mock is changed."
+      }
     }
   }
 }

@@ -37,6 +37,8 @@
  *   (`runAs`, the fields a schedule record keeps of its maker) and tells ./on-change.ts, which runs it
  *   after a change as that maker, asked again at each run (services/schedule-actor.ts).
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-11-01 — A refusal carries its facts as `details` (the widest audience the sources
  *     allow), so a page says it in its own language (WP10e B9).
  *   v1.2.0 — 2026-11-01 — `schedule: { on: 'change' }` (WP9c): define keeps `runAs` and registers the
@@ -52,7 +54,7 @@ import type { CallerContext } from '../caller-context.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { createScheduleRecord, type ScheduleWriteCaller } from '../schedule-write.js';
-import { getActiveScheduler } from '../scheduler.js';
+import { nodeContext } from '../node-context.js';
 import { recordFailure } from '../datapackage/store.js';
 import { readPointer } from '../datapackage/version-audience.js';
 import { logger } from '../../utils/logger.js';
@@ -122,7 +124,7 @@ async function schedulesOf(ctx: DataProductCtx, name: string): Promise<Scheduled
  * would leave the owner's schedule firing at a product that no longer exists.
  */
 async function removeSchedule(ctx: DataProductCtx, job: ScheduledJobRecord): Promise<void> {
-    getActiveScheduler()?.removeJob(job.id);
+    nodeContext().scheduler?.removeJob(job.id);
     await ctx.deps.storage.deleteScheduledJob(job.id);
     emitChange('scheduler');
 }

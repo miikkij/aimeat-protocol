@@ -11,13 +11,15 @@
  * @structure applyExtensionCode
  * @usage registered in appliers.ts under the kind 'extension-code'
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c, extensions-08).
  */
 import { localAccountName } from '../../utils/gaii.js';
 import { actionCodeDigest } from '../extension-email-policy-ask.js';
 import { heldCodeRequest, withoutCodeHold } from '../extension-code-hold.js';
 import { activateExtension } from '../extension-lifecycle.js';
-import { getActiveScheduler } from '../scheduler.js';
+import { nodeContext } from '../node-context.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 export async function applyExtensionCode(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {
@@ -35,6 +37,6 @@ export async function applyExtensionCode(ctx: PublishStoreCtx, ownerGhii: string
   const cleared = await ctx.storage.updateExtension(name, { config });
   if (!cleared) return { ok: false, reason: 'the change could not be saved' };
   // The schedules belong to the one who installed it, as the package install registers them.
-  await activateExtension({ storage: ctx.storage, config: ctx.config, scheduler: getActiveScheduler() }, { ...ext, config }, request.requested_by.principal);
+  await activateExtension({ storage: ctx.storage, config: ctx.config, scheduler: nodeContext().scheduler }, { ...ext, config }, request.requested_by.principal);
   return { ok: true };
 }

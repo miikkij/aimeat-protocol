@@ -34,6 +34,8 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.4.0 — 2026-11-02 — The enrolled credential carries a store place's default for agents (services/place-agent-scopes.ts).
  *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): agent:write on POST /v1/agents/v2/enrol. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.2.0 — 2026-10-10 — A move grant: an agent that holds a key gets a new one from the connector
@@ -53,7 +55,7 @@ import { readCardJws, verifyCardJws } from '../../services/agent-card.js';
 import type { CardDefect } from '../../models/agent-card.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
 import { widenAndAnnounce } from '../agents/announce-scopes.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { nodeContext } from '../../services/node-context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { cardUri, jwksUri } from './card.js';
 import { logger } from '../../utils/logger.js';
@@ -95,7 +97,7 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
       return;
     }
 
-    const tunnels = getActiveConnectTunnelManager();
+    const tunnels = nodeContext().tunnel;
     if (!tunnels?.isOnline(auth.sub)) {
       res.status(409).json(error(config.nodeId, 'NOT_CONNECTED',
         'Enrolment happens over the connection the daemon already holds, and this caller is not holding one.'));

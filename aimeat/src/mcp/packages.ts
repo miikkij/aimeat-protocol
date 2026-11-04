@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-31 — aimeat_package_get passes `config`: the operator's read of a sold package is written
  *     to the operator trail in the author's account.
  *   2026-10-31 — aimeat_package_price_set and aimeat_package_sales (an author sells their own package to
@@ -106,7 +108,7 @@ import { setPackageVersionStatus } from '../services/packages/compose/package-cr
 import { composeWithPublishGate, composeSetWithPublishGate } from '../services/packages/compose/package-publish-ask.js';
 import { pullPackage, listRepositoryPackages } from '../services/packages/peer/package-pull.js';
 import type { PeerInfo } from '../services/federation.js';
-import { getActiveScheduler } from '../services/scheduler.js';
+import { nodeContext } from '../services/node-context.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
@@ -405,7 +407,7 @@ export function registerPackageTools(
 
     // Taking a bad version back: the same service POST /v1/packages/:groupId/versions/:version/withdraw calls.
     mcp.registerTool('aimeat_package_withdraw', { description: descriptionFor('aimeat_package_withdraw'), inputSchema: zodShapeFor('aimeat_package_withdraw'), annotations: annotationsFor('aimeat_package_withdraw') }, async ({ group_id, version, reason }) => {
-        const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() }, { owner: ownerOf(), isOperator: false }, { groupId: group_id, version, reason });
+        const out = await withdrawVersion({ storage, config, scheduler: nodeContext().scheduler }, { owner: ownerOf(), isOperator: false }, { groupId: group_id, version, reason });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ withdrawal: out.withdrawal, copies_here: out.copies_here, next_step: 'Publish a fixed version; managed copies receive it as an update.' }, null, 2) }] };
     });
@@ -430,7 +432,7 @@ export function registerPackageTools(
 
         // A package that carries an install bundle is a set (services/install-bundle-owner.ts), the
         // same branch POST /v1/packages/:groupId/install takes.
-        const setDeps = { storage, config, peers, scheduler: getActiveScheduler() ?? undefined };
+        const setDeps = { storage, config, peers, scheduler: nodeContext().scheduler ?? undefined };
         if (await bundleInstallOf(setDeps, group_id, owner)) {
             const set = await installSetForOwner(setDeps, { owner, sub: gaii, ownerGhii, ...grant() }, {
                 groupId: group_id, config: installConfig, organismNames, dryRun: dryRun === true, grantApps,
@@ -442,7 +444,7 @@ export function registerPackageTools(
         }
 
         const out = await installOrRequest(
-            { storage, config, scheduler: getActiveScheduler() ?? undefined },
+            { storage, config, scheduler: nodeContext().scheduler ?? undefined },
             { owner, sub: gaii, ownerGhii, ...grant() },
             { groupId: group_id, label, version, dryRun: dryRun === true, mode, config: installConfig, grantApps },
         );

@@ -24,6 +24,8 @@
  * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-11-04 — The running AI job service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveAiJobService (codebase analysis 2026-11-03, item D-i).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The three reads pass the session principal as the viewer, so an agent sees and stops
@@ -49,7 +51,8 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
-import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
+import { AiJobError } from '../services/ai-jobs/index.js';
+import { nodeContext } from '../services/node-context.js';
 import type { AiJobState, AiJobViewer } from '../services/ai-jobs/types.js';
 import { startedByOf } from '../services/ai-jobs/starter.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -85,7 +88,7 @@ export function registerAiJobTools(
     /** Resolved per call, not at registration: the service belongs to the process and the tool
      *  surface is built per session. A node with no service running says so instead of throwing. */
     const service = () => {
-        const s = getActiveAiJobService();
+        const s = nodeContext().aiJobs;
         if (!s) throw new AiJobError('AI_JOBS_UNAVAILABLE', 503, 'Background AI jobs are not running on this node.');
         return s;
     };

@@ -41,6 +41,8 @@
  *   v1.4.0 — 2026-10-06 — A presence push names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.5.0 — 2026-10-25 — secaudit2026oct22: applyRemoteUpdates keeps an update only for a person homed
  *     on the pushing peer and only with a defined status; the others are ignored and logged once.
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -51,7 +53,7 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from './event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { logger } from '../utils/logger.js';
 
 export type RawStatus = 'available' | 'busy' | 'away' | 'offline';
@@ -291,7 +293,7 @@ export class PresenceTracker {
     if (!this.config || node !== this.config.nodeId) return { ghii: gaii, status: 'unknown', since: null };
 
     // A live tunnel socket is the strongest "running right now" signal (in-memory, no DB).
-    if (getActiveConnectTunnelManager()?.isConnected(gaii)) return { ghii: gaii, status: 'available', since: null };
+    if (nodeContext().tunnel?.isConnected(gaii)) return { ghii: gaii, status: 'available', since: null };
 
     // No socket: recently-seen (last heartbeat/activity) → away; otherwise offline.
     const lastSeen = await this.getAgentLastSeen(gaii);

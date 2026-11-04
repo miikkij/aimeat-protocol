@@ -11,6 +11,8 @@
  * @structure scopesExceedNodeMax(config, scopes) · approveDeviceAuth(...)
  * @usage import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-11-02 — On a store place an agent approver passes on the place's words its own scopes cover, at
  *     approval, and the new agent is marked as having had its default, so its first token mint no longer
  *     adds the full default (secaudit2026nov02d round 13,
@@ -40,7 +42,7 @@ import { recordAccountEvent } from '../../services/account-events.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { issueJWT, generateSessionId } from '../../auth/jwt.js';
 import { emitChange } from '../../services/event-bus.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { nodeContext } from '../../services/node-context.js';
 import { emitToolListChanged } from '../../services/resource-events.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
@@ -190,14 +192,14 @@ export async function approveDeviceAuth(
       // the open tunnel and the open MCP sessions of the agent end before the new credential exists.
       await storage.revokeSessionsByGaii(gaii);
       await storage.deleteOAuthRefreshTokensByGaii(gaii);
-      try { getActiveConnectTunnelManager()?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('device approve: tunnel close failed', { gaii, error: String(err) }); }
+      try { nodeContext().tunnel?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('device approve: tunnel close failed', { gaii, error: String(err) }); }
       closeMcpSessionsForGaii(gaii);
     }
     // Re-approval is the other door that changes what an agent may do, and an agent being
     // re-approved is exactly the one likely to have a session open — an open MCP session AND an
     // open tunnel, whose credential the node pinned at attach and will keep honouring until told.
     emitToolListChanged(gaii);
-    getActiveConnectTunnelManager()?.notifyScopesChanged(gaii);
+    nodeContext().tunnel?.notifyScopesChanged(gaii);
   } else {
     // New agent: create from scratch
     keyPair = await generateKeyPair();

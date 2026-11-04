@@ -37,6 +37,8 @@
  *   - resolveOperatorAgentName / OPERATOR_AGENT_REFUSAL: re-exported from operator-principal.ts
  * @usage const result = await deactivateOwner(storage, 'alice', 'operator-bob');
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-25 -- The header says where background work asks the flag (services/account-deactivated.ts; secaudit2026oct22).
  *   v1.3.0 — 2026-10-16 — Each tolerant step runs in a savepoint, and the flag is read back after the
  *     commit: on PostgreSQL one rejected statement had turned the COMMIT into a silent rollback of the
@@ -56,7 +58,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { AimeatConfig } from '../config.js';
 import { recordOperatorAction } from './operator-access-audit.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { inSavepoint } from './tolerant-step.js';
 
 // The operator tools import the question from here; its one home is operator-principal.ts.
@@ -151,7 +153,7 @@ export async function deactivateOwner(storage: Storage, name: string, by: string
   // 7. Live connect-tunnel sockets verified their bearer only at upgrade — close them now.
   //    Outside the transaction: a socket close is not a storage write and cannot roll back.
   try {
-    getActiveConnectTunnelManager()?.closeForOwner(name);
+    nodeContext().tunnel?.closeForOwner(name);
   } catch (err) {
     incomplete.push('tunnels');
     logger.warn('deactivateOwner: tunnel close failed', { owner: name, error: String(err) });

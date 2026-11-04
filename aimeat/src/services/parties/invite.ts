@@ -33,6 +33,8 @@
  * @structure INVITE_TTL_DAYS · inviteLinkOf · sendShareLink · shareAndSend · previewInvite · redeemInvite
  * @usage const out = await sendShareLink(ctx, 'matti', { share, email, locale });
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-11-04 — The mail allowance is counted in the node's storage (takeMailSendOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.2.1 — 2026-11-04 — The link mail goes through mail-gate.ts sendMail as a third-party mail with the
  *     account turn taken before the write (codebase analysis 2026-11-03, item B3).
@@ -48,7 +50,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CallerContext } from '../caller-context.js';
 import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
-import { getActiveEmailService } from '../email.js';
+import { nodeContext } from '../node-context.js';
 import { takeMailSendOnNode, MAIL_SEND_LIMIT } from '../account-limits.js';
 import { sendMail, type AccountTurnTaken } from '../mail-gate.js';
 import { logger } from '../../utils/logger.js';
@@ -152,7 +154,7 @@ export async function sendShareLink(
     // The mail goes to an address the caller names, so it draws on the account's mail allowance, the
     // one POST /v1/outbound/send and aimeat_mail_send draw on (account-limits.ts takeMailSend;
     // codebase analysis 2026-11-03, item A11). Asked before the write, and only when a mail will go.
-    const mail = getActiveEmailService();
+    const mail = nodeContext().email;
     let counted: AccountTurnTaken | null = null;
     if (mail?.enabled) {
         const turn = await takeMailSendOnNode(c.ownerGhii);

@@ -12,6 +12,8 @@
  *   ownerMailLimitReached
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.5.1 — 2026-11-04 — mailOwnerFrom sends through mail-gate.ts sendMail, which keeps the per-sender
  *     daily count that lived here, unchanged (codebase analysis 2026-11-03, item B3).
  *   v1.5.0 — 2026-11-04 — mailOwnerFrom asks provenOwnerAddress (the flag and the hash) and takes the
@@ -43,7 +45,8 @@ import { notify } from './notify.js';
 import type { NotifSource } from './notification-settings.js';
 import { emitChange } from './event-bus.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
-import { getActiveEmailService, type EmailService } from './email.js';
+import type { EmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { appendMailLog, type MailLogKind } from './notification-settings.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { sendMail, senderLimitReached } from './mail-gate.js';
@@ -196,7 +199,7 @@ export async function mailOwnerFrom(
   storage: Storage, config: AimeatConfig, ghii: string, sender: string, subject: string, text: string,
   opts: MailOwnerOptions = {},
 ): Promise<NotificationEmailOutcome> {
-  const email = 'email' in opts ? opts.email : getActiveEmailService();
+  const email = 'email' in opts ? opts.email : nodeContext().email;
   if (!email?.enabled) return 'mail_off';
   const account = await storage.getGHII(ghii);
   if (!provenOwnerAddress(account)) return 'no_address';

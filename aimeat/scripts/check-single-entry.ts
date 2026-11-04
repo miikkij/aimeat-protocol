@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.12.0 — 2026-11-04 — Rule service-locator: the five running services are read from nodeContext()
+ *     (services/node-context.ts); 93 of the 94 getActive* calls (69 of 70 files) moved, and the one left is the
+ *     inactivity nudge, whose unit test mocks services/email.js (codebase analysis 2026-11-03, item D-i).
  *   v1.11.0 — 2026-11-04 — Rules scope-widen-at-mint and token-mint: the store place's default is added
  *     only at the doors the baseline names, and every issueJWT caller is listed with what it mints
  *     (codebase analysis 2026-11-03, item B7).
@@ -243,6 +246,13 @@ export const RULES: Rule[] = [
     pattern: /\b(bookBeneficiaryShares|recordMoneyPlatformFee)\(/,
     // The two writers themselves: their own definitions.
     skipDirs: ['src/commerce/beneficiary-book.ts', 'src/commerce/platform-fee.ts'],
+  },
+  {
+    id: 'service-locator',
+    label: 'The node\'s running scheduler, mail service, AI job service, workflow engine and connector tunnel manager are read from nodeContext() (services/node-context.ts), which initializeServices fills; the five getActive* handles that held them one by one may only be called fewer times (codebase analysis 2026-11-03, D-i)',
+    pattern: /\bgetActive(Scheduler|EmailService|AiJobService|WorkflowEngine|ConnectTunnelManager)\(/,
+    // email.ts defines getActiveEmailService, the one handle kept for a unit test that mocks that module.
+    skipDirs: ['src/services/email.ts'],
   },
 ];
 

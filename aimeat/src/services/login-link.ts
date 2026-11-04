@@ -32,6 +32,8 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.6.2 — 2026-11-04 — The link and the welcome go through mail-gate.ts sendMail as sign-in mail
  *     (codebase analysis 2026-11-03, item B3).
  *   v1.6.1 — 2026-10-31 — redeemLoginLink() takes the account's verified address as "still theirs" as
@@ -60,7 +62,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import type { Locale } from '../i18n.js';
-import { getActiveEmailService, type EmailService } from './email.js';
+import type { EmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
 import { appendMailLog } from './notification-settings.js';
 import { welcomeEmail } from './email-template-welcome.js';
@@ -181,7 +184,7 @@ export async function issueLoginLink(
  */
 export async function sendLoginLink(
     storage: Storage, config: AimeatConfig, ghii: GHIIRecord, email: string, ttlMs = LOGIN_LINK_TTL_MS,
-    mail: EmailService | null | undefined = getActiveEmailService(), redirect?: unknown, locale?: Locale,
+    mail: EmailService | null | undefined = nodeContext().email, redirect?: unknown, locale?: Locale,
 ): Promise<boolean> {
     if (!mail?.enabled || !ghii.magicLinkEnabled) return false;
     const owner = await storage.getOwner(ghii.ownerName);
@@ -203,7 +206,7 @@ export async function sendLoginLink(
  */
 export async function sendWelcomeLink(
     storage: Storage, config: AimeatConfig, ghii: GHIIRecord, email: string,
-    mail: EmailService | null | undefined = getActiveEmailService(), redirect?: unknown,
+    mail: EmailService | null | undefined = nodeContext().email, redirect?: unknown,
 ): Promise<boolean> {
     if (!mail?.enabled || !ghii.magicLinkEnabled) return false;
     const owner = await storage.getOwner(ghii.ownerName);
