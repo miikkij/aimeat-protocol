@@ -11,10 +11,14 @@
  *   - setupTotp(): create secret, QR, and hashed/encrypted material for storage
  *   - validateTotpCode() / validateBackupCode(): verify a submitted code (timing-safe backup compare)
  *   - generateBackupCodes(): mint a fresh set of plain + hashed backup codes
- *   - encryptSecret() / decryptSecret(): internal AES-256-GCM (iv:authTag:ciphertext) at-rest crypto
+ *   - encryptSecret() / decryptSecret(): at-rest crypto through services/encryption.ts (iv:authTag:ciphertext)
  *   - sealPlaintextTotpSecrets(): boot step, encrypts a secret stored in plain text
  *
  * @version-history
+ *   v1.3.0 — 2026-11-04 — encryptSecret() and decryptSecret() call encrypt() and decrypt() of
+ *     services/encryption.ts instead of a copy of AES-GCM of their own: the stored form is the same,
+ *     and the secret follows the data key's ring when a key is added (codebase analysis 2026-11-03,
+ *     item B9).
  *   v1.2.0 — 2026-10-09 — A secret is never stored in plain text: the general key (AIMEAT_ENCRYPTION_KEY)
  *     encrypts it, the TOTP key is the fallback, and with neither setupTotp() throws
  *     TotpEncryptionUnavailableError (503) instead. A stored secret is read in all three forms (plain,
@@ -29,7 +33,8 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { TOTP, Secret } from 'otpauth';
 import { createRequire } from 'node:module';
-import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { encrypt, decrypt } from './encryption.js';
 
 // CJS-ESM interop for qrcode
 const require = createRequire(import.meta.url);
@@ -221,23 +226,14 @@ export function validateBackupCode(
 
 // ── AES-256-GCM encryption/decryption ──
 
+// The stored secrets' own functions (services/encryption.ts): the same `iv:authTag:ciphertext` form
+// under key 0, and a key id under a later key of the ring, so a TOTP secret is rotated with the rest.
 function encryptSecret(secret: string, key: Buffer): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  // Format: iv:authTag:ciphertext (all hex)
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+  return encrypt(secret, key);
 }
 
 function decryptSecret(data: string, key: Buffer): string {
-  const [ivHex, authTagHex, ciphertextHex] = data.split(':');
-  const iv = Buffer.from(ivHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  const ciphertext = Buffer.from(ciphertextHex, 'hex');
-  const decipher = createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(authTag);
-  return decipher.update(ciphertext) + decipher.final('utf8');
+  return decrypt(data, key);
 }
 
 // ── Boot step: encrypt a secret stored in plain text ──

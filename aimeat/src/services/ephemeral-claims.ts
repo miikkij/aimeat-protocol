@@ -39,9 +39,12 @@
  *   if (!await spendOnce('signature', sig, Date.now() + 300_000)) refuse();
  *   const c = await windowCounter('mail-send').bump(account, { windowMs: 60_000 });
  * @version-history
+ *   v1.0.1 — 2026-11-04 — The payload's AES-GCM goes through utils/aes-gcm.ts, the node's one
+ *     implementation; the stored form is unchanged (codebase analysis 2026-11-03, item B9).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, high-availability stage 2, items 2.3 and 2.4).
  */
-import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from 'node:crypto';
+import { createHash, hkdfSync } from 'node:crypto';
+import { gcmOpen, gcmSeal } from '../utils/aes-gcm.js';
 import type { Storage } from '../storage/interface.js';
 import type { EphemeralCount } from '../storage/repositories/ephemeral-claim.repository.js';
 import { sessionStorage } from '../auth/node-auth.js';
@@ -110,17 +113,13 @@ function payloadKey(kind: string, value: string): Buffer {
 }
 
 function seal(kind: string, value: string, data: unknown): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', payloadKey(kind, value), iv);
-  const ct = Buffer.concat([cipher.update(JSON.stringify(data ?? null), 'utf8'), cipher.final()]);
-  return Buffer.concat([iv, cipher.getAuthTag(), ct]).toString('base64');
+  const { iv, tag, ct } = gcmSeal(payloadKey(kind, value), JSON.stringify(data ?? null));
+  return Buffer.concat([iv, tag, ct]).toString('base64');
 }
 
 function open(kind: string, value: string, sealed: string): unknown {
   const buf = Buffer.from(sealed, 'base64');
-  const decipher = createDecipheriv('aes-256-gcm', payloadKey(kind, value), buf.subarray(0, 12));
-  decipher.setAuthTag(buf.subarray(12, 28));
-  return JSON.parse(Buffer.concat([decipher.update(buf.subarray(28)), decipher.final()]).toString('utf8'));
+  return JSON.parse(gcmOpen(payloadKey(kind, value), { iv: buf.subarray(0, 12), tag: buf.subarray(12, 28), ct: buf.subarray(28) }).toString('utf8'));
 }
 
 // ── One-time values ──────────────────────────────────────────────────────────────────────────────

@@ -38,12 +38,12 @@
       "digest": "sha256:9ab4198efa657bfd7f38315e"
     },
     "03-shared-responsibility.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/config-posture.ts",
         "aimeat/src/auth/node-keys.ts"
       ],
-      "digest": "sha256:1fcbc48c2d1deb00a2a83ac7"
+      "digest": "sha256:894c892df3b876b9a0c7ad54"
     },
     "04-identity-access.md": {
       "reviewedOn": "2026-11-04",
@@ -120,13 +120,13 @@
       "digest": "sha256:a3eec7b960928ad6b1577e84"
     },
     "11-backup-recovery.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "docs/operations/backup-and-restore.md",
         "aimeat/src/auth/node-keys.ts",
         "aimeat/src/services/encryption.ts"
       ],
-      "digest": "sha256:a2cfabff1df7831595ccad4c"
+      "digest": "sha256:c29dc870cca20d457bb8c8cb"
     },
     "12-updates-releases.md": {
       "reviewedOn": "2026-11-01",
@@ -210,14 +210,14 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:54e0e524642ea6811a52f363"
+      "digest": "sha256:bb33358b11c75b48630d0199"
     },
     "README.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "docs/operations/README.md"
       ],
-      "digest": "sha256:1321504425b104cdb3f6b2c2"
+      "digest": "sha256:e2cf81e06a8e39a8ef877f02"
     },
     "templates/application-register-entry.md": {
       "reviewedOn": "2026-11-02",
@@ -290,7 +290,7 @@
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
-      "aimeat/src/auth/node-keys.ts": "aac90000400b1caa"
+      "aimeat/src/auth/node-keys.ts": "22584846ee8531df"
     },
     "04-identity-access.md": {
       "aimeat/src/services/external-login.ts": "b164a1f73cb4956f",
@@ -340,8 +340,8 @@
     },
     "11-backup-recovery.md": {
       "docs/operations/backup-and-restore.md": "c4a998fa57b04c2a",
-      "aimeat/src/auth/node-keys.ts": "aac90000400b1caa",
-      "aimeat/src/services/encryption.ts": "46eeede52cdc5803"
+      "aimeat/src/auth/node-keys.ts": "22584846ee8531df",
+      "aimeat/src/services/encryption.ts": "e165ad9ad570a575"
     },
     "12-updates-releases.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
@@ -374,7 +374,7 @@
       ".github/SECURITY.md": "3298fcc91e6ba5ee"
     },
     "README.md": {
-      "docs/operations/README.md": "febe51a3cdddf7af"
+      "docs/operations/README.md": "8ede1e231a5edbdb"
     },
     "templates/application-register-entry.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
@@ -419,7 +419,7 @@
       "aimeat/src/services/process-lease.ts": "36268e000a135f38",
       "aimeat/src/services/ai-jobs/reclaim.ts": "75c2fbca64a0c49c",
       "aimeat/src/services/workflow/engine-lock.ts": "7867146c310b2c7d",
-      "aimeat/src/services/ephemeral-claims.ts": "2a5ad595b9776e64"
+      "aimeat/src/services/ephemeral-claims.ts": "d9811a476371afca"
     }
   }
 }

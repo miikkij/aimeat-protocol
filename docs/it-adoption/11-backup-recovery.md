@@ -1,6 +1,6 @@
 # 11 Backup and recovery
 
-> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 11a8800b9) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the sysadmin who owns backups and the continuity planner who sets recovery targets. It lists what must be backed up for a node to come back as the same node, gives the procedure in short, proposes RTO and RPO values for the organisation to decide, and describes the restore test. The commands for each storage backend are in [Backup and restore](../operations/backup-and-restore.md), which stays the single home for them.
 
@@ -22,6 +22,7 @@ Rules that follow from this:
 
 - Never change `AIMEAT_ENCRYPTION_KEY`, `AIMEAT_TOTP_ENCRYPTION_KEY` (the data key when the first is not set, which is the case after `aimeat init`) or `AIMEAT_KEY_PASSPHRASE` on a running node, and never restore a database under different values ([Backup and restore](../operations/backup-and-restore.md), `aimeat/.env.example`, `aimeat/src/cli/init-wizard.ts`).
 - Adding `AIMEAT_ENCRYPTION_KEY` later to a node that ran on `AIMEAT_TOTP_ENCRYPTION_KEY` (as `aimeat init` sets up) is safe while the TOTP key stays set: new secrets are written under the data key, and every secret stored before still opens, because the node tries the TOTP key when the data key does not open a value (`aimeat/src/services/encryption.ts`). The node re-encrypts nothing, so keep `AIMEAT_TOTP_ENCRYPTION_KEY` set and backed up for as long as secrets written before the change are in use; removing it leaves those unreadable.
+- The node holds its data keys in a key ring, and a secret sealed under any key but the first names that key's number. Every node has one data key today, and no setting adds a second one yet, so the rule above stands: replacing the data key is not possible yet ([Key rotation](../operations/key-rotation.md), `aimeat/src/services/encryption.ts`).
 - Store the database backup and the secrets apart, or encrypt the set: the database holds people's data and the `.env` holds the key to their secrets ([Backup and restore](../operations/backup-and-restore.md)).
 - Docker: neither compose file keeps the node key directory on a volume. Mount one or set `AIMEAT_NODE_KEY_PATH` to a file on a volume, and back it up ([Production deployment](../operations/production-deployment.md)).
 

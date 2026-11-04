@@ -38,8 +38,11 @@
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S4a).
  *   v1.0.1 — 2026-10-10 — The cache of opened rows compares the secrets instead of keying on a
  *     SHA-256 of them (code scanning alert 1726).
+ *   v1.0.2 — 2026-11-04 — AES-GCM through utils/aes-gcm.ts, the node's one implementation; the
+ *     `nk1:` form is unchanged (codebase analysis 2026-11-03, item B9).
  */
-import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
+import { pbkdf2Sync, randomBytes } from 'node:crypto';
+import { gcmOpen, gcmSeal } from '../utils/aes-gcm.js';
 
 export interface NodeKeySecrets {
   /** AIMEAT_KEY_PASSPHRASE. */
@@ -108,11 +111,8 @@ export function sealNodePrivateKey(privateKey: string, publicKey: string, secret
     salt = Buffer.alloc(0);
     key = dk;
   }
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  cipher.setAAD(aadOf(publicKey));
-  const ct = Buffer.concat([cipher.update(privateKey, 'utf8'), cipher.final()]);
-  return `${SEALED_NODE_KEY_PREFIX}${kind}:${salt.toString('hex')}:${iv.toString('hex')}:${cipher.getAuthTag().toString('hex')}:${ct.toString('hex')}`;
+  const { iv, tag, ct } = gcmSeal(key, privateKey, aadOf(publicKey));
+  return `${SEALED_NODE_KEY_PREFIX}${kind}:${salt.toString('hex')}:${iv.toString('hex')}:${tag.toString('hex')}:${ct.toString('hex')}`;
 }
 
 /** The plain private key from a stored row. A plain row is returned as it is; a sealed one is opened or refused. */
@@ -143,10 +143,7 @@ export function openNodePrivateKey(stored: string, publicKey: string, secrets: N
   }
   let plain: string;
   try {
-    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
-    decipher.setAAD(aadOf(publicKey));
-    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-    plain = Buffer.concat([decipher.update(Buffer.from(ctHex, 'hex')), decipher.final()]).toString('utf8');
+    plain = gcmOpen(key, { iv: Buffer.from(ivHex, 'hex'), tag: Buffer.from(tagHex, 'hex'), ct: Buffer.from(ctHex, 'hex') }, aadOf(publicKey)).toString('utf8');
   } catch {
     // The GCM tag check failed: turned into a refusal that names the secret.
     throw new NodeKeyLockedError(`The node key in the database does not open with the ${kind === 'p' ? 'AIMEAT_KEY_PASSPHRASE' : 'AIMEAT_ENCRYPTION_KEY'} this server has: the value changed, or the row was altered.`, publicKey);

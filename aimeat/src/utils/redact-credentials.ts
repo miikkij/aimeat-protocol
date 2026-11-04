@@ -20,6 +20,8 @@
  *     logger: vendor prefixes with underscores (sk_live_, whsec_, rk_), the node's own token prefixes,
  *     JWTs, AES-GCM ciphertext, credential query parameters, and a recursive, cycle-safe field
  *     walk (secrets audit 2026-10-09, 07-side-channels d1 and d5).
+ *   v1.0.1 — 2026-11-04 — The ciphertext pattern takes the key-id forms `v3:<kid>:` and `v3u:<kid>:`
+ *     with their prefix (codebase analysis 2026-11-03, item B9).
  */
 
 const REDACTED = '[redacted]';
@@ -51,7 +53,7 @@ export function redactCredentialText(text: string): string {
     .replace(/\bxox[abprs]-[A-Za-z0-9-]{10,}/g, REDACTED)
     .replace(/\bAIza[0-9A-Za-z_-]{20,}/g, REDACTED)
     .replace(/\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*/g, REDACTED)
-    .replace(/\b(?:v2:)?[0-9a-f]{24}:[0-9a-f]{32}(?::[0-9a-f]*)?/gi, REDACTED);
+    .replace(/\b(?:v2:|v3u?:\d{1,6}:)?[0-9a-f]{24}:[0-9a-f]{32}(?::[0-9a-f]*)?/gi, REDACTED);
 }
 
 /**

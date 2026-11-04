@@ -901,6 +901,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/encryption.ts :: map :: rings": {
+      "count": 1,
+      "reason": "The data key ring, set from the node's configuration at start; every process that reads the same configuration holds the same ring, and nothing is learned at run time. A process started without the new key cannot open a value another process sealed with it, which docs/operations/key-rotation.md step 3 covers (codebase analysis 2026-11-03, item B9)."
+    },
     "src/services/event-bus.ts :: set :: transports": {
       "count": 1,
       "reason": "The transports this process hands its events to (services/bus-relay.ts). Each process adds its own at boot; this is what carries events to the other processes."

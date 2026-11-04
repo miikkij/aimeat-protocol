@@ -17,8 +17,9 @@
  *   - decrypt(data, key) — returns plaintext
  *   - encryptBound(plaintext, key, context) — returns v2:iv:authTag:ciphertext, bound to context
  *   - decryptBound(data, key, context) — plaintext, or a throw when the form or the context differ
- *   - isBoundCiphertext(data) — true for the v2 form
+ *   - isBoundCiphertext(data) — true for the v2 and v3 forms
  *   - getEncryptionKey(config) — resolves key from config with fallback
+ *   - KeyRing / configureKeyRing(ring) — the keys by id, and the one new values are sealed with
  *
  *   ADDING THE DATA KEY LATER. A node installed with `aimeat init` runs on AIMEAT_TOTP_ENCRYPTION_KEY
  *   alone. When AIMEAT_ENCRYPTION_KEY is added, getEncryptionKey() returns it, and nothing re-encrypts
@@ -27,7 +28,21 @@
  *   the data key's fallback, and decrypt() and decryptBound() try it when the data key's tag check
  *   fails. New values are written under the data key; the old ones keep opening as long as the TOTP
  *   key stays set (IT adoption review; Jouni, 2026-11-02).
+ *
+ *   THE KEY RING AND THE KEY ID. A data key could not be replaced: every stored value names no key,
+ *   so a new key opens none of them (codebase analysis 2026-11-03, security-architecture finding 10).
+ *   A value sealed now under any key but key 0 says which key it is: `v3:<kid>:iv:authTag:ciphertext`
+ *   (bound) and `v3u:<kid>:iv:authTag:ciphertext` (unbound), where `kid` is the key's number in the
+ *   ring. Key 0 is the key the node had before key ids existed, and a value without a key id is read
+ *   as key 0, with key 0's TOTP-key fallback as above. A key ring with key 0 alone, which is every
+ *   node today, writes the two older forms exactly as before, so nothing stored or written changes
+ *   until a second key is added. configureKeyRing() is the step a rotation takes; the runbook is
+ *   docs/operations/key-rotation.md. The AES-GCM itself is utils/aes-gcm.ts, shared with the other
+ *   four places the node encrypts.
  * @version-history
+ *   v1.3.0 -- 2026-11-04 -- The key ring, the `v3:`/`v3u:` forms with a key id, configureKeyRing(),
+ *     and AES-GCM through utils/aes-gcm.ts (codebase analysis 2026-11-03, item B9;
+ *     test/unit/key-ring.test.ts, test/unit/legacy-keys-still-open.test.ts).
  *   v1.2.0 -- 2026-11-02 -- decrypt() and decryptBound() fall back to AIMEAT_TOTP_ENCRYPTION_KEY when
  *     AIMEAT_ENCRYPTION_KEY was added later (test/unit/encryption-key-fallback.test.ts).
  *   v1.1.0 — 2026-10-09 — encryptBound / decryptBound / isBoundCiphertext: ciphertext bound to the
@@ -35,36 +50,96 @@
  *   v1.0.0 — 2026-03-20 — Initial: extracted from totp.ts pattern
  */
 
-import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
+import { gcmOpen, gcmSeal, type GcmSealed } from '../utils/aes-gcm.js';
+
+// ── The key ring ─────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A node's data keys by number. Key 0 is the key the node had before key ids existed; `current` is
+ * the key new values are sealed with, and it is the key getEncryptionKey() hands every caller.
+ */
+export interface KeyRing {
+  current: number;
+  keys: ReadonlyMap<number, Buffer>;
+}
+
+/**
+ * The configured rings, filed under the hex of their current key: the one Buffer every caller holds.
+ * A key with no ring here is a ring of one, key 0, which is every node until a rotation adds a key.
+ */
+// process-local: set from the node's configuration at start, the same in every process that reads it; nothing is learned at run time
+const rings = new Map<string, KeyRing>();
+
+/**
+ * Make `ring` the ring of its current key, and answer that key. The rotation step calls it with the
+ * keys from the node's configuration (docs/operations/key-rotation.md); nothing calls it on a node
+ * with one key. Throws when the ring does not hold its current key or a key is not 32 bytes.
+ */
+export function configureKeyRing(ring: KeyRing): Buffer {
+  const current = ring.keys.get(ring.current);
+  if (!current) throw new Error(`The key ring names key ${ring.current} as current and does not hold it.`);
+  for (const [kid, k] of ring.keys) {
+    if (!Number.isInteger(kid) || kid < 0 || k.length !== 32) throw new Error(`Key ${kid} of the key ring is not a 256-bit key with a whole-number id.`);
+  }
+  rings.set(current.toString('hex'), { current: ring.current, keys: new Map(ring.keys) });
+  return current;
+}
+
+/** The ring a caller's key is the current key of: a configured one, or the ring of one. */
+function ringOf(key: Buffer): KeyRing {
+  return rings.get(key.toString('hex')) ?? { current: 0, keys: new Map([[0, key]]) };
+}
+
+/** Key 0 of the ring, which opens every value written without a key id. */
+const keyZeroOf = (key: Buffer): Buffer => ringOf(key).keys.get(0) ?? key;
+
+const UNBOUND_V3_PREFIX = 'v3u:';
+const BOUND_V3_PREFIX = 'v3:';
+const KID_RE = /^\d{1,6}$/;
+
+const hexOf = (s: GcmSealed): string => `${s.iv.toString('hex')}:${s.tag.toString('hex')}:${s.ct.toString('hex')}`;
+
+/** The three hex parts of `iv:authTag:ciphertext`, as the reader of every form has split them. */
+function partsOf(body: string): GcmSealed {
+  const [ivHex, authTagHex, ciphertextHex] = body.split(':');
+  return { iv: Buffer.from(ivHex, 'hex'), tag: Buffer.from(authTagHex, 'hex'), ct: Buffer.from(ciphertextHex, 'hex') };
+}
+
+/** Open a `v3:`/`v3u:` value with the key its id names. Throws when the ring does not hold that key. */
+function openWithKid(data: string, prefix: string, key: Buffer, aad?: Buffer): string {
+  const rest = data.slice(prefix.length);
+  const cut = rest.indexOf(':');
+  const kid = rest.slice(0, cut);
+  if (cut < 0 || !KID_RE.test(kid)) throw new Error('The sealed value names no key id.');
+  const k = ringOf(key).keys.get(Number(kid));
+  if (!k) throw new Error(`The value was sealed with key ${kid}, which this node's key ring does not hold.`);
+  return gcmOpen(k, partsOf(rest.slice(cut + 1)), aad).toString('utf8');
+}
+
+// ── Unbound values ───────────────────────────────────────────────────────────────────────────────
 
 /**
  * Encrypt a string with AES-256-GCM.
- * @returns `iv:authTag:ciphertext` (all hex-encoded, colon-separated)
+ * @returns `iv:authTag:ciphertext` (all hex-encoded, colon-separated) under key 0, and
+ *   `v3u:<kid>:iv:authTag:ciphertext` under any later key of the ring.
  */
 export function encrypt(plaintext: string, key: Buffer): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+  const ring = ringOf(key);
+  const sealed = hexOf(gcmSeal(key, plaintext));
+  return ring.current === 0 ? sealed : `${UNBOUND_V3_PREFIX}${ring.current}:${sealed}`;
 }
 
 /**
  * Decrypt an AES-256-GCM encrypted string.
- * @param data Format: `iv:authTag:ciphertext` (all hex)
+ * @param data Format: `iv:authTag:ciphertext` (all hex), or `v3u:<kid>:` followed by it
  */
 export function decrypt(data: string, key: Buffer): string {
-  return withFallback(key, k => decryptWith(data, k));
+  if (typeof data === 'string' && data.startsWith(UNBOUND_V3_PREFIX)) return openWithKid(data, UNBOUND_V3_PREFIX, key);
+  return withFallback(keyZeroOf(key), k => decryptWith(data, k));
 }
 
 function decryptWith(data: string, key: Buffer): string {
-  const [ivHex, authTagHex, ciphertextHex] = data.split(':');
-  const iv = Buffer.from(ivHex, 'hex');
-  const authTag = Buffer.from(authTagHex, 'hex');
-  const ciphertext = Buffer.from(ciphertextHex, 'hex');
-  const decipher = createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(authTag);
-  return decipher.update(ciphertext) + decipher.final('utf8');
+  return gcmOpen(key, partsOf(data)).toString('utf8');
 }
 
 /**
@@ -93,24 +168,24 @@ function withFallback(key: Buffer, open: (k: Buffer) => string): string {
   }
 }
 
+// ── Bound values ─────────────────────────────────────────────────────────────────────────────────
+
 const BOUND_PREFIX = 'v2:';
 
-/** True for a value encryptBound() wrote. */
+/** True for a value encryptBound() wrote, under key 0 (`v2:`) or a later key (`v3:`). */
 export function isBoundCiphertext(data: unknown): boolean {
-  return typeof data === 'string' && data.startsWith(BOUND_PREFIX);
+  return typeof data === 'string' && (data.startsWith(BOUND_PREFIX) || data.startsWith(BOUND_V3_PREFIX));
 }
 
 /**
  * Encrypt with AES-256-GCM and authenticate `context` with it.
- * @returns `v2:iv:authTag:ciphertext` (hex parts)
+ * @returns `v2:iv:authTag:ciphertext` (hex parts) under key 0, and `v3:<kid>:iv:authTag:ciphertext`
+ *   under any later key of the ring
  */
 export function encryptBound(plaintext: string, key: Buffer, context: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  cipher.setAAD(Buffer.from(context, 'utf8'));
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return `${BOUND_PREFIX}${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+  const ring = ringOf(key);
+  const sealed = hexOf(gcmSeal(key, plaintext, Buffer.from(context, 'utf8')));
+  return ring.current === 0 ? `${BOUND_PREFIX}${sealed}` : `${BOUND_V3_PREFIX}${ring.current}:${sealed}`;
 }
 
 /**
@@ -119,15 +194,12 @@ export function encryptBound(plaintext: string, key: Buffer, context: string): s
  */
 export function decryptBound(data: string, key: Buffer, context: string): string {
   if (!isBoundCiphertext(data)) throw new Error('not a bound ciphertext');
-  return withFallback(key, k => decryptBoundWith(data, k, context));
+  if (data.startsWith(BOUND_V3_PREFIX)) return openWithKid(data, BOUND_V3_PREFIX, key, Buffer.from(context, 'utf8'));
+  return withFallback(keyZeroOf(key), k => decryptBoundWith(data, k, context));
 }
 
 function decryptBoundWith(data: string, key: Buffer, context: string): string {
-  const [ivHex, authTagHex, ciphertextHex] = data.slice(BOUND_PREFIX.length).split(':');
-  const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
-  decipher.setAAD(Buffer.from(context, 'utf8'));
-  decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
-  return decipher.update(Buffer.from(ciphertextHex, 'hex')) + decipher.final('utf8');
+  return gcmOpen(key, partsOf(data.slice(BOUND_PREFIX.length)), Buffer.from(context, 'utf8')).toString('utf8');
 }
 
 /** A 32-byte key from its hex form, or null. */
