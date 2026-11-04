@@ -119,6 +119,7 @@
  *     moved unchanged to engine-resume.ts (max-file-lines).
  *   v1.23.0 — 2026-10-22 — An answer whose write was refused turns its step red, and the owner is told as for any failed step (secaudit 2026-10, r66).
  *   v1.24.0 — 2026-10-27 — A run whose account is deactivated dispatches no step until reactivation (secaudit2026oct26).
+ *   v1.25.0 — 2026-11-04 — A `workspace.rows` event another process produced starts no run here: the process that appended starts it, once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -127,7 +128,7 @@ import { isTerminalTaskStatus } from '../../storage/interface.js';
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
-import { emitChange, onRowsAppendedEvent, offRowsAppendedEvent, type RowsAppendedEvent } from '../event-bus.js';
+import { emitChange, onRowsAppendedEvent, offRowsAppendedEvent, isRemoteEvent, type RowsAppendedEvent } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName, runAsNode } from '../../utils/gaii.js';
 import { buildEvalCtx } from './eval-context.js';
@@ -603,7 +604,7 @@ export class WorkflowEngine {
 
   /** The bus is one per process: answer for this node's row spaces only, as this node. */
   private readonly rowsHandler = (evt: RowsAppendedEvent): void => {
-    if (evt.nodeId !== this.config.nodeId) return;
+    if (evt.nodeId !== this.config.nodeId || isRemoteEvent(evt)) return;
     runAsNode(this.config.nodeId, () => { void fireWorkspaceRows(this.triggerDeps(), evt).catch(err => logger.error('workspace.rows trigger failed', { error: String(err) })); });
   };
 

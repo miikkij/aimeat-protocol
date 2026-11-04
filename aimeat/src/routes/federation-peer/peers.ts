@@ -5,6 +5,10 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — A heartbeat tells the `federation` change only for a known peer whose signature and
+ *     single use passed: an unknown sender or a refused one changed nothing, and with the event bus
+ *     between processes (services/bus-relay.ts) every such event makes each process read the peers
+ *     again (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — The single use of a signed heartbeat or presence message is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.14.0 — 2026-10-31 — A peer's settlement ceiling: settlement_ceiling on GET /peers, on PUT
  *     /peers/:nodeId, and its own door PUT /peers/:nodeId/settlement-ceiling (a whole number, "none",
@@ -315,6 +319,8 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             // Liveness recovers a peer from a liveness state, never from an operator decision
             // (depeering, suspended) or an admission state (pending, approved). Same rule as ping.
             if (LIVENESS_RECOVERABLE.has(peer.status)) peer.status = 'active';
+            // Only a verified heartbeat changed a peer; every process reads the peers again on it.
+            emitChange('federation');
         }
 
         res.json(success(config.nodeId, {
@@ -325,7 +331,6 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 uptime_seconds: Math.floor(process.uptime()),
             },
         }));
-        emitChange('federation');
     });
 
     // POST /v1/federation/presence — receive a peer's presence push (snapshot or delta)

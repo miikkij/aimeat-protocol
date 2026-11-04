@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-04 -- e2e-two-process-bus.ts joins the list (not the guard tier): two processes of one node on one PostgreSQL database share the event bus (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 -- e2e-app-versions-access.ts joins the list (not the guard tier): an app's version list answers what the app's read answers for that caller, and carries no content (codebase analysis 2026-11-03, item A1).
  *   2026-11-02 -- e2e-dsp-agreements.ts joins the list (not the guard tier): what a Dataspace agreement grants and books, and the process room (secaudit2026nov02d round 13).
  *   2026-11-02 -- e2e-ai-ecosystem-caller.ts joins the list (not the guard tier): an ecosystem app's AI calls, on its own node (:29397) (secaudit2026nov02d round 13).
@@ -1807,6 +1808,9 @@ const ALL_SUITES = [
     'test/e2e-graceful-shutdown.ts',
     // Two processes started together on one empty PostgreSQL database both boot (the boot lock; HA stage 1).
     'test/e2e-boot-lock.ts',
+    // Two processes of one node on one PostgreSQL database: the event bus over LISTEN/NOTIFY carries a
+    // write, a peer removal and a setting to the other process, and a write starts its work once (HA stage 2).
+    'test/e2e-two-process-bus.ts',
     'test/e2e-package-update-widening.ts',
     'test/e2e-memory-bin-purge.ts',
     'test/e2e-docsign-caller-refusals.ts',

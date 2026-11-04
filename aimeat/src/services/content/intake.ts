@@ -33,13 +33,15 @@
  *   v1.0.1 — 2026-11-02 — A removed file's profile sections file goes with its facts.
  *   v1.1.0 — 2026-11-03 — A published workspace document gets its shared fingerprint on arrival when
  *     its workspace or organism turned that on and the publisher's own settings run the profile step.
+ *   v1.2.0 — 2026-11-04 — A memory write another process made is not read here: the process that
+ *     wrote reads it, once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { isReservedServerKey, isServerWrittenKey } from '../../utils/reserved-keys.js';
-import { onMemoryWrittenEvent, type MemoryWriteEvent } from '../event-bus.js';
+import { onMemoryWrittenEvent, isRemoteEvent, type MemoryWriteEvent } from '../event-bus.js';
 import { callerFromAuth } from '../caller-context.js';
 import { setStorageFileHooks } from '../storage-file-write.js';
 import { inspectSource, memoryValueText } from './pipeline.js';
@@ -185,6 +187,9 @@ const MAX_WAITING = 2000;
 const waiting = new Map<string, ReturnType<typeof setTimeout>>();
 
 function onMemoryWritten(deps: Deps, evt: MemoryWriteEvent): void {
+  // The process that wrote reads it, once: a write another process made is that process's to read
+  // (event-bus.ts, the origin rule).
+  if (isRemoteEvent(evt)) return;
   if (deps.config.contentClassMode === 'off') return;
   const { key, ownerGaii } = evt;
   if (key.startsWith('contentclass.') || isReservedServerKey(key) || isServerWrittenKey(key)) return;

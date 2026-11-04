@@ -29,6 +29,8 @@
  *     runAsNode. One node per process in production, so nothing there changes.
  *   v1.3.0 — 2026-11-04 — Boot resumes the stored outbox's webhook and mail retries (services/outbox.ts;
  *     codebase analysis 2026-11-03, HA 1.5).
+ *   v1.4.0 — 2026-11-04 — The tracked-response listener returns for a write another process made, so
+ *     one write is evaluated once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -47,7 +49,7 @@ import { startSyncScheduler } from '../services/sync-scheduler.js';
 import { startMessageRetryJob } from '../services/message-delivery.js';
 import { startTrackedResponseReconciler, evaluateTrackedKey } from '../services/tracked-response.js';
 import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
-import { onMemoryWrittenEvent } from '../services/event-bus.js';
+import { onMemoryWrittenEvent, isRemoteEvent } from '../services/event-bus.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
 import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.js';
 import { backfillDependencyMap } from '../services/dependency-map.js';
@@ -138,7 +140,10 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
   // The bus calls a listener as whoever emitted the event, which in a process that serves more than
   // one node can be another node, so this one runs as THIS node, and so does the evaluation it starts.
   // A production process serves one node, so nothing there changes.
+  // It starts work, so it runs for this process's writes only: the process that wrote evaluates, once
+  // (services/event-bus.ts, the origin rule).
   onMemoryWrittenEvent(evt => runAsNode(config.nodeId, () => {
+    if (isRemoteEvent(evt)) return;
     if (!isTracked(evt.key)) return;   // O(1) gate — only watched keys do any work
     evaluateTrackedKey({ config, storage, peers }, evt.key)
       .catch(err => logger.warn('tracked-response reactive evaluate failed', { error: String(err) }));

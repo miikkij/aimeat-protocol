@@ -2,14 +2,16 @@
  * @file event-bus.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Process-local pub/sub bus for live updates. Two channels:
+ * @description Pub/sub bus for live updates, in each process, and carried to the node's other
+ *   processes by the transports of services/bus-relay.ts (see "Other processes" below). Channels:
  *   `change` — coarse domain-string events broadcast to every SSE client (UI
  *   live refresh); `delivery` — agent-scoped targeted events carrying a full
  *   payload, consumed by the ConnectTunnelManager to push a single agent's
  *   socket (realtime reverse delivery). SSE never subscribes to `delivery`, so
  *   per-agent payloads are not broadcast to UI clients.
  * @structure emitChange/emitRecordChange/emitRecordChangePriorUnknown/onChangeEvent/offChangeEvent (change) +
- *   emitDelivery/onDeliveryEvent/offDeliveryEvent (delivery).
+ *   emitDelivery/onDeliveryEvent/offDeliveryEvent (delivery), and the task-moved, publicActivity,
+ *   memoryWritten, rowsAppended and appChange channels; addBusTransport/emitRemote/isRemoteEvent (other processes).
  * @usage import { emitDelivery } from '../services/event-bus.js';
  * @version-history
  *   v1.0.0 — pre-2026-06 — Initial change-event bus for SSE live updates.
@@ -39,11 +41,65 @@
  *     records others read. emitRecordChangePriorUnknown for a writer that does not know the earlier
  *     visibility: routed to the streams the same way, never marked (codebase analysis 2026-11-03,
  *     item C4).
+ *   v1.10.0 — 2026-11-04 — The bus reaches the node's other processes: every event is also handed
+ *     to the transports added with addBusTransport (services/bus-relay.ts, PostgreSQL LISTEN/NOTIFY),
+ *     and an event another process produced arrives through emitRemote. isRemoteEvent tells a
+ *     listener which is which: a listener that starts work (a workflow trigger, the content intake,
+ *     a data product, a tracked response) runs only for its own process's events; a listener that
+ *     tells a browser, a tunnel or a cache runs for every process's events. With no transport (SQLite,
+ *     one process) nothing here changes (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import { EventEmitter } from 'node:events';
 
 const bus = new EventEmitter();
 bus.setMaxListeners(0); // unlimited — each SSE client adds a listener
+
+// ── Other processes of this node ────────────────────────────────────────────
+//
+// THE ORIGIN RULE. An event reaches every process of the node, so a listener that STARTS work would
+// start it once per process. Such a listener asks isRemoteEvent(evt) and returns for an event another
+// process produced: the process where the write happened does the work, once. A listener that only
+// tells somebody (an SSE stream, an agent's tunnel, a read cache, a registry reload) runs for every
+// event, because the browser, the agent or the cache may be on any process.
+//
+// The mark is kept beside the event object, never in it: the public activity stream sends its event
+// object as it is, and a field added here would reach every visitor's page.
+
+/** The channels of this bus. Every one of them reaches the node's other processes. */
+export type BusChannelName = 'change' | 'delivery' | 'task-moved' | 'publicActivity' | 'memoryWritten' | 'rowsAppended' | 'appChange';
+
+/** What carries this process's events to the node's other processes (services/bus-relay.ts). Never throws. */
+export interface BusTransport { publish(channel: BusChannelName, evt: object): void }
+
+// process-local: the transports this process hands its events to; each process adds its own at boot.
+const transports = new Set<BusTransport>();
+const remoteEvents = new WeakSet<object>();
+
+/** Hand every later event to `transport` as well. Answers the function that stops it. */
+export function addBusTransport(transport: BusTransport): () => void {
+  transports.add(transport);
+  return () => { transports.delete(transport); };
+}
+
+/** One event on one channel: to the other processes, then to this process's listeners as before. */
+function fire(channel: BusChannelName, evt: object): void {
+  for (const t of transports) t.publish(channel, evt);
+  bus.emit(channel, evt);
+}
+
+/**
+ * An event another process of this node produced, told to this process's listeners. It is never
+ * handed to a transport again, so it reaches each process once.
+ */
+export function emitRemote(channel: BusChannelName, evt: object): void {
+  remoteEvents.add(evt);
+  bus.emit(channel, evt);
+}
+
+/** True for an event another process produced (emitRemote). A listener that starts work returns for it. */
+export function isRemoteEvent(evt: object): boolean {
+  return remoteEvents.has(evt);
+}
 
 export interface ChangeEvent {
   domain: string;
@@ -73,7 +129,7 @@ export interface ChangeEvent {
 }
 
 export function emitChange(domain: string, ownerGaii?: string): void {
-  bus.emit('change', { domain, timestamp: Date.now(), ...(ownerGaii ? { ownerGaii } : {}) } satisfies ChangeEvent);
+  fire('change', { domain, timestamp: Date.now(), ...(ownerGaii ? { ownerGaii } : {}) } satisfies ChangeEvent);
 }
 
 /** Every workspace domain starts with this; the rest is `<organismId>/<workspaceId>`. */
@@ -101,7 +157,7 @@ export function workspaceOfKey(key: string): { organismId: string; ws: string } 
  */
 export function emitWorkspaceChange(organismId: string, ws: string): void {
   if (!organismId || !ws) return;
-  bus.emit('change', { domain: workspaceDomain(organismId, ws), timestamp: Date.now(), organismId } satisfies ChangeEvent);
+  fire('change', { domain: workspaceDomain(organismId, ws), timestamp: Date.now(), organismId } satisfies ChangeEvent);
 }
 
 /** The visibilities under which only the owner and the owner's own agents and apps read a record. */
@@ -136,7 +192,7 @@ export function emitRecordChange(
   if (isOwnerOnlyChange(ownerGaii, ...visibilities)) {
     // The writer named every visibility the change involved, so the read cache may keep what it
     // computed from records other people read (ChangeEvent.ownerOnly).
-    bus.emit('change', { domain, timestamp: Date.now(), ownerGaii: ownerGaii as string, ownerOnly: true } satisfies ChangeEvent);
+    fire('change', { domain, timestamp: Date.now(), ownerGaii: ownerGaii as string, ownerOnly: true } satisfies ChangeEvent);
     return;
   }
   emitChange(domain);
@@ -185,7 +241,7 @@ export interface DeliveryEvent {
 }
 
 export function emitDelivery(evt: Omit<DeliveryEvent, 'timestamp'>): void {
-  bus.emit('delivery', { ...evt, timestamp: Date.now() } satisfies DeliveryEvent);
+  fire('delivery', { ...evt, timestamp: Date.now() } satisfies DeliveryEvent);
 }
 
 export function onDeliveryEvent(handler: (evt: DeliveryEvent) => void): void {
@@ -213,7 +269,7 @@ export interface TaskMovedEvent {
 }
 
 export function emitTaskMoved(taskId: string): void {
-  bus.emit('task-moved', { taskId, timestamp: Date.now() } satisfies TaskMovedEvent);
+  fire('task-moved', { taskId, timestamp: Date.now() } satisfies TaskMovedEvent);
 }
 
 export function onTaskMoved(handler: (evt: TaskMovedEvent) => void): void {
@@ -248,7 +304,7 @@ export interface PublicActivityEvent {
 }
 
 export function emitPublicActivity(evt: PublicActivityEvent): void {
-  bus.emit('publicActivity', evt);
+  fire('publicActivity', evt);
 }
 
 export function onPublicActivityEvent(handler: (evt: PublicActivityEvent) => void): void {
@@ -281,7 +337,7 @@ export interface MemoryWriteEvent {
 }
 
 export function emitMemoryWritten(ownerGaii: string, key: string, op?: 'created' | 'updated'): void {
-  bus.emit('memoryWritten', { ownerGaii, key, ...(op ? { op } : {}), timestamp: Date.now() } satisfies MemoryWriteEvent);
+  fire('memoryWritten', { ownerGaii, key, ...(op ? { op } : {}), timestamp: Date.now() } satisfies MemoryWriteEvent);
   // Every central write path names its key here, so a key inside a workspace tells that workspace's
   // open pages from this one place.
   const inWs = workspaceOfKey(key);
@@ -319,7 +375,7 @@ export interface RowsAppendedEvent {
 }
 
 export function emitRowsAppended(evt: Omit<RowsAppendedEvent, 'timestamp'>): void {
-  bus.emit('rowsAppended', { ...evt, timestamp: Date.now() } satisfies RowsAppendedEvent);
+  fire('rowsAppended', { ...evt, timestamp: Date.now() } satisfies RowsAppendedEvent);
   emitWorkspaceChange(evt.organismId, evt.wsId);
 }
 
@@ -349,7 +405,7 @@ export interface AppChangeEvent {
 }
 
 export function emitAppChange(evt: Omit<AppChangeEvent, 'timestamp'>): void {
-  bus.emit('appChange', { ...evt, timestamp: Date.now() } satisfies AppChangeEvent);
+  fire('appChange', { ...evt, timestamp: Date.now() } satisfies AppChangeEvent);
 }
 
 /**

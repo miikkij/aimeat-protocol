@@ -18,10 +18,13 @@
  *   does not overwrite it.
  * @structure
  *   - MAINTENANCE_REREAD_MS — the re-read interval
- *   - createMaintenanceCache(read, initial, opts) → { get, set }
+ *   - createMaintenanceCache(read, initial, opts) → { get, set, refresh }
  *   - loadMaintenanceCache(storage) — the node's cache, seeded from storage at boot
  * @usage const maintenance = await loadMaintenanceCache(storage); maintenance.get().enabled
  * @version-history
+ *   v1.1.0 — 2026-11-04 — refresh(): read storage now, when another process of the node tells this one
+ *     it switched maintenance (services/bus-relay.ts); the 5 s re-read stays as the fallback (codebase
+ *     analysis 2026-11-03, HA stage 2, e2-bus).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item A8).
  */
 import type { MaintenanceState, Storage } from '../storage/interface.js';
@@ -35,6 +38,11 @@ export interface MaintenanceCache {
   get(): MaintenanceState;
   /** The operator's switch on this process: takes effect at once, and wins over a re-read already under way. */
   set(state: MaintenanceState): void;
+  /**
+   * Read storage now: another process of the node switched maintenance (services/bus-relay.ts tells
+   * it). Resolves when the read is done; a switch on this process during the read still wins.
+   */
+  refresh(): Promise<void>;
 }
 
 const OFF: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
@@ -50,31 +58,36 @@ export function createMaintenanceCache(
   const state: MaintenanceState = { ...initial };
   let readAt = now();
   let generation = 0;
-  let reading = false;
+  let reading: Promise<void> | null = null;
 
-  const reread = (): void => {
-    reading = true;
+  const reread = (): Promise<void> => {
     const startedAt = generation;
-    read().then((fresh) => {
+    const p: Promise<void> = read().then((fresh) => {
       // A switch made on this process after the read began is newer than what the read saw.
       if (generation === startedAt && fresh) Object.assign(state, fresh);
     }, (err: unknown) => {
       logger.warn('maintenance: re-read from storage failed, keeping the last known state', { error: String(err) });
     }).finally(() => {
       readAt = now();
-      reading = false;
+      if (reading === p) reading = null;
     });
+    reading = p;
+    return p;
   };
 
   return {
     get() {
-      if (!reading && now() - readAt >= rereadMs) reread();
+      if (!reading && now() - readAt >= rereadMs) void reread();
       return state;
     },
     set(next) {
       generation++;
       Object.assign(state, next);
       readAt = now();
+    },
+    refresh() {
+      // A read already under way may have begun before the other process wrote: read once more after it.
+      return reading ? reading.then(reread) : reread();
     },
   };
 }

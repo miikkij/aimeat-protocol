@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-04 — The event bus between the node's processes starts last (./bus-relay-start.ts), and a stored peer row becomes the in-memory peer through services/federation-peer-reload.ts peerInfoFromRow, moved there unchanged (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — setupAnonymousIdentity moved unchanged to ./anonymous-identity.ts (800-line limit after the HA stage 1 merge).
  *   2026-11-04 — createEmailService gets storage, so mail retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-04 — The maintenance state is services/maintenance-cache.ts: re-read from storage, so a CLI stop reaches the running node (codebase analysis 2026-11-03, item A8). The boot seeding runs under the boot lock (./boot-seed-lock.ts; HA stage 1).
@@ -148,6 +149,8 @@ import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../s
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { runOnceOnlyKeepSteps } from './once-only-keep-steps.js';
 import { flagOrphanPeerApprovalsOnce } from '../services/federation-orphan-approvals.js';
+import { peerInfoFromRow } from '../services/federation-peer-reload.js';
+import { startNodeBusRelay } from './bus-relay-start.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -451,39 +454,7 @@ export async function initializeServices(
     const savedPeers = await storage.listFederationPeers();
     for (const sp of savedPeers) {
       if (sp.nodeId === config.nodeId) { logger.warn('A stored federation peer has this node\'s own id; it is not loaded, and the row stays in storage', { nodeId: sp.nodeId }); continue; }
-      peers.set(sp.nodeId, {
-        nodeId: sp.nodeId,
-        url: sp.url,
-        publicKey: sp.publicKey,
-        status: sp.status,
-        addedAt: sp.addedAt,
-        lastSeen: sp.lastSeen,
-        shareCatalogue: sp.shareCatalogue ?? true,
-        replicateMemory: sp.replicateMemory ?? true,
-        allowRouting: sp.allowRouting ?? true,
-        // A row written before these columns existed keeps what it could already do. supportUpstream
-        // is the opposite default: support routing is never inherited from an absent value.
-        allowMessaging: sp.allowMessaging ?? true,
-        allowBroadcast: sp.allowBroadcast ?? true,
-        allowSettlement: sp.allowSettlement ?? true,
-        supportUpstream: sp.supportUpstream ?? false,
-        peerMode: sp.peerMode || 'federation',
-        allowFederatedAuth: sp.allowFederatedAuth ?? false,
-        federationAuthScopes: sp.federationAuthScopes ?? [],
-        tier: sp.tier ?? 'member',
-        availability: sp.availability ?? undefined,
-        expiresAt: sp.expiresAt ?? null,
-        heartbeatOk: sp.heartbeatOk ?? 0,
-        heartbeatTotal: sp.heartbeatTotal ?? 0,
-        availabilityWindow: sp.availabilityWindow ?? null,
-        availabilityPct: sp.availabilityPct ?? null,
-        softwareVersion: sp.softwareVersion ?? null,
-        nodeCardHash: sp.nodeCardHash ?? null,
-        relayClaimAt: sp.relayClaimAt ?? null,
-        relayClaim: sp.relayClaim ?? null,
-        lastClaimedRelayAt: sp.lastClaimedRelayAt ?? null,
-        lastUnclaimedRelayAt: sp.lastUnclaimedRelayAt ?? null,
-      });
+      peers.set(sp.nodeId, peerInfoFromRow(sp));
     }
     if (savedPeers.length > 0) {
       logger.info(`Loaded ${savedPeers.length} persisted federation peers`);
@@ -708,6 +679,9 @@ export async function initializeServices(
   if (tunnelManager && mailboxNotificationService) {
     tunnelManager.setNotificationService(mailboxNotificationService);
   }
+
+  // The event bus between this node's processes, with the registries above (PostgreSQL only).
+  await startNodeBusRelay({ storage, config, peers, maintenance });
 
   return {
     maintenance,
