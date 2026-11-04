@@ -42,6 +42,17 @@ export const CREDENTIAL_KINDS = {
             + '(services/app-parties/service.ts appPartyFromRequest). No credential is 401.',
         admitsNoCredential: false,
     },
+    'ucp-platform': {
+        credential: 'A UCP 2026-08-25 platform buying for a person with no account: UCP-Agent names its profile, and a '
+            + 'request signed under RFC 9421 is verified against that profile\'s keys. An unsigned request is taken, '
+            + 'because UCP lets a business keep checkout open; the checkout id and its bound profile decide the rest.',
+        admitsNoCredential: true,
+    },
+    'ucp-platform-signed': {
+        credential: 'A UCP 2026-08-25 platform that must prove itself: UCP-Agent names its profile and the request is '
+            + 'signed under RFC 9421 with a key of that profile. Unsigned is 401.',
+        admitsNoCredential: false,
+    },
 } as const satisfies Record<string, CredentialKindInfo>;
 
 export type CredentialKind = keyof typeof CREDENTIAL_KINDS;

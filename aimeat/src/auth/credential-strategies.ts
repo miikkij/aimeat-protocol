@@ -28,6 +28,8 @@
  *     const participant = credentialOf(req, 'dsp-participant');
  *   });
  * @version-history
+ *   v1.3.0 — 2026-11-04 — 'ucp-platform' and 'ucp-platform-signed': a UCP platform on the guest
+ *     checkout, and ucpRawBody (codebase analysis 2026-11-03, item B8).
  *   v1.2.0 — 2026-11-04 — 'app-party': a person registered to one app (codebase analysis 2026-11-03, item B8).
  *   v1.1.0 — 2026-11-04 — 'party': an outside party on /v1/parties/me* (codebase analysis 2026-11-03, item B8).
  *   v1.0.0 — 2026-11-04 — Initial: the Dataspace Protocol participant (codebase analysis 2026-11-03, item B8).
@@ -41,6 +43,8 @@ import { verifyDspRequest, type Participant } from '../services/dataspace/verifi
 import { catalogError, negotiationError, transferError } from '../services/dataspace/contract.js';
 import { partyCredentialOf, verifyParty, type PartyContext } from '../services/parties/verify.js';
 import { appPartyFromRequest, type AppPartyCtx } from '../services/app-parties/service.js';
+import { parseUcpAgent, platformProfile } from '../services/ucp/platform-profile.js';
+import { verifyMessage } from '../services/ucp/http-signatures.js';
 import { logger } from '../utils/logger.js';
 
 /** The principal each kind puts on the request. */
@@ -48,7 +52,12 @@ export interface CredentialPrincipals {
     'dsp-participant': Participant;
     party: PartyContext;
     'app-party': AppPartyCtx;
+    'ucp-platform': UcpPlatform;
+    'ucp-platform-signed': UcpPlatform;
 }
+
+/** A UCP platform: the profile its UCP-Agent header names, whose keys verified the signature when one was sent. */
+export interface UcpPlatform { profileUrl: string }
 
 /** What each kind's strategy is built with at the route. */
 export interface StrategyOptions {
@@ -57,6 +66,8 @@ export interface StrategyOptions {
     party: { storage: Storage; config: AimeatConfig };
     /** The app is the route's :owner and :filename. */
     'app-party': { storage: Storage; config: AimeatConfig };
+    'ucp-platform': { config: AimeatConfig };
+    'ucp-platform-signed': { config: AimeatConfig };
 }
 
 /** A principal on the request, tagged with its kind. */
@@ -114,10 +125,48 @@ const appParty: Strategy<'app-party'> = (deps) => async (req, res) => {
     return v.ctx;
 };
 
+/** The raw body as it arrived, for the digest a UCP signature covers (server.ts keeps it on /ucp/ paths). */
+export function ucpRawBody(req: Request): Buffer | null {
+    const r = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (Buffer.isBuffer(r)) return r;
+    return req.body && Object.keys(req.body as object).length ? Buffer.from(JSON.stringify(req.body)) : null;
+}
+
+/**
+ * A UCP 2026-08-25 platform (was platformOf() in routes/ucp-checkout.ts): the profile UCP-Agent names,
+ * after the signature, when the request has one, checked out against that profile's keys. `mustSign`
+ * refuses an unsigned request. The checkout's own switch is read first, as it was: with commerce off
+ * every endpoint answers 503 whatever the request carries. Answers are UCP protocol errors, `{ code, content }`.
+ */
+const ucpPlatform = (mustSign: boolean) => ({ config }: { config: AimeatConfig }): ((req: Request, res: Response) => Promise<UcpPlatform | null>) => {
+    // Read once when the route is built, as the router did.
+    const allowHttp = config.baseUrl.startsWith('http://');
+    return async (req, res) => {
+        const protocolError = (status: number, code: string, content: string): null => { res.status(status).json({ code, content }); return null; };
+        if (!config.commerceEnabled) return protocolError(503, 'unavailable', 'Checkout is switched off on this node.');
+        const profileUrl = parseUcpAgent(req.get('ucp-agent'), allowHttp);
+        if (!profileUrl) return protocolError(400, 'invalid_profile_url', 'UCP-Agent must name the platform profile: profile="https://…".');
+        const signed = req.get('signature-input') !== undefined || req.get('signature') !== undefined;
+        if (!signed && mustSign) return protocolError(401, 'signature_missing', 'This request must be signed by the platform (RFC 9421).');
+        if (signed) {
+            const profile = await platformProfile(profileUrl);
+            if (!profile) return protocolError(424, 'profile_unreachable', 'The platform profile could not be fetched to check the signature.');
+            const headers: Record<string, string | undefined> = {};
+            for (const [k, v] of Object.entries(req.headers)) headers[k.toLowerCase()] = Array.isArray(v) ? v.join(', ') : v;
+            const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+            const r = verifyMessage({ method: req.method, url, headers }, ucpRawBody(req), profile.keys);
+            if (!r.ok) return protocolError(r.code === 'digest_mismatch' || r.code === 'algorithm_unsupported' ? 400 : 401, r.code, 'The request signature did not verify.');
+        }
+        return { profileUrl };
+    };
+};
+
 const STRATEGIES: { [K in CredentialKind]: Strategy<K> } = {
     'dsp-participant': dspParticipant,
     party: outsideParty,
     'app-party': appParty,
+    'ucp-platform': ucpPlatform(false),
+    'ucp-platform-signed': ucpPlatform(true),
 };
 
 /**
