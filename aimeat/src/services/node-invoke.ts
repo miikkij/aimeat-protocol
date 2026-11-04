@@ -5,15 +5,15 @@
  * @description Run one node capability by name, with the caller's own credential.
  *
  *   ONE IMPLEMENTATION, AND THIS IS NOT A SECOND ONE. The dispatch goes through the shared
- *   name-to-REST table (`CONNECT_CLI_TOOLS`) and lands on the node's own Express stack over
- *   loopback, carrying the CALLER'S bearer. So `requireAuth`, `requireScope`, the ownership checks
+ *   name-to-REST table (`CONNECT_CLI_TOOLS`) and lands on the node's own Express stack in process
+ *   (services/request-injector.ts: the same HTTP server, no socket), carrying the CALLER'S bearer. So `requireAuth`, `requireScope`, the ownership checks
  *   and the AIMEAT envelope all apply by construction, exactly as they do when the same capability
  *   is reached as a tool or as a route. There is no privileged path here and nothing is re-derived:
  *   an `invoke` of `aimeat_memory_write` IS a `POST /v1/memory` by the same principal.
  *
- *   This is the shape the connect tunnel has used since June (services/connect-tunnel.ts
- *   `handleRequest`): a loopback self-fetch with the principal's pinned token, rather than reaching
- *   into storage behind the gates. It is the reason a wide surface is safe at all.
+ *   This is the shape the connect tunnel has used since June (services/connect-tunnel-forward.ts): a
+ *   request to the node itself with the principal's pinned token, rather than reaching into storage
+ *   behind the gates. It is the reason a wide surface is safe at all.
  *
  *   WHY THE CONNECTOR'S TABLE. It is the only map from a capability NAME to the REST call that
  *   performs it, and it is already wrapped where it matters: `withDeclaredInputOnly` refuses a
@@ -29,6 +29,10 @@
  * @usage
  *   const out = await invokeNodeCapability(config, { id, input, bearer, agentName });
  * @version-history
+ *   2026-11-04 — The request goes to the node's own HTTP server in process (services/request-injector.ts)
+ *     instead of a fetch to 127.0.0.1, marked for the caller's bearer (auth/injected-request.ts) instead
+ *     of carrying a loopback pass. The route, its gates, the headers it reads and the answer are the
+ *     same (codebase analysis 2026-11-03, item D-j).
  *   2026-10-12 — The loopback request carries the node's loopback pass for the caller's bearer
  *     (auth/loopback-pass.ts), so a session bound to the MCP endpoint (RFC 8707) keeps reaching the
  *     REST routes from 4.0.0, when a REST route refuses that token from outside. The caller's
@@ -42,7 +46,7 @@ import { AimeatClient } from '../tool-dispatch/api-client.js';
 import { findNodeCapability, NON_INVOKABLE, listNodeCapabilities } from './node-capabilities.js';
 import { logger } from '../utils/logger.js';
 import { movedToolMessage } from '../tool-catalog/moved-tools.js';
-import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../auth/loopback-pass.js';
+import { inProcessOrigin, withInProcessFetch } from './request-injector.js';
 
 export interface InvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
 export interface InvokeSuccess { ok: true; capability: string; result: unknown; duration_ms: number }
@@ -103,48 +107,50 @@ export async function invokeNodeCapability(
     ? args.input as Record<string, unknown>
     : {};
 
-  // Loopback, so the request runs through the real Express stack. NOT config.baseUrl, which would
-  // add a public-internet hop for a call that never leaves this process's host.
-  const client = new AimeatClient(`http://127.0.0.1:${config.port}`, args.bearer);
-  // The node's own pass for this bearer (auth/loopback-pass.ts). A session that signed in over MCP
-  // OAuth holds a token bound to the MCP endpoint, which a REST route refuses from 4.0.0; the pass
-  // says this request is the node calling itself for that session. Identity and scopes are still
-  // the bearer's, read by the route as before. Ended when this call ends.
-  const pass = mintLoopbackPass(args.bearer);
-  client.setNodeHeaders({ [LOOPBACK_PASS_HEADER]: pass });
-  const started = Date.now();
-  try {
-    const response = await tool.handler({
-      client,
-      config: { node_url: `http://127.0.0.1:${config.port}`, agent: args.agentName, owner: '' },
-      agentPath: encodeURIComponent(args.agentName),
-    }, input);
-    const duration = Date.now() - started;
-    // The capability's own refusal is an ANSWER, not a failure of the dispatcher: hand it back whole
-    // so the caller reads the same envelope it would have got calling the route directly.
-    if (response && typeof response === 'object' && (response as { ok?: unknown }).ok === false) {
-      const err = (response as { error?: { code?: string; message?: string } }).error;
-      // THE STATUS IS THE ROUTE'S, NOT OURS. This door's whole claim is that it can do exactly what
-      // its caller can do and nothing more, which means a refusal here has to be the refusal the
-      // caller would have got at the route — same code AND same status. It reported 400 for
-      // everything until 2026-09-01, so a caller could not tell "you are not allowed" (403) from
-      // "there is no such thing" (404) from "you asked wrongly" (400), and the equivalence the
-      // catalogue's safety rests on was untrue in the one place anyone would look.
-      return {
-        ok: false,
-        status: client.lastStatus >= 400 ? client.lastStatus : 400,
-        code: err?.code ?? 'CAPABILITY_REFUSED',
-        message: err?.message ?? 'That capability refused the call.',
-        details: response,
-      };
+  // In process (services/request-injector.ts), so the request runs through the real Express stack,
+  // the node's own HTTP server included, with no socket. The address is the loopback one, NOT
+  // config.baseUrl, which would add a public-internet hop for a call that never leaves this process.
+  // The dispatch is marked for this bearer (auth/injected-request.ts): a session that signed in over
+  // MCP OAuth holds a token bound to the MCP endpoint, which a REST route refuses from 4.0.0 from
+  // outside, and the mark says this request is the node calling itself for that session. Identity
+  // and scopes are still the bearer's, read by the route as before.
+  const origin = inProcessOrigin(config);
+  const bearer = args.bearer;
+  return withInProcessFetch<InvokeSuccess | InvokeRefusal>(config, { forBearer: bearer }, async (fetchIn) => {
+    const client = new AimeatClient(origin, bearer);
+    client.setFetch(fetchIn);
+    const started = Date.now();
+    try {
+      const response = await tool.handler({
+        client,
+        config: { node_url: origin, agent: args.agentName, owner: '' },
+        agentPath: encodeURIComponent(args.agentName),
+      }, input);
+      const duration = Date.now() - started;
+      // The capability's own refusal is an ANSWER, not a failure of the dispatcher: hand it back whole
+      // so the caller reads the same envelope it would have got calling the route directly.
+      if (response && typeof response === 'object' && (response as { ok?: unknown }).ok === false) {
+        const err = (response as { error?: { code?: string; message?: string } }).error;
+        // THE STATUS IS THE ROUTE'S, NOT OURS. This door's whole claim is that it can do exactly what
+        // its caller can do and nothing more, which means a refusal here has to be the refusal the
+        // caller would have got at the route — same code AND same status. It reported 400 for
+        // everything until 2026-09-01, so a caller could not tell "you are not allowed" (403) from
+        // "there is no such thing" (404) from "you asked wrongly" (400), and the equivalence the
+        // catalogue's safety rests on was untrue in the one place anyone would look.
+        return {
+          ok: false,
+          status: client.lastStatus >= 400 ? client.lastStatus : 400,
+          code: err?.code ?? 'CAPABILITY_REFUSED',
+          message: err?.message ?? 'That capability refused the call.',
+          details: response,
+        };
+      }
+      return { ok: true, capability: id, result: (response as { data?: unknown })?.data ?? response, duration_ms: duration };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // A thrown handler is usually a contract problem the caller can fix (an undeclared parameter,
+      // a missing required one), so it comes back as 400 with the message rather than as a 500.
+      return { ok: false, status: 400, code: 'CAPABILITY_ERROR', message };
     }
-    return { ok: true, capability: id, result: (response as { data?: unknown })?.data ?? response, duration_ms: duration };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // A thrown handler is usually a contract problem the caller can fix (an undeclared parameter,
-    // a missing required one), so it comes back as 400 with the message rather than as a 500.
-    return { ok: false, status: 400, code: 'CAPABILITY_ERROR', message };
-  } finally {
-    revokeLoopbackPass(pass);
-  }
+  });
 }

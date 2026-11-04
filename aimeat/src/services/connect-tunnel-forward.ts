@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The forward half of the Connector Forward Tunnel: one `request` frame replayed
- *   through the node's REAL Express stack over loopback, with that identity's own bearer, and the
+ *   through the node's REAL Express stack in process, with that identity's own bearer, and the
  *   correlated `response` sent back.
  *
  *   THIS IS THE SECURITY MODEL'S SPINE, which is why it is worth its own file rather than being a
@@ -21,6 +21,9 @@
  * @structure ForwardContext / ForwardConn — what the dispatch needs · forwardRequest()
  * @usage import { forwardRequest } from './connect-tunnel-forward.js';
  * @version-history
+ *   2026-11-04 — The forward goes to the node's own HTTP server in process (services/request-injector.ts)
+ *     instead of a fetch to 127.0.0.1; the URL, its loopback pin, the headers and the answer are the same
+ *     (codebase analysis 2026-11-03, item D-j).
  *   2026-10-27 — The forwarded request carries SELF_REQUEST_HEADER, so the setup code's loopback waiver does not take it for this machine's own (secaudit2026oct26).
  *   v1.0.0 — 2026-09-03 — Extracted from connect-tunnel.ts (max-file-lines).
  */
@@ -30,6 +33,7 @@ import type { ConnectFrame, ConnectTunnelStats } from './connect-tunnel-wire.js'
 import type { Fairness } from './connect-tunnel-multiplex.js';
 import { logger } from '../utils/logger.js';
 import { SELF_REQUEST_HEADER } from '../auth/loopback-pass.js';
+import { withInProcessFetch } from './request-injector.js';
 
 /** Just enough of a connection for the dispatch: whose it is, where it writes, what it may use. */
 export interface ForwardConn {
@@ -59,8 +63,8 @@ const FORWARDABLE_HEADERS = new Set(['content-type', 'accept', 'idempotency-key'
 const FORWARDABLE_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
- * Forward a tunneled `request` through the real Express stack (loopback
- * self-fetch with the pinned agent bearer) and return the correlated
+ * Forward a tunneled `request` through the real Express stack (an in-process
+ * request with the pinned agent bearer) and return the correlated
  * `response`. Scope enforcement + the AIMEAT envelope hold by construction.
  */
 export async function forwardRequest(ctx: ForwardContext, conn: ForwardConn, frame: ConnectFrame): Promise<void> {
@@ -134,14 +138,17 @@ export async function forwardRequest(ctx: ForwardContext, conn: ForwardConn, fra
       headers['Content-Type'] = 'application/json';
     }
 
-    const res = await fetch(url, {
-      method: frame.method,
-      headers,
-      body: hasBody ? JSON.stringify(frame.body) : undefined,
-      signal: controller.signal,
+    // To the node's own HTTP server in process (services/request-injector.ts), with no socket: the
+    // same request the loopback fetch made, through the same stack.
+    const { status, text } = await withInProcessFetch(ctx.config, {}, async (fetchIn) => {
+      const res = await fetchIn(url.href, {
+        method: frame.method,
+        headers,
+        body: hasBody ? JSON.stringify(frame.body) : undefined,
+        signal: controller.signal,
+      });
+      return { status: res.status, text: await res.text() };
     });
-
-    const text = await res.text();
     // The other half of fairness. One agent's enormous answer is one agent's answer, and putting
     // it on a wire eleven others are waiting on delays all of them. Measured on the encoded body
     // because that is what actually occupies the socket.
@@ -166,7 +173,7 @@ export async function forwardRequest(ctx: ForwardContext, conn: ForwardConn, fra
     // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     try { body = text ? JSON.parse(text) : null; } catch { body = text; }
 
-    ctx.sendTo(conn, { type: 'response', id, status: res.status, body });
+    ctx.sendTo(conn, { type: 'response', id, status, body });
   } catch (err) {
     ctx.stats.forwardErrorsTotal++;
     const aborted = err instanceof Error && err.name === 'AbortError';

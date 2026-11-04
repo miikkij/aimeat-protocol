@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The listening server is handed to services/request-injector.ts, which gives it the
+ *     node's requests to itself in process (codebase analysis 2026-11-03, item D-j).
  *   2026-11-04 — The stop drains first (server-bootstrap/drain.ts): readiness 503, no new connection,
  *     live streams ended, requests in flight finished within 5 s, then the background work and the
  *     buffers, and exit 0; a 25 s last resort and a second signal exit 1 (codebase analysis
@@ -93,6 +95,7 @@ import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
 import { signedInOnly } from './config-visibility.js';
 import { passwordOffLockoutWarning, twoStepWithoutTotpWarning } from './services/sign-in-policy.js';
 import { trackRequests, drainServer } from './server-bootstrap/drain.js';
+import { noteListeningServer } from './services/request-injector.js';
 
 /** How long shutdown waits for scheduled runs in progress; it runs beside the request drain. */
 const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
@@ -313,6 +316,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // The request counter the stop's drain reads, attached in the same tick as listen(), so it sees
   // every request (server-bootstrap/drain.ts).
   const requestTracker = trackRequests(server);
+  // The node's requests to itself are handed to this server in process, as connections that are not
+  // sockets, so they meet the same request counter and the same stop (services/request-injector.ts).
+  noteListeningServer(config.port, server);
 
   // WebSocket upgrade handling for personal node tunnels + realtime P2P + connector forward tunnel
   if (tunnelManager || realtimeManager || connectTunnelManager) {

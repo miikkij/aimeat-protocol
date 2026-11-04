@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-11-04 — createServer registers the app for its port with services/request-injector.ts, so the
+ *     node's requests to itself reach it in process (codebase analysis 2026-11-03, item D-j).
  *   2026-11-04 — createServer marks the process ready (services/node-lifecycle.ts) after the routes are mounted, for GET /v1/health/ready (HA stage 1).
  *   2026-11-04 — The guard and the admin route share services.maintenance, which re-reads storage (codebase analysis 2026-11-03, item A8).
  *   2026-11-04 — openapiBodyGuard() after inputJunkGuard(): the JSON body is compared with openapi.yaml
@@ -104,6 +106,7 @@ import { hideInternalErrorText } from './middleware/internal-error-text.js';
 import { notFoundHandler, errorHandler } from './middleware/fallback-handlers.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
 import { markReady } from './services/node-lifecycle.js';
+import { registerInProcessApp } from './services/request-injector.js';
 
 export interface ServerResult {
   app: express.Express;
@@ -154,6 +157,9 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
 async function buildServer(config: AimeatConfig, configSources?: ConfigSources): Promise<ServerResult> {
   const app = express();
+  // The node's requests to itself (aimeat_invoke, the capability invoke, the connector tunnel's
+  // forward) reach this app in process, with no socket (services/request-injector.ts).
+  registerInProcessApp(config.port, app);
 
   // Per-request storage profiler (opt-in: config.perfTrace + ?trace=1). Outermost so its wall-clock
   // spans the whole pipeline; a no-op middleware when disabled. See services/perf-trace.ts.

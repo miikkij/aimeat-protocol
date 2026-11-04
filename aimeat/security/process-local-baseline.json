@@ -1205,6 +1205,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/request-injector.ts :: map :: targets": {
+      "count": 1,
+      "reason": "This process's own Express app and listening server per port: a request the node makes to itself goes to the process that makes it, which a second process changes nothing in."
+    },
     "src/services/request-nonce.ts :: map :: seen": {
       "count": 1,
       "reason": "DEBT"

@@ -5,9 +5,9 @@
  * @description The grammar of an extension-backed capability's source ref, and the once-per-node
  *   step that switches off a stored capability whose ref does not follow it.
  *
- *   WHY. An extension-backed capability is invoked as a loopback POST to
- *   /v1/ext/<name>/<action> with the caller's bearer token and the node's loopback pass
- *   (services/capability-invoke.ts). The ref `ext:<name>:<action>` was stored as the registrant
+ *   WHY. An extension-backed capability is invoked as a POST the node sends to itself in process,
+ *   to /v1/ext/<name>/<action> with the caller's bearer token (services/capability-invoke.ts,
+ *   services/request-injector.ts). The ref `ext:<name>:<action>` was stored as the registrant
  *   wrote it and split on ':' into that path, so a ref whose segments were not an extension name and
  *   an action id made the request reach another REST route of the node, as the caller, with a body
  *   the caller chose and a route the registrant chose (secaudit2026oct22,

@@ -16,6 +16,9 @@
  *   with the running version switched per test: a 4.0.0 run and a 3.26.1 run of the same code.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-token-on-rest.test.ts
  * @version-history
+ *   2026-11-04 — The setup registers the app and its server with services/request-injector.ts, as
+ *     server.ts and index-start.ts do for the node, because the three tools now reach the routes in
+ *     process (codebase analysis 2026-11-03, item D-j). No assertion changes.
  *   2026-10-16 — A call by name to aimeat_app_tool_invoke without ext:invoke answers SCOPE_DENIED naming
  *     the permission, no longer "not found": the test asserted the answer QA audit E5-04 replaced.
  *   v1.0.1 — 2026-10-13 — aimeat_app_tool_invoke is not offered to a caller without ext:invoke, which the
@@ -49,6 +52,7 @@ import { memoryRouter } from '../../src/routes/memory.js';
 import { extensionsRouter } from '../../src/routes/extensions.js';
 import { runCapabilityAggregation } from '../../src/services/capability-aggregator.js';
 import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../../src/auth/loopback-pass.js';
+import { registerInProcessApp, noteListeningServer } from '../../src/services/request-injector.js';
 
 const NODE_ID = 'aimeat-mcp-token-rest-test';
 const BASE_URL = 'https://node.test';
@@ -187,6 +191,10 @@ beforeAll(async () => {
     base = `http://127.0.0.1:${port}`;
     // The loopback calls go to config.port, so it names this server.
     config.port = port;
+    // What server.ts and index-start.ts do for the node: the node's requests to itself reach this app
+    // in process (services/request-injector.ts).
+    registerInProcessApp(port, app);
+    noteListeningServer(port, server);
 
     // The seller's extension, its capability, and a public app-tool manifest over it.
     v.version = '4.0.0';
