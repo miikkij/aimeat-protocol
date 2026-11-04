@@ -9,6 +9,8 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-11-04 — listMemory, listMemoryMeta and their many-owner twins take `limit` and a key cursor in
+ *     SQL (applyPage); without them the query is unchanged (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
  *     first, never the value (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
@@ -50,14 +52,14 @@
  */
 import { sql } from 'kysely';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
-import type { KeyActivityRow, MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+import type { KeyActivityRow, MemoryListOpts, MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 import { clampKeyActivityLimit } from '../../../repositories/memory.repository.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { buildSearchBlob, byteSize, isLive, jsonb, rowToMeta, rowToRecord } from '../helpers.js';
 import { likePrefix } from '../../../key-prefix.js';
 
-type ListOpts = { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter };
+type ListOpts = MemoryListOpts;
 type CountOpts = { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] };
 
 /** Annotation reader — the archived history keeps who/what changed a value (value._actor / _event). */
@@ -91,7 +93,31 @@ function applyList(q: any, opts?: ListOpts) {
   if (typeof opts?.maxFlags === 'number') q = q.where('flagCount', '<=', opts.maxFlags);
   q = applyArchive(q, opts?.archived);
   if (opts?.tags?.length) q = q.where(sql<boolean>`"tags" @> ${sql.val(opts.tags)}`);   // array-contains-all
-  return q;
+  return applyPage(q, opts);
+}
+
+/**
+ * The page of a keyspace listing (MemoryListOpts `limit`, `after`), in SQL: live rows only, the key
+ * cursor, byte order of key and then owner (COLLATE "C", the order SQLite's BINARY gives), and the
+ * LIMIT. Without either option the query is the one it always was, in the order the database returns.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyPage(q: any, opts?: ListOpts) {
+  if (opts?.limit === undefined && opts?.after === undefined) return q;
+  q = liveSql(q, new Date());
+  const after = opts.after;
+  if (after !== undefined) {
+    const afterOwner = opts.afterOwner;
+    q = afterOwner === undefined
+      ? q.where(sql`"key" COLLATE "C"`, '>', after)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : q.where((eb: any) => eb.or([
+        eb(sql`"key" COLLATE "C"`, '>', after),
+        eb.and([eb('key', '=', after), eb(sql`"ownerGaii" COLLATE "C"`, '>', afterOwner)]),
+      ]));
+  }
+  q = q.orderBy(sql`"key" COLLATE "C"`).orderBy(sql`"ownerGaii" COLLATE "C"`);
+  return opts.limit === undefined ? q : q.limit(Math.max(0, Math.floor(opts.limit)));
 }
 
 type AllOpts = { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean };

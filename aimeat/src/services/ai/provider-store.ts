@@ -29,6 +29,7 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   2026-11-04 — The provider count reads at most MAX_OWNER_PROVIDERS rows (codebase analysis 2026-11-03, item C1).
  *   v1.4.1 — 2026-11-01 — free_model reads freeModelOf/freeLastResortOf: none in eu-only (ai.region_mode); openrouter_region carries the mode.
  *   v1.4.0 — 2026-10-31 — aiProvidersView carries openrouter_region: the operator's region, what the
  *     person may choose and what applies to them now (ai/openrouter-region.ts regionView).
@@ -328,7 +329,8 @@ export async function putOwnerAiProvider(
   assertHostAllowed(config, p.provider);
   const key = `${PROVIDER_PREFIX}${id}`;
   const existing = await storage.getMemory(ownerGhii, key);
-  if (!existing && (await storage.listMemoryMeta(ownerGhii, { prefix: PROVIDER_PREFIX })).length >= MAX_OWNER_PROVIDERS) {
+  // `limit` stops the read at the ceiling: the comparison needs to know only whether there are that many.
+  if (!existing && (await storage.listMemoryMeta(ownerGhii, { prefix: PROVIDER_PREFIX, limit: MAX_OWNER_PROVIDERS })).length >= MAX_OWNER_PROVIDERS) {
     throw new AiCompletionError('TOO_MANY_PROVIDERS', 409, `An account holds at most ${MAX_OWNER_PROVIDERS} AI providers of its own.`);
   }
   // The health of what the owner had tested stays; a capability whose model changed is untested again.

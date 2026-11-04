@@ -13,9 +13,11 @@
  *   v1.1.0 — 2026-10-23 — takeFirstWithoutLimit, with the getApp read that stalled aimeat.io as a fixture.
  *   v1.2.0 — 2026-11-04 — contentListReads and compareContentLists, with listAppVersions as a fixture
  *     (codebase analysis 2026-11-03, item A1).
+ *   v1.3.0 — 2026-11-04 — typedStorageRepositories: the parameter's type decides the bound (codebase
+ *     analysis 2026-11-03, item C1).
  */
 import { describe, it, expect } from 'vitest';
-import { unboundedMethods, wholeTableCalls, takeFirstWithoutLimit, contentListReads, compare, compareContentLists, type Baseline } from '../../scripts/check-unbounded-lists.js';
+import { unboundedMethods, wholeTableCalls, takeFirstWithoutLimit, contentListReads, compare, compareContentLists, typedStorageRepositories, type Baseline } from '../../scripts/check-unbounded-lists.js';
 import { storageRepositories } from '../../scripts/inventory/storage-methods.js';
 
 const repos = [{
@@ -117,6 +119,19 @@ describe('check:unbounded-lists', () => {
         expect(compareContentLists(reads, { listAppsWithContent: 'the copy scan' }).refused).toEqual([reads[0]]);
         expect(compareContentLists(reads, { listAppsWithContent: 'x', listAppVersions: 'y', listGone: 'z' }).stale).toEqual(['listGone']);
         expect(compareContentLists(reads, { listAppsWithContent: ' ', listAppVersions: 'y' }).emptyReasons).toEqual(['listAppsWithContent']);
+    });
+
+    it('decides a bound from the parameter type: an options type with a limit bounds, an inline one without it does not, and a scalar named limit does', () => {
+        const typed = typedStorageRepositories(process.cwd());
+        const unbounded = new Set(unboundedMethods(typed).map(m => m.name));
+        // MemoryListOpts carries limit and after (codebase analysis 2026-11-03, item C1).
+        for (const name of ['listMemory', 'listMemoryMeta', 'listMemoryForOwners', 'listMemoryMetaForOwners']) expect(unbounded.has(name)).toBe(false);
+        // listKeyActivity(prefix, sinceIso, limit): a scalar named limit.
+        expect(unbounded.has('listKeyActivity')).toBe(false);
+        // listConsents(ownerGaii, opts?: { ...no limit }): the name `opts` no longer passes for a bound.
+        expect(unbounded.has('listConsents')).toBe(true);
+        // The name-only reading is still what a repository without types gets.
+        expect(unboundedMethods(repos).map(m => m.name)).toEqual(['listOwners', 'listPats']);
     });
 
     it('reads the real Storage composite: every repository, and the two lists the audit named among the whole-table ones', () => {

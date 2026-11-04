@@ -11,6 +11,8 @@
  * @structure getPartyData · putPartyData · deletePartyData · putSharedData
  * @usage const out = await getPartyData(deps, ctx, 'cart', { shared: false });
  * @version-history
+ *   2026-11-04 — The collection count reads at most MAX_PARTY_COLLECTIONS meta rows, no values
+ *     (codebase analysis 2026-11-03, item C1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4.2).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -50,7 +52,8 @@ export async function putPartyData(deps: Deps, ctx: AppPartyCtx, key: string, va
     const full = partyDataKey(ctx.appId, ctx.party.uid, key);
     if (!(await deps.storage.getMemory(ctx.ownerGhii, full))) {
         const prefix = `${PARTY_DATA_PREFIX}${appKeySegment(ctx.appId)}.${ctx.party.uid}.`;
-        if ((await deps.storage.listMemory(ctx.ownerGhii, { prefix })).length >= MAX_PARTY_COLLECTIONS) {
+        // `limit` stops the read at the ceiling: the comparison needs to know only whether there are that many.
+        if ((await deps.storage.listMemoryMeta(ctx.ownerGhii, { prefix, limit: MAX_PARTY_COLLECTIONS })).length >= MAX_PARTY_COLLECTIONS) {
             return refuse(413, 'QUOTA_EXCEEDED', `A person keeps at most ${MAX_PARTY_COLLECTIONS} collections in one app.`);
         }
     }

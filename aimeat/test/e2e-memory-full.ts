@@ -24,6 +24,8 @@
  *     token, since a deleted account's credentials no longer authenticate.
  *   v1.7.3 — 2026-10-23 — The admin-registered owners get a password and sign in with it; POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-11-04 — A bounded listing with values answers the first N items of the unbounded one, with
+ *     the same total, quota and truncation fields (codebase analysis 2026-11-03, item C1).
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -829,6 +831,48 @@ await test('a bounded listing still tells the truth about how much there is', as
 
     const counted = await json('/v1/memory?prefix=lim.&limit=2&count=true', { headers: auth1() });
     assert(counted.body.data?.count === 5, `a count answers how many there are, not how many were asked for: got ${counted.body.data?.count}`);
+});
+
+// A bounded listing WITH values is pinned against the unbounded listing of the same records: the
+// first N items, the total, the quota and the truncation fields are the same. Green before and after
+// the bounded listing stopped reading every value (codebase analysis 2026-11-03, item C1).
+await test('a bounded listing with values answers the first N items of the unbounded one, with the same total and quota', async () => {
+    const values: unknown[] = [
+        { n: 1, pad: 'x'.repeat(120) }, 'plain text with ÄÖ and ✓', [1, 2, { deep: { y: 'y'.repeat(40) } }],
+        12.5, true, { kieli: '日本語', merkki: '🧠', tyhjä: {} }, { z: 1, a: 2, m: [null, 'q'] },
+    ];
+    for (const [i, value] of values.entries()) {
+        const r = await json('/v1/memory', { method: 'POST', headers: auth1(), body: JSON.stringify({ key: `pagecmp.${i}`, value, visibility: 'private', tags: i % 2 ? ['odd'] : ['even'] }) });
+        assert(r.status === 200 || r.status === 201, `seed pagecmp.${i}: ${r.status}`);
+    }
+    // The same key under the owner and an agent: the owner-scope listing keeps the owner's copy and names the agent in also_under.
+    await json('/v1/memory', { method: 'POST', headers: ownerAuth(), body: JSON.stringify({ key: 'pagecmp.3', value: { owner: true }, visibility: 'private' }) });
+    await json('/v1/memory', { method: 'POST', headers: ownerAuth(), body: JSON.stringify({ key: 'pagecmp.owner-only', value: 'owner', visibility: 'owner' }) });
+    const cases: Array<{ path: string; headers: () => Record<string, string> }> = [
+        { path: '/v1/memory?prefix=pagecmp.', headers: auth1 },
+        { path: '/v1/memory?prefix=pagecmp.&tags=odd', headers: auth1 },
+        { path: '/v1/memory?prefix=pagecmp.&owner_scope=true', headers: ownerAuth },
+    ];
+    for (const c of cases) {
+        const full = await json(c.path, { headers: c.headers() });
+        assert(full.status === 200, `${c.path}: status ${full.status}`);
+        const all = full.body.data;
+        assert(all.total >= 2, `${c.path}: seeded records listed, total ${all.total}`);
+        for (const k of [1, 2, all.total - 1, all.total, all.total + 3]) {
+            const part = await json(`${c.path}&limit=${k}`, { headers: c.headers() });
+            assert(part.status === 200, `${c.path}&limit=${k}: status ${part.status}`);
+            const d = part.body.data;
+            const expected = all.items.slice(0, k);
+            assert(JSON.stringify(d.items) === JSON.stringify(expected), `${c.path}&limit=${k}: items differ from the first ${k} of the unbounded listing`);
+            assert(d.total === all.total, `${c.path}&limit=${k}: total ${d.total}, unbounded ${all.total}`);
+            assert(JSON.stringify(d.quota) === JSON.stringify(all.quota), `${c.path}&limit=${k}: quota ${JSON.stringify(d.quota)}, unbounded ${JSON.stringify(all.quota)}`);
+            const cut = k < all.total;
+            assert((d.truncated === true) === cut, `${c.path}&limit=${k}: truncated ${d.truncated}`);
+            assert(cut ? d.shown === k : d.shown === undefined, `${c.path}&limit=${k}: shown ${d.shown}`);
+            const counted = await json(`${c.path}&limit=${k}&count=true`, { headers: c.headers() });
+            assert(counted.body.data?.count === all.total, `${c.path}&limit=${k}&count=true: ${counted.body.data?.count}`);
+        }
+    }
 });
 
 await test('search?prefix scopes to a namespace', async () => {

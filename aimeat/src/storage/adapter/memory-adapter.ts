@@ -23,12 +23,15 @@
  *   const rows = await adapter.findByOwners(gaiis, { prefix: 'organism.' });
  *
  * @version-history
+ *   2026-11-04 — ListOpts is the storage's MemoryListOpts, so `limit` and the key cursor reach SQL
+ *     (codebase analysis 2026-11-03, item C1).
  *   v1.0.0 — 2026-07-15 — Phase 0 scaffolding: contract defined; wraps existing Storage (coexist).
  *   v1.1.0 — 2026-08-11 — Dropped the `Transactor` seam. Its only implementation was `return fn()`
  *     and nothing consumed it, so the contract advertised a transaction boundary that did not exist.
  */
 import type { ArchiveFilter, MemoryRecord } from '../interface.js';
 import type {
+  MemoryListOpts,
   MemoryMetaRow,
   MemoryTextHit,
   MemoryTextSearchOpts,
@@ -37,15 +40,9 @@ import type {
 
 export type { MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord };
 
-/** Filters for a keyspace listing (single owner or an IN-set of owners). Mirrors the existing
- *  Storage.listMemory options so the wrap is behaviour-preserving. */
-export interface ListOpts {
-  prefix?: string;
-  visibility?: string;
-  tags?: string[];
-  maxFlags?: number;
-  archived?: ArchiveFilter;
-}
+/** Filters for a keyspace listing (single owner or an IN-set of owners). The Storage.listMemory
+ *  options themselves, so the wrap is behaviour-preserving. */
+export type ListOpts = MemoryListOpts;
 
 /** Filters for a DISTINCT-key count across an IN-set of owners (no values loaded). */
 export interface CountOpts {

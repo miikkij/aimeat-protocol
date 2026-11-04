@@ -14,6 +14,8 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-11-04 — MemoryListOpts: the four keyspace listings take `limit` and a key cursor, applied in
+ *     SQL on both providers (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt of the records under a key prefix changed
  *     since a time, newest first, without the value (the overview's activity counts).
  *   2026-10-31 — restoreMemory takes an optional visibility, stored in the same UPDATE that clears the
@@ -80,6 +82,38 @@ export interface MemoryMetaRow {
   aiProvenanceId?: string | null;
   /** Kept and out of every default read. Not the same as deleted, which these projections never return. */
   archived?: boolean;
+}
+
+/**
+ * The filters of a keyspace listing ({@link MemoryRepository.listMemory} and its three siblings), and
+ * the page. Without `limit` and `after` a listing returns every match in the order the database
+ * returns them, as it always has. With either, the page is taken in SQL on both providers: live rows
+ * only, ordered by key and then owner in byte order (PostgreSQL `COLLATE "C"`, SQLite BINARY), the
+ * tag and flag filters applied before the LIMIT, so the LIMIT counts only rows the caller keeps.
+ */
+export interface MemoryListOpts {
+  prefix?: string;
+  visibility?: string;
+  tags?: string[];
+  maxFlags?: number;
+  archived?: ArchiveFilter;
+  /** At most this many rows. */
+  limit?: number;
+  /** Key cursor: only keys after this one in byte order (the last key of the previous page). */
+  after?: string;
+  /** With `after`, on a many-owner listing: the last owner of the previous page, for the rows of the same key. */
+  afterOwner?: string;
+}
+
+/**
+ * One principal's memory as the write ceilings count it, kept by the database in the statement that
+ * changes a row (codebase analysis 2026-11-03, item C3), so a write no longer sums every row of the
+ * writer. `keys` is what `countMemory([owner], { excludePrefixes: MEMORY_COUNT_EXCLUDED_PREFIXES })`
+ * answers; `bytes` is what {@link MemoryRepository.sumMemoryBytes} answers on the same provider.
+ */
+export interface MemoryTotals {
+  keys: number;
+  bytes: number;
 }
 
 /** A single ranked full-text hit from {@link MemoryRepository.searchText}. */
@@ -191,7 +225,7 @@ export interface MemoryRepository {
    * record was pure waste (the value bytes dominated the delete cost). Cheap even over a whole namespace.
    */
   listMemoryKeysByPrefix?(keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]>;
-  listMemory(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
+  listMemory(ownerGaii: string, opts?: MemoryListOpts): Promise<MemoryRecord[]>;
   /**
    * List one owner's memory as lightweight META rows — key + metadata + stored `byteSize`, with the
    * `value` NEVER loaded or transferred (the DB projects only the metadata columns). Backs
@@ -199,15 +233,15 @@ export interface MemoryRepository {
    * paying to deserialise + re-serialise every value (the old meta path loaded all values just to omit
    * them from the response and sum bytes in JS). Same filters as {@link listMemory}.
    */
-  listMemoryMeta(ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]>;
+  listMemoryMeta(ownerGaii: string, opts?: MemoryListOpts): Promise<MemoryMetaRow[]>;
   /**
    * List memory across MANY owner identities in ONE query (ownerGaii IN …) — the owner-scope union in
    * a single round-trip instead of one {@link listMemory} per identity (an owner with ~100 agents was
    * ~65 serial reads). Rows may contain the same key under several identities; the caller
    * (services/owner-memory.ts) dedups GHII-first. `*Meta` is the value-free variant for ?include=meta.
    */
-  listMemoryForOwners(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]>;
-  listMemoryMetaForOwners(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]>;
+  listMemoryForOwners(ownerGaiis: string[], opts?: MemoryListOpts): Promise<MemoryRecord[]>;
+  listMemoryMetaForOwners(ownerGaiis: string[], opts?: MemoryListOpts): Promise<MemoryMetaRow[]>;
   /**
    * Count DISTINCT memory keys across the given owner identities (GHII + agents + GEAIs) — cheap
    * (no values loaded/transferred), mirroring listOwnerScopeMemory's key-dedup. For stat displays
