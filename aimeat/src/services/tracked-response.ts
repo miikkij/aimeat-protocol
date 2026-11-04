@@ -19,6 +19,8 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.6.0 -- 2026-11-04 -- The reconciler runs in one node process per round (process-lease.ts claimedSweep;
+ *     codebase analysis 2026-11-03, item HA 2.7).
  *   v1.5.1 — 2026-10-25 — listTrackedResponses and evaluateOwnerTrackedResponses read under the contract key prefix. Each read every
  *     memory record of the account and filtered by type, which took 3.3–3.8 s on an aimeat.io account
  *     with three contracts and held GET /v1/messages/overview (the Messages page mount) to the same time.
@@ -55,6 +57,7 @@ import { stampAutonomousOutput } from './ai-provenance.js';
 import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 import { isSameOwner } from '../utils/gaii.js';
+import { claimedSweep } from './process-lease.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 export type TrackedResponseState =
@@ -440,10 +443,11 @@ export async function cancelTrackedResponse(storage: Storage, ownerGaii: string,
 /** Periodic safety-net sweep (mirrors startMessageRetryJob — runs where `peers` is available). */
 export function startTrackedResponseReconciler(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): ReturnType<typeof setInterval> {
   const ctx: DeliveryCtx = { config, storage, peers };
-  return setInterval(() => {
+  // One node process per round (process-lease.ts), so a contract's reply is not sent by two at once.
+  return setInterval(claimedSweep(storage, config, 'tracked-response', RECONCILE_INTERVAL_MS, () => {
     reconcileTrackedResponses(ctx).catch(err =>
       logger.error('tracked-response reconcile sweep failed', { error: (err as Error).message }));
-  }, RECONCILE_INTERVAL_MS);
+  }), RECONCILE_INTERVAL_MS);
 }
 
 // ── Served spec (self-description for AIs) ──────────────────────────────────────
