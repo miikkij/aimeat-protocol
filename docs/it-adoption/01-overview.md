@@ -30,7 +30,7 @@ Three principal types act on a node: people (GHII, a human identity such as `ali
 | An AI model | AI features need an AI provider key or a local model server that you choose. Without one, the node stores and serves data, and AI features stay off | [06 AI and models](06-ai-and-models.md), `aimeat/src/services/ai/types.ts` |
 | A TLS terminator | The node speaks plain HTTP. A reverse proxy holds the certificates | [Production deployment](../operations/production-deployment.md) |
 | A data processing platform | A node keeps refined knowledge and the state apps show. High-volume processing runs in separate services that read from and write to the node | [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#what-a-node-is-for) |
-| A cluster manager | A node runs as one active process, with an optional standby on one PostgreSQL database; more than one active process is not supported yet, and page 18 lists what stays per process. Growth beyond one node is more nodes, each with its own database, connected by federation | [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md) |
+| A cluster manager | A node runs as one process, or as several processes on one PostgreSQL database, active or standby; page 18 lists what stays per process. Growth beyond one node is more nodes, each with its own database, connected by federation | [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md) |
 | A backup system | Database, secrets and node key are yours to back up | [Backup and restore](../operations/backup-and-restore.md) |
 | A certified product | The repository holds no certification or audit attestation by a third party | [14 Compliance mapping](14-compliance-mapping.md) |
 
@@ -101,7 +101,7 @@ What this means for you: there is no long-term support line. Plan to follow rele
 - Only the newest node release receives security fixes; there is no long-term support line (`.github/SECURITY.md`).
 - No support contract or service level comes with the open-source project.
 - The project has one named maintainer (`.github/SECURITY.md`). The MIT licence and the rules, checks and tests in the repository let an organisation continue the software itself ([17 Exit plan, continue it yourselves](17-exit-plan.md#continue-it-yourselves)).
-- One active process with a standby is supported; more than one active process is not supported yet, because live updates, request rate limits and Config page changes stay per process. The project records no test of a standby taking over behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
+- Several processes on one PostgreSQL database are supported, as a standby or as more active processes. Request rate limits, the AI key hold, idempotency keys and requests through a tunnel stay per process, so several active processes divide the limits. The project records no test of several processes behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
 - `relay` and `mirror` node types are accepted, but the guide states that the names alone do not give working replication or a tested resource budget (`docs/coding-guidelines/environment-configs.md`).
 - The change log is in two places: `CHANGELOG.md` up to node 3.15.0, `aimeat/public/changelog.json` after it.
 - The repository holds no third-party certification or audit attestation.

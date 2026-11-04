@@ -25,7 +25,7 @@
       "digest": "sha256:9823b75b60d5dd8f313cb74f"
     },
     "02-architecture.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/storage/storage-factory.ts",
         "aimeat/deploy/aimeat.service",
@@ -35,7 +35,7 @@
         "aimeat/src/services/connections/providers-files.ts",
         "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:bce6eeddda4db5d405e93fa4"
+      "digest": "sha256:9ab4198efa657bfd7f38315e"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -156,12 +156,12 @@
       "digest": "sha256:681876df8071fe5a96125740"
     },
     "15-operations-runbook.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "docs/operations/production-deployment.md",
         "aimeat/deploy/aimeat.service"
       ],
-      "digest": "sha256:8ebc0a60039c62ef6118c2a3"
+      "digest": "sha256:ab240d210d6185e6174de0dc"
     },
     "16-known-limitations.md": {
       "reviewedOn": "2026-11-03",
@@ -202,9 +202,15 @@
         "aimeat/src/storage/providers/postgres-kysely/migrate.ts",
         "aimeat/src/services/maintenance-cache.ts",
         "aimeat/src/server-bootstrap/drain.ts",
-        "aimeat/src/services/notification-sweeps.ts"
+        "aimeat/src/services/notification-sweeps.ts",
+        "aimeat/src/services/bus-relay.ts",
+        "aimeat/src/server-bootstrap/bus-relay-start.ts",
+        "aimeat/src/services/process-lease.ts",
+        "aimeat/src/services/ai-jobs/reclaim.ts",
+        "aimeat/src/services/workflow/engine-lock.ts",
+        "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:ac137197a5676d5734117bd3"
+      "digest": "sha256:54e0e524642ea6811a52f363"
     },
     "README.md": {
       "reviewedOn": "2026-11-03",
@@ -278,7 +284,7 @@
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "a730e25abfdcb643",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
-      "docs/operations/production-deployment.md": "1b871ac99c027b8a",
+      "docs/operations/production-deployment.md": "9c0c46739bbcfbd3",
       "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1"
     },
@@ -353,7 +359,7 @@
       "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
     },
     "15-operations-runbook.md": {
-      "docs/operations/production-deployment.md": "1b871ac99c027b8a",
+      "docs/operations/production-deployment.md": "9c0c46739bbcfbd3",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577"
     },
     "16-known-limitations.md": {
@@ -392,22 +398,28 @@
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
       "aimeat/src/services/once-only-step.ts": "12c59204aa41d7f2",
-      "aimeat/src/services/event-bus.ts": "f73b40db41597ad5",
+      "aimeat/src/services/event-bus.ts": "ecbc1a1ff2fe2b02",
       "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
       "aimeat/src/mcp/legacy-sessions.ts": "4784fea1f0026443",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "057c1fe56320598d",
+      "aimeat/src/services/ai-jobs/service.ts": "884384ff2c98f398",
       "aimeat/src/services/config-apply.ts": "91fae249f6d8349e",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "83dc661b20909a16",
+      "aimeat/security/process-local-baseline.json": "3c0b42af10dd549d",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "41f44d4c72ded9c2",
-      "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
+      "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
-      "aimeat/src/services/notification-sweeps.ts": "41dc0401bea00176"
+      "aimeat/src/services/notification-sweeps.ts": "41dc0401bea00176",
+      "aimeat/src/services/bus-relay.ts": "11799af91121af30",
+      "aimeat/src/server-bootstrap/bus-relay-start.ts": "4ea49009017ba3bc",
+      "aimeat/src/services/process-lease.ts": "36268e000a135f38",
+      "aimeat/src/services/ai-jobs/reclaim.ts": "75c2fbca64a0c49c",
+      "aimeat/src/services/workflow/engine-lock.ts": "7867146c310b2c7d",
+      "aimeat/src/services/ephemeral-claims.ts": "2a5ad595b9776e64"
     }
   }
 }

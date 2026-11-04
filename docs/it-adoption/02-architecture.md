@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.2.0 (commit a463a1e3b) on 2026-11-03. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 02cca5c1b) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
@@ -8,7 +8,7 @@ This page is for the architect and the network or firewall owner. It names the c
 
 | Component | Required | What it is | Source |
 |---|---|---|---|
-| Node process | Yes | A Node.js process (engine `>=24.22.1`), plain HTTP on `AIMEAT_PORT` (40050). With `AIMEAT_BIND_HOST` empty it listens on every address. One active process with a standby on one PostgreSQL database is supported; more than one active process is not supported yet ([18](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database)) | `aimeat/package.json`, `aimeat/src/index.ts`, `aimeat/.env.example` |
+| Node process | Yes | A Node.js process (engine `>=24.22.1`), plain HTTP on `AIMEAT_PORT` (40050). With `AIMEAT_BIND_HOST` empty it listens on every address. Several processes on one PostgreSQL database are supported, as a standby or as more active processes ([18](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database)) | `aimeat/package.json`, `aimeat/src/index.ts`, `aimeat/.env.example` |
 | Reverse proxy | Yes, on any shared network | nginx, Caddy or a cloud load balancer. Holds TLS, passes `Host`, WebSocket upgrades and unbuffered streams | [Production deployment](../operations/production-deployment.md) |
 | Database | Yes | PostgreSQL 16 or 17 (`AIMEAT_STORAGE=postgres-kysely`, `DATABASE_URL`), or SQLite (`AIMEAT_STORAGE=sqlite`, `AIMEAT_SQLITE_PATH`). The node warns below PostgreSQL 16 and starts | `aimeat/src/storage/providers/postgres-kysely/server-version.ts`, `aimeat/src/storage/storage-factory.ts` |
 | File store | No | Stored file bytes: in the database (the default), in S3 or an S3-compatible service, or in Azure Blob (`AIMEAT_FILE_STORE`, `AIMEAT_FILE_STORE_S3_ENDPOINT`, `AIMEAT_FILE_STORE_AZURE_ACCOUNT`) | `aimeat/src/storage/blob/s3-client.ts`, `aimeat/src/storage/blob/azure-client.ts`, `aimeat/.env.example` |
@@ -176,12 +176,12 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 
 The repository documents no minimum CPU, memory or disk size.
 
-**A node grows up first, and out by more nodes.** One process serves a node in the shape the guides describe, and the code's design notes say a node runs one process where state stays in it (`aimeat/src/services/ai/node-key-hold.ts`). The supported shape is one active process and a standby on one PostgreSQL database; more than one active process is not supported yet. Processes of one node that share a database already claim some work in it: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`), a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`), the processes take one node key, and the short sign-in steps, the replay caches of signed requests and the per-account limits are kept in the database (`aimeat/src/services/ephemeral-claims.ts`). What stays in each process is listed with its consequence on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); in short:
+**A node grows up first, and out by more nodes.** One process serves a node in the shape the guides describe. Several processes on one PostgreSQL database are supported too, as a standby or as more active processes, because the processes share what they must in the database: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`), a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`), the processes take one node key, the short sign-in steps, the replay caches of signed requests and the per-account limits are kept in the database (`aimeat/src/services/ephemeral-claims.ts`), live updates and cache clears reach every process over the event bus (`aimeat/src/services/bus-relay.ts`), and AI jobs, workflow runs and sweeps run under leases (`aimeat/src/services/process-lease.ts`). What stays in each process is listed with its consequence on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); in short:
 
 - the request rate limiters and the node-key spending hold are per process (`aimeat/src/middleware/rate-limit.ts`, `aimeat/src/services/ai/node-key-hold.ts`);
-- live updates and the cache are per process (`aimeat/src/services/event-bus.ts`, `aimeat/src/services/cache.ts`).
+- a request answered through an agent's or a personal node's tunnel goes through the process the tunnel connected to (`aimeat/src/services/connect-tunnel.ts`, `aimeat/src/services/personal-tunnel.ts`).
 
-For availability, use a process manager restart, one active process with a standby, separate nodes to keep one outage small, a tested restore and, on PostgreSQL, the database's own high-availability features ([18](18-scope-and-deployment-patterns.md#availability)).
+For availability, use a process manager restart, a second process as a standby or as a second active process, separate nodes to keep one outage small, a tested restore and, on PostgreSQL, the database's own high-availability features ([18](18-scope-and-deployment-patterns.md#availability)).
 
 ## On premises and in the cloud
 
@@ -195,7 +195,7 @@ For availability, use a process manager restart, one active process with a stand
 
 ## Limits
 
-- More than one active node process is not supported yet: live updates, request rate limits and Config page changes stay per process. One active process with a standby is supported, and the project records no test of a standby taking over behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
+- Several active node processes divide the request rate limits and the AI key hold, which stay per process, and a request through a tunnel works only on the process holding it. The project records no test of several processes behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
 - The repository documents no minimum CPU, memory or disk size; the only figures are the heap ceilings and memory limits in `aimeat/deploy/aimeat.service` and `aimeat/Dockerfile` and one measured trace.
 - With `AIMEAT_STORAGE` unset, the node runs on an in-memory database and loses all data at restart; `aimeat validate` warns but the node starts (`aimeat/src/utils/env-validator.ts`, `aimeat/src/storage/storage-factory.ts`).
 - With `AIMEAT_BIND_HOST` empty the node listens on every address; the firewall must keep the port closed to everything but the proxy.

@@ -403,11 +403,11 @@ Storage interface (src/storage/interface.ts)
 
 A few read endpoints recompute the same expensive result on every page load or poll (owner usage
 summary, memory counts, catalogue scans). `services/cache.ts` is a small process-local TTL cache with
-tag-based invalidation that those hot paths opt into with one call. A node runs one active Express
-process; a standby process on the same database may wait beside it and take over when the active
-one stops, and more than one active process is not supported yet ([IT adoption page 18](../it-adoption/18-scope-and-deployment-patterns.md#several-node-processes-on-one-database),
-ruled 2026-11-04). Federation and relay coordinate out of band, not through a shared app cache, so a
-plain in-process `Map` is coherent for the one process that serves; a standby starts with an empty
+tag-based invalidation that those hot paths opt into with one call. A node runs one Express process
+or several on one PostgreSQL database, as a standby or as more active processes ([IT adoption page 18](../it-adoption/18-scope-and-deployment-patterns.md#several-node-processes-on-one-database),
+ruled 2026-11-04). Each process keeps its own `Map`, and stays coherent because every process's
+`emitChange` reaches every process over the event bus (`services/bus-relay.ts`, PostgreSQL
+`LISTEN`/`NOTIFY`) and drops the tagged entries there too; a process that starts begins with an empty
 cache. **Do not** add Redis, memcached or lru-cache. New module-level state or timers are counted by
 `pnpm check:process-local`, which asks each new one what breaks with a second process.
 
