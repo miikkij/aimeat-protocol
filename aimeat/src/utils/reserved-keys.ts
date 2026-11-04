@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-11-04 -- SERVICE_OWNED_KEY_PREFIXES and SERVICE_OWNED_KEYS may only shrink: a new service record
+ *     goes to serviceRecords() (codebase analysis 2026-11-03, item B6).
  *   2026-11-02 -- `mcp-capability-consents.` is service-owned: which capabilities of other accounts the
  *     account holder allowed to run a remote MCP tool with their own sign-in (services/mcp-client/
  *     capability-consent.ts; secaudit2026nov02d round 13). A new prefix, so nothing wrote it before.
@@ -455,6 +457,13 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * under. They lived on the `latest.json` pointer, which an app with storage:write rewrites. The
  * service's setPackageExchange is its one writer, straight to storage; a new prefix, so nothing wrote it
  * through the memory API before this.
+ *
+ * THE LIST MAY ONLY SHRINK (2026-11-04, codebase analysis 2026-11-03 item B6). A new record that one
+ * service keeps for an account goes into that account's service namespace through serviceRecords()
+ * (services/service-records.ts), where no memory route reaches it, so it needs no entry here.
+ * check:trusted-keys refuses a new entry against security/service-owned-records.json. None of the
+ * entries above moved there: the account holder reads each of them today through GET /v1/memory,
+ * GET /v1/memory/:key and the exports, and no memory route reads the service namespace.
  */
 export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'datapkg-exchange.', 'living-spend-hold.', 'company-page-writers.', 'mcp-capability-consents.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.', 'dsp.'];
 

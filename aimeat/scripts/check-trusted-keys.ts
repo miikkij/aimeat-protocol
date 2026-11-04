@@ -43,6 +43,8 @@
  *   cd aimeat && pnpm check:trusted-keys:seed       # merge today's reads into the exemption file
  *   ... --root <dir>                                # scan a fixture tree instead of this one
  * @version-history
+ *   2026-11-04 — The service-owned list may only shrink and its reads outside serviceRecords() may only
+ *     fall, against security/service-owned-records.json (codebase analysis 2026-11-03, item B6).
  *   v2.1.1 — 2026-09-25 — The summary line lists the prefixes only the node writes (`notif.`) beside
  *     the keys; the three `notif.` exemptions are gone, because every memory door now refuses the key.
  *   v2.1.0 — 2026-09-24 — "Covered by the denylist" asks isReservedServerKey, so a key only the node
@@ -63,7 +65,10 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES, isReservedServerKey } from '../src/utils/reserved-keys.js';
+import {
+    RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES, SERVICE_OWNED_KEY_PREFIXES, SERVICE_OWNED_KEYS,
+    isReservedServerKey, isServiceOwnedKey,
+} from '../src/utils/reserved-keys.js';
 
 /**
  * The tree to scan: the working directory, which `pnpm check:trusted-keys` sets to the package, or
@@ -85,6 +90,31 @@ const SRC = join(ROOT, 'src');
 const SKIP_DIRS = ['storage', 'generated', 'static', 'data', 'types', 'schemas'];
 
 const EXEMPTIONS = join(ROOT, 'security', 'trusted-key-exemptions.json');
+
+/**
+ * The shrink-only baseline of the service-owned list (codebase analysis 2026-11-03, item B6): the
+ * prefixes and exact keys SERVICE_OWNED_KEY_PREFIXES and SERVICE_OWNED_KEYS hold, and how many reads of
+ * them do not go through serviceRecords(). A new service record goes into the account's service
+ * namespace (services/service-records.ts), which needs no list entry, so the list may only shrink and
+ * the count may only fall. A fixture tree without the file is not gated on it.
+ */
+const SERVICE_OWNED_BASELINE = join(ROOT, 'security', 'service-owned-records.json');
+
+interface ServiceOwnedBaseline { note: string; prefixes: string[]; keys: string[]; readsOutsideServiceRecords: number }
+
+/** What the service-owned baseline says against the list and the count today. */
+export function compareServiceOwned(
+    baseline: ServiceOwnedBaseline, now: { prefixes: readonly string[]; keys: readonly string[]; reads: number },
+): { added: string[]; removed: string[]; readsAbove: number; readsBelow: number } {
+    const had = new Set([...baseline.prefixes, ...baseline.keys]);
+    const has = new Set([...now.prefixes, ...now.keys]);
+    return {
+        added: [...has].filter(e => !had.has(e)),
+        removed: [...had].filter(e => !has.has(e)),
+        readsAbove: Math.max(0, now.reads - baseline.readsOutsideServiceRecords),
+        readsBelow: Math.max(0, baseline.readsOutsideServiceRecords - now.reads),
+    };
+}
 
 /** Identities no owner-scoped principal can address, so a key under one is already out of reach. */
 const SYSTEM_IDENTITIES = ['__network_policy__', 'SITE_OWNER_GAII', '__genesis__', 'system@', '__system__'];
@@ -116,6 +146,8 @@ export interface ScanResult {
     /** Reads the denylist already covers, and reads under a synthetic system identity. */
     reserved: number;
     systemIdentity: number;
+    /** Of `reserved`: reads of a SERVICE_OWNED key in an owner's namespace, not through serviceRecords(). */
+    serviceOwned: number;
 }
 
 interface ExemptionFile { note: string; exempt: Record<string, string> }
@@ -396,6 +428,7 @@ export function scanSources(inputs: Scanned[]): ScanResult {
     let unresolved = 0;
     let reserved = 0;
     let systemIdentity = 0;
+    let serviceOwned = 0;
 
     for (const p of prepared) {
         const t: Tables = {
@@ -408,7 +441,13 @@ export function scanSources(inputs: Scanned[]): ScanResult {
         const record = (index: number, identity: string, keyExpr: string): void => {
             const resolved = resolveKeyExpression(keyExpr, t);
             if (!resolved) { unresolved++; return; }
-            if (isReserved(resolved.key)) { reserved++; return; }
+            if (isReserved(resolved.key)) {
+                reserved++;
+                // A service-owned key read here is a read that does not go through serviceRecords()
+                // (services/service-records.ts), whose own reads build the key at run time.
+                if (isServiceOwnedKey(resolved.key)) serviceOwned++;
+                return;
+            }
             if (isSystemIdentity(identity, t)) { systemIdentity++; return; }
             findings.push({
                 file: p.file, line: at(index), key: resolved.key,
@@ -461,7 +500,7 @@ export function scanSources(inputs: Scanned[]): ScanResult {
             }
         }
     }
-    return { findings, unresolved, reserved, systemIdentity };
+    return { findings, unresolved, reserved, systemIdentity, serviceOwned };
 }
 
 /**
@@ -550,7 +589,7 @@ export function main(): void {
         process.exit(1);
     }
 
-    const { findings, unresolved, reserved, systemIdentity } = scanSources(files.map(f => ({
+    const { findings, unresolved, reserved, systemIdentity, serviceOwned } = scanSources(files.map(f => ({
         file: relative(ROOT, f).replace(/\\/g, '/'),
         source: readFileSync(f, 'utf-8'),
     })));
@@ -576,7 +615,34 @@ export function main(): void {
     console.log(`  exempt, reason written    ${String(known.size - unreviewed.length - reasonless.length).padStart(4)}`);
     console.log(`  exempt, UNREVIEWED        ${String(unreviewed.length).padStart(4)}   (backlog, may only shrink)`);
     console.log(`  NEW, not exempt           ${String(fresh.length).padStart(4)}`);
+    console.log(`  service-owned entries     ${String(SERVICE_OWNED_KEY_PREFIXES.length + SERVICE_OWNED_KEYS.length).padStart(4)}   (may only shrink: a new one goes to serviceRecords())`);
+    console.log(`  service-owned reads       ${String(serviceOwned).padStart(4)}   (not through serviceRecords(), may only fall)`);
     console.log('');
+
+    // The service-owned list may only shrink, and its reads outside serviceRecords() may only fall.
+    const so = existsSync(SERVICE_OWNED_BASELINE)
+        ? compareServiceOwned(JSON.parse(readFileSync(SERVICE_OWNED_BASELINE, 'utf-8')) as ServiceOwnedBaseline,
+            { prefixes: SERVICE_OWNED_KEY_PREFIXES, keys: SERVICE_OWNED_KEYS, reads: serviceOwned })
+        : null;
+    if (so?.added.length) {
+        console.log('  These entries joined SERVICE_OWNED_KEY_PREFIXES or SERVICE_OWNED_KEYS (utils/reserved-keys.ts). A record');
+        console.log('  one service keeps for an account goes into that account\'s service namespace through');
+        console.log('  serviceRecords() (services/service-records.ts), where no memory route reaches it and no list');
+        console.log('  entry is needed:');
+        for (const e of so.added) console.log(`    ${e}`);
+        console.log('');
+    }
+    if (so?.readsAbove) {
+        console.log(`  ${so.readsAbove} more read(s) of a service-owned key outside serviceRecords() than security/service-owned-records.json`);
+        console.log('  allows. Read a new service record through serviceRecords() (services/service-records.ts).');
+        console.log('');
+    }
+    if (so && (so.removed.length || so.readsBelow)) {
+        console.log('  The service-owned backlog fell: lower security/service-owned-records.json to match, that is the ratchet turning:');
+        for (const e of so.removed) console.log(`    ${e} is no longer on the list`);
+        if (so.readsBelow) console.log(`    readsOutsideServiceRecords ${serviceOwned}`);
+        console.log('');
+    }
 
     if (fresh.length) {
         console.log('  If the server ACTS on this value, an app the owner granted memory:write can poison it.');
@@ -602,15 +668,18 @@ export function main(): void {
         console.log('');
     }
 
-    if (strict && (fresh.length || reasonless.length)) {
+    const soFails = !!so && (so.added.length > 0 || so.readsAbove > 0);
+    if (strict && (fresh.length || reasonless.length || soFails)) {
         const parts = [
             fresh.length ? `${fresh.length} new unguarded server-read key(s)` : '',
             reasonless.length ? `${reasonless.length} exemption(s) without a reason` : '',
+            so?.added.length ? `${so.added.length} new service-owned list entr${so.added.length === 1 ? 'y' : 'ies'}` : '',
+            so?.readsAbove ? `${so.readsAbove} new service-owned read(s) outside serviceRecords()` : '',
         ].filter(Boolean);
         console.error(`✖ ${parts.join(', ')}.`);
         process.exit(1);
     }
-    console.log(fresh.length || reasonless.length
+    console.log(fresh.length || reasonless.length || soFails
         ? '  (report only — pass --strict to gate)'
         : '  ✓ no new unguarded server-read keys, and every exemption carries a reason');
 }

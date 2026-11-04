@@ -18,6 +18,8 @@
  *   exists only inside a comment.
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-trusted-keys.test.ts
  * @version-history
+ *   2026-11-04 — The service-owned list may only shrink and its reads outside serviceRecords() may only
+ *     fall (codebase analysis 2026-11-03, item B6).
  *   v1.1.0 — 2026-09-05 — The gate runs in-process: the module is re-imported fresh per test with
  *     `--root` on process.argv, console captured and process.exit turned into a throw, instead of a
  *     `node --import tsx` child per test. The child cost 12.8 s for 14 tests; the same assertions
@@ -234,6 +236,51 @@ export const load = (storage: Storage, ghii: string) => storage.getMemory(ghii, 
         const { out } = await runGate();
         expect(out).toContain('src/services/gone.ts:removed.key');
         expect(out).toContain('exemption(s) match no read any more');
+    });
+});
+
+// Codebase analysis 2026-11-03, item B6: a new service record goes into the account's service
+// namespace (services/service-records.ts), so the service-owned list may only shrink and its reads
+// outside serviceRecords() may only fall.
+describe('the service-owned list and its reads (security/service-owned-records.json)', () => {
+    async function baseline(over: Partial<{ prefixes: string[]; keys: string[]; readsOutsideServiceRecords: number }> = {}): Promise<void> {
+        const { SERVICE_OWNED_KEY_PREFIXES, SERVICE_OWNED_KEYS } = await import('../../src/utils/reserved-keys.js');
+        writeFileSync(join(tree, 'security', 'service-owned-records.json'), JSON.stringify({
+            note: 'fixture', prefixes: [...SERVICE_OWNED_KEY_PREFIXES], keys: [...SERVICE_OWNED_KEYS], readsOutsideServiceRecords: 0, ...over,
+        }, null, 2), 'utf8');
+    }
+    const holdRead = `
+import type { Storage } from '../../storage/interface.js';
+export async function readHold(storage: Storage, ownerGhii: string) {
+  return storage.getMemory(ownerGhii, 'commerce.hold.h-1');
+}
+`;
+
+    it('fails on a new read of a service-owned key outside serviceRecords()', async () => {
+        await baseline();
+        probe(holdRead);
+        const { code, out } = await runGate();
+        expect(out).toContain('new service-owned read(s) outside serviceRecords()');
+        expect(code).toBe(1);
+    });
+
+    it('fails on an entry the list holds and the baseline does not, and names it', async () => {
+        const { SERVICE_OWNED_KEY_PREFIXES } = await import('../../src/utils/reserved-keys.js');
+        await baseline({ prefixes: SERVICE_OWNED_KEY_PREFIXES.filter(p => p !== 'dsp.') });
+        probe('export const nothingRead = 1;\n');
+        const { code, out } = await runGate();
+        expect(out).toContain('new service-owned list entry');
+        expect(out).toContain('    dsp.');
+        expect(code).toBe(1);
+    });
+
+    it('passes when the count fell, and says to lower the baseline', async () => {
+        await baseline({ readsOutsideServiceRecords: 3 });
+        probe(holdRead);
+        const { code, out } = await runGate();
+        expect(out).toContain('The service-owned backlog fell');
+        expect(out).toContain('readsOutsideServiceRecords 1');
+        expect(code).toBe(0);
     });
 });
 

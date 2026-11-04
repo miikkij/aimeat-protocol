@@ -44,6 +44,8 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   2026-11-04 — The service-owned list and its reads outside serviceRecords() join the report (codebase
+ *     analysis 2026-11-03, item B6).
  *   2026-10-27 — The writing routes that read a body without a schema join the report (check:write-validation).
  *   2026-10-20 — The unbounded storage lists, the whole-table reads and the repositories no
  *     two-provider case calls join the report (QA audit P7-10, P4-09).
@@ -165,6 +167,19 @@ const RATCHETS: Ratchet[] = [
     { file: 'aimeat/security/open-write-exemptions.json', label: 'Writes admitting no credential', check: 'check:open-writes', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/atomic-write-baseline.json', label: 'Reads written back unversioned', check: 'check:atomic-writes', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/trusted-key-exemptions.json', label: 'Server-trusted memory keys', check: 'check:trusted-keys', count: exemptMap, open: exemptOpen },
+    // Codebase analysis 2026-11-03, item B6: the service-owned list only shrinks, and its reads outside serviceRecords() only fall.
+    {
+        file: 'aimeat/security/service-owned-records.json',
+        label: 'Service-owned keys in owner namespaces',
+        check: 'check:trusted-keys',
+        count: raw => listLength('prefixes')(raw) + listLength('keys')(raw),
+    },
+    {
+        file: 'aimeat/security/service-owned-records.json',
+        label: 'Service-owned reads outside serviceRecords()',
+        check: 'check:trusted-keys',
+        count: raw => Number(parse(raw).readsOutsideServiceRecords ?? 0),
+    },
     { file: 'aimeat/security/config-coverage-exemptions.json', label: 'Settings not in the Config tab', check: 'check:config-coverage', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/outbound-fetch-exemptions.json', label: 'Bare outbound fetches', check: 'check:outbound-fetch', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/denial-coverage-exemptions.json', label: 'Suites with no denial case', check: 'check:denial-coverage', count: exemptMap, open: exemptOpen },

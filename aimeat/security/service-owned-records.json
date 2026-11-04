@@ -1,0 +1,36 @@
+{
+  "note": "Shrink-only baseline for check:trusted-keys (codebase analysis 2026-11-03, item B6). `prefixes` and `keys` are SERVICE_OWNED_KEY_PREFIXES and SERVICE_OWNED_KEYS in src/utils/reserved-keys.ts on 2026-11-04: a record one service keeps for an account now goes into that account's service namespace through serviceRecords() (src/services/service-records.ts), so an entry not listed here fails the gate. None of these moved in B6, because the account holder reads each of them today through GET /v1/memory, GET /v1/memory/:key and the exports, and no memory route reads the service namespace. `readsOutsideServiceRecords` is how many reads of a service-owned key the scan resolves outside serviceRecords(); it may only fall. When an entry leaves the list or the count falls, lower this file to match.",
+  "prefixes": [
+    "classification.policy.",
+    "scope-use.",
+    "agent-workplace.",
+    "agent-goals.",
+    "commerce.session.",
+    "identity.adult.",
+    "commerce.subscription.",
+    "commerce.hold.",
+    "commerce.hold-in.",
+    "commerce.benefit.",
+    "identity.verified-name.",
+    "agent-device-return.",
+    "mcp.tasks.",
+    "commerce.platform-fee.",
+    "portfolio-read-hold.",
+    "datapkg-audience.",
+    "datapkg-exchange.",
+    "living-spend-hold.",
+    "company-page-writers.",
+    "mcp-capability-consents.",
+    "dataproducts.",
+    "party-reads.",
+    "party-purchases.",
+    "app-parties.",
+    "app-party-data.",
+    "dsp."
+  ],
+  "keys": [
+    "parties",
+    "datapkg-freshness-notices"
+  ],
+  "readsOutsideServiceRecords": 40
+}
