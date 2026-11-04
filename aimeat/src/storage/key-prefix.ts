@@ -12,9 +12,11 @@
  *   prefix is escaped and LIKE keeps doing the work.
  *   SQLite: GLOB is case-sensitive and, unlike LIKE, can use the key index under the default BINARY
  *   collation. GLOB's own wildcards (`*`, `?`, `[`) are escaped by putting each in a bracket.
- * @structure likePrefix · globPrefix
+ * @structure likePrefix · globPrefix · likeShape · globShape
  * @usage q.where('key', 'like', likePrefix(prefix)) on PostgreSQL; `key GLOB ?` with globPrefix(prefix) on SQLite.
  * @version-history
+ *   2026-11-04 — likeShape and globShape: a literal prefix and a literal suffix, for the key-shape
+ *     reads of methods/memory-shape.ts (codebase analysis 2026-11-03, item C7).
  *   2026-10-16 — Initial: the prefix helper both providers' memory methods use (QA audit D4-07).
  */
 
@@ -26,4 +28,17 @@ export function likePrefix(prefix: string): string {
 /** A SQLite GLOB pattern that matches exactly the strings starting with `prefix`, with regard to case. */
 export function globPrefix(prefix: string): string {
   return `${prefix.replace(/[*?[]/g, m => `[${m}]`)}*`;
+}
+
+const likeLiteral = (s: string): string => s.replace(/[\\%_]/g, m => `\\${m}`);
+const globLiteral = (s: string): string => s.replace(/[*?[]/g, m => `[${m}]`);
+
+/** A PostgreSQL LIKE pattern for the strings that start with `prefix` and end with `suffix`, both literal. */
+export function likeShape(prefix: string, suffix: string): string {
+  return `${likeLiteral(prefix)}%${likeLiteral(suffix)}`;
+}
+
+/** A SQLite GLOB pattern for the strings that start with `prefix` and end with `suffix`, both literal. */
+export function globShape(prefix: string, suffix: string): string {
+  return `${globLiteral(prefix)}*${globLiteral(suffix)}`;
 }

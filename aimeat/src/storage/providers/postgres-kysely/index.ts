@@ -82,6 +82,7 @@ import { usageMethods } from './methods/usage.js';
 import { accountEventMethods } from './methods/account-events.js';
 import { workspaceRowMethods } from './methods/workspace-rows.js';
 import { memoryTallyMethods } from './methods/memory-tally.js';
+import { memoryShapeMethods } from './methods/memory-shape.js';
 import { ssoConnectionMethods } from './methods/sso-connections.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
@@ -267,6 +268,7 @@ Object.assign(
   accountEventMethods,
   workspaceRowMethods,
   memoryTallyMethods,
+  memoryShapeMethods,
   ssoConnectionMethods,
   capabilityMethods,
   knowledgeMethods,

@@ -10,9 +10,13 @@
  *   once per new batch. Neither pass ever creates a notification; neither runs when the owner has
  *   not asked.
  * @structure sweepHeldPushes · sweepNotificationDigests · digestSectionOf · digestText ·
- *   listOwnerNotificationRecords and listOwnerNotifications (the shared owner-exact reads)
+ *   listOwnerNotificationRecords and listOwnerNotifications (the shared owner-exact reads) ·
+ *   readNotificationInbox and findOwnerNotificationsByIds (the bell's page and the by-id lookup)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.5.0 -- 2026-11-04 -- readNotificationInbox: the bell's page and its unread and total counts, read in
+ *     SQL; findOwnerNotificationsByIds: the notifications of named ids, narrowed by the key's end (codebase
+ *     analysis 2026-11-03, item C7).
  *   v1.4.1 -- 2026-11-04 -- The digest's address comes from provenOwnerAddress (owner-mail-address.ts), the one
  *     answer to "is this owner's address proven", which also checks the stored address hash (codebase
  *     analysis 2026-11-03, item A9).
@@ -107,6 +111,37 @@ export async function listOwnerNotificationRecords(storage: Storage, ghii: strin
   return rows
     .filter(r => r.value && typeof r.value === 'object' && (r.value as StoredNotif).id)
     .sort((a, b) => ((b.value as StoredNotif).createdAt || '').localeCompare((a.value as StoredNotif).createdAt || ''));
+}
+
+/**
+ * One page of an owner's notifications, newest first, with the owner's unread and total counts: what
+ * listOwnerNotificationRecords answered after a sort and a slice, read with the order, the filter and
+ * the window in SQL (storage listInboxRows, countInboxRows). The bell asks on every agent task,
+ * message and workspace event, so it reads the page it shows and two numbers, never 90 days of
+ * values (codebase analysis 2026-11-03, item C7).
+ */
+export async function readNotificationInbox(
+  storage: Storage, ghii: string, opts: { limit: number; unreadOnly?: boolean },
+): Promise<{ rows: MemoryRecord[]; unread: number; total: number }> {
+  const [rows, counts] = await Promise.all([
+    storage.listInboxRows(ghii, NOTIF_PREFIX, { limit: opts.limit, unreadOnly: opts.unreadOnly }),
+    storage.countInboxRows(ghii, NOTIF_PREFIX),
+  ]);
+  return { rows, unread: counts.unread, total: counts.total };
+}
+
+/**
+ * The owner's notifications whose id is one of `ids`, newest first, as listOwnerNotificationRecords
+ * filtered to those ids would answer. notify() writes a notification under `notif.<ISO>.<first eight
+ * characters of its id>` and nothing else writes the prefix (utils/reserved-keys.ts
+ * SERVER_WRITTEN_KEY_PREFIXES), so the key's end narrows the read in SQL and the id itself decides.
+ */
+export async function findOwnerNotificationsByIds(storage: Storage, ghii: string, ids: Iterable<unknown>): Promise<MemoryRecord[]> {
+  const wanted = new Set([...ids].filter((v): v is string => typeof v === 'string' && v.length > 0));
+  if (!wanted.size) return [];
+  const suffixes = [...new Set([...wanted].map(id => id.slice(0, 8)))];
+  const rows = await storage.listInboxRows(ghii, NOTIF_PREFIX, { keySuffixes: suffixes });
+  return rows.filter(r => wanted.has((r.value as StoredNotif).id));
 }
 
 /** One owner's stored notifications with their keys and versions, newest first. */
