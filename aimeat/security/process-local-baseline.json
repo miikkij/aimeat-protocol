@@ -45,6 +45,18 @@
       "count": 1,
       "reason": "What this process releases at its own stop."
     },
+    "src/services/process-lease.ts :: map :: keepers": {
+      "count": 1,
+      "reason": "This process's own lease keepers; other processes read the stored lease records, not this map."
+    },
+    "src/services/process-lease.ts :: interval :: startProcessLease": {
+      "count": 1,
+      "reason": "Each process renews its own lease; a second process renews its own and reads this one's from storage."
+    },
+    "src/services/ai-jobs/service.ts :: interval :: reconcileAfterRestart": {
+      "count": 1,
+      "reason": "Each process looks for the AI jobs of a process that ended; the take-over is claimed on the stored index, so two processes do not both take one."
+    },
     "src/auth/jwt.ts :: interval :: initRevocationStorage": {
       "count": 1,
       "reason": "DEBT"

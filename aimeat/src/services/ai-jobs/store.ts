@@ -18,16 +18,20 @@
  *   overflows drops its OLDEST entries and says so in the log. A silent truncation would read as
  *   "everything is here" when it is not.
  * @structure liveKey · logKeyFor · readJob · writeJob · deleteJob · listLiveJobs · foldIntoLog ·
- *   findInLogs · pruneLogs · readActiveIndex · addToActiveIndex · removeFromActiveIndex
+ *   findInLogs · pruneLogs · readActiveIndex · addToActiveIndex · removeFromActiveIndex · claimActiveEntry
  * @usage import { writeJob, foldIntoLog } from './store.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-04 -- The node-wide index is changed on its version (two concurrent starts lost an
+ *     entry before), each entry names the process that runs the job (`by`), and claimActiveEntry takes a
+ *     job over from a process that is gone (codebase analysis 2026-11-03, item HA 2.5).
  *   v1.1.0 — 2026-10-19 — foldIntoLog appends to the day record on its version (updateRecord)
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { updateRecord } from '../record-cas.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { sameProcess, type ProcessRef } from '../process-lease.js';
 import type { AiJobRecord, AiJobLogEntry } from './types.js';
 
 export const AI_JOB_KEY_PREFIX = 'ai.jobs.';
@@ -175,26 +179,51 @@ export async function pruneLogs(storage: Storage, ownerGhii: string, retentionDa
 
 // ── the node-wide live index (restart reconciliation reads this) ───────────────
 
-export interface ActiveJobRef { jobId: string; ownerGhii: string }
+/** A live job on the node, and the process that runs it (`by`; none on an entry written before
+ *  2026-11-04, which counts as held by no live process). */
+export interface ActiveJobRef { jobId: string; ownerGhii: string; by?: ProcessRef }
+
+function parseIndex(v: unknown): ActiveJobRef[] {
+    return Array.isArray(v) ? (v as ActiveJobRef[]).filter(e => e && typeof e.jobId === 'string' && typeof e.ownerGhii === 'string') : [];
+}
 
 export async function readActiveIndex(storage: Storage, nodeId: string): Promise<ActiveJobRef[]> {
     const rec = await storage.getMemory(systemGhiiFor(nodeId), ACTIVE_INDEX_KEY);
-    const arr = rec?.value as ActiveJobRef[] | undefined;
-    return Array.isArray(arr) ? arr.filter(e => e && typeof e.jobId === 'string' && typeof e.ownerGhii === 'string') : [];
+    return parseIndex(rec?.value);
 }
 
-async function writeActiveIndex(storage: Storage, nodeId: string, entries: ActiveJobRef[]): Promise<void> {
-    await upsert(storage, systemGhiiFor(nodeId), ACTIVE_INDEX_KEY, entries, ['ai', 'ai-job-index']);
+/** Change the index on its version, so two requests or two processes writing it keep each other's entries. */
+async function changeActiveIndex(
+    storage: Storage, nodeId: string, change: (entries: ActiveJobRef[]) => ActiveJobRef[] | typeof UNCHANGED,
+): Promise<void> {
+    await updateRecord(storage, systemGhiiFor(nodeId), ACTIVE_INDEX_KEY, parseIndex, change,
+        { tag: 'ai-job-index', tags: ['ai', 'ai-job-index'] });
 }
 
 export async function addToActiveIndex(storage: Storage, nodeId: string, ref: ActiveJobRef): Promise<void> {
-    const entries = await readActiveIndex(storage, nodeId);
-    if (entries.some(e => e.jobId === ref.jobId)) return;
-    await writeActiveIndex(storage, nodeId, [...entries, ref]);
+    await changeActiveIndex(storage, nodeId, entries => entries.some(e => e.jobId === ref.jobId) ? UNCHANGED : [...entries, ref]);
 }
 
 export async function removeFromActiveIndex(storage: Storage, nodeId: string, jobId: string): Promise<void> {
-    const entries = await readActiveIndex(storage, nodeId);
-    if (!entries.some(e => e.jobId === jobId)) return;
-    await writeActiveIndex(storage, nodeId, entries.filter(e => e.jobId !== jobId));
+    await changeActiveIndex(storage, nodeId, entries => entries.some(e => e.jobId === jobId) ? entries.filter(e => e.jobId !== jobId) : UNCHANGED);
+}
+
+/**
+ * Take a live job over for `next`: true when the entry still named the holder `seen` (or no holder,
+ * when `seen` is undefined) and now names `next`. Of two processes taking the same job over, one wins.
+ */
+export async function claimActiveEntry(
+    storage: Storage, nodeId: string, jobId: string, seen: ProcessRef | undefined, next: ProcessRef,
+): Promise<boolean> {
+    let won = false;
+    await changeActiveIndex(storage, nodeId, entries => {
+        won = false;
+        const at = entries.findIndex(e => e.jobId === jobId);
+        if (at < 0) return UNCHANGED;
+        const by = entries[at].by;
+        if (seen ? !sameProcess(by, seen) : !!by) return UNCHANGED;
+        won = true;
+        return entries.map((e, i) => i === at ? { ...e, by: next } : e);
+    });
+    return won;
 }

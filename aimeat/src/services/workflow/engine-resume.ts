@@ -8,6 +8,9 @@
  * @structure ResumeDeps · resumeRuns(deps)
  * @usage await resumeRuns({ storage, nodeId, readActiveRuns, withLock, persist, onTaskTerminal });
  * @version-history
+ *   v1.1.0 -- 2026-11-04 -- The open model calls are cleared only when no other node process runs
+ *     (ResumeDeps.othersAlive): a starting process cleared the live calls of the other one (codebase
+ *     analysis 2026-11-03, item HA 2.6).
  *   v1.0.0 — 2026-10-20 — Moved from engine.ts, unchanged (max-file-lines).
  */
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
@@ -29,6 +32,9 @@ export interface ResumeDeps {
   withLock: (runId: string, fn: () => Promise<void>) => Promise<void>;
   persist: (ownerGhii: string, run: WorkflowRun) => Promise<void>;
   onTaskTerminal: (task: AgentTaskRecord, outcome: 'done' | 'failed' | 'declined') => Promise<void>;
+  /** Whether another node process runs beside this one (services/process-lease.ts). Its model calls
+   *  are open for real, so their marks stay; the watchdog ends such a step by its answer or its timeout. */
+  othersAlive?: () => Promise<boolean>;
 }
 
 /** The body of WorkflowEngine.resumeInflight; its doc comment in engine.ts says what it does and why. */
@@ -36,9 +42,10 @@ export async function resumeRuns(deps: ResumeDeps): Promise<void> {
   const active = await deps.readActiveRuns(deps.storage, deps.nodeId);
   if (!active.length) return;
   logger.info(`WorkflowEngine: re-syncing ${active.length} in-flight run(s) after restart`);
+  const clearCalls = !(await deps.othersAlive?.());
   for (const a of active) {
     try {
-      await deps.withLock(a.runId, async () => {
+      if (clearCalls) await deps.withLock(a.runId, async () => {
         const held = (await deps.storage.getMemory(a.ownerGhii, runKey(a.workflowId, a.runId)))?.value as WorkflowRun | undefined;
         if (held && clearOpenCalls(held)) await deps.persist(a.ownerGhii, held);
       });
