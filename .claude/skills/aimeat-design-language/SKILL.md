@@ -2,7 +2,7 @@
 name: aimeat-design-language
 description: "The look of the node's OWN screens under aimeat/public/ and aimeat/src/static/: the two faces (showroom outside, poster inside), the three type tokens every font on the site descends from, the four shapes, the colours, the wordmark, and the one place a value is changed (theme.css tokens) with the map of every surface a token reaches. Use only when changing or judging one of those screens, or a font or colour token they read. Not for an app published on the node, whatever its name: an app forks a Design Book genre and has a look of its own (Jouni, 2026-10-09)."
 metadata:
-  version: 1.13.0
+  version: 1.13.1
   updated: 2026-10-09
   owner: Jouni Miikki
 ---
@@ -58,14 +58,15 @@ link. Nothing on the node links a font CDN, and the CSP refuses one; a new face 
 there, with its row in `lib/fonts/LICENSE.md`, before a token names it. The list a theme may
 choose from is `THEME_FACES` in `src/services/themes/tokens.ts`, and the Design Book's copy is
 `SERVED_FONT_FAMILIES` in `src/services/app-ui/signature-tokens.ts`; a new face goes into both.
-Since 2026-11-04 the node serves thirty families: the ten house and palette faces above, and
-twenty for themes and apps that want a face of their own (Instrument Serif and Sans, Schibsted
+Since 2026-11-04 the node serves thirty-three families: the ten house and palette faces above, and
+twenty-three for themes and apps that want a face of their own (Instrument Serif and Sans, Schibsted
 Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Mona Sans, Hubot Sans, Geist Mono, Martian
 Mono, Press Start 2P, Selawik, IBM Plex Sans and IBM Plex Mono, vendored for the SOC console's
 accepted design on 2026-10-09, Newsreader, the text face of the kirjapaino look, vendored on
 2026-10-17 with the Fraunces italic, Michroma, the display face of the tdr look, vendored on
-2026-10-22 with the IBM Plex Mono 600, and Pixelify Sans, Baloo 2 and Nunito for the Tiilitaivas
-theme on 2026-11-04).
+2026-10-22 with the IBM Plex Mono 600, Pixelify Sans, Baloo 2 and Nunito for the Tiilitaivas
+theme on 2026-11-04, and on the same day Source Serif 4 and Source Sans 3 for the vuosikertomus
+look and Hanken Grotesk for the konserni look).
 
 **A second theme ships with the node: Tiilitaivas** (`src/services/themes/tiilitaivas.ts`), optional
 and read only like AIMEAT, which stays the default. Its rules differ from the poster's on purpose:
