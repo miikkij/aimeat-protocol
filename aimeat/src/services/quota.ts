@@ -9,6 +9,8 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  *
  * @version-history
+ *   2026-11-04 — checkMemoryQuota takes the byte total its caller already read (codebase analysis
+ *     2026-11-03, item C3); storage.sumMemoryBytes reads the kept total instead of summing the rows.
  *   v1.4.1 — 2026-10-30 — checkStorageQuota takes the store the writer named: a file put in one of the
  *     owner's own stores passes, one put in a node store counts (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.4.0 — 2026-10-29 — The storage quota leaves out the files kept in storage their owner connected,
@@ -131,8 +133,10 @@ export async function checkMemoryQuota(
     gaii: string,
     additionalBytes: number,
     replacingBytes: number = 0,
+    /** The writer's byte total when the caller already read it (memoryCeilings reads the kept totals once). */
+    knownCurrentBytes?: number,
 ): Promise<QuotaCheckResult> {
-    const currentBytes = await getMemoryTotalBytes(storage, gaii);
+    const currentBytes = knownCurrentBytes ?? await getMemoryTotalBytes(storage, gaii);
     const projectedBytes = currentBytes - replacingBytes + additionalBytes;
     const quotaBytes = config.memoryQuotaMb * 1024 * 1024;
 

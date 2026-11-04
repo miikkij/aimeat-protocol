@@ -15,6 +15,8 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   2026-11-04 — The kept memory totals (schema-memory-totals.ts) after initializeSchema (codebase
+ *     analysis 2026-11-03, item C3).
  *   2026-11-04 — The memory query indexes (schema-memory-indexes.ts) after initializeSchema
  *     (codebase analysis 2026-11-03, item C6).
  *   2026-10-16 — chunkedUploads is the shared ChunkedUploadStore (QA audit F05b-02).
@@ -58,6 +60,7 @@ import type { Storage } from '../../interface.js';
 import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import { initializeSchema } from './schema.js';
 import { applyMemoryQueryIndexes } from './schema-memory-indexes.js';
+import { applyMemoryTotals } from './schema-memory-totals.js';
 
 import type { SqliteInternals } from './methods/internal.js';
 import { accountEventMethods } from './methods/account-events.js';
@@ -156,6 +159,7 @@ export class SqliteStorage {
     this.db.pragma('foreign_keys = ON');
     initializeSchema(this.db);
     applyMemoryQueryIndexes(this.db);
+    applyMemoryTotals(this.db);
   }
 
   /**

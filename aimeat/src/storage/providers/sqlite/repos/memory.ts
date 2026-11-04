@@ -18,6 +18,7 @@
  *   listKeyActivity
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   2026-11-04 — sumMemoryBytes reads the kept total (memory_totals) (codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — memoryPageSql: the page of a keyspace listing in SQL (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
  *     first, never the value (the overview's activity counts).
@@ -157,8 +158,11 @@ function isMemoryExpired(record: MemoryRecord): boolean {
 /** Sum the byte size of one owner's memory values, computed entirely in SQLite (no rows/values
  *  transferred to JS). Backs the memory total-size quota — replaces a load-all + re-serialise. */
 export function sumMemoryBytes(db: Database.Database, ownerGaii: string): number {
-  const row = db.prepare('SELECT COALESCE(SUM(byteSize), 0) AS s FROM memory WHERE ownerGaii = ?').get(ownerGaii) as { s: number };
-  return row.s;
+  // SUM(byteSize) over every row of the owner, as the triggers of schema-memory-totals.ts keep it on
+  // every change; this summed every row of the owner on every memory write (codebase analysis
+  // 2026-11-03, item C3).
+  const row = db.prepare('SELECT bytes FROM memory_totals WHERE ownerGaii = ?').get(ownerGaii) as { bytes: number } | undefined;
+  return row?.bytes ?? 0;
 }
 
 /** Sum value bytes across MANY owner identities in one SQL SUM — the owner-scope total-usage figure

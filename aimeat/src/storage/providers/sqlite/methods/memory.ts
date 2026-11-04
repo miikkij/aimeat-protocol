@@ -8,6 +8,9 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-11-04 — getMemoryTotals and compactMemoryTotals over memory_totals; sumMemoryBytes reads it
+ *     (repos/memory.ts); setMemory's first read takes version, trackable and groupId, and the whole
+ *     row only for a trackable key (codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — listMemory, listMemoryMeta and their many-owner twins take `limit` and a key cursor in
  *     SQL (allPaged, repos/memory.ts memoryPageSql); without them the statement is unchanged
  *     (codebase analysis 2026-11-03, item C1).
@@ -29,7 +32,7 @@
  */
 import type { MemoryRecord, ArchiveFilter } from '../../../interface.js';
 import type {
-  MemoryListOpts, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord, MemoryMetaRow,
+  MemoryListOpts, MemoryTextHit, MemoryTextSearchOpts, MemoryTotals, MemoryVersionRecord, MemoryMetaRow,
 } from '../../../repositories/memory.repository.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { searchValueText } from '../../../search-text.js';
@@ -91,9 +94,17 @@ export const memoryMethods = {
     //
     // The old value is not recoverable after this, and that is the right rule: the bin protects
     // against a DELETE, not against an overwrite, exactly as it never protected against one before.
-    const rawRow = this.db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ?')
-      .get(record.ownerGaii, record.key) as Record<string, unknown> | undefined;
-    const existing = rawRow ? this.deserializeMemory(rawRow) : null;
+    //
+    // The probe reads what this decides with (version, trackable, groupId); the value is read only for
+    // a trackable key, whose history keeps it (codebase analysis 2026-11-03, item C3: every column,
+    // value included, was read on every write).
+    const probe = this.db.prepare('SELECT version, trackable, groupId FROM memory WHERE ownerGaii = ? AND key = ?')
+      .get(record.ownerGaii, record.key) as { version: number; trackable: number; groupId: string | null } | undefined;
+    const existing: MemoryRecord | Pick<MemoryRecord, 'version' | 'trackable' | 'groupId'> | null = !probe ? null
+      : probe.trackable
+        ? this.deserializeMemory(this.db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ?').get(record.ownerGaii, record.key) as Record<string, unknown>)
+        // The same mapping deserializeMemory gives these three columns.
+        : { version: probe.version, ...(probe.groupId ? { groupId: probe.groupId } : {}) };
     // Trackable is a property of the key: inherit the existing setting if the writer didn't specify, so
     // a generic rewrite never silently turns tracking off. Archiving keeps the PREVIOUS version.
     const trackable = record.trackable ?? existing?.trackable ?? false;
@@ -107,15 +118,17 @@ export const memoryMethods = {
     const searchValues = searchValueText(record.value, record.key);
     if (existing) {
       if (existing.trackable) {
+        // A trackable key's row was read whole above.
+        const full = existing as MemoryRecord;
         // Archive the about-to-be-overwritten version into the separate history table (append-only).
         this.db.prepare(
           `INSERT OR IGNORE INTO memory_history (ownerGaii, key, version, value, actor, event, recordedAt)
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         ).run(
-          existing.ownerGaii, existing.key, existing.version,
-          JSON.stringify(existing.value),
-          this.memoryAnnotation(existing.value, '_actor'), this.memoryAnnotation(existing.value, '_event'),
-          existing.updatedAt,
+          full.ownerGaii, full.key, full.version,
+          JSON.stringify(full.value),
+          this.memoryAnnotation(full.value, '_actor'), this.memoryAnnotation(full.value, '_event'),
+          full.updatedAt,
         );
       }
       record.version = existing.version + 1;
@@ -279,6 +292,17 @@ export const memoryMethods = {
 
   async sumMemoryBytes(this: SqliteStorage, ownerGaii: string): Promise<number> {
     return sumMemoryBytesRepo(this.db, ownerGaii);
+  },
+
+  /** The kept totals (schema-memory-totals.ts): one row per owner, none when both are zero. */
+  async getMemoryTotals(this: SqliteStorage, ownerGaii: string): Promise<MemoryTotals> {
+    const row = this.db.prepare('SELECT keys, bytes FROM memory_totals WHERE ownerGaii = ?').get(ownerGaii) as { keys: number; bytes: number } | undefined;
+    return { keys: row?.keys ?? 0, bytes: row?.bytes ?? 0 };
+  },
+
+  /** Nothing to fold: the triggers keep one row per owner and remove a row at zero. */
+  async compactMemoryTotals(this: SqliteStorage): Promise<number> {
+    return 0;
   },
 
   async sumMemoryBytesForOwners(this: SqliteStorage, ownerGaiis: string[]): Promise<number> {

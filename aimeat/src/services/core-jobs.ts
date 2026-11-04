@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-04 — memory-ttl-cleanup also folds the kept memory totals (storage.compactMemoryTotals;
+ *     codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — outbox-sweep: webhook and mail retries kept in the stored outbox are resumed (services/outbox.ts;
  *     codebase analysis 2026-11-03, HA 1.5).
  *   2026-11-01 — datapackage-freshness: the owners of data packages that turned stale are told once
@@ -381,6 +383,9 @@ async function runMemoryTtlCleanupJob(storage: Storage): Promise<void> {
   // TTL in SQL, as pruneExpiredBoardPosts does for board posts.
   const removed = await storage.deleteExpiredMemory(new Date().toISOString());
   if (removed > 0) logger.info(`Memory TTL sweep removed ${removed} expired record(s)`);
+  // The kept memory totals fold each owner's delta rows into one, so reading a total stays a read of
+  // one row per owner (PostgreSQL; SQLite keeps one row already). No total changes (item C3).
+  if (storage.compactMemoryTotals) await storage.compactMemoryTotals();
 }
 
 async function runBoardPostTtlCleanupJob(storage: Storage): Promise<void> {

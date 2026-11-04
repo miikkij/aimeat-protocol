@@ -14,6 +14,8 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-11-04 — getMemoryTotals and compactMemoryTotals: the kept per-principal key count and byte
+ *     total (codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — MemoryListOpts: the four keyspace listings take `limit` and a key cursor, applied in
  *     SQL on both providers (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt of the records under a key prefix changed
@@ -260,6 +262,19 @@ export interface MemoryRepository {
    * that load-all was O(N) per write / O(N²) per bulk import.
    */
   sumMemoryBytes(ownerGaii: string): Promise<number>;
+  /**
+   * One principal's memory as the write ceilings count it ({@link MemoryTotals}), kept by the database
+   * in the statement that changes a row (codebase analysis 2026-11-03, item C3), so a write reads one
+   * small row set instead of counting and summing every row of the writer. Optional so a storage stub
+   * without it falls back to countMemory and sumMemoryBytes; both providers implement it.
+   */
+  getMemoryTotals?(ownerGaii: string): Promise<MemoryTotals>;
+  /**
+   * Fold each principal's kept-total rows into one, and drop the principals whose rows sum to zero
+   * (PostgreSQL keeps a row per changing statement; SQLite keeps one per principal and answers 0). The
+   * memory TTL job runs it. Returns the rows removed.
+   */
+  compactMemoryTotals?(): Promise<number>;
   /**
    * Sum the byte size of memory VALUES across MANY owner identities (GHII + agents + GEAIs) in ONE
    * DB-side aggregate — the owner-scope total-usage figure (profile Home). Replaces calling

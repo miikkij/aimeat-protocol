@@ -23,21 +23,26 @@
  *   const refusal = await memoryCeilingRefusal({ storage, config }, target, [{ key, value }]);
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   2026-11-04 — The key count and the byte total come from one read of the kept totals
+ *     (storage.getMemoryTotals), and a record the caller already read is passed in `known` instead
+ *     of being read again; the answers are the same (codebase analysis 2026-11-03, item C3).
  *   v1.0.1 — 2026-10-25 — The node's own UCP records under a seller (NODE_BOOKKEEPING_PREFIXES) are
  *     left out of the owner's key count (secaudit2026oct22).
  *   v1.0.0 — 2026-08-11 — Extracted after the audit's own diff was checked for duplication: the same
  *     three ceilings existed in memory-write.ts and workspace-write-guards.ts.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { MemoryRecord, Storage } from '../storage/interface.js';
+import { MEMORY_COUNT_EXCLUDED_PREFIXES } from '../storage/memory-totals.js';
 import { checkMemoryQuota, chargeOverage } from './quota.js';
 
 /**
  * Key prefixes the node writes under an owner for parties with no account here, each record with
  * its own expiry (commerce/ucp-guest-checkout.ts, routes/ucp-checkout.ts). They are left out of the
- * owner's key count: an unsigned platform request must not fill the owner's own limit.
+ * owner's key count: an unsigned platform request must not fill the owner's own limit. The list
+ * lives with the kept totals, which count by it (storage/memory-totals.ts).
  */
-const NODE_BOOKKEEPING_PREFIXES = ['commerce.ucp.idem.', 'commerce.ucp.session.'] as const;
+const NODE_BOOKKEEPING_PREFIXES = MEMORY_COUNT_EXCLUDED_PREFIXES;
 
 export interface CeilingRefusal {
     status: number;
@@ -73,6 +78,8 @@ export async function memoryCeilings(
     deps: { storage: Storage; config: AimeatConfig },
     targetGaii: string,
     planned: PlannedWrite[],
+    /** The records the caller already read by key (storage.getMemory, null for none), so they are not read twice. */
+    known?: ReadonlyMap<string, MemoryRecord | null>,
 ): Promise<CeilingResult> {
     const { storage, config } = deps;
     const maxValueBytes = config.memoryMaxValueSizeKb * 1024;
@@ -93,10 +100,16 @@ export async function memoryCeilings(
             };
         }
         additional += size;
-        const row = await storage.getMemory(targetGaii, p.key);
+        const row = known?.has(p.key) ? known.get(p.key) ?? null : await storage.getMemory(targetGaii, p.key);
         if (row) replacing += Buffer.byteLength(JSON.stringify(row.value), 'utf8');
         else newKeys++;
     }
+
+    // The writer's key count and byte total as the database keeps them (storage/memory-totals.ts), one
+    // read of a few rows. Until 2026-11-04 every write summed every row of the writer, and a write that
+    // added a key also counted them (codebase analysis 2026-11-03, item C3). A storage without kept
+    // totals (a test stub) is counted and summed as before.
+    const totals = storage.getMemoryTotals ? await storage.getMemoryTotals(targetGaii) : null;
 
     // An UPDATE never grows the key count, so the count is only taken when the set adds a key.
     let keyCount: number | undefined;
@@ -104,7 +117,7 @@ export async function memoryCeilings(
         // The node's own expiring UCP records under a seller (idempotency claims, guest checkouts)
         // are written by the node for platforms with no account here, so they do not use up the
         // owner's own key limit (secaudit2026oct22).
-        keyCount = await storage.countMemory([targetGaii], { excludePrefixes: [...NODE_BOOKKEEPING_PREFIXES] });
+        keyCount = totals ? totals.keys : await storage.countMemory([targetGaii], { excludePrefixes: [...NODE_BOOKKEEPING_PREFIXES] });
         if (keyCount + newKeys > config.memoryMaxKeysPerAgent) {
             // The remedy named here matters: "delete unused keys" sends someone who hit the wall
             // through one-key-per-small-fact off to delete data instead of fixing the shape that
@@ -121,7 +134,7 @@ export async function memoryCeilings(
         }
     }
 
-    const quota = await checkMemoryQuota(config, storage, targetGaii, additional, replacing);
+    const quota = await checkMemoryQuota(config, storage, targetGaii, additional, replacing, totals?.bytes);
     if (!quota.allowed) {
         return { ok: false, refusal: { status: 413, code: 'QUOTA_EXCEEDED', message: quota.reason ?? 'Storage quota exceeded' } };
     }
