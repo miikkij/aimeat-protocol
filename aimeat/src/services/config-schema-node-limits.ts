@@ -9,6 +9,8 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
+ *   2026-11-04 — storage.request_statement_ms (codebase analysis 2026-11-03, item C8),
+ *     mcp.legacy_sessions_per_principal and mcp.legacy_sessions_total (item C5).
  *   2026-10-31 — schedules.max_per_owner, schedules.min_interval_seconds and realtime.rooms_per_owner
  *     (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-2 and -3).
  *   2026-10-29 — federation.resolve_max_peers (secaudit2026oct26 round 8c, federation-03).
@@ -74,4 +76,13 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'realtimeRoomsPerOwner', dotPath: 'realtime.rooms_per_owner', envVar: 'AIMEAT_REALTIME_ROOMS_PER_OWNER', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'The most realtime rooms one owner and their agents hold open together, inside realtime.max_rooms, so one account cannot take every room. Rooms that are open stay. 0 = no separate limit',
     range: '0-10000' },
+  { key: 'dbRequestStatementMs', dotPath: 'storage.request_statement_ms', envVar: 'AIMEAT_DB_REQUEST_STATEMENT_MS', type: 'number', validate: v => wholeOrOff(v) && (v as number) <= 3_600_000, immutable: false,
+    description: 'On PostgreSQL, the longest time in milliseconds one database statement may run while the node answers a web or MCP request; a longer one is stopped and the request fails. Scheduled jobs and background work keep the database\'s own limit of 120 seconds. The default 120000 is that same limit. 0 = no limit',
+    range: '0-3600000' },
+  { key: 'mcpLegacySessionsPerPrincipal', dotPath: 'mcp.legacy_sessions_per_principal', envVar: 'AIMEAT_MCP_LEGACY_SESSIONS_PER_PRINCIPAL', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most open MCP sessions of the older (2025) protocol one AI or person keeps. A new session past it closes their least recently used one, and that client connects again by itself. 0 = no limit',
+    range: '0-100000' },
+  { key: 'mcpLegacySessionsTotal', dotPath: 'mcp.legacy_sessions_total', envVar: 'AIMEAT_MCP_LEGACY_SESSIONS_TOTAL', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most open MCP sessions of the older (2025) protocol on the whole node. Each holds its own copy of the tool list in memory. A new session past it closes the least recently used one, and that client connects again by itself. 0 = no limit',
+    range: '0-1000000' },
 ];

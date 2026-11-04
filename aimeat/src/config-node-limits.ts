@@ -13,6 +13,8 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   2026-11-04 — dbRequestStatementMs (codebase analysis 2026-11-03, item C8), mcpLegacySessionsPerPrincipal
+ *     and mcpLegacySessionsTotal (item C5).
  *   2026-10-31 — scheduleMaxPerOwner, scheduleMinIntervalSeconds and realtimeRoomsPerOwner
  *     (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-2 and -3).
  *   2026-10-29 — federationResolveMaxPeers (secaudit2026oct26 round 8c, federation-03).
@@ -117,6 +119,28 @@ export interface NodeLimitsConfig {
    * (secaudit2026oct31w2 round 10).
    */
   realtimeRoomsPerOwner: number;
+  /**
+   * The PostgreSQL statement limit, in milliseconds, for a statement made while an HTTP request is
+   * being answered (utils/request-context.ts onRequestPath). AIMEAT_DB_REQUEST_STATEMENT_MS, default
+   * 120000, which is the pool's own limit (storage/providers/postgres-kysely/pool-limits.ts), so
+   * nothing changes until an operator sets another value; 0 is no limit. Jobs, sweeps and work a
+   * request left running keep the pool's limit. SQLite has no statement limit (codebase analysis
+   * 2026-11-03, item C8).
+   */
+  dbRequestStatementMs: number;
+  /**
+   * The most 2025-era MCP sessions one principal keeps open (mcp/legacy-sessions.ts). Past it, a new
+   * session closes that principal's least recently used one, whose client re-initializes, as after
+   * the idle limit. AIMEAT_MCP_LEGACY_SESSIONS_PER_PRINCIPAL, default 100; 0 is no limit (codebase
+   * analysis 2026-11-03, item C5).
+   */
+  mcpLegacySessionsPerPrincipal: number;
+  /**
+   * The most 2025-era MCP sessions the node keeps open in all. Past it, a new session closes the least
+   * recently used one. AIMEAT_MCP_LEGACY_SESSIONS_TOTAL, default 1000; 0 is no limit (codebase
+   * analysis 2026-11-03, item C5).
+   */
+  mcpLegacySessionsTotal: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -142,5 +166,8 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     scheduleMaxPerOwner: wholeOr(env.AIMEAT_SCHEDULE_MAX_PER_OWNER, 1000),
     scheduleMinIntervalSeconds: wholeOr(env.AIMEAT_SCHEDULE_MIN_INTERVAL_SECONDS, 60),
     realtimeRoomsPerOwner: wholeOr(env.AIMEAT_REALTIME_ROOMS_PER_OWNER, 50),
+    dbRequestStatementMs: wholeOr(env.AIMEAT_DB_REQUEST_STATEMENT_MS, 120_000),
+    mcpLegacySessionsPerPrincipal: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_PER_PRINCIPAL, 100),
+    mcpLegacySessionsTotal: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_TOTAL, 1000),
   };
 }

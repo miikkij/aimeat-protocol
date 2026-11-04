@@ -13,7 +13,9 @@
  *
  * @version-history
  *   2026-11-04 — installRequestMemo prepares the storage for the request memo (services/request-memo.ts),
- *     after the file stores and before the perf-trace Proxy (codebase analysis 2026-11-03, item C2). *   v1.12.0 — 2026-10-29 — installFileStores wraps the storage before the perf-trace Proxy: stored files
+ *     after the file stores and before the perf-trace Proxy (codebase analysis 2026-11-03, item C2).
+ *   2026-11-04 — The PostgreSQL pool reads storage.request_statement_ms from the config for a statement
+ *     made while a request is answered (codebase analysis 2026-11-03, item C8). *   v1.12.0 — 2026-10-29 — installFileStores wraps the storage before the perf-trace Proxy: stored files
  *     keep their bytes in an S3 or Azure Blob store when one is set (services/file-store/).
  *   v1.11.1 — 2026-10-25 — The refresh cookie's migration window (auth.refresh_cookie_legacy_until) is
  *     set once at start when no source gave it (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
@@ -104,6 +106,10 @@ export async function initializeConfig(
   // The request memo (services/request-memo.ts): every write through this storage drops what the
   // request memoised, so only a storage prepared here is memoised at all.
   installRequestMemo(database);
+  // PostgreSQL only: a statement made while a request is answered takes storage.request_statement_ms,
+  // read on every connection it takes, so a change on the Config tab applies without a restart.
+  const statementLimit = (database as { requestStatementLimit?: { ms: () => number } }).requestStatementLimit;
+  if (statementLimit) statementLimit.ms = () => config.dbRequestStatementMs;
   const storage = instrumentStorage(database, config.perfTrace);
   const storageLabels: Record<string, string> = {
     memory: 'in-memory (data will not persist across restarts)',

@@ -15,6 +15,9 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-04 — requestStatementLimit: the pool gives a statement made while a request is answered
+ *     the request-path limit (./pool-limits.ts applyRequestStatementLimit), the pool's own by default
+ *     (codebase analysis 2026-11-03, item C8).
  *   2026-10-25 — Zoneless timestamps are UTC on any host: Date parameters are sent in UTC, a zoneless
  *     value is read as UTC, and the session zone is UTC (./utc-timestamps.ts). A time written inside
  *     the autumn fold hour had read back one hour early on a host east of UTC (secaudit2026oct22).
@@ -41,7 +44,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
-import { POOL_LIMITS, logPoolWaitTimeouts, type PoolLimits } from './pool-limits.js';
+import { POOL_LIMITS, logPoolWaitTimeouts, applyRequestStatementLimit, type PoolLimits, type RequestStatementLimit } from './pool-limits.js';
 import { UTC_SESSION_OPTIONS, useUtcInputDates, utcTypeParsers } from './utc-timestamps.js';
 import type { MemoryRecord, Storage } from '../../interface.js';
 import { ChunkedUploadStore } from '../../chunked-upload-store.js';
@@ -135,6 +138,8 @@ export class PostgresKyselyStorage {
   readonly ready: Promise<void>;
   /** Transient chunked-upload sessions (never persisted), one expiry rule with SQLite (storage/chunked-upload-store.ts). */
   readonly chunkedUploads = new ChunkedUploadStore();
+  /** The request-path statement limit (./pool-limits.ts); config-init points `ms` at the node's config. */
+  readonly requestStatementLimit: RequestStatementLimit;
 
   constructor(connectionString: string, limits: PoolLimits = POOL_LIMITS) {
     // TIME LIMITS (QA audit E6-07). Without them a database that stops answering, or twenty
@@ -157,6 +162,10 @@ export class PostgresKyselyStorage {
       idle_in_transaction_session_timeout: limits.idleInTransactionMs,
     });
     logPoolWaitTimeouts(this.pool, limits.connectionWaitMs);
+    // A request being answered may get a statement limit of its own (storage.request_statement_ms).
+    // Until the node points it at its config, and while it equals the pool's, nothing is sent.
+    this.requestStatementLimit = { ms: () => limits.statementMs };
+    applyRequestStatementLimit(this.pool, limits.statementMs, this.requestStatementLimit);
     // A CONNECTION THAT ENDS MUST NOT END THE PROCESS. node-postgres emits `error` on a client
     // whose socket ends, and an EventEmitter `error` with no listener is thrown as an uncaught
     // exception. The pool only listens while a client is idle, and it re-emits what it hears on

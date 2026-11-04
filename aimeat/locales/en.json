@@ -13227,6 +13227,9 @@
     "cfg_mcp_task_after_ms": "Slow tool call becomes an MCP task after (ms)",
     "cfg_mcp_capability_use_approval": "Ask before another account's tool uses a person's sign-in",
     "cfg_mcp_unused_client_days": "Unused client registrations (days)",
+    "cfg_mcp_legacy_sessions_per_principal": "Older MCP sessions per AI or person",
+    "cfg_mcp_legacy_sessions_total": "Older MCP sessions in all",
+    "cfg_storage_request_statement_ms": "Database query limit while answering (ms)",
     "cfg_registration_mode": "Who may register",
     "cfg_registration_members_see_each_other": "Everyone on this server sees each other",
     "cfg_scopes_default_agent_scopes": "Default agent scopes",
@@ -13571,6 +13574,9 @@
     "cfgDesc_mcp_task_after_ms": "When an AI client that supports MCP tasks calls a tool that is still running after this many milliseconds, AIMEAT answers at once with an MCP task, and the client asks for the result later. 0 answers every such call with a task.",
     "cfgDesc_mcp_capability_use_approval": "On some MCP servers each person signs in with their own account. There, a capability that another account published acts as the person who uses it. Always ask: the first use of each other account's capability asks that person once, with one press; each new capability costs a press, the operator's own too. Ask, except for operators' tools (default): an operator's capability runs without asking, and every other account's asks once; the operator already holds every right here, so this gives no protection away. Off: nothing asks, and the person loses the say over which tool acts as them. A change takes effect at once. An AI can make it stricter, never looser.",
     "cfgDesc_mcp_unused_client_days": "An MCP client registration that no sign-in used is deleted after this many days. A client someone signed in with stays. 0 keeps every registration.",
+    "cfgDesc_mcp_legacy_sessions_per_principal": "How many open sessions of the older MCP protocol one AI or person keeps. A new session past it closes their least recently used one, and that app connects again by itself. 0 means no limit.",
+    "cfgDesc_mcp_legacy_sessions_total": "How many open sessions of the older MCP protocol the whole server keeps. Each one holds its own copy of the tool list in memory. A new session past it closes the least recently used one, and that app connects again by itself. 0 means no limit.",
+    "cfgDesc_storage_request_statement_ms": "On PostgreSQL, how long one database query may run while the server answers a page, an app or an AI. A longer query stops and that request fails. Scheduled jobs keep the database's own limit of 120 seconds. The default 120000 is that same limit. 0 means no limit.",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
     "cfgDesc_registration_members_see_each_other": "For a company server. Every person with an account here is in every other person's address book as a colleague, and a first message between two of them needs no approval. Off by default.",
     "cfgDesc_scopes_default_agent_scopes": "The permissions an agent gets when nobody chooses any, one per line. Out of the box it may read and write its owner's memory, read the catalogue, read the workspaces of its owner's organisms and see its owner's other agents.",
@@ -29621,6 +29627,35 @@
           "low": "Lower: abandoned registrations go sooner. An app whose registration was deleted registers again before it signs in.",
           "high": "Higher: abandoned registrations stay longer in the database.",
           "tip": "Keep the default. A client that someone signed in with is never deleted, whatever the number."
+        },
+        "legacy_sessions_per_principal": {
+          "title": "Older MCP sessions per AI or person",
+          "short": "How many open sessions of the older MCP protocol one AI or person keeps. 0 means no limit. The default is 100.",
+          "what": "An AI app that speaks the older MCP protocol (2025) opens a session with this server, and the server keeps a copy of the tool list in memory for each open session. Most apps never close a session, so it stays until it has been unused for the session idle limit. When one AI or person opens a session past this number, the server closes their session that was unused the longest. That app gets an answer that the session is gone and connects again by itself, as it does after the idle limit.",
+          "range": "A whole number, 0 or more. The default is 100. 0 means no limit.",
+          "low": "Lower: an app that keeps many sessions open loses its oldest ones sooner and connects again.",
+          "high": "Higher: one AI or person can keep more sessions, and more memory, in use.",
+          "tip": "Keep the default. One app uses one session at a time, so a real AI does not reach 100."
+        },
+        "legacy_sessions_total": {
+          "title": "Older MCP sessions in all",
+          "short": "How many open sessions of the older MCP protocol the whole server keeps. 0 means no limit. The default is 1000.",
+          "what": "Each open session of the older MCP protocol (2025) holds a copy of the tool list in this server's memory, about 3 MB. This limit keeps all of them together from filling the memory. When a new session passes it, the server closes the session that was unused the longest, whoever has it. That app gets an answer that the session is gone and connects again by itself.",
+          "range": "A whole number, 0 or more. The default is 1000. 0 means no limit.",
+          "low": "Lower: less memory in use; on a busy server, apps connect again more often.",
+          "high": "Higher: more sessions stay open, and they can use more memory.",
+          "tip": "Keep the default unless the server runs short of memory. Apps that speak the newer protocol (2026) keep no session and do not count."
+        }
+      },
+      "storage": {
+        "request_statement_ms": {
+          "title": "Database query limit while answering (ms)",
+          "short": "On PostgreSQL, how long one database query may run while the server answers a request. 0 means no limit. The default is 120000 (two minutes).",
+          "what": "When a page, an app or an AI asks this server something, the server reads its database to answer. A query that runs very long keeps a database connection busy, and the server has 20 of them for everyone. This limit stops a query that runs longer, and that one request fails with an error. Scheduled jobs and other work in the background keep the database's own limit of two minutes, whatever this is. The default is that same two minutes, so nothing changes until you set another number. On SQLite this setting does nothing.",
+          "range": "Milliseconds, from 0 to 3600000 (one hour). The default is 120000. 0 means no limit.",
+          "low": "Lower: a slow query ends sooner and frees its connection for others; a request that needs a long query, such as a large export, fails.",
+          "high": "Higher: long queries finish, and a slow one keeps a connection busy for longer.",
+          "tip": "Keep the default unless you have measured your slowest requests. Lower it in small steps and watch the log for requests that start to fail."
         }
       },
       "personal_nodes": {

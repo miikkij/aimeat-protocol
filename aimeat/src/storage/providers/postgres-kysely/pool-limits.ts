@@ -11,11 +11,17 @@
  *   - POOL_LIMITS: the values the node runs with
  *   - logPoolWaitTimeouts(pool, waitMs): one warn line (at most one per 30 s) with the pool counts
  *     when a caller's wait for a connection timed out
+ *   - RequestStatementLimit, applyRequestStatementLimit(pool, poolMs, limit): a separate statement
+ *     limit while an HTTP request is being answered (storage.request_statement_ms)
  * @version-history
+ *   2026-11-04 — applyRequestStatementLimit: the request-path statement limit, a setting whose default
+ *     is the pool's 120 s, so nothing changes until an operator sets it. No limit here is shortened
+ *     (codebase analysis 2026-11-03, item C8).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E6-07).
  */
 import type pg from 'pg';
 import { logger } from '../../../utils/logger.js';
+import { onRequestPath } from '../../../utils/request-context.js';
 
 export interface PoolLimits {
   /** Pool size. 20 in the node; a test sets 1 to show what a caller does when every connection is busy. */
@@ -42,6 +48,47 @@ export const POOL_LIMITS: PoolLimits = {
   lockMs: 60_000,
   idleInTransactionMs: 300_000,
 };
+
+/**
+ * The statement limit for a statement made while an HTTP request is being answered. The node points
+ * `ms` at its config (storage.request_statement_ms) at boot; until then, and whenever it answers the
+ * pool's own statementMs, nothing is sent (codebase analysis 2026-11-03, item C8).
+ */
+export interface RequestStatementLimit { ms: () => number }
+
+/**
+ * Give a connection the request-path statement limit while a request is being answered, and the
+ * pool's own limit otherwise. Wraps the promise form of `pool.connect()`, as logPoolWaitTimeouts does:
+ * on a connection whose limit differs from the one this caller needs, one `SET statement_timeout`
+ * before it is handed out, and the connection remembers what it holds. With the default (the request
+ * limit equal to the pool's) nothing is ever sent. Decided when connect() is called, in the caller's
+ * async context (utils/request-context.ts onRequestPath).
+ */
+export function applyRequestStatementLimit(pool: pg.Pool, poolStatementMs: number, limit: RequestStatementLimit): void {
+  const original = pool.connect.bind(pool) as (...args: unknown[]) => unknown;
+  const holds = new WeakMap<pg.PoolClient, number>();
+  (pool as unknown as { connect: (...args: unknown[]) => unknown }).connect = (...args: unknown[]) => {
+    if (args.length > 0) return original(...args);
+    const wanted = onRequestPath() ? requestLimitMs(limit, poolStatementMs) : poolStatementMs;
+    return (original() as Promise<pg.PoolClient>).then(async (client) => {
+      if ((holds.get(client) ?? poolStatementMs) === wanted) return client;
+      try {
+        await client.query(`SET statement_timeout = ${wanted}`);
+      } catch (err) {
+        client.release(err instanceof Error ? err : new Error(String(err)));
+        throw err;
+      }
+      holds.set(client, wanted);
+      return client;
+    });
+  };
+}
+
+/** The configured request-path limit as a whole number of 0 or more, else the pool's own. */
+function requestLimitMs(limit: RequestStatementLimit, poolStatementMs: number): number {
+  const ms = Number(limit.ms());
+  return Number.isInteger(ms) && ms >= 0 ? ms : poolStatementMs;
+}
 
 const WAIT_TIMEOUT_TEXT = 'timeout exceeded when trying to connect';
 const LOG_EVERY_MS = 30_000;
