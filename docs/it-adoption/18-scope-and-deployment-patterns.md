@@ -174,7 +174,7 @@ Every outbound call these make is listed, with its setting, on [02 Architecture]
 | Why does the node stay small? | It holds refined knowledge and the state that apps show. Model inference and heavy processing run in other services, so a heavy job cannot take the knowledge store down with it, and a node outage does not stop those services' own work | [Services around a node](#services-around-a-node) |
 | How is one host's loss covered? | A second process on a second host, as a standby or as a second active process; the processes take over each other's AI jobs when a lease runs out | [Several node processes on one database](#several-node-processes-on-one-database) |
 | How is the blast radius kept small? | Separate nodes for units, partners or people: an outage, a setting or a breach on one node stays on it | [Many nodes](#many-nodes) |
-| How is the database covered? | PostgreSQL's own standby and WAL archiving, and backups with a tested restore; the RTO and RPO tiers are on page 11 | [11 Backup and recovery](11-backup-recovery.md#proposed-rto-and-rpo) |
+| How is the database covered? | PostgreSQL's own standby and WAL archiving, and backups with a tested restore; the RTO and RPO tiers are on page 11, and the setup, the timed restore and the failover drill in the database high availability guide | [11 Backup and recovery](11-backup-recovery.md#proposed-rto-and-rpo), [Database high availability](../operations/database-high-availability.md) |
 
 ## Operator access is a design decision
 
