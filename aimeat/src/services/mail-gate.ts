@@ -82,6 +82,7 @@ export type MailOutcome = 'sent' | 'failed' | 'mail_off' | 'no_address' | 'limit
  * restart starts the count again, which costs at most one more day's worth (notification-create.ts
  * EMAIL_PER_DAY says the default).
  */
+// process-local: each process counts a sender's mails on its own, so N active processes allow N times the daily limit.
 const sentBySender = new Map<string, number[]>();
 const DAY_MS = 86_400_000;
 

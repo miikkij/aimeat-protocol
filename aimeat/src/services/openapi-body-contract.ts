@@ -227,6 +227,7 @@ export function loadBodyContract(file: string | null = findOpenApiFile()): BodyC
     return buildBodyContract(parse(readFileSync(file, 'utf-8')) as RawDoc);
 }
 
+// process-local: openapi.yaml read once per process; every process reads the same file.
 let shared: BodyContract | null | undefined;
 
 /**

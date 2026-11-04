@@ -1,6 +1,22 @@
 {
   "note": "Process-local state and timers in aimeat/src (scripts/check-process-local.ts). Seeded 2026-11-04 from the code of that day (codebase analysis 2026-11-03, HA stage 1). Each entry is a count per file, kind and name, and the reason it is per process; DEBT means known, not judged yet. A count may only fall: a new one needs a `// process-local: <what breaks with a second process>` marker and an entry here with that reason, and a fallen count is lowered here.",
   "entries": {
+    "src/services/cache.ts :: map :: inFlight": {
+      "count": 1,
+      "reason": "Each process shares its own computes of one cache key; a second process computes its own once."
+    },
+    "src/services/config-strictness.ts :: let :: ranks": {
+      "count": 1,
+      "reason": "Derived from the config schema in the code; every process builds the same table."
+    },
+    "src/services/mail-gate.ts :: map :: sentBySender": {
+      "count": 1,
+      "reason": "Each process counts a sender's mails on its own (moved from notification-create.ts emailsSent), so N active processes allow N times the daily limit; one active process plus a standby keeps it."
+    },
+    "src/services/openapi-body-contract.ts :: let :: shared": {
+      "count": 1,
+      "reason": "openapi.yaml read once per process; every process reads the same file."
+    },
     "src/services/admin-password.ts :: map :: misses": {
       "count": 1,
       "reason": "Each process counts wrong admin passwords on its own, so N active processes allow N times the limit; one active process plus a standby keeps the limit as set."
@@ -597,10 +613,6 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/config-admin-view.ts :: set :: PERSON_ONLY_LOOSENING": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/services/connect-tunnel-hooks.ts :: set :: closeListeners": {
       "count": 1,
       "reason": "DEBT"
@@ -1054,10 +1066,6 @@
       "reason": "DEBT"
     },
     "src/services/node-update-check.ts :: let :: inflight": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/notification-create.ts :: map :: emailsSent": {
       "count": 1,
       "reason": "DEBT"
     },

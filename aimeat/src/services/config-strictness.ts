@@ -65,6 +65,7 @@ export function settingLoosens(path: string, from: unknown, to: unknown): boolea
 }
 
 /** Where each group is asked: the schema position of its first row. Built on first use. */
+// process-local: derived from the config schema in the code; every process builds the same table.
 let ranks: Map<string, number> | null = null;
 function rankOf(path: string): number {
   if (!ranks) {

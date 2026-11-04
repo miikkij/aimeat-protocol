@@ -80,6 +80,7 @@ let evictions = 0;
 /** A compute in progress for one key. `current` turns false when its key or a tag is invalidated. */
 interface Flight { value: Promise<unknown>; tags: string[]; current: boolean }
 /** Key -> the compute in progress, so concurrent misses of one key run it once. */
+// process-local: each process shares its own computes; a second process computes its own once.
 const inFlight = new Map<string, Flight>();
 
 /** Detach the flights that carry `tag` (or every flight): their result is not stored. */
