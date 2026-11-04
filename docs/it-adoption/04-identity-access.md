@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit 2c1cddba9) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 0cbee36e3) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -165,7 +165,7 @@ Two settings decide the sign-in policy. Both can be changed while the node runs:
 - `on`: `AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS` wrong passwords lock the account for `AIMEAT_PASSWORD_LOCKOUT_MINUTES` (429 `PASSWORD_LOCKED`), and `AIMEAT_TOTP_MAX_FAILED` wrong codes for `AIMEAT_TOTP_LOCKOUT_SECONDS` (429 `TOTP_LOCKED`) (`aimeat/src/services/password-check.ts`).
 - An organisation whose policy requires an account lockout sets it `on`.
 
-**Who changes them.** A change that weakens any of these settings is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set` (`aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`).
+**Who changes them.** A change that weakens any of these settings is refused to an AI credential with 403 `PERSON_REQUIRED`; the operator makes it signed in in person. A change that tightens works from an AI too, for example with `aimeat_admin_config_set`. The same rule refuses an AI the removal of a saved value of these settings (`DELETE /v1/admin/config/:path`). Each setting's row in the Config schema carries the rule. The admin Config API, its MCP tool and the reset apply it; an import from Consul or with `aimeat config import` at the server does not, because the values come from the operator's own configuration (`aimeat/src/services/config-strictness.ts`, `aimeat/src/services/config-admin-view.ts`, `aimeat/src/services/sign-in-policy.ts`).
 
 ## First-run setup
 
