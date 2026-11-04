@@ -24,8 +24,8 @@
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item C7): the notification bell and
  *     the app-tool scan read only the rows they answer with.
  */
-import type { MemoryRecord } from '../interface.js';
-import type { MemoryMetaRow } from './memory.repository.js';
+// From the type's own file, not ../interface.ts, which imports this one: no import cycle.
+import type { MemoryRecord } from '../types/commerce.js';
 
 /** How many inbox rows an owner has, and how many of them are unread. */
 export interface InboxCounts {
@@ -62,6 +62,4 @@ export interface MemoryShapeRepository {
   countInboxRows(ownerGaii: string, prefix: string): Promise<InboxCounts>;
   /** Every owner's rows whose key starts with `prefix` and ends with `suffix`, as listAllMemory orders them. */
   listAllMemoryByKeyShape(prefix: string, suffix: string, opts?: KeyShapeOpts): Promise<MemoryRecord[]>;
-  /** listAllMemoryByKeyShape without the value: the META projection of listAllMemoryMeta. */
-  listAllMemoryMetaByKeyShape(prefix: string, suffix: string, opts?: KeyShapeOpts): Promise<MemoryMetaRow[]>;
 }

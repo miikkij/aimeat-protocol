@@ -17,7 +17,7 @@
  * @version-history
  *   2026-11-04 — Initial (codebase analysis 2026-11-03, item C7).
  */
-import type { MemoryRecord } from './interface.js';
+import type { MemoryRecord } from './types/commerce.js';
 
 /** The key without its last `.segment`: the time part of an inbox key. */
 export function keyStem(key: string): string {

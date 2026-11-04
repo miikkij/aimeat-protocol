@@ -193,9 +193,6 @@ describe('the key-shape listing (C7, the app-tool scan)', () => {
       const got = await s.listAllMemoryByKeyShape(prefix, '.tools', { visibility: 'public' });
       expect({ provider: name, rows: got.map(r => [r.ownerGaii, r.key]) }).toEqual({ provider: name, rows: want.map(r => [r.ownerGaii, r.key]) });
       expect(got.map(r => r.value)).toEqual(want.map(r => r.value));
-      const meta = await s.listAllMemoryMetaByKeyShape(prefix, '.tools', { visibility: 'public' });
-      expect(meta.map(r => [r.ownerGaii, r.key, r.version, r.updatedAt])).toEqual(want.map(r => [r.ownerGaii, r.key, r.version, r.updatedAt]));
-      expect(meta.every(r => !('value' in r))).toBe(true);
       expect((await s.listAllMemoryByKeyShape(prefix, '.tools', { limit: 1 })).map(r => r.key)).toEqual([all.filter(r => r.key.endsWith('.tools'))[0]!.key]);
     }
   });

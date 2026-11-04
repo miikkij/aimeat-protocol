@@ -132,7 +132,7 @@ function windowAll(q: any, opts: AllOpts | undefined) {
   return opts?.limit ? q.limit(opts.limit).offset(opts.offset ?? 0) : q;
 }
 
-export const META_COLS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'allowedOrigins',
+const META_COLS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'allowedOrigins',
   'aiProvenanceId', 'archived', 'tags', 'version', 'flagCount', 'byteSize', 'ttlHours', 'createdAt', 'updatedAt'] as const;
 
 export const memoryMethods = {

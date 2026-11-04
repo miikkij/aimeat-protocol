@@ -43,11 +43,11 @@ import type { KeyActivityRow } from '../../../repositories/memory.repository.js'
 import { globPrefix } from '../../../key-prefix.js';
 
 /** The projected columns, in one place so the three reads below cannot drift apart on what META means. */
-export const META_COLS = 'key, ownerGaii, visibility, groupId, workspaceRef, allowedOrigins, aiProvenanceId, '
+const META_COLS = 'key, ownerGaii, visibility, groupId, workspaceRef, allowedOrigins, aiProvenanceId, '
   + 'archived, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt';
 
 /** Shared row→meta mapping for the projections below (tags parsed, defaults applied). */
-export function rowToMeta(row: Record<string, unknown>): MemoryMetaRow {
+function rowToMeta(row: Record<string, unknown>): MemoryMetaRow {
   return {
     key: row.key as string,
     ownerGaii: row.ownerGaii as string,

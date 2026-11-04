@@ -159,7 +159,11 @@ const TOOLS_KEY_SUFFIX = '.tools';
  */
 async function publicToolManifestRecords(storage: Storage): Promise<MemoryRecord[]> {
   const opts = { visibility: 'public', limit: MANIFEST_SCAN_ROWS };
-  const meta = await storage.listAllMemoryMetaByKeyShape(TOOLS_KEY_PREFIX, TOOLS_KEY_SUFFIX, opts);
+  // The same rows as the query below, without values: the public `apps.*` rows, kept to the key shape
+  // `apps.<something>.tools` in the same order (key, then owner), the first MANIFEST_SCAN_ROWS of them.
+  const meta = (await storage.listAllMemoryMeta({ prefix: TOOLS_KEY_PREFIX, visibility: 'public' })).items
+    .filter(r => r.key.endsWith(TOOLS_KEY_SUFFIX) && r.key.length >= TOOLS_KEY_PREFIX.length + TOOLS_KEY_SUFFIX.length)
+    .slice(0, MANIFEST_SCAN_ROWS);
   const stamp = createHash('sha256');
   for (const r of meta) stamp.update(`${r.ownerGaii}\u0000${r.key}\u0000${r.version}\u0000${r.updatedAt}\n`);
   return cached(`app-tools:manifests:${stamp.digest('hex')}`, TTL.catalogue,
