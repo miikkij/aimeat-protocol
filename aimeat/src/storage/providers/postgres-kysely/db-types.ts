@@ -467,6 +467,15 @@ export interface MemoryTotals {
   bytes: string;
 }
 
+/** A short-lived value or window counter every process sees (migration 0126). BIGINT arrives as a string. */
+export interface EphemeralClaim {
+  kind: string;
+  id: string;
+  payload: Generated<string>;
+  count: Generated<string>;
+  expiresAt: string;
+}
+
 export interface AccountEvent {
   id: string;
   ownerGhii: string;
@@ -2433,6 +2442,7 @@ export interface DB {
   MemoryWriteTally: MemoryWriteTally;
   MemoryFamilyTally: MemoryFamilyTally;
   MemoryTotals: MemoryTotals;
+  EphemeralClaim: EphemeralClaim;
   AccountEventArchive: AccountEventArchive;
   WorkspaceRow: WorkspaceRow;
   WorkspaceRowRevision: WorkspaceRowRevision;

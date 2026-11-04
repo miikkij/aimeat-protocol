@@ -15,6 +15,8 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   2026-11-04 — ephemeralClaimMethods bound (ephemeral_claim; codebase analysis 2026-11-03,
+ *     high-availability stage 2).
  *   2026-11-04 — The kept memory totals (schema-memory-totals.ts) after initializeSchema (codebase
  *     analysis 2026-11-03, item C3).
  *   2026-11-04 — The memory query indexes (schema-memory-indexes.ts) after initializeSchema
@@ -95,6 +97,7 @@ import { federationMethods } from './methods/federation.js';
 import { fileMethods } from './methods/files.js';
 import { financeMethods } from './methods/finance.js';
 import { heldNameMethods } from './methods/held-names.js';
+import { ephemeralClaimMethods } from './methods/ephemeral-claims.js';
 import { identityMethods } from './methods/identity.js';
 import { identityExtraMethods } from './methods/identity-extras.js';
 import { knowledgeMethods } from './methods/knowledge.js';
@@ -309,6 +312,7 @@ Object.assign(
   fileMethods,
   financeMethods,
   heldNameMethods,
+  ephemeralClaimMethods,
   identityMethods,
   identityExtraMethods,
   knowledgeMethods,

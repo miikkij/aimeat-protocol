@@ -15,6 +15,8 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-04 — ephemeralClaimMethods bound (EphemeralClaim, migration 0126; codebase analysis
+ *     2026-11-03, high-availability stage 2).
  *   2026-11-04 — The migrations run under the boot lock, and bootLock() takes it for the boot seeding
  *     (migrate.ts takeBootLock; codebase analysis 2026-11-03, HA stage 1).
  *   2026-11-04 — _rawMemory answers MemoryWriteProbe, the three columns setMemory decides with
@@ -119,6 +121,7 @@ import { componentVersionMethods } from './methods/component-versions.js';
 import { passkeyMethods } from './methods/passkeys.js';
 import { secretMethods } from './methods/secrets.js';
 import { heldNameMethods } from './methods/held-names.js';
+import { ephemeralClaimMethods } from './methods/ephemeral-claims.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -259,6 +262,7 @@ Object.assign(
   passkeyMethods,
   secretMethods,
   heldNameMethods,
+  ephemeralClaimMethods,
   identityMethods,
   walletMethods,
   sessionMethods,

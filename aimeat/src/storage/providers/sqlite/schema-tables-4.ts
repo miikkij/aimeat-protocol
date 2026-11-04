@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.17.0 — 2026-11-04 — Ends with applyEphemeralClaimSchema: ephemeral_claim, short-lived values every
+ *     process sees (codebase analysis 2026-11-03, high-availability stage 2). Mirrors Postgres 0126.
  *   v1.16.0 — 2026-11-02 — Ends with applyMcpUserCredentialSchema: mcp_user_credentials, a person's own
  *     sign-in on a shared MCP server. Mirrors Postgres 0123.
  *   v1.15.0 — 2026-10-25 — released_component_names: a bare extension or cortex name released by
@@ -38,6 +40,7 @@
 import type Database from 'better-sqlite3';
 import { applyWorkspaceRowRevisionSchema } from './schema-workspace-row-revisions.js';
 import { applyMcpUserCredentialSchema } from './schema-mcp-user-credentials.js';
+import { applyEphemeralClaimSchema } from './schema-ephemeral-claim.js';
 
 export function applySchemaTables4(db: Database.Database): void {
   db.exec(`
@@ -782,4 +785,6 @@ export function applySchemaTables4(db: Database.Database): void {
   applyWorkspaceRowRevisionSchema(db);
   // Personal sign-in on a shared MCP server, after mcp_servers exists (Postgres 0123).
   applyMcpUserCredentialSchema(db);
+  // Short-lived values every process sees (Postgres 0126).
+  applyEphemeralClaimSchema(db);
 }
