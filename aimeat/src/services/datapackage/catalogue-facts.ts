@@ -30,6 +30,8 @@
  * @usage
  *   const facts = (await allDatasetFacts(storage)).filter(f => f.audience === 'public');
  * @version-history
+ *   2026-11-04 — The cached facts carry MEMORY_ANY_LEVEL_TAG, so a change to a record only its owner
+ *     reads still drops them (codebase analysis 2026-11-03, item C4).
  *   v1.4.0 — 2026-11-02 — A manifest counts only in the namespace and at the key the service writes it,
  *     and the audience and withdrawal come from the service's audience record (secaudit2026nov02d round 13,
  *     datapackage:catalogue-facts:trusts-writable-manifest-owner-and-audience).
@@ -41,7 +43,7 @@
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.1, D1.3, D1.4).
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { cached, invalidateKey, TTL } from '../cache.js';
+import { cached, invalidateKey, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
 import { packageAudienceOf } from '../knowledge-audience.js';
 import { bare, bytesHash } from './contract.js';
 import type { AimeatConfig } from '../../config.js';
@@ -262,7 +264,8 @@ export async function allDatasetFacts(storage: Storage): Promise<DatasetFacts[]>
       out.push(r ? { ...f, audience: r.visibility === 'owner' ? 'private' : r.visibility } : f);
     }
     return out.sort((a, b) => b.modified.localeCompare(a.modified));
-  }, ['domain:memory', 'domain:files', 'domain:catalogue']);
+    // The facts read manifests and audience records of every level, so every memory change drops them.
+  }, ['domain:memory', MEMORY_ANY_LEVEL_TAG, 'domain:files', 'domain:catalogue']);
 }
 
 /** Drop the cached scan: a catalogue entry was written or removed. */

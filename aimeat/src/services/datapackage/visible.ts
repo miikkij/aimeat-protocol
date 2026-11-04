@@ -31,11 +31,13 @@
  *   visiblePackages · viewerOf
  * @usage const rows = await visiblePackages(deps, viewerOf(config, req.auth), 'shared');
  * @version-history
+ *   2026-11-04 — The cached audiences carry MEMORY_ANY_LEVEL_TAG: they read audience records of every
+ *     level (codebase analysis 2026-11-03, item C4).
  *   v1.0.0 — 2026-11-02 — Initial (WP11, plan doc-mvwxcas3dom3; design canvas "Jaettu data").
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
-import { cached, TTL } from '../cache.js';
+import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from '../cache.js';
 import { signedInOnly } from '../../config-visibility.js';
 import { readerFor } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
@@ -119,7 +121,7 @@ export async function trustedAudiences(deps: Deps): Promise<Map<string, TrustedF
             }));
         }
         return out;
-    }, ['domain:memory', 'domain:files', 'domain:catalogue']);
+    }, ['domain:memory', MEMORY_ANY_LEVEL_TAG, 'domain:files', 'domain:catalogue']);
 }
 
 const audienceWord = (visibility: string | undefined): string => visibility ?? 'public';

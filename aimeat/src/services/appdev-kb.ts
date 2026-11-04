@@ -14,6 +14,8 @@
  *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   2026-11-04 -- A pitfall delete is announced with emitRecordChangePriorUnknown: the same streams hear
+ *     it, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   2026-10-20 -- listOwnerScopeMemory and listOwnerScopeShown take an optional `view` (the reader's
  *     principal and whether it reads as the owner), applied with ownerScopeView before the GHII-first
  *     dedupe, so a copy the reader may not see does not hide the reader's own record. The MCP
@@ -63,7 +65,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
-import { emitRecordChange } from './event-bus.js';
+import { emitRecordChangePriorUnknown } from './event-bus.js';
 import { writeMemoryRecord } from './memory-write.js';
 import type { ContentReader } from './classification/reader.js';
 import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
@@ -667,6 +669,8 @@ export async function deletePitfallEntry(
     // The MCP tool used to emit this and the REST door did not, which is how a browser delete left
     // the entry visible until a reload. An entry kept to its owner is told to that owner's streams;
     // a shared one is told to everybody who may be reading the list.
-    emitRecordChange('memory', existing.ownerGaii, existing.visibility);
+    // The manifest changed too, at its own level, so the read cache drops as for any change
+    // (event-bus.ts emitRecordChangePriorUnknown); the streams hear it as before.
+    emitRecordChangePriorUnknown('memory', existing.ownerGaii, existing.visibility);
     return true;
 }

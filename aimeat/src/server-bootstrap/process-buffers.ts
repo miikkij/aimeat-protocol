@@ -18,6 +18,9 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-04 — The cache listener's rule moves to services/cache-invalidation.ts, where a memory
+ *     change only its owner reads keeps the `domain:memory` entries computed from records others read
+ *     (codebase analysis 2026-11-03, item C4).
  *   2026-11-04 — flushProcessBuffers releases this process's claims in the stored outbox (services/outbox.ts;
  *     codebase analysis 2026-11-03, item HA 1.5).
  *   2026-11-04 — flushProcessBuffers marks the running AI jobs first, so the next start queues them again
@@ -45,8 +48,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { onChangeEvent } from '../services/event-bus.js';
-import { invalidateTag } from '../services/cache.js';
-import { localAccountName, runAsNode } from '../utils/gaii.js';
+import { dropCachesForChange } from '../services/cache-invalidation.js';
+import { runAsNode } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
 import { configureAuthAudit } from '../services/auth-audit.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
@@ -115,13 +118,10 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // The bus calls a listener as whoever emitted the event, which in a process that serves more than
   // one node can be another node, so this one runs as THIS node and cuts the owner for it. A
   // production process serves one node, so nothing there changes.
-  onChangeEvent((evt) => runAsNode(config.nodeId, () => {
-    invalidateTag(`domain:${evt.domain}`);
-    if (evt.ownerGaii) {
-      const owner = localAccountName(evt.ownerGaii);
-      if (owner) invalidateTag(`owner:${owner}:${evt.domain}`);
-    }
-  }));
+  // A memory change that only its owner reads keeps the broad `domain:memory` entries, which are
+  // computed from records other people read (services/cache-invalidation.ts; codebase analysis
+  // 2026-11-03, item C4).
+  onChangeEvent((evt) => runAsNode(config.nodeId, () => dropCachesForChange(evt)));
 
   return { webhookDispatcher, stats };
 }

@@ -16,11 +16,12 @@
  * @structure SharedKnowledgeManifest · sharedKnowledgeManifests · sharedKnowledgeFor
  * @usage const rows = await sharedKnowledgeFor({ storage, config }, req.auth, ownerName);
  * @version-history
+ *   2026-11-04 — The cached manifests carry MEMORY_ANY_LEVEL_TAG (codebase analysis 2026-11-03, item C4).
  *   v1.0.0 — 2026-11-02 — Initial (WP11).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { cached, TTL } from './cache.js';
+import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from './cache.js';
 import { localAccountName } from '../utils/gaii.js';
 import { packageAudienceOf, knowledgeAudienceAllows } from './knowledge-audience.js';
 import { readerFor } from './classification/reader.js';
@@ -55,7 +56,8 @@ export async function sharedKnowledgeManifests(storage: Storage): Promise<Shared
             }
         }
         return out;
-    }, ['domain:memory', 'domain:catalogue']);
+        // Manifests below public are read whatever their level, so every memory change drops this.
+    }, ['domain:memory', MEMORY_ANY_LEVEL_TAG, 'domain:catalogue']);
 }
 
 /**

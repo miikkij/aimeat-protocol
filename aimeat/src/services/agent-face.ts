@@ -26,6 +26,7 @@
  *     if (await serveAppAgentFace(res, config, storage, app, { lang: formatMdLang(req.query.lang) })) return;
  *   }
  * @version-history
+ *   2026-11-04 — The cached face carries MEMORY_ANY_LEVEL_TAG (codebase analysis 2026-11-03, item C4).
  *   v1.7.0 — 2026-10-27 — Readers who miss one face entry at once share one build; when the owner's
  *     extension runs are all taken the reader gets the stored face or the converted page, uncached
  *     (secaudit2026oct26, extension-system-run:request-driven-runs-outside-run-slot-pool). The body
@@ -54,7 +55,7 @@ import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { sendMarkdown, htmlToMarkdown } from './markdown-negotiation.js';
-import { cached, TTL } from './cache.js';
+import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from './cache.js';
 import { getOwnerScopePublicMemory } from './owner-memory.js';
 import { renderAppMarkdown, FORMAT_MD_BUSY } from './app-format-md.js';
 import {
@@ -159,7 +160,9 @@ export async function buildAppAgentFace(
         const rendered = await renderAppMarkdown({ storage, config }, app, { lang });
         if (rendered === FORMAT_MD_BUSY) throw new FormatMdBusy();
         return composeAppAgentFace(config, storage, app, rendered);
-      }, ['domain:memory', 'domain:apps']);
+        // The owner's extension action can read the owner's records of any level, so every memory
+        // change drops the face.
+      }, ['domain:memory', MEMORY_ANY_LEVEL_TAG, 'domain:apps']);
     } catch (err) {
       // The owner's extension runs are all taken: this reader gets the stored face or the converted
       // page, and nothing is cached, so the next reader asks the action again.

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The bulk write and the import announce with emitRecordChangePriorUnknown: the same
+ *     streams hear them, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   2026-10-31 — The write tally names an app grant as the app (data-map/tally-writer.ts; secaudit2026oct31w2 round 10).
  *   2026-10-27 — An entry of POST /v1/memory/bulk or /import of the welcome page's switch
  *     (portfolio.config) asks the publish gate as PUT /v1/portfolio/config does: all but the change
@@ -105,7 +107,7 @@ import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js
 import { tallyWriterOf } from '../../services/data-map/tally-writer.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
-import { emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
+import { emitMemoryWritten, emitRecordChange, emitRecordChangePriorUnknown } from '../../services/event-bus.js';
 import { isServiceOwnedKey, isOwnerRemovableServiceKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -269,7 +271,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Scoped by what was WRITTEN (event-bus.ts emitRecordChange): a batch of records only their owner
     // reads is told to that owner's streams. A batch does not read what each key held before, so a
     // record it moved from public to private is not announced to those who could read it until now.
-    if (result.created + result.updated > 0) emitRecordChange('memory', gaii, ...items.map(i => i.visibility));
+    // For the same reason the read cache drops as for any change (event-bus.ts emitRecordChangePriorUnknown).
+    if (result.created + result.updated > 0) emitRecordChangePriorUnknown('memory', gaii, ...items.map(i => i.visibility));
     stats?.increment('memory_writes');
 
     const failed = [...preFailed.map(f => ({ key: f.key, reason: f.reason })),
@@ -485,7 +488,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     emitResourceListChanged(gaii);
-    emitRecordChange('memory', gaii, ...items.map(i => i.visibility));
+    // An import does not read what each key held before either (event-bus.ts emitRecordChangePriorUnknown).
+    emitRecordChangePriorUnknown('memory', gaii, ...items.map(i => i.visibility));
     // 202 when an entry was stored below public and waits for the owner (batch-guards.ts batchPublishAnswer).
     const published = batchPublishAnswer(result);
     res.status(published.status).json(success(config.nodeId, {

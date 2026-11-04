@@ -19,6 +19,7 @@
  *   import { buildAppAgentSurface } from '../services/app-agent-surface.js';
  *   const surface = await buildAppAgentSurface(storage, config, app);
  * @version-history
+ *   2026-11-04 — The cached surface carries MEMORY_ANY_LEVEL_TAG (codebase analysis 2026-11-03, item C4).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: `ai_transparency` on the surface — whether the app's own
  *     bytes carry a provenance record, whether it asked for the scope that lets it generate content,
  *     and the node's convention in one sentence. Every member is a fact the NODE holds rather than a
@@ -29,7 +30,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
-import { cached, TTL } from './cache.js';
+import { cached, MEMORY_ANY_LEVEL_TAG, TTL } from './cache.js';
 import { listSkillsByBinding } from './skills.js';
 import { filterOfferings } from './exchange-market.js';
 import { parseAppScopes } from './protected-resource.js';
@@ -205,6 +206,7 @@ export async function buildAppAgentSurface(
         },
       };
     },
-    ['domain:apps', 'domain:memory'],
+    // Offerings are read whatever their level, so every memory change drops this.
+    ['domain:apps', 'domain:memory', MEMORY_ANY_LEVEL_TAG],
   );
 }
