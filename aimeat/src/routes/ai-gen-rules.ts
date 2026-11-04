@@ -19,6 +19,8 @@
  *     GET /v1/ai/gen-rules — the rules, their levels, the owner's exceptions, what applies to the caller
  *     PUT /v1/ai/gen-rules — owner: apply; agent: propose, then confirm with confirm_token
  * @version-history
+ *   v1.0.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
+ *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.0.0 — 2026-10-31 — Initial (wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
  */
 import { Router, type Request, type Response } from 'express';
@@ -31,7 +33,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { isOwnerPrincipal } from '../auth/account-security.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { callerOf } from '../middleware/caller.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { bindGenRulesConfig, genRulesView, setOwnerGenRules } from '../services/ai/gen-rules-store.js';
 import { aiCallerOf } from './ai-policy.js';
@@ -71,7 +73,7 @@ export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router
   // ── GET /v1/ai/gen-rules ── never a secret, so whoever acts for the owner with ai:use may read it.
   router.get('/v1/ai/gen-rules', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     try {
-      const { payer, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
+      const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
       const who = aiCallerOf(req, config.nodeId);
       const view = await genRulesView(storage, config, payer, {
         ownerInPerson: who.caller === 'owner',
@@ -94,8 +96,9 @@ export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router
         const r = await setOwnerGenRules(storage, config, resolveIdentity(auth, config.nodeId), input, { kind: 'owner' });
         return res.json(success(config.nodeId, r));
       }
-      const principal = resolveIdentity(auth, config.nodeId);
-      const { payer, agent } = aiPayerOf(principal);
+      const caller = callerOf(req, config.nodeId, storage);
+      const principal = caller.principal;
+      const { payer, agent } = caller.payer;
       if (isForeignPrincipal(auth) || auth.roles.includes('app') || !agent) {
         return res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
           'Only the owner, or an agent of theirs proposing a change the owner confirms, may change the generation rules.'));

@@ -15,6 +15,8 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-11-04 — The asking agent is the session principal's caller facts (`principalCaller(gaii).payer`),
+ *     the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-31 — The result names the generation rules in force (gen_rules), when any.
  *   2026-10-21 — `public: true` asks the node's publish gate with the session's caller, as
  *     aimeat_storage_upload does: an agent without publish:public gets the picture stored private and
@@ -46,11 +48,10 @@ import { generateForOwner } from '../services/ai-image.js';
 import { readImageInputs } from '../services/ai/call-files.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { AiCompletionError } from '../services/ai/completion.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { recordUrlFor } from '../services/ai-provenance-marks.js';
-import type { CallerContext } from '../services/caller-context.js';
+import { principalCaller, type CallerContext } from '../services/caller-context.js';
 
 export function registerAiImageTool(
     mcp: McpServer,
@@ -78,7 +79,7 @@ export function registerAiImageTool(
             }
             const gaii = scope.ownerGhii;
             // Who asked, for the agent's own key and cap; the owner above still pays and stores.
-            const { agent } = aiPayerOf(getAgentGaii());
+            const { agent } = principalCaller(getAgentGaii()).payer;
             try {
                 // The pictures the model works from: the agent's own files, or pictures it made with
                 // this tool before (which live in the owner's storage), under the agent's reader.

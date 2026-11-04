@@ -13,6 +13,8 @@
  *   brings in a picture needs the directive and few of them hold memory:write-reserved.
  * @structure registerAiGenRulesTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   v1.0.1 — 2026-11-04 — The payer is the session principal's caller facts (`principalCaller(gaii).payer`),
+ *     the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.0.0 — 2026-10-31 — Initial (wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
  */
 import { McpServer } from '@modelcontextprotocol/server';
@@ -21,7 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { principalCaller } from '../services/caller-context.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { genRulesView, setOwnerGenRules } from '../services/ai/gen-rules-store.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -42,7 +44,7 @@ export function registerAiGenRulesTools(
         annotations: annotationsFor('aimeat_ai_gen_rules'),
     },
     async () => {
-      const { payer, agent } = aiPayerOf(getAgentGaii());
+      const { payer, agent } = principalCaller(getAgentGaii()).payer;
       return text(await genRulesView(storage, config, payer, { ownerInPerson: false, ...(agent ? { agent } : {}) }));
     },
   );
@@ -56,7 +58,7 @@ export function registerAiGenRulesTools(
     },
     async ({ gen_rules, confirm_token }) => {
       const principal = getAgentGaii();
-      const { payer } = aiPayerOf(principal);
+      const { payer } = principalCaller(principal).payer;
       try {
         return text(await setOwnerGenRules(storage, config, payer, gen_rules, {
           kind: 'agent', principal, ...(confirm_token ? { confirmToken: confirm_token } : {}),

@@ -29,6 +29,10 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.9.0 — 2026-11-04 — Rules principal-kind and payer-resolve: what kind of caller this is and who
+ *     pays for its AI call are answered by services/caller-facts.ts and read from the CallerContext;
+ *     13 hand classifier lines in 6 files and 33 door calls of aiPayerOf moved, so both baselines
+ *     are empty (codebase analysis 2026-11-03, item B1).
  *   v1.8.0 — 2026-11-04 — Rule mail-send: a mail goes out through sendMail (services/mail-gate.ts); the
  *     24 files that called the mail service directly moved onto it, so the baseline is empty. RULES is
  *     exported for its unit test (codebase analysis 2026-11-03, item B3).
@@ -136,7 +140,8 @@ export const RULES: Rule[] = [
     id: 'agent-role',
     label: 'What kind of principal a caller is, is asked of its caller object (services/caller-context.ts: kind, inPerson), built once per request (callerOf) or per MCP session (C9)',
     pattern: /roles\)?\??\.includes\(['"]agent['"]\)/,
-    skipDirs: ['src/auth/', 'src/utils/gaii.ts', 'src/services/caller-context.ts'],
+    // caller-facts.ts is where the caller object's kind, via and reader kind are answered (B1).
+    skipDirs: ['src/auth/', 'src/utils/gaii.ts', 'src/services/caller-context.ts', 'src/services/caller-facts.ts'],
   },
   {
     id: 'wildcard-test',
@@ -187,6 +192,22 @@ export const RULES: Rule[] = [
     label: 'A route\'s caller is callerOf(req) (middleware/caller.ts), built once per request with its answers on it, not an object copied field by field from req.auth (C9)',
     pattern: /roles:req\.auth!?\.roles/,
     skipDirs: ['src/middleware/caller.ts', 'src/auth/'],
+  },
+  {
+    id: 'principal-kind',
+    label: 'What kind of caller a credential or an identity is, is answered by services/caller-facts.ts (credentialKind, readerOf, principalKindOf, usageActorOfPrincipal, usageActorOfRoles) and carried on the CallerContext; eleven hand classifiers disagreed, and an ecosystem app was planned as the owner in person (codebase analysis 2026-11-03, B1)',
+    // A kind literal returned straight from a role or identity-shape test:
+    // `if(roles.includes('app'))return'app'`, `if(p.startsWith('eco:'))return'eco'`.
+    pattern: /(includes\(['"](#|owner|operator|agent|ecosystem|app|federated)['"]\)|startsWith\((['"]eco:['"]|ECO_PREFIX)\)|isGEAI\([^)]*\))\)*return['"](owner|person|agent|eco|ecosystem|app|human|ai|visitor|anonymous)['"]/,
+    skipDirs: ['src/services/caller-facts.ts'],
+  },
+  {
+    id: 'payer-resolve',
+    label: 'Who pays for an AI call is the caller\'s `payer` (callerOf(req).payer on REST, principalCaller(principal).payer where only the identity is held; services/caller-facts.ts payerOfPrincipal), not resolved again at each door (codebase analysis 2026-11-03, B1)',
+    pattern: /\b(aiPayerOf|payerOfPrincipal)\(/,
+    // caller-facts.ts holds the rule; agent-ai-keys.ts keeps aiPayerOf as its one-line read for the
+    // tests that import it. services/ai/caller-context.ts maps the payer onto the planner's caller class.
+    skipDirs: ['src/services/caller-facts.ts', 'src/services/agent-ai-keys.ts'],
   },
   {
     id: 'sale-booking',

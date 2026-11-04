@@ -2,6 +2,8 @@
  * @file ai-voice.ts
  * @description Agent access to the same metered voice stages as browser streaming.
  * @version-history
+ *   2026-11-04 — The asking agent is the session principal's caller facts (`principalCaller(gaii).payer`),
+ *     the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-08 — The reply and the speech pass the agent that asked (aiPayerOf), as completions do.
@@ -26,12 +28,12 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { principalCaller } from '../services/caller-context.js';
 import { z } from 'zod';
 
 export function registerAiVoiceTools(mcp: McpServer, storage: Storage, config: AimeatConfig, getAgentGaii: () => string): void {
   // The agent that asked, by bare name: its own key pays first, its cap applies, the record names it.
-  const agentOf = (): { agent?: string } => { const { agent } = aiPayerOf(getAgentGaii()); return agent ? { agent } : {}; };
+  const agentOf = (): { agent?: string } => { const { agent } = principalCaller(getAgentGaii()).payer; return agent ? { agent } : {}; };
   const out = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
   // Every failure reads `CODE: message` with the code POST /v1/ai/stream and /speak answer: a typed
   // refusal its own (RATE_LIMITED, PROVIDER_REJECTED…), an input that does not parse INVALID_BODY,

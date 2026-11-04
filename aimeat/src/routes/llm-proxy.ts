@@ -27,6 +27,7 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.14.1 -- 2026-11-04 -- The payer is the request's caller's (`callerOf(req).payer`), the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.14.0 -- 2026-11-01 -- A call with tools says so (`requires.tools`), so its OpenRouter region must offer the model with tool calling.
  *   v1.13.0 -- 2026-10-27 -- A stream the provider answered and then broke off is settled from what came
  *     (its usage frame, else the text seen), where it was only logged; a node-key call is priced by its
@@ -81,8 +82,7 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { callerOf } from '../middleware/caller.js';
 import { aiCallerOf } from './ai-policy.js';
 import {
     prepareAiCall, settleAiCall, AiCompletionError, planFor, recordFailedAttempts, type AiCallPlan,
@@ -143,7 +143,7 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/llm/models', requireAuth(), requireScope('ai:use'), aiRateLimit, async (req: Request, res: Response) => {
         if (!assertAiUseAllowed(req, res, config.nodeId)) return;
         // The same payer the completion below resolves, so the list is of the models that key reaches.
-        const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
+        const { payer: gaii, agent } = callerOf(req, config.nodeId, storage).payer;
         try {
             // A client that sends its role on every call sends it here too, and then lists the
             // models of the provider that role would use.
@@ -186,8 +186,8 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
      */
     router.post('/v1/llm/chat/completions', requireAuth(), requireScope('ai:use'), chatLimit, async (req: Request, res: Response) => {
         if (!assertAiUseAllowed(req, res, config.nodeId)) return;
-        // An agent's call is paid by its owner, in the agent's name (services/agent-ai-keys.ts).
-        const { payer: gaii, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
+        // An agent's call is paid by its owner, in the agent's name (services/caller-facts.ts payerOfPrincipal).
+        const { payer: gaii, agent } = callerOf(req, config.nodeId, storage).payer;
 
         const body = (req.body ?? {}) as CacheSessionBody & {
             stream?: boolean;

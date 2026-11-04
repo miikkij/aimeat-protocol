@@ -6,6 +6,8 @@
  * @structure registerVoiceRoutes; voiceAppId binds app tokens to their signed identity
  * @usage registerVoiceRoutes(router, config, storage)
  * @version-history
+ *   2026-11-04 - The asking agent is the request's caller's (`callerOf(req).payer`), the answer aiPayerOf
+ *     gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-19 - voiceAppId accepts the signed app's own file name (with or without .html) and its full
  *     owner/filename as app_id, as /v1/ai/complete and the aimeat-ai library send it; another app's id is
  *     still 403 APP_ID_MISMATCH, now with what to send and both ids in details
@@ -26,7 +28,8 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
-import { ownerGhiiOf, resolveIdentity } from '../utils/gaii.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
+import { callerOf } from '../middleware/caller.js';
 import { error, success } from '../middleware/envelope.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
@@ -36,7 +39,6 @@ import { logger } from '../utils/logger.js';
 import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../models/ai-voice-contract.js';
 import { createVoiceResult } from '../services/ai-voice-result.js';
 import { aiCallerOf } from './ai-policy.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { namesSignedApp } from '../services/ai-app-id.js';
 import { setProvenanceHeaders, envelopeMeta, type ServedProvenance } from '../services/ai-provenance-marks.js';
 import { toIetfHeader } from '../services/ai-provenance-adapters.js';
@@ -107,10 +109,11 @@ export function registerVoiceRoutes(router: Router, config: AimeatConfig, storag
         if (!res.write(JSON.stringify(event) + '\n')) await once(res, 'drain', { signal: controller.signal });
         res.flush?.();
       };
-      const principal = resolveIdentity(req.auth!, config.nodeId);
+      const caller = callerOf(req, config.nodeId, storage);
+      const principal = caller.principal;
       const payer = ownerGhiiOf(principal);
       // Who asked: an agent's own key pays first, its cap applies, and the record names it (B11).
-      const { agent } = aiPayerOf(principal);
+      const { agent } = caller.payer;
       const who = { ...aiCallerOf(req, config.nodeId), ...(agent ? { agent } : {}) };
       if (kind === 'reply') await streamReply(storage, config, payer, { ...reply.parse(body), ...who }, controller.signal, emit);
       else await streamSpeech(storage, config, payer, { ...speech.parse(body), ...who }, controller.signal, emit);

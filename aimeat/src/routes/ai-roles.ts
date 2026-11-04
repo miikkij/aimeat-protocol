@@ -17,6 +17,8 @@
  *     GET /v1/ai/roles
  *     PUT /v1/ai/roles
  * @version-history
+ *   v1.1.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
+ *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.1.0 — 2026-09-28 — GET answers an app with its own roles only (it had seen every app's).
  *   v1.0.0 — 2026-09-28 — Initial.
  */
@@ -29,7 +31,7 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { callerOf } from '../middleware/caller.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { setRoles } from '../services/ai/roles.js';
 import { aiRolesView, appRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
@@ -51,7 +53,7 @@ export function aiRolesRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/ai/roles', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      const { payer } = aiPayerOf(owner(req));
+      const { payer } = callerOf(req, config.nodeId, storage).payer;
       const view = await aiRolesView(storage, config, payer);
       // An app sees its own roles only (appRolesView): the app the node identified from its grant.
       const { caller, verifiedApp } = aiCallerOf(req, config.nodeId);
@@ -73,8 +75,9 @@ export function aiRolesRouter(config: AimeatConfig, storage: Storage): Router {
         const gaii = owner(req);
         return res.json(success(config.nodeId, await setRoles(storage, gaii, input, await knownRoleProviders(storage, config, gaii), { kind: 'owner' })));
       }
-      const principal = owner(req);
-      const { payer, agent } = aiPayerOf(principal);
+      const caller = callerOf(req, config.nodeId, storage);
+      const principal = caller.principal;
+      const { payer, agent } = caller.payer;
       if (isForeignPrincipal(auth) || auth.roles.includes('app') || !agent) {
         return res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
           'Only the owner, or an agent of theirs proposing a change the owner confirms, may change the AI roles or bind an app\'s role.'));

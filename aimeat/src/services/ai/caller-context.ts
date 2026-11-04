@@ -19,12 +19,15 @@
  *   const who = aiCallerFromCredential(req.auth!, resolveIdentity(req.auth!, config.nodeId));
  *   await completeForOwner(storage, config, payer, { ...who, prompt });
  * @version-history
+ *   v1.1.1 — 2026-11-04 — The agent and the ecosystem app come from the principal's caller facts
+ *     (services/caller-facts.ts principalCaller), the answer aiPayerOf gave (codebase analysis
+ *     2026-11-03, item B1).
  *   v1.1.0 — 2026-11-02 — An ecosystem app's credential is the app `eco:<app>`, not the owner
  *     (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AI-3).
  */
 import type { CallerClass } from './policy.js';
-import { aiPayerOf } from '../agent-ai-keys.js';
+import { principalCaller } from '../caller-facts.js';
 import { CHAT_AGENT_NAME } from '../chat-agent.js';
 
 /** Who asks, as the AI planner reads it. */
@@ -50,7 +53,7 @@ export function aiCallerFromCredential(
   principal: string,
 ): AiCallerContext {
   if (cred.roles.includes('app') && cred.app) return { caller: 'app', verifiedApp: cred.app };
-  const { agent, ecoApp } = aiPayerOf(principal);
+  const { agent, ecoApp } = principalCaller(principal).payer;
   // An ecosystem app is the owner's app `eco:<app>`, never the owner in person: the owner's rules
   // for apps apply to it and a generation rule bypass is not its to ask (services/ai/gen-rules.ts).
   // It fell through to 'owner' until 2026-11-02 (secaudit2026nov02d round 13).

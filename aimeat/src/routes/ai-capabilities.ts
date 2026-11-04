@@ -15,6 +15,8 @@
  *   Both need `ai:use` (an owner session passes), as every AI route does (auth/ai-gate.ts).
  * @structure aiCapabilitiesRouter(config, storage)
  * @version-history
+ *   v1.3.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
+ *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.3.0 — 2026-10-08 — A failure that is not a provider's is 500 INTERNAL_ERROR (nodeFailureOf), not
  *     502 PROVIDER_ERROR (aiprov plan, A8).
  *   v1.2.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -28,8 +30,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { success, error } from '../middleware/envelope.js';
 import { retryAfterOf } from '../services/account-limits.js';
-import { resolveIdentity } from '../utils/gaii.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { callerOf } from '../middleware/caller.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';
 import { embedForOwner } from '../services/ai-embed.js';
@@ -49,8 +50,8 @@ export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Ro
   // ── GET /v1/ai/capabilities ──
   router.get('/v1/ai/capabilities', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
-    const { payer, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
-    const appId = typeof req.query.app_id === 'string' && req.query.app_id ? req.query.app_id.slice(0, 200) : undefined;
+    const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
+    const appId =typeof req.query.app_id === 'string' && req.query.app_id ? req.query.app_id.slice(0, 200) : undefined;
     try {
       const view = await aiCapabilitiesView(storage, config, payer, {
         ...aiCallerOf(req, config.nodeId), ...(agent ? { agent } : {}), ...(appId ? { appId } : {}),
@@ -68,7 +69,7 @@ export function aiCapabilitiesRouter(config: AimeatConfig, storage: Storage): Ro
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     req.setTimeout(180_000);
     res.setTimeout(180_000);
-    const { payer, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
+    const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
     const { input, model, app_id, provider, fallback, role: roleField } = (req.body ?? {}) as {
       input?: unknown; model?: string; app_id?: string; provider?: string; fallback?: boolean; role?: unknown;
     };

@@ -7,6 +7,9 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.4.0 — 2026-11-04 — isOwnerPrincipal reads isOwnerInPerson (utils/gaii.ts) for its first half
+ *     instead of a copy of that role test; the answer is the same for every credential
+ *     (test/unit/caller-classifiers.test.ts; codebase analysis 2026-11-03, item B1).
  *   v1.3.3 — 2026-10-20 — isSignedInCaller and requireOwnerPrincipal ask isAnonymousPrincipal, so the
  *     minted anonymous token counts as nobody too (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.3.2 — 2026-10-05 — isOwnerPrincipal takes the caller as data ({ roles, scopes, federated }), a
@@ -28,7 +31,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { ACCOUNT_SECURITY_SCOPE } from '../utils/scope-coverage.js';
-import { isForeignPrincipal } from '../utils/gaii.js';
+import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { deny401, deny403 } from './deny.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
@@ -86,6 +89,9 @@ export function isOwnerPrincipal(
   auth: { roles: string[]; scopes?: string[]; federated?: boolean } | null | undefined,
 ): boolean {
   if (!auth) return false;
+  // The account holder in person: the one test (isOwnerInPerson), which already refuses a visitor,
+  // an agent, an ecosystem app and an app grant.
+  if (isOwnerInPerson(auth)) return true;
   // A federated session is a visitor from another node whose `owner` is the local part of their home
   // name and may equal a LOCAL account's name (routes/ghii/register-login.ts). It is never the local
   // account holder in person, so it is never an owner principal — this is the root of the
@@ -93,12 +99,9 @@ export function isOwnerPrincipal(
   // 2026-09: A3-1/A3-3). requireRole('owner') refuses it too; a federated visitor's reach is its
   // granted scopes, not the account.
   if (isForeignPrincipal(auth)) return false;
-  const roles = auth.roles;
-  const isApp = roles.includes('app');
-  if (roles.includes('owner') && !isApp && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
   // Exact string, no wildcard. scope-coverage.ts enforces the same rule everywhere a scope is
   // proposed or approved; this line is that rule at the door itself.
-  return !isApp && (auth.scopes ?? []).includes(ACCOUNT_SECURITY_SCOPE);
+  return !auth.roles.includes('app') && (auth.scopes ?? []).includes(ACCOUNT_SECURITY_SCOPE);
 }
 
 /**

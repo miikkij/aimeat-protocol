@@ -20,6 +20,8 @@
  * @usage
  *   recordAppOpen({ appOwnerGaii: app.ownerGaii, filename: app.filename, viewer: req.auth?.sub });
  * @version-history
+ *   v1.2.0 — 2026-11-04 — actorKindOf reads usageActorOfPrincipal (services/caller-facts.ts), the same
+ *     answers (codebase analysis 2026-11-03, item B1).
  *   v1.1.1 — 2026-09-26 — The app author's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-18 — `anonymous`: the node's synthetic anonymous principal is nobody, and an
  *     open it carries is an anonymous open. It had been counted as a signed-in one.
@@ -28,6 +30,7 @@
 import { recordUsageCall } from './usage-buffer.js';
 import { ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import type { UsageActorKind } from '../../storage/interface.js';
+import { usageActorOfPrincipal } from '../caller-facts.js';
 
 /** `undefined`, `''` and the literal 'anon' all mean nobody signed in. */
 function isAnonymous(viewer?: string | null): boolean {
@@ -35,9 +38,7 @@ function isAnonymous(viewer?: string | null): boolean {
 }
 
 export function actorKindOf(principal: string): UsageActorKind {
-  if (principal.startsWith('eco:')) return 'eco';
-  if (principal.includes('#')) return 'agent';
-  return 'owner';
+  return usageActorOfPrincipal(principal);
 }
 
 export function recordAppOpen(args: {

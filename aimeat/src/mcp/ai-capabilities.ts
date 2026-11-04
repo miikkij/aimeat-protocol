@@ -11,6 +11,8 @@
  *   storage and the call is paid by the owner, in the agent's name, as the REST route does.
  * @structure registerAiCapabilityTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-11-04 — The payer is the session principal's caller facts (`principalCaller(gaii).payer`), the
+ *     answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-08 — aimeat_ai_transcribe names the transcript's provenance record: provenance_id and record_url.
@@ -28,7 +30,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { principalCaller } from '../services/caller-context.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';
 import { queryModels } from '../services/ai/catalog/query.js';
@@ -53,7 +55,7 @@ export function registerAiCapabilityTools(
   };
   /** The payer, the agent when the principal is one, and the caller as the owner's policy names it. */
   const who = () => {
-    const { payer, agent } = aiPayerOf(getAgentGaii());
+    const { payer, agent } = principalCaller(getAgentGaii()).payer;
     return { payer, ...(agent ? { agent } : {}), caller: (agent ? 'agent' : 'owner') as 'agent' | 'owner' };
   };
 

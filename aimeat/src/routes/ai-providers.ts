@@ -27,6 +27,8 @@
  *     GET    /v1/ai/routing
  *     PUT    /v1/ai/routing
  * @version-history
+ *   v1.3.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
+ *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.3.0 — 2026-10-31 — GET /v1/ai/routing carries openrouter_region: where the account's OpenRouter
  *     calls are processed and what it may choose (services/ai/openrouter-region.ts).
  *   v1.2.0 — 2026-10-25 — GET /v1/ai/routing carries free_model, the free model as the last resort on the
@@ -44,7 +46,7 @@ import { success, error } from '../middleware/envelope.js';
 import { retryAfterOf } from '../services/account-limits.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { callerOf } from '../middleware/caller.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import {
   aiProvidersView, putOwnerAiProvider, deleteOwnerAiProvider, setOwnerProviderKey, deleteOwnerProviderKey, knownProviderIds,
@@ -79,7 +81,7 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
   router.get('/v1/ai/providers', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      const { payer, agent } = aiPayerOf(owner(req));
+      const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
       res.json(success(config.nodeId, await aiProvidersView(storage, config, payer, agent), [
         { description: 'Add or change one of your providers (the owner, on the web page)', method: 'PUT', url: '/v1/ai/providers/{id}' },
         { description: 'Test a provider for one capability', method: 'POST', url: '/v1/ai/providers/{id}/test' },
@@ -132,7 +134,7 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     const body = (req.body ?? {}) as { capability?: unknown; accept_cost?: unknown };
     try {
-      const { payer, agent } = aiPayerOf(owner(req));
+      const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
       const r = await testProvider(storage, config, payer, {
         provider: req.params.id as string,
         ...(typeof body.capability === 'string' ? { capability: body.capability as AiCapability } : {}),
@@ -147,7 +149,7 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
   router.get('/v1/ai/routing', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      const { payer, agent } = aiPayerOf(owner(req));
+      const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
       const v = await aiProvidersView(storage, config, payer, agent);
       res.json(success(config.nodeId, { routing: v.routing, free_model: v.free_model, openrouter_region: v.openrouter_region, providers: v.providers.map(p => ({ id: p.id, type: p.type, capabilities: p.capabilities })) }, [
         { description: 'Change the routing (the owner, or an agent proposing)', method: 'PUT', url: '/v1/ai/routing' },
@@ -169,8 +171,9 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
         const gaii = owner(req);
         return res.json(success(config.nodeId, await setRouting(storage, gaii, input, await knownProviderIds(storage, config, gaii), { kind: 'owner' })));
       }
-      const principal = owner(req);
-      const { payer, agent } = aiPayerOf(principal);
+      const caller = callerOf(req, config.nodeId, storage);
+      const principal = caller.principal;
+      const { payer, agent } = caller.payer;
       if (isForeignPrincipal(auth) || auth.roles.includes('app') || !agent) {
         return res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
           'Only the owner, or an agent of theirs proposing a change the owner confirms, may change the routing.'));

@@ -10,6 +10,8 @@
  *   is connected: the AI shows the owner the change, then calls again with the token.
  * @structure registerAiPolicyTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-11-04 — The payer is the session principal's caller facts (`principalCaller(gaii).payer`), the
+ *     answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -21,7 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { principalCaller } from '../services/caller-context.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { policyView, setOwnerAiPolicy } from '../services/ai/policy-store.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -43,7 +45,7 @@ export function registerAiPolicyTools(
     },
     async ({ policy, confirm_token }) => {
       const principal = getAgentGaii();
-      const { payer } = aiPayerOf(principal);
+      const { payer } = principalCaller(principal).payer;
       try {
         if (!policy) return text({ mode: 'current', ...(await policyView(storage, config, payer)) });
         return text(await setOwnerAiPolicy(storage, payer, policy, {

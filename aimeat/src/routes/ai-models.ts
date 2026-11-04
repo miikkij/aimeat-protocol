@@ -13,6 +13,8 @@
  *     POST /v1/admin/ai/catalog/refresh   the operator refreshes now, whatever the cadence says.
  * @structure aiModelsRouter(config, storage)
  * @version-history
+ *   v1.2.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
+ *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.2.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-28 — The filtering moved to services/ai/catalog/query.ts, which aimeat_ai_models
  *     calls too (V5). The answer is unchanged.
@@ -24,8 +26,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { callerOf } from '../middleware/caller.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { catalogMeta, catalogModels } from '../services/ai/catalog/store.js';
 import { refreshCatalog } from '../services/ai/catalog/refresh.js';
@@ -41,7 +42,7 @@ export function aiModelsRouter(config: AimeatConfig, storage: Storage): Router {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     const q = req.query as Record<string, string | undefined>;
     try {
-      const { payer, agent } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
+      const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
       const answer = await queryModels(storage, config, { payer, ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId) }, {
         ...(q.capability ? { capability: q.capability } : {}), ...(q.type ? { type: q.type } : {}),
         ...(q.status ? { status: q.status } : {}), allowed: q.allowed === 'true',

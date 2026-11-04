@@ -31,6 +31,8 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.4.2 — 2026-11-04 — The actor kind is usageActorOfRoles (services/caller-facts.ts), the same
+ *     answers for every role list (codebase analysis 2026-11-03, item B1).
  *   v1.4.1 — 2026-11-04 — The usage record names an ecosystem app's call as the app's (actor kind
  *     `eco`): the recorder tested a role `eco` no token carries, so the call was recorded as the
  *     owner's (codebase analysis 2026-11-03, item A3).
@@ -78,6 +80,7 @@ import { commerceFeePercent } from './marketplace-fee.js';
 import { recordUsageCall } from './usage/usage-buffer.js';
 import { isPartyRef } from './parties/contract.js';
 import type { UsageActorKind, UsageOutcome, UsageSurface } from '../storage/interface.js';
+import { usageActorOfRoles } from './caller-facts.js';
 
 /** The permission a hosted app needs before it may draw on its owner's contracts. */
 export const SPEND_SCOPE = 'contract:spend';
@@ -151,13 +154,9 @@ function appIdOfCoordinate(coordExt: string): string {
 }
 
 export function actorKindOf(session?: { roles: string[] } | null): UsageActorKind {
-  const roles = session?.roles ?? [];
-  if (roles.includes('app')) return 'app';
   // An ecosystem app's session carries the role `ecosystem` (auth/middleware.ts); `eco` is the usage
-  // stream's name for that kind.
-  if (roles.includes('ecosystem')) return 'eco';
-  if (roles.includes('agent')) return 'agent';
-  return 'owner';
+  // stream's name for that kind. The rule is usageActorOfRoles (services/caller-facts.ts).
+  return usageActorOfRoles(session?.roles ?? []);
 }
 
 /**

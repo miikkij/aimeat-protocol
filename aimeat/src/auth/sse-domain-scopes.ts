@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.11.0 — 2026-11-04 — isOwnerPrincipal reads isOwnerInPerson (utils/gaii.ts) of the roles instead
+ *     of a copy of that test; the same answer for every role list (codebase analysis 2026-11-03, B1).
  *   v1.10.0 — 2026-11-01 — `app-parties` passes for a principal holding app:write: the people registered
  *     to an app without an account changed, so the owner's panels read the list again (WP9d).
  *   v1.9.0 — 2026-11-01 — `datapackages` passes for a principal holding storage:read: a data package of
@@ -56,6 +58,7 @@
  * instances, extensions, cortex, skills, portfolio, ecosystem-apps, presence, realtime).
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 import { WORKSPACE_DOMAIN_PREFIX } from '../services/event-bus.js';
 
 export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
@@ -155,9 +158,10 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
  * on the owner's behalf; agents and ecosystem apps are restricted for the same reason.
  */
 export function isOwnerPrincipal(auth: { roles?: string[] }): boolean {
-  const roles = auth.roles ?? [];
-  if (roles.includes('app') || roles.includes('agent') || roles.includes('ecosystem')) return false;
-  return roles.includes('owner');
+  // The one role test (isOwnerInPerson), asked of the roles alone as this function always has: the
+  // federated mark is not read here. A visitor's token carries the role `federated` and no `owner`
+  // (utils/gaii.ts FEDERATED_ROLE), so it is restricted either way.
+  return isOwnerInPerson({ roles: auth.roles ?? [] });
 }
 
 /**

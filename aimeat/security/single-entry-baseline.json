@@ -181,9 +181,9 @@
         "count": 3,
         "why": "Reads the caller's role list, which both surfaces build from askOperator (rolesWithOperator on REST, boardCaller on MCP)."
       },
-      "src/services/classification/reader-kind.ts": {
+      "src/services/caller-facts.ts": {
         "count": 1,
-        "why": "C4: tells a person from an AI by the session's roles. Moves to isOwnerInPerson."
+        "why": "readerOf: an unattended run is ['operator'] without 'owner' and reads as an AI; the reader kind is not the operator question isOperatorCaller answers (moved from classification/reader-kind.ts, codebase analysis 2026-11-03, B1)."
       },
       "src/services/consent-write.ts": {
         "count": 1,
@@ -269,9 +269,9 @@
         "count": 1,
         "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
       },
-      "src/services/classification/reader-kind.ts": {
-        "count": 2,
-        "why": "Tells a person from an AI by the roles; an app and a visitor count as a person here, which isOwnerInPerson does not answer."
+      "src/services/caller-facts.ts": {
+        "count": 3,
+        "why": "readerOf tells a person from an AI by the roles (an app and a visitor count as a person there, which isOwnerInPerson does not answer), and credentialVia names a signed-in session; neither decides access (moved from classification/reader-kind.ts, codebase analysis 2026-11-03, B1)."
       },
       "src/services/consent-write.ts": {
         "count": 1,
@@ -387,10 +387,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/classification/reader-kind.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/services/connect-tunnel.ts": {
         "count": 1,
         "why": "UNREVIEWED"
@@ -404,10 +400,6 @@
         "why": "UNREVIEWED"
       },
       "src/services/memory-write.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/services/metered-access.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -688,6 +680,8 @@
         "why": "settleRefreshCookieWindowAtStart stores auth.refresh_cookie_legacy_until once at start when no source set it: the node's own write, no caller, and the row has no tighten-only rule."
       }
     },
-    "mail-send": {}
+    "mail-send": {},
+    "principal-kind": {},
+    "payer-resolve": {}
   }
 }

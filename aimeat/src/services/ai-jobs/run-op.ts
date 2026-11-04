@@ -21,6 +21,8 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key, viewer?)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.10.1 -- 2026-11-04 -- The payer is the job principal's caller facts (`principalCaller(owner).payer`,
+ *     services/caller-facts.ts), the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.10.0 -- 2026-11-02 -- An ecosystem app's job is paid by its owner (aiPayerOf); its picture stays
  *     in the app's own namespace (secaudit2026nov02d round 13).
  *   v1.9.0 -- 2026-10-22 -- A transcription's audio is held to the job's viewer (starter.ts
@@ -61,7 +63,7 @@ import { memoryWriterAsk } from '../memory-publish-gate.js';
 import { warningsNote } from '../classification/reader.js';
 import { generateForOwner, type GenerateForOwnerResult } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
-import { aiPayerOf } from '../agent-ai-keys.js';
+import { principalCaller } from '../caller-facts.js';
 import { aiOpOf } from './op.js';
 import { AiJobError, type AiJobRecord, type AiJobClassificationWarnings } from './types.js';
 
@@ -124,7 +126,7 @@ export async function runJobOp(
     signal: AbortSignal,
 ): Promise<JobOpOutcome> {
     const { storage, config } = deps;
-    const { payer, agent, ecoApp } = aiPayerOf(job.owner);
+    const { payer, agent, ecoApp } = principalCaller(job.owner).payer;
     // Who the call runs as: the app or agent that started the job, under the owner's rules for it.
     const who = jobCaller(job);
     const common = {

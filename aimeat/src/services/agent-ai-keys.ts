@@ -34,6 +34,9 @@
  *   const agent = agentNameOf(caller.principal, caller.gaii);
  *   const key = agent ? await readAgentKey(storage, config, caller.gaii, agent, 'decide') : null;
  * @version-history
+ *   v1.5.0 — 2026-11-04 — aiPayerOf and aiAskerOf read payerOfPrincipal and askerOf (services/caller-facts.ts),
+ *     where the rule moved unchanged; routes and MCP tools read `caller.payer` (codebase analysis
+ *     2026-11-03, item B1).
  *   v1.4.0 — 2026-11-02 — aiPayerOf: an ecosystem app is paid by its owner, as the owner's app
  *     `eco:<app>`; aiAskerOf names who asked (secaudit2026nov02d round 13).
  *   v1.3.0 — 2026-10-18 — writeAgentKey and writeAgentCap merge into the record as stored, on its
@@ -52,7 +55,8 @@ import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
 import { updatePrivateRecord } from './private-record.js';
 import { UNCHANGED } from './record-cas.js';
 import { emitChange } from './event-bus.js';
-import { parseGAII, parseGEAI, isValidGEAI, isValidAgentName, ECO_PREFIX } from '../utils/gaii.js';
+import { parseGAII, isValidAgentName } from '../utils/gaii.js';
+import { payerOfPrincipal, askerOf, type AiPayer } from './caller-facts.js';
 
 /** The two models an agent may hold a key for. */
 export type AgentAiModel = 'decide' | 'openrouter';
@@ -77,40 +81,19 @@ export function agentNameOf(principal: string, ownerGhii: string): string | null
 }
 
 /**
- * WHO PAYS FOR A TEXT CALL, AND IN WHOSE NAME IT WAS ASKED. An agent's call is paid by its owner:
- * the owner's settings, daily budget, allowance and usage record, with the agent named so that its
- * own key comes first and its own cap applies. Every other principal pays as itself, as before.
- *
- * Ruled by the developer on 2026-09-20. Until then a text door took the payer to be the principal,
- * so an agent's completion was keyed, budgeted and metered in the AGENT's own namespace: the owner's
- * own key never paid for an agent's call, the owner's daily budget did not cap it, and each agent
- * drew a free starter allowance of its own. The decision model (services/decide/) and the voice door
- * (routes/ai-voice.ts, ownerGhiiOf) already paid from the owner; this makes text the same, and the
- * order agent key, owner key, server key true on every AI door.
- *
- * An ecosystem app (`eco:<app>#<owner>@<node>`) is paid by its owner too, as the owner's app
- * `eco:<app>` (`ecoApp`): the owner's key, settings, app allowlist, per-app cap, daily budget and
- * node-key allowance apply to it, and its spend shows on the owner's usage under that name. Until
- * 2026-11-02 it paid as itself, from its own `eco:` namespace, outside the owner's settings and with
- * a free starter allowance of its own per app (secaudit2026nov02d round 13). Storage is not moved:
- * what the app keeps stays in its own namespace (utils/gaii.ts resolveIdentity).
+ * WHO PAYS FOR A TEXT CALL, AND IN WHOSE NAME IT WAS ASKED: payerOfPrincipal in services/caller-facts.ts, which
+ * holds the rulings (an agent's call is paid by its owner, 2026-09-20; an ecosystem app's by its owner
+ * as the owner's app `eco:<app>`, 2026-11-02). A request's and an MCP session's caller carry the answer
+ * as `caller.payer` (services/caller-context.ts); this is the same answer for a path that holds only
+ * the principal string (an AI job, a planner call).
  */
-export function aiPayerOf(principal: string): { payer: string; agent?: string; ecoApp?: string } {
-  const p = parseGAII(principal);
-  if (p) return { payer: `${p.owner}@${p.node}`, agent: p.agent };
-  const e = parseGEAI(principal);
-  return e ? { payer: `${e.owner}@${e.node}`, ecoApp: `${ECO_PREFIX}${e.app}` } : { payer: principal };
+export function aiPayerOf(principal: string): AiPayer {
+  return payerOfPrincipal(principal);
 }
 
-/**
- * Who asked for a call, as the provenance record and the usage ledger name it beside the payer: the
- * agent's GAII, the ecosystem app's GEAI (`app` is `eco:<app>`, as aiPayerOf names it), or the payer.
- * `app` is the app the node identified (the plan's verified app), never a request body's word.
- */
+/** Who asked for a call, beside the payer: askerOf in services/caller-facts.ts. */
 export function aiAskerOf(payer: string, who: { agent?: string; app?: string }): string {
-  if (who.agent) return `${who.agent}#${payer}`;
-  if (who.app?.startsWith(ECO_PREFIX) && isValidGEAI(`${who.app}#${payer}`)) return `${who.app}#${payer}`;
-  return payer;
+  return askerOf(payer, who);
 }
 
 export function agentKeyRecord(model: AgentAiModel, agent: string): string {
