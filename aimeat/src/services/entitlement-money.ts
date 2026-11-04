@@ -15,6 +15,8 @@
  *   const s = await settleEntitlementMoney(storage, config, { consumerGhii, providerGhii, priceMicros, currency, feePct, reference });
  *   if (!s.ok) // deny; else keep s.trackingCode for a later refund
  * @version-history
+ *   2026-11-04 — The operator's fee is booked through settlePurchase (commerce/settle-purchase.ts), still
+ *     strict (codebase analysis 2026-11-03, item B2).
  *   v1.0.0 — 2026-07-20 — Initial money accrual rail for the entitlement gateway (EXCHANGE money unit).
  *   v1.0.1 — 2026-09-26 — ownerOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.0.2 — 2026-10-11 — The morsel payment handler no longer exists, so the accrual handler is picked from every registered handler. recordMoneyPlatformFee comes from commerce/platform-fee.ts, which breaks the import cycle with the checkout.
@@ -25,7 +27,7 @@ import type { PaymentContext, PaymentHandler } from '../commerce/types.js';
 import { listPaymentHandlers } from '../commerce/payment-handlers.js';
 import { TEST_MONEY_HANDLER_ID } from '../commerce/test-money-handler.js';
 import { percentFee } from '../commerce/money.js';
-import { recordMoneyPlatformFee } from '../commerce/platform-fee.js';
+import { settlePurchase } from '../commerce/settle-purchase.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
 
@@ -72,12 +74,15 @@ export async function settleEntitlementMoney(
         buyerGhii: args.consumerGhii, trackingCode: collected.trackingCode, reference: args.reference,
       });
     }
-    if (fee > 0) {
-      await recordMoneyPlatformFee(storage, config, {
-        fee, currency: args.currency, sellerGhii: args.providerGhii, buyerGhii: args.consumerGhii,
+    // The provider has their net; the operator's fee is booked (commerce/settle-purchase.ts). Strict, as
+    // before: a fee that cannot be booked fails the settlement.
+    await settlePurchase(storage, config, {
+      from: 'delivered',
+      steps: [{ books: [{
+        kind: 'fee', fee, currency: args.currency, sellerGhii: args.providerGhii, buyerRef: args.consumerGhii,
         trackingCode: collected.trackingCode, handler: handler.id,
-      });
-    }
+      }] }],
+    });
     return { ok: true, handler: handler.id, trackingCode: collected.trackingCode, fee, net };
   } catch {
     return { ok: false, reason: 'settlement_failed' };

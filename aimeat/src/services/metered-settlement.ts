@@ -25,6 +25,8 @@
  *   contract from opposite ends: the door calls one of them, never both.
  * @structure settleMeteredCharge · resolvePacingToll · chargePacing · SettlementResult · BeneficiaryAccrual
  * @version-history
+ *   2026-11-04 — The money rail's beneficiary accrual books through settlePurchase, in one transaction
+ *     (commerce/settle-purchase.ts; codebase analysis 2026-11-03, item B2).
  *   v1.2.4 — 2026-10-25 — A pacing reversal credits the payer only the shares it took back, plus the
  *     burned part; a share the provider or operator no longer holds is not credited (secaudit2026oct22).
  *   v1.2.3 — 2026-10-12 — The payer's rows name an initiator only when someone other than the payer
@@ -50,8 +52,9 @@ import { percentFee } from '../commerce/money.js';
 import { commerceFeePercent, resolveOperatorFeeGhii } from './marketplace-fee.js';
 import { settleEntitlementMoney, refundEntitlementMoney } from './entitlement-money.js';
 import { commitSpend, refundSpend, type MeteredEntitlement, type PricingSpec } from './metered-entitlements.js';
-import { readSplit, computeSplit, type DynamicDesignation, type SplitResult } from '../commerce/beneficiary-split.js';
-import { bookBeneficiaryShares, reverseAccrual } from '../commerce/beneficiary-book.js';
+import type { DynamicDesignation, SplitResult } from '../commerce/beneficiary-split.js';
+import { reverseAccrual } from '../commerce/beneficiary-book.js';
+import { settlePurchase } from '../commerce/settle-purchase.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -215,30 +218,38 @@ type Args = Parameters<typeof settleMeteredCharge>[0];
  * went to the operator, which is how a 70 % share quietly becomes more than the provider kept.
  */
 function beneficiaryAccrualFor(
-  { storage, ent, caller, product }: Args,
+  { config, storage, ent, caller, product }: Args,
   args: { providerCut: number; trackingCode: string; currency: string; reference: string },
 ): BeneficiaryAccrual {
   return async (designations = []) => {
     if (args.providerCut <= 0) return null;
+    // A book entry, not a payment: the provider already has the money and the consumer already has
+    // their answer. Failing the call now would undo a good delivery to fix a bookkeeping problem, so
+    // the step is tolerant. The call is delivered (its meter committed), so this books it
+    // (commerce/settle-purchase.ts).
+    const context = { label: product.label, provider: ent.providerGhii, trackingCode: args.trackingCode };
     try {
-      const split = await readSplit(storage, ent.providerGhii, product.ext, product.action);
-      const result = computeSplit(args.providerCut, split, designations);
-      if (!result.lines.length) return null;
-      await bookBeneficiaryShares(storage, {
-        lines: result.lines, trackingCode: args.trackingCode, fromGhii: ent.providerGhii,
-        currency: args.currency, buyerGhii: ownerGhiiOf(caller), reference: args.reference,
+      const settled = await settlePurchase(storage, config, {
+        from: 'delivered',
+        steps: [{
+          books: [{
+            kind: 'shares', sellerGhii: ent.providerGhii, ext: product.ext, action: product.action, net: args.providerCut,
+            currency: args.currency, designations, trackingCode: args.trackingCode, buyerRef: ownerGhiiOf(caller), reference: args.reference,
+          }],
+          tolerant: { message: ACCRUAL_FAILED, context },
+        }],
       });
-      return result;
+      const step = settled.steps[0];
+      const result = step?.ok ? step.splits[0] ?? null : null;
+      return result && result.lines.length ? result : null;
     } catch (err) {
-      // A book entry, not a payment: the provider already has the money and the consumer already has
-      // their answer. Failing the call now would undo a good delivery to fix a bookkeeping problem.
-      logger.error('[metered-settlement] beneficiary accrual failed; the provider keeps the whole cut for this call', {
-        label: product.label, provider: ent.providerGhii, trackingCode: args.trackingCode, error: String(err),
-      });
+      logger.error(ACCRUAL_FAILED, { ...context, error: String(err) });
       return null;
     }
   };
 }
+
+const ACCRUAL_FAILED = '[metered-settlement] beneficiary accrual failed; the provider keeps the whole cut for this call';
 
 /**
  * Morsel rail: a contract denominated in morsels is a contract on PACING, not a price (ruling D4,
