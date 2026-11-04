@@ -103,6 +103,10 @@ describe('getCapabilitiesBySourceRefs and capabilityLookup (C7)', () => {
       expect(bulk.map(c => c.source.ref).sort()).toEqual([`${p}a`, `${p}c`]);
       for (const ref of asked) expect(bulk.find(c => c.source.ref === ref) ?? null).toEqual(await s.getCapabilityBySourceRef(ref));
       expect(await s.getCapabilitiesBySourceRefs([])).toEqual([]);
+      // The rows of one source type, which the scan's cleanup reads, are the same rows.
+      const ofType = (await s.listCapabilitiesBySourceType('app-tool')).filter(c => c.source.ref.startsWith(p));
+      expect(ofType.map(c => c.source.ref).sort()).toEqual([`${p}a`, `${p}b`, `${p}c`]);
+      expect(ofType.find(c => c.source.ref === `${p}a`)).toEqual(bulk.find(c => c.source.ref === `${p}a`));
 
       const lookup = await capabilityLookup(s, asked);
       for (const ref of [...asked, `${p}b`]) expect(await lookup.get(ref)).toEqual(await s.getCapabilityBySourceRef(ref));
