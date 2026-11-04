@@ -150,7 +150,7 @@ function appIdOfCoordinate(coordExt: string): string {
   return coordExt.startsWith('apptool:') ? coordExt.slice('apptool:'.length) : '';
 }
 
-function actorKindOf(session?: { roles: string[] } | null): UsageActorKind {
+export function actorKindOf(session?: { roles: string[] } | null): UsageActorKind {
   const roles = session?.roles ?? [];
   if (roles.includes('app')) return 'app';
   // An ecosystem app's session carries the role `ecosystem` (auth/middleware.ts); `eco` is the usage

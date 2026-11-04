@@ -40,7 +40,7 @@ import type { UsageActorKind } from '../storage/interface.js';
 type AnyFn = (...args: unknown[]) => unknown;
 
 /** What kind of principal this is, read from the identity's own shape rather than from a session. */
-function actorKindOf(principal: string): UsageActorKind {
+export function actorKindOf(principal: string): UsageActorKind {
   if (principal.startsWith('eco:')) return 'eco';
   if (principal.includes('#')) return 'agent';
   return 'owner';

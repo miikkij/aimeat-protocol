@@ -34,7 +34,7 @@ function isAnonymous(viewer?: string | null): boolean {
   return !viewer || viewer === 'anon';
 }
 
-function actorKindOf(principal: string): UsageActorKind {
+export function actorKindOf(principal: string): UsageActorKind {
   if (principal.startsWith('eco:')) return 'eco';
   if (principal.includes('#')) return 'agent';
   return 'owner';
