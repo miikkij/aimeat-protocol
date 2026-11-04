@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.2.0 (commit 02cca5c1b) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 0c741df55) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -79,7 +79,7 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The node key: two processes that start without a key file adopt one key | `aimeat/src/auth/node-keys.ts` |
 | Sign-in through an outside identity provider (the OIDC login round is a stored nonce), device authorization requests, MCP OAuth clients, refresh tokens and approvals, spent upload tokens, spent agent return proofs | `aimeat/src/routes/oauth-login.ts`, `aimeat/src/routes/agents/device-auth.ts`, `aimeat/src/mcp/oauth.ts`, `aimeat/src/routes/upload.ts`, `aimeat/src/services/device-return-proof.ts` |
 | Messages and tasks for an agent wait in storage and go out with the backlog when the agent's tunnel connects | `aimeat/src/services/connect-tunnel-push.ts` |
-| Processes that start together migrate and seed one after the other: the boot lock is a PostgreSQL advisory lock, and a process waits for it up to 60 s | `aimeat/src/storage/providers/postgres-kysely/migrate.ts`, `aimeat/src/server-bootstrap/boot-seed-lock.ts` |
+| Processes that start together migrate and seed one after the other: the boot lock is a PostgreSQL advisory lock held by a transaction (never by a session, so it also holds behind a connection pooler), and a process waits for it up to 60 s | `aimeat/src/storage/providers/postgres-kysely/migrate.ts`, `aimeat/src/server-bootstrap/boot-seed-lock.ts` |
 | Maintenance mode: a stop switched on by `aimeat maintenance on` or through another process reaches every process over the event bus below, and within 5 s through a poll of storage when the bus is down | `aimeat/src/services/maintenance-cache.ts` |
 | The live update bus: a change made on one process reaches the browsers (SSE) and the agent tunnels connected to every process, over PostgreSQL `LISTEN`/`NOTIFY`, and a message or task for an agent reaches it on whichever process holds its tunnel. Work an event starts (a workflow trigger, an intake, a data product) runs only on the process that made the change, so it runs once. SQLite has no bus: one process per database file | `aimeat/src/services/bus-relay.ts`, `aimeat/src/services/event-bus.ts`, `aimeat/src/storage/providers/postgres-kysely/bus-wire.ts` |
 | The read cache: a change on any process clears the entries it touches on every process | `aimeat/src/server-bootstrap/process-buffers.ts`, `aimeat/src/services/cache-invalidation.ts` |
@@ -174,7 +174,7 @@ Every outbound call these make is listed, with its setting, on [02 Architecture]
 | Why does the node stay small? | It holds refined knowledge and the state that apps show. Model inference and heavy processing run in other services, so a heavy job cannot take the knowledge store down with it, and a node outage does not stop those services' own work | [Services around a node](#services-around-a-node) |
 | How is one host's loss covered? | A second process on a second host, as a standby or as a second active process; the processes take over each other's AI jobs when a lease runs out | [Several node processes on one database](#several-node-processes-on-one-database) |
 | How is the blast radius kept small? | Separate nodes for units, partners or people: an outage, a setting or a breach on one node stays on it | [Many nodes](#many-nodes) |
-| How is the database covered? | PostgreSQL's own standby and WAL archiving, and backups with a tested restore; the RTO and RPO tiers are on page 11 | [11 Backup and recovery](11-backup-recovery.md#proposed-rto-and-rpo) |
+| How is the database covered? | PostgreSQL's own standby and WAL archiving, and backups with a tested restore; the RTO and RPO tiers are on page 11, and the setup, the timed restore and the failover drill in the database high availability guide | [11 Backup and recovery](11-backup-recovery.md#proposed-rto-and-rpo), [Database high availability](../operations/database-high-availability.md) |
 
 ## Operator access is a design decision
 

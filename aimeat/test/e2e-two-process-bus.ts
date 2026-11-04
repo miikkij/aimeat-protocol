@@ -12,7 +12,11 @@
  *     4. one append of workspace rows on A starts its `workspace.rows` workflow once, not once per
  *        process (the origin rule in services/event-bus.ts). The workflow is `parallel`, so the
  *        overlap guard would not hide a second start;
- *     5. a task created on A reaches its agent at once when the agent's tunnel is held by B.
+ *     5. a task created on A reaches its agent at once when the agent's tunnel is held by B;
+ *     6. after the listening connections of A and B are dropped (pg_terminate_backend), B reads its
+ *        registries again when it listens again, so a setting changed in the database while no
+ *        event could arrive (registration closed with no NOTIFY) is in force on B; before the drop
+ *        B does not see it, which shows the reconnect is what applied it.
  *
  *   WHY. With the bus in one process, a change made on A reached only A: B's pages did not update,
  *   B kept accepting a peer the operator had removed in an emergency, and B ran with the old settings
@@ -24,11 +28,13 @@
  *   so on a SQLite run the suite is skipped with that reason.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-two-process-bus
  * @version-history
+ *   v1.1.0 — 2026-11-04 — Case 6: a dropped listening connection, and the registries read again
+ *     after it (codebase analysis 2026-11-03, item HA stage 3).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { ownNodeDb, runBackend } from './helpers/own-node-db.js';
+import { ownNodeDb, runBackend, type OwnNodeDb } from './helpers/own-node-db.js';
 import { skip, isSkip } from './helpers/skip.js';
 import { setupOperator, registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
@@ -126,6 +132,7 @@ async function openStream(p: 'A' | 'B', token: string) {
 
 let op: RegisteredOwner;
 let plain: RegisteredOwner;
+let nodeDb: OwnNodeDb | undefined;
 
 console.log('\n=== TWO PROCESSES, ONE BUS (the event bus over PostgreSQL LISTEN/NOTIFY) ===\n');
 
@@ -133,6 +140,7 @@ try {
     await test('Setup: process A, then process B, of one node on one empty database; the operator\'s token works on both', async () => {
         if (runBackend() !== 'postgres-kysely') skip('SQLite is one file for one process; the bus between processes is PostgreSQL only');
         const db = await ownNodeDb('two-process-bus');
+        nodeDb = db;
         await startProcess('A', db);
         await startProcess('B', db);
         op = await setupOperator(base('A'), process.env.AIMEAT_ADMIN_PASSWORD ?? '', `busop${stamp}`);
@@ -261,6 +269,35 @@ try {
             assert(d !== null, 'the tunnel on B got no deliver frame for the task created on A');
             assert((d!.payload as any)?.id === t.body.data.task.id && d!.kind === 'task_assigned', `deliver: ${short(d)}`);
         } finally { await tunnel.close(); }
+    });
+
+    await test('6. After the listening connections drop, B reads its settings again: a change no event announced is in force on B', async () => {
+        if (!op || !nodeDb) skip('no setup');
+        const pg = (await import('pg')).default;
+        const admin = new pg.Client(nodeDb.dbUrl);
+        await admin.connect();
+        const register = (name: string) => json('B', '/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'x', password: 'E2eOwnerPass-2026' }) });
+        try {
+            // Registration closed in the database with no NOTIFY: a change whose event was lost.
+            const row = await admin.query('UPDATE "SystemSetting" SET "value" = \'closed\' WHERE "key" = \'config:registration.mode\'');
+            assert(row.rowCount === 1, `the stored registration setting (left by case 3): ${row.rowCount} row(s)`);
+            await sleep(1_500);
+            const unchanged = await register(`busgap${stamp}`);
+            assert(unchanged.status === 201, `B applied a change no event announced, before any drop: ${unchanged.status} ${short(unchanged.body)}`);
+
+            const dropped = await admin.query(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+                WHERE datname = current_database() AND pid <> pg_backend_pid() AND query = 'LISTEN aimeat_bus'`);
+            assert((dropped.rowCount ?? 0) >= 2, `the listening connections of A and B: ${dropped.rowCount} dropped`);
+            const droppedAt = Date.now();
+            let reg = await register(`busgap${stamp}a`);
+            for (let i = 0; reg.status === 201 && Date.now() - droppedAt < 15_000; i++) { await sleep(250); reg = await register(`busgap${stamp}b${i}`); }
+            assert(reg.status !== 201, `B still registers new accounts ${Date.now() - droppedAt} ms after its listening connection dropped: ${reg.status} ${short(reg.body)}`);
+            const listening = await admin.query(`SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND query = 'LISTEN aimeat_bus'`);
+            assert(listening.rows[0].n >= 2, `A and B listen again: ${listening.rows[0].n}`);
+        } finally {
+            await admin.end();
+            await json('A', '/v1/admin/config', { method: 'PUT', token: op.token, body: JSON.stringify({ changes: [{ path: 'registration.mode', value: 'open' }] }) });
+        }
     });
 } finally {
     for (const p of procs) if (p.exit() === null) p.proc.kill();

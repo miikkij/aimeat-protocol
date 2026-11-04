@@ -169,7 +169,7 @@ carry are below, grouped by topic, each with the page that explains it.
 - The node has no backup scheduler; the schedule, encryption and off-site copy are the operator's. With a bucket file store, turn on object versioning: after a restore of an older database, objects written after that backup are no longer named and the daily sweep can remove them.
 - The node never re-encrypts its stored secrets. After `AIMEAT_ENCRYPTION_KEY` is added to a node that ran on `AIMEAT_TOTP_ENCRYPTION_KEY` (as `aimeat init` sets up), the secrets stored before open only while the TOTP key stays set (`aimeat/src/services/encryption.ts`).
 - Restoring a newer backup onto an older node version is not supported. Losing `AIMEAT_ENCRYPTION_KEY` makes every stored secret unreadable; losing both the key passphrase and the key file stops the node from starting as the same node.
-- No restore-time figure at production size exists, and PostgreSQL WAL archiving and standby replication are not covered by the guides or tests.
+- No restore-time figure at production size exists, and no failover drill is recorded. PostgreSQL WAL archiving and standby replication are described in [Database high availability](../operations/database-high-availability.md) and not exercised by the repository's tests.
 - The SBOM is not attached to a release. The upgrade test covers one step, from the previous release to the new build. The repository describes no process for publishing security advisories or CVE identifiers. No Docker image is published.
 
 ### Compliance and regulated use ([14](14-compliance-mapping.md), [regulated-sector addendum](templates/regulated-sector-addendum.md))

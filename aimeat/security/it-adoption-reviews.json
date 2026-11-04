@@ -120,13 +120,16 @@
       "digest": "sha256:a3eec7b960928ad6b1577e84"
     },
     "11-backup-recovery.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "docs/operations/backup-and-restore.md",
         "aimeat/src/auth/node-keys.ts",
-        "aimeat/src/services/encryption.ts"
+        "aimeat/src/services/encryption.ts",
+        "docs/operations/database-high-availability.md",
+        "aimeat/src/storage/providers/postgres-kysely/read-retry.ts",
+        "aimeat/src/server-bootstrap/bus-relay-start.ts"
       ],
-      "digest": "sha256:a2cfabff1df7831595ccad4c"
+      "digest": "sha256:5d7c69f23e2fb8c20cbd488b"
     },
     "12-updates-releases.md": {
       "reviewedOn": "2026-11-01",
@@ -210,14 +213,14 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:54e0e524642ea6811a52f363"
+      "digest": "sha256:50fc91e090e8a2decd074b71"
     },
     "README.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "docs/operations/README.md"
       ],
-      "digest": "sha256:1321504425b104cdb3f6b2c2"
+      "digest": "sha256:af69269baf2ee22dcf96fa8d"
     },
     "templates/application-register-entry.md": {
       "reviewedOn": "2026-11-02",
@@ -341,7 +344,10 @@
     "11-backup-recovery.md": {
       "docs/operations/backup-and-restore.md": "c4a998fa57b04c2a",
       "aimeat/src/auth/node-keys.ts": "aac90000400b1caa",
-      "aimeat/src/services/encryption.ts": "46eeede52cdc5803"
+      "aimeat/src/services/encryption.ts": "46eeede52cdc5803",
+      "docs/operations/database-high-availability.md": "fb3b82782584e700",
+      "aimeat/src/storage/providers/postgres-kysely/read-retry.ts": "2ae23e7a2d98bbad",
+      "aimeat/src/server-bootstrap/bus-relay-start.ts": "4ea49009017ba3bc"
     },
     "12-updates-releases.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
@@ -374,7 +380,7 @@
       ".github/SECURITY.md": "3298fcc91e6ba5ee"
     },
     "README.md": {
-      "docs/operations/README.md": "febe51a3cdddf7af"
+      "docs/operations/README.md": "1fa5c973804d9424"
     },
     "templates/application-register-entry.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
@@ -410,7 +416,7 @@
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
       "aimeat/security/process-local-baseline.json": "3c0b42af10dd549d",
-      "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "41f44d4c72ded9c2",
+      "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
       "aimeat/src/services/notification-sweeps.ts": "41dc0401bea00176",

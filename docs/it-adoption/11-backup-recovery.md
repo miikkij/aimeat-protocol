@@ -1,6 +1,6 @@
 # 11 Backup and recovery
 
-> Checked against AIMEAT node 4.2.0 (commit 959664aab) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 44d5499cf) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the sysadmin who owns backups and the continuity planner who sets recovery targets. It lists what must be backed up for a node to come back as the same node, gives the procedure in short, proposes RTO and RPO values for the organisation to decide, and describes the restore test. The commands for each storage backend are in [Backup and restore](../operations/backup-and-restore.md), which stays the single home for them.
 
@@ -51,7 +51,7 @@ The online SQLite backup, the stopped-node copy and the PostgreSQL dump and rest
 
 ## Proposed RTO and RPO
 
-These are proposals. The organisation decides them from its own business impact analysis and records them in [templates/organization-profile.md](templates/organization-profile.md). The repository contains no restore-time measurement at production size, so measure RTO in the first restore test.
+These are proposals. The organisation decides them from its own business impact analysis and records them in [templates/organization-profile.md](templates/organization-profile.md). The repository contains no restore-time measurement at production size, so measure RTO in the first restore test ([Database high availability](../operations/database-high-availability.md#time-a-restore-at-production-size) gives the steps).
 
 | Tier | RPO (data loss) | How it is reached | RTO (time to service) | Reasoning |
 |---|---|---|---|---|
@@ -59,7 +59,7 @@ These are proposals. The organisation decides them from its own business impact 
 | Standard | 1 h | PostgreSQL: hourly dumps, or nightly base backup with continuous WAL archiving. SQLite: hourly online backups | 2 h | Fits a node used for daily work by a team. WAL archiving is PostgreSQL's own point-in-time recovery ([PostgreSQL documentation, continuous archiving](https://www.postgresql.org/docs/current/continuous-archiving.html)) |
 | High | 15 min or less | PostgreSQL with continuous WAL archiving, or a streaming standby ([PostgreSQL documentation, warm standby](https://www.postgresql.org/docs/current/warm-standby.html)) | 1 h | For a node others depend on through apps or federation. Needs a prepared standby host with the same `.env` and key file |
 
-The AIMEAT documentation describes `pg_dump` and SQLite backups; WAL archiving and standbys are standard PostgreSQL operation that the node's guides do not cover and the repository's tests do not exercise. Whatever the tier, the secrets and the key file change rarely: back them up when they change and keep them with every database generation.
+The AIMEAT documentation describes `pg_dump` and SQLite backups in [Backup and restore](../operations/backup-and-restore.md), and a streaming standby with automatic failover, WAL archiving with point-in-time recovery, a timed restore and a failover drill in [Database high availability](../operations/database-high-availability.md). The standby and the archiving are standard PostgreSQL operation that the repository's tests do not exercise. What the tests cover is the node's side of a failover: a read built by the node's query builder outside a transaction is asked once more on a new connection when its connection was lost, a write fails to its caller, and the event bus between the node's processes reads its registries again after its connection dropped (`aimeat/src/storage/providers/postgres-kysely/read-retry.ts`, `aimeat/src/server-bootstrap/bus-relay-start.ts`). Whatever the tier, the secrets and the key file change rarely: back them up when they change and keep them with every database generation.
 
 Retention of backups is a privacy decision as well: a record or account a person erased stays in every older backup until that backup is destroyed, and a restore brings it back. State the backup retention in the privacy notice ([Backup and restore](../operations/backup-and-restore.md)); see [05 Data protection](05-data-protection.md).
 
@@ -90,7 +90,9 @@ The repository records one exercised restore, on 2026-10-12 on SQLite with a san
 - Losing `AIMEAT_ENCRYPTION_KEY` makes every stored secret unreadable, with no recovery path in the node.
 - Losing both the key passphrase and the key file stops the node from starting as the same node.
 - No restore-time figure at production size exists in the repository; RTO values here are proposals until measured.
-- PostgreSQL WAL archiving and standby replication are not covered by the node's guides or tests.
+- PostgreSQL WAL archiving and standby replication are described in [Database high availability](../operations/database-high-availability.md) and not exercised by the repository's tests. The project records no failover drill.
+- During a database failover, writes fail and the node does not retry them; a read is retried once, and only one built by the node's query builder outside a transaction (`aimeat/src/storage/providers/postgres-kysely/read-retry.ts`).
+- The node knows one database address (`DATABASE_URL`), sends no read to a replica, and does not support a connection pooler in transaction mode in that address ([Database high availability](../operations/database-high-availability.md#a-connection-pooler)).
 - A restore brings back data that people erased after the backup was taken.
 
 ## Open questions

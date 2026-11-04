@@ -13,6 +13,9 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-04 — bootLock() is a transaction-scoped advisory lock, held by a transaction left open
+ *     until the release, so it holds through a connection pooler (codebase analysis 2026-11-03, item
+ *     HA stage 3).
  *   2026-11-04 — busWire(): the line the event bus of a node's processes talk over (PostgreSQL only;
  *     codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — EphemeralClaimRepository: short-lived values and window counters every process of a
@@ -251,7 +254,8 @@ export interface Storage extends
    * Take the node's BOOT LOCK and answer the function that gives it back. Two processes of one node
    * on one database that start together hold it in turn: each migrates under it (the provider does
    * that itself) and seeds under it (server-bootstrap/service-init.ts), so neither seeds while the
-   * other does. PostgreSQL only: a session advisory lock on a connection of its own. A provider with
+   * other does. PostgreSQL only: a transaction-scoped advisory lock in a transaction left open on a
+   * connection of its own until the release (never a session lock, which a pooler loses). A provider with
    * one process per database (SQLite, memory) has none, and the caller goes on without it.
    */
   bootLock?(): Promise<() => Promise<void>>;
