@@ -28,24 +28,30 @@
  *     const participant = credentialOf(req, 'dsp-participant');
  *   });
  * @version-history
+ *   v1.1.0 — 2026-11-04 — 'party': an outside party on /v1/parties/me* (codebase analysis 2026-11-03, item B8).
  *   v1.0.0 — 2026-11-04 — Initial: the Dataspace Protocol participant (codebase analysis 2026-11-03, item B8).
  */
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
 import type { CredentialKind } from './credential-kinds.js';
+import { error } from '../middleware/envelope.js';
 import { verifyDspRequest, type Participant } from '../services/dataspace/verifier.js';
 import { catalogError, negotiationError, transferError } from '../services/dataspace/contract.js';
+import { partyCredentialOf, verifyParty, type PartyContext } from '../services/parties/verify.js';
 import { logger } from '../utils/logger.js';
 
 /** The principal each kind puts on the request. */
 export interface CredentialPrincipals {
     'dsp-participant': Participant;
+    party: PartyContext;
 }
 
 /** What each kind's strategy is built with at the route. */
 export interface StrategyOptions {
     /** `process` picks the DSP error body: a catalog error, or a negotiation or transfer error naming the :pid. */
     'dsp-participant': { config: AimeatConfig; process: 'catalog' | 'negotiation' | 'transfer' };
+    party: { storage: Storage; config: AimeatConfig };
 }
 
 /** A principal on the request, tagged with its kind. */
@@ -77,8 +83,23 @@ const dspParticipant: Strategy<'dsp-participant'> = ({ config, process }) => asy
     return null;
 };
 
+/** An outside party of an owner (was partyOf() in routes/parties.ts). */
+const outsideParty: Strategy<'party'> = (deps) => async (req, res) => {
+    const cred = partyCredentialOf(req);
+    if (!cred) {
+        res.status(401).json(error(deps.config.nodeId, 'AUTH_REQUIRED', 'Sign in with the name and the key the owner gave you.', undefined, {
+            basic_user: '<owner>/<party name>', basic_password: 'the party key', token_endpoint: '/v1/parties/token',
+        }));
+        return null;
+    }
+    const v = await verifyParty(deps, cred);
+    if (!v.ok) { res.status(v.status).json(error(deps.config.nodeId, v.code, v.message)); return null; }
+    return v.ctx;
+};
+
 const STRATEGIES: { [K in CredentialKind]: Strategy<K> } = {
     'dsp-participant': dspParticipant,
+    party: outsideParty,
 };
 
 /**

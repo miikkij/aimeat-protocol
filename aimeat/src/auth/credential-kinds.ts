@@ -31,6 +31,11 @@ export const CREDENTIAL_KINDS = {
             + 'or one of the operator\'s static tokens (services/dataspace/verifier.ts). No credential is 401.',
         admitsNoCredential: false,
     },
+    party: {
+        credential: 'An outside party of an owner: HTTP Basic <owner>/<party name> with the party key, or a party token from '
+            + 'POST /v1/parties/token (services/parties/verify.ts). No credential is 401, a stopped party 403.',
+        admitsNoCredential: false,
+    },
 } as const satisfies Record<string, CredentialKindInfo>;
 
 export type CredentialKind = keyof typeof CREDENTIAL_KINDS;
