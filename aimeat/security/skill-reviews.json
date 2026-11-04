@@ -374,7 +374,7 @@
       "digest": "sha256:110b77df9abf93ec33aacbf7"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -385,7 +385,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:6eb066c8e0e9dce456dea917",
+      "digest": "sha256:0203310b9a81bd7b3ef92b63",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -767,7 +767,7 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "39140d92ef94092c",
+      "aimeat/src/routes/memory/bulk.ts": "2bad88072571dc96",
       "aimeat/src/routes/memory/key.ts": "0879c21bf9ad1241",
       "aimeat/src/services/memory-bin.ts": "9fa3d0c47be934d5",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
