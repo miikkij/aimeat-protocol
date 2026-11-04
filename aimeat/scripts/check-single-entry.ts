@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.10.0 — 2026-11-04 — Rules scope-widen-at-mint and token-mint: the store place's default is added
+ *     only at the doors the baseline names, and every issueJWT caller is listed with what it mints
+ *     (codebase analysis 2026-11-03, item B7).
  *   v1.9.0 — 2026-11-04 — Rules principal-kind and payer-resolve: what kind of caller this is and who
  *     pays for its AI call are answered by services/caller-facts.ts and read from the CallerContext;
  *     13 hand classifier lines in 6 files and 33 door calls of aiPayerOf moved, so both baselines
@@ -208,6 +211,19 @@ export const RULES: Rule[] = [
     // caller-facts.ts holds the rule; agent-ai-keys.ts keeps aiPayerOf as its one-line read for the
     // tests that import it. services/ai/caller-context.ts maps the payer onto the planner's caller class.
     skipDirs: ['src/services/caller-facts.ts', 'src/services/agent-ai-keys.ts'],
+  },
+  {
+    id: 'scope-widen-at-mint',
+    label: 'An agent\'s scopes are decided when it is approved and kept on its record; a token mint copies them. The store place\'s default (services/place-agent-scopes.ts) is added only where the baseline says why, so a sixth door cannot widen at mint (codebase analysis 2026-11-03, B7; round 13 had four commits on this default alone)',
+    pattern: /\b(widenForPlace|widenAndAnnounce|applyPlaceDefault)\(/,
+    // The default's own module and the one function the mints call.
+    skipDirs: ['src/services/place-agent-scopes.ts', 'src/routes/agents/announce-scopes.ts'],
+  },
+  {
+    id: 'token-mint',
+    label: 'A token is minted by issueJWT (auth/jwt.ts) only at a door the baseline names with what it mints and where its roles and scopes come from, so a new mint is a sentence somebody writes (codebase analysis 2026-11-03, B7)',
+    pattern: /\bissueJWT\(/,
+    skipDirs: ['src/auth/jwt.ts'],
   },
   {
     id: 'sale-booking',
