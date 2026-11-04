@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-04: check:verb-parity, the writing verbs of one route path name the same guards or the difference is listed (codebase analysis 2026-11-03, B4).
  *  - 2026-11-01: check:it-adoption, every page of the IT adoption package was read against the code it describes, and the settings and tools it names exist.
  *  - 2026-11-01: check:datapackage-pointer-reads, a data package's audience is read from the service's record, not from latest.json (secaudit2026oct31w2).
  *  - 2026-10-27: check:string-bounds (every Zod string bounded, zero allowed) and check:write-validation (writing routes read their body through a schema; seeded ratchet).
@@ -114,6 +115,9 @@ export const FAST_CHECKS = [
     // Secaudit 2026-10, C1, C2 and C7: a security decision with a function of its own is made only
     // through it; the hand copies left are counted per file and may only fall.
     { script: 'check:single-entry', label: 'A password check, an account deletion and an operator check each go through their one function' },
+    // Codebase analysis 2026-11-03, B4: the writing verbs of one route path name the same guards, or
+    // the difference is listed with its reason (d1f37bb4a: PUT refused what DELETE allowed).
+    { script: 'check:verb-parity', label: 'The writing verbs of one route path name the same guards, or the difference is listed with its reason' },
     // TARGET-082: stored content reaches a caller only through a loader that takes a classification
     // reader, or through a listed read that says why it is the node's own.
     { script: 'check:classification-reach', label: 'Every content read passes the classification reader or is listed with its reason' },
