@@ -19,6 +19,8 @@
  *   - runMigrations(pool): apply every file not applied yet, in lexical order
  *   - takeBootLock(pool) / runMigrationsLocked(pool): the boot lock two booting processes share
  * @version-history
+ *   v1.3.1 — 2026-11-04 — The migrations run on the connection that holds the boot lock, so a pool of
+ *     one connection boots (storage-fault-injection E6-07 waited for a second connection and failed).
  *   v1.3.0 — 2026-11-04 — The boot lock (pg_advisory_lock on a connection of its own) around the
  *     migrations, and takeBootLock() for the boot seeding (codebase analysis 2026-11-03, HA stage 1).
  *   v1.2.1 — 2026-10-25 — The `superseded_by` column is added only when it is missing: the ALTER's lock
@@ -74,6 +76,11 @@ export const BOOT_LOCK_WAIT_MS = 60_000;
  * process that ends releases it the same way.
  */
 export async function takeBootLock(pool: pg.Pool, waitMs = BOOT_LOCK_WAIT_MS): Promise<() => Promise<void>> {
+  return (await holdBootLock(pool, waitMs)).release;
+}
+
+/** takeBootLock, also answering the connection that holds the lock (null when the wait ran out). */
+async function holdBootLock(pool: pg.Pool, waitMs: number): Promise<{ client: pg.PoolClient | null; release: () => Promise<void> }> {
   const client = await pool.connect();
   try {
     await client.query(`SET statement_timeout = ${Math.max(1, Math.floor(waitMs))}`);
@@ -84,30 +91,41 @@ export async function takeBootLock(pool: pg.Pool, waitMs = BOOT_LOCK_WAIT_MS): P
       // query_canceled: the wait ran out. The connection is sound; it goes back without the lock.
       await client.query('RESET statement_timeout').then(() => client.release(), (e: Error) => client.release(e));
       logger.warn(`boot lock: another process held it for over ${Math.round(waitMs / 1000)} s; going on without it`);
-      return async () => { /* nothing was taken */ };
+      return { client: null, release: async () => { /* nothing was taken */ } };
     }
     client.release(err as Error);
     throw err;
   }
   let released = false;
-  return async () => {
-    if (released) return;
-    released = true;
-    try {
-      await client.query('SELECT pg_advisory_unlock($1)', [BOOT_LOCK_KEY]);
-      client.release();
-    } catch (err) {
-      // Destroying the connection ends its session, and the lock with it.
-      client.release(err as Error);
-    }
+  return {
+    client,
+    release: async () => {
+      if (released) return;
+      released = true;
+      try {
+        await client.query('SELECT pg_advisory_unlock($1)', [BOOT_LOCK_KEY]);
+        client.release();
+      } catch (err) {
+        // Destroying the connection ends its session, and the lock with it.
+        client.release(err as Error);
+      }
+    },
   };
 }
 
-/** runMigrations under the boot lock, so a second process booting at the same time waits for this one. */
+/**
+ * runMigrations under the boot lock, so a second process booting at the same time waits for this one.
+ * The migrations run on the connection that holds the lock: a pool of one connection (a small
+ * personal node, the E6-07 pool test) has no second connection to give them, and the boot waited for
+ * one until the pool's connection limit refused it.
+ */
 export async function runMigrationsLocked(pool: pg.Pool): Promise<void> {
-  const release = await takeBootLock(pool);
+  const { client, release } = await holdBootLock(pool, BOOT_LOCK_WAIT_MS);
   try {
-    await runMigrations(pool);
+    if (!client) { await runMigrations(pool); return; }
+    // The lock's connection serves every file's transaction in turn; it goes back to the pool with the lock.
+    const held = { query: client.query.bind(client), release: () => { /* kept until the lock goes */ } } as unknown as pg.PoolClient;
+    await migrateOn(client, async () => held);
   } finally {
     await release();
   }
@@ -115,6 +133,10 @@ export async function runMigrationsLocked(pool: pg.Pool): Promise<void> {
 
 /** Apply every not-yet-applied migration file in lexical order, each in its own transaction. */
 export async function runMigrations(pool: pg.Pool): Promise<void> {
+  await migrateOn(pool, () => pool.connect());
+}
+
+async function migrateOn(pool: Pick<pg.Pool, 'query'>, takeClient: () => Promise<pg.PoolClient>): Promise<void> {
   await pool.query('CREATE TABLE IF NOT EXISTS "_kysely_migrations" (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
   // Set on a file that never ran, to the file that replaced it. ALTER TABLE takes its ACCESS EXCLUSIVE
   // lock before IF NOT EXISTS is checked, so it waits behind any reader of the table (the nightly
@@ -136,7 +158,7 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
       continue;
     }
     const ddl = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
-    const client = await pool.connect();
+    const client = await takeClient();
     try {
       await client.query('BEGIN');
       // The pool's statement and lock limits end a stalled request (pool-limits.ts). A migration
