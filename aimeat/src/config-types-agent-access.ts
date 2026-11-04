@@ -5,10 +5,12 @@
  * @description The settings that bound what an agent, an ecosystem app or an app may reach, mixed
  *   into AimeatConfig. Moved out of config-types.ts unchanged when that file reached the 800-line
  *   ceiling, in the change that added appOriginSignInRefuse.
- * @structure MCP_CAPABILITY_USE_APPROVAL_VALUES · McpCapabilityUseApproval · mcpCapabilityUseApprovalFrom ·
- *   AgentAccessConfig
+ * @structure MCP_CAPABILITY_USE_APPROVAL_VALUES · McpCapabilityUseApproval · CAPABILITY_USE_APPROVAL_LABEL ·
+ *   mcpCapabilityUseApprovalFrom · AgentAccessConfig
  * @usage import type { AgentAccessConfig } from './config-types-agent-access.js';
  * @version-history
+ *   2026-11-04 — CAPABILITY_USE_APPROVAL_LABEL moved here from services/mcp-client/capability-use-setting.ts
+ *     unchanged, which re-exports it (codebase analysis 2026-11-03, item B4).
  *   v1.1.0 — 2026-11-03 — mcpCapabilityUseApproval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL: off, operators,
  *     ask; default operators), secaudit2026nov02d round 13b.
  *   v1.0.0 — 2026-10-04 — Moved from config-types.ts (a pure move), with appOriginSignInRefuse added.
@@ -22,6 +24,13 @@
  */
 export const MCP_CAPABILITY_USE_APPROVAL_VALUES = ['off', 'operators', 'ask'] as const;
 export type McpCapabilityUseApproval = typeof MCP_CAPABILITY_USE_APPROVAL_VALUES[number];
+
+/**
+ * The setting's name as the Config tab shows it in English (dashboard.cfg_mcp_capability_use_approval).
+ * Here so the setting's row (services/config-schema-access.ts) words its refusal with it without an
+ * import cycle; services/mcp-client/capability-use-setting.ts exports it under the same name.
+ */
+export const CAPABILITY_USE_APPROVAL_LABEL = 'Ask before another account\'s tool uses a person\'s sign-in';
 
 /** The environment's value when it is one of the values, `operators` otherwise. */
 export function mcpCapabilityUseApprovalFrom(raw: string | undefined): McpCapabilityUseApproval {

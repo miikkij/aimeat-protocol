@@ -29,6 +29,8 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.6.0 — 2026-11-04 — Rule config-write: a setting row is written through services/config-apply.ts,
+ *     which applies the setting's own tighten-only rule (codebase analysis 2026-11-03, B4).
  *   v1.5.0 — 2026-11-04 — Rule verification-level-gate: an owner's address is proven by
  *     provenOwnerAddress, not by the account's verification level (codebase analysis 2026-11-03, A9).
  *   v1.4.0 — 2026-11-04 — Rule admin-password: the admin password is read only by its one check, its
@@ -159,6 +161,12 @@ const RULES: Rule[] = [
     id: 'admin-password',
     label: 'The node\'s admin password is checked only by checkAdminPassword (services/admin-password.ts), with one count of wrong passwords per address for every route that takes it (codebase analysis 2026-11-03, A12)',
     pattern: /\bconfig\.adminPassword\b/,
+  },
+  {
+    id: 'config-write',
+    label: 'A setting row is written and removed through services/config-apply.ts (applyConfigChanges, storeConfigValue, resetConfigValue), where the rule that an AI may only make a setting stricter is read from the setting\'s row; a write elsewhere skips it, as DELETE did before d1f37bb4a (codebase analysis 2026-11-03, B4)',
+    pattern: /\.(setConfigValue|deleteConfigValue)\(/,
+    skipDirs: ['src/storage/'],
   },
   {
     id: 'request-caller-built',

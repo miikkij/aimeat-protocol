@@ -663,6 +663,24 @@
         "count": 1,
         "why": "The configuration display shows the password masked, or says it is generated at start; nothing is compared."
       }
+    },
+    "config-write": {
+      "src/services/config-apply.ts": {
+        "count": 2,
+        "why": "The one writer and the one reset: storeConfigValue and resetConfigValue, behind the tighten-only rule of applyConfigChanges and resetRefusal."
+      },
+      "src/services/config-at-rest-rows.ts": {
+        "count": 1,
+        "why": "The start-up pass that encrypts a secret row stored in plain text: it rewrites the same value sealed, so no setting changes and there is no caller."
+      },
+      "src/services/hooks-overview.ts": {
+        "count": 5,
+        "why": "The hooks.<name> rows hold the operator's hook lists, which are not Config rows (no row in config-schema.ts), so no setting rule applies. setHookActions is reached from PUT and DELETE /v1/admin/hooks/:hookName (requireOperator) and the MCP admin hooks tool (operator test); the other writes are start-up migrations."
+      },
+      "src/services/owner-session.ts": {
+        "count": 1,
+        "why": "settleRefreshCookieWindowAtStart stores auth.refresh_cookie_legacy_until once at start when no source set it: the node's own write, no caller, and the row has no tighten-only rule."
+      }
     }
   }
 }

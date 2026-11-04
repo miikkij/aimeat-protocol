@@ -1,0 +1,5182 @@
+{
+ "put classification.mode off->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->off narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->off agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->off unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->off anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->owner person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->owner ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->owner narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->owner agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->owner unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->owner anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->all person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->all ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->all narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->all agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->all unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->all anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "off",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode off->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode off->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode off->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode off->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode off->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode off->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode owner->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->off narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from owner to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode owner->off agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from owner to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode owner->off unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from owner to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode owner->off anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from owner to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode owner->owner person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->owner ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->owner narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->owner agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->owner unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->owner anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->all person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->all ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->all narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->all agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->all unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->all anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode owner->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode owner->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode owner->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode owner->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode owner->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode owner->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode all->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->off narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->off agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->off unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->off anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->owner person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->owner ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->owner narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->owner agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->owner unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->owner anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put classification.mode all->all person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->all ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->all narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->all agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->all unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->all anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "all"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put classification.mode all->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode all->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode all->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode all->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode all->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put classification.mode all->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "classification.mode",
+     "reason": "Invalid value for classification.mode"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required off->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->off narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->off agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->off unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->off anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->operators narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->operators agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->operators unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->operators anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->everyone person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->everyone ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->everyone narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->everyone agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->everyone unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->everyone anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required off->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required off->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required off->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required off->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required off->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required off->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required operators->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->off narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from operators to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required operators->off agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from operators to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required operators->off unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from operators to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required operators->off anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from operators to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required operators->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->operators narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->operators agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->operators unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->operators anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->everyone person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->everyone ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->everyone narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->everyone agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->everyone unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->everyone anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "operators",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required operators->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required operators->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required operators->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required operators->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required operators->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required operators->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required everyone->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->off narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->off agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->off unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->off anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->operators narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->operators agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->operators unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->operators anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.two_step_required everyone->everyone person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->everyone ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->everyone narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->everyone agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->everyone unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->everyone anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.two_step_required everyone->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required everyone->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required everyone->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required everyone->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required everyone->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.two_step_required everyone->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in on->on person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->on ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->on narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->on agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->on unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->on anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->operators narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->operators agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->operators unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->operators anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "on",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in on->off person": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in on->off ownerPat": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in on->off narrowPat": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in on->off agent": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in on->off unattended": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in on->off anonymous": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in on->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in on->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in on->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in on->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in on->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in on->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in operators->on person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->on ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->on narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from operators to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->on agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from operators to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->on unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from operators to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->on anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from operators to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->operators narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->operators agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->operators unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->operators anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in operators->off person": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->off ownerPat": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->off narrowPat": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->off agent": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->off unattended": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->off anonymous": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in operators->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in operators->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in operators->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in operators->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in operators->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in operators->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in off->on person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->on ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->on narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->on agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->on unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->on anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->operators narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->operators agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->operators unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->operators anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.password_sign_in off->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->off narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->off agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->off unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->off anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.password_sign_in off->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in off->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in off->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in off->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in off->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.password_sign_in off->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.password_sign_in",
+     "reason": "Invalid value for auth.password_sign_in"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout off->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->off narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->off agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->off unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->off anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->on person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->on ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->on narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->on agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->on unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->on anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout off->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout off->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout off->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout off->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout off->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout off->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout on->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->off narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.sign_in_lockout on->off agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.sign_in_lockout on->off unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.sign_in_lockout on->off anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "put auth.sign_in_lockout on->on person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->on ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->on narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->on agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->on unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->on anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put auth.sign_in_lockout on->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout on->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout on->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout on->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout on->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put auth.sign_in_lockout on->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.sign_in_lockout",
+     "reason": "Invalid value for auth.sign_in_lockout"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval off->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->off narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->off agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->off unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->off anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->operators narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->operators agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->operators unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->operators anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->ask person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->ask ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->ask narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->ask agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->ask unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->ask anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "off",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval off->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval off->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval off->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval off->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval off->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval off->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval operators->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->off narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from operators to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "operators",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval operators->off agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from operators to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "operators",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval operators->off unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from operators to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "operators",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval operators->off anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from operators to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "operators",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval operators->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->operators narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->operators agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->operators unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->operators anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->ask person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->ask ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->ask narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->ask agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->ask unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->ask anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval operators->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval operators->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval operators->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval operators->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval operators->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval operators->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval ask->off person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->off ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->off narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval ask->off agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval ask->off unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval ask->off anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "put mcp.capability_use_approval ask->operators person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->operators ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->operators narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to operators asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "operators"
+  }
+ },
+ "put mcp.capability_use_approval ask->operators agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to operators asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "operators"
+  }
+ },
+ "put mcp.capability_use_approval ask->operators unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to operators asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "operators"
+  }
+ },
+ "put mcp.capability_use_approval ask->operators anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to operators asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "operators"
+  }
+ },
+ "put mcp.capability_use_approval ask->ask person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->ask ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->ask narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->ask agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->ask unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->ask anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "ask"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "put mcp.capability_use_approval ask->bogus person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval ask->bogus ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval ask->bogus narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval ask->bogus agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval ask->bogus unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "put mcp.capability_use_approval ask->bogus anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "mcp.capability_use_approval",
+     "reason": "Invalid value for mcp.capability_use_approval"
+    }
+   ]
+  }
+ },
+ "batch classification loosen, then two-step loosen person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch classification loosen, then two-step loosen ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch classification loosen, then two-step loosen narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch classification loosen, then two-step loosen agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch classification loosen, then two-step loosen unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch classification loosen, then two-step loosen anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then classification loosen person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   },
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch two-step loosen, then classification loosen ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   },
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch two-step loosen, then classification loosen narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then classification loosen agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then classification loosen unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then classification loosen anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch password loosen, then two-step loosen person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch password loosen, then two-step loosen ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch password loosen, then two-step loosen narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch password loosen, then two-step loosen agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch password loosen, then two-step loosen unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch password loosen, then two-step loosen anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.password_sign_in from off to on makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then password loosen person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   },
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch two-step loosen, then password loosen ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "off"
+   },
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "on"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch two-step loosen, then password loosen narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then password loosen agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then password loosen unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then password loosen anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch lockout off, then password loosen person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "off"
+   },
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch lockout off, then password loosen ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "on",
+    "new_value": "off"
+   },
+   {
+    "path": "auth.password_sign_in",
+    "old_value": "off",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch lockout off, then password loosen narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch lockout off, then password loosen agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch lockout off, then password loosen unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch lockout off, then password loosen anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.sign_in_lockout from on to off makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then classification loosen person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "off"
+   },
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch capability loosen, then classification loosen ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "off"
+   },
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch capability loosen, then classification loosen narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then classification loosen agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then classification loosen unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then classification loosen anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step loosen person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "operators"
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch capability loosen, then two-step loosen ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "operators"
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "everyone",
+    "new_value": "operators"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch capability loosen, then two-step loosen narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step loosen agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step loosen unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step loosen anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step required while TOTP is off person": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is switched off on this server (totp.enabled is false), so auth.two_step_required cannot require it: people it covers could not set up their app and sign in. Switch totp.enabled on first, or in the same request. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step required while TOTP is off ownerPat": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is switched off on this server (totp.enabled is false), so auth.two_step_required cannot require it: people it covers could not set up their app and sign in. Switch totp.enabled on first, or in the same request. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step required while TOTP is off narrowPat": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is switched off on this server (totp.enabled is false), so auth.two_step_required cannot require it: people it covers could not set up their app and sign in. Switch totp.enabled on first, or in the same request. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step required while TOTP is off agent": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is switched off on this server (totp.enabled is false), so auth.two_step_required cannot require it: people it covers could not set up their app and sign in. Switch totp.enabled on first, or in the same request. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step required while TOTP is off unattended": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is switched off on this server (totp.enabled is false), so auth.two_step_required cannot require it: people it covers could not set up their app and sign in. Switch totp.enabled on first, or in the same request. Nothing in this request was applied."
+ },
+ "batch capability loosen, then two-step required while TOTP is off anonymous": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is switched off on this server (totp.enabled is false), so auth.two_step_required cannot require it: people it covers could not set up their app and sign in. Switch totp.enabled on first, or in the same request. Nothing in this request was applied."
+ },
+ "batch capability loosen, then password off with no operator who has another way in person": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "batch capability loosen, then password off with no operator who has another way in ownerPat": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "batch capability loosen, then password off with no operator who has another way in narrowPat": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "batch capability loosen, then password off with no operator who has another way in agent": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "batch capability loosen, then password off with no operator who has another way in unattended": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "batch capability loosen, then password off with no operator who has another way in anonymous": {
+  "ok": false,
+  "status": 409,
+  "code": "OPERATOR_LOCKOUT",
+  "message": "No operator account has a passkey or an identity provider link, so with password sign-in off nobody could sign in to run this server. Choose \"operators\" to keep the password for operators only, or register a passkey on an operator account first. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then TOTP off while required person": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is required (auth.two_step_required is operators), so totp.enabled cannot be switched off: people it covers could not set up their app and sign in. Set auth.two_step_required to off first. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then TOTP off while required ownerPat": {
+  "ok": false,
+  "status": 409,
+  "code": "TWO_STEP_NEEDS_TOTP",
+  "message": "Two-step sign-in is required (auth.two_step_required is operators), so totp.enabled cannot be switched off: people it covers could not set up their app and sign in. Set auth.two_step_required to off first. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then TOTP off while required narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then TOTP off while required agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then TOTP off while required unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch two-step loosen, then TOTP off while required anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing auth.two_step_required from everyone to operators makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch stricter, then looser, on one setting person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   },
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch stricter, then looser, on one setting ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "operators",
+    "new_value": "ask"
+   },
+   {
+    "path": "mcp.capability_use_approval",
+    "old_value": "ask",
+    "new_value": "off"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch stricter, then looser, on one setting narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "batch stricter, then looser, on one setting agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "batch stricter, then looser, on one setting unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "batch stricter, then looser, on one setting anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "The setting \"Ask before another account's tool uses a person's sign-in\" decides who is asked before another account's tool acts as a person on a server where each person signs in with their own account. Changing it from ask to off asks fewer people, so an AI does not make that change. The node's operator makes it signed in themselves, under Admin, Config. An AI may make it stricter: from off to operators, or from operators to ask. Nothing in this request was applied.",
+  "details": {
+   "setting": "mcp.capability_use_approval",
+   "from": "ask",
+   "to": "off"
+  }
+ },
+ "batch classification stricter, then looser person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   },
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch classification stricter, then looser ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "classification.mode",
+    "old_value": "owner",
+    "new_value": "all"
+   },
+   {
+    "path": "classification.mode",
+    "old_value": "all",
+    "new_value": "owner"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch classification stricter, then looser narrowPat": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch classification stricter, then looser agent": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch classification stricter, then looser unattended": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch classification stricter, then looser anonymous": {
+  "ok": false,
+  "status": 403,
+  "code": "PERSON_REQUIRED",
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves. Nothing in this request was applied."
+ },
+ "batch TOTP on and two-step required in one request person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "totp.enabled",
+    "old_value": false,
+    "new_value": true
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch TOTP on and two-step required in one request ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "totp.enabled",
+    "old_value": false,
+    "new_value": true
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch TOTP on and two-step required in one request narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "totp.enabled",
+    "old_value": false,
+    "new_value": true
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch TOTP on and two-step required in one request agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "totp.enabled",
+    "old_value": false,
+    "new_value": true
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch TOTP on and two-step required in one request unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "totp.enabled",
+    "old_value": false,
+    "new_value": true
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch TOTP on and two-step required in one request anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "totp.enabled",
+    "old_value": false,
+    "new_value": true
+   },
+   {
+    "path": "auth.two_step_required",
+    "old_value": "off",
+    "new_value": "everyone"
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch a stricter value and an ordinary setting person": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.access_ttl_seconds",
+    "old_value": 900,
+    "new_value": 1200
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch a stricter value and an ordinary setting ownerPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.access_ttl_seconds",
+    "old_value": 900,
+    "new_value": 1200
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch a stricter value and an ordinary setting narrowPat": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.access_ttl_seconds",
+    "old_value": 900,
+    "new_value": 1200
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch a stricter value and an ordinary setting agent": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.access_ttl_seconds",
+    "old_value": 900,
+    "new_value": 1200
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch a stricter value and an ordinary setting unattended": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.access_ttl_seconds",
+    "old_value": 900,
+    "new_value": 1200
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch a stricter value and an ordinary setting anonymous": {
+  "ok": true,
+  "applied": [
+   {
+    "path": "auth.sign_in_lockout",
+    "old_value": "off",
+    "new_value": "on"
+   },
+   {
+    "path": "auth.access_ttl_seconds",
+    "old_value": 900,
+    "new_value": 1200
+   }
+  ],
+  "note": "Config updated and persisted to database. Changes survive restart."
+ },
+ "batch a value the setting does not take person": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "batch a value the setting does not take ownerPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "batch a value the setting does not take narrowPat": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "batch a value the setting does not take agent": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "batch a value the setting does not take unattended": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "batch a value the setting does not take anonymous": {
+  "ok": false,
+  "status": 400,
+  "code": "INVALID_INPUT",
+  "message": "No valid changes applied",
+  "details": {
+   "errors": [
+    {
+     "path": "auth.two_step_required",
+     "reason": "Invalid value for auth.two_step_required"
+    }
+   ]
+  }
+ },
+ "switch off->off person": {
+  "ok": true,
+  "applied": false,
+  "mode": "off",
+  "from": "off"
+ },
+ "switch off->off ownerPat": {
+  "ok": true,
+  "applied": false,
+  "mode": "off",
+  "from": "off"
+ },
+ "switch off->off narrowPat": {
+  "ok": true,
+  "applied": false,
+  "mode": "off",
+  "from": "off"
+ },
+ "switch off->off agent": {
+  "ok": true,
+  "applied": false,
+  "mode": "off",
+  "from": "off"
+ },
+ "switch off->off unattended": {
+  "ok": true,
+  "applied": false,
+  "mode": "off",
+  "from": "off"
+ },
+ "switch off->off anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch off->owner person": {
+  "ok": true,
+  "applied": true,
+  "mode": "owner",
+  "from": "off"
+ },
+ "switch off->owner ownerPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "owner",
+  "from": "off"
+ },
+ "switch off->owner narrowPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "owner",
+  "from": "off"
+ },
+ "switch off->owner agent": {
+  "ok": true,
+  "applied": true,
+  "mode": "owner",
+  "from": "off"
+ },
+ "switch off->owner unattended": {
+  "ok": true,
+  "applied": true,
+  "mode": "owner",
+  "from": "off"
+ },
+ "switch off->owner anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch off->all person": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "off"
+ },
+ "switch off->all ownerPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "off"
+ },
+ "switch off->all narrowPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "off"
+ },
+ "switch off->all agent": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "off"
+ },
+ "switch off->all unattended": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "off"
+ },
+ "switch off->all anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch off->bogus person": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch off->bogus ownerPat": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch off->bogus narrowPat": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch off->bogus agent": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch off->bogus unattended": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch off->bogus anonymous": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch owner->off person": {
+  "ok": true,
+  "applied": true,
+  "mode": "off",
+  "from": "owner"
+ },
+ "switch owner->off ownerPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "off",
+  "from": "owner"
+ },
+ "switch owner->off narrowPat": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from owner to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch owner->off agent": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from owner to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch owner->off unattended": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from owner to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch owner->off anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch owner->owner person": {
+  "ok": true,
+  "applied": false,
+  "mode": "owner",
+  "from": "owner"
+ },
+ "switch owner->owner ownerPat": {
+  "ok": true,
+  "applied": false,
+  "mode": "owner",
+  "from": "owner"
+ },
+ "switch owner->owner narrowPat": {
+  "ok": true,
+  "applied": false,
+  "mode": "owner",
+  "from": "owner"
+ },
+ "switch owner->owner agent": {
+  "ok": true,
+  "applied": false,
+  "mode": "owner",
+  "from": "owner"
+ },
+ "switch owner->owner unattended": {
+  "ok": true,
+  "applied": false,
+  "mode": "owner",
+  "from": "owner"
+ },
+ "switch owner->owner anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch owner->all person": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "owner"
+ },
+ "switch owner->all ownerPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "owner"
+ },
+ "switch owner->all narrowPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "owner"
+ },
+ "switch owner->all agent": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "owner"
+ },
+ "switch owner->all unattended": {
+  "ok": true,
+  "applied": true,
+  "mode": "all",
+  "from": "owner"
+ },
+ "switch owner->all anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch owner->bogus person": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch owner->bogus ownerPat": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch owner->bogus narrowPat": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch owner->bogus agent": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch owner->bogus unattended": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch owner->bogus anonymous": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch all->off person": {
+  "ok": true,
+  "applied": true,
+  "mode": "off",
+  "from": "all"
+ },
+ "switch all->off ownerPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "off",
+  "from": "all"
+ },
+ "switch all->off narrowPat": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch all->off agent": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch all->off unattended": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from all to off gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch all->off anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch all->owner person": {
+  "ok": true,
+  "applied": true,
+  "mode": "owner",
+  "from": "all"
+ },
+ "switch all->owner ownerPat": {
+  "ok": true,
+  "applied": true,
+  "mode": "owner",
+  "from": "all"
+ },
+ "switch all->owner narrowPat": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch all->owner agent": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch all->owner unattended": {
+  "ok": false,
+  "code": "PERSON_REQUIRED",
+  "status": 403,
+  "message": "Changing classification from all to owner gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves."
+ },
+ "switch all->owner anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch all->all person": {
+  "ok": true,
+  "applied": false,
+  "mode": "all",
+  "from": "all"
+ },
+ "switch all->all ownerPat": {
+  "ok": true,
+  "applied": false,
+  "mode": "all",
+  "from": "all"
+ },
+ "switch all->all narrowPat": {
+  "ok": true,
+  "applied": false,
+  "mode": "all",
+  "from": "all"
+ },
+ "switch all->all agent": {
+  "ok": true,
+  "applied": false,
+  "mode": "all",
+  "from": "all"
+ },
+ "switch all->all unattended": {
+  "ok": true,
+  "applied": false,
+  "mode": "all",
+  "from": "all"
+ },
+ "switch all->all anonymous": {
+  "ok": false,
+  "code": "OPERATOR_REQUIRED",
+  "status": 403,
+  "message": "Only an operator of this server changes the classification switch."
+ },
+ "switch all->bogus person": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch all->bogus ownerPat": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch all->bogus narrowPat": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch all->bogus agent": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch all->bogus unattended": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "switch all->bogus anonymous": {
+  "ok": false,
+  "code": "INVALID_INPUT",
+  "status": 400,
+  "message": "mode is off, owner or all."
+ },
+ "reset classification.mode person": {
+  "refusal": null
+ },
+ "reset classification.mode ownerPat": {
+  "refusal": null
+ },
+ "reset classification.mode narrowPat": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "classification.mode"
+   },
+   "message": "Removing the saved value of classification.mode puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset classification.mode agent": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "classification.mode"
+   },
+   "message": "Removing the saved value of classification.mode puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset classification.mode unattended": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "classification.mode"
+   },
+   "message": "Removing the saved value of classification.mode puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset classification.mode anonymous": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "classification.mode"
+   },
+   "message": "Removing the saved value of classification.mode puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.two_step_required person": {
+  "refusal": null
+ },
+ "reset auth.two_step_required ownerPat": {
+  "refusal": null
+ },
+ "reset auth.two_step_required narrowPat": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.two_step_required"
+   },
+   "message": "Removing the saved value of auth.two_step_required puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.two_step_required agent": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.two_step_required"
+   },
+   "message": "Removing the saved value of auth.two_step_required puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.two_step_required unattended": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.two_step_required"
+   },
+   "message": "Removing the saved value of auth.two_step_required puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.two_step_required anonymous": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.two_step_required"
+   },
+   "message": "Removing the saved value of auth.two_step_required puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.password_sign_in person": {
+  "refusal": null
+ },
+ "reset auth.password_sign_in ownerPat": {
+  "refusal": null
+ },
+ "reset auth.password_sign_in narrowPat": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.password_sign_in"
+   },
+   "message": "Removing the saved value of auth.password_sign_in puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.password_sign_in agent": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.password_sign_in"
+   },
+   "message": "Removing the saved value of auth.password_sign_in puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.password_sign_in unattended": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.password_sign_in"
+   },
+   "message": "Removing the saved value of auth.password_sign_in puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.password_sign_in anonymous": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.password_sign_in"
+   },
+   "message": "Removing the saved value of auth.password_sign_in puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.sign_in_lockout person": {
+  "refusal": null
+ },
+ "reset auth.sign_in_lockout ownerPat": {
+  "refusal": null
+ },
+ "reset auth.sign_in_lockout narrowPat": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.sign_in_lockout"
+   },
+   "message": "Removing the saved value of auth.sign_in_lockout puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.sign_in_lockout agent": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.sign_in_lockout"
+   },
+   "message": "Removing the saved value of auth.sign_in_lockout puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.sign_in_lockout unattended": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.sign_in_lockout"
+   },
+   "message": "Removing the saved value of auth.sign_in_lockout puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset auth.sign_in_lockout anonymous": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "auth.sign_in_lockout"
+   },
+   "message": "Removing the saved value of auth.sign_in_lockout puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset mcp.capability_use_approval person": {
+  "refusal": null
+ },
+ "reset mcp.capability_use_approval ownerPat": {
+  "refusal": null
+ },
+ "reset mcp.capability_use_approval narrowPat": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "mcp.capability_use_approval"
+   },
+   "message": "Removing the saved value of mcp.capability_use_approval puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset mcp.capability_use_approval agent": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "mcp.capability_use_approval"
+   },
+   "message": "Removing the saved value of mcp.capability_use_approval puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset mcp.capability_use_approval unattended": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "mcp.capability_use_approval"
+   },
+   "message": "Removing the saved value of mcp.capability_use_approval puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset mcp.capability_use_approval anonymous": {
+  "refusal": {
+   "status": 403,
+   "code": "PERSON_REQUIRED",
+   "details": {
+    "setting": "mcp.capability_use_approval"
+   },
+   "message": "Removing the saved value of mcp.capability_use_approval puts it back to the value in the server's files or its default, which can be less safe, so an AI does not do it. An AI may still set a stricter value. The operator removes the saved value on the admin Config page, signed in themselves."
+  }
+ },
+ "reset totp.enabled person": {
+  "refusal": null
+ },
+ "reset totp.enabled ownerPat": {
+  "refusal": null
+ },
+ "reset totp.enabled narrowPat": {
+  "refusal": null
+ },
+ "reset totp.enabled agent": {
+  "refusal": null
+ },
+ "reset totp.enabled unattended": {
+  "refusal": null
+ },
+ "reset totp.enabled anonymous": {
+  "refusal": null
+ },
+ "reset auth.access_ttl_seconds person": {
+  "refusal": null
+ },
+ "reset auth.access_ttl_seconds ownerPat": {
+  "refusal": null
+ },
+ "reset auth.access_ttl_seconds narrowPat": {
+  "refusal": null
+ },
+ "reset auth.access_ttl_seconds agent": {
+  "refusal": null
+ },
+ "reset auth.access_ttl_seconds unattended": {
+  "refusal": null
+ },
+ "reset auth.access_ttl_seconds anonymous": {
+  "refusal": null
+ },
+ "reset not.a.setting person": {
+  "refusal": null
+ },
+ "reset not.a.setting ownerPat": {
+  "refusal": null
+ },
+ "reset not.a.setting narrowPat": {
+  "refusal": null
+ },
+ "reset not.a.setting agent": {
+  "refusal": null
+ },
+ "reset not.a.setting unattended": {
+  "refusal": null
+ },
+ "reset not.a.setting anonymous": {
+  "refusal": null
+ }
+}

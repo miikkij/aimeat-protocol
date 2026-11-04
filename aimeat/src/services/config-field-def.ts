@@ -6,15 +6,37 @@
  *   every field. Moved out of config-schema.ts when that file reached the 800-line ceiling. It
  *   imports nothing: the key's type is a parameter, and config-schema.ts, which already reads the
  *   config types, names it (`ConfigFieldDef`), so this file adds no import cycle.
- * @structure ConfigFieldShape<K>
+ * @structure TightenOnly · ConfigFieldShape<K>
  * @usage import type { ConfigFieldDef } from './config-schema.js';
  * @version-history
+ *   2026-11-04 — `aiMayOnlyTighten`: an AI credential may only make the setting stricter, judged by the
+ *     order of its values on every write and reset path (services/config-strictness.ts; codebase
+ *     analysis 2026-11-03, item B4).
  *   2026-10-25 — `applies: 'restart'`: a row stored in the database that takes effect at the next start.
  *   2026-10-16 — `refusal`: the reason a row's check gives for a value it refuses on principle (QA audit D6-01).
  *   v1.2.0 — 2026-10-11 — `list`: a setting whose running value is a list of strings.
  *   v1.1.0 — 2026-09-29 — `choices`: the fixed values of a string setting, for the Config tab's pick.
  *   v1.0.0 — 2026-09-24 — Moved from config-schema.ts; the key's type became a parameter.
  */
+
+/**
+ * A setting an AI credential may only make stricter. A person's own session (classification/
+ * reader-kind.ts answers 'human') changes it either way; an agent, a narrow personal access token, an
+ * unattended run, a visitor and a write that names nobody are refused a looser value and the removal of
+ * its saved value, with PERSON_REQUIRED, on every path that writes settings (services/config-strictness.ts).
+ */
+export interface TightenOnly {
+  /** The values from the most open to the strictest. A value outside the list is left to `validate`. */
+  order: readonly string[];
+  /**
+   * Settings judged as one: in a request that changes several of them, the first looser one in the
+   * request's order is the one answered. Without it the setting is its own group. Groups are asked in
+   * the order their first setting stands in the schema.
+   */
+  group?: string;
+  /** What the AI is told when a change from `from` to `to` is refused; a general sentence when absent. */
+  refusal?: (from: string, to: string) => { message: string; details?: Record<string, unknown> };
+}
 
 export interface ConfigFieldShape<K extends string> {
   /** AimeatConfig property name (e.g. 'welcomeBonus'), or a site link as 'siteLinks.<name>'. */
@@ -61,6 +83,8 @@ export interface ConfigFieldShape<K extends string> {
    * `.includes(x)` on it became a substring test.
    */
   list?: boolean;
+  /** An AI credential may only make this setting stricter (TightenOnly above). */
+  aiMayOnlyTighten?: TightenOnly;
   /**
    * Admin API display mode:
    * - undefined / 'visible': shown with actual value

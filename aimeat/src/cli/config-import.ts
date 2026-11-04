@@ -12,6 +12,8 @@
  *   - runConfigImport(config, options): orchestrates source load → classify → confirm → storage.setConfigValue
  *
  * @version-history
+ *   v1.2.1 — 2026-11-04 — Writes through storeConfigValue (services/config-apply.ts), the one writer of a
+ *     setting row; the stored text is the same (codebase analysis 2026-11-03, item B4).
  *   v1.2.0 — 2026-10-09 — A secret row is written encrypted with the node key
  *     (services/config-at-rest.ts; secrets audit 2026-10-09, S4b).
  *   v1.1.0 — 2026-08-18 — A path the node's host sealed is reported and not written. The write
@@ -25,7 +27,7 @@ import * as readline from 'node:readline';
 import { loadFileSource } from '../services/config-loader.js';
 import { MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/config-schema.js';
 import { isSealed } from '../services/config-sealing.js';
-import { sealSettingForStorage } from '../services/config-at-rest-rows.js';
+import { storeConfigValue } from '../services/config-apply.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import type { AimeatConfig } from '../config.js';
@@ -160,8 +162,10 @@ export async function runConfigImport(
   let imported = 0;
   for (const dotPath of stats.mutable) {
     try {
-      // A secret row is stored encrypted, as the Config page stores it (services/config-at-rest.ts).
-      await storage.setConfigValue(dotPath, sealSettingForStorage(dotPath, values[dotPath], config));
+      // A secret row is stored encrypted, as the Config page stores it (services/config-at-rest.ts), through
+      // the one writer of a setting row. The person at the server's shell runs this, so the tighten-only
+      // rule an AI credential meets on the Config API is not asked here.
+      await storeConfigValue(storage, config, dotPath, values[dotPath]);
       imported++;
     } catch (err) {
       console.warn(`  Warning: Failed to import ${dotPath}: ${(err as Error).message}`);

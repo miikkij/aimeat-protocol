@@ -10,6 +10,8 @@
  * @structure DATA_ACCESS_CONFIG_FIELDS
  * @usage import { DATA_ACCESS_CONFIG_FIELDS } from './config-schema-data-access.js';
  * @version-history
+ *   2026-11-04 — classification.mode carries `aiMayOnlyTighten`: off, owner, all from open to strict, and
+ *     the refusal an AI gets for a looser value, worded as before (codebase analysis 2026-11-03, item B4).
  *   v1.6.0 — 2026-11-02 — consent.app_party_signups_per_hour and consent.app_party_pending_hours
  *     (secaudit2026nov02d round 13).
  *   v1.5.0 — 2026-11-02 — consent.party_purchases_per_hour (secaudit2026nov02d round 13).
@@ -23,11 +25,20 @@
  *     classification.agent_clearance_default added (plan doc-mvdipuyqraas, L2.1).
  */
 import { CLEARANCE_ID_PATTERN, type dataAccessDefaults } from '../config-data-access.js';
-import type { ConfigFieldShape } from './config-field-def.js';
+import type { ConfigFieldShape, TightenOnly } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
 import { DATASPACE_CONFIG_FIELDS } from './config-schema-dataspace.js';
 
 type DataAccessKey = keyof ReturnType<typeof dataAccessDefaults>;
+
+/**
+ * The classification switch (services/classification/switch.ts): off, owner, all from open to strict.
+ * Turning it off, or from all to owner, gives protection away, so an AI does not make that change.
+ */
+const CLASSIFICATION_TIGHTEN: TightenOnly = {
+  order: ['off', 'owner', 'all'],
+  refusal: (from, to) => ({ message: `Changing classification from ${from} to ${to} gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves.` }),
+};
 
 export const DATA_ACCESS_CONFIG_FIELDS: ConfigFieldShape<DataAccessKey>[] = [
   { key: 'consentEnabled', dotPath: 'consent.enabled', envVar: 'AIMEAT_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Consent layer enabled' },
@@ -40,7 +51,7 @@ export const DATA_ACCESS_CONFIG_FIELDS: ConfigFieldShape<DataAccessKey>[] = [
   { key: 'appPartySignupsPerHour', dotPath: 'consent.app_party_signups_per_hour', envVar: 'AIMEAT_APP_PARTY_SIGNUPS_PER_HOUR', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100000, immutable: false, description: 'How many times one network address may sign up to this server\'s apps in an hour, counted over every app. Past it the signup is refused with 429 until the hour has passed. 0: no limit', range: '0-100000' },
   { key: 'appPartyPendingHours', dotPath: 'consent.app_party_pending_hours', envVar: 'AIMEAT_APP_PARTY_PENDING_HOURS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 8760, immutable: false, description: 'How many hours a person who signed up to an app and never opened the mailed link keeps a place in the app\'s list of registered people, counted from the last link sent. After that the next signup to the app removes them, and their place counts no more toward the app\'s limit of 1000 people. They can sign up again. 0: they keep the place until the app\'s owner removes them', range: '0-8760' },
   { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
-  { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', ...oneOf('off', 'owner', 'all'), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
+  { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', ...oneOf('off', 'owner', 'all'), aiMayOnlyTighten: CLASSIFICATION_TIGHTEN, immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
   // ── The Eclipse Dataspace Protocol provider, section `dataspace` ── config-schema-dataspace.ts
   ...DATASPACE_CONFIG_FIELDS,
   { key: 'agentClearanceDefault', dotPath: 'classification.agent_clearance_default', envVar: 'AIMEAT_AGENT_CLEARANCE_DEFAULT', type: 'string', validate: v => v === '' || (typeof v === 'string' && CLEARANCE_ID_PATTERN.test(v)), refusal: 'Write the id of a classification in this server\'s policy, such as sisainen, or leave it empty for no limit.', immutable: false, description: 'The highest classification a NEW agent may read, written as the classification\'s id (for example sisainen for Internal). Content classified higher is hidden from the agent and counted. Empty: no limit. Agents that already exist keep what they have, and the owner can change it on the agent\'s page. Matters only while classification is on' },
