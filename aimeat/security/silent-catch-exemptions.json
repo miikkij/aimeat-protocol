@@ -433,6 +433,10 @@
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
+    "src/auth/node-signer.ts": {
+      "count": 2,
+      "reason": "Two answers, not failures (codebase analysis 2026-11-03, item B9): a node key object that cannot be exported has no purpose keys, so derive() answers null and every token is read with the node key as before; a token whose header does not read has no kid, and jwtVerify then refuses it with the error it always gave."
+    },
     "src/auth/node-keys.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."

@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit ddec0f144) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit c1fe5ca66) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -241,7 +241,7 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 | MCP OAuth access and refresh tokens | per MCP client | per client | `POST /v1/mcp/token/revoke`, agent removal | `aimeat/src/mcp/oauth.ts` |
 | SCIM token | Until replaced | per connection | `aimeat_admin_sso_scim_token` issues a new one | `aimeat/src/routes/scim.ts` |
 
-- Every access JWT the node issues is EdDSA, signed with the node's Ed25519 key (`aimeat/src/auth/jwt.ts`). Personal access tokens, SCIM tokens and refresh tokens are opaque random values stored as SHA-256 hashes (`aimeat/src/routes/access-tokens.ts`, `aimeat/src/routes/scim.ts`).
+- Every access JWT the node issues is EdDSA. Each kind of token (a session, a download address, a share link, an app grant and the others) is signed with its own key, derived from the node's Ed25519 key for that kind alone and named in the token's header, so a token of one kind does not verify as another (`aimeat/src/auth/node-signer.ts`). A token issued before 2026-11-04 was signed with the node key itself and keeps working until it expires. Personal access tokens, SCIM tokens and refresh tokens are opaque random values stored as SHA-256 hashes (`aimeat/src/routes/access-tokens.ts`, `aimeat/src/routes/scim.ts`).
 - Token revocations persist in the database. Each process caches the answer for 60 seconds and marks a token it revokes itself at once (`aimeat/src/auth/jwt.ts`).
 - A password reset ends every sign-in session of the person; a password change ends every one but the current session; the person's agents keep theirs (`aimeat/src/routes/ghii/recovery.ts`).
 - Personal access tokens are created by the owner only, may carry full owner or operator access when the owner chooses it, and are stored as hashes (`aimeat/src/routes/access-tokens.ts`).
@@ -270,7 +270,7 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 - An operator cannot reset their own TOTP. On a node with one operator who has lost both the device and the backup codes, no reset path was found in the product.
 - A token revocation is known at once in the process that made it; another node process can take up to 60 seconds to see it (`aimeat/src/auth/jwt.ts`).
 - An operator's agent holding `operator:admin` can do what the operator can do on the admin routes, granting the operator role to another account included.
-- No node key rotation procedure was found (see 03).
+- No node key rotation procedure was found (see 03). The token keys are derived from the node key, so a new node key ends every token issued before it ([Key rotation](../operations/key-rotation.md)).
 
 ## Open questions
 

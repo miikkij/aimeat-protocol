@@ -17,8 +17,12 @@
  *   if (!(await designBookPreviewTokenOpens(req.query.t, id))) → 404
  * @version-history
  *   v1.0.0 — 2026-10-17 — Initial: a proposal's preview stops being public (plan doc-mvcn6c7e4e5q, V0.4).
+ *   v1.1.0 — 2026-11-04 — Signed with the preview purpose's own key (auth/node-signer.ts); a token
+ *     signed before, with the node key, opens as before until it expires (codebase analysis
+ *     2026-11-03, item B9).
  */
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../../auth/node-signer.js';
 import { logger } from '../../utils/logger.js';
 
 let _privateKey: CryptoKey | null = null;
@@ -35,20 +39,20 @@ export const DB_PREVIEW_TTL_SECONDS = 3600;
 /** A token that opens the preview of the one part `id`. */
 export async function designBookPreviewToken(id: string): Promise<string> {
   if (!_privateKey) throw new Error('Design Book preview token keys not initialized');
-  return new SignJWT({ typ: 'dbpreview', id })
-    .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+  return signFor('dbpreview', new SignJWT({ typ: 'dbpreview', id })
     .setIssuedAt()
-    .setExpirationTime(`${DB_PREVIEW_TTL_SECONDS}s`)
-    .sign(_privateKey);
+    .setExpirationTime(`${DB_PREVIEW_TTL_SECONDS}s`), _privateKey);
 }
 
 /** True when `token` is a valid, unexpired preview token for exactly the part `id`. */
 export async function designBookPreviewTokenOpens(token: unknown, id: string): Promise<boolean> {
-  if (!_publicKey || typeof token !== 'string' || !token || token.length > 4096) return false;
+  if (!_publicKey || !_privateKey || typeof token !== 'string' || !token || token.length > 4096) return false;
   try {
-    const p = (await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] })).payload as Record<string, unknown>;
+    const p = (await verifyFor('dbpreview', token, { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] })).payload as Record<string, unknown>;
     return p.typ === 'dbpreview' && p.id === id;
   } catch (err) {
+    // A token this node signed for another purpose opens nothing here, as a token of another type never did.
+    if (err instanceof TokenPurposeError) return false;
     logger.debug('designbook preview: a token that opens nothing', { error: String(err) });
     return false;
   }

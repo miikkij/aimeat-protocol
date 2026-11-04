@@ -14,6 +14,8 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.6.1 — 2026-11-04 — The key file's AES-GCM goes through utils/aes-gcm.ts, the node's one
+ *     implementation; the file's form is unchanged (codebase analysis 2026-11-03, item B9).
  *   v1.6.0 — 2026-11-01 — The node keys sign the outside party's access token too
  *     (services/parties/token.ts; plan doc-mvwxcas3dom3, D2.1).
  *   v1.5.1 — 2026-10-31 — Every read of a key file goes through readKeyFileText, which retries the
@@ -68,7 +70,8 @@
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync, linkSync, renameSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
-import { pbkdf2Sync, randomBytes as cryptoRandomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
+import { pbkdf2Sync, randomBytes as cryptoRandomBytes } from 'node:crypto';
+import { gcmOpen, gcmSeal } from '../utils/aes-gcm.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from './keypair.js';
@@ -244,20 +247,17 @@ function encryptNodeKey(
   passphrase: string,
 ): EncryptedKeyFile {
   const salt = cryptoRandomBytes(32);
-  const iv = cryptoRandomBytes(12); // 96-bit IV for AES-256-GCM
   const derivedKey = pbkdf2Sync(passphrase, salt, 100_000, 32, 'sha512');
 
-  const cipher = createCipheriv('aes-256-gcm', derivedKey, iv);
   const plaintext = JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey });
-  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf-8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
+  const { iv, tag, ct } = gcmSeal(derivedKey, plaintext);
 
   return {
     encrypted: true,
     salt: salt.toString('hex'),
     iv: iv.toString('hex'),
-    authTag: authTag.toString('hex'),
-    data: encrypted.toString('hex'),
+    authTag: tag.toString('hex'),
+    data: ct.toString('hex'),
   };
 }
 
@@ -266,14 +266,11 @@ function decryptNodeKey(
   passphrase: string,
 ): { publicKey: string; privateKey: string } {
   const salt = Buffer.from(file.salt, 'hex');
-  const iv = Buffer.from(file.iv, 'hex');
-  const authTag = Buffer.from(file.authTag, 'hex');
-  const encryptedData = Buffer.from(file.data, 'hex');
   const derivedKey = pbkdf2Sync(passphrase, salt, 100_000, 32, 'sha512');
 
-  const decipher = createDecipheriv('aes-256-gcm', derivedKey, iv);
-  decipher.setAuthTag(authTag);
-  const decrypted = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+  const decrypted = gcmOpen(derivedKey, {
+    iv: Buffer.from(file.iv, 'hex'), tag: Buffer.from(file.authTag, 'hex'), ct: Buffer.from(file.data, 'hex'),
+  });
   const data = JSON.parse(decrypted.toString('utf-8'));
 
   if (!data.publicKey || !data.privateKey) {

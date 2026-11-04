@@ -26,6 +26,9 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-11-04 — The pending sign-up token is signed with its purpose's own key (auth/node-signer.ts);
+ *     a token signed before, with the node key, verifies as before until it expires (codebase
+ *     analysis 2026-11-03, item B9).
  *   2026-10-29 — Step 2 answers `second_factor` when the caller's adoptionAsksCode says the first
  *     organisation sign-in into an adopted account asks its code (secaudit2026oct26 round 8c,
  *     adoption-skips-second-factor).
@@ -53,7 +56,8 @@
  *     every door that sends a browser to an address a request named asks one function.
  */
 import { createHash } from 'node:crypto';
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor } from '../auth/node-signer.js';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
@@ -122,7 +126,7 @@ export function normalizeUsername(raw: unknown, nodeId: string): { username: str
 /** Sign the verified external identity into a short-lived EdDSA token (node key). */
 export async function signPendingToken(data: PendingSignup): Promise<string> {
   const { privateKey } = getNodeCryptoKeys();
-  return new SignJWT({
+  return signFor('external-login-pending', new SignJWT({
     purpose: PENDING_PURPOSE,
     provider: data.provider,
     providerSub: data.providerSub,
@@ -136,10 +140,8 @@ export async function signPendingToken(data: PendingSignup): Promise<string> {
     // Signed since 2026-10-27: over https it goes out under the `__Host-` cookie only (readPendingSignup).
     hc: 1,
   })
-    .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setIssuedAt()
-    .setExpirationTime(`${PENDING_TTL_SECONDS}s`)
-    .sign(privateKey);
+    .setExpirationTime(`${PENDING_TTL_SECONDS}s`), privateKey);
 }
 
 /** Verify + decode a pending-signup token. Returns null on any tamper/expiry/wrong-purpose. */
@@ -153,8 +155,9 @@ export async function verifyPendingToken(token: string): Promise<PendingSignup |
  */
 async function verifyPendingPayload(token: string): Promise<{ pending: PendingSignup; hostCookie: boolean } | null> {
   try {
-    const { publicKey } = getNodeCryptoKeys();
-    const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
+    // A token this node signed for another purpose throws TokenPurposeError here, answered null below
+    // as a token without this purpose always was.
+    const { payload } = await verifyFor('external-login-pending', token, getNodeCryptoKeys(), { algorithms: ['EdDSA'] });
     if (payload.purpose !== PENDING_PURPOSE || typeof payload.providerSub !== 'string' || typeof payload.provider !== 'string') return null;
     return { hostCookie: payload.hc === 1, pending: {
       provider: payload.provider,

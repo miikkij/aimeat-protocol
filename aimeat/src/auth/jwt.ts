@@ -9,6 +9,10 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.12.0 — 2026-11-04 — issueJWT signs with the session's own key, derived from the node key and
+ *     named in the header (auth/node-signer.ts), and verifyJWT refuses a token signed for any other
+ *     purpose by its key. A token without a key id, signed with the node key before this change,
+ *     verifies as before until it expires (codebase analysis 2026-11-03, item B9).
  *   2026-10-25 — The optional `pat` claim: the id of the personal access token a JWT was minted from.
  *     issueJWT writes it and verifyJWT carries it, so credentialRevoked can end the JWT when the PAT
  *     is revoked (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
@@ -55,7 +59,8 @@
  *     written the claim, so no token in circulation lacks it.
  *   v1.1.0 — 2026-06-14 — Add optional `eco_app` claim for GEAI (ecosystem app) sessions.
  */
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor } from './node-signer.js';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -191,7 +196,6 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     // for signed-in members asks auth/anonymous-principal.ts isAnonymousPrincipal() instead, which
     // knows the shared anonymous principal by its identity whether or not the flag is there.
   })
-    .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
     .setIssuedAt(Math.floor(issuedMs / 1000))
     .setExpirationTime(`${ttlSeconds}s`);
@@ -202,7 +206,8 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
   }
   if (payload.aud) builder.setAudience(payload.aud);
 
-  return builder.sign(nodePrivateKey);
+  // The session's own key, derived from the node key, named in the header (auth/node-signer.ts).
+  return signFor('session', builder, nodePrivateKey);
 }
 
 export interface VerifiedToken {
@@ -256,8 +261,9 @@ function asVisitor(v: VerifiedToken): VerifiedToken {
 const PURPOSE_CLAIMS = ['typ', 'purpose', 'vc'] as const;
 
 /**
- * Is this signed payload a session, as issueJWT writes one? Every short-lived token the node mints
- * is signed with the same node key, so the signature alone says only "this node signed it". A
+ * Is this signed payload a session, as issueJWT writes one? Every short-lived token the node minted
+ * before 2026-11-04 was signed with the same node key, so for those the signature alone says only
+ * "this node signed it" (tokens since then carry their purpose's key, auth/node-signer.ts). A
  * session carries `sub`, `owner` and `node` as strings and `roles` as a list of strings, under the
  * header type `JWT`, and none of the purpose claims above. A token that fails this is refused as a
  * session (401), never read with a default for the missing claim (secrets audit 2026-10-09, S-1).
@@ -270,15 +276,18 @@ function isSessionShape(payload: Record<string, unknown>, headerTyp: unknown): b
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
-  if (!nodePublicKey) throw new Error('Node keys not initialized');
+  if (!nodePublicKey || !nodePrivateKey) throw new Error('Node keys not initialized');
 
   try {
-    const { payload, protectedHeader } = await jwtVerify(token, nodePublicKey, {
+    // A session signed since 2026-11-04 verifies with the session key alone, and a token signed for
+    // any other purpose is refused here by its key (TokenPurposeError, caught below as null). A token
+    // with no key id, signed with the node key before then, verifies with the node key as before.
+    const { payload, protectedHeader } = await verifyFor('session', token, { privateKey: nodePrivateKey, publicKey: nodePublicKey }, {
       algorithms: ['EdDSA'],
     });
     // A download, upload, share or app-access token, a draft preview, a frame grant, an operator
-    // confirmation, a pending signup and a verifiable credential are signed with this key too. They
-    // are not sessions, so they authenticate nothing here.
+    // confirmation, a pending signup and a verifiable credential were signed with the node key too,
+    // and a credential still is. They are not sessions, so they authenticate nothing here.
     if (!isSessionShape(payload as Record<string, unknown>, protectedHeader.typ)) return null;
     return asVisitor({
       sub: payload.sub as string,

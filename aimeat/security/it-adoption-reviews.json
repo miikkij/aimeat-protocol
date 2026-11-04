@@ -38,12 +38,12 @@
       "digest": "sha256:9ab4198efa657bfd7f38315e"
     },
     "03-shared-responsibility.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/config-posture.ts",
         "aimeat/src/auth/node-keys.ts"
       ],
-      "digest": "sha256:1fcbc48c2d1deb00a2a83ac7"
+      "digest": "sha256:894c892df3b876b9a0c7ad54"
     },
     "04-identity-access.md": {
       "reviewedOn": "2026-11-04",
@@ -58,7 +58,7 @@
         "aimeat/src/services/two-step-setup.ts",
         "aimeat/src/routes/ghii/login-two-step.ts"
       ],
-      "digest": "sha256:24c5e79c8d6b26d4ab8a92c9"
+      "digest": "sha256:e6a6d7f824162a00b2c348a5"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-02",
@@ -129,10 +129,10 @@
         "aimeat/src/storage/providers/postgres-kysely/read-retry.ts",
         "aimeat/src/server-bootstrap/bus-relay-start.ts"
       ],
-      "digest": "sha256:5d7c69f23e2fb8c20cbd488b"
+      "digest": "sha256:9ed851de747a667e6e4a0253"
     },
     "12-updates-releases.md": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         ".github/SECURITY.md",
         "docs/operations/upgrading.md"
@@ -167,7 +167,7 @@
       "digest": "sha256:ab240d210d6185e6174de0dc"
     },
     "16-known-limitations.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "docs/known_gaps.md",
         "docs/security/threat-model.md",
@@ -213,14 +213,14 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:16ea2185328db556437b7136"
+      "digest": "sha256:4565598f16b6d289265b3562"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
       "watches": [
         "docs/operations/README.md"
       ],
-      "digest": "sha256:af69269baf2ee22dcf96fa8d"
+      "digest": "sha256:56156e4304b4175162d4cbf0"
     },
     "templates/application-register-entry.md": {
       "reviewedOn": "2026-11-02",
@@ -293,10 +293,10 @@
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
-      "aimeat/src/auth/node-keys.ts": "aac90000400b1caa"
+      "aimeat/src/auth/node-keys.ts": "22584846ee8531df"
     },
     "04-identity-access.md": {
-      "aimeat/src/services/external-login.ts": "b164a1f73cb4956f",
+      "aimeat/src/services/external-login.ts": "f3951ae68b839e55",
       "aimeat/src/services/oidc-providers.ts": "e784e39b32c1fe2a",
       "aimeat/src/routes/scim.ts": "2a7149ea1dc93d7c",
       "aimeat/src/routes/saml-login.ts": "147ff327a6c5f0e7",
@@ -343,8 +343,8 @@
     },
     "11-backup-recovery.md": {
       "docs/operations/backup-and-restore.md": "c4a998fa57b04c2a",
-      "aimeat/src/auth/node-keys.ts": "aac90000400b1caa",
-      "aimeat/src/services/encryption.ts": "46eeede52cdc5803",
+      "aimeat/src/auth/node-keys.ts": "22584846ee8531df",
+      "aimeat/src/services/encryption.ts": "e165ad9ad570a575",
       "docs/operations/database-high-availability.md": "fb3b82782584e700",
       "aimeat/src/storage/providers/postgres-kysely/read-retry.ts": "2ae23e7a2d98bbad",
       "aimeat/src/server-bootstrap/bus-relay-start.ts": "4ea49009017ba3bc"
@@ -380,7 +380,7 @@
       ".github/SECURITY.md": "3298fcc91e6ba5ee"
     },
     "README.md": {
-      "docs/operations/README.md": "1fa5c973804d9424"
+      "docs/operations/README.md": "e1a38a7cccb9e0c5"
     },
     "templates/application-register-entry.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
@@ -415,7 +415,7 @@
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "64d251d6d4fa1667",
+      "aimeat/security/process-local-baseline.json": "421322a53cf4d276",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
@@ -425,7 +425,7 @@
       "aimeat/src/services/process-lease.ts": "36268e000a135f38",
       "aimeat/src/services/ai-jobs/reclaim.ts": "75c2fbca64a0c49c",
       "aimeat/src/services/workflow/engine-lock.ts": "7867146c310b2c7d",
-      "aimeat/src/services/ephemeral-claims.ts": "2a5ad595b9776e64"
+      "aimeat/src/services/ephemeral-claims.ts": "d9811a476371afca"
     }
   }
 }

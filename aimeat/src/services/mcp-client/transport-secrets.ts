@@ -25,6 +25,8 @@
  * @usage await storage.createMcpServer(sealServerRowSecrets(row, config));
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
+ *   v1.0.1 — 2026-11-04 — A value sealed under a later key of the key ring (`v3:<kid>:`) is read as
+ *     sealed too (codebase analysis 2026-11-03, item B9).
  */
 import { encryptBound, decryptBound, getEncryptionKey } from '../encryption.js';
 import { logger } from '../../utils/logger.js';
@@ -32,8 +34,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { McpServerRecord, McpTransport } from '../../models/mcp-server-schemas.js';
 
-/** The sealed form encryptBound writes: v2:iv:tag:ciphertext, hex. */
-const SEALED_RE = /^v2:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/;
+/** The sealed forms encryptBound writes: v2:iv:tag:ciphertext under key 0, v3:<kid>:iv:tag:ciphertext under a later key; hex. */
+const SEALED_RE = /^(?:v2|v3:\d{1,6}):[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/;
 
 type KeyConfig = Pick<AimeatConfig, 'encryptionKey' | 'totpSecretEncryptionKey'>;
 

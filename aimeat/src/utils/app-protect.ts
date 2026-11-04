@@ -24,6 +24,8 @@
  *   v1.0.0 — 2026-07-07 — Initial: domainLock, watermark, obfuscate (Phase 3).
  *   v1.1.0 — 2026-07-16 — domainLock/watermark inject before the LAST closing tag (shared
  *     html-inject helper), not the first — first-match landed inside app JS containing '</body>'.
+ *   v1.1.1 — 2026-11-04 — decodeWatermark reads a watermark sealed under a later key of the key ring
+ *     (`v3u:<kid>:`) too (codebase analysis 2026-11-03, item B9).
  */
 import type { AimeatConfig } from '../config.js';
 import type { AppProtection } from '../storage/interface.js';
@@ -91,7 +93,7 @@ export interface DecodedWatermark { viewer: string; app: string; version: number
 export function decodeWatermark(token: string, config: AimeatConfig): DecodedWatermark | null {
   const key = getEncryptionKey(config);
   if (!key) return null;
-  const m = token.match(new RegExp(`${WM_MARKER}:([0-9a-f:]+)`, 'i'));
+  const m = token.match(new RegExp(`${WM_MARKER}:((?:v3u:\\d{1,6}:)?[0-9a-f:]+)`, 'i'));
   const cipher = (m ? m[1] : token).trim();
   try {
     const o = JSON.parse(decrypt(cipher, key)) as { v: string; a: string; ver: number; t: string };

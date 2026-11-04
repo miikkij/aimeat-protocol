@@ -17,13 +17,17 @@
  * @usage
  *   import { generateShareToken, verifyShareToken } from '../services/share-token.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-04 -- Signed with the share purpose's own key (auth/node-signer.ts); a token
+ *     signed before, with the node key, verifies as before until it expires (codebase analysis
+ *     2026-11-03, item B9).
  *   v1.1.0 -- 2026-10-09 -- The token carries `pwv`, the version of the password it was unlocked with
  *     (shareTokenVersionOf), and the gate compares it with the current one, so a password change ends
  *     every token minted under the old password (secrets audit 2026-10-09, S-6).
  *   v1.0.0 -- 2026-07-10 -- TARGET-025: password-protected workspace shares (SESSIO 008)
  */
 
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 import { createHmac } from 'node:crypto';
 
 let _privateKey: CryptoKey | null = null;
@@ -73,26 +77,26 @@ export const SHARE_TOKEN_TTL_SECONDS = 24 * 3600;
 export async function generateShareToken(payload: ShareTokenPayload, ttlSeconds: number = SHARE_TOKEN_TTL_SECONDS): Promise<string> {
     if (!_privateKey) throw new Error('Share token keys not initialized');
 
-    return new SignJWT({
+    return signFor('share', new SignJWT({
         typ: 'share',
         org: payload.org,
         ws: payload.ws,
         pwv: payload.pwv,
     })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), _privateKey);
 }
 
 export async function verifyShareToken(token: string): Promise<ShareTokenPayload> {
-    if (!_publicKey) throw new Error('Share token keys not initialized');
+    if (!_publicKey || !_privateKey) throw new Error('Share token keys not initialized');
 
     let payload;
     try {
-        const result = await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] });
+        const result = await verifyFor('share', token, { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] });
         payload = result.payload;
     } catch (err) {
+        // A token this node signed for another purpose gets the answer a token of another type always got.
+        if (err instanceof TokenPurposeError) throw new ShareTokenError('TOKEN_INVALID', 'Token is not a share token');
         const msg = (err as Error).message;
         if (msg.includes('expired') || msg.includes('exp')) {
             throw new ShareTokenError('TOKEN_EXPIRED', 'Share token has expired');

@@ -17,8 +17,12 @@
  *   import { mintConfirmToken, verifyConfirmToken } from '../services/operator-confirm.js';
  * @version-history
  *   v1.0.0 -- 2026-07-05 -- Initial (Skills feature Phase 3 — operator enactment)
+ *   v1.1.0 -- 2026-11-04 -- Signed with the confirm purpose's own key (auth/node-signer.ts); a token
+ *     signed before, with the node key, verifies as before until it expires (codebase analysis
+ *     2026-11-03, item B9).
  */
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 import { createHash, randomUUID } from 'node:crypto';
 
 let _privateKey: CryptoKey | null = null;
@@ -50,18 +54,16 @@ function payloadHash(payload: unknown): string {
 /** Mint a confirm token bound to (caller, action, exact payload). */
 export async function mintConfirmToken(sub: string, action: string, payload: unknown): Promise<string> {
     if (!_privateKey) throw new Error('Confirm token keys not initialized');
-    return new SignJWT({ typ: 'confirm', action, phash: payloadHash(payload) })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+    return signFor('confirm', new SignJWT({ typ: 'confirm', action, phash: payloadHash(payload) })
         .setJti(randomUUID())
         .setSubject(sub)
         .setIssuedAt()
-        .setExpirationTime(`${CONFIRM_TTL_SECONDS}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${CONFIRM_TTL_SECONDS}s`), _privateKey);
 }
 
 /** Verify a confirm token against the caller + action + the payload being applied. */
 export async function verifyConfirmToken(token: string, sub: string, action: string, payload: unknown): Promise<void> {
-    if (!_publicKey) throw new Error('Confirm token keys not initialized');
+    if (!_publicKey || !_privateKey) throw new Error('Confirm token keys not initialized');
 
     const now = Math.floor(Date.now() / 1000);
     for (const [hash, exp] of usedTokens) {
@@ -74,8 +76,10 @@ export async function verifyConfirmToken(token: string, sub: string, action: str
 
     let claims;
     try {
-        claims = (await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] })).payload;
+        claims = (await verifyFor('confirm', token, { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] })).payload;
     } catch (err) {
+        // A token this node signed for another purpose gets the answer a token of another type always got.
+        if (err instanceof TokenPurposeError) throw new ConfirmTokenError('TOKEN_INVALID', 'Confirm token does not match this caller/action');
         const msg = (err as Error).message;
         if (msg.includes('exp')) throw new ConfirmTokenError('TOKEN_EXPIRED', 'Confirm token expired (10 min TTL) — propose again');
         throw new ConfirmTokenError('TOKEN_INVALID', `Invalid confirm token: ${msg}`);

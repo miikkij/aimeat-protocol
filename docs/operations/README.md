@@ -13,6 +13,7 @@ from the admin page and by an operator's AI with the `aimeat_admin_*` tools; the
 | Back it up and prove the backup restores | [Backup and restore](backup-and-restore.md) |
 | Keep the PostgreSQL database available: a standby with automatic failover, WAL archiving, a timed restore, and what the node does during a failover | [Database high availability](database-high-availability.md) |
 | Move to a new version, and prepare for what 4.0.0 removes | [Upgrading](upgrading.md) |
+| Know what each key protects and how one is replaced | [Key rotation](key-rotation.md) |
 | Connect it to other nodes, watch the peers, remove one | [Running federation](federation.md) |
 | Set up e-invoice delivery and the other settings bookkeeping uses | [Bookkeeping](bookkeeping.md) |
 | Know every setting | [Configuration reference](../b-config.md) |

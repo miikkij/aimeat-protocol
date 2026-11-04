@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.13.0 — 2026-11-04 — Rules aes-gcm and token-key: AES-256-GCM goes through utils/aes-gcm.ts
+ *     (baseline empty), and a JWT is signed or verified by hand only where the baseline names the
+ *     outside party whose key it uses (codebase analysis 2026-11-03, item B9).
  *   v1.12.0 — 2026-11-04 — Rule service-locator: the five running services are read from nodeContext()
  *     (services/node-context.ts); 93 of the 94 getActive* calls (69 of 70 files) moved, and the one left is the
  *     inactivity nudge, whose unit test mocks services/email.js (codebase analysis 2026-11-03, item D-i).
@@ -253,6 +256,18 @@ export const RULES: Rule[] = [
     pattern: /\bgetActive(Scheduler|EmailService|AiJobService|WorkflowEngine|ConnectTunnelManager)\(/,
     // email.ts defines getActiveEmailService, the one handle kept for a unit test that mocks that module.
     skipDirs: ['src/services/email.ts'],
+  },
+  {
+    id: 'aes-gcm',
+    label: 'A value is encrypted with AES-256-GCM only through gcmSeal and gcmOpen (utils/aes-gcm.ts), the node\'s one implementation, which the stored secrets, the TOTP secrets, the node key and the short-lived claim rows use (codebase analysis 2026-11-03, B9)',
+    pattern: /\bcreate(Cipheriv|Decipheriv)\(/,
+    skipDirs: ['src/utils/aes-gcm.ts'],
+  },
+  {
+    id: 'token-key',
+    label: 'A token the node signs or verifies for itself goes through signFor and verifyFor (auth/node-signer.ts), which sign each kind with its purpose\'s own key; a file that signs or verifies a JWT by hand is listed with the outside party whose key it uses (codebase analysis 2026-11-03, B9)',
+    pattern: /\bjwtVerify\(|\.setProtectedHeader\(/,
+    skipDirs: ['src/auth/node-signer.ts'],
   },
 ];
 

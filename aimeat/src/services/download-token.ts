@@ -17,6 +17,9 @@
  * @usage
  *   import { generateDownloadToken, verifyDownloadToken } from '../services/download-token.js';
  * @version-history
+ *   v1.4.0 -- 2026-11-04 -- Signed with the download purpose's own key (auth/node-signer.ts); a token
+ *     signed before, with the node key, verifies as before until it expires (codebase analysis
+ *     2026-11-03, item B9).
  *   v1.3.0 -- 2026-10-31 -- The v1.2.1 transition ends: a token without `ver` is refused TOKEN_INVALID,
  *     with a word on asking for a new download URL. Every such token was minted before 2026-10-20 and
  *     had expired by 2026-10-21, so no URL handed out stops working (Jouni, 2026-10-31; secaudit
@@ -40,7 +43,8 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): presigned download handle for storage files
  */
 
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 
 let _privateKey: CryptoKey | null = null;
 let _publicKey: CryptoKey | null = null;
@@ -96,7 +100,7 @@ export async function generateDownloadToken(payload: DownloadTokenPayload, ttlSe
         throw new Error('A download token names no file version: pass the stored file\'s createdAt as `version`.');
     }
 
-    return new SignJWT({
+    return signFor('download', new SignJWT({
         typ: 'download',
         key: payload.key,
         mimeType: payload.mimeType,
@@ -104,21 +108,21 @@ export async function generateDownloadToken(payload: DownloadTokenPayload, ttlSe
         ver: payload.version,
         ...(payload.filename ? { filename: payload.filename } : {}),
     })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setSubject(payload.sub)
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), _privateKey);
 }
 
 export async function verifyDownloadToken(token: string): Promise<VerifiedDownloadToken> {
-    if (!_publicKey) throw new Error('Download token keys not initialized');
+    if (!_publicKey || !_privateKey) throw new Error('Download token keys not initialized');
 
     let payload;
     try {
-        const result = await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] });
+        const result = await verifyFor('download', token, { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] });
         payload = result.payload;
     } catch (err) {
+        // A token this node signed for another purpose gets the answer a token of another type always got.
+        if (err instanceof TokenPurposeError) throw new DownloadTokenError('TOKEN_INVALID', 'Token is not a download token');
         const msg = (err as Error).message;
         if (msg.includes('expired') || msg.includes('exp')) {
             throw new DownloadTokenError('TOKEN_EXPIRED', 'Download token has expired');
