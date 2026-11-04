@@ -97,7 +97,7 @@
  *     record on the envelope carrier and every `resp.data ?? resp` in the connector dropped it.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 11.
  */
-import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../mcp/ai-provenance-input.js';
+import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../services/ai-provenance-input.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 
 // The bytes a memory value's provenance record is about, from the node's own definition rather than

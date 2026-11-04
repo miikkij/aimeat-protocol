@@ -77,7 +77,7 @@ import { SkillValidationError, isAllowedSkillPath, SKILL_NAME_RE } from '../serv
 import { readSkillFileInput, skillFileBytes, skillFileEncodings } from '../services/skill-files.js';
 import { parseSkillVisibility, SKILL_VISIBILITY_HINT } from '../services/skill-audience.js';
 import { ProvenanceScopeError } from '../services/ai-provenance.js';
-import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../services/ai-provenance-echo.js';
 import { readerFor } from '../services/classification/reader.js';
 import { isOperatorCaller } from '../services/operator-override.js';

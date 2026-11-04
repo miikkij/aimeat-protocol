@@ -15,7 +15,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
-import { emitToolListChanged } from '../../mcp/index.js';
+import { emitToolListChanged } from '../../services/resource-events.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { widenForPlace } from '../../services/place-agent-scopes.js';
 

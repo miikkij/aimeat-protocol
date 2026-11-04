@@ -247,12 +247,12 @@
       "digest": "sha256:1dfd53086f4b9286972b62f3"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-04",
       "watches": [
-        "aimeat/src/mcp/ai-provenance-input.ts",
+        "aimeat/src/services/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:83e26e7b02b3f6154df97a19"
+      "digest": "sha256:afe16000bfcfb7348ae3a252"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-11-02",
@@ -262,12 +262,12 @@
       "digest": "sha256:52ebcd099c3f0297a44fc1f2"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:12f508aa0d881cacc735ccac"
+      "digest": "sha256:4a70bed14d75baed3c1ae47f"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -337,7 +337,7 @@
       "digest": "sha256:1540298cdf0a2e41b5d51471"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -346,7 +346,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:60bc9034fe10900db6ee2c98"
+      "digest": "sha256:a265f36c7d266bc79815dcd0"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-01",
@@ -374,7 +374,7 @@
       "digest": "sha256:110b77df9abf93ec33aacbf7"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -385,7 +385,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:6eb066c8e0e9dce456dea917",
+      "digest": "sha256:94e184cb0a10fb449dcc7f62",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -432,11 +432,11 @@
       "digest": "sha256:aa300e947fd7cef743a0330f"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-10-26",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:87dff7445b39fbe020329618"
+      "digest": "sha256:da6de015fa51191441342e9b"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-10-26",
@@ -446,14 +446,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:a6e8c33ca48f6c56a17b6022"
+      "digest": "sha256:6a4772607eba2384f8005ce4"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -634,14 +634,14 @@
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
-      "aimeat/src/mcp/ai-provenance-input.ts": "42efb1420ca3feda",
+      "aimeat/src/services/ai-provenance-input.ts": "52e4c12a65c86c51",
       "aimeat/src/services/ai-provenance.ts": "dc4b6f07194fccf8"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "487cb90f6512b381"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "e1f1561f60340d7c",
+      "aimeat/src/mcp/core.ts": "3bbaaf7dd64ce153",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "21a02556dfd7c4f3"
     },
     "node:manage-my-profile-data": {
@@ -664,7 +664,7 @@
       "aimeat/src/services/ai/routing.ts": "3ab2ace7eeab4d80"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "feaff1af3ffa487c"
+      "aimeat/src/routes/skills.ts": "f52a24653544fe3f"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "43fad9e1b6aedc0d"
@@ -672,7 +672,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/mcp/agent-schedules.ts": "e765a5170e850f1e",
-      "aimeat/src/services/scheduler.ts": "b228800f4b2c4643",
+      "aimeat/src/services/scheduler.ts": "ed3f7c9855612e94",
       "aimeat/src/services/ai/route-plan.ts": "3972a5cb00aab986"
     },
     "node:aimeat-game-apps": {
@@ -754,7 +754,7 @@
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
       "aimeat/src/routes/organisms/workspace-ops.ts": "dca722aac4be161b",
       "aimeat/src/routes/organisms/workspace-access.ts": "c28427159eaf9f7c",
-      "aimeat/src/services/agent-profile-write.ts": "99b9970e98fddb42",
+      "aimeat/src/services/agent-profile-write.ts": "8cd2abe3dc838b0f",
       "aimeat/src/services/agent-task-rules.ts": "207afa09788c8a11"
     },
     "node:aimeat-extension-builder": {
@@ -767,14 +767,14 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "39140d92ef94092c",
-      "aimeat/src/routes/memory/key.ts": "0879c21bf9ad1241",
+      "aimeat/src/routes/memory/bulk.ts": "558fd06de10a714c",
+      "aimeat/src/routes/memory/key.ts": "c91da37221733eba",
       "aimeat/src/services/memory-bin.ts": "9fa3d0c47be934d5",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
       "aimeat/src/services/owner-erasure.ts": "bf2dbc341811d895",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
-      "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
+      "aimeat/src/mcp/organisms.ts": "5a71ceba6881143b"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "d52a31eafc176cab",

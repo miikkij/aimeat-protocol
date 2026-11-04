@@ -61,7 +61,7 @@ import { appOwnedKeyRefusal, writeStorageFile } from '../services/storage-file-w
 import { pageKeyWriteRefusal, pageWriterOf } from '../services/storage-page-keys.js';
 import { organismVisibilityRefusal } from '../services/organism-visibility.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
 import { randomBytes } from 'node:crypto';
 import { versionedAddress } from '../utils/http-range.js';

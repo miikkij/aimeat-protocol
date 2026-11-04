@@ -81,7 +81,7 @@ import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';
 import {
     writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
 } from '../../services/app-draft-edit.js';
-import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
 import { isSharedApp } from '../../services/app-dev-grant.js';
 import { roadmapGate } from '../../services/app-roadmap.js';

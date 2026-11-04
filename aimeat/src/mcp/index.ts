@@ -195,10 +195,10 @@ import { getStats } from '../services/stats.js';
 // Lives in resource-events.ts, a leaf, so a service can notify an agent without importing the
 // registry this file assembles (which imports the service back: a cycle). Re-exported here so
 // every existing importer keeps working; new code imports the leaf.
-import { emitResourceUpdated, emitResourceListChanged, resourceEvents, type ResourceChangeEvent } from './resource-events.js';
+import { emitResourceUpdated, emitResourceListChanged, resourceEvents, type ResourceChangeEvent } from '../services/resource-events.js';
 import { answerMovedTools } from './moved-tools-answer.js';
 import { treatNullAsAbsent } from './null-as-absent.js';
-export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
+export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from '../services/resource-events.js';
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();

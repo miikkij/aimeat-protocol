@@ -41,7 +41,7 @@ import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
 import { isOwnerInPerson, mayActOnAgent } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
-import { emitResourceUpdated } from '../../mcp/index.js';
+import { emitResourceUpdated } from '../../services/resource-events.js';
 import { createTask } from '../../services/agent-task-write.js';
 import { mayLoosenStart } from '../../services/agent-task-rules.js';
 import { startAnswer } from '../../services/task-start-notice.js';

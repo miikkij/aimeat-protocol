@@ -32,7 +32,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { emitRecordChange } from '../../services/event-bus.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';

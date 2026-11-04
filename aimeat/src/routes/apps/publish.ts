@@ -75,7 +75,7 @@ import { validateCortexAgents } from '../../models/crew-def-schemas.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
-import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { publishApp } from '../../services/app-publish.js';
 import { servedMarksResponse } from '../../services/app-serve-marks-strip.js';

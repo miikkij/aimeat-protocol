@@ -96,7 +96,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { writeStorageFile } from '../storage-file-write.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/resource-events.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../resource-events.js';
 import {
     provenanceForWrite, storeHeldProvenance, contentHashOf as recordHashOf, type DeclaredProvenance,
 } from '../ai-provenance.js';

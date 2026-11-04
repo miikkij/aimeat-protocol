@@ -66,7 +66,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { emitResourceUpdated } from '../mcp/index.js';
+import { emitResourceUpdated } from '../services/resource-events.js';
 import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
 import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding-guide.js';
 import { calculateReadiness } from '../services/readiness-scorer.js';

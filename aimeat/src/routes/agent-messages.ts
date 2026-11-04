@@ -51,13 +51,13 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { resolveIdentity, agentGaiiFromIdentifier, isSameOwner, isOwnerInPerson, mayActOnAgent } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { emitResourceUpdated } from '../mcp/index.js';
+import { emitResourceUpdated } from '../services/resource-events.js';
 import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
 import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { sendAgentMessage } from '../services/agent-message-send.js';
 import { agentIsStopped } from '../services/agent-stop.js';
-import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;

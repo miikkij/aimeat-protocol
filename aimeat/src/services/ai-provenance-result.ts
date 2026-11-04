@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/ai-provenance-result.ts
+ * @file src/services/ai-provenance-result.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `ai_provenance` block on an MCP tool RESULT — defined once, so every read tool
@@ -28,6 +28,8 @@
  * @usage
  *   return jsonContent({ ...payload, ...(await readProvenance(storage, config, rec.aiProvenanceId)) });
  * @version-history
+ *   v1.1.1 — 2026-11-04 — Moved unchanged from src/mcp/ to src/services/, because a service imports
+ *     it and a service may not import from src/mcp/ (codebase analysis 2026-11-03, item D-b).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. The block's SHAPE moved to
  *     services/ai-provenance-marks.ts as provenanceItemBlock(), because Phase 9 gave the REST board
  *     and agent-message reads the same per-item block and a second declaration of it is how the two
@@ -39,7 +41,7 @@ import type { Storage } from '../storage/interface.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock,
   type AiProvenanceItemBlock,
-} from '../services/ai-provenance-marks.js';
+} from './ai-provenance-marks.js';
 
 /** The `ai_provenance` value on a tool result: the id, the document, and where it resolves. */
 export type AiProvenanceResultBlock = AiProvenanceItemBlock;

@@ -19,7 +19,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { StorageProvenanceInput } from '../services/storage-file-write.js';
-import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 
 /** The writer's statement, read from a JSON body, or the violations of a block that does not validate. */

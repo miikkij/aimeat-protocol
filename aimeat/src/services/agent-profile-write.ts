@@ -72,7 +72,7 @@ import { buildGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
 import { emitChange } from './event-bus.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { emitToolListChanged } from '../mcp/resource-events.js';
+import { emitToolListChanged } from './resource-events.js';
 import { deriveStepsForMode } from '../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
 import { inferModeFromPlatform } from './platform-detector.js';

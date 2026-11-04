@@ -31,7 +31,7 @@ import { driveFileText, storeDriveFile } from '../services/connections/drive-fil
 import { writeResource, loadStoredBytes, type WritePayload } from '../services/connections/write.js';
 import { connectionHoldersOf, requireUsableConnection, readAsOwnerRefusal } from '../services/connections/access.js';
 import { readerFor } from '../services/classification/reader.js';
-import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 

@@ -49,7 +49,7 @@ import {
 import { setCompanyFrontPageGated, publishCompanyPortfolioGated } from '../services/company/company-publish-gate.js';
 import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
 import { callerOf } from '../middleware/caller.js';
-import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
 import type { CompanyRecord } from '../models/company-schemas.js';
 import {
   setCompanySmtp, getCompanySmtpPublic, deleteCompanySmtp,

@@ -36,7 +36,7 @@ import { decideTaskStart, mayStartWaitingTask, taskWakeId, type StartCaller } fr
 import { waitReason } from './task-start-notice.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { emitChange, emitDelivery } from './event-bus.js';
-import { emitResourceUpdated } from '../mcp/resource-events.js';
+import { emitResourceUpdated } from './resource-events.js';
 import { logger } from '../utils/logger.js';
 
 export interface TaskStartDeps {

@@ -49,7 +49,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord, AgentTaskRecord, AgentTaskScope, AppRecord } from '../storage/interface.js';
 import { emitChange, emitDelivery } from './event-bus.js';
-import { emitResourceUpdated } from '../mcp/resource-events.js';
+import { emitResourceUpdated } from './resource-events.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { deployedAgentName } from '../models/crew-def-schemas.js';
 import { presentOfferPacing, type Offer } from '../models/offer-schemas.js';

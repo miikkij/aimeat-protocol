@@ -126,7 +126,7 @@ import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from
 import { provenanceDeclarationRefusal } from '../services/ai-provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { mintMessageProvenance, withMessageProvenance } from '../services/message-provenance.js';
-import { toDeclaredProvenance } from '../mcp/ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';

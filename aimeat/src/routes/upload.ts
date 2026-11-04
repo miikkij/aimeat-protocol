@@ -187,7 +187,7 @@ import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { effectiveDevLevel, mayAct } from '../services/app-dev-grant.js';
 import { accountOf } from '../services/app-members.js';
 import { logger } from '../utils/logger.js';
-import { emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceListChanged } from '../services/resource-events.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { prepareSecretConfigForWrite } from '../services/extension-secrets.js';
 import { carryHostFieldValues } from '../services/extension-network-hosts.js';

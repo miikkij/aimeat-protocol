@@ -81,7 +81,7 @@ import {
     applyOwnerLegalUpdate, appLegalState, legalReadiness, appSellsForMoney, parseLegalInput, legalUpdateRefusal,
 } from '../../services/app-legal.js';
 import { recordAppAudit, type AppAuditAction } from '../../services/app-audit.js';
-import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { operatorOverride } from '../../services/operator-override.js';
 import { appIsPaced, appToll } from '../../services/app-pacing.js';

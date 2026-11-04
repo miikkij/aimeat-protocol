@@ -20,7 +20,7 @@ import { descriptionFor, structuredResult } from '../tool-catalog/shape.js';
 import { annotationsFor } from './annotations.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { genericListOutput } from '../tool-catalog/output-schemas.js';
-import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { writeProvenanceEcho } from '../services/ai-provenance-result.js';
 import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 
 export interface CoreWorkToolDeps {

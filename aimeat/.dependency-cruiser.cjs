@@ -23,6 +23,9 @@
  *   cd aimeat && pnpm deps:graph          # the same graph as an SVG, to look at
  *   cd aimeat && pnpm deps:baseline:shrink   # remove the baseline entries a fix made stale
  * @version-history
+ *   v1.3.0 — 2026-11-04 — routes-do-not-import-the-mcp-server, with no baseline entry: the 23 routes
+ *     that imported mcp/index.ts for the resource events import services/resource-events.ts
+ *     (codebase analysis 2026-11-03, item D-b).
  *   v1.2.0 — 2026-11-04 — no-circular takes run-time cycles only (error); type-only cycles are
  *     no-circular-type-only (warn). A stale baseline entry fails check:deps
  *     (codebase analysis 2026-11-03, item D-a).
@@ -126,6 +129,18 @@ module.exports = {
             severity: 'error',
             from: { path: '^src/services' },
             to: { path: '^src/mcp', dependencyTypesNot: ['type-only'] },
+        },
+        {
+            name: 'routes-do-not-import-the-mcp-server',
+            comment:
+                'mcp/index.ts assembles the whole MCP server (every tool group; its static reach was '
+                + '1921 of 3632 modules on 2026-11-03). Until 2026-11-04, 23 routes imported it only '
+                + 'to emit a resource event, which lives in services/resource-events.ts, so a unit '
+                + 'test of any of those routes loaded more than half the node. A route that needs '
+                + 'something from the MCP layer imports the leaf module that holds it.',
+            severity: 'error',
+            from: { path: '^src/routes/' },
+            to: { path: '^src/mcp/index[.]ts$', dependencyTypesNot: ['type-only'] },
         },
         {
             name: 'mcp-does-not-import-routes',

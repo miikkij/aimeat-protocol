@@ -70,7 +70,7 @@ import { decodeStrictBase64 } from '../utils/base64.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, jsonContent } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { toolError } from './tool-error.js';
 import type { CallerContext } from '../services/caller-context.js';

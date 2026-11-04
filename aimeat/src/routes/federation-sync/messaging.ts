@@ -99,7 +99,7 @@ import {
     signedMessageRefusal, audienceRefusal, deliveryRefusal, pinnedRefusal, federationPeerProofPin,
 } from '../../services/signed-node-request.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
-import { emitResourceUpdated } from '../../mcp/index.js';
+import { emitResourceUpdated } from '../../services/resource-events.js';
 import { notify } from '../../services/notify.js';
 import { parseGaiiLoose, isSameOwner, localAccountName, localAccountOf } from '../../utils/gaii.js';
 import { acceptedSameAccount } from '../../services/contact-same-account.js';

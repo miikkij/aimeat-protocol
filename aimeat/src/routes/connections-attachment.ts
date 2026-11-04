@@ -22,7 +22,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireScope } from '../auth/middleware.js';
 import type { ConnectContext } from '../services/connections/oauth.js';
 import { storeMailAttachment } from '../services/connections/attachment-store.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 
 export async function answerStoredAttachment(
     req: Request, res: Response, config: AimeatConfig, storage: Storage,

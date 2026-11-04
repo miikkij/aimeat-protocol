@@ -17,7 +17,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { removeStorageFile } from '../services/storage-file-write.js';
 import { extractKey } from './storage-files-request.js';

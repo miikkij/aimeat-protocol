@@ -40,7 +40,7 @@ import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
-import { emitResourceUpdated } from '../../mcp/index.js';
+import { emitResourceUpdated } from '../../services/resource-events.js';
 import { recordTaskStarted } from '../../services/activity-recorder.js';
 import { AgentTaskUpdateSchema, AgentTaskRequestChangesSchema } from '../../models/agent-task-schemas.js';
 import {
