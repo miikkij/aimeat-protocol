@@ -16,6 +16,11 @@
  *   credential is exactly the kind of thing that gets added in a hurry and read as normal afterwards,
  *   because it looks like the forty above it. This makes adding one a decision somebody wrote down.
  *
+ *   A CREDENTIAL THE HANDLER VERIFIES IS DECLARED INSTEAD (2026-11-04). A door that takes a participant,
+ *   a party or a platform credential names it in its chain with acceptCredential('<kind>', …), the auth
+ *   layer verifies it, and the door leaves this list. The list only shrinks: a stale entry fails, and
+ *   `ceiling` must equal the number listed, so a new door with no credential raises it visibly.
+ *
  *   FEDERATION IS DELIBERATELY NOT HERE. Its fifteen write doors belong to
  *   `check:federation-signatures`, which asks a sharper question about them: owner-gated, or the
  *   peer's Ed25519 signature verified in the handler. Two gates over one population means two lists
@@ -27,6 +32,10 @@
  *   cd aimeat && pnpm check:open-writes --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:open-writes --seed     # rewrite the exemption file
  * @version-history
+ *   v1.1.0 — 2026-11-04 — A ratchet: a listed door that is gone or now declares a credential strategy
+ *     (acceptCredential, src/auth/credential-strategies.ts) fails until it is removed, and the list has
+ *     a ceiling that only falls; the report counts the writing doors that declare a strategy
+ *     (codebase analysis 2026-11-03, item B8).
  *   v1.0.0 — 2026-09-04 — Initial, on the neighbouring session's triage and in the shape it specified.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -39,6 +48,12 @@ const EXEMPTIONS = join(AIMEAT, 'security', 'open-write-exemptions.json');
 
 interface ExemptionFile {
     note: string;
+    /**
+     * The most entries `exempt` may hold. It only falls: a door that declares a credential strategy
+     * leaves the list and the ceiling is lowered in the same change. Raising it is the visible decision
+     * a door with no credential at all needs (codebase analysis 2026-11-03, item B8).
+     */
+    ceiling?: number;
     /** `METHOD /path` → where the credential is checked. */
     exempt: Record<string, string>;
 }
@@ -52,8 +67,11 @@ export function main(): boolean {
     const seed = process.argv.includes('--seed');
 
     const { files } = srcProgram();
-    const doors = openWriteDoors(toRows(collectDoors(files)))
+    const rows = toRows(collectDoors(files));
+    const doors = openWriteDoors(rows)
         .sort((a, b) => a.id.localeCompare(b.id));
+    // Writing doors whose credential the auth layer verifies (src/auth/credential-strategies.ts).
+    const declared = rows.filter(r => r.kind === 'rest' && !r.id.startsWith('GET ') && r.guards.some(g => g.name === 'acceptCredential'));
 
     if (seed) {
         const file: ExemptionFile = {
@@ -65,6 +83,7 @@ export function main(): boolean {
                 + 'plus PKCE verifier, a device_code, a one-time connectivity key, a pre-signed token, the '
                 + 'admin password, an IP check that closes as soon as one owner exists). The gate exists '
                 + 'for the door that has not been added yet.',
+            ceiling: doors.length,
             exempt: Object.fromEntries(doors.map(d => [key(d), SEED_REASON])),
         };
         writeFileSync(EXEMPTIONS, JSON.stringify(file, null, 2) + '\n', 'utf-8');
@@ -83,8 +102,9 @@ export function main(): boolean {
     console.log('  ' + '─'.repeat(62));
     console.log(`  doors             ${String(doors.length).padStart(3)}   outside /v1/federation/*`);
     console.log(`  no middleware     ${String(doors.filter(d => d.guards.length === 0).length).padStart(3)}   the chain is empty; the handler decides`);
-    console.log(`  listed            ${String(listed.length).padStart(3)}   of which triaged: ${triaged.length}`);
+    console.log(`  listed            ${String(listed.length).padStart(3)}   of which triaged: ${triaged.length}; ceiling ${exempt.ceiling ?? '(none)'}`);
     console.log(`  NEW, not listed   ${String(fresh.length).padStart(3)}`);
+    console.log(`  strategy          ${String(declared.length).padStart(3)}   writing doors that declare acceptCredential() (src/auth/credential-strategies.ts)`);
     console.log('');
 
     if (fresh.length > 0) {
@@ -96,13 +116,28 @@ export function main(): boolean {
         console.error('  device_code, a pre-signed token, the admin password. If this one is too, add it to');
         console.error('  security/open-write-exemptions.json with the sentence saying where that check is.');
         console.error('  If it is not, it is a hole and the middleware chain is where it gets closed.');
+        console.error('  A credential the handler verifies (a participant, a party, a platform) is declared');
+        console.error('  in the chain instead: acceptCredential(\'<kind>\', …) in src/auth/credential-strategies.ts.');
         return false;
     }
 
     if (stale.length > 0) {
-        console.log(`  ✓ ${stale.length} listed door${stale.length === 1 ? '' : 's'} gone or now gated. Remove to lock the gain in:`);
-        for (const k of stale) console.log(`    ${k}`);
-        return true;
+        console.error(`  ✖ ${stale.length} listed door${stale.length === 1 ? '' : 's'} gone or now gated. Remove ${stale.length === 1 ? 'it' : 'them'} from`);
+        console.error('    security/open-write-exemptions.json and lower its ceiling in the same change, so the list');
+        console.error('    only shrinks:');
+        for (const k of stale) console.error(`    ${k}`);
+        return false;
+    }
+
+    const ceiling = exempt.ceiling ?? listed.length;
+    if (listed.length !== ceiling) {
+        console.error(listed.length > ceiling
+            ? `  ✖ ${listed.length} doors are listed and the ceiling is ${ceiling}. A new door that takes no credential is a`
+              + '\n    decision: declare its credential with acceptCredential() if it has one, or raise the ceiling in'
+              + '\n    security/open-write-exemptions.json in the same change, with the sentence that says why it is safe.'
+            : `  ✖ ${listed.length} doors are listed and the ceiling is ${ceiling}. Lower the ceiling to ${listed.length} in`
+              + '\n    security/open-write-exemptions.json, so the count only falls.');
+        return false;
     }
 
     console.log(`  ✓ no writing door takes a caller with no credential, beyond the ${listed.length} listed`);
