@@ -7113,6 +7113,7 @@
     "expired": "Tämä pyyntö on vanhentunut.",
     "newScope": "uusi",
     "area": {
+      "agent": "agenttiesi luominen ja poistaminen",
       "memory": "tallentamasi tiedot",
       "storage": "täällä säilyttämäsi tiedostot",
       "catalogue": "julkinen hakemisto",
@@ -19400,6 +19401,9 @@
     "redirectUnchecked": "Tämä palvelin ei voinut tarkistaa, minne kirjautumiskoodi lähetettäisiin. Hyväksy vain tekoäly, jonka yhdistit itse.",
     "identityHost": "Sovellus tunnistetaan osoitteestaan",
     "nameSelfDeclared": "\"{client}\" on nimi, jonka sovellus antoi itselleen. Tämä palvelin ei ole tarkistanut sitä, joten katso yllä oleva osoite.",
+    "localApp": "Tämä sovellus toimii omalla tietokoneellasi.",
+    "localAppNameUnchecked": "AIMEAT ei ole tarkistanut nimeä \"{client}\", joten hyväksy vain, jos käynnistit sovelluksen itse.",
+    "localAppStartedByYou": "Hyväksy vain, jos käynnistit sovelluksen itse.",
     "yourAi": "Tekoälysi",
     "yourAiInline": "tekoälysi",
     "lead": "{client} saa AIMEATissa oman nimen ja omat oikeudet. Tätä kutsutaan agentiksi. Kaikki, mitä se täällä tekee, näkyy agentin nimellä, ja sinä päätät, mitä se saa tehdä.",

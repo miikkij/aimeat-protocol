@@ -30,6 +30,8 @@
  *   - Phase 3: app-grant PKCE and redirect_uri refusals at authorize and token
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-oauth-consent-refusals
  * @version-history
+ *   v1.3.0 — 2026-11-04 — Phase 4: redirect_local, which makes the consent page say that the app runs
+ *     on the person's own computer instead of showing a loopback address.
  *   v1.2.0 — 2026-10-25 — Phase 4: GET /v1/mcp/consent-info, what the consent page shows as the server
  *     checked it, and no redirect for Deny that the client did not register (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — The token names the client by its registered name, not a posted client_name (secaudit2026oct22).
@@ -344,6 +346,26 @@ await test('a redirect the client did not register is not offered to Deny, and a
     assert(off.status === 200 && off.body.redirect_ok === false && !('redirect_uri' in off.body) && !('redirect_host' in off.body), `unregistered: ${short(off.body)}`);
     const none = await json('/v1/mcp/consent-info?client_id=mcp-client-nobody');
     assert(none.status === 404 && none.body.error === 'invalid_client', `unknown: ${none.status} ${short(none.body)}`);
+});
+
+// The page says "runs on your own computer" only for what the server read as a loopback redirect; a
+// host that only looks like one must keep being shown as an address.
+await test('redirect_local: true for a registered loopback redirect on any port, false for a public host and for a look-alike', async () => {
+    const info = async (registered: string, asked: string) => {
+        const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `Local ${stamp}`, redirect_uris: [registered] }) });
+        assert(reg.status === 201, `register ${registered}: ${reg.status} ${short(reg.body)}`);
+        return (await json(`/v1/mcp/consent-info?client_id=${encodeURIComponent(reg.body.client_id)}&redirect_uri=${encodeURIComponent(asked)}`)).body;
+    };
+    const ip = await info('http://127.0.0.1/callback', 'http://127.0.0.1:58627/callback');
+    assert(ip.redirect_ok === true && ip.redirect_local === true, `127.0.0.1: ${short(ip)}`);
+    const name = await info('http://localhost/callback', 'http://localhost:62067/callback');
+    assert(name.redirect_ok === true && name.redirect_local === true, `localhost: ${short(name)}`);
+    const pub = await info(MCP_REDIRECT, MCP_REDIRECT);
+    assert(pub.redirect_ok === true && pub.redirect_local === false, `public host: ${short(pub)}`);
+    const alike = await info('https://127.0.0.1.example.test/cb', 'https://127.0.0.1.example.test/cb');
+    assert(alike.redirect_ok === true && alike.redirect_local === false, `look-alike: ${short(alike)}`);
+    const off = await info(MCP_REDIRECT, 'http://127.0.0.1:58627/callback');
+    assert(off.redirect_ok === false && !('redirect_local' in off), `unregistered loopback: ${short(off)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

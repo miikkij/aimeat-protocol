@@ -1373,7 +1373,9 @@
         } else {
           history.pushState(null, '', path);
         }
-        
+        // A view that stays mounted when only the query changes reads the new address from this event.
+        window.dispatchEvent(new Event('aimeat-navigated'));
+
         try {
           setViewError(null);
           const mod = await loadView(loader);
@@ -2128,6 +2130,8 @@
               // The header folds the pill itself on a phone (theme.css, ≤640px), so it keeps the full
               // row; compact became the pill's default everywhere on 2026-09-13.
               compact: false,
+              // The signed-in name goes to the home and opens its settings dialog (views/home/index.js).
+              nameHref: '/v1/home?settings=1',
               // A node the store sold has its owner already, so its sign-in offers no registration
               // (Jouni v27 P3): the pill says "Sign in" instead of "Sign in / Register".
               // Its dialog has no "Create account" tab either: others come in by invitation (v31 K24).

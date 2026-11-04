@@ -85867,6 +85867,7 @@ paths:
                   redirect_ok: { type: boolean }
                   redirect_uri: { type: string, description: Present when redirect_ok. }
                   redirect_host: { type: string, description: Present when redirect_ok. }
+                  redirect_local: { type: boolean, description: 'Present when redirect_ok. True when the redirect is a loopback address (RFC 8252), which reaches a program on the computer the browser runs on.' }
         '400':
           description: client_id missing.
         '404':

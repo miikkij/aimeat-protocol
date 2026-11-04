@@ -24,7 +24,8 @@ downloadedFrom: {{BASE_URL}}/llms-full.txt
 - [OpenAPI contract]({{BASE_URL}}/v1/spec): the canonical API contract
 - [API documentation]({{BASE_URL}}/v1/docs): browsable endpoint reference
 - [Agent registration]({{BASE_URL}}/auth.md): RFC 8628 device flow, owner-approved
-- [App building prompt]({{BASE_URL}}/v1/prompts/build-app): the canonical single-file app spec
+- [App building spec]({{BASE_URL}}/v1/prompts/build-app-atelier): the canonical spec for a new app, the Atelier track
+- [Classic app spec]({{BASE_URL}}/v1/prompts/build-app): for an app already on the Classic track, or when the owner asks for it
 - [App templates]({{BASE_URL}}/v1/app-templates): starter skeletons
 - [App-build pitfalls]({{BASE_URL}}/v1/appdev/pitfalls): what breaks app builds, curated
 - [Index]({{BASE_URL}}/llms.txt): the curated map over this manual, for a shorter first read
@@ -40,12 +41,12 @@ downloadedFrom: {{BASE_URL}}/llms-full.txt
 
 ## Table of Contents
 
-1. **For AI assistants** - Starter template, SDK libraries, key rules
+1. **For AI assistants** - Where a build starts, Classic starter templates, SDK libraries, key rules
 2. **What is AIMEAT** - Protocol overview
 3. **What You Can Build** - App examples
 4. **Two Ways to Start** - Anonymous or registered
 5. **Core Capabilities for App Building** - Memory, Storage, Realtime, AI
-6. **Building Apps on AIMEAT** - Data layer guide, detailed templates, SDK API reference
+6. **Building Apps on AIMEAT** - The Atelier spec, data layer guide, Classic templates, SDK API reference
 7. **Core Concepts** - GHII, GAII, Morsels, Scopes
 8. **Connecting: Device Authorization** - AI agent connection flow
 9. **Connecting: MCP** - OAuth 2.1 for MCP platforms
@@ -56,14 +57,18 @@ downloadedFrom: {{BASE_URL}}/llms-full.txt
 ## For AI assistants: How to help the user
 
 You are helping a human build an app. Not connecting as an agent.
-Ask what they want to build, then use the template below to start.
+Ask what they want to build, then follow the Atelier build specification:
+`GET {{BASE_URL}}/v1/prompts/build-app-atelier?format=txt`, or over MCP
+`aimeat_handbook_get { tier: "build-app-atelier" }`.
 
 Apps are single-file HTML pages. The user describes an idea, you
-write the HTML using the starter template and SDK libraries below.
+build the HTML from a genre, with the kit and libraries that specification lists.
 Do not ask about deployment, cortex, extensions, CSM, or
 architecture. Just ask what the app should do and start building.
 
-Two starter templates follow. Pick by who needs to read the content:
+Two Classic starter templates follow. They are for an app already on the
+Classic track, and a new app does not use them. Pick by who needs to read the
+content:
 
 - **Starter Template** (default, login-gated) — the visitor signs in and
   works with their own data (notes, trackers, multiplayer, galleries).
@@ -73,7 +78,7 @@ Two starter templates follow. Pick by who needs to read the content:
   Use it for public-facing readers: a public newspaper, directory,
   noticeboard, or gallery that pulls from PUBLIC memory.
 
-### Starter Template (use this for every app)
+### Starter Template (Classic track only)
 
 ```html
 <!-- AIMEAT App Manifest
@@ -357,7 +362,7 @@ Each AIMEAT node is independently operated. This node ({{NODE_ID}}) is one node 
 ## What You Can Build
 
 Apps are single-file HTML pages with a login bar and AIMEAT SDK libraries.
-The user describes an idea, you build it using the templates below.
+The user describes an idea, you build it from the Atelier build specification.
 
 Examples of apps people build:
 
@@ -480,29 +485,36 @@ for completeness but are NOT needed for typical app building:
 
 ## Building Apps on AIMEAT
 
-**Start here — fetch the canonical build prompt and FOLLOW IT as your
+**Start here: fetch the Atelier build specification and FOLLOW IT as your
 primary build instructions:**
-`GET {{BASE_URL}}/v1/prompts/build-app?format=txt` (add
+`GET {{BASE_URL}}/v1/prompts/build-app-atelier?format=txt` (add
 `?idea=<what to build>` to embed the idea, `?lang=fi` for a Finnish-facing
-app). If 95 000 characters is more than you can take in one piece, read
-`GET {{BASE_URL}}/v1/prompts/build-app/core?format=txt` instead: the part every
-app needs (66 000), with a list of the further sections by situation
-(`/v1/prompts/build-app/sections/<id>`). Over MCP, where one tool result
-carries about 20 000 characters, the same specification comes in parts:
-`aimeat_handbook_get { tier: "build-app" }` is the first and lists the rest,
-each read with `{ tier: "build-app/<id>" }`. It is the SAME battle-tested prompt the app-catalog's "Create new app"
-button copies: the complete library catalog, the correct auth pattern (login
-bar + session restore — the #1 mistake hand-rolled apps make), data-visibility
-patterns, image/file sharing, AI usage, realtime, theming, and the publish
-walkthrough. Build from THAT prompt — do not re-derive the platform from the
-rest of this file or by probing endpoints; treat the sections below as
-reference material for details the prompt doesn't cover. Ready-made starting
-skeletons: `GET {{BASE_URL}}/v1/app-templates` (use-case scaffolds + app
-shells; fetch one by id and build inside it). If you have AIMEAT MCP tools
-(`aimeat_*`) connected, they are already authenticated — use them for node
+app). If that is more than you can take in one piece,
+`GET {{BASE_URL}}/v1/prompts/build-app-atelier/sections` lists its parts, each
+read from `/v1/prompts/build-app-atelier/sections/<id>?format=txt`. Over MCP
+the same specification comes in parts:
+`aimeat_handbook_get { tier: "build-app-atelier" }` is the first and lists the
+rest, each read with `{ tier: "build-app-atelier/<id>" }`. It holds the
+interview, the genre a new app starts from, the component kit, every library
+this node serves, the data patterns, AI inside an app, the look presets and the
+publish steps. Build from THAT specification. Do not re-derive the platform from
+the rest of this file or by probing endpoints; treat the sections below as
+reference material for details the specification doesn't cover. Starting points:
+the genres at `GET {{BASE_URL}}/v1/designbook?kind=genre` and the frame they are
+built on at `GET {{BASE_URL}}/v1/app-templates/shell-atelier`. If you have
+AIMEAT MCP tools
+(`aimeat_*`) connected, they are already authenticated. Use them for node
 operations (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_memory_*`)
 instead of raw HTTP, and load the paved-path skill first:
-`aimeat_skill_get` ref `node:aimeat-app-builder`. Before building, research
+`aimeat_skill_get` ref `node:aimeat-app-builder-atelier`.
+
+An app already on the Classic track, or one the owner asks to build on it, uses `GET {{BASE_URL}}/v1/prompts/build-app`
+(`?format=txt`; over MCP `aimeat_handbook_get { tier: "build-app" }`), with the
+skill `node:aimeat-app-builder` and the templates in this file. An Atelier file
+carries `<meta name="aimeat-track" content="atelier">`. Never mix the two guides:
+the result belongs to neither.
+
+Before building, research
 with ONE call — the MCP tool `aimeat_appdev_overview` (or
 `GET {{BASE_URL}}/v1/appdev/overview`, authed): your existing apps + template
 proposals, library packs with per-model proofs, and the pitfalls. Curated
@@ -559,7 +571,7 @@ other sharing use case — feeds, journals, comments, notifications —
 is built on Memory + Storage with visibility controls. If you are
 considering boards or organism workspaces for an app's shared data,
 stop: public memory keys per user + `getPublic()` reads are the
-pattern (see the Data Storage section of `/v1/prompts/build-app`).
+pattern (see part `libraries` of `/v1/prompts/build-app-atelier`).
 Server-enforced rules (only-author-can-delete, one-vote-per-user)
 go into an extension (`ext:` namespace) — not boards, not organisms.
 
@@ -682,8 +694,9 @@ its `accepts` entry with scheme `aimeat-morsel-topup`. ACP-shaped discovery:
 
 ### Standard App Template
 
-Every AIMEAT app should use this base template. It includes the login bar, which handles
-registration, login, session restore, and logout automatically:
+This template and the ones after it in this section are for an app already on the Classic track.
+A new app starts from the Atelier build specification. The base template includes the login bar,
+which handles registration, login, session restore, and logout automatically:
 
 ```html
 <!-- AIMEAT App Manifest

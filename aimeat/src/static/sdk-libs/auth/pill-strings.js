@@ -18,6 +18,8 @@
  * @usage import { pillStrings } from './pill-strings.js';
  *   const i = Object.assign({}, pillStrings(lang), opts.i18n);   // a caller's strings always win
  * @version-history
+ *   v1.4.0 — 2026-11-04 — `homeSettings`: where the name goes on a page that makes it a link, with the
+ *     words of `home.settings.open` in locales/.
  *   v1.3.0 — 2026-09-24 — Themes & Styles: `lookThemes` and `lookStyles` name the picker's two groups,
  *     `styleLightOnly` and `styleDarkOnly` say why light/dark stands down for a style with one mode.
  *     `themeLabel` names the light/dark group "Light or dark": "theme" is the whole look now, one word
@@ -41,6 +43,7 @@ export var PILL_STRINGS = {
     styleLightOnly: 'This style has a light mode only', styleDarkOnly: 'This style has a dark mode only',
     lookThemes: 'Themes', lookStyles: 'Styles in this theme', modeOnly: 'only',
     chooseLook: 'Choose look', switchLanguage: 'Language', pageSettings: 'Settings',
+    homeSettings: 'Home settings',
   },
   fi: {
     loggedIn: 'kirjautuneena', logoutBtn: 'Kirjaudu ulos', signInBtn: '❤️ Kirjaudu', account: 'Tili',
@@ -51,6 +54,7 @@ export var PILL_STRINGS = {
     styleLightOnly: 'Tällä tyylillä on vain vaalea tila', styleDarkOnly: 'Tällä tyylillä on vain tumma tila',
     lookThemes: 'Teemat', lookStyles: 'Tämän teeman tyylit', modeOnly: 'vain',
     chooseLook: 'Valitse tyyli', switchLanguage: 'Kieli', pageSettings: 'Asetukset',
+    homeSettings: 'Kodin asetukset',
   },
   es: {
     loggedIn: 'sesión iniciada', logoutBtn: 'Cerrar sesión', signInBtn: '❤️ Entrar', account: 'Cuenta',
@@ -61,6 +65,7 @@ export var PILL_STRINGS = {
     styleLightOnly: 'Este estilo solo tiene modo claro', styleDarkOnly: 'Este estilo solo tiene modo oscuro',
     lookThemes: 'Temas', lookStyles: 'Estilos de este tema', modeOnly: 'solo',
     chooseLook: 'Elige el aspecto', switchLanguage: 'Idioma', pageSettings: 'Ajustes',
+    homeSettings: 'Configuración del hogar',
   },
 };
 

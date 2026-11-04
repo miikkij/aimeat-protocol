@@ -13,6 +13,7 @@
  *   modalI18n/buildMarkup/wire/refreshSession/init — runs init() on DOM ready.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.3.2 — 2026-11-04 — The name in the pill links to the home's settings dialog, as in the SPA.
  *   v1.3.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.3.0 — 2026-09-30 — An operator sees the new-version tag (GET /v1/admin/node-update) beside the
  *     pill; it links to /v1/admin?nodeUpdate=1, where the SPA opens the dialog.
@@ -274,6 +275,7 @@ function main() {
           pillI18n.themeToDark = t['nav.themeToDark'] || NAV_FALLBACK['nav.themeToDark'];
           pillI18n.themeToLight = t['nav.themeToLight'] || NAV_FALLBACK['nav.themeToLight'];
           window.AIMEAT.auth.mountLoginButton('#headerAuth', {
+            nameHref: nodeHref('/v1/home?settings=1'),
             onLogin: function () { window.dispatchEvent(new Event('aimeat-auth-change')); },
             onLogout: function () { window.dispatchEvent(new Event('aimeat-auth-change')); },
             i18n: pillI18n,

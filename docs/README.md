@@ -13,7 +13,7 @@ purpose and maintenance status. [Maintenance](maintenance.md) explains the check
 | Find an API operation | [API reference](a-endpoints.md), [OpenAPI](../openapi.yaml) |
 | Connect an agent | [Agent guide](building-an-aimeat-compatible-agent.md), [client connection paths](c-platform-notes.md) |
 | Connect an external application | [Ecosystem guide](building-an-aimeat-compatible-ecosystem-app.md) |
-| Build a hosted app | The target node's `/v1/prompts/build-app`, then [app development](portal-developer-guide.md) |
+| Build a hosted app | The target node's `/v1/prompts/build-app-atelier` (`/v1/prompts/build-app` for an app already on the Classic track, or when the owner asks for it), then [app development](portal-developer-guide.md) |
 | Configure a node | [Configuration](b-config.md), [environment examples](coding-guidelines/environment-configs.md) |
 | Develop the platform | [Development guides](coding-guidelines/README.md), [CLAUDE.md](../CLAUDE.md) |
 | Approve and run a node in an organisation | [IT adoption package](it-adoption/README.md): the go-live checklist, shared responsibility, identity, data, AI models, security, hardening, compliance mapping, known limitations, and templates for the organisation's own records |

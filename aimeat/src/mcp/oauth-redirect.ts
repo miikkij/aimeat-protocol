@@ -22,9 +22,11 @@
  *   nowhere else.
  * @structure
  *   - redirectUriRegistered(registered, requested) — the allowlist check both MCP OAuth routes use
+ *   - isLoopbackRedirect(uri) — the same loopback test, for GET /v1/mcp/consent-info
  * @usage
  *   if (!redirectUriRegistered(client.redirectUris, redirectUri)) refuse();
  * @version-history
+ *   v1.1.0 — 2026-11-04 — isLoopbackRedirect, so the consent page can say the app runs on the person's computer.
  *   v1.0.0 — 2026-10-22 — Initial: the RFC 8252 §7.3 loopback port exception, for Claude Code.
  */
 
@@ -37,6 +39,11 @@ function loopback(uri: string): URL | null {
     if (u.protocol !== 'http:' || !LOOPBACK_HOSTS.has(u.hostname)) return null;
     if (u.username || u.password || u.hash) return null;
     return u;
+}
+
+/** Is this redirect a loopback address, which reaches a program on the computer the browser runs on? */
+export function isLoopbackRedirect(uri: string): boolean {
+    return loopback(uri) !== null;
 }
 
 /**

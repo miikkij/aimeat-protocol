@@ -7,6 +7,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.8.0 — 2026-11-04 — The name in the login pill may be a link: the bar's link rules leave it looking
+ *     like the plain name.
  *   v1.7.1 — 2026-11-01 — The short sign-in form and the phone rule now reach every node's signed-out
  *     bar, not only a store-sold one (WP10e B7); the rules are unchanged.
  *   v1.7.0 — 2026-11-01 — A store-sold place's sign-in button keeps one line and shows its short form
@@ -237,6 +239,9 @@
 .topnav-right a, .topnav-menu > a { font-weight: var(--weight-bold); font-size: 0.88rem; color: var(--text-dim); padding: 6px 4px; border-radius: 0; }
 .topnav-right a:hover, .topnav-menu > a:hover { color: var(--text); background: none; }
 .topnav-right .profile-link { color: var(--text); background: none; }
+.topnav-right a.aimeat-auth-ghii, .topnav-right a.aimeat-auth-ghii:hover {
+  font-weight: 800; font-size: 13px; color: var(--aimeat-pill-name, var(--accent)); padding: 0; background: none;
+}
 .topnav-right a.active, .topnav-menu > a.active {
   color: var(--text); background: none;
   text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 7px; text-decoration-color: var(--accent);

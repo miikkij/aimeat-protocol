@@ -2,14 +2,15 @@
   "$schema": "https://context7.com/schema/context7.json",
   "url": "https://context7.com/miikkij/aimeat-protocol",
   "public_key": "pk_3NQYAMkNG4423mPQKpu0K",
-  "projectTitle": "AIMEAT Protocol",
-  "description": "AIMEAT keeps a person's knowledge, agents and apps on a node they own and lets them work with it from the AI they already use. The open protocol and its reference node, reached over MCP and REST.",
+  "projectTitle": "AIMEAT",
+  "description": "AIMEAT is an open platform for AI. It keeps a person's data and apps on a node they own, and lets them work with it from the AI they already use. Humans, agents and apps read and write the same state through the same access guard, over MCP and REST. MIT licensed: what you build on it is yours.",
   "folders": [
     "docs"
   ],
   "excludeFolders": [
     "docs/internal",
     "docs/examples",
+    "docs/typesafe",
     "aimeat/node_modules",
     "node_modules"
   ],
@@ -27,14 +28,20 @@
     "dependency-management.md",
     "prompt-writing.md",
     "init-wizard.md",
-    "pitfalls.md"
+    "pitfalls.md",
+    "getting-started.md",
+    "catalog.md",
+    "maintenance.md",
+    "AIMEAT-RFC-v4.0-Core-full.md",
+    "AIMEAT-RFC-v4.0-Platform-full.md",
+    "AIMEAT-RFC-v4.0-errata.md"
   ],
   "rules": [
-    "An AIMEAT node is reached over MCP first and REST second. The hosted node is https://aimeat.io/v1/mcp; a self-hosted node exposes the same surface at <node>/v1/mcp.",
+    "An AIMEAT node is reached over MCP first and REST second. The hosted node is https://aimeat.io/v1/mcp; a self-hosted node exposes the same surface at <node>/v1/mcp. Over MCP, call aimeat_handbook_get first.",
     "Fetch <node>/llms.txt for the index and <node>/llms-full.txt for the full builder's manual before writing code against the API.",
     "Three principal types: GHII (alice@node-id) is a human, GAII (claude#alice@node-id) is an AI agent, GEAI (eco:app#alice@node-id) is an ecosystem app. Store and authorize by the resolved identity, never by a client-supplied id.",
-    "Agents are never created implicitly. An agent joins through RFC 8628 device authorization and the human owner approves it and picks its scopes.",
-    "A memory value is a record, not a cell: one key holds one entity or one collection read as a unit. The budget is 1024 kB per value and 1000 keys per principal.",
-    "Build an app as a single self-contained HTML file. Fetch the canonical spec from <node>/v1/prompts/build-app rather than inventing a structure."
+    "Agents are never created implicitly. The human owner approves every agent and picks its scopes: an MCP client through the OAuth 2.1 consent page, a client without MCP through RFC 8628 device authorization. An agent the node runs itself is proposed with aimeat_agent_propose and waits for the owner's approval.",
+    "A memory value is a record, not a cell: one key holds one entity or one collection read as a unit. Limits are node settings. The defaults are 1024 kB per value, and 1000 keys and 10 MB for each owner and each agent. Design for the defaults, because some nodes allow more and you cannot count on it. GET /v1/memory returns this node's key and byte limits under quota.",
+    "Build a new app on the Atelier track, as one HTML file by default that loads its libraries from <node>/v1/libs. Fetch the spec from <node>/v1/prompts/build-app-atelier, or over MCP call aimeat_handbook_get with tier build-app-atelier, rather than inventing a structure. <node>/v1/prompts/build-app is the Classic track, for apps already on it or when the owner asks for it."
   ]
 }

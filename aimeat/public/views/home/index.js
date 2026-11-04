@@ -16,6 +16,8 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-04: /v1/home?settings=1 opens the settings dialog: the name in the login pill links there
+ *     (Jouni, 2026-11-04). Closing takes the parameter out of the address, so a reload stays closed.
  *   2026-11-02: Under the change-log band, on a customer's node, "Sillä aikaa kun olit poissa"
  *     (away.js): what happened while the buyer was away (Jouni, 2.11 00.52, three visits).
  *   2026-11-02: Under the welcome, on a customer's node, the first visit's morning digest offer and the
@@ -95,6 +97,7 @@ import { MadeForYouOffer } from './made-for-you.js';
 import { useHomeVisit } from './visits.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+const addressAsksForSettings = () => new URLSearchParams(location.search).get('settings') === '1';
 
 
 export default function HomeView({ navigate }) {
@@ -103,8 +106,29 @@ export default function HomeView({ navigate }) {
   // The welcome asks to connect an AI until one has: by the same test the getting-started steps tick
   // "connected" with (any AI of theirs has reached this node), so the two never disagree.
   const connected = !!state?.initialized || !!journey?.stages?.find((s) => s.id === 'connect')?.done;
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(addressAsksForSettings);
   const [toast, setToast] = useState('');
+
+  // The login pill's name links to /v1/home?settings=1 from every page. On this page the view stays
+  // mounted, so it follows the address on the SPA's navigation event and on back and forward.
+  useEffect(() => {
+    const follow = () => setSettingsOpen(addressAsksForSettings());
+    window.addEventListener('aimeat-navigated', follow);
+    window.addEventListener('popstate', follow);
+    return () => {
+      window.removeEventListener('aimeat-navigated', follow);
+      window.removeEventListener('popstate', follow);
+    };
+  }, []);
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    const url = new URL(location.href);
+    if (url.searchParams.has('settings')) {
+      url.searchParams.delete('settings');
+      history.replaceState(history.state, '', url);
+    }
+  }, []);
 
   // Which home to show decides which layout to read, and both are read before either is needed:
   // switching between them mid-session must not blank the page while a second fetch runs.
@@ -200,7 +224,7 @@ export default function HomeView({ navigate }) {
         freeformProvenance=${surface.freeformProvenance}
         ctx=${ctx}
         locale=${getLocale()} />
-      <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
+      <${HomeSettingsDialog} open=${settingsOpen} onClose=${closeSettings}
         session=${session} showToast=${showToast} />
       <${ToastBox} toast=${toast ? { msg: toast, type: 'error' } : null} hold role="status" />
     <//>`;
