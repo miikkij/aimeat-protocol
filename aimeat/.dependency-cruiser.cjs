@@ -21,7 +21,11 @@
  * @usage
  *   cd aimeat && pnpm check:deps          # the gate
  *   cd aimeat && pnpm deps:graph          # the same graph as an SVG, to look at
+ *   cd aimeat && pnpm deps:baseline:shrink   # remove the baseline entries a fix made stale
  * @version-history
+ *   v1.2.0 — 2026-11-04 — no-circular takes run-time cycles only (error); type-only cycles are
+ *     no-circular-type-only (warn). A stale baseline entry fails check:deps
+ *     (codebase analysis 2026-11-03, item D-a).
  *   v1.1.0 — 2026-10-05 — The exclude is anchored, so the connector's MCP tools are read; four layer
  *     rules (services and mcp do not import routes, services do not import mcp, mcp does not import
  *     the cli) with today's edges in the baseline; a warning for a server module src/index.ts never
@@ -49,10 +53,25 @@ module.exports = {
             name: 'no-circular',
             comment:
                 'A cycle means neither module can be understood, tested or moved without the other. '
-                + 'Nothing in this repo checked for one before 2026-09-04.',
+                + 'Nothing in this repo checked for one before 2026-09-04. This rule takes the cycles '
+                + 'whose every edge exists at run time: those are the ones that load in an order, so a '
+                + 'top-level call in one of their files can read a const of another before it is set.',
             severity: 'error',
             from: { path: '^src' },
-            to: { circular: true },
+            to: { circular: true, viaOnly: { dependencyTypesNot: ['type-only'] } },
+        },
+        {
+            name: 'no-circular-type-only',
+            comment:
+                'A cycle that closes through an `import type` compiles away and cannot fail at load '
+                + 'time, so it is a warning, not an error. Until 2026-11-04 both kinds shared one rule, '
+                + 'and 215 of its 238 entries were of this kind, which hid the 23 that matter. '
+                + 'dependency-cruiser reports ONE path per edge, so an edge that also sits on a run-time '
+                + 'cycle could be reported here; on 2026-11-04 none was (48 run-time cycle edges, all '
+                + 'reported by no-circular).',
+            severity: 'warn',
+            from: { path: '^src' },
+            to: { circular: true, via: { dependencyTypes: ['type-only'] } },
         },
         {
             name: 'storage-is-the-bottom',
@@ -192,6 +211,10 @@ module.exports = {
         },
     ],
     options: {
+        // A baseline entry the code no longer produces fails the gate. The baseline "may only
+        // shrink" was a convention until 2026-11-04, and 18 fixed entries had stayed in it, each a
+        // free pass for the same edge to come back. Remove them with `pnpm deps:baseline:shrink`.
+        baseline: { staleEntriesSeverity: 'error' },
         doNotFollow: { path: 'node_modules' },
         // Anchored: the unanchored form `(^|/)(test|tools|scripts)/` also matched
         // src/cli/connect/mcp/tools/, so 58 connector tool files were never read (secaudit 2026-10, M1).
