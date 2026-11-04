@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-04: check:pooler-safe, no session advisory lock and no LISTEN outside the event bus's own connection (codebase analysis 2026-11-03, item HA stage 3).
  *  - 2026-11-04: check:family-index, the classification index exports no file that reaches a module importing the family back (codebase analysis 2026-11-03, item D-g).
  *  - 2026-11-04: check:process-local, module-level runtime state and timers as a shrink-only list (codebase analysis 2026-11-03, HA stage 1).
  *  - 2026-11-04: check:verb-parity, the writing verbs of one route path name the same guards or the difference is listed (codebase analysis 2026-11-03, B4).
@@ -97,6 +98,7 @@ export const FAST_CHECKS = [
     { script: 'check:write-validation', label: 'Every writing route that reads a body checks it with a schema, or is listed; the list only shrinks' },
     { script: 'check:unbounded-lists', label: 'No new storage list without a bound, no new whole-table read, and no Postgres take-first read without LIMIT 1; the list only shrinks' },
     { script: 'check:process-local', label: 'No new module-level runtime state or timer without a process-local marker and a baseline entry; the list only shrinks' },
+    { script: 'check:pooler-safe', label: 'No session advisory lock in src/, and LISTEN only on the event bus\'s own connection, so a connection pooler stays possible' },
     { script: 'check:storage-conformance', label: 'No new storage repository without a two-provider case, and the methods those cases call only rise' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
     // 2026-10-01, after the peer-registration incident: who writes a federation peer, and who trusts
