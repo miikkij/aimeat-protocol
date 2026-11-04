@@ -204,7 +204,7 @@
         "aimeat/src/server-bootstrap/drain.ts",
         "aimeat/src/services/notification-sweeps.ts"
       ],
-      "digest": "sha256:1d9dbfc9c115609e329ebb6c"
+      "digest": "sha256:745dbc5b9cff1447824b2f1e"
     },
     "README.md": {
       "reviewedOn": "2026-11-03",
@@ -403,7 +403,7 @@
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "3f9aeb820cb6ded1",
+      "aimeat/security/process-local-baseline.json": "6d8c0e89627cce18",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "0674971f4a490dd3",
       "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
