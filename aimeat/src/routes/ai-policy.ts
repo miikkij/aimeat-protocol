@@ -17,6 +17,8 @@
  *     PUT  /v1/ai/policy       — owner: apply; agent: propose, then confirm with confirm_token
  *     GET  /v1/ai/recommended  — the node's recommended models per capability
  * @version-history
+ *   v1.2.2 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
+ *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.2.1 — 2026-10-05 — aiCallerOf decides through services/ai/caller-context.ts, the rule every
  *     AI entry point uses now (secaudit 2026-10, AI-3).
  *   v1.2.0 — 2026-10-02 — aiCallerOf carries the request's language, so an AI refusal's `fix` is in
@@ -34,7 +36,7 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { callerOf } from '../middleware/caller.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { policyView, recommendedModelsOf, setOwnerAiPolicy } from '../services/ai/policy-store.js';
 import type { CallerClass } from '../services/ai/policy.js';
@@ -61,7 +63,7 @@ export function aiCallerOf(req: Request, nodeId: string): { caller: CallerClass;
   const lang = requestLanguageOf(req);
   const withLang = lang ? { lang } : {};
   // The one rule for every entry point (services/ai/caller-context.ts). The agent's name is not
-  // returned here: the routes pass the payer's agent themselves (aiPayerOf).
+  // returned here: the routes pass the payer's agent themselves (callerOf(req).payer).
   const who = aiCallerFromCredential(auth, resolveIdentity(auth, nodeId));
   return { caller: who.caller, ...(who.verifiedApp ? { verifiedApp: who.verifiedApp } : {}), ...withLang };
 }
@@ -88,7 +90,7 @@ export function aiPolicyRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/ai/policy', requireAuth(), requireScope('ai:use'), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      const { payer } = aiPayerOf(resolveIdentity(req.auth!, config.nodeId));
+      const { payer } = callerOf(req, config.nodeId, storage).payer;
       const view = await policyView(storage, config, payer);
       const { caller } = aiCallerOf(req, config.nodeId);
       const key = caller === 'agent' ? 'agents' : caller === 'app' ? 'apps' : caller === 'chat' ? 'chat' : 'owner';
@@ -115,8 +117,9 @@ export function aiPolicyRouter(config: AimeatConfig, storage: Storage): Router {
         const r = await setOwnerAiPolicy(storage, resolveIdentity(auth, config.nodeId), input, { kind: 'owner' });
         return res.json(success(config.nodeId, r));
       }
-      const principal = resolveIdentity(auth, config.nodeId);
-      const { payer, agent } = aiPayerOf(principal);
+      const caller = callerOf(req, config.nodeId, storage);
+      const principal = caller.principal;
+      const { payer, agent } = caller.payer;
       if (isForeignPrincipal(auth) || auth.roles.includes('app') || !agent) {
         return res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
           'Only the owner, or an agent of theirs proposing a change the owner confirms, may change the model policy.'));

@@ -181,9 +181,9 @@
         "count": 3,
         "why": "Reads the caller's role list, which both surfaces build from askOperator (rolesWithOperator on REST, boardCaller on MCP)."
       },
-      "src/services/classification/reader-kind.ts": {
+      "src/services/caller-facts.ts": {
         "count": 1,
-        "why": "C4: tells a person from an AI by the session's roles. Moves to isOwnerInPerson."
+        "why": "readerOf: an unattended run is ['operator'] without 'owner' and reads as an AI; the reader kind is not the operator question isOperatorCaller answers (moved from classification/reader-kind.ts, codebase analysis 2026-11-03, B1)."
       },
       "src/services/consent-write.ts": {
         "count": 1,
@@ -269,9 +269,9 @@
         "count": 1,
         "why": "(owner || operator) without agent: also admits the node's own operator-only caller, which isOwnerInPerson refuses."
       },
-      "src/services/classification/reader-kind.ts": {
-        "count": 2,
-        "why": "Tells a person from an AI by the roles; an app and a visitor count as a person here, which isOwnerInPerson does not answer."
+      "src/services/caller-facts.ts": {
+        "count": 3,
+        "why": "readerOf tells a person from an AI by the roles (an app and a visitor count as a person there, which isOwnerInPerson does not answer), and credentialVia names a signed-in session; neither decides access (moved from classification/reader-kind.ts, codebase analysis 2026-11-03, B1)."
       },
       "src/services/consent-write.ts": {
         "count": 1,
@@ -387,10 +387,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/classification/reader-kind.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/services/connect-tunnel.ts": {
         "count": 1,
         "why": "UNREVIEWED"
@@ -404,10 +400,6 @@
         "why": "UNREVIEWED"
       },
       "src/services/memory-write.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/services/metered-access.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -709,6 +701,88 @@
       "src/services/headless-network.ts": {
         "count": 2,
         "why": "The headless browser's own-origin list, and the base from which the node fetches (through safeFetch) what that browser asks of the node's own pages. Part of the headless rendering the codebase analysis left on the socket."
+      }
+    },
+    "principal-kind": {},
+    "payer-resolve": {},
+    "scope-widen-at-mint": {
+      "src/routes/agents-v2/enrolment.ts": {
+        "count": 1,
+        "why": "A MINT: the enrolled credential adds the store place's default on the agent's first time (widenAndAnnounce). Moving it to approval changes which agents get the default (B7 report); it stays here until the developer rules."
+      },
+      "src/routes/agents-v2/token.ts": {
+        "count": 1,
+        "why": "A MINT: the crew run's token adds the store place's default on the agent's first time (widenAndAnnounce). Moving it to approval changes which agents get the default (B7 report); it stays here until the developer rules."
+      },
+      "src/routes/agents/device-auth-approve.ts": {
+        "count": 1,
+        "why": "THE APPROVAL: the owner, or an agent within its own scopes, approves the agent and the place's default is written to its record there (applyPlaceDefault with the approver's bound). This is where the decision belongs."
+      },
+      "src/routes/auth.ts": {
+        "count": 2,
+        "why": "MINTS: POST /v1/auth/token (an agent's signed challenge) and POST /v1/auth/refresh (an agent session) add the store place's default on the agent's first time (widenAndAnnounce). Moving them to approval changes which agents get the default (B7 report); they stay here until the developer rules."
+      }
+    },
+    "token-mint": {
+      "src/mcp/commerce.ts": {
+        "count": 1,
+        "why": "The fulfilment call's token for the calling agent itself: its own sub and role, the scopes on its record."
+      },
+      "src/mcp/oauth.ts": {
+        "count": 2,
+        "why": "MCP OAuth code exchange and refresh: the agent the owner chose on the consent page, the scopes on its record, the roles the code carried."
+      },
+      "src/routes/access-tokens.ts": {
+        "count": 1,
+        "why": "A JWT exchanged from a personal access token: the PAT row's sub, roles and (for an agent-level PAT) scopes, marked via pat."
+      },
+      "src/routes/admin.ts": {
+        "count": 1,
+        "why": "The setup session after the admin password: the owner record's own roles, no scopes."
+      },
+      "src/routes/agents-v2/enrolment.ts": {
+        "count": 1,
+        "why": "The enrolled agent's credential: role agent, the scopes on its record (with the store place's default, see scope-widen-at-mint)."
+      },
+      "src/routes/agents-v2/token.ts": {
+        "count": 1,
+        "why": "A crew run's token from a signed assertion: role agent, the scopes on its record (with the store place's default, see scope-widen-at-mint)."
+      },
+      "src/routes/agents/device-auth-approve.ts": {
+        "count": 1,
+        "why": "Device authorization approved: role agent, the scopes granted at this approval."
+      },
+      "src/routes/app-grants.ts": {
+        "count": 1,
+        "why": "An app grant's access token: role app, the scopes the owner approved for the grant, the app named."
+      },
+      "src/routes/auth.ts": {
+        "count": 5,
+        "why": "Anonymous mode's token (ANONYMOUS_SCOPES); an agent's signed challenge (its record's scopes, with the place default); the deprecated owner-key sign-in (owner record roles); a PAT cookie refresh (the PAT row); POST /v1/auth/refresh (the same roles and the record's scopes again)."
+      },
+      "src/routes/ecosystem-apps.ts": {
+        "count": 1,
+        "why": "An ecosystem app approved by its owner: role ecosystem, the scopes approved."
+      },
+      "src/routes/ghii/register-login.ts": {
+        "count": 2,
+        "why": "Registration (the owner record's roles, or owner) and the federated sign-in (role federated, the visitor's home name, the peer's granted scopes)."
+      },
+      "src/routes/ghii/web-verify.ts": {
+        "count": 1,
+        "why": "The agent created by a web identity proof: role agent, the scopes on its record."
+      },
+      "src/routes/setup.ts": {
+        "count": 1,
+        "why": "The first owner's session at node setup: the owner record's own roles."
+      },
+      "src/services/chat-agent.ts": {
+        "count": 1,
+        "why": "The node chat's own agent (mintChatAgentToken): role agent, the scopes of its identity, an MCP or REST audience."
+      },
+      "src/services/owner-session.ts": {
+        "count": 3,
+        "why": "The owner's access token at sign-in and at the two refresh-cookie steps: the owner's current roles, no scopes."
       }
     }
   }

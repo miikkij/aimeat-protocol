@@ -22,6 +22,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer aiPayerOf gave
+ *     (codebase analysis 2026-11-03, item B1).
  *   2026-11-02 — An ecosystem app's call is paid by its owner as the owner's app (aiPayerOf); its
  *     picture stays in its own namespace (secaudit2026nov02d round 13).
  *   2026-10-31 — POST /v1/ai/image takes gen_rules_bypass (the owner in person only) and answers
@@ -119,7 +121,6 @@ import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { retryAfterOf } from '../services/account-limits.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import {
   completeForOwner, prepareAiCall, AiCompletionError, getTodayUsage, getDailyBudgetUsd,
@@ -194,8 +195,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       req.setTimeout(1_800_000);
       res.setTimeout(1_800_000);
 
-      // An agent's call is paid by its owner, in the agent's name (services/agent-ai-keys.ts).
-      const { payer: gaii, agent } = aiPayerOf(resolve(req));
+      // An agent's call is paid by its owner, in the agent's name (services/caller-facts.ts payerOfPrincipal).
+      const { payer: gaii, agent } = callerOf(req, config.nodeId, storage).payer;
       const {
         prompt, systemPrompt, model: modelOverride, modelRole,
         temperature, top_p, max_tokens, app_id, images, provider, fallback, files, role: roleField,
@@ -351,8 +352,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const controller = new AbortController();
         res.on('close', () => { if (!res.writableEnded) controller.abort(); });
         // The audio was looked up under the caller above; the call is PAID by the human, in the
-        // agent's name, exactly as /v1/ai/complete does (services/agent-ai-keys.ts).
-        const { payer, agent } = aiPayerOf(gaii);
+        // agent's name, exactly as /v1/ai/complete does (services/caller-facts.ts payerOfPrincipal).
+        const { payer, agent } = callerOf(req, config.nodeId, storage).payer;
         const r = await transcribeForOwner(storage, config, payer, {
           audio, model, language, verbose: !!verbose, appId: voiceAppId(req, app_id), temperature, signal: controller.signal,
           ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
@@ -405,7 +406,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       // Paid by the human, in the agent's name, like /v1/ai/complete; the picture lands in the
       // payer's storage, which is where the MCP tool has always put it. An ecosystem app's picture
       // stays in its own namespace, where it has always landed, while its owner pays.
-      const { payer: gaii, agent, ecoApp } = aiPayerOf(resolve(req));
+      const { payer: gaii, agent, ecoApp } = callerOf(req, config.nodeId, storage).payer;
       const holder = ecoApp ? resolve(req) : gaii;
       const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback, role: roleField, reference_images, mask, gen_rules_bypass } = req.body as {
         prompt?: string; model?: string; size?: string; storage_key?: string;
@@ -494,7 +495,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       if (!gateOwnerOrAiUseAgent(req, res)) return;
       // The same payer the completion door resolves, so the answer here is the answer there: for an
       // agent, its own key or its owner's.
-      const { payer: gaii, agent } = aiPayerOf(resolve(req));
+      const { payer: gaii, agent } = callerOf(req, config.nodeId, storage).payer;
       // The gate a text call runs, spending nothing (System 2, V5): available when a call would find
       // a provider now. It had read only the old OpenRouter setting, so an owner whose text runs on
       // another provider, or on the node's own, was told no. A spent budget is a refusal of its own

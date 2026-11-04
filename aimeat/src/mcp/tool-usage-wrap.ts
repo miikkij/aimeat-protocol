@@ -20,6 +20,8 @@
  * @usage
  *   patchable.tool = wrapToolHandler(gatedTool, () => agentGaii);
  * @version-history
+ *   2026-11-04 — actorKindOf reads usageActorOfPrincipal (services/caller-facts.ts), the one test of a
+ *     principal's shape, with the same answers (codebase analysis 2026-11-03, item B1).
  *   2026-10-28 — A refusal's `Held: [...]` list is not read as words the agent lacks: a refused
  *     provenance declaration asked the owner for every word the agent held.
  *   2026-10-16 — A SCOPE_DENIED result is read from its code in either shape a tool answers with:
@@ -36,14 +38,13 @@ import { noteScopeUse } from '../services/scope-use.js';
 import { requiredScopesForTool } from '../tool-catalog/scopes.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import type { UsageActorKind } from '../storage/interface.js';
+import { usageActorOfPrincipal } from '../services/caller-facts.js';
 
 type AnyFn = (...args: unknown[]) => unknown;
 
 /** What kind of principal this is, read from the identity's own shape rather than from a session. */
-function actorKindOf(principal: string): UsageActorKind {
-  if (principal.startsWith('eco:')) return 'eco';
-  if (principal.includes('#')) return 'agent';
-  return 'owner';
+export function actorKindOf(principal: string): UsageActorKind {
+  return usageActorOfPrincipal(principal);
 }
 
 /** An MCP result that says it failed without throwing. Both shapes count as an error. */

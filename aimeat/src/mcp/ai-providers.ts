@@ -17,6 +17,8 @@
  *   change to the roles or a binding of an app's role is a proposal the owner confirms, as the routing is.
  * @structure registerAiProviderTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-11-04 — The payer is the session principal's caller facts (`principalCaller(gaii).payer`), the
+ *     answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-31 — aimeat_ai_routing_set's read carries openrouter_region, as GET /v1/ai/routing does.
  *   2026-10-25 — aimeat_ai_routing_set's read carries free_model, as GET /v1/ai/routing does (secaudit2026oct22 follow-up).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -31,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { principalCaller } from '../services/caller-context.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { aiProvidersView, knownProviderIds } from '../services/ai/provider-store.js';
 import { testProvider } from '../services/ai/provider-test.js';
@@ -55,7 +57,7 @@ export function registerAiProviderTools(
   };
 
   mcp.registerTool('aimeat_ai_providers', { description: descriptionFor('aimeat_ai_providers'), inputSchema: zodShapeFor('aimeat_ai_providers'), annotations: annotationsFor('aimeat_ai_providers') }, async () => {
-    const { payer, agent } = aiPayerOf(getAgentGaii());
+    const { payer, agent } = principalCaller(getAgentGaii()).payer;
     try { return text(await aiProvidersView(storage, config, payer, agent)); } catch (e) { return refusal(e); }
   });
 
@@ -67,7 +69,7 @@ export function registerAiProviderTools(
         annotations: annotationsFor('aimeat_ai_provider_test'),
     },
     async ({ provider, capability, accept_cost }) => {
-      const { payer, agent } = aiPayerOf(getAgentGaii());
+      const { payer, agent } = principalCaller(getAgentGaii()).payer;
       try {
         return text(await testProvider(storage, config, payer, {
           provider, ...(capability ? { capability: capability as AiCapability } : {}), acceptCost: accept_cost === true,
@@ -86,7 +88,7 @@ export function registerAiProviderTools(
     },
     async ({ routing, confirm_token }) => {
       const principal = getAgentGaii();
-      const { payer, agent } = aiPayerOf(principal);
+      const { payer, agent } = principalCaller(principal).payer;
       try {
         if (!routing) {
           const v = await aiProvidersView(storage, config, payer, agent);
@@ -101,7 +103,7 @@ export function registerAiProviderTools(
 
   // ── AI roles (services/ai/roles.ts): the functions GET and PUT /v1/ai/roles call ──
   mcp.registerTool('aimeat_ai_roles', { description: descriptionFor('aimeat_ai_roles'), inputSchema: zodShapeFor('aimeat_ai_roles'), annotations: annotationsFor('aimeat_ai_roles') }, async () => {
-    const { payer } = aiPayerOf(getAgentGaii());
+    const { payer } = principalCaller(getAgentGaii()).payer;
     try { return text(await aiRolesView(storage, config, payer)); } catch (e) { return refusal(e); }
   });
 
@@ -115,7 +117,7 @@ export function registerAiProviderTools(
     async ({ roles, bindings, confirm_token }) => {
       // Over MCP a change is a proposal first, whoever is connected, as for the routing above.
       const principal = getAgentGaii();
-      const { payer } = aiPayerOf(principal);
+      const { payer } = principalCaller(principal).payer;
       // One shape, the one PUT /v1/ai/roles reads: { roles?, bindings? }.
       const input = { ...(roles !== undefined ? { roles } : {}), ...(bindings !== undefined ? { bindings } : {}) };
       try {

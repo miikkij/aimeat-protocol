@@ -34,6 +34,8 @@
  *   const to = await approverGhiis({ storage, config }, accountGhii, 'operators');
  *   await tellAsker({ storage, config }, { accountGhii, asker, outcome: 'declined', sentence, decidedBy, contextId, what });
  * @version-history
+ *   v1.2.0 — 2026-11-04 — askerKind reads principalKindOf (services/caller-facts.ts), the one test of a
+ *     stored identity's shape; the same answer for every principal (codebase analysis 2026-11-03, B1).
  *   v1.1.0 — 2026-10-25 — closeQuestion(): a decided question's notices show the answer and lose their
  *     buttons, whoever decided and wherever (the developer's review of the sandbox).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, the developer's approval standard).
@@ -45,7 +47,8 @@ import { listOperatorGhiis } from './operators.js';
 import { sendAgentV2Message } from './agent-v2-messaging.js';
 import { emitChange } from './event-bus.js';
 import { answerNotifications, type AnswerOutcome } from './notification-answers.js';
-import { isGEAI, localAccountName } from '../utils/gaii.js';
+import { localAccountName } from '../utils/gaii.js';
+import { principalKindOf, type PrincipalKind } from './caller-facts.js';
 import { logger } from '../utils/logger.js';
 
 /** Who answers a question: the account holder, or the node's operators. */
@@ -73,9 +76,11 @@ export async function closeQuestion(
 
 /** The kind of a principal as it is stored: `eco:` is an app, a `#` an agent, anything else a person. */
 export function askerKind(principal: string): AskerKind {
-  if (isGEAI(principal)) return 'app';
-  return principal.includes('#') ? 'agent' : 'person';
+  return ASKER_KIND[principalKindOf(principal)];
 }
+
+/** principalKindOf (services/caller-facts.ts) in this module's words: an ecosystem app asks as an app. */
+const ASKER_KIND: Readonly<Record<PrincipalKind, AskerKind>> = { eco: 'app', agent: 'agent', person: 'person' };
 
 /** An account name or a GHII, as a GHII on this node. */
 function asGhii(config: AimeatConfig, account: string): string {

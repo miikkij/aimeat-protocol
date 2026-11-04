@@ -23,9 +23,15 @@
  *   KNOWN LIMIT (decided 2026-09-29, spec question 6): the owner's own session driven by an AI client
  *   over REST carries nothing that tells it apart from the person, so it reads as the person; an
  *   owner-level PAT given to an AI client reads as the person in the same way.
+ *
+ *   The rule itself is readerOf in services/caller-facts.ts, beside the caller's other facts, and the
+ *   CallerContext carries it as `reader`; this function is that answer for a credential that is not
+ *   a CallerContext (an extension's `ctx.caller`, a config write's caller).
  * @structure ReaderKind · ReaderCredential · readerKindOf(auth)
  * @usage const kind = readerKindOf(req.auth);
  * @version-history
+ *   v1.3.0 — 2026-11-04 — The rule moves to services/caller-facts.ts readerOf, unchanged; this reads it
+ *     (codebase analysis 2026-11-03, item B1).
  *   v1.2.0 — 2026-11-04 — An owner-level PAT is the person, as isOwnerInPerson answers for it (Jouni,
  *     2026-11-04, "ihmiseksi"); a narrower PAT, an agent token and an app grant keep their answers
  *     (codebase analysis 2026-11-03, PAT ruling).
@@ -33,7 +39,9 @@
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 
-export type ReaderKind = 'human' | 'ai' | 'anonymous';
+import { readerOf, type ReaderKind } from '../caller-facts.js';
+
+export type { ReaderKind } from '../caller-facts.js';
 
 /** The credential fields this reads. `req.auth` and an extension's `ctx.caller` both fit. */
 export interface ReaderCredential {
@@ -43,15 +51,7 @@ export interface ReaderCredential {
   via?: string;
 }
 
+/** The reader kind of a credential: services/caller-facts.ts readerOf. */
 export function readerKindOf(auth: ReaderCredential | null | undefined): ReaderKind {
-  if (!auth) return 'anonymous';
-  if (auth.anonymous) return 'anonymous';
-  // The `via: 'pat'` mark is not asked: an owner-level PAT is the person (Jouni, 2026-11-04), as
-  // isOwnerInPerson (utils/gaii.ts) answers for it, and a narrower PAT holds role agent.
-  const roles = auth.roles ?? [];
-  // An operator signed in is ['owner', 'operator']; an unattended run is ['operator'] alone.
-  if (roles.includes('agent') || roles.includes('ecosystem') || (roles.includes('operator') && !roles.includes('owner'))) return 'ai';
-  if (roles.includes('owner') || roles.includes('app') || roles.includes('federated')) return 'human';
-  // A credential with no role we recognise is read the stricter way.
-  return 'ai';
+  return readerOf(auth);
 }

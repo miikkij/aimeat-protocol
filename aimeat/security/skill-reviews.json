@@ -302,26 +302,26 @@
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:250bb8a212ec74088b4ef3ad"
+      "digest": "sha256:92295b49869dcf1d83755c44"
     },
     "node:aimeat-ai-model-policy": {
-      "reviewedOn": "2026-10-05",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/ai/policy-gate.ts",
         "aimeat/src/services/ai/policy-store.ts",
         "aimeat/src/routes/ai-policy.ts"
       ],
-      "digest": "sha256:e05a3f1ce04108721d635f0b"
+      "digest": "sha256:409a5905ebb1bb950c161f8c"
     },
     "node:aimeat-gen-rules": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/ai/gen-rules.ts",
         "aimeat/src/services/ai/gen-rules-store.ts",
         "aimeat/src/routes/ai-gen-rules.ts",
         "aimeat/src/services/ai-image.ts"
       ],
-      "digest": "sha256:622dba3980dc13c20bec75c6"
+      "digest": "sha256:032f727529a1834fdd4c0b3c"
     },
     "node:aimeat-extension-builder": {
       "reviewedOn": "2026-11-04",
@@ -659,8 +659,8 @@
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "2fed3fb34f21a6e7",
-      "aimeat/src/routes/ai-providers.ts": "41e102a20bb078b2",
+      "aimeat/src/routes/ai.ts": "4d0c1ad976f29d5e",
+      "aimeat/src/routes/ai-providers.ts": "3d1df564f1367e3b",
       "aimeat/src/services/ai/routing.ts": "3ab2ace7eeab4d80"
     },
     "node:use-app-bound-skills": {
@@ -724,7 +724,7 @@
     "node:aimeat-ai-model-policy": {
       "aimeat/src/services/ai/policy-gate.ts": "e6c589fe0f7d8aa3",
       "aimeat/src/services/ai/policy-store.ts": "2481a16ae530297d",
-      "aimeat/src/routes/ai-policy.ts": "74ae649471435de9"
+      "aimeat/src/routes/ai-policy.ts": "d70db16573f26c4b"
     },
     "node:aimeat-ai-capabilities": {
       "aimeat/src/services/ai/capabilities.ts": "c2bd2ada0b90307e",
@@ -828,7 +828,7 @@
     "node:aimeat-gen-rules": {
       "aimeat/src/services/ai/gen-rules.ts": "8cf30c2a05b14cbc",
       "aimeat/src/services/ai/gen-rules-store.ts": "34377e884aa25b71",
-      "aimeat/src/routes/ai-gen-rules.ts": "012cd2933649f50b",
+      "aimeat/src/routes/ai-gen-rules.ts": "b3339d944f0ee1fc",
       "aimeat/src/services/ai-image.ts": "53c0267de7433bf0"
     }
   }

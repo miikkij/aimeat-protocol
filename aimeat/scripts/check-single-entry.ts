@@ -29,6 +29,13 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.11.0 — 2026-11-04 — Rules scope-widen-at-mint and token-mint: the store place's default is added
+ *     only at the doors the baseline names, and every issueJWT caller is listed with what it mints
+ *     (codebase analysis 2026-11-03, item B7).
+ *   v1.10.0 — 2026-11-04 — Rules principal-kind and payer-resolve: what kind of caller this is and who
+ *     pays for its AI call are answered by services/caller-facts.ts and read from the CallerContext;
+ *     13 hand classifier lines in 6 files and 33 door calls of aiPayerOf moved, so both baselines
+ *     are empty (codebase analysis 2026-11-03, item B1).
  *   v1.9.0 — 2026-11-04 — Rule self-fetch: a request the node makes to itself goes through
  *     services/request-injector.ts; the baseline is the headless-browser modules and the tunnel's
  *     resolution origin (codebase analysis 2026-11-03, item D-j).
@@ -139,7 +146,8 @@ export const RULES: Rule[] = [
     id: 'agent-role',
     label: 'What kind of principal a caller is, is asked of its caller object (services/caller-context.ts: kind, inPerson), built once per request (callerOf) or per MCP session (C9)',
     pattern: /roles\)?\??\.includes\(['"]agent['"]\)/,
-    skipDirs: ['src/auth/', 'src/utils/gaii.ts', 'src/services/caller-context.ts'],
+    // caller-facts.ts is where the caller object's kind, via and reader kind are answered (B1).
+    skipDirs: ['src/auth/', 'src/utils/gaii.ts', 'src/services/caller-context.ts', 'src/services/caller-facts.ts'],
   },
   {
     id: 'wildcard-test',
@@ -199,6 +207,35 @@ export const RULES: Rule[] = [
     // The injector builds the origin. src/cli is the connector, a process of its own whose local
     // daemon listens on a port of its own.
     skipDirs: ['src/services/request-injector.ts', 'src/cli/'],
+  },
+  {
+    id: 'principal-kind',
+    label: 'What kind of caller a credential or an identity is, is answered by services/caller-facts.ts (credentialKind, readerOf, principalKindOf, usageActorOfPrincipal, usageActorOfRoles) and carried on the CallerContext; eleven hand classifiers disagreed, and an ecosystem app was planned as the owner in person (codebase analysis 2026-11-03, B1)',
+    // A kind literal returned straight from a role or identity-shape test:
+    // `if(roles.includes('app'))return'app'`, `if(p.startsWith('eco:'))return'eco'`.
+    pattern: /(includes\(['"](#|owner|operator|agent|ecosystem|app|federated)['"]\)|startsWith\((['"]eco:['"]|ECO_PREFIX)\)|isGEAI\([^)]*\))\)*return['"](owner|person|agent|eco|ecosystem|app|human|ai|visitor|anonymous)['"]/,
+    skipDirs: ['src/services/caller-facts.ts'],
+  },
+  {
+    id: 'payer-resolve',
+    label: 'Who pays for an AI call is the caller\'s `payer` (callerOf(req).payer on REST, principalCaller(principal).payer where only the identity is held; services/caller-facts.ts payerOfPrincipal), not resolved again at each door (codebase analysis 2026-11-03, B1)',
+    pattern: /\b(aiPayerOf|payerOfPrincipal)\(/,
+    // caller-facts.ts holds the rule; agent-ai-keys.ts keeps aiPayerOf as its one-line read for the
+    // tests that import it. services/ai/caller-context.ts maps the payer onto the planner's caller class.
+    skipDirs: ['src/services/caller-facts.ts', 'src/services/agent-ai-keys.ts'],
+  },
+  {
+    id: 'scope-widen-at-mint',
+    label: 'An agent\'s scopes are decided when it is approved and kept on its record; a token mint copies them. The store place\'s default (services/place-agent-scopes.ts) is added only where the baseline says why, so a sixth door cannot widen at mint (codebase analysis 2026-11-03, B7; round 13 had four commits on this default alone)',
+    pattern: /\b(widenForPlace|widenAndAnnounce|applyPlaceDefault)\(/,
+    // The default's own module and the one function the mints call.
+    skipDirs: ['src/services/place-agent-scopes.ts', 'src/routes/agents/announce-scopes.ts'],
+  },
+  {
+    id: 'token-mint',
+    label: 'A token is minted by issueJWT (auth/jwt.ts) only at a door the baseline names with what it mints and where its roles and scopes come from, so a new mint is a sentence somebody writes (codebase analysis 2026-11-03, B7)',
+    pattern: /\bissueJWT\(/,
+    skipDirs: ['src/auth/jwt.ts'],
   },
   {
     id: 'sale-booking',
