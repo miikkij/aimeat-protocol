@@ -230,7 +230,7 @@ export const readerKindWord = (k) => W('reader.' + (['human', 'ai', 'system', 'a
 
 /**
  * The reader of an audit row in words when it is this server's own Content Classifier: its rules and
- * its model write as `classifier@<node>` (services/classification/classifier.ts), of kind system or
+ * its model write as `classifier@<node>` (services/classification-run/classifier.ts), of kind system or
  * ai. Null for any other reader, whose own name the page shows.
  * @param {string} reader @param {string} kind
  * @returns {string|null}
@@ -320,7 +320,7 @@ function exceptionPurposeWords(p) {
 }
 
 /**
- * True for an audit row that records a change of the node's switch (services/classification/switch.ts):
+ * True for an audit row that records a change of the node's switch (services/classification-run/switch.ts):
  * key `classification.mode`, the new mode as its label, `<from> → <to>` as its purpose.
  * @param {any} row
  * @returns {boolean}

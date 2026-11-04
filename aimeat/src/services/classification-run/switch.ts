@@ -1,5 +1,5 @@
 /**
- * @file src/services/classification/switch.ts
+ * @file src/services/classification-run/switch.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's classification switch (config `classification.mode`: off, owner or all)
@@ -25,6 +25,10 @@
  * @usage
  *   const out = await setClassificationSwitch({ storage, config }, { auth: req.auth!, scopes }, 'all');
  * @version-history
+ *   v1.2.1 — 2026-11-04 — Moved unchanged from services/classification/, which it imports through
+ *     that family's index: the switch writes config through config-apply.ts, and the config strictness
+ *     rule reads the caller's kind from the family, so it sits outside the family the index covers
+ *     (codebase analysis 2026-11-03, item D-g).
  *   v1.2.0 — 2026-11-04 — The order and the refusal's words moved onto the setting's row
  *     (config-schema-data-access.ts), judged by config-strictness.ts; the write names the caller to
  *     applyConfigChanges, which asks the same rule. The answers are the same (codebase analysis
@@ -43,10 +47,9 @@ import { isSealed, sealRefusal } from '../config-sealing.js';
 import { emitChange } from '../event-bus.js';
 import { askOperator } from '../operator-principal.js';
 import { callerPrincipal } from '../../utils/gaii.js';
-import { recordClassificationAudit } from './audit.js';
-import { offerDefaultCapsWhenSwitchedOn } from './default-caps.js';
-import { ClassificationError } from './labels.js';
-import { readerKindOf } from './reader-kind.js';
+import {
+  ClassificationError, offerDefaultCapsWhenSwitchedOn, readerKindOf, recordClassificationAudit,
+} from '../classification/index.js';
 
 /** The config path of the switch. */
 export const CLASSIFICATION_MODE_PATH = 'classification.mode';

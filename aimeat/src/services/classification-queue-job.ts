@@ -5,7 +5,7 @@
  * @description The hourly core job `core:classification-queue` (TARGET-082 V3, spec §7): works
  *   through the Content Classifier's queues (one per owner or organism under system@<node>, see
  *   classifier.ts) within the day's caps. Items wait there when a cap was reached, when a model call
- *   failed, when a scan queued a prefix, many keys or organism content (services/classification/
+ *   failed, when a scan queued a prefix, many keys or organism content (services/classification-run/
  *   scan.ts), or when the write hook had more writes than it holds in process.
  *
  *   OFF. With config.classificationMode 'off' the job returns before it reads anything.
@@ -37,7 +37,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { classifyText, drainQueue, enqueue, type QueuedItem } from './classification/classifier.js';
+import { classifyText, drainQueue, enqueue, type QueuedItem } from './classification-run/classifier.js';
 import { scopeOrganism } from './classification/policy.js';
 import { documentContentKeys } from './classification/labels.js';
 import { contentText, setWriteClassifier } from './classify-on-write.js';

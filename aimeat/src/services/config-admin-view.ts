@@ -49,7 +49,7 @@ import { applyConfigChanges, type ConfigChange, type ConfigApplyResult } from '.
 import { isSealed, sealRefusal } from './config-sealing.js';
 import type { ConfigProvenance } from './config-provenance.js';
 import { emitChange } from './event-bus.js';
-import { CLASSIFICATION_MODE_PATH, recordSwitchChange, type SwitchCaller } from './classification/switch.js';
+import { CLASSIFICATION_MODE_PATH, recordSwitchChange, type SwitchCaller } from './classification-run/switch.js';
 import { offerDefaultCapsWhenSwitchedOn } from './classification/default-caps.js';
 import { recordOperatorNodeAct } from './operator-access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';

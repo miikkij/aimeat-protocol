@@ -29,12 +29,12 @@ vi.mock('../../src/services/decide/service.js', () => ({ decideForOwner: (...a: 
 vi.mock('../../src/services/ai/completion.js', () => ({ completeForOwner: (...a: unknown[]) => completeMock(...a) }));
 
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { classifyText, drainQueue, enqueue, readQueue, type QueuedItem } from '../../src/services/classification/classifier.js';
+import { classifyText, drainQueue, enqueue, readQueue, type QueuedItem } from '../../src/services/classification-run/classifier.js';
 import { matchRules, resetRegexBudgets } from '../../src/services/classification/detect.js';
 import { defaultPolicy, type ClassificationPolicy } from '../../src/services/classification/defaults.js';
 import { memoryTarget, readContentLabel, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { writePolicy } from '../../src/services/classification/policy-admin.js';
-import { scanContent } from '../../src/services/classification/scan.js';
+import { scanContent } from '../../src/services/classification-run/scan.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const N = 'n';

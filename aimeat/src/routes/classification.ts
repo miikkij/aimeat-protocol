@@ -46,9 +46,9 @@ import {
 } from '../services/classification/labels.js';
 import { readAuditLog, readPolicy, reviewPolicy, writePolicy } from '../services/classification/policy-admin.js';
 import type { PolicyLevel } from '../services/classification/policy.js';
-import { scanContent } from '../services/classification/scan.js';
+import { scanContent } from '../services/classification-run/scan.js';
 import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
-import { setClassificationSwitch } from '../services/classification/switch.js';
+import { setClassificationSwitch } from '../services/classification-run/switch.js';
 import { makeException, readExceptions, removeException } from '../services/classification/exception-admin.js';
 import { activatePack, deactivatePack, packStatus } from '../services/classification/packs.js';
 import { readNodePolicy } from '../services/classification/policy.js';

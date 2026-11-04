@@ -134,7 +134,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | CLS-03 | met | `aimeat/src/services/classification/reader.ts` (`useForAi`) | |
 | CLS-04 | met | `aimeat/src/middleware/refusals.ts:123-141` | |
 | CLS-05 | met | `aimeat/src/services/classification/levels.ts:7-21` (`POLICY_DILUTES`) | |
-| CLS-06 | met | `aimeat/src/services/classification/switch.ts:9-21` (`PERSON_REQUIRED`); `aimeat/src/services/classification/policy-admin.ts:13-17`; owner in audience `aimeat/src/services/classification/audience.ts:16-29` | |
+| CLS-06 | met | `aimeat/src/services/classification-run/switch.ts:9-21` (`PERSON_REQUIRED`); `aimeat/src/services/classification/policy-admin.ts:13-17`; owner in audience `aimeat/src/services/classification/audience.ts:16-29` | |
 | CLS-07 | met | `aimeat/src/services/classification/audit.ts:5-38` | |
 | CLS-08 | met | `aimeat/src/services/classification/labels.ts:235-236` | |
 | Classification default off | fact | `aimeat/src/config-data-access.ts:24-40,50` (`off`, `owner`, `all`) | |

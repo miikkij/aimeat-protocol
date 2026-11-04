@@ -37,7 +37,7 @@ import { putInvite, NS_INVITE } from '../src/services/app-member-invites.js';
 import { writeAgentGate, readAgentGates, DECIDE_AGENTS_RECORD } from '../src/services/decide/gate.js';
 import { decideDefaultCap, settleDefaultCapsAtStart, DEFAULT_CAPS_INCIDENT_TYPE } from '../src/services/classification/default-caps.js';
 import { NODE_POLICY_KEY, readNodePolicy } from '../src/services/classification/policy.js';
-import { settleAudienceAfterRise } from '../src/services/classification/audience-settle.js';
+import { settleAudienceAfterRise } from '../src/services/classification-run/audience-settle.js';
 import { memoryTarget } from '../src/services/classification/labels.js';
 import { DEFAULT_LABELS } from '../src/services/classification/defaults.js';
 import { listSecurityIncidents } from '../src/services/security-incident.js';

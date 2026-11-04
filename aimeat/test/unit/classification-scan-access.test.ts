@@ -16,7 +16,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { OrganismRecord, OrganismMembershipRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { labelActorOf } from '../../src/services/classification/labels.js';
-import { scanContent } from '../../src/services/classification/scan.js';
+import { scanContent } from '../../src/services/classification-run/scan.js';
 
 const N = 'test-node';
 const ALICE = `alice@${N}`;

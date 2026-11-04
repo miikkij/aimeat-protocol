@@ -18,7 +18,7 @@ import {
   AUDIENCE_LEVELS, audienceRank, capAllows, isAudienceLevel, narrowerCap, storedLevel,
 } from '../../src/services/classification/audience-levels.js';
 import { audienceCapOf, audienceOfShareAccess, audienceOfVisibility } from '../../src/services/classification/audience-cap.js';
-import { settleAudienceAfterRise } from '../../src/services/classification/audience-settle.js';
+import { settleAudienceAfterRise } from '../../src/services/classification-run/audience-settle.js';
 import { DEFAULT_LABELS, defaultPolicy } from '../../src/services/classification/defaults.js';
 import {
   loosenings, mergePolicy, normaliseLayer, PolicyError, validateLayer, validateNodePolicy, weakerFields,

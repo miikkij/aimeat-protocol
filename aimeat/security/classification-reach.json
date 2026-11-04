@@ -1204,7 +1204,7 @@
       },
       "why": "The node's own read (TARGET-082 V3): the hourly queue job loads a queued personal item's current value so the node's own classifier can judge it; the classifier checks useForAi before any model reads the text, and nothing is shown to a caller."
     },
-    "src/services/classification/audience-settle.ts": {
+    "src/services/classification-run/audience-settle.ts": {
       "reads": {
         "getMemory": 2,
         "listAllMemoryMeta": 1,
@@ -1264,7 +1264,7 @@
       },
       "why": "The node's own read (TARGET-082 V1): the owner's classification switch record, never shown to anyone."
     },
-    "src/services/classification/scan.ts": {
+    "src/services/classification-run/scan.ts": {
       "reads": {
         "getMemory": 2,
         "getOwnerScopeMemory": 1

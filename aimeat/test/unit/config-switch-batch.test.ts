@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { changeNodeSettings } from '../../src/services/config-admin-view.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
-import type { SwitchCaller } from '../../src/services/classification/switch.js';
+import type { SwitchCaller } from '../../src/services/classification-run/switch.js';
 
 const NODE = 'switch-batch-test';
 const agent: SwitchCaller = { sub: `claude#op@${NODE}`, owner: 'op', roles: ['agent'], scopes: ['operator:admin'] };

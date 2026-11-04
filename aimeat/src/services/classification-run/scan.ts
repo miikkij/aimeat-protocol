@@ -1,5 +1,5 @@
 /**
- * @file src/services/classification/scan.ts
+ * @file src/services/classification-run/scan.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Classify on request (TARGET-082 V3, spec §7 (c)): a person or their AI names memory
@@ -26,6 +26,8 @@
  * @structure ScanResult · scanContent()
  * @usage const out = await scanContent(deps, actor, { keys: ['notes.2026-09'] });
  * @version-history
+ *   v1.3.1 — 2026-11-04 — Moved unchanged from services/classification/ beside the classifier it
+ *     calls; it imports that family through its index (codebase analysis 2026-11-03, item D-g).
  *   v1.3.0 — 2026-10-22 — The owner-scope read rule: a caller without memory:read-as-owner judges
  *     only the records it may read, and the answer names the permission (secaudit 2026-10, v76).
  *   v1.2.0 — 2026-09-30 — An organism item is authorized one by one, not once per scope: a member
@@ -38,11 +40,12 @@
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { getOwnerScopeMemory, listOwnerScopeMemoryMeta } from '../owner-memory.js';
-import { ClassificationError, memoryTarget, readContentLabel, type LabelActor } from './labels.js';
+import {
+  ClassificationError, labelActorReadsAll, memoryTarget, READ_AS_OWNER_NOTE, readContentLabel, scopeOrganism,
+  type LabelActor,
+} from '../classification/index.js';
 import { classifyText, enqueue, type ClassifyOutcome } from './classifier.js';
-import { scopeOrganism } from './policy.js';
 import { ownerScopeView, visibleToSameOwnerReader } from '../owner-scope-read.js';
-import { labelActorReadsAll, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
 
 /** Named personal keys judged inside the request; each may be a model call. */
 const NOW_MAX = 3;

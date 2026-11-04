@@ -281,7 +281,7 @@ import { appsBackupRouter } from '../routes/apps-backup.js';
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
 import { setNotifyPushService } from '../services/notify.js';
-import { registerAudienceSettle } from '../services/classification/audience-settle.js';
+import { registerAudienceSettle } from '../services/classification-run/audience-settle.js';
 import { createEudiwService } from '../services/eudiw.js';
 import { createSdJwtVerifier } from '../services/sd-jwt.js';
 import { createOidcClient, type OidcClient } from '../services/oidc-client.js';
