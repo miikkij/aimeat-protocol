@@ -15,6 +15,7 @@
  *   import { ratio, mixOklab, over } from './atelier-color.js';
  *   import { hueRotateSrgb, duotoneSrgb } from './atelier-color.js';   // the effects' proof
  * @version-history
+ *   v1.1.0 — 2026-11-04 — withLightness and lightnessOf, for the brand colour of a style kit.
  *   v1.2.0 — 2026-09-05 — capLightness: the OKLCh lightness CAP the light contract now puts on
  *     the accent (`oklch(from … min(l, N) c h)`), computed the way rotateHue computes the
  *     rotation beside it — chroma and hue untouched, only L pulled down, and only when the
@@ -105,6 +106,17 @@ export function capLightness(hex: string, maxL: number): string {
   const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
   const h = Math.atan2(lab.b, lab.a);
   return labToHex({ L: maxL, a: c * Math.cos(h), b: c * Math.sin(h) });
+}
+
+/** The same hue and chroma at another OKLab lightness (0..1): a brand colour lightened stays that colour. */
+export function withLightness(hex: string, L: number): string {
+  const lab = hexToLab(hex);
+  return labToHex({ L: Math.min(1, Math.max(0, L)), a: lab.a, b: lab.b });
+}
+
+/** How light a colour is in OKLab (0..1). */
+export function lightnessOf(hex: string): number {
+  return hexToLab(hex).L;
 }
 
 /** Mix two opaque colours in OKLab, `p` being the first colour's share (0..1). */

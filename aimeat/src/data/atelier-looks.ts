@@ -30,6 +30,8 @@
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.9.0 — 2026-11-04 — OFFICE_LOOKS (atelier-looks-office.ts): mappi, korostus, komento, vuosikertomus and
+ *     konserni, the office and corporate worlds, composed after the worlds.
  *   v1.8.0 — 2026-09-05 — THE AMBIENT (wish-atelier-ambient-visuals): five looks name the one
  *     layer allowed to move at idle — aurora runs the aurora drift at the whisper, neon-dense
  *     and terminal the floor grid, broadcast the static, stage the dust — and two WORLDS arrive
@@ -89,7 +91,8 @@ export { STRUCTURES, type AtelierStructure };
 // The WORLDS (the looks that own their ground) live in atelier-looks-worlds.ts since 2026-09-05,
 // the same pure move under the same cap; LOOKS below composes them after the page looks.
 import { WORLD_LOOKS } from './atelier-looks-worlds.js';
-export { WORLD_LOOKS };
+import { OFFICE_LOOKS } from './atelier-looks-office.js';
+export { WORLD_LOOKS, OFFICE_LOOKS };
 
 // The SHAPE of a look lives in atelier-look-shape.ts (2026-09-05), so this file and the worlds
 // file can both fill it without importing each other; re-exported so every importer keeps the
@@ -460,7 +463,7 @@ const PAGE_LOOKS: readonly AtelierLook[] = [
 ];
 
 /** Every look: the page looks first, then the worlds — the order a picker and the prompt show. */
-export const LOOKS: readonly AtelierLook[] = [...PAGE_LOOKS, ...WORLD_LOOKS];
+export const LOOKS: readonly AtelierLook[] = [...PAGE_LOOKS, ...WORLD_LOOKS, ...OFFICE_LOOKS];
 
 const byId = new Map(LOOKS.map((l) => [l.id, l]));
 

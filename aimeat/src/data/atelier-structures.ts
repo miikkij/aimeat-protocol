@@ -12,6 +12,8 @@
  * @usage
  *   import { STRUCTURES } from '../data/atelier-looks.js';   // the re-export, unchanged
  * @version-history
+ *   v1.3.0 — 2026-11-04 — The interface moves to atelier-structure-shape.ts and the office structures
+ *     (atelier-structures-office.ts) join STRUCTURES.
  *   v1.2.0 — 2026-10-22 — operator-console, the machine room's page structure for the tdr look:
  *     a solid bar with a wide capital title, the hero as a plate with two accent corner brackets,
  *     letter-spaced capital labels, outlined actions that fill with the accent when touched, and
@@ -23,18 +25,13 @@
  *   v1.0.0 — 2026-09-01 — Extracted verbatim from atelier-looks.ts (v1.6.0).
  */
 
-/** A named, reusable page-shape recipe. `css(sel)` emits its rules scoped to one look. */
-export interface AtelierStructure {
-  id: string;
-  /** One sentence for the catalogue and the data sheet. */
-  summary: string;
-  /** The rules, scoped to the given look selector (e.g. "[data-ak-look='editorial']"). */
-  css: (sel: string) => string;
-}
+import type { AtelierStructure } from './atelier-structure-shape.js';
+import { OFFICE_STRUCTURES } from './atelier-structures-office.js';
+export type { AtelierStructure };
 
 // ── The structures: page shapes, written once, reused by any look ────────────────────────────
 
-export const STRUCTURES: readonly AtelierStructure[] = [
+const BASE_STRUCTURES: readonly AtelierStructure[] = [
   {
     id: 'masthead',
     summary: 'The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review\'s finding).',
@@ -462,3 +459,6 @@ ${sel} .ak-mosaic__band .ak-hero .ak-hero__inner {
 }`,
   },
 ];
+
+/** Every structure: the ones above, then the office and corporate ones (atelier-structures-office.ts). */
+export const STRUCTURES: readonly AtelierStructure[] = [...BASE_STRUCTURES, ...OFFICE_STRUCTURES];

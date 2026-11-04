@@ -25,6 +25,7 @@
  *   const failures = runMatrix({ '--ak-accent': '#b3261e' }).filter((r) => !r.ok);
  *   runMatrix(undefined, { presets: ['riso'], effect: { id: 'duotone', params: { strength: 0.8 } } });
  * @version-history
+ *   v1.7.0 — 2026-11-04 — AK-MARK: the words on the marker, and the marker pair among the ground tokens.
  *   v1.6.0 — 2026-09-05 — AK-SOLID: the accent as a FLAT FILL under its own ink, which nothing
  *     had ever proven. AK-GRAD proves the brand gradient and every look darkens its stops toward
  *     the ink, so the primary action read; the tab, the chip, the avatar, the compare handle and
@@ -332,6 +333,8 @@ export const GROUND_TOKENS = [
   // able to own its ok/warn/err too — the theme's light-mode tones vanish on a forced-dark
   // world, and AK-TONE below now proves whichever values stand.
   '--ak-ok', '--ak-warn', '--ak-err',
+  // The marker pair (2026-11-04): a highlighter is a colour of its own, and AK-MARK proves it.
+  '--ak-mark', '--ak-mark-ink',
 ] as const;
 
 /** Tokens the base contract must declare — a look can never inherit half its identity. */
@@ -339,6 +342,7 @@ export const REQUIRED_BASE = [
   '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-surface-image', '--ak-ink', '--ak-ink-dim',
   '--ak-line', '--ak-line-w', '--ak-accent', '--ak-accent-2', '--ak-spectrum-2', '--ak-spectrum-3',
   '--ak-page-image', '--ak-glass', '--ak-blur', '--ak-grain', '--ak-accent-ink', '--ak-accent-text',
+  '--ak-mark', '--ak-mark-ink',
   '--ak-hero-ink', '--ak-hero-ink-dim',
   '--ak-ok', '--ak-warn', '--ak-err', '--ak-ok-text', '--ak-warn-text', '--ak-err-text',
   '--ak-focus', '--ak-grad', '--ak-scrim', '--ak-hero-image',
@@ -532,6 +536,9 @@ export function runMatrix(
         // The 2026-09-05 measuring review read 3.58:1 there on the house palette, on ten
         // separate components. Body size, no large-text discount: a tab label is 13px.
         add(combo, 'AK-SOLID action ink on the flat accent', ratio(accentInk, colorOf('--ak-accent')), MIN_TEXT, 'text on a component filled with the raw accent (tab, chip, avatar, badge)');
+
+        // AK-MARK: the words on the marker, which every <mark> in every look wears.
+        add(combo, 'AK-MARK words on the marker', ratio(colorOf('--ak-mark-ink'), colorOf('--ak-mark')), MIN_TEXT, 'the words a machine proposed, on the marker');
 
         // AK-GRAD: the primary action's text on both stops (body-size text — no large-text discount).
         const gradStops = gradientStops(vars.get('--ak-grad')!, vars, `${combo} --ak-grad`);

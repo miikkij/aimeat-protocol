@@ -312,7 +312,7 @@ function bodyShapeHint(kind: PartKind): string {
   }
   if (kind === 'avatar') return 'An avatar part\'s body is { svg: "<svg…>…</svg>" }: one SVG element, at most 256 kB, no DOCTYPE.';
   if (kind === 'ornament') return `An ornament part's body is { ornament: one of ${ORNAMENTS.filter((o) => !o.set).map((o) => o.id).join(', ')} or a set's figure such as art-deco-frame, params?, look? }: a figure the Atelier kit draws round an element; or { set: one of ${ORNAMENT_SET_IDS.join(', ')}, params?, look? }: five figures in one style.`;
-  if (kind === 'kit') return 'A kit part\'s body is { reach: "own" | "organism" | "node", organism?, look, tokens?, genre?, ornament?: { set, palette? }, logo?, from_app? }: the whole look of an app, and who reads it.';
+  if (kind === 'kit') return 'A kit part\'s body is { reach: "own" | "organism" | "node", organism?, look, brand?, tokens?, genre?, ornament?: { set, palette? }, logo?, from_app? }: the whole look of an app, and who reads it.';
   if (kind === 'component') {
     return 'A component part\'s body is { prefix, html, css, use, judgement: { reach: "general" | "special", why }, from_app? }: markup and a stylesheet under one class prefix, every colour a var(--ak-…) token, no script.';
   }

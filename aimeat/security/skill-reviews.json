@@ -151,7 +151,7 @@
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:1a13b471eaa10466dcd3efb2"
+      "digest": "sha256:10fe6c4c17ad74688657b803"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -478,7 +478,7 @@
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:8783e01620e901ec86e94ed5"
+      "digest": "sha256:4f7c25debca9946022d51d8c"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-10-29",
@@ -569,8 +569,8 @@
       "aimeat/src/services/app-spec-gate.ts": "1c415a82078c0a0f"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "58130bf1c60513c1",
-      "aimeat/src/services/build-atelier-layers.ts": "cf45add323b4731c",
+      "aimeat/src/services/build-atelier-prompt.ts": "949507014329b508",
+      "aimeat/src/services/build-atelier-layers.ts": "2f6550518b79a0df",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "eb3ec036ab55c7ac",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
@@ -686,7 +686,7 @@
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "ffbbc71080bb57ca",
       "aimeat/public/css/poster.css": "3a32b3760fd32b41",
-      "aimeat/public/lib/aimeat-fonts.css": "d0c524d2a1bb30d2"
+      "aimeat/public/lib/aimeat-fonts.css": "5b1c4dde6b61c603"
     },
     "project:aimeat-frontend-verify": {
       "aimeat/scripts/sandbox.ts": "e0908125aa35620b"

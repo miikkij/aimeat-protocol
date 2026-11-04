@@ -11,6 +11,8 @@
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.10.0 — 2026-11-04 — SERVED_FONT_FAMILIES takes Source Serif 4, Source Sans 3 and Hanken Grotesk
+ *     (aimeat-fonts.css v1.8.0), the faces of the vuosikertomus and konserni looks.
  *   v1.9.0 — 2026-11-04 — SERVED_FONT_FAMILIES takes Pixelify Sans, Baloo 2 and Nunito
  *     (aimeat-fonts.css v1.7.0), the faces of the Tiilitaivas theme.
  *   v1.8.0 — 2026-10-22 — SERVED_FONT_FAMILIES takes Michroma (aimeat-fonts.css v1.6.0), the TDR
@@ -47,6 +49,7 @@ export const SERVED_FONT_FAMILIES: readonly string[] = [
   'Newsreader',
   'Michroma',
   'Pixelify Sans', 'Baloo 2', 'Nunito',
+  'Source Serif 4', 'Source Sans 3', 'Hanken Grotesk',
 ];
 
 /** Faces a browser has without a download, and the generic keywords. Lower case. */

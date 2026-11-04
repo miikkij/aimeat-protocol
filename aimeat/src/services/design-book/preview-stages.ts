@@ -26,6 +26,7 @@
  * @structure lookStage · layerStage · wornStage · lookForShape · StageBody
  * @usage const body = lookStage(part.id, part.title, tokens, preset);
  * @version-history
+ *   v1.3.0 — 2026-11-04 — The working-day stage, for the office and corporate looks.
  *   v1.2.0 — 2026-10-22 — The tdr look (the TDR machine room) is shown on the operator's console
  *     stage and, as a layer or a worn effect, in the dark theme, the family's own default.
  *   v1.1.0 — 2026-10-17 — A printed letter's stage (an issue's contents and the subscriber count),
@@ -152,6 +153,23 @@ const STAGES: Stage[] = [
         { id: 'a3', title: 'Oda Lumen', sub: 'Closing set, lights low.' },
       ],
       'stage.door': [{ id: 'a', label: 'Sold', value: 184 }, { id: 'b', label: 'On the door', value: 36 }, { id: 'c', label: 'Guest list', value: 12 }],
+    },
+  },
+  {
+    // A working day in an office or a company: the rows somebody came to check and the sums they add up to.
+    match: /mappi|korostus|komento|vuosikertomus|konserni|office|corporate|binder|annual report/,
+    blocks: [
+      hero('The month so far', 'What came in, what is still open, and what waits for you to look at it.'),
+      { id: 'rows', component: 'list', props: { source: 'stage.rows', title: 'To check' }, span: 'main' },
+      { id: 'sums', component: 'statRow', props: { source: 'stage.sums', title: 'This month' }, span: 'side' },
+    ],
+    sources: {
+      'stage.rows': [
+        { id: 'r1', title: 'Invoice to the harbour office', sub: 'Sent on the 3rd, due on the 17th.' },
+        { id: 'r2', title: 'Order the receipt rolls', sub: 'A reminder for the 20th.' },
+        { id: 'r3', title: 'Sale at the trade fair', sub: 'Waits for a person to add it to the books.' },
+      ],
+      'stage.sums': [{ id: 'a', label: 'Invoiced', value: 4 }, { id: 'b', label: 'Paid', value: 2 }, { id: 'c', label: 'Open', value: 2 }],
     },
   },
   {

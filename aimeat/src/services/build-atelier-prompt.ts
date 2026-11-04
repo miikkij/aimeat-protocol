@@ -550,6 +550,7 @@ function composeBody(config: AimeatConfig): string {
     + 'and flat is a choice, never an accident. Ask the owner how it should feel and map the '
     + 'answer:\n\n';
   body += renderLooks() + '\n\n';
+  body += 'THE MARKER: put `<mark>` round words an AI proposed and nobody has accepted yet, and take it away when a person accepts them. Every look wears it, proven readable; on `korostus` it is the whole idea of the page, so keep that look\'s one colour for this one meaning.\n\n';
   body += 'NEVER write a colour, an animation, a theme control or a language switch: colours are '
     + 'the `--ak-*` tokens (every preset × palette × mode combination is verified arithmetically '
     + 'on this node), motion comes from the components, and the login pill owns the theme, '

@@ -6,7 +6,7 @@
  *   in one part, so a person's next app, or every new app of a company's members, starts in their
  *   own style (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa).
  *
- *   THE BODY IS DATA: { reach, organism?, look, tokens?, genre?, ornament?, logo?, from_app? }. A
+ *   THE BODY IS DATA: { reach, organism?, look, brand?, tokens?, genre?, ornament?, logo?, from_app? }. A
  *   look this node ships, the signature tokens on top of it (colours, faces, corners, motion; the
  *   same bench a look part runs, contrast-matrix pair proof included), the genre a new app forks
  *   from, the ornament set it wears, and its logo. Nothing in it is markup or script.
@@ -28,6 +28,12 @@
  *   const body = validateKitBody({ reach: 'own', look: 'editorial', tokens: { '--ak-accent': '#1d4ed8/#93c5fd' } });
  *   if (!(await kitReadable(storage, nodeId, part, readerOwnerGhii))) throw notFound;
  * @version-history
+ *   v1.3.0 — 2026-11-04 — A kit with no ornament set previews as a working screen in the real app shell,
+ *     because what makes the office looks theirs (the tabs, the numbered contents, the bar in the
+ *     company's colour) is the shell's, and the five-figure screen has none of it.
+ *   v1.2.0 — 2026-11-04 — `brand`: one colour, from which kit-brand.ts works out the accent, the words on
+ *     it and the accent as text per mode, proven on the kit's look. The head stylesheet carries those
+ *     pairs on the look's element too, where a look re-declares the accent as text.
  *   v1.1.0 — 2026-10-30 — kitPreviewHtml: a kit previews as a page of its own (its bar and logo, and the
  *     five-figure screen in its look, tokens and ornament set). The generic look page made two kits on
  *     one look read as the same kit (Jouni, 2026-10-30).
@@ -43,6 +49,7 @@ import { systemGhiiFor } from '../compliance-register.js';
 import { DesignBookError } from './errors.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 import { SET_STAGE, STAGE_CSS } from './ornament.js';
+import { BRAND_TOKENS, deriveBrandTokens, type BrandProof } from './kit-brand.js';
 
 /** Who reads a kit: its proposer alone, one organism's members, or everyone once it is published. */
 export const KIT_REACHES = ['own', 'organism', 'node'] as const;
@@ -54,6 +61,10 @@ export interface KitBody {
   organism?: string;
   /** A look this node ships: the base every token below changes. */
   look: string;
+  /** One brand colour as #rrggbb: the accent pairs below are worked out from it and proven (kit-brand.ts). */
+  brand?: string;
+  /** What the node worked out from `brand`, never taken from the caller. */
+  brand_proof?: BrandProof;
   /** Signature token overrides on top of the look, benched as a look part's are. */
   tokens?: Record<string, string>;
   /** The genre a new app forks from. */
@@ -71,12 +82,13 @@ export const KIT_PROMPT_PARAGRAPH = 'THE STYLE KIT COMES BEFORE THE GENRE. A new
   + '(GET /v1/designbook/kits/in-force), naming the `organism` when the app is built for one: the '
   + 'kit the person or their organism chose answers with what to fork, the head stylesheet, the '
   + 'app() line and the ornament line. Build in it unless the person asks otherwise; with no kit, '
-  + 'pick a genre as below.\n\n';
+  + 'pick a genre as below. A company with one brand colour makes its kit with `brand: "#rrggbb"` on the look `konserni`: '
+  + 'the node works out the accent, the words on it and the accent as text, and proves them.\n\n';
 
 /** The fields of a stored part the reach rules read. */
 interface KitPart { kind: string; body: unknown; proposed_by_owner: string; status: string }
 
-const SHAPE = 'A kit part\'s body is { reach: "own" | "organism" | "node", organism?, look, tokens?, genre?, ornament?: { set, palette?: "set" | "look" }, logo?, from_app? }';
+const SHAPE = 'A kit part\'s body is { reach: "own" | "organism" | "node", organism?, look, brand?, tokens?, genre?, ornament?: { set, palette?: "set" | "look" }, logo?, from_app? }';
 const ORG_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{2,80}$/;
 const GENRE_RE = /^genre-[a-z0-9][a-z0-9-]{1,60}$/;
 const FILENAME_RE = /^[a-z0-9][a-z0-9._-]{0,120}\.html$/i;
@@ -121,6 +133,15 @@ export function validateKitBody(o: Record<string, unknown>): KitBody {
       if (err instanceof AppUiError) throw new DesignBookError('BODY_INVALID', `The kit's tokens did not pass the bench — ${err.message}`, 422);
       throw err;
     }
+  }
+  if (o.brand !== undefined) {
+    if (out.tokens?.['--ak-accent']) {
+      throw new DesignBookError('BODY_INVALID', 'A kit takes "brand" or an --ak-accent pair in "tokens", not both: "brand" works the accent out for you.', 422);
+    }
+    const { tokens, proof } = deriveBrandTokens(String(o.brand), o.look);
+    out.brand = proof.brand;
+    out.brand_proof = proof;
+    out.tokens = { ...(out.tokens ?? {}), ...tokens };
   }
   if (o.genre !== undefined) {
     if (typeof o.genre !== 'string' || !GENRE_RE.test(o.genre)) {
@@ -204,6 +225,7 @@ function kitCss(tokens: Record<string, string>): string {
   const plain: string[] = [];
   let pair = '';
   for (const [name, value] of Object.entries(tokens)) {
+    if (isDerivedPair(name)) continue;
     if (name === '--ak-accent' && value.includes('/')) {
       const [light, dark] = value.split('/').map(s => s.trim());
       pair = `:root[data-theme="dark"] { --ak-accent: ${dark || light}; }`;
@@ -212,7 +234,26 @@ function kitCss(tokens: Record<string, string>): string {
       plain.push(`${name}: ${value};`);
     }
   }
-  return [`:root { ${plain.join(' ')} }`, pair].filter(Boolean).join('\n');
+  return [`:root { ${plain.join(' ')} }`, pair, derivedPairsCss(tokens)].filter(Boolean).join('\n');
+}
+
+/** The two tokens only a brand colour sets, always a light/dark pair. */
+function isDerivedPair(name: string): boolean {
+  return name !== '--ak-accent' && (BRAND_TOKENS as readonly string[]).includes(name);
+}
+
+/**
+ * The words on the accent and the accent as text. A look may re-declare these on its own element,
+ * where a value at :root alone would lose, so they stand on the look's element as well.
+ */
+function derivedPairsCss(tokens: Record<string, string>): string {
+  const names = Object.keys(tokens).filter(isDerivedPair);
+  if (!names.length) return '';
+  const half = (i: number): string => names.map((n) => {
+    const parts = tokens[n]!.split('/').map((p) => p.trim());
+    return `${n}: ${parts[i] || parts[0]};`;
+  }).join(' ');
+  return `:root, [data-ak-look] { ${half(0)} }\n:root[data-theme="dark"], :root[data-theme="dark"] [data-ak-look] { ${half(1)} }`;
 }
 
 /**
@@ -223,15 +264,16 @@ function kitPreviewCss(tokens: Record<string, string>): string {
   const plain: string[] = [];
   let dark = '';
   for (const [name, value] of Object.entries(tokens)) {
+    if (isDerivedPair(name)) continue;
     if (name === '--ak-accent' && value.includes('/')) {
       const [l, d] = value.split('/').map(s => s.trim());
       plain.push(`--ak-accent: ${l};`);
-      dark = `:root[data-theme="dark"], :root[data-theme="dark"] body[data-ak-look] { --ak-accent: ${d || l}; }`;
+      dark = `:root[data-theme="dark"], :root[data-theme="dark"] .ak-app[data-ak-look], :root[data-theme="dark"] body[data-ak-look] { --ak-accent: ${d || l}; }`;
     } else {
       plain.push(`${name}: ${value};`);
     }
   }
-  return [`:root, body[data-ak-look] { ${plain.join(' ')} }`, dark].filter(Boolean).join('\n');
+  return [`:root, .ak-app[data-ak-look], body[data-ak-look] { ${plain.join(' ')} }`, dark, derivedPairsCss(tokens)].filter(Boolean).join('\n');
 }
 
 /**
@@ -244,8 +286,9 @@ export function kitPreviewHtml(part: { title: string; summary: string; body: unk
   const body = part.body as KitBody;
   const css = body.tokens && Object.keys(body.tokens).length ? kitPreviewCss(body.tokens) : '';
   const set = body.ornament?.set;
+  if (!set) return kitWorkingScreen(part.title, body, css, theme);
   const spec = JSON.stringify({ set: set ?? null, palette: body.ornament?.palette ?? 'set' }).replace(/</g, '\\u003c');
-  const facts = [`look ${body.look}`, body.genre ? `starts from ${body.genre}` : '', set ? `ornaments ${set}` : ''].filter(Boolean).join(' · ');
+  const facts = [`look ${body.look}`, body.brand ? `brand ${body.brand}` : '', body.genre ? `starts from ${body.genre}` : '', set ? `ornaments ${set}` : ''].filter(Boolean).join(' · ');
   return [
     `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
@@ -271,6 +314,45 @@ export function kitPreviewHtml(part: { title: string; summary: string; body: unk
   ].join('\n');
 }
 
+/**
+ * The preview of a kit that wears no ornaments: one working screen in the real app shell, with its
+ * side column, a heading, a marked proposal, a table, figures and actions. The words are the page's
+ * own constants; only the kit's title and logo come from the part, as JSON with "<" escaped.
+ */
+function kitWorkingScreen(title: string, body: KitBody, css: string, theme: 'light' | 'dark'): string {
+  const spec = JSON.stringify({ title, look: body.look, logo: body.logo ?? null }).replace(/</g, '\\u003c');
+  return [
+    `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
+    `<style>${css}</style></head><body>`,
+    '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
+    '<script>',
+    `var SPEC = ${spec};`,
+    KIT_WORKING_SCREEN_JS,
+    '</scr' + 'ipt></body></html>',
+  ].join('\n');
+}
+
+const KIT_WORKING_SCREEN_JS = [
+  'var K = AIMEAT.atelier; var none = function () {};',
+  'var item = function (id, label, group, extra) { var o = { id: id, label: label, onPick: none }; if (group) o.group = group; for (var k in extra || {}) o[k] = extra[k]; return o; };',
+  'var a = K.app({ title: SPEC.title, look: SPEC.look, logo: SPEC.logo || undefined, nav: "side", navLabel: "Pages", requireLogin: false, navItems: [',
+  '  item("now", "Where you stand"), item("cal", "Calendar"), item("msg", "Messages", null, { count: 2 }), item("money", "Money"),',
+  '  item("cust", "Customers", "More"), item("ai", "AI help", "More"), item("set", "Settings", "More") ],',
+  '  onReady: function () {',
+  '    if (a.nav) a.nav.set({ value: "ai" });',
+  '    K.hero({ target: a.main, title: "AI help", sub: "The AI suggests and you decide. Nothing is recorded before you have looked at the rows.", parts: SPEC.look === "vuosikertomus" ? { before: "06" } : {} });',
+  '    K.callout({ target: a.main, tone: "warn", text: "Remove health details before you paste text. The text goes to an AI model." });',
+  '    var s = K.section({ target: a.main, title: "Check the suggestions" });',
+  '    var p = document.createElement("p"); p.append("15 Dec at 12, "); var m = document.createElement("mark"); m.textContent = "a time with the harbour office"; p.append(m); p.append(", 200 €"); s.body.appendChild(p);',
+  '    K.table({ target: s.body, columns: [{ key: "d", label: "Day" }, { key: "t", label: "Entry" }, { key: "n", label: "Sum", align: "right" }], rows: [{ id: 1, d: "15 Dec", t: "Harbour office", n: "200 €" }, { id: 2, d: "20 Nov", t: "Order the receipt rolls", n: "" }, { id: 3, d: "3 Nov", t: "Sale at the trade fair", n: "120 €" }] });',
+  '    K.statRow({ target: a.main, tiles: [{ id: "a", label: "Suggested", value: 3 }, { id: "b", label: "Recorded", value: 0 }, { id: "c", label: "Together", value: 320, unit: "€" }] });',
+  '    var bar = document.createElement("div"); bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap"; a.main.appendChild(bar);',
+  '    [["ak-btn ak-btn--primary", "Add the chosen"], ["ak-btn", "Tell me where I stand"]].forEach(function (x) { var b = document.createElement("button"); b.className = x[0]; b.textContent = x[1]; bar.appendChild(b); });',
+  '  } });',
+].join('\n');
+
 /** The kit page's own pieces: the bar with the logo, and the line of what the kit carries. */
 const KIT_STAGE_CSS = [
   // The ground carries the kit's accent, so a shelf of kits on one look still reads as different kits.
@@ -279,12 +361,12 @@ const KIT_STAGE_CSS = [
   '.kit-bar { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--ak-accent); border-radius: var(--ak-radius, 12px); }',
   '.kit-bar__logo { width: 44px; height: 44px; border-radius: var(--ak-radius-sm, 8px); object-fit: cover; }',
   '.kit-bar__logo--none { display: grid; place-items: center; background: var(--ak-surface); color: var(--ak-accent); font: var(--ak-weight-display, 700) 22px/1 var(--ak-font-display, Georgia, serif); }',
-  '.kit-bar__name { font: var(--ak-weight-display, 600) 1.5rem/1.2 var(--ak-font-display, Georgia, serif); color: var(--ak-surface); }',
-  '.orn-head h1 { font-size: clamp(2rem, 5vw, 3.2rem) !important; color: var(--ak-accent); }',
+  '.kit-bar__name { font: var(--ak-weight-display, 600) 1.5rem/1.2 var(--ak-font-display, Georgia, serif); color: var(--ak-accent-ink); }',
+  '.orn-head h1 { font-size: clamp(2rem, 5vw, 3.2rem) !important; color: var(--ak-accent-text); }',
   '.orn-head p { font-size: 1.15rem !important; }',
   '.kit-facts { margin-top: 10px !important; font-family: var(--ak-font-mono, monospace); font-size: 0.9rem !important; }',
   '.orn-set .orn-card, .kit-bar { border-radius: var(--ak-radius, 4px); }',
-  '.orn-set .orn-card h2, .orn-set__title { font-size: 1.8rem; color: var(--ak-accent); }',
+  '.orn-set .orn-card h2, .orn-set__title { font-size: 1.8rem; color: var(--ak-accent-text); }',
   '.orn-set p, .orn-set ul { font-size: 1.15rem; }',
 ].join('\n');
 

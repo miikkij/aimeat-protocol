@@ -486,6 +486,10 @@
   --ak-accent-ink:    var(--color-primary-content, #ffffff);
   /* The accent as TEXT: pulled toward the ink until small text passes contrast. */
   --ak-accent-text:   color-mix(in oklab, var(--ak-accent) 74%, var(--ak-ink));
+  /* The MARKER: what <mark> wears, the words a machine proposed and nobody has accepted yet. Quiet
+   * by default; a look that makes it its whole idea sets its own pair (korostus). */
+  --ak-mark:          color-mix(in oklab, var(--ak-accent) 22%, var(--ak-surface));
+  --ak-mark-ink:      var(--ak-ink);
   --ak-ok:            var(--color-success, #0f7a45);
   --ak-warn:          var(--color-warning, #8a5300);
   --ak-err:           var(--color-error, #b3261e);
