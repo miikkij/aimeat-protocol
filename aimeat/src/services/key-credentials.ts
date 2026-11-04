@@ -16,6 +16,8 @@
  * @structure IssuedKeyCredentials; issueFirstLoginKeyCredentials(storage, config, ghii).
  * @usage const cred = await issueFirstLoginKeyCredentials(storage, config, ghiiRecord); // null if N/A
  * @version-history
+ *   v1.0.1 — 2026-11-04 — The credentials mail goes through mail-gate.ts sendMail as sign-in mail
+ *     (codebase analysis 2026-11-03, item B3).
  *   v1.0.0 — 2026-07-07 — Initial (TARGET-011 VIP-session: real login + clear credentials).
  */
 import type { AimeatConfig } from '../config.js';
@@ -23,6 +25,7 @@ import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { hashPassword } from './password.js';
 import { generateReadablePassword } from '../utils/password-generation.js';
 import { getActiveEmailService } from './email.js';
+import { sendMail } from './mail-gate.js';
 import { logger } from '../utils/logger.js';
 
 export interface IssuedKeyCredentials {
@@ -66,12 +69,15 @@ export async function issueFirstLoginKeyCredentials(
     const to = ghii.notificationEmail || inv.email;
     if (emailSvc?.enabled && to) {
       const org = inv.organismId ? await storage.getOrganism(inv.organismId) : null;
-      emailSent = await emailSvc.sendKeyCredentials(to, {
+      emailSent = await sendMail(emailSvc, {
+        kind: 'sign-in', to,
+        why: 'The first sign-in\'s credentials, to the account\'s address or else the address the code key was made for.',
+      }, { form: 'key-credentials', args: {
         username: ghii.username,
         password,
         orgName: org?.name || 'AIMEAT',
         loginUrl: config.baseUrl,
-      }, ghii.locale);
+      }, locale: ghii.locale }) === 'sent';
     }
 
     return { username: ghii.username, password, email_sent: emailSent };

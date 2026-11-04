@@ -31,6 +31,7 @@
  *   tellPermissionAnswer(deps, agent, words, outcome, by) · sendPermissionAsk(deps, ownerGhii, agent, words, call?)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   2026-11-04 — The mail goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-04 — The mail's address is asked of owner-mail-address.ts provenOwnerAddress, which also
  *     compares it with the proven hash (codebase analysis 2026-11-03, item A9).
  *   2026-10-31 — withheldDmNotice: a direct message the agent may not read is asked about in words of
@@ -55,6 +56,7 @@ import { notify, type NotifyInput } from './notify.js';
 import { readNotificationSettings, appendMailLog } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail } from './mail-gate.js';
 import { wrapHtml } from './email-templates.js';
 import { allowUrl, agentPageUrl, plainPermission, oneClickWords, OPERATOR_WORDS } from './permission-ask.js';
 import { createT, toLocale, type Locale } from '../i18n.js';
@@ -265,7 +267,7 @@ export async function sendPermissionAsk(
     const prefs = await readNotificationSettings(deps.storage, ownerGhii);
     if (prefs.email.agentAsks === false) return;
     const mail = permissionAskEmail(agent, words, deps.config.baseUrl, toLocale(ghii.locale), onePress);
-    const sent = await email.sendRaw(to, mail.subject, mail.html, mail.text);
+    const sent = await sendMail(email, { kind: 'owner', account: ghii }, { form: 'html', subject: mail.subject, html: mail.html, text: mail.text }) === 'sent';
     if (sent) await appendMailLog(deps.storage, ownerGhii, { kind: 'agent_ask', subject: mail.subject });
   } catch (err) {
     logger.warn('permission-ask-notice: the person could not be told; the refusal still stands', {

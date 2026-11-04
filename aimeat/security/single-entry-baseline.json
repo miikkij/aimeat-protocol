@@ -687,6 +687,7 @@
         "count": 1,
         "why": "settleRefreshCookieWindowAtStart stores auth.refresh_cookie_legacy_until once at start when no source set it: the node's own write, no caller, and the row has no tighten-only rule."
       }
-    }
+    },
+    "mail-send": {}
   }
 }

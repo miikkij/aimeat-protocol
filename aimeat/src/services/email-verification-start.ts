@@ -10,6 +10,7 @@
  * @structure startRegistrationEmailVerification(storage, emailService, ownerName, email, locale?).
  * @usage const { verificationId, emailSent } = await startRegistrationEmailVerification(...);
  * @version-history
+ *   2026-11-04 — The code goes through mail-gate.ts sendMail as sign-in mail (codebase analysis 2026-11-03, item B3).
  *   2026-10-16 — The code comes from crypto.randomInt (utils/one-time-code.ts), not Math.random (QA audit F02a-02).
  *   v1.0.0 — 2026-08-07 — Lifted out of routes/ghii/register-login.ts when attach-email was split off,
  *     so both callers share one definition instead of the route file owning it.
@@ -17,6 +18,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { EmailService } from './email.js';
+import { sendMail } from './mail-gate.js';
 import { sixDigitCode } from '../utils/one-time-code.js';
 
 export async function startRegistrationEmailVerification(
@@ -35,6 +37,10 @@ export async function startRegistrationEmailVerification(
         expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), createdAt: now, verifiedAt: null,
     });
     let emailSent = false;
-    if (emailService?.enabled) { await emailService.sendVerificationCode(clean, code, locale); emailSent = true; }
+    if (emailService?.enabled) {
+        await sendMail(emailService, { kind: 'sign-in', to: clean, why: 'The registration code, to the address the account is being completed with.' },
+            { form: 'verification-code', code, locale });
+        emailSent = true;
+    }
     return { verificationId, emailSent };
 }

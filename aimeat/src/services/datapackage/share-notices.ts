@@ -15,11 +15,14 @@
  * @structure EMAIL_RE · noticeSuperseded · noticeWithdrawn · mailParties
  * @usage void noticeSuperseded(deps, ownerGhii, name, previousHash, newHash);
  * @version-history
+ *   v1.0.1 — 2026-11-04 — A notice goes through mail-gate.ts sendMail as a third-party mail (codebase
+ *     analysis 2026-11-03, item B3).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.2).
  */
 import type { ConsentRecord, Storage } from '../../storage/interface.js';
 import { bare } from './contract.js';
 import { getActiveEmailService } from '../email.js';
+import { sendMail } from '../mail-gate.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { isLiveShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
@@ -30,6 +33,10 @@ type StoreDeps = { storage: Storage };
 
 /** A contact the node mails: one address, nothing around it. */
 export const EMAIL_RE = /^[^\s@<>()",;]+@[^\s@<>()",;]+\.[^\s@<>()",;]+$/;
+
+/** Why a share notice draws on no account count (mail-gate.ts third-party). */
+const SHARE_NOTICE_BOUND = 'The node\'s own notice of a publish or a withdrawal the owner made: one mail per live share, '
+    + 'to the contact of a party the owner already shares with.';
 
 /** Mail the party of each share. Answers how many mails were sent. */
 async function mailParties(
@@ -44,7 +51,8 @@ async function mailParties(
         const to = party?.contact?.trim();
         if (!party || !to || !EMAIL_RE.test(to)) continue;
         try {
-            if (await mail.sendNotification(to, subject, body(party.displayName || party.name))) sent++;
+            if (await sendMail(mail, { kind: 'third-party', to, count: { uncounted: SHARE_NOTICE_BOUND } },
+                { form: 'notification', subject, body: body(party.displayName || party.name) }) === 'sent') sent++;
         } catch (err) {
             logger.warn('datapackage share notice: a mail could not be sent', { owner: ownerGhii, party: party.name, error: String(err) });
         }

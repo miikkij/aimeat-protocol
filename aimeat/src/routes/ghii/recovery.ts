@@ -6,6 +6,7 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The code, reset and username mails go through mail-gate.ts sendMail as sign-in mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-02 — The password sign-in policy (services/sign-in-policy.ts): with it off,
  *     /password/reset-request and /password/reset answer 403 PASSWORD_SIGN_IN_OFF before anything is
  *     read; under `operators` the reset refuses a non-operator after the code and before it is spent.
@@ -54,6 +55,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
+import { sendMail } from '../../services/mail-gate.js';
 import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -164,7 +166,8 @@ export function registerRecoveryRoutes(
         // Send verification email if service is available
         if (emailService?.enabled) {
             const locale = ghiiRecord.locale;
-            const sent = await emailService.sendVerificationCode(normalizedEmail, code, locale);
+            const sent = await sendMail(emailService, { kind: 'sign-in', to: normalizedEmail, why: 'The code that proves the address the account holder just gave.' },
+                { form: 'verification-code', code, locale }) === 'sent';
             if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'verification', subject: 'verification code' });
         }
 
@@ -337,7 +340,8 @@ export function registerRecoveryRoutes(
             // The reset template, not the email-verification one: that mail said "verify your email
             // address" under the same subject as the sign-up code (email-template-reset.ts).
             const m = passwordResetEmail(code, ghiiRecord.locale);
-            const sent = await emailService.sendRaw(resetTo, m.subject, m.html, m.text);
+            const sent = await sendMail(emailService, { kind: 'sign-in', to: resetTo, why: 'The reset code, to the address the account proved (provenRecoveryAddress).' },
+                { form: 'html', subject: m.subject, html: m.html, text: m.text }) === 'sent';
             if (sent) {
                 await appendMailLog(storage, ghiiRecord.ghii, { kind: 'password_reset', subject: 'password reset code' });
                 logger.info('Password reset code sent successfully');
@@ -560,7 +564,8 @@ export function registerRecoveryRoutes(
                 const body = locale === 'fi'
                     ? `Käyttäjätunnuksesi on: ${ghiiRecord.username}\n\nJos et pyytänyt tätä, voit ohittaa tämän viestin.`
                     : `Your username is: ${ghiiRecord.username}\n\nIf you did not request this, you can safely ignore this email.`;
-                const sent = await emailService.sendNotification(recoverTo, subject, body);
+                const sent = await sendMail(emailService, { kind: 'sign-in', to: recoverTo, why: 'The username reminder, to the address the account proved (provenRecoveryAddress).' },
+                    { form: 'notification', subject, body }) === 'sent';
                 if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'username', subject });
             }
         }

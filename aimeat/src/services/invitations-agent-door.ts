@@ -20,6 +20,7 @@
  *   createRegistrationInvitation
  * @usage const result = await createRegistrationInvitation(storage, config, { email, agent, observed });
  * @version-history
+ *   2026-11-04 — The invitation mail goes through mail-gate.ts sendMail as a third-party mail (codebase analysis 2026-11-03, item B3).
  *   2026-10-16 — A send that fails on a node with mail cancels the invitation it wrote and returns sendFailed, so the route can say nothing was sent and the address is not locked out of a retry for 24 hours (QA audit F02a-04).
  *   2026-10-15 — A node whose email service is disabled writes no invitation and returns mailUnavailable, so the route can say nothing was sent (feature-list audit #23).
  *   v1.0.0 — 2026-09-12 — Extracted from invitations.ts (max-file-lines), unchanged.
@@ -31,6 +32,7 @@ import type { Storage } from '../storage/interface.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { hashInviteToken, inviteEmailHash, InvitationError } from './invitations.js';
 import { getActiveEmailService } from './email.js';
+import { sendMail } from './mail-gate.js';
 import { registrationInviteEmail } from './email-templates.js';
 import { isValidEmail } from '../utils/email-validator.js';
 import { logger } from '../utils/logger.js';
@@ -166,7 +168,10 @@ export async function createRegistrationInvitation(
     }, input.locale);
     let emailSent = false;
     try {
-        emailSent = await emailSvc.sendRaw(cleanEmail, subject, html, text);
+        emailSent = await sendMail(emailSvc, {
+            kind: 'third-party', to: cleanEmail,
+            count: { uncounted: 'An endpoint with no account to count: one live invitation per address (above) and the route\'s own rate limit (routes/registration-invites.ts).' },
+        }, { form: 'html', subject, html, text }) === 'sent';
     } catch (err) {
         // emailSent stays false: the branch below cancels the invitation and answers not sent.
         logger.warn('registration invite: the mail service refused the send', { error: String(err) });

@@ -25,6 +25,7 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.5.4 — 2026-11-04 — The rescue goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
  *   v1.5.3 — 2026-11-04 — The rescue mails only an address provenOwnerAddress proves, not any address
  *     of an account at level 1 or above (codebase analysis 2026-11-03, item A9).
  *   v1.5.2 — 2026-10-18 — writeMarkerOnce creates the marker with createMemoryIfAbsent and answers
@@ -64,6 +65,7 @@ import { updateRecord, UNCHANGED } from './record-cas.js';
 import { getActiveEmailService } from './email.js';
 import { outboundEmailHtml } from './email-templates.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail } from './mail-gate.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import type { AccountEventKind } from '../storage/interface.js';
@@ -782,7 +784,7 @@ export async function runMcpOnboardingRescueJob(
         // become a retry loop against an address that bounces, and of two passes at once (a manual
         // run beside a scheduled one) only the one whose marker landed sends.
         if (!await writeMarkerOnce(storage, g.ghii, MCP_RESCUE_SENT_KEY, { at: new Date().toISOString(), delivered: false })) continue;
-        const ok = await email.sendRaw(to, c.subject, html, text).catch(err => {
+        const ok = await sendMail(email, { kind: 'owner', account: g }, { form: 'html', subject: c.subject, html, text }).then(r => r === 'sent', err => {
             logger.warn('onboarding-funnel: rescue email send failed', { owner: g.ownerName, error: String(err) });
             return false;
         });

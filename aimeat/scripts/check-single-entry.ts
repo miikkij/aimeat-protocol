@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.8.0 — 2026-11-04 — Rule mail-send: a mail goes out through sendMail (services/mail-gate.ts); the
+ *     24 files that called the mail service directly moved onto it, so the baseline is empty. RULES is
+ *     exported for its unit test (codebase analysis 2026-11-03, item B3).
  *   v1.7.0 — 2026-11-04 — Rule sale-booking: a sale's fee and shares are booked only by settlePurchase
  *     (commerce/settle-purchase.ts), with the purchase's last write (codebase analysis 2026-11-03, B2).
  *   v1.6.0 — 2026-11-04 — Rule config-write: a setting row is written through services/config-apply.ts,
@@ -63,7 +66,7 @@ interface Rule {
   skipDirs?: string[];
 }
 
-const RULES: Rule[] = [
+export const RULES: Rule[] = [
   {
     id: 'password-verify',
     label: 'An account password is checked only by checkPassword (services/password-check.ts), which applies the account lock (C1)',
@@ -169,6 +172,15 @@ const RULES: Rule[] = [
     label: 'A setting row is written and removed through services/config-apply.ts (applyConfigChanges, storeConfigValue, resetConfigValue), where the rule that an AI may only make a setting stricter is read from the setting\'s row; a write elsewhere skips it, as DELETE did before d1f37bb4a (codebase analysis 2026-11-03, B4)',
     pattern: /\.(setConfigValue|deleteConfigValue)\(/,
     skipDirs: ['src/storage/'],
+  },
+  {
+    id: 'mail-send',
+    label: 'A mail goes out through sendMail (services/mail-gate.ts), whose intent says whose mail it is: an owner mail asks provenOwnerAddress and the sender\'s daily limit, a third-party mail shows the account\'s turn or the reason it has none (codebase analysis 2026-11-03, B3)',
+    // A call of an EmailService send method. sendNotification is also the web-push method, so it
+    // counts only on an object whose name does not say push (pushService, push, webpush).
+    pattern: /\.(sendVerificationCode|sendMagicLink|sendInvite|sendKeyInvite|sendKeyCredentials|sendRaw|sendWithAttachments)\(|(^|[^\w$])(?![\w$]*push)[\w$]+[!?]?\.sendNotification\(|\)[!?]?\.sendNotification\(/i,
+    // email.ts defines the methods; push.ts is the web-push service, whose own method is sendNotification.
+    skipDirs: ['src/services/mail-gate.ts', 'src/services/email.ts', 'src/services/push.ts'],
   },
   {
     id: 'request-caller-built',

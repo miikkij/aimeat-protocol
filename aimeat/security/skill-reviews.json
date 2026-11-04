@@ -346,7 +346,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:a265f36c7d266bc79815dcd0"
+      "digest": "sha256:c946429c670cd375a568adb2"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-01",
@@ -753,7 +753,7 @@
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
       "aimeat/src/routes/organisms/workspace-ops.ts": "dca722aac4be161b",
-      "aimeat/src/routes/organisms/workspace-access.ts": "c28427159eaf9f7c",
+      "aimeat/src/routes/organisms/workspace-access.ts": "5f6047e5621c3e26",
       "aimeat/src/services/agent-profile-write.ts": "8cd2abe3dc838b0f",
       "aimeat/src/services/agent-task-rules.ts": "207afa09788c8a11"
     },

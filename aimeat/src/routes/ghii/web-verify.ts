@@ -6,6 +6,7 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The registration code goes through mail-gate.ts sendMail as sign-in mail (codebase analysis 2026-11-03, item B3).
  *   2026-10-31 — POST /v1/ghii/magic-link takes `lang`, the language of the page the link was asked
  *     from, and the mail is written in it (v27 P1).
  *   2026-10-27 — register-web reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
@@ -80,6 +81,7 @@ import type { Router, RequestHandler } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
+import { sendMail } from '../../services/mail-gate.js';
 import { LOCALES, type Locale } from '../../i18n.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { fromNodeMachine } from '../../auth/loopback-pass.js';
@@ -352,7 +354,8 @@ export function registerWebVerifyRoutes(
                 createdAt: now,
                 verifiedAt: null,
             });
-            await emailService.sendVerificationCode(email, code, typeof locale === 'string' ? locale : undefined);
+            await sendMail(emailService, { kind: 'sign-in', to: email, why: 'The registration code, to the address the person registers with.' },
+                { form: 'verification-code', code, locale: typeof locale === 'string' ? locale : undefined });
             verificationId = verId;
         }
 

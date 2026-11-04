@@ -27,6 +27,9 @@
  * @structure AgreementEvent · tellAgreement()
  * @usage const told = await tellAgreement(deps, agreement, 'sent', { pdf });
  * @version-history
+ *   v1.0.3 — 2026-11-04 — Both sides' mail goes through mail-gate.ts sendMail: the contact the operator
+ *     wrote and the operator's own address as operator mail, a counterparty account's proven address as
+ *     an owner mail (codebase analysis 2026-11-03, item B3).
  *   v1.0.2 — 2026-11-04 — The account's address is asked of provenOwnerAddress, which also compares it
  *     with the proven hash (codebase analysis 2026-11-03, item A9).
  *   v1.0.1 — 2026-11-02 — A counterparty account's own address is used only when it is verified
@@ -39,6 +42,7 @@ import { logger } from '../utils/logger.js';
 import { notify } from './notify.js';
 import { getActiveEmailService } from './email.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail, type MailIntent, type MailMessage } from './mail-gate.js';
 import { wrapHtml, esc } from './email-templates.js';
 import { displayPrefsFor, formatForPerson } from './display-prefs.js';
 import { inForce, newest } from './compliance-agreements.js';
@@ -152,15 +156,22 @@ function changedSubprocessors(a: Agreement, lang: Lang): string[] {
 }
 
 /**
- * The counterparty account's address when it proved it (owner-mail-address.ts), else null: any
- * principal of that account holding memory:write-reserved may set the address, and a new one arrives
- * unverified. Without one the step goes to the bell, the operator's `contactEmail` still reaches the
- * counterparty, and the operator's answer says what went out (`told.counterpartyEmail`).
+ * Where the counterparty's mail goes, as a mail-gate.ts intent, or null. The `contactEmail` the
+ * operator wrote on the agreement first; else the counterparty account's address when it proved it
+ * (owner-mail-address.ts): any principal of that account holding memory:write-reserved may set the
+ * address, and a new one arrives unverified. Without either the step goes to the bell, and the
+ * operator's answer says what went out (`told.counterpartyEmail`).
  */
-async function emailOf(storage: Storage, account: string | undefined): Promise<string | null> {
-  if (!account) return null;
-  return provenOwnerAddress(await storage.getGHII(account));
+async function counterpartyMail(storage: Storage, a: Agreement): Promise<MailIntent | null> {
+  // Present but empty sends nothing, as the `??` this replaced did.
+  if (a.counterparty.contactEmail != null) return a.counterparty.contactEmail ? { kind: 'operator', to: a.counterparty.contactEmail, why: OPERATOR_CONTACT } : null;
+  if (!a.counterparty.account) return null;
+  const account = await storage.getGHII(a.counterparty.account);
+  return provenOwnerAddress(account) ? { kind: 'owner', account } : null;
 }
+
+/** Why the counterparty contact address may be mailed without an account count. */
+const OPERATOR_CONTACT = 'The operator wrote the counterparty contact on the agreement; only the operator makes and moves an agreement.';
 
 function html(lang: Lang, subject: string, lines: string[], link: string | null, linkText: string, a: Agreement): { html: string; text: string } {
   const body = lines.filter(Boolean).map(l => `<p>${esc(l)}</p>`).join('\n')
@@ -168,6 +179,13 @@ function html(lang: Lang, subject: string, lines: string[], link: string | null,
     + `\n<p class="url-fallback">${esc(`${a.id} · ${L(lang, 'versio', 'version')} ${newest(a).n}`)}</p>`;
   const text = [...lines.filter(Boolean), ...(link ? [`${linkText}: ${link}`] : []), `${a.id} v${newest(a).n}`].join('\n\n');
   return { html: wrapHtml(esc(subject), body, lang), text };
+}
+
+/** The mail of one side: with the agreement's PDF attached when the step carries one. */
+function mailOf(subject: string, m: { html: string; text: string }, x: TellExtra): MailMessage {
+  return x.pdf
+    ? { form: 'attachments', subject, html: m.html, text: m.text, attachments: [{ filename: x.pdf.name, content: x.pdf.data, contentType: 'application/pdf' }] }
+    : { form: 'html', subject, html: m.html, text: m.text };
 }
 
 /** Tell both sides what this step means for them. Never throws: a notice failing must not undo the step. */
@@ -188,12 +206,10 @@ export async function tellAgreement(deps: Deps, a: Agreement, ev: AgreementEvent
     const operatorAccount = created?.by && created.by.includes('@') && !created.by.includes('#') ? created.by : null;
 
     if (w.cp) {
-      const to = a.counterparty.contactEmail ?? await emailOf(deps.storage, a.counterparty.account);
+      const to = await counterpartyMail(deps.storage, a);
       if (to && email?.enabled) {
         const m = html(lang, w.cp.subject, w.cp.lines, cpLink ? `${base}${cpLink}` : null, L(lang, 'Avaa sopimus', 'Open the agreement'), a);
-        told.counterpartyEmail = x.pdf
-          ? await email.sendWithAttachments(to, w.cp.subject, m.html, m.text, [{ filename: x.pdf.name, content: x.pdf.data, contentType: 'application/pdf' }])
-          : await email.sendRaw(to, w.cp.subject, m.html, m.text);
+        told.counterpartyEmail = await sendMail(email, to, mailOf(w.cp.subject, m, x)) === 'sent';
       }
       if (a.counterparty.account && ev !== 'reminder' && ev !== 'notice-reminder' && ev !== 'counterparty-signed' && ev !== 'copy-received' && ev !== 'deletion-done') {
         const r = await notify(deps.storage, a.counterparty.account, {
@@ -214,9 +230,7 @@ export async function tellAgreement(deps: Deps, a: Agreement, ev: AgreementEvent
       const opEmail = deps.config.operator?.email;
       if (opEmail && email?.enabled && (ev === 'counterparty-signed' || ev === 'in-force' || ev === 'objection')) {
         const m = html(lang, w.op.subject, w.op.lines, `${base}${opLink}`, L(lang, 'Avaa sopimus', 'Open the agreement'), a);
-        told.operatorEmail = x.pdf
-          ? await email.sendWithAttachments(opEmail, w.op.subject, m.html, m.text, [{ filename: x.pdf.name, content: x.pdf.data, contentType: 'application/pdf' }])
-          : await email.sendRaw(opEmail, w.op.subject, m.html, m.text);
+        told.operatorEmail = await sendMail(email, { kind: 'operator', to: opEmail, why: 'The operator\'s own address (operator.email).' }, mailOf(w.op.subject, m, x)) === 'sent';
       }
     }
   } catch (err) {

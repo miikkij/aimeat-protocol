@@ -12,6 +12,8 @@
  *   ownerMailLimitReached
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.5.1 — 2026-11-04 — mailOwnerFrom sends through mail-gate.ts sendMail, which keeps the per-sender
+ *     daily count that lived here, unchanged (codebase analysis 2026-11-03, item B3).
  *   v1.5.0 — 2026-11-04 — mailOwnerFrom asks provenOwnerAddress (the flag and the hash) and takes the
  *     mail log's kind and the caller's own mail service, so the workflow-end report goes through it
  *     (codebase analysis 2026-11-03, items A2 and A9).
@@ -44,6 +46,7 @@ import { isSameOriginPath } from '../utils/same-origin-path.js';
 import { getActiveEmailService, type EmailService } from './email.js';
 import { appendMailLog, type MailLogKind } from './notification-settings.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail, senderLimitReached } from './mail-gate.js';
 import { logger } from '../utils/logger.js';
 
 export class NotificationCreateError extends Error {
@@ -68,25 +71,16 @@ export type NotificationEmailOutcome = 'sent' | 'not_asked' | 'no_address' | 'ma
  * again, which costs at most one more day's worth; the owner's mute stops a sender for good.
  */
 export const EMAIL_PER_DAY = 10;
-const emailsSent = new Map<string, number[]>();
-
-function underEmailLimit(key: string, now: number, limit: number): boolean {
-  if (limit <= 0) return true;
-  const recent = (emailsSent.get(key) ?? []).filter(at => now - at < 86_400_000);
-  emailsSent.set(key, recent);
-  return recent.length < limit;
-}
 
 /**
  * The daily limit `sender` (`kind:id`) has already reached for mail to `ghii`, or 0 while it may still
  * mail. Reads the count without taking from it, so a caller can tell the owner in the bell entry why
- * the mail did not come (task-result-delivery.ts).
+ * the mail did not come (task-result-delivery.ts). The count is kept by mail-gate.ts.
  */
 export function ownerMailLimitReached(config: AimeatConfig, ghii: string, sender: string): number {
   const limit = emailPerDay(config);
   if (limit <= 0) return 0;
-  const recent = (emailsSent.get(`${ghii} ${sender}`) ?? []).filter(at => Date.now() - at < 86_400_000);
-  return recent.length < limit ? 0 : limit;
+  return senderLimitReached({ key: `${ghii} ${sender}`, perDay: limit }) ? limit : 0;
 }
 
 /** The per-sender daily mail limit in force: the setting, else EMAIL_PER_DAY. */
@@ -204,17 +198,14 @@ export async function mailOwnerFrom(
 ): Promise<NotificationEmailOutcome> {
   const email = 'email' in opts ? opts.email : getActiveEmailService();
   if (!email?.enabled) return 'mail_off';
-  const to = provenOwnerAddress(await storage.getGHII(ghii));
-  if (!to) return 'no_address';
-  const now = Date.now();
-  const key = `${ghii} ${sender}`;
-  if (!underEmailLimit(key, now, emailPerDay(config))) return 'limit';
+  const account = await storage.getGHII(ghii);
+  if (!provenOwnerAddress(account)) return 'no_address';
   try {
-    // A reply goes where somebody reads it (email.reply_to), not to the node's no-reply sender.
-    const ok = await email.sendNotification(to, subject, text, { replyTo: config.smtpReplyTo });
-    if (!ok) return 'failed';
-    // Counted only while a limit is in force (underEmailLimit made the entry).
-    emailsSent.get(key)?.push(now);
+    // The proven address, the sender's daily limit and its count are the gate's (mail-gate.ts). A
+    // reply goes where somebody reads it (email.reply_to), not to the node's no-reply sender.
+    const outcome = await sendMail(email, { kind: 'owner', account, limit: { key: `${ghii} ${sender}`, perDay: emailPerDay(config) } },
+      { form: 'notification', subject, body: text, opts: { replyTo: config.smtpReplyTo } });
+    if (outcome !== 'sent') return outcome;
     await appendMailLog(storage, ghii, { kind: opts.logKind ?? 'notification', subject });
     return 'sent';
   } catch (err) {

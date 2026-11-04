@@ -27,6 +27,8 @@
  *   applyAppInvitesForVerifiedEmail
  * @usage await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii);
  * @version-history
+ *   v1.3.1 — 2026-11-04 — The invitation mail goes through mail-gate.ts sendMail as a third-party mail
+ *     (codebase analysis 2026-11-03, item B3).
  *   v1.3.0 — 2026-10-18 — putInvite writes on the record's version (app-members.ts updateAppRecord).
  *   v1.2.0 — 2026-10-05 — applyAppInvitesForVerifiedEmail takes `only`: the one app whose invitation
  *     link a new account accepted, before its address is verified (secaudit 2026-10, APP-2).
@@ -42,6 +44,7 @@ import { approveMember, appStem } from './app-member-approve.js';
 import { appMemberInviteEmail, type NoticeLang } from './app-member-notices.js';
 import { inviteEmailHash } from './invitations.js';
 import { getActiveEmailService } from './email.js';
+import { sendMail } from './mail-gate.js';
 import { mintAppInviteLink, cancelAppInviteLinks } from './app-invite-link.js';
 import type { AimeatConfig } from '../config.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -171,7 +174,12 @@ export async function sendAppInvite(
       date: invite.expiresAt.slice(0, 10),
     });
     try {
-      emailSent = await mail.sendRaw(input.email.trim(), subject, html, text);
+      emailSent = await sendMail(mail, {
+        kind: 'third-party', to: input.email.trim(),
+        // Only the owner in person reaches this through the counted contacts lookup (app-roster-write.ts);
+        // an app token, an agent or a manager comes here directly, bounded by the open-invitation cap alone.
+        count: { uncounted: 'At most MAX_OPEN_INVITES_PER_APP open per app; the owner in person is also counted as an address lookup (takeEmailLookup) by app-roster-write.ts.' },
+      }, { form: 'html', subject, html, text }) === 'sent';
     } catch (err) {
       logger.warn('app-member-invites: the invitation email failed, the invitation stands', { error: String(err) });
     }
