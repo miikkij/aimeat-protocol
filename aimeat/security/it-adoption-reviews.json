@@ -81,16 +81,18 @@
       "digest": "sha256:6fa688b45c8a057d593bd92e"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/config-posture.ts",
         "aimeat/src/middleware/cors.ts",
         "aimeat/src/utils/env-validator.ts",
         "docs/security/verification-matrix.md",
         "aimeat/src/services/sign-in-policy.ts",
-        "aimeat/src/services/mcp-client/capability-use-setting.ts"
+        "aimeat/src/services/mcp-client/capability-use-setting.ts",
+        "aimeat/src/middleware/openapi-body-guard.ts",
+        "aimeat/src/data/openapi-body-modes.ts"
       ],
-      "digest": "sha256:836debd8511668438b3fa11b"
+      "digest": "sha256:019b7deca08d069d4cb0fb3c"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -309,7 +311,9 @@
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105",
-      "aimeat/src/services/mcp-client/capability-use-setting.ts": "0b4b9dfb4fd267a7"
+      "aimeat/src/services/mcp-client/capability-use-setting.ts": "0b4b9dfb4fd267a7",
+      "aimeat/src/middleware/openapi-body-guard.ts": "365d008badd54ed4",
+      "aimeat/src/data/openapi-body-modes.ts": "f032bb16f797b9bc"
     },
     "08-threat-model.md": {
       "docs/security/threat-model.md": "211b04c0cc93e8fe",
