@@ -19398,6 +19398,7 @@
     "identityHost": "Sovellus tunnistetaan osoitteestaan",
     "nameSelfDeclared": "\"{client}\" on nimi, jonka sovellus antoi itselleen. Tämä palvelin ei ole tarkistanut sitä, joten katso yllä oleva osoite.",
     "localApp": "Tämä sovellus toimii omalla tietokoneellasi.",
+    "localAppKeepRunning": "Pidä sovellus käynnissä, kunnes tämä on valmis. Jos selain sen jälkeen sanoo, ettei se saa yhteyttä, sovellus pysähtyi liian aikaisin. Mitään ei menetetty: aloita kirjautuminen sovelluksessa uudelleen.",
     "localAppNameUnchecked": "AIMEAT ei ole tarkistanut nimeä \"{client}\", joten hyväksy vain, jos käynnistit sovelluksen itse.",
     "localAppStartedByYou": "Hyväksy vain, jos käynnistit sovelluksen itse.",
     "yourAi": "Tekoälysi",

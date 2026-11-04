@@ -349,6 +349,9 @@
       const local = verified.redirect_ok && verified.redirect_local === true;
       if (local) {
         lines.push(escHtml(t('localApp')));
+        // The program that receives the result stops with its command, and the person cannot see that
+        // from here: after Approve the browser only says it cannot connect (Codex 0.166.0, measured).
+        lines.push(escHtml(t('localAppKeepRunning')));
       } else if (verified.redirect_ok && verified.redirect_host) {
         lines.push(`${escHtml(t('codeGoesTo'))} <strong>${escHtml(verified.redirect_host)}</strong>`);
       } else {

@@ -18661,6 +18661,7 @@
     "identityHost": "The app is identified by its address",
     "nameSelfDeclared": "\"{client}\" is the name the app gave itself. This server has not checked it, so check the address above.",
     "localApp": "This app runs on your own computer.",
+    "localAppKeepRunning": "Keep it running until this is done. If your browser then says it cannot connect, the app stopped too early. Nothing is lost: start the sign-in again in the app.",
     "localAppNameUnchecked": "AIMEAT has not checked the name \"{client}\", so approve only if you started the app yourself.",
     "localAppStartedByYou": "Approve only if you started the app yourself.",
     "yourAi": "Your AI",

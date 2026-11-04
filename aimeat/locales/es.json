@@ -17473,6 +17473,7 @@
     "identityHost": "La aplicación se identifica por su dirección",
     "nameSelfDeclared": "\"{client}\" es el nombre que la aplicación se dio a sí misma. Este servidor no lo ha comprobado, así que fíjate en la dirección de arriba.",
     "localApp": "Esta aplicación funciona en tu propia computadora.",
+    "localAppKeepRunning": "Mantenla en marcha hasta que esto termine. Si después el navegador dice que no puede conectar, la aplicación se detuvo demasiado pronto. No se pierde nada: vuelve a iniciar sesión desde la aplicación.",
     "localAppNameUnchecked": "AIMEAT no ha comprobado el nombre \"{client}\", así que apruébala solo si la iniciaste tú.",
     "localAppStartedByYou": "Apruébala solo si la iniciaste tú.",
     "yourAi": "Tu IA",
