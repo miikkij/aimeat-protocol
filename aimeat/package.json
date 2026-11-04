@@ -248,6 +248,7 @@
     "check:owner-principal:report": "tsx scripts/check-owner-principal.ts",
     "check:owner-principal:seed": "tsx scripts/check-owner-principal.ts --seed",
     "check:deps": "depcruise src --config .dependency-cruiser.cjs --ignore-known",
+    "check:family-index": "tsx scripts/check-family-index.ts",
     "deps:report": "depcruise src --config .dependency-cruiser.cjs --no-ignore-known",
     "deps:baseline": "depcruise-baseline src --config .dependency-cruiser.cjs",
     "deps:baseline:shrink": "tsx scripts/deps-baseline-shrink.ts",

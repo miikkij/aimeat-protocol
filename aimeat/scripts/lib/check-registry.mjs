@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-04: check:family-index, the classification index exports no file that reaches a module importing the family back (codebase analysis 2026-11-03, item D-g).
  *  - 2026-11-04: check:process-local, module-level runtime state and timers as a shrink-only list (codebase analysis 2026-11-03, HA stage 1).
  *  - 2026-11-04: check:verb-parity, the writing verbs of one route path name the same guards or the difference is listed (codebase analysis 2026-11-03, B4).
  *  - 2026-11-01: check:it-adoption, every page of the IT adoption package was read against the code it describes, and the settings and tools it names exist.
@@ -137,6 +138,9 @@ export const FAST_CHECKS = [
     { script: 'check:shared-impl', label: 'MCP tools call what REST calls' },
     { script: 'check:surface-focus', label: 'The v2 surfaces are still projections' },
     { script: 'check:deps', label: 'No new import cycle or layer inversion' },
+    // Codebase analysis 2026-11-03, D-g: an index over the classification family made 54 cycles in
+    // October; check:deps sees such a cycle only after a module imports the index.
+    { script: 'check:family-index', label: 'A family index exports no file that reaches a module importing the family back' },
     { script: 'check:sse-parity', label: 'An agent writes, and the open page hears about it' },
     { script: 'check:imports-tracked', label: 'Every relative import points at a tracked file' },
     { script: 'check:package-scripts', label: 'Every package.json script points at a tracked file and an existing script' },
