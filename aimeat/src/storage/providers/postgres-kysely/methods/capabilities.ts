@@ -8,6 +8,8 @@
  *   cost/examples/tags JSON columns) are stored as JSONB, so the increment/trust mutators are
  *   read-modify-write on the JSON blob — identical semantics to the Prisma (Mongo/PG) implementation.
  * @version-history
+ *   2026-11-04 — getCapabilitiesBySourceRefs: many source refs in one read (codebase analysis
+ *     2026-11-03, item C7).
  *   v1.2.0 — 2026-10-13 — A stored `cost.morsels` reads as `cost.toll_morsels` (utils/toll-name.ts;
  *     decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.1.0 — 2026-09-09 — deleteCapabilityLogsBefore and setCapabilityTrust deleted: no caller.
@@ -152,6 +154,16 @@ export const capabilityMethods = {
   async getCapabilityBySourceRef(this: PostgresKyselyStorage, sourceRef: string): Promise<CapabilityRecord | null> {
     const r = await this.db.selectFrom('Capability').selectAll().where('sourceRef', '=', sourceRef).executeTakeFirst();
     return r ? toCapability(r) : null;
+  },
+
+  async getCapabilitiesBySourceRefs(this: PostgresKyselyStorage, sourceRefs: string[]): Promise<CapabilityRecord[]> {
+    // Chunked like getMemoryForOwners, so a node-wide scan stays well inside the bind limit.
+    const out: CapabilityRecord[] = [];
+    for (let i = 0; i < sourceRefs.length; i += 1000) {
+      const rows = await this.db.selectFrom('Capability').selectAll().where('sourceRef', 'in', sourceRefs.slice(i, i + 1000)).execute();
+      out.push(...rows.map(toCapability));
+    }
+    return out;
   },
 
   async listCapabilitiesBySourceType(this: PostgresKyselyStorage, sourceType: string): Promise<CapabilityRecord[]> {

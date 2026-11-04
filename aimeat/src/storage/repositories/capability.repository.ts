@@ -12,6 +12,8 @@
  *   - governance: setCapabilityOverride, add/remove/countCapabilityVouches
  *
  * @version-history
+ *   2026-11-04 — getCapabilitiesBySourceRefs: many source refs in one read, for the capability scan
+ *     (codebase analysis 2026-11-03, item C7).
  *   v1.2.0 — 2026-09-09 — deleteCapabilityLogsBefore and setCapabilityTrust deleted: no caller
  *     outside their own unit test (the vouch rows refresh the trust blob themselves).
  *   v1.1.0 — 2026-08-28 — Vouches become ROWS, not a counter. increment/decrementVouchCount only
@@ -32,6 +34,11 @@ export interface CapabilityRepository {
   listCapabilities(filters: CapabilityFilter): Promise<{ capabilities: CapabilityRecord[]; total: number }>;
   listCapabilitiesByOwner(ownerGhii: string): Promise<CapabilityRecord[]>;
   getCapabilityBySourceRef(sourceRef: string): Promise<CapabilityRecord | null>;
+  /**
+   * Every row whose source ref is one of `sourceRefs`, in one read (no order). A ref no row holds is
+   * absent. The capability scan reads its refs this way instead of one getCapabilityBySourceRef each.
+   */
+  getCapabilitiesBySourceRefs(sourceRefs: string[]): Promise<CapabilityRecord[]>;
   listCapabilitiesBySourceType(sourceType: string): Promise<CapabilityRecord[]>;
 
   incrementCapabilityStats(id: string, delta: {

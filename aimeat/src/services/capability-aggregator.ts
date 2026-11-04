@@ -5,6 +5,11 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.9.0 - 2026-11-04 - Each part of the scan reads the rows of its source refs in one query
+ *     (capabilityLookup over getCapabilitiesBySourceRefs) instead of one getCapabilityBySourceRef per
+ *     ref; after the scan writes a row, every later ref is read on its own as before. The app-tool and
+ *     offering parts read their manifests first, then the rows, then write (codebase analysis
+ *     2026-11-03, item C7).
  *   v1.8.2 - 2026-10-25 - A cortex capability's usage line takes its address from cortexLibPath, the
  *     two segments of a cortex named `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   v1.8.1 - 2026-10-24 - The cleanup step leaves a row whose operatorOverride.disabled is set as it
@@ -46,8 +51,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord, CortexLibComponent, CortexPromptComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { cortexLibPath } from './component-address.js';
-import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
-import { OffersDocSchema, normalizeOfferPacing, TOLL_MORSELS_MAX, type Offer } from '../models/offer-schemas.js';
+import { AppToolsDocSchema, type AppToolsDoc } from '../models/app-tool-schemas.js';
+import { OffersDocSchema, normalizeOfferPacing, TOLL_MORSELS_MAX, type Offer, type OffersDoc } from '../models/offer-schemas.js';
 
 /**
  * An app tool's pacing amount per use: `tollMorsels`, plus a 3.26.x `price.morsels`, which is pacing
@@ -93,7 +98,8 @@ function ownerGhiiOf(installedBy: string | null | undefined, nodeId: string): st
  * the scan had not reached. An auto-generated row's id IS its source ref, so the existing row's
  * ref is set back to it. Answers true when a row was created. Any other error propagates.
  */
-async function createOrAdopt(storage: Storage, cap: CapabilityRecord): Promise<boolean> {
+async function createOrAdopt(storage: Storage, cap: CapabilityRecord, lookup?: CapabilityLookup): Promise<boolean> {
+  lookup?.wrote();
   try {
     await storage.createCapability(cap);
     return true;
@@ -101,11 +107,50 @@ async function createOrAdopt(storage: Storage, cap: CapabilityRecord): Promise<b
     const existing = await storage.getCapability(cap.id);
     if (!existing) throw err;
     if (existing.source.ref !== cap.source.ref || existing.source.type !== cap.source.type) {
-      await storage.updateCapability(existing.id, { source: cap.source, updatedAt: cap.updatedAt });
+      await updateRow(storage, lookup, existing.id, { source: cap.source, updatedAt: cap.updatedAt });
     }
     return false;
   }
 }
+
+/** updateCapability for a row the scan found, telling the lookup that the scan wrote. */
+async function updateRow(storage: Storage, lookup: CapabilityLookup | undefined, id: string, updates: Partial<CapabilityRecord>): Promise<void> {
+  lookup?.wrote();
+  await storage.updateCapability(id, updates);
+}
+
+/** getCapabilityBySourceRef for the refs of one part of the scan, read in one query. */
+export interface CapabilityLookup {
+  get(ref: string): Promise<CapabilityRecord | null>;
+  /** The scan wrote a row: from now on every ref is read on its own again, as it is in the store. */
+  wrote(): void;
+}
+
+/**
+ * The rows of `refs` in one read (getCapabilitiesBySourceRefs), answering each `get` as
+ * getCapabilityBySourceRef would: the row holding the ref, or null. A ref not in `refs`, and every ref
+ * after the scan wrote a row (a create may adopt a row by its id and move its source ref), is read on
+ * its own, so a lookup never answers from a row the scan has changed. A run in which nothing changed,
+ * the usual one, costs one read per part instead of one per ref (codebase analysis 2026-11-03, C7).
+ */
+export async function capabilityLookup(storage: Storage, refs: string[]): Promise<CapabilityLookup> {
+  const asked = new Set(refs);
+  const known = new Map<string, CapabilityRecord>();
+  for (const row of asked.size ? await storage.getCapabilitiesBySourceRefs([...asked]) : []) {
+    if (!known.has(row.source.ref)) known.set(row.source.ref, row);
+  }
+  let fresh = true;
+  return {
+    async get(ref) {
+      if (fresh && asked.has(ref)) return known.get(ref) ?? null;
+      return storage.getCapabilityBySourceRef(ref);
+    },
+    wrote() { fresh = false; },
+  };
+}
+
+/** The source ref of one extension action's capability row. */
+const extensionRef = (extName: string, actionId: string): string => `ext:${extName}:${actionId}`;
 
 /** What the aggregator reads of one extension: its name, its actions' shapes and who installed it. */
 type AggregatedExtension = Awaited<ReturnType<Storage['listExtensions']>>[number];
@@ -122,15 +167,15 @@ type AggregatedExtension = Awaited<ReturnType<Storage['listExtensions']>>[number
  * CAPABILITY_NOT_FOUND until that clock came round.
  */
 export async function aggregateExtensionCapabilities(
-  config: AimeatConfig, storage: Storage, ext: AggregatedExtension, seenRefs?: Set<string>,
+  config: AimeatConfig, storage: Storage, ext: AggregatedExtension, seenRefs?: Set<string>, lookup?: CapabilityLookup,
 ): Promise<{ created: number; updated: number }> {
   let created = 0, updated = 0;
   if (ext.status !== 'active' || !ext.actions) return { created, updated };
   const now = new Date().toISOString();
   for (const action of ext.actions) {
-    const ref = `ext:${ext.name}:${action.id}`;
+    const ref = extensionRef(ext.name, action.id);
     seenRefs?.add(ref);
-    const existing = await storage.getCapabilityBySourceRef(ref);
+    const existing = lookup ? await lookup.get(ref) : await storage.getCapabilityBySourceRef(ref);
     const schemaHash = makeSchemaHash(action.inputSchema, action.outputSchema);
 
     if (!existing) {
@@ -153,10 +198,10 @@ export async function aggregateExtensionCapabilities(
         operatorOverride: null, stats: makeDefaultStats(),
         tags: [], createdAt: now, updatedAt: now,
       };
-      if (await createOrAdopt(storage, cap)) created++;
+      if (await createOrAdopt(storage, cap, lookup)) created++;
     } else if (existing.status === 'disabled') {
       // Re-enable: source is active again (extension was reinstalled)
-      await storage.updateCapability(existing.id, {
+      await updateRow(storage, lookup, existing.id, {
         status: 'active',
         source: { type: 'extension', ref, version: ext.version },
         inputSchema: action.inputSchema || null,
@@ -168,7 +213,7 @@ export async function aggregateExtensionCapabilities(
       || existing.ownerGhii !== ownerGhiiOf(ext.installedBy, config.nodeId)) {
       // The owner is repaired too: rows written before 2026-09-03 carry the bare installer name,
       // which no route's `ownerGhii === resolveIdentity(...)` check ever matched.
-      await storage.updateCapability(existing.id, {
+      await updateRow(storage, lookup, existing.id, {
         source: { type: 'extension', ref, version: ext.version },
         ownerGhii: ownerGhiiOf(ext.installedBy, config.nodeId),
         inputSchema: action.inputSchema || null,
@@ -221,8 +266,10 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   // (memory trace 2026-08-17).
   try {
     const extensions = await storage.listExtensions({ lean: true });
+    const lookup = await capabilityLookup(storage, extensions.flatMap(ext =>
+      (ext.status === 'active' && ext.actions ? ext.actions.map(a => extensionRef(ext.name, a.id)) : [])));
     for (const ext of extensions) {
-      const made = await aggregateExtensionCapabilities(config, storage, ext, seenRefs);
+      const made = await aggregateExtensionCapabilities(config, storage, ext, seenRefs, lookup);
       created += made.created;
       updated += made.updated;
     }
@@ -232,10 +279,12 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   // 2. Scan published actions (discovery only, callable: false)
   try {
     const actions = await storage.listActions();
+    const actionRef = (a: (typeof actions)[number]) => `action:${a.providerGaii}:${a.id}`;
+    const lookup = await capabilityLookup(storage, actions.map(actionRef));
     for (const action of actions) {
-      const ref = `action:${action.providerGaii}:${action.id}`;
+      const ref = actionRef(action);
       seenRefs.add(ref);
-      const existing = await storage.getCapabilityBySourceRef(ref);
+      const existing = await lookup.get(ref);
 
       if (!existing) {
         const schemaHash = makeSchemaHash(action.inputSchema, action.outputSchema);
@@ -261,11 +310,11 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           operatorOverride: null, stats: makeDefaultStats(),
           tags: action.tags || [], createdAt: now, updatedAt: now,
         };
-        if (await createOrAdopt(storage, cap)) created++;
+        if (await createOrAdopt(storage, cap, lookup)) created++;
       } else if (existing.status === 'disabled') {
         // Re-enable: the action is published again. Without this branch an action row stayed
         // disabled after one missed scan until the next one deleted it.
-        await storage.updateCapability(existing.id, { status: 'active', source: { type: 'action', ref, version: action.updatedAt }, updatedAt: now });
+        await updateRow(storage, lookup, existing.id, { status: 'active', source: { type: 'action', ref, version: action.updatedAt }, updatedAt: now });
         updated++;
       }
     }
@@ -277,10 +326,11 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   try {
     const cortexList = await storage.listCortexExtensions({ status: 'active', lean: true });
     logger.info(`Capability aggregator: found ${cortexList.length} active cortex modules`);
+    const lookup = await capabilityLookup(storage, cortexList.map(c => `cortex:${c.name}`));
     for (const cortex of cortexList) {
       const ref = `cortex:${cortex.name}`;
       seenRefs.add(ref);
-      const existing = await storage.getCapabilityBySourceRef(ref);
+      const existing = await lookup.get(ref);
 
       // Extract lib component exports and API surface from cortex manifest
       const components = cortex.components || [];
@@ -332,10 +382,10 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           operatorOverride: null, stats: makeDefaultStats(),
           tags: cortex.tags || [], createdAt: now, updatedAt: now,
         };
-        if (await createOrAdopt(storage, cap)) created++;
+        if (await createOrAdopt(storage, cap, lookup)) created++;
       } else if (existing.status === 'disabled') {
         // Re-enable: cortex is active again (was reinstalled)
-        await storage.updateCapability(existing.id, {
+        await updateRow(storage, lookup, existing.id, {
           status: 'active', callable: false,
           source: { type: 'cortex', ref, version: cortex.version },
           exports: libExports.length > 0 ? libExports.map(name => ({
@@ -356,7 +406,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         // changed, exports were missing, or the record still says callable from before cortexes
         // were marked browser-only — mirror the extension branch so a manifest enrichment actually
         // reaches GET /v1/capabilities.
-        await storage.updateCapability(existing.id, {
+        await updateRow(storage, lookup, existing.id, {
           callable: false,
           ownerGhii: ownerGhiiOf(cortex.installedBy, config.nodeId),
           source: { type: 'cortex', ref, version: cortex.version },
@@ -383,6 +433,8 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
     // One unreadable owner does not stop the other owners' tools from being refreshed, but it
     // makes the scan incomplete: the cleanup cannot tell that owner's tools from removed ones.
     let everyOwnerRead = true;
+    // Every owner's manifests first, then their rows in one read (capabilityLookup), then the writes.
+    const manifests: Array<{ ownerName: string; ownerGhii: string; appId: string; doc: AppToolsDoc }> = [];
     for (const owner of owners) {
       const ownerGhii = `${owner.name}@${config.nodeId}`;
       let records: Array<{ key: string; value: unknown }> = [];
@@ -394,42 +446,45 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         records = [];
       }
       for (const rec of records) {
-        const appId = rec.key.replace(/^apps\./, '').replace(/\.tools$/, '');
         const parsed = AppToolsDocSchema.safeParse(rec.value);
-        if (!parsed.success) continue;
-        for (const tool of parsed.data.tools) {
-          const ref = `app-tool:${owner.name}/${appId}:${tool.name}`;
-          seenRefs.add(ref);
-          const existing = await storage.getCapabilityBySourceRef(ref);
-          const schemaHash = makeSchemaHash(tool.inputSchema, tool.outputSchema);
-          const morsels = toolPacing(tool);
-          const version = String(parsed.data.version ?? parsed.data.updatedAt ?? '1');
-          const fields = {
-            name: `${appId}: ${tool.name}`,
-            summary: tool.description || '',
-            inputSchema: (tool.inputSchema as Record<string, unknown> | undefined) ?? null,
-            outputSchema: (tool.outputSchema as Record<string, unknown> | undefined) ?? null,
-            usage: `aimeat_app_tool_invoke { app_id: '${appId}', tool: '${tool.name}', input: {...} } under a contract for this app tool (aimeat_exchange_offerings → aimeat_exchange_accept), or the owner's own apps free of charge`,
-            cost: morsels ? { toll_morsels: morsels } : null,
-            schemaHash,
+        if (parsed.success) manifests.push({ ownerName: owner.name, ownerGhii, appId: rec.key.replace(/^apps\./, '').replace(/\.tools$/, ''), doc: parsed.data });
+      }
+    }
+    const appToolRef = (ownerName: string, appId: string, tool: string) => `app-tool:${ownerName}/${appId}:${tool}`;
+    const lookup = await capabilityLookup(storage, manifests.flatMap(m => m.doc.tools.map(t => appToolRef(m.ownerName, m.appId, t.name))));
+    for (const { ownerName, ownerGhii, appId, doc } of manifests) {
+      for (const tool of doc.tools) {
+        const ref = appToolRef(ownerName, appId, tool.name);
+        seenRefs.add(ref);
+        const existing = await lookup.get(ref);
+        const schemaHash = makeSchemaHash(tool.inputSchema, tool.outputSchema);
+        const morsels = toolPacing(tool);
+        const version = String(doc.version ?? doc.updatedAt ?? '1');
+        const fields = {
+          name: `${appId}: ${tool.name}`,
+          summary: tool.description || '',
+          inputSchema: (tool.inputSchema as Record<string, unknown> | undefined) ?? null,
+          outputSchema: (tool.outputSchema as Record<string, unknown> | undefined) ?? null,
+          usage: `aimeat_app_tool_invoke { app_id: '${appId}', tool: '${tool.name}', input: {...} } under a contract for this app tool (aimeat_exchange_offerings → aimeat_exchange_accept), or the owner's own apps free of charge`,
+          cost: morsels ? { toll_morsels: morsels } : null,
+          schemaHash,
+        };
+        if (!existing) {
+          const cap: CapabilityRecord = {
+            id: ref, ...fields,
+            ownerGhii, visibility: 'public', scope: 'local', status: 'active',
+            rejectionReason: null, deprecationMessage: null, replacedBy: null,
+            source: { type: 'app-tool', ref, version },
+            authRequired: 'registered', callable: false,
+            exports: null, whenToUse: '', whenNotToUse: '', examples: [], dependencies: [],
+            webhookUrl: null, trustRequired: null,
+            trust: makeDefaultTrust(), redactedFields: [], operatorOverride: null, stats: makeDefaultStats(),
+            tags: [], createdAt: now, updatedAt: now,
           };
-          if (!existing) {
-            const cap: CapabilityRecord = {
-              id: ref, ...fields,
-              ownerGhii, visibility: 'public', scope: 'local', status: 'active',
-              rejectionReason: null, deprecationMessage: null, replacedBy: null,
-              source: { type: 'app-tool', ref, version },
-              authRequired: 'registered', callable: false,
-              exports: null, whenToUse: '', whenNotToUse: '', examples: [], dependencies: [],
-              webhookUrl: null, trustRequired: null,
-              trust: makeDefaultTrust(), redactedFields: [], operatorOverride: null, stats: makeDefaultStats(),
-              tags: [], createdAt: now, updatedAt: now,
-            };
-            if (await createOrAdopt(storage, cap)) created++;
-          } else if (existing.status === 'disabled' || existing.schemaHash !== schemaHash || existing.summary !== fields.summary || existing.usage !== fields.usage || existing.source.version !== version) {
-            await storage.updateCapability(existing.id, { ...fields, status: 'active', source: { type: 'app-tool', ref, version }, updatedAt: now });
-            updated++;
-          }
+          if (await createOrAdopt(storage, cap, lookup)) created++;
+        } else if (existing.status === 'disabled' || existing.schemaHash !== schemaHash || existing.summary !== fields.summary || existing.usage !== fields.usage || existing.source.version !== version) {
+          await updateRow(storage, lookup, existing.id, { ...fields, status: 'active', source: { type: 'app-tool', ref, version }, updatedAt: now });
+          updated++;
         }
       }
     }
@@ -441,16 +496,23 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   // an EXCHANGE contract when the offer is listed), so the entry is not callable here.
   try {
     const agents = await storage.listAgents();
+    // Every agent's offers first, then their rows in one read (capabilityLookup), then the writes.
+    const offerDocs: Array<{ agent: (typeof agents)[number]; parsed: { data: OffersDoc } }> = [];
     for (const agent of agents) {
       const rec = await storage.getMemory(agent.gaii, `agents.${agent.name}.offers`);
       if (!rec) continue;
       const parsed = OffersDocSchema.safeParse(rec.value);
-      if (!parsed.success) continue;
+      if (parsed.success) offerDocs.push({ agent, parsed });
+    }
+    const offeringRef = (agent: (typeof agents)[number], offerId: string) => `offering:${agent.owner}/${agent.name}:${offerId}`;
+    const lookup = await capabilityLookup(storage, offerDocs.flatMap(({ agent, parsed }) =>
+      (parsed.data.offers as Offer[]).filter(o => o.visibility === 'public').map(o => offeringRef(agent, o.id))));
+    for (const { agent, parsed } of offerDocs) {
       for (const offer of parsed.data.offers as Offer[]) {
         if (offer.visibility !== 'public') continue;
-        const ref = `offering:${agent.owner}/${agent.name}:${offer.id}`;
+        const ref = offeringRef(agent, offer.id);
         seenRefs.add(ref);
-        const existing = await storage.getCapabilityBySourceRef(ref);
+        const existing = await lookup.get(ref);
         const schemaHash = makeSchemaHash(offer.inputSchema, offer.outputSchema);
         // The offer's pacing amount; an old `price.morsels` adds to it (normalizeOfferPacing).
         const morsels = normalizeOfferPacing(offer).tollMorsels ?? 0;
@@ -479,9 +541,9 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
             trust: makeDefaultTrust(), redactedFields: [], operatorOverride: null, stats: makeDefaultStats(),
             createdAt: now, updatedAt: now,
           };
-          if (await createOrAdopt(storage, cap)) created++;
+          if (await createOrAdopt(storage, cap, lookup)) created++;
         } else if (existing.status === 'disabled' || existing.schemaHash !== schemaHash || existing.summary !== fields.summary || existing.usage !== fields.usage || existing.source.version !== version) {
-          await storage.updateCapability(existing.id, { ...fields, status: 'active', source: { type: 'offering', ref, version }, updatedAt: now });
+          await updateRow(storage, lookup, existing.id, { ...fields, status: 'active', source: { type: 'offering', ref, version }, updatedAt: now });
           updated++;
         }
       }

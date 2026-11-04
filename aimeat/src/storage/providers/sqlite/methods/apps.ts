@@ -40,6 +40,8 @@
  *     carry it, and setAppAccess sets it on every version row.
  *   2026-11-04 — listAppVersionSummaries: the version list without the content; GET .../versions
  *     read every version's payload through listAppVersions (codebase analysis 2026-11-03, item A1).
+ *   2026-11-04 — findOperatorHiddenApps: which of the named apps the operator hid, without the payload
+ *     (codebase analysis 2026-11-03, item C7).
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
@@ -121,6 +123,22 @@ export const appMethods = {
       'SELECT versionNumber, size, createdAt FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC'
     ).all(ownerGaii, filename) as { versionNumber: number; size: number; createdAt: string }[];
     return rows.map(r => ({ versionNumber: r.versionNumber, size: Number(r.size), createdAt: String(r.createdAt) }));
+  },
+
+  async findOperatorHiddenApps(this: SqliteStorage, apps: Array<{ ownerName: string; filename: string }>): Promise<Array<{ ownerName: string; filename: string }>> {
+    // getAppByOwnerName's row is the highest versionNumber of (ownerName, filename); the app is hidden
+    // when that row says so. Names and flags only, never the payload (codebase analysis 2026-11-03, C7).
+    const out: Array<{ ownerName: string; filename: string }> = [];
+    for (let i = 0; i < apps.length; i += 200) {
+      const chunk = apps.slice(i, i + 200);
+      const rows = this.db.prepare(
+        `SELECT DISTINCT a.ownerName, a.filename FROM apps a WHERE a.operatorHidden = 1
+           AND (${chunk.map(() => '(a.ownerName = ? AND a.filename = ?)').join(' OR ')})
+           AND a.versionNumber = (SELECT MAX(b.versionNumber) FROM apps b WHERE b.ownerName = a.ownerName AND b.filename = a.filename)`
+      ).all(...chunk.flatMap(a => [a.ownerName, a.filename])) as { ownerName: string; filename: string }[];
+      out.push(...rows.map(r => ({ ownerName: String(r.ownerName), filename: String(r.filename) })));
+    }
+    return out;
   },
 
   async listAppVersionSummaries(this: SqliteStorage, ownerGaii: string, filename: string): Promise<AppVersionSummary[]> {

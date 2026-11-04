@@ -8,6 +8,8 @@
  * @structure capabilityMethods
  * @usage Object.assign(SqliteStorage.prototype, capabilityMethods) in ../index.ts
  * @version-history
+ *   2026-11-04 — getCapabilitiesBySourceRefs: many source refs in one read (codebase analysis
+ *     2026-11-03, item C7).
  *   v1.0.0 — 2026-10-05 — 16 methods (deserializeCapability, createCapability, getCapability, …) moved here
  *     from capability-agents.ts so the file mirrors postgres-kysely/methods/capabilities.ts (secaudit
  *     2026-10, M8).
@@ -188,6 +190,17 @@ export const capabilityMethods = {
   async getCapabilityBySourceRef(this: SqliteStorage, sourceRef: string): Promise<CapabilityRecord | null> {
     const row = this.db.prepare('SELECT * FROM capabilities WHERE sourceRef = ?').get(sourceRef) as Record<string, unknown> | undefined;
     return row ? this.deserializeCapability(row) : null;
+  },
+
+  async getCapabilitiesBySourceRefs(this: SqliteStorage, sourceRefs: string[]): Promise<CapabilityRecord[]> {
+    // Chunked well inside SQLite's bound-parameter limit.
+    const out: CapabilityRecord[] = [];
+    for (let i = 0; i < sourceRefs.length; i += 500) {
+      const chunk = sourceRefs.slice(i, i + 500);
+      const rows = this.db.prepare(`SELECT * FROM capabilities WHERE sourceRef IN (${chunk.map(() => '?').join(', ')})`).all(...chunk) as Record<string, unknown>[];
+      out.push(...rows.map(r => this.deserializeCapability(r)));
+    }
+    return out;
   },
 
   async listCapabilitiesBySourceType(this: SqliteStorage, sourceType: string): Promise<CapabilityRecord[]> {
