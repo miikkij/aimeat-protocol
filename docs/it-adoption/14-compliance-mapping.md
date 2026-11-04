@@ -1,6 +1,6 @@
 # 14 Compliance mapping
 
-> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 4dfad71bd) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the DPO, the compliance officer and the auditor. It maps GDPR, the EU AI Act, ISO/IEC 27001:2022 Annex A and NIS2 Article 21 to what the AIMEAT node does, and says what stays with the organisation. AIMEAT is not certified, and the repository holds no external audit or attestation. "Yes" below means the node has the mechanism; it never means the organisation is compliant by running it. The node's own compliance features say the same: every risk or framework verdict is served with a not-legal-advice note (`aimeat/src/data/compliance-questionnaire.ts`).
 
