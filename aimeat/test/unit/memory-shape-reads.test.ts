@@ -31,9 +31,11 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { listOwnerNotificationRecords, readNotificationInbox, findOwnerNotificationsByIds } from '../../src/services/notification-sweeps.js';
 import { NOTIF_PREFIX } from '../../src/services/notify.js';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 
 const SQLITE_PATH = `./test/.memory-shape-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
+requirePostgresWhenAsked('memory-shape-reads');
 
 interface Provider { name: string; storage: Storage }
 const provs: Provider[] = [];

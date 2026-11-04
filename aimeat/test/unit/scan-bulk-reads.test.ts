@@ -24,9 +24,11 @@ import type { Storage, CapabilityRecord, MemoryRecord } from '../../src/storage/
 import type { AimeatConfig } from '../../src/config.js';
 import { capabilityLookup } from '../../src/services/capability-aggregator.js';
 import { listPublicAppTools } from '../../src/commerce/app-tool-catalog.js';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 
 const SQLITE_PATH = `./test/.scan-bulk-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
+requirePostgresWhenAsked('scan-bulk-reads');
 
 interface Provider { name: string; storage: Storage }
 const provs: Provider[] = [];
