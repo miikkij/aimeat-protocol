@@ -14,11 +14,22 @@
  *   not run it: it records it with `superseded_by` in the same transaction that applies the new one.
  *   A database that applied the old file keeps what it did, and the new file brings it to the same
  *   end state.
+ *
+ *   THE BOOT LOCK IS TRANSACTION-SCOPED. It is `pg_advisory_xact_lock`, held by an open transaction,
+ *   never a session lock: a connection pooler in transaction mode (PgBouncer) gives a session's next
+ *   statement to another server connection, so a session lock taken through it is held by whoever
+ *   uses that server connection next and is never given back. A transaction keeps its one server
+ *   connection until it ends, through a pooler too. `pnpm check:pooler-safe` refuses a session
+ *   advisory lock anywhere in src/.
  * @structure
  *   - SUPERSEDED: old file → the file that replaces it
  *   - runMigrations(pool): apply every file not applied yet, in lexical order
  *   - takeBootLock(pool) / runMigrationsLocked(pool): the boot lock two booting processes share
  * @version-history
+ *   v1.4.0 — 2026-11-04 — The boot lock is transaction-scoped (pg_advisory_xact_lock): the seeding
+ *     holds it in a transaction left open on its connection, and each migration file takes it in its
+ *     own transaction and reads the ledger again under it. A session lock does not survive a
+ *     connection pooler in transaction mode (codebase analysis 2026-11-03, item HA stage 3).
  *   v1.3.1 — 2026-11-04 — The migrations run on the connection that holds the boot lock, so a pool of
  *     one connection boots (storage-fault-injection E6-07 waited for a second connection and failed).
  *   v1.3.0 — 2026-11-04 — The boot lock (pg_advisory_lock on a connection of its own) around the
@@ -53,14 +64,53 @@ export const SUPERSEDED: Readonly<Record<string, string>> = {
 const RECORD_SUPERSEDED = 'INSERT INTO "_kysely_migrations"(name, superseded_by) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING';
 
 /**
- * The key of the boot lock: a PostgreSQL session advisory lock that one process of a node holds
- * while it migrates, and again while it seeds at boot (server-bootstrap/service-init.ts). Advisory
- * locks belong to one database, so nodes on other databases of the same server never meet it.
+ * The key of the boot lock: a PostgreSQL transaction-scoped advisory lock that one process of a node
+ * holds while it applies a migration file, and while it seeds at boot (server-bootstrap/service-init.ts).
+ * Advisory locks belong to one database, so nodes on other databases of the same server never meet it.
  */
 export const BOOT_LOCK_KEY = 4_142_202_611;
 
 /** How long a booting process waits for another to give the boot lock back before it goes on without it. */
 export const BOOT_LOCK_WAIT_MS = 60_000;
+
+/** query_canceled (statement_timeout) and lock_not_available (lock_timeout): a bounded lock wait ran out. */
+const WAIT_RAN_OUT = new Set(['57014', '55P03']);
+
+/** A lock wait's bound in whole milliseconds, never 0 (0 means no limit to PostgreSQL). */
+const waitBound = (waitMs: number): number => Math.max(1, Math.floor(waitMs));
+
+/**
+ * In the open transaction on `client`: wait for the boot lock at most `waitMs`. True when it is held
+ * now, until the transaction ends; false when the wait ran out, and then the transaction is aborted
+ * and the caller rolls it back. Both statement_timeout and lock_timeout end a lock wait, so both are
+ * set to the bound for this one statement (LOCAL: they end with the transaction).
+ */
+async function lockInTransaction(client: pg.PoolClient, waitMs: number): Promise<boolean> {
+  const bound = waitBound(waitMs);
+  await client.query(`SET LOCAL statement_timeout = ${bound}`);
+  await client.query(`SET LOCAL lock_timeout = ${bound}`);
+  try {
+    await client.query('SELECT pg_advisory_xact_lock($1)', [BOOT_LOCK_KEY]);
+    return true;
+  } catch (err) {
+    if (WAIT_RAN_OUT.has((err as { code?: string }).code ?? '')) return false;
+    throw err;
+  }
+}
+
+/**
+ * ROLLBACK just before the caller throws its own error. That error is the one that matters: a
+ * ROLLBACK that also fails adds nothing an operator can act on, and reporting it would replace the
+ * real cause.
+ */
+async function rollbackBeforeThrow(client: pg.PoolClient): Promise<void> {
+  // eslint-disable-next-line aimeat/no-silent-catch -- the caller throws the real error right after this
+  await client.query('ROLLBACK').catch(() => { /* already broken */ });
+}
+
+function warnWaitRanOut(waitMs: number): void {
+  logger.warn(`boot lock: another process held it for over ${Math.round(waitMs / 1000)} s; going on without it`);
+}
 
 /**
  * Take the boot lock on a connection of its own, waiting as long as another process holds it, and
@@ -68,84 +118,114 @@ export const BOOT_LOCK_WAIT_MS = 60_000;
  * after the other instead of at once: without it both read the applied set, both ran the next file,
  * and the second failed on the first's primary key and did not boot until it was restarted.
  *
- * The wait is bounded by `waitMs`. A holder whose host died keeps its session, and the lock, until
+ * The lock is held by a transaction this function opens and leaves open until the release, which
+ * ends it (nothing is written in it). The transaction lifts the pool's idle-in-transaction limit for
+ * itself, so a long seeding keeps the lock, as the session lock before it was kept.
+ *
+ * The wait is bounded by `waitMs`. A holder whose host died keeps its transaction, and the lock, until
  * the database notices the dead connection, which can take hours; so after the wait the process goes
  * on without the lock, as every process did before the lock existed (a clash then fails one boot,
- * and the process manager starts it again). The connection's own statement limit is back once the
- * lock is held. A lock whose release fails goes with its connection, which is destroyed, and a
- * process that ends releases it the same way.
+ * and the process manager starts it again). A lock whose release fails goes with its connection,
+ * which is destroyed, and a process that ends releases it the same way.
  */
 export async function takeBootLock(pool: pg.Pool, waitMs = BOOT_LOCK_WAIT_MS): Promise<() => Promise<void>> {
-  return (await holdBootLock(pool, waitMs)).release;
-}
-
-/** takeBootLock, also answering the connection that holds the lock (null when the wait ran out). */
-async function holdBootLock(pool: pg.Pool, waitMs: number): Promise<{ client: pg.PoolClient | null; release: () => Promise<void> }> {
   const client = await pool.connect();
+  let held: boolean;
   try {
-    await client.query(`SET statement_timeout = ${Math.max(1, Math.floor(waitMs))}`);
-    await client.query('SELECT pg_advisory_lock($1)', [BOOT_LOCK_KEY]);
-    await client.query('RESET statement_timeout');
+    await client.query('BEGIN');
+    held = await lockInTransaction(client, waitMs);
+    if (held) await client.query('SET LOCAL idle_in_transaction_session_timeout = 0');
   } catch (err) {
-    if ((err as { code?: string }).code === '57014') {
-      // query_canceled: the wait ran out. The connection is sound; it goes back without the lock.
-      await client.query('RESET statement_timeout').then(() => client.release(), (e: Error) => client.release(e));
-      logger.warn(`boot lock: another process held it for over ${Math.round(waitMs / 1000)} s; going on without it`);
-      return { client: null, release: async () => { /* nothing was taken */ } };
-    }
+    await rollbackBeforeThrow(client);
     client.release(err as Error);
     throw err;
   }
+  if (!held) {
+    // The wait ran out. The connection is sound; it goes back without the lock.
+    await client.query('ROLLBACK').then(() => client.release(), (e: Error) => client.release(e));
+    warnWaitRanOut(waitMs);
+    return async () => { /* nothing was taken */ };
+  }
   let released = false;
-  return {
-    client,
-    release: async () => {
-      if (released) return;
-      released = true;
-      try {
-        await client.query('SELECT pg_advisory_unlock($1)', [BOOT_LOCK_KEY]);
-        client.release();
-      } catch (err) {
-        // Destroying the connection ends its session, and the lock with it.
-        client.release(err as Error);
-      }
-    },
+  return async () => {
+    if (released) return;
+    released = true;
+    try {
+      await client.query('COMMIT');
+      client.release();
+    } catch (err) {
+      // Destroying the connection ends its transaction, and the lock with it.
+      client.release(err as Error);
+    }
   };
 }
 
 /**
  * runMigrations under the boot lock, so a second process booting at the same time waits for this one.
- * The migrations run on the connection that holds the lock: a pool of one connection (a small
- * personal node, the E6-07 pool test) has no second connection to give them, and the boot waited for
- * one until the pool's connection limit refused it.
+ * Each step takes the lock in its own transaction: the ledger table's creation, then every file not
+ * applied yet, which is read in the ledger again once the lock is held, so a file another process
+ * applied meanwhile is passed over. One connection at a time: a pool of one connection (a small
+ * personal node, the E6-07 pool test) has no second one to give.
  */
 export async function runMigrationsLocked(pool: pg.Pool): Promise<void> {
-  const { client, release } = await holdBootLock(pool, BOOT_LOCK_WAIT_MS);
-  try {
-    if (!client) { await runMigrations(pool); return; }
-    // The lock's connection serves every file's transaction in turn; it goes back to the pool with the lock.
-    const held = { query: client.query.bind(client), release: () => { /* kept until the lock goes */ } } as unknown as pg.PoolClient;
-    await migrateOn(client, async () => held);
-  } finally {
-    await release();
-  }
+  await migrateOn(pool, BOOT_LOCK_WAIT_MS);
 }
 
 /** Apply every not-yet-applied migration file in lexical order, each in its own transaction. */
 export async function runMigrations(pool: pg.Pool): Promise<void> {
-  await migrateOn(pool, () => pool.connect());
+  await migrateOn(pool, null);
 }
 
-async function migrateOn(pool: Pick<pg.Pool, 'query'>, takeClient: () => Promise<pg.PoolClient>): Promise<void> {
-  await pool.query('CREATE TABLE IF NOT EXISTS "_kysely_migrations" (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  // Set on a file that never ran, to the file that replaced it. ALTER TABLE takes its ACCESS EXCLUSIVE
-  // lock before IF NOT EXISTS is checked, so it waits behind any reader of the table (the nightly
-  // pg_dump holds one for minutes) and the boot dies on the pool's lock_timeout. It runs only when
-  // the column is missing.
-  const hasSupersededBy = await pool.query(
-    "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = '_kysely_migrations' AND column_name = 'superseded_by'",
-  );
-  if (hasSupersededBy.rowCount === 0) await pool.query('ALTER TABLE "_kysely_migrations" ADD COLUMN IF NOT EXISTS superseded_by text');
+/**
+ * One transaction on its own connection, under the boot lock when `lock` holds a wait bound. Answers
+ * 'wait-ran-out' when the lock was not had in time; nothing of `fn` ran then.
+ */
+async function lockedTransaction(pool: pg.Pool, lock: number | null, fn: (client: pg.PoolClient) => Promise<void>): Promise<'done' | 'wait-ran-out'> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (lock !== null && !await lockInTransaction(client, lock)) {
+      await client.query('ROLLBACK');
+      return 'wait-ran-out';
+    }
+    await fn(client);
+    await client.query('COMMIT');
+    return 'done';
+  } catch (err) {
+    await rollbackBeforeThrow(client);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** `lockedTransaction`, and without the lock from then on when the wait ran out (the caller's `state.lock` turns null). */
+async function stepUnderBootLock(pool: pg.Pool, state: { lock: number | null }, fn: (client: pg.PoolClient) => Promise<void>): Promise<void> {
+  if (await lockedTransaction(pool, state.lock, fn) === 'done') return;
+  warnWaitRanOut(state.lock ?? 0);
+  state.lock = null;
+  await lockedTransaction(pool, null, fn);
+}
+
+async function migrateOn(pool: pg.Pool, lockWaitMs: number | null): Promise<void> {
+  const state = { lock: lockWaitMs };
+  await stepUnderBootLock(pool, state, async (client) => {
+    // Under the lock: two processes creating the ledger table at once collide in the catalog. The
+    // lock's own wait bound is put back to the pool's limits for these statements.
+    if (state.lock !== null) {
+      await client.query('SET LOCAL statement_timeout = DEFAULT');
+      await client.query('SET LOCAL lock_timeout = DEFAULT');
+    }
+    await client.query('CREATE TABLE IF NOT EXISTS "_kysely_migrations" (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
+    // Set on a file that never ran, to the file that replaced it. ALTER TABLE takes its ACCESS EXCLUSIVE
+    // lock before IF NOT EXISTS is checked, so it waits behind any reader of the table (the nightly
+    // pg_dump holds one for minutes) and the boot dies on the pool's lock_timeout. It runs only when
+    // the column is missing.
+    const hasSupersededBy = await client.query(
+      "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = '_kysely_migrations' AND column_name = 'superseded_by'",
+    );
+    if (hasSupersededBy.rowCount === 0) await client.query('ALTER TABLE "_kysely_migrations" ADD COLUMN IF NOT EXISTS superseded_by text');
+  });
   const applied = new Set((await pool.query<{ name: string }>('SELECT name FROM "_kysely_migrations"')).rows.map(r => r.name));
   const files = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort();
   for (const file of files) {
@@ -158,29 +238,24 @@ async function migrateOn(pool: Pick<pg.Pool, 'query'>, takeClient: () => Promise
       continue;
     }
     const ddl = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
-    const client = await takeClient();
     try {
-      await client.query('BEGIN');
-      // The pool's statement and lock limits end a stalled request (pool-limits.ts). A migration
-      // that rewrites a large table is not stalled, and a node that cannot finish one does not boot,
-      // so this transaction lifts both limits for itself (LOCAL ends with the transaction).
-      await client.query('SET LOCAL statement_timeout = 0');
-      await client.query('SET LOCAL lock_timeout = 0');
-      await client.query(ddl);
-      await client.query('INSERT INTO "_kysely_migrations"(name) VALUES ($1)', [file]);
-      for (const [old, by] of Object.entries(SUPERSEDED)) {
-        if (by === file && !applied.has(old)) await client.query(RECORD_SUPERSEDED, [old, file]);
-      }
-      await client.query('COMMIT');
+      await stepUnderBootLock(pool, state, async (client) => {
+        // Another process that held the lock before this one may have applied the file meanwhile.
+        if (state.lock !== null && (await client.query('SELECT 1 FROM "_kysely_migrations" WHERE name = $1', [file])).rowCount) return;
+        // The pool's statement and lock limits end a stalled request (pool-limits.ts). A migration
+        // that rewrites a large table is not stalled, and a node that cannot finish one does not boot,
+        // so this transaction lifts both limits for itself (LOCAL ends with the transaction).
+        await client.query('SET LOCAL statement_timeout = 0');
+        await client.query('SET LOCAL lock_timeout = 0');
+        await client.query(ddl);
+        await client.query('INSERT INTO "_kysely_migrations"(name) VALUES ($1)', [file]);
+        for (const [old, by] of Object.entries(SUPERSEDED)) {
+          if (by === file && !applied.has(old)) await client.query(RECORD_SUPERSEDED, [old, file]);
+        }
+      });
       applied.add(file);
     } catch (err) {
-      // The migration error thrown on the next line is the one that matters. A ROLLBACK that also
-      // fails adds nothing an operator can act on, and reporting it would replace the real cause.
-      // eslint-disable-next-line aimeat/no-silent-catch -- the real error is thrown immediately below
-      await client.query('ROLLBACK').catch(() => { /* already broken */ });
       throw new Error(`migration ${file} failed: ${(err as Error).message}`, { cause: err });
-    } finally {
-      client.release();
     }
   }
 }
