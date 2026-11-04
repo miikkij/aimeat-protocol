@@ -29,6 +29,8 @@
  *   const state = await readCrewState(storage, agent);
  *   const out = await publishCrewDef({ storage, config }, caller, agent, doc);
  * @version-history
+ *   2026-11-04 — No per-key getMemory for a storage without getMemoryByKeys: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-19 — publishCrewDef claims its revision by creating the history copy (expectedVersion 0)
  *     and writes the live key on the version it read, so two publishes at once take two revisions
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -40,7 +42,7 @@
  *   v1.0.0 — 2026-08-28 — Initial (JSON-agent Crew tab, node side).
  */
 import type { AimeatConfig } from '../config.js';
-import type { MemoryRecord, Storage, AgentRecord } from '../storage/interface.js';
+import type { Storage, AgentRecord } from '../storage/interface.js';
 import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
 import { listVersionRefs, versionNumberOf } from './workspace-versions.js';
 import { emitChange, emitDelivery } from './event-bus.js';
@@ -194,11 +196,7 @@ export async function readCrewState(storage: Storage, agent: AgentRecord): Promi
   const own = refs.filter(r => r.ownerGaii === agent.gaii).sort((a, b) => b.n - a.n);
   // publishedAt per revision needs the values; the window is at most 10 rows, so one batched read.
   const versionKeys = own.map(r => r.key);
-  const rows = versionKeys.length
-    ? (storage.getMemoryByKeys
-        ? await storage.getMemoryByKeys(agent.gaii, versionKeys)
-        : (await Promise.all(versionKeys.map(k => storage.getMemory(agent.gaii, k)))).filter((r): r is MemoryRecord => !!r))
-    : [];
+  const rows = versionKeys.length ? await storage.getMemoryByKeys(agent.gaii, versionKeys) : [];
   const publishedAtByKey = new Map(rows.map(r => [r.key, unwrapEnvelope(r.value, agent.name)?.publishedAt || null]));
   const draftObj = asObject(draftRec?.value);
   const draftDoc = draftObj ? asObject(draftObj.doc) : null;

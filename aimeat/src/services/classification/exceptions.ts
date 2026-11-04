@@ -48,6 +48,8 @@
  *   await recordAutoException(deps, { by, byKind: 'app', app, scope, target, label, action: 'lower', reason });
  *   const active = await activeExceptionsFor(deps, scope, targets);
  * @version-history
+ *   2026-11-04 — No per-key fallback for a storage without bulkDeleteMemory: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-18 — Action 'audience': the owner, in person, lets one item be shown wider than
  *     its label's audience cap, with a reason (plan doc-mvdipuyqraas, L3.3; audience-cap.ts reads it).
  *   v1.1.0 — 2026-09-30 — activeExceptionsFor() reads every month with no cap (past 1000 in force the
@@ -389,10 +391,7 @@ async function deleteRecords(storage: Storage, nodeId: string, keys: string[]): 
   if (!keys.length) return 0;
   const owner = `system@${nodeId}`;
   // For good, not to the bin: an erased person's exceptions must not come back with a restore.
-  if (storage.bulkDeleteMemory) return storage.bulkDeleteMemory(keys.map(key => ({ ownerGaii: owner, key })));
-  let n = 0;
-  for (const key of keys) if (await storage.deleteMemory(owner, key)) n++;
-  return n;
+  return storage.bulkDeleteMemory(keys.map(key => ({ ownerGaii: owner, key })));
 }
 
 /**

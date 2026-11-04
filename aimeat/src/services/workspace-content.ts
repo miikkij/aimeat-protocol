@@ -21,6 +21,8 @@
  *   const got = await loadWorkspaceContent({ storage, config }, reader, { sub, ownerName, accessorGaii }, { organismId, ws });
  *   if (!got.ok) return refuse(got.status, got.code, got.message);
  * @version-history
+ *   2026-11-04 — No per-key getMemory for a storage without getMemoryByKeys: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-11-04 — `truncated`: the workspace holds more rows than one read loads (5 000), which
  *     the read used to leave out with nothing to say so. `valuesOnDemand`: the rows without their
  *     values, decided and passed through the reader the same way, and `hydrate` reads the values a
@@ -178,9 +180,7 @@ async function hydrateRows(storage: Storage, rows: MemoryRecord[]): Promise<Memo
   }
   const full = new Map<string, MemoryRecord>();
   for (const [owner, keys] of keysByOwner) {
-    const got = storage.getMemoryByKeys
-      ? await storage.getMemoryByKeys(owner, [...keys])
-      : (await Promise.all([...keys].map(k => storage.getMemory(owner, k)))).filter((r): r is MemoryRecord => !!r);
+    const got = await storage.getMemoryByKeys(owner, [...keys]);
     for (const r of got) full.set(`${r.ownerGaii}\u0000${r.key}`, r);
   }
   return rows.flatMap(r => {

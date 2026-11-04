@@ -16,6 +16,8 @@
  * @structure SharedKnowledgeManifest · sharedKnowledgeManifests · sharedKnowledgeFor
  * @usage const rows = await sharedKnowledgeFor({ storage, config }, req.auth, ownerName);
  * @version-history
+ *   2026-11-04 — No empty answer for a storage without getMemoryByKeysAnyOwner: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The cached manifests carry MEMORY_ANY_LEVEL_TAG (codebase analysis 2026-11-03, item C4).
  *   v1.0.0 — 2026-11-02 — Initial (WP11).
  */
@@ -47,7 +49,6 @@ export async function sharedKnowledgeManifests(storage: Storage): Promise<Shared
         }
         const list = [...keys];
         const out: SharedKnowledgeManifest[] = [];
-        if (!storage.getMemoryByKeysAnyOwner) return out;
         for (let i = 0; i < list.length; i += READ_CHUNK) {
             for (const rec of await storage.getMemoryByKeysAnyOwner(list.slice(i, i + READ_CHUNK))) {
                 if (rec.visibility === 'public' || (rec.value as { type?: unknown } | null)?.type !== 'knowledge-package') continue;

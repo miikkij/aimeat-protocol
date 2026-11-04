@@ -30,6 +30,8 @@
  *   nextChangeRunAt · triggersOf · ChangeTrigger
  * @usage installDataproductChangeRuns({ storage, config }, (ownerGhii, name) => runDataproductOnChange(storage, config, ownerGhii, name));
  * @version-history
+ *   2026-11-04 — listMemoryKeysByPrefix called without a presence check: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-11-01 — Initial (WP9c, plan doc-mvwxcas3dom3 D9.5).
  */
 import type { SourceDeps } from './source-common.js';
@@ -169,7 +171,7 @@ function onFile(state: NodeState, ownerGaii: string, key: string): void {
 
 /** Read every definition that runs on a change, across the accounts of this node. */
 async function loadIndex(deps: SourceDeps, state: NodeState): Promise<void> {
-    const keys = (await deps.storage.listMemoryKeysByPrefix?.(DATAPRODUCT_KEY_PREFIX)) ?? [];
+    const keys = await deps.storage.listMemoryKeysByPrefix(DATAPRODUCT_KEY_PREFIX);
     for (const { ownerGaii, key } of keys) {
         if (!key.startsWith(DATAPRODUCT_KEY_PREFIX) || ownerGaii !== ownerGhiiOf(ownerGaii) || nodeOf(ownerGaii) !== state.nodeId) continue;
         const def = asDefinition((await deps.storage.getMemory(ownerGaii, key))?.value);

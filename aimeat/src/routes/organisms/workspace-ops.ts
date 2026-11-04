@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — No per-key delete loop for a storage without deleteMemoryByPrefix: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.25.0 -- 2026-10-27 -- POST /v1/organisms/:id/workspaces checks its body with validateBody
  *     (models/write-body-schemas.ts): a too-long or junk name is a 400 naming the field.
  *   v1.24.1 -- 2026-10-24 -- GET …/workspace/records asks canReadWorkspaceRecords instead of the
@@ -675,14 +677,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const prefix = ws ? `organism.${id}.w.${ws}.` : `organism.${id}.`;
     // Data-access redesign (Phase 2): wipe the container in ONE statement (all rows under the prefix,
     // active AND archived) instead of a per-key deleteMemory loop over thousands of rows.
-    let memoryKeys: number;
-    if (storage.deleteMemoryByPrefix) {
-      memoryKeys = await storage.deleteMemoryByPrefix(prefix);
-    } else {
-      const { items } = await storage.listAllMemory({ prefix, limit: 100000, archived: 'include' });
-      memoryKeys = 0;
-      for (const r of items) { if (await storage.deleteMemory(r.ownerGaii, r.key)) memoryKeys++; }
-    }
+    const memoryKeys = await storage.deleteMemoryByPrefix(prefix);
     let schemas = 0;
     for (const s of await storage.listSchemas(prefix)) { if (await storage.deleteSchema(s.keyPattern)) schemas++; }
     res.json(success(config.nodeId, { deleted: true, memoryKeys, schemas }));

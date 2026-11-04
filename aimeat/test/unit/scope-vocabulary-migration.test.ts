@@ -21,6 +21,7 @@ import {
     CONDITIONAL_SCOPES, VOCABULARY_NAMED_AT, AGENT_VOCABULARY_MIGRATION_KEY,
 } from '../../src/services/scope-vocabulary-migration.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { sameScopeList } from '../../src/storage/scope-list.js';
 
 /** Just enough Storage for the migration: list the agents, record what it writes back. */
 function stubStorage(agents: Array<{ gaii: string; defaultScopes?: string[] }>) {
@@ -30,6 +31,14 @@ function stubStorage(agents: Array<{ gaii: string; defaultScopes?: string[] }>) 
         updateAgent: async (gaii: string, patch: { defaultScopes?: string[] }) => {
             if (patch.defaultScopes) written.set(gaii, patch.defaultScopes);
             return undefined;
+        },
+        // The conditional scope write every Storage has (required since 2026-11-04): written only
+        // when the stored list still equals the one the caller read.
+        setAgentScopesIf: async (gaii: string, expected: readonly string[], next: string[]) => {
+            const held = written.get(gaii) ?? agents.find(a => a.gaii === gaii)?.defaultScopes;
+            if (!sameScopeList(held, expected)) return false;
+            written.set(gaii, next);
+            return true;
         },
     } as unknown as Storage;
     return { storage, written };
@@ -123,6 +132,20 @@ describe('migrateScopeVocabulary', () => {
             listAppGrants: async () => [],
             getMemory: async (owner: string, key: string) => memory.get(`${owner}|${key}`) ?? null,
             setMemory: async (rec: { ownerGaii: string; key: string }) => { memory.set(`${rec.ownerGaii}|${rec.key}`, rec); },
+            // The conditional writes every Storage has (required since 2026-11-04).
+            setAgentScopesIf: async (_gaii: string, expected: readonly string[], next: string[]) => {
+                if (!sameScopeList(agent.defaultScopes, expected)) return false;
+                agent.defaultScopes = next;
+                return true;
+            },
+            createMemoryIfAbsent: async (rec: { ownerGaii: string; key: string }) => {
+                if (memory.has(`${rec.ownerGaii}|${rec.key}`)) return null;
+                memory.set(`${rec.ownerGaii}|${rec.key}`, rec); return rec;
+            },
+            setMemoryIfVersion: async (rec: { ownerGaii: string; key: string }, v: number) => {
+                if ((memory.get(`${rec.ownerGaii}|${rec.key}`) as { version?: number } | undefined)?.version !== v) return null;
+                memory.set(`${rec.ownerGaii}|${rec.key}`, rec); return rec;
+            },
         } as unknown as Storage;
 
         const first = await migrateScopeVocabulary(storage, 'node');

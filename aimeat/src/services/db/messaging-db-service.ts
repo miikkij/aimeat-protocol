@@ -13,6 +13,8 @@
  * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName, { agentThreads }) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   2026-11-04 — No per-owner loop for a storage without listConversationsForOwners: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.7.0 — 2026-10-21 — Group chat. The group memberships are read once (groupsOf) for the whole list.
  *     A group row is not hidden because its last writer is a pending contact, and a group the reader is
  *     in without any message of it in their mailbox gets an empty row (withEmptyGroupRows), so a person
@@ -273,16 +275,9 @@ export class MessagingDbService {
     return byId;
   }
 
-  /** ONE batched read of every mailbox's conversations (fan-out→IN); falls back to a per-owner
-   *  listConversations loop when the backend lacks the batch primitive (e.g. deprecating mongodb). */
+  /** ONE batched read of every mailbox's conversations (fan-out→IN). */
   private async batchConversations(gaiis: string[]): Promise<Record<string, ConversationSummary[]>> {
-    if (this.storage.listConversationsForOwners) return this.storage.listConversationsForOwners(gaiis);
-    const out: Record<string, ConversationSummary[]> = {};
-    await Promise.all(gaiis.map(async (g) => {
-      const convs = await this.storage.listConversations(g).catch(err => { logger.warn('own: continuing after a suppressed failure', { error: String(err) }); return []; });
-      if (convs.length) out[g] = convs;
-    }));
-    return out;
+    return this.storage.listConversationsForOwners(gaiis);
   }
 }
 

@@ -22,6 +22,8 @@
  * @structure ucpCheckoutRouter
  * @usage router.use(ucpCheckoutRouter(config, storage)); // from commerceUcpRouter
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.2 — 2026-10-25 — PUT, complete and cancel answer 404 for a checkout that is absent or another
  *     platform's before an Idempotency-Key is claimed, so they write nothing under the seller
  *     (guestCheckoutExists; secaudit2026oct22).
@@ -135,8 +137,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     if (prior && !prior.released) return answerPrior(prior);
     const pending = recordOf({ bodyHash, pending: true });
     const claimed = stored
-      ? (storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(pending, stored.version) : await storage.setMemory(pending))
-      : (storage.createMemoryIfAbsent ? await storage.createMemoryIfAbsent(pending) : await storage.setMemory(pending));
+      ? await storage.setMemoryIfVersion(pending, stored.version)
+      : await storage.createMemoryIfAbsent(pending);
     if (!claimed) return answerPrior({ bodyHash, pending: true });
     return {
       done: false,

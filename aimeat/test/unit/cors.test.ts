@@ -15,12 +15,18 @@ function mockConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
 }
 
 function mockStorage(overrides: Partial<Storage> = {}): Storage {
-    return {
+    const storage = {
         getGHIIByOwner: vi.fn().mockResolvedValue(null),
         getAgent: vi.fn().mockResolvedValue(null),
         getMemory: vi.fn().mockResolvedValue(null),
         ...overrides,
     } as unknown as Storage;
+    // getMemoryMeta is getMemory without the value (a required Storage method since 2026-11-04);
+    // the double answers it from its own getMemory, so a case's getMemory answer is what CORS reads.
+    if (!overrides.getMemoryMeta) {
+        storage.getMemoryMeta = (owner: string, key: string) => storage.getMemory(owner, key) as ReturnType<Storage['getMemoryMeta']>;
+    }
+    return storage;
 }
 
 function mockReq(overrides: Partial<Request> = {}): Request {

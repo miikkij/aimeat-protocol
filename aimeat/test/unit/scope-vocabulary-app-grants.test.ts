@@ -17,6 +17,7 @@ import {
     migrateAppGrantScopeVocabulary, appGrantPredatesVocabulary, GRANDFATHERED_SCOPES, VOCABULARY_NAMED_AT,
 } from '../../src/services/scope-vocabulary-migration.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { sameScopeList } from '../../src/storage/scope-list.js';
 
 type Grant = { grantId: string; scopes: string[]; createdAt: string; scopesFixedAt?: string | null };
 
@@ -27,6 +28,14 @@ function stubStorage(grants: Grant[]) {
         updateAppGrant: async (grantId: string, patch: { scopes?: string[] }) => {
             if (patch.scopes) written.set(grantId, patch.scopes);
             return null;
+        },
+        // The conditional scope write every Storage has (required since 2026-11-04): written only
+        // when the stored list still equals the one the caller read.
+        setAppGrantScopesIf: async (grantId: string, expected: readonly string[], next: string[]) => {
+            const held = written.get(grantId) ?? grants.find(g => g.grantId === grantId)?.scopes;
+            if (!sameScopeList(held, expected)) return false;
+            written.set(grantId, next);
+            return true;
         },
     } as unknown as Storage;
     return { storage, written };

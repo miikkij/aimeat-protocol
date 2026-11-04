@@ -42,6 +42,8 @@
  *   const plan = await readAppPlan(storage, 'alice/talkoot.html');
  *   const out = await writeAppPlan(storage, { appId, patch, by, principal, actor: 'owner' });
  * @version-history
+ *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-30 — `proposals`: layouts and navigations the AI drew for this app, which a choice may name.
  *   v1.1.0 — 2026-10-29 — CUSTOM_CHOICE for layout and nav, with a note; the refusal names it and says
  *     how to leave a choice to the AI (cold Opus runs of a 3D game hit "single" and "agent-decides").
@@ -365,7 +367,6 @@ export async function writeAppPlan(
   storage: Storage,
   input: { appId: string; patch: PlanPatch; by: string; principal: string; actor: 'owner' | 'ai'; expectedRevision?: number },
 ): Promise<{ plan: AppPlan; created: boolean } | { conflict: AppPlan | null } | { refused: string }> {
-  if (!storage.createMemoryIfAbsent || !storage.setMemoryIfVersion) throw new Error('App plan writes require atomic storage.');
   for (let attempt = 0; attempt < 40; attempt++) {
     const existing = await readAuthorAppRecord(storage, NS_PLAN, appPlanKey(input.appId), input.appId);
     const live = parsePlan(existing?.value, input.appId);

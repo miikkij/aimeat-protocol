@@ -38,6 +38,8 @@
  *   const spec = await readAppDesignSpec(storage, 'alice/paja.html');
  *   const out = await writeAppDesignSpec(storage, { appId, markdown, by, principal, appVersion });
  * @version-history
+ *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-27 — A spec older than the account that now holds the author name is an earlier
  *     holder's and reads as none; eraseAppDesignSpecsOf for the account erasure (secaudit2026oct26).
  *   v1.0.0 — 2026-10-02 — Initial (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
@@ -145,7 +147,6 @@ export async function writeAppDesignSpec(
   storage: Storage,
   input: { appId: string; markdown: string; by: string; principal: string; appVersion: number; expectedRevision?: number },
 ): Promise<{ spec: AppDesignSpec; replacedRevision: number | null; unchanged: boolean } | { conflict: AppDesignSpec }> {
-  if (!storage.createMemoryIfAbsent || !storage.setMemoryIfVersion) throw new Error('Design spec writes require atomic storage.');
   for (let attempt = 0; attempt < 40; attempt++) {
     const existing = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(input.appId), input.appId);
     const current = existing?.value as AppDesignSpec | undefined;

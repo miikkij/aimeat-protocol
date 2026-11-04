@@ -44,6 +44,8 @@
  * @structure LoweredItem · settleAudienceAfterRise() · registerAudienceSettle()
  * @usage registerAudienceSettle(storage, config);   // once, at boot (server-bootstrap/routes-loader.ts)
  * @version-history
+ *   2026-11-04 — No fallback for a storage without setMemoryIfVersion or getMemoryByKeysAnyOwner: both
+ *     are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.2.1 — 2026-10-20 — Says where a binned record is held to the cap: on the restore, not here
  *     (services/memory-bin.ts restoreLevel; secaudit 2026-10). No behaviour change.
  *   v1.2.0 — 2026-10-18 — A memory record is lowered on the version that was read (setMemoryIfVersion,
@@ -124,7 +126,7 @@ function memoryCandidate(ctx: Ctx, rec: Pick<MemoryRecord, 'ownerGaii' | 'key' |
         const full = await ctx.storage.getMemory(rec.ownerGaii, rec.key);
         if (!full) return null;
         const next = { ...full, key: rec.key, visibility, groupId: undefined, workspaceRef: undefined, version: full.version + 1, updatedAt: new Date().toISOString() };
-        if (ctx.storage.setMemoryIfVersion ? !(await ctx.storage.setMemoryIfVersion(next, full.version)) : !(await ctx.storage.setMemory(next))) continue;
+        if (!(await ctx.storage.setMemoryIfVersion(next, full.version))) continue;
         emitChange('memory', ownerGhiiOf(rec.ownerGaii));
         return audienceOfVisibility(visibility);
       }
@@ -220,7 +222,7 @@ async function candidatesOf(ctx: Ctx, t: ContentLabelTarget): Promise<Candidate[
       if (!org) { const rec = await storage.getMemory(t.scope, t.key); return rec ? one(memoryCandidate(ctx, rec)) : []; }
       // An organism's document: every copy of it, whoever holds it.
       const keys = [...new Set([t.key, ...documentContentKeys(t.key)])];
-      const recs = storage.getMemoryByKeysAnyOwner ? await storage.getMemoryByKeysAnyOwner(keys) : [];
+      const recs = await storage.getMemoryByKeysAnyOwner(keys);
       return recs.flatMap(r => one(memoryCandidate(ctx, r)));
     }
     case 'file': {

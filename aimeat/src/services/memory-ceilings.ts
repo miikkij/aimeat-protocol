@@ -23,6 +23,8 @@
  *   const refusal = await memoryCeilingRefusal({ storage, config }, target, [{ key, value }]);
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   2026-11-04 — No countMemory and sumMemoryBytes for a storage without getMemoryTotals: it is
+ *     required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The key count and the byte total come from one read of the kept totals
  *     (storage.getMemoryTotals), and a record the caller already read is passed in `known` instead
  *     of being read again; the answers are the same (codebase analysis 2026-11-03, item C3).
@@ -33,16 +35,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { MemoryRecord, Storage } from '../storage/interface.js';
-import { MEMORY_COUNT_EXCLUDED_PREFIXES } from '../storage/memory-totals.js';
 import { checkMemoryQuota, chargeOverage } from './quota.js';
-
-/**
- * Key prefixes the node writes under an owner for parties with no account here, each record with
- * its own expiry (commerce/ucp-guest-checkout.ts, routes/ucp-checkout.ts). They are left out of the
- * owner's key count: an unsigned platform request must not fill the owner's own limit. The list
- * lives with the kept totals, which count by it (storage/memory-totals.ts).
- */
-const NODE_BOOKKEEPING_PREFIXES = MEMORY_COUNT_EXCLUDED_PREFIXES;
 
 export interface CeilingRefusal {
     status: number;
@@ -107,17 +100,17 @@ export async function memoryCeilings(
 
     // The writer's key count and byte total as the database keeps them (storage/memory-totals.ts), one
     // read of a few rows. Until 2026-11-04 every write summed every row of the writer, and a write that
-    // added a key also counted them (codebase analysis 2026-11-03, item C3). A storage without kept
-    // totals (a test stub) is counted and summed as before.
-    const totals = storage.getMemoryTotals ? await storage.getMemoryTotals(targetGaii) : null;
+    // added a key also counted them (codebase analysis 2026-11-03, item C3).
+    const totals = await storage.getMemoryTotals(targetGaii);
 
     // An UPDATE never grows the key count, so the count is only taken when the set adds a key.
     let keyCount: number | undefined;
     if (newKeys > 0) {
         // The node's own expiring UCP records under a seller (idempotency claims, guest checkouts)
         // are written by the node for platforms with no account here, so they do not use up the
-        // owner's own key limit (secaudit2026oct22).
-        keyCount = totals ? totals.keys : await storage.countMemory([targetGaii], { excludePrefixes: [...NODE_BOOKKEEPING_PREFIXES] });
+        // owner's own key limit (secaudit2026oct22): the kept totals leave them out
+        // (MEMORY_COUNT_EXCLUDED_PREFIXES, storage/memory-totals.ts).
+        keyCount = totals.keys;
         if (keyCount + newKeys > config.memoryMaxKeysPerAgent) {
             // The remedy named here matters: "delete unused keys" sends someone who hit the wall
             // through one-key-per-small-fact off to delete data instead of fixing the shape that
@@ -134,7 +127,7 @@ export async function memoryCeilings(
         }
     }
 
-    const quota = await checkMemoryQuota(config, storage, targetGaii, additional, replacing, totals?.bytes);
+    const quota = await checkMemoryQuota(config, storage, targetGaii, additional, replacing, totals.bytes);
     if (!quota.allowed) {
         return { ok: false, refusal: { status: 413, code: 'QUOTA_EXCEEDED', message: quota.reason ?? 'Storage quota exceeded' } };
     }

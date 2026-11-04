@@ -11,6 +11,8 @@
  *   - balance ops: debitBalance, creditBalance, creditBalanceCapped (atomic)
  *
  * @version-history
+ *   2026-11-04 — setAgentScopesIf is required: both providers implement it (codebase analysis
+ *     2026-11-03, item D-e).
  *   v1.3.0 — 2026-10-20 — clearGrantsToIdentity: the references where ANOTHER party named this GAII
  *     as the grantee. deleteAgent runs it inside its own transaction, and owner erasure runs it per
  *     agent (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
@@ -34,7 +36,7 @@ export interface AgentRepository {
    * meanwhile, so the caller reads again and merges. The agent row has no version column, so the
    * condition is the value itself (services/scope-list-swap.ts).
    */
-  setAgentScopesIf?(gaii: string, expected: readonly string[], next: string[]): Promise<boolean>;
+  setAgentScopesIf(gaii: string, expected: readonly string[], next: string[]): Promise<boolean>;
   deleteAgent(gaii: string): Promise<boolean>;
   /**
    * Clear every reference in which ANOTHER party named this GAII as the one it grants to: a consent

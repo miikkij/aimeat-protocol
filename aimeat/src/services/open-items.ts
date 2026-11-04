@@ -37,6 +37,8 @@
  *   const open = await listItems(storage, config, ownerGhii, owner);
  *   const shown = await showItems(storage, config, readerFor({ storage, config }, req.auth), owner);
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.2.2 — 2026-11-01 — The hello_mcp check leaves out a proof key the node's own chat or basic agents wrote.
  *   v1.2.1 — 2026-10-18 — The portfolio keys come from services/portfolio-config.ts, not from the route.
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: showItems, the list as a caller may see it: the record passes
@@ -255,13 +257,10 @@ export async function mutateList<T>(
 
         // Compare-and-swap rather than read-then-write. Checking the version with a second read and
         // then writing leaves a gap another writer fits through; these two primitives close it in
-        // the storage layer. They are optional on the interface, so fall back to a plain upsert on a
-        // backend that lacks them, the same way the legacy memory adapter does.
+        // the storage layer.
         if (memoryVersion === 0) {
-            if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return result; }
             if (await storage.createMemoryIfAbsent(record)) return result;
         } else {
-            if (!storage.setMemoryIfVersion) { await storage.setMemory(record); return result; }
             if (await storage.setMemoryIfVersion(record, memoryVersion)) return result;
         }
         // Lost the swap: somebody wrote between the read and the write. Read again and re-apply.

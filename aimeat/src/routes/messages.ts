@@ -21,6 +21,8 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-11-04 — No per-id read for a storage without getDirectMessagesByIds: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 -- A named 1:1 conversation_id is bound to the sender; agent-thread merges the owner's other rows only with messages:read-as-owner (secaudit2026oct26).
  *   2026-10-26 -- /v1/messages/:id/reactions is registered here (./message-reactions.ts); a thread carries each message's reactions.
  *   2026-10-25 -- GET /v1/messages/overview takes `?compact=true`: previews and agent names only, for a list.
@@ -729,9 +731,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const firstIds = pending.map(c => c.firstMessageId).filter((x): x is string => !!x);
     const firstById = new Map<string, DirectMessageRecord>();
     if (firstIds.length) {
-      const msgs = storage.getDirectMessagesByIds
-        ? await storage.getDirectMessagesByIds(firstIds, ghii)
-        : (await Promise.all(firstIds.map(id => storage.getDirectMessage(id, ghii)))).filter((m): m is DirectMessageRecord => !!m);
+      const msgs = await storage.getDirectMessagesByIds(firstIds, ghii);
       for (const m of msgs) firstById.set(m.id, m);
     }
     const requests = pending.map(c => {

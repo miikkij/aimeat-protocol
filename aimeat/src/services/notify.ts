@@ -26,6 +26,8 @@
  * @usage import { notify } from '../services/notify.js';
  *   await notify(storage, `${creatorOwner}@${nodeId}`, { type: 'workspace_access_request', title, link });
  * @version-history
+ *   2026-11-04 — No per-key loop for a storage without bulkDeleteMemory: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-25 -- NotifyInput.ref: the question a notice asks, so the flow that decides it can mark
  *     the notice answered and take its buttons away (services/notification-answers.ts; secaudit2026oct22).
  *   v1.4.0 -- 2026-08-30 -- The owner's settings decide what happens (notification-settings.ts): a
@@ -157,10 +159,7 @@ export async function dismissConversationNotifications(storage: Storage, recipie
       .filter(r => { const v = r.value as { link?: string } | null; return !!v && typeof v.link === 'string' && links.has(v.link); })
       .map(r => ({ ownerGaii: recipientGhii, key: r.key }));
     if (!refs.length) return 0;
-    if (storage.bulkDeleteMemory) return await storage.bulkDeleteMemory(refs);
-    let removed = 0;
-    for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key)) removed++; }
-    return removed;
+    return await storage.bulkDeleteMemory(refs);
   } catch (err) {
     logger.warn('notify: suppressed failure, continuing', { error: String(err) });
     return 0;

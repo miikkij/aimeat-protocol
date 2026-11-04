@@ -26,6 +26,8 @@
  *   flushVisibility · mergeDay · resetVisibilityState (tests)
  * @usage countVisit(storage, config, { ownerGaii, target: app.filename, ...visit });
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-11 — recordPurchase sums money only: a purchase in morsels is counted as a free
  *     purchase with no amount, since a morsel is pacing, not a price (isMorselCurrency).
  *   v1.1.0 — 2026-10-08 — The owner's settings moved to visibility-settings.ts, which also holds the
@@ -406,9 +408,9 @@ async function mergeOwnerMonth(
       } as MemoryRecord;
       let won: boolean;
       if (version === 0) {
-        won = storage.createMemoryIfAbsent ? !!(await storage.createMemoryIfAbsent(record)) : (await storage.setMemory(record), true);
+        won = !!(await storage.createMemoryIfAbsent(record));
       } else {
-        won = storage.setMemoryIfVersion ? !!(await storage.setMemoryIfVersion(record, version)) : (await storage.setMemory(record), true);
+        won = !!(await storage.setMemoryIfVersion(record, version));
       }
       if (won) {
         if (version === 0) await pruneOldMonths(storage, ownerGhii, month);

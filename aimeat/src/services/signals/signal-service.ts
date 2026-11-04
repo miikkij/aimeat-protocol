@@ -27,6 +27,8 @@
  * @structure SignalError · createStream/listStreams/getStream/deleteStream · recordHit · readReport
  * @usage await recordHit(storage, { ownerGhii, streamId, event: 'open', userAgent });
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.1 — 2026-10-08 — withKeyLock is exported: the AI visibility counter
  *     (services/visibility/visibility-counter.ts) merges into its month record through the same
  *     per-key queue.
@@ -404,11 +406,7 @@ async function writeMonth(
     version: version + 1, createdAt, updatedAt: rec.updatedAt,
   } as MemoryRecord;
   try {
-    if (version === 0) {
-      if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return true; }
-      return !!(await storage.createMemoryIfAbsent(record));
-    }
-    if (!storage.setMemoryIfVersion) { await storage.setMemory(record); return true; }
+    if (version === 0) return !!(await storage.createMemoryIfAbsent(record));
     return !!(await storage.setMemoryIfVersion(record, version));
   } catch (e) {
     logger.warn('signals: month record write failed', { key, error: String(e) });

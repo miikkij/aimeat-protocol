@@ -24,6 +24,8 @@
  * @structure toolsForPackage(doc) · installPackageAppTools(deps, args)
  * @usage meta.app.tools = toolsForPackage(rec.value); await installPackageAppTools(...)
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without createMemoryIfAbsent: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.1 — 2026-10-19 — The carried list is written with createMemoryIfAbsent
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-10-02 — Initial.
@@ -81,6 +83,5 @@ export async function installPackageAppTools(storage: Storage, args: {
     key, ownerGaii: args.ownerGhii, value: doc.data as unknown as Record<string, unknown>, visibility: 'public' as const,
     tags: ['app-tools', 'package-installed'], ttlHours: null, version: 1, createdAt: args.now, updatedAt: args.now,
   };
-  if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return; }
   await storage.createMemoryIfAbsent(record);
 }

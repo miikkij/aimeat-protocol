@@ -25,6 +25,9 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-11-04 — The 501 NOT_SUPPORTED answers for a storage without setMemoryIfVersion or
+ *     createMemoryIfAbsent are gone: both are required on Storage, so no node reached them (codebase
+ *     analysis 2026-11-03, item D-e).
  *   2026-10-31 — The write tally names an app grant as the app (data-map/tally-writer.ts; secaudit2026oct31w2 round 10).
  *   2026-10-27 — A merge that changes where a mail refinery reads and files mail, by an app or an agent
  *     that may not run it, stores the rest and answers 202 with the owner's request (secaudit2026oct26).
@@ -414,17 +417,9 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       };
 
       if (existing) {
-        if (!storage.setMemoryIfVersion) {
-          res.status(501).json(error(config.nodeId, 'NOT_SUPPORTED', 'This storage backend cannot apply a merge patch safely (no compare-and-swap).'));
-          return;
-        }
         record = await storage.setMemoryIfVersion(candidate, existing.version);
         lastConflictVersion = existing.version;
       } else {
-        if (!storage.createMemoryIfAbsent) {
-          res.status(501).json(error(config.nodeId, 'NOT_SUPPORTED', 'This storage backend cannot create a record atomically (no insert-if-absent).'));
-          return;
-        }
         record = await storage.createMemoryIfAbsent(candidate);
         created = record !== null;
       }

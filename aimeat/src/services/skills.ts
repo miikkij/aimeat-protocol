@@ -32,6 +32,8 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.14.0 -- 2026-10-26 -- Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss):
  *     publishSkill stores a file that is not UTF-8 text as base64 with `encoding` on its index entry
  *     (skill-files.ts), refuses a NEW skill whose SKILL.md breaks a blocking rule of the standard
@@ -373,8 +375,8 @@ export async function publishSkill(
       ...(aiProvenanceId ? { aiProvenanceId } : {}),
     };
     const record = own
-      ? (storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(next, own.version) : await storage.setMemory(next))
-      : (storage.createMemoryIfAbsent ? await storage.createMemoryIfAbsent(next) : await storage.setMemory(next));
+      ? await storage.setMemoryIfVersion(next, own.version)
+      : await storage.createMemoryIfAbsent(next);
     return record ? { record, manifest, version, visibility, fileTexts } : null;
   };
   let written: Awaited<ReturnType<typeof writeOnce>> = null;
@@ -736,7 +738,7 @@ export async function setSkillVisibility(
     const value: SkillManifestValue = { ...(manifest.value as SkillManifestValue) };
     if (stored.audience) value.audience = stored.audience; else delete value.audience;
     const next = { ...manifest, key: manifestKey(name), value, visibility: stored.record, version: manifest.version + 1, updatedAt: now };
-    const record = storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(next, manifest.version) : await storage.setMemory(next);
+    const record = await storage.setMemoryIfVersion(next, manifest.version);
     if (record) return toSummary(record, scope, scope === 'user' ? (owner ?? null) : null);
   }
   throw new Error(`skill ${name} changed under every one of ${CAS_ATTEMPTS} attempts; try again`);

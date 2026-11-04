@@ -32,6 +32,8 @@
  *   await claimSessionForCompletion(storage, session, key);   // throws SESSION_NOT_OPEN
  *   const refusal = invoiceRailRefusal(handler?.id, sellables); if (refusal) throw refusal;
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.3.0 — 2026-10-27 — changeOpenSession: the buyer's item change and cancel write the stored session
  *     only while it is open (secaudit2026oct26, commerce/session-service:stale-session-write-reopens-consumed-payment).
  *     rememberCardPage: the card pages the node opened, for the webhook completion (secaudit2026oct26,
@@ -70,9 +72,7 @@ export async function claimSessionForCompletion(storage: Storage, session: Check
     key, ownerGaii: session.buyerGhii, value: claimed as unknown as Record<string, unknown>, visibility: stored.visibility,
     tags: stored.tags, ttlHours: stored.ttlHours, version: stored.version + 1, createdAt: stored.createdAt, updatedAt: now,
   };
-  const written = storage.setMemoryIfVersion
-    ? await storage.setMemoryIfVersion(record, stored.version)
-    : await storage.setMemory(record);
+  const written = await storage.setMemoryIfVersion(record, stored.version);
   if (!written) throw NOT_OPEN('completing');
 }
 

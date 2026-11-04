@@ -35,6 +35,8 @@
  *   // ... later, on introduce:
  *   const claimed = await consumeLinkInvite(storage, token, nodeId);
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — An invite may name the node it is for (`nodeId`). consumeLinkInvite leaves such an
  *     invite unused for any other node id ('other-node'), and leaves an invite that names no node
  *     unused when the node id is held by a peer under another key ('held', with its key): the operator
@@ -200,9 +202,7 @@ async function consumeAtKey(
     };
     // Written on the version that was read: of two introductions with one token, one write lands and
     // the other is answered as a consumed invite.
-    const landed = storage.setMemoryIfVersion
-      ? !!await storage.setMemoryIfVersion(next, record.version)
-      : (await storage.setMemory(next), true);
+    const landed = !!await storage.setMemoryIfVersion(next, record.version);
     if (!landed) return { ok: false, reason: 'consumed' };
 
     return { ok: true, tier: consumed.tier, invite: consumed };

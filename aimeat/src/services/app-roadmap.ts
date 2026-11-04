@@ -31,6 +31,8 @@
  *   const road = await readAppRoadmap(storage, ownerGhii, appId);
  *   await addRoadmapEntry(storage, { ownerGhii, appId, state: 'done', what: 'The login pill fits a phone.', by, version });
  * @version-history
+ *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-27 — A roadmap older than the account that now holds the author name is an earlier
  *     holder's and reads as none; eraseAppRoadmapsOf for the account erasure (secaudit2026oct26).
  *   v1.1.0 — 2026-09-24 — APP_ROADMAP_WISHES_PER_ACCOUNT: one account holds at most ten open wishes
@@ -115,7 +117,6 @@ export async function readAppRoadmap(storage: Storage, appId: string): Promise<A
 
 /** Retry the change against the current record; never acknowledge a lost update. */
 async function changeRoadmap(storage: Storage, appId: string, change: (road: AppRoadmap) => void): Promise<AppRoadmap> {
-  if (!storage.createMemoryIfAbsent || !storage.setMemoryIfVersion) throw new Error('Roadmap writes require atomic storage.');
   for (let attempt = 0; attempt < 40; attempt++) {
     const existing = await readAuthorAppRecord(storage, NS_ROADMAP, appRoadmapKey(appId), appId);
     const road = existing ? structuredClone(existing.value as AppRoadmap) : emptyRoadmap(appId);

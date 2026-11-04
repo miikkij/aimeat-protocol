@@ -39,6 +39,8 @@
  *   migrateMailReadConsent
  * @usage migrateMailReadConsent(storage, config).catch(err => logger.error(…));   // once at boot
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without createMemoryIfAbsent: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.3.0 — 2026-09-26 — The agents' notice allows with one tap, as the apps' does: its button per
  *     agent calls POST /v1/agents/:name/read-through, the owner's own door, instead of opening the
  *     agent's page.
@@ -168,9 +170,7 @@ async function claim(storage: Storage, nodeId: string): Promise<boolean> {
     key: MAIL_READ_CONSENT_KEY, ownerGaii: markerOwner(nodeId), value, visibility: 'private',
     tags: ['migration'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
   };
-  if (storage.createMemoryIfAbsent) return (await storage.createMemoryIfAbsent(record)) !== null;
-  await storage.setMemory(record);
-  return true;
+  return (await storage.createMemoryIfAbsent(record)) !== null;
 }
 
 /** Has this owner been sent this notice already, by a run that stopped before its marker said done? */

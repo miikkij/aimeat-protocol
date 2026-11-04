@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-04 — No per-organism read for a storage without listPendingApprovalsForOrgs: it is required
+ *     on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — POST /v1/organisms and PUT /v1/organisms/:id check their bodies with validateBody
  *     (models/write-body-schemas.ts): a too-long or junk value is a 400 naming the field.
  *   2026-10-25 — GET /v1/organisms/waiting leaves out an organism that does not admit the calling
@@ -256,9 +258,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // Pending approvals for EVERY member org in one batched read (was listPendingApprovals per org), then
     // the ws-name registry lookup for just the orgs that have approvals in one batched cross-owner read.
     const orgIds = orgs.map(o => o.id);
-    const apsByOrg = storage.listPendingApprovalsForOrgs
-      ? await storage.listPendingApprovalsForOrgs(orgIds, { status: 'pending' })
-      : Object.fromEntries(await Promise.all(orgs.map(async o => [o.id, await storage.listPendingApprovals(o.id, { status: 'pending' })] as const)));
+    const apsByOrg = await storage.listPendingApprovalsForOrgs(orgIds, { status: 'pending' });
     const namesByOrg = await workspaceNamesByOrg(orgs.filter(o => (apsByOrg[o.id]?.length)).map(o => o.id));
     for (const org of orgs) {
       const aps = apsByOrg[org.id] ?? [];

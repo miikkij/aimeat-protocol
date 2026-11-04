@@ -10,6 +10,8 @@
  * @usage
  *   const r = await deleteRecordsBatchOp(deps, caller, { organismId, ws, namespace, ids });
  * @version-history
+ *   2026-11-04 — No value scan or per-key delete for a storage without listMemoryKeysByPrefix or
+ *     bulkBinMemory: both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-27 — The fenced-space rule is asked for the workspace the keys lie in, also when
  *     the body names no ws or a dotted one (secaudit2026oct26, mcp-workspace:delete-fence-ws-from-input).
  *   v1.1.0 — 2026-10-18 — A delete tells the workspace's live domain (services/event-bus.ts
@@ -99,12 +101,9 @@ export async function deleteRecordsBatchOp(
     const refs: { ownerGaii: string; key: string }[] = [];
     const deleted: { id: string; keys: number }[] = [];
     const failed: { id: string; reason: string }[] = [];
-    // ONE value-free (ownerGaii, key) scan of the namespace: the delete needs only addresses. Falls
-    // back to a value scan only on a backend without the key-only primitive.
+    // ONE value-free (ownerGaii, key) scan of the namespace: the delete needs only addresses.
     const nsPrefix = `${root}.${namespace}.`;
-    const nsKeys = storage.listMemoryKeysByPrefix
-        ? await storage.listMemoryKeysByPrefix(nsPrefix)
-        : (await storage.listAllMemory({ prefix: nsPrefix, limit: 100000 })).items.map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
+    const nsKeys = await storage.listMemoryKeysByPrefix(nsPrefix);
     const done = new Set<string>();
     for (const rid of ids) {
         if (done.has(rid)) continue;
@@ -120,8 +119,7 @@ export async function deleteRecordsBatchOp(
 
     let removed = 0;
     if (refs.length) {
-        if (storage.bulkBinMemory) removed = await storage.bulkBinMemory(refs, callerId);
-        else for (const r of refs) { if (await storage.deleteMemory(r.ownerGaii, r.key, callerId)) removed++; }
+        removed = await storage.bulkBinMemory(refs, callerId);
     }
     if (removed > 0) {
         emitChange('organisms');

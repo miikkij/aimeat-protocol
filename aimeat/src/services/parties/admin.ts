@@ -9,6 +9,8 @@
  * @structure operatorSetStop · partySecurityCounts
  * @usage await operatorSetStop(deps, 'alice', 'matti', true, 'scraping');
  * @version-history
+ *   2026-11-04 — No zero counts for a storage without getMemoryByKeysAnyOwner: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.9).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -47,7 +49,6 @@ export async function operatorSetStop(
  */
 export async function partySecurityCounts(storage: Storage): Promise<Record<string, number>> {
     const counts = { total: 0, stopped: 0, stopped_by_operator: 0, failed_key_attempts: 0, refused_reads_7d: 0, served_reads_7d: 0 };
-    if (!storage.getMemoryByKeysAnyOwner) return counts;
     await flushAll();
     for (const rec of await storage.getMemoryByKeysAnyOwner([PARTIES_KEY])) {
         for (const p of parsePartiesValue(rec.value).parties) {

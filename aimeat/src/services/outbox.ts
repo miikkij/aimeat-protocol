@@ -32,6 +32,8 @@
  *   registerOutboxHandler('mail', { delays: [1000, 3000, 9000], leaseMs: 180_000, attempt, ... });
  *   const delivered = await deliverWithRetries(storage, nodeId, 'mail', payload);
  * @version-history
+ *   2026-11-04 — The CAS methods called without optional chaining: both are required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, HA stage 1 item 1.5).
  */
 import { randomUUID } from 'node:crypto';
@@ -122,8 +124,8 @@ async function writeEntry(storage: Storage, nodeId: string, entry: StoredEntry, 
         tags: ['outbox'], ttlHours: null, version: version + 1, createdAt: entry.createdAt, updatedAt: now,
     };
     const written = version === 0
-        ? await storage.createMemoryIfAbsent?.(record)
-        : await storage.setMemoryIfVersion?.(record, version);
+        ? await storage.createMemoryIfAbsent(record)
+        : await storage.setMemoryIfVersion(record, version);
     return written ? record.version : null;
 }
 

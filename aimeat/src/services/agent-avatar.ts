@@ -31,6 +31,8 @@
  *   const avatars = await readAvatars(storage, agents.map(a => a.gaii));
  *   rows.map(a => ({ ...row, avatar: avatars.get(a.gaii) ?? null }));
  * @version-history
+ *   2026-11-04 — No per-agent getMemory for a storage without getMemoryForOwners: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-19 — Initial (wish-agenteille-oma-avatar-jonka-agentti-asettaa-itse).
  */
 import type { Storage } from '../storage/interface.js';
@@ -117,9 +119,7 @@ export async function readAvatarRecords(storage: Storage, gaiis: readonly string
     const unique = [...new Set(gaiis)];
     const out = new Map<string, MemoryRecord>();
     if (unique.length === 0) return out;
-    const rows = storage.getMemoryForOwners
-        ? await storage.getMemoryForOwners(unique, AVATAR_KEY)
-        : (await Promise.all(unique.map(g => storage.getMemory(g, AVATAR_KEY)))).filter((r): r is MemoryRecord => !!r);
+    const rows = await storage.getMemoryForOwners(unique, AVATAR_KEY);
     for (const r of rows) out.set(r.ownerGaii, r);
     return out;
 }

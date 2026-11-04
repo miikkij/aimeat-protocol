@@ -37,6 +37,8 @@
  *   const prev = await findWorkspaceRecord(storage, key);
  *   await writeWorkspaceRecord({ storage, config }, { key, value, owner: ownerGhii, prev });
  * @version-history
+ *   2026-11-04 — requireCas() deleted: setMemoryIfVersion and createMemoryIfAbsent are required on
+ *     Storage, so the guarded write calls them directly (codebase analysis 2026-11-03, item D-e).
  *   v1.4.0 — 2026-11-03 — deleteWorkspaceInstance also removes the document's shared fingerprint
  *     once no copy of its published version is left (services/content/shared-profile.ts).
  *   v1.3.0 — 2026-09-29 — A landed record is scheduled for write-time classification
@@ -165,8 +167,8 @@ export async function writeWorkspaceRecord(
         // where there is no version to compare against — without it two sessions starting the same
         // draft at the same moment would each believe they created it.
         const swapped = input.ifVersion === null
-            ? await requireCas(storage, 'createMemoryIfAbsent').call(storage, record)
-            : await requireCas(storage, 'setMemoryIfVersion').call(storage, record, input.ifVersion);
+            ? await storage.createMemoryIfAbsent(record)
+            : await storage.setMemoryIfVersion(record, input.ifVersion);
         if (!swapped) return { written: false, version: prev?.version ?? 0 };
     } else {
         await storage.setMemory(record);
@@ -186,21 +188,6 @@ export async function writeWorkspaceRecord(
     classifyAfterWrite(deps, input.owner, input.key, input.value);
     await afterMemoryWrite(deps, input.owner, input.key, !!prev, input.principal);
     return { written: true, version: record.version };
-}
-
-/**
- * The two atomic primitives are OPTIONAL on the repository interface, so a backend without them must
- * say so rather than fall through to a plain upsert — that fallback is exactly the last-write-wins
- * this guard exists to avoid, and it would be invisible. Both shipped backends implement them.
- */
-function requireCas<K extends 'setMemoryIfVersion' | 'createMemoryIfAbsent'>(
-    storage: Storage, method: K,
-): NonNullable<Storage[K]> {
-    const fn = storage[method];
-    if (!fn) {
-        throw new Error(`CAS_UNSUPPORTED: this storage backend has no ${method}, so a safe in-place edit is not possible on it.`);
-    }
-    return fn as NonNullable<Storage[K]>;
 }
 
 /**

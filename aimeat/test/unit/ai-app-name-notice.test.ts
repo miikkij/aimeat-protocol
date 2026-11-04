@@ -41,6 +41,15 @@ function memoryStorage(): Storage {
   return {
     getMemory: async (owner: string, key: string) => rows.get(`${owner}::${key}`) ?? null,
     setMemory: async (r: MemoryRecord) => { rows.set(`${r.ownerGaii}::${r.key}`, r); return r; },
+    // The conditional writes every Storage has (required since 2026-11-04).
+    createMemoryIfAbsent: async (r: MemoryRecord) => {
+      if (rows.has(`${r.ownerGaii}::${r.key}`)) return null;
+      rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+    },
+    setMemoryIfVersion: async (r: MemoryRecord, v: number) => {
+      if (rows.get(`${r.ownerGaii}::${r.key}`)?.version !== v) return null;
+      rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+    },
   } as unknown as Storage;
 }
 

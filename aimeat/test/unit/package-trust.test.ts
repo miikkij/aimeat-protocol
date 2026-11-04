@@ -130,6 +130,15 @@ describe('PKG-2: a sale onto a grant another seller or the author made keeps its
             listVersions: async () => ({ versions: [{ author: 'alice' }] }),
             getMemory: async (ns: string, key: string) => mem.get(`${ns}/${key}`) ?? null,
             setMemory: async (rec: any) => { mem.set(`${rec.ownerGaii}/${rec.key}`, rec); },
+            // The conditional writes every Storage has (required since 2026-11-04).
+            createMemoryIfAbsent: async (rec: any) => {
+                if (mem.has(`${rec.ownerGaii}/${rec.key}`)) return null;
+                mem.set(`${rec.ownerGaii}/${rec.key}`, rec); return rec;
+            },
+            setMemoryIfVersion: async (rec: any, v: number) => {
+                if (mem.get(`${rec.ownerGaii}/${rec.key}`)?.version !== v) return null;
+                mem.set(`${rec.ownerGaii}/${rec.key}`, rec); return rec;
+            },
         } as unknown as Storage;
     }
     const AUTHOR = { owner: 'alice', isOperator: false };
@@ -223,6 +232,15 @@ describe('PKG-8: a grant adds no peer on a node that is not a repository, and ne
             listVersions: async () => ({ versions: [{ author: 'alice' }] }),
             getMemory: async (ns: string, key: string) => mem.get(`${ns}/${key}`) ?? null,
             setMemory: async (rec: any) => { mem.set(`${rec.ownerGaii}/${rec.key}`, rec); },
+            // The conditional writes every Storage has (required since 2026-11-04).
+            createMemoryIfAbsent: async (rec: any) => {
+                if (mem.has(`${rec.ownerGaii}/${rec.key}`)) return null;
+                mem.set(`${rec.ownerGaii}/${rec.key}`, rec); return rec;
+            },
+            setMemoryIfVersion: async (rec: any, v: number) => {
+                if (mem.get(`${rec.ownerGaii}/${rec.key}`)?.version !== v) return null;
+                mem.set(`${rec.ownerGaii}/${rec.key}`, rec); return rec;
+            },
         } as unknown as Storage;
     }
     const AUTHOR = { owner: 'alice', isOperator: false };

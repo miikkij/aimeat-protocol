@@ -30,6 +30,8 @@
  * @usage const room = await settlementRoom(config, storage, from_node, amount);
  *        if (!room.ok) { await recordRefusedSettlement(config, storage, {...}); refuse(429); }
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-31 — Initial (secaudit2026oct31w2 round 10, W2-4,
  *     federation-settlements.ts:settle:peer-credit-not-bound-to-obligation).
  */
@@ -231,9 +233,7 @@ export async function recordRefusedSettlement(config: AimeatConfig, storage: Sto
     // The day's first refusal claims the record; a later one updates it on its version.
     let value: SettlementRefusals;
     let first = false;
-    const claimed = storage.createMemoryIfAbsent
-      ? await storage.createMemoryIfAbsent({ ...base, value: fresh, version: 1 })
-      : null;
+    const claimed = await storage.createMemoryIfAbsent({ ...base, value: fresh, version: 1 });
     if (claimed) {
       value = fresh; first = true;
     } else {
@@ -248,7 +248,7 @@ export async function recordRefusedSettlement(config: AimeatConfig, storage: Sto
           items: [...prev.items, item].slice(-KEEP_ITEMS),
         };
         const next = { ...base, createdAt: existing.createdAt, value, version: existing.version + 1 };
-        const wrote = storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(next, existing.version) : await storage.setMemory(next);
+        const wrote = await storage.setMemoryIfVersion(next, existing.version);
         // Two refusals at the same moment: the one that lost is still in the log line below.
         if (!wrote) logger.warn('A refused settlement was counted by a concurrent write first', { ...item, from: r.fromNode });
       }
@@ -281,8 +281,7 @@ export async function recordRefusedSettlement(config: AimeatConfig, storage: Sto
       const v = latest?.value as SettlementRefusals | undefined;
       if (latest && v) {
         const next = { ...base, createdAt: latest.createdAt, value: { ...v, incident: out.id }, version: latest.version + 1 };
-        if (storage.setMemoryIfVersion) await storage.setMemoryIfVersion(next, latest.version);
-        else await storage.setMemory(next);
+        await storage.setMemoryIfVersion(next, latest.version);
       }
     }
     const vars = { node: r.fromNode, amount: r.amount, limit: r.room.limit };

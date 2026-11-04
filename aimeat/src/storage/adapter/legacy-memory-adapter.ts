@@ -12,6 +12,9 @@
  * @structure LegacyMemoryAdapter — constructor(storage); one method per adapter primitive
  * @usage const adapter = new LegacyMemoryAdapter(storage);
  * @version-history
+ *   2026-11-04 — getByKeys, upsertIfVersion, bulkUpsert and deleteSubtree call the storage method
+ *     directly: it is required on Storage, so the per-key fallbacks and the plain upsert in place of
+ *     a version-checked one are gone (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-07-15 — Phase 0 scaffolding: wraps Storage, no behaviour change.
  *   v1.1.0 — 2026-08-11 — Dropped `withTransaction`. It was `return fn()`, nothing called it, and its
  *     presence implied an atomicity guarantee the adapter never provided.
@@ -47,17 +50,10 @@ export class LegacyMemoryAdapter implements MemoryStorageAdapter {
     return rows.filter(r => r.key === key);
   }
 
-  /** Many keys under one owner in one IN read. Uses the bulk primitive when the backend has it; else
-   *  falls back to a per-key loop (correct, just N round-trips). */
+  /** Many keys under one owner in one IN read. */
   async getByKeys(ownerGaii: string, keys: string[]): Promise<MemoryRecord[]> {
     if (keys.length === 0) return [];
-    if (this.storage.getMemoryByKeys) return this.storage.getMemoryByKeys(ownerGaii, keys);
-    const out: MemoryRecord[] = [];
-    for (const key of keys) {
-      const r = await this.storage.getMemory(ownerGaii, key);
-      if (r) out.push(r);
-    }
-    return out;
+    return this.storage.getMemoryByKeys(ownerGaii, keys);
   }
 
   // ── Keyspace listings ──────────────────────────────────────────────
@@ -113,20 +109,13 @@ export class LegacyMemoryAdapter implements MemoryStorageAdapter {
   }
 
   upsertIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
-    // The fat provider exposes setMemoryIfVersion optionally; fall back to a plain upsert only when the
-    // backend genuinely lacks it (the route already guards on `storage.setMemoryIfVersion` existing).
-    if (this.storage.setMemoryIfVersion) return this.storage.setMemoryIfVersion(record, expectedVersion);
-    return this.storage.setMemory(record).then(r => r);
+    return this.storage.setMemoryIfVersion(record, expectedVersion);
   }
 
-  /** Bulk upsert via the backend's one-transaction primitive when present (SQLite: one commit); else a
-   *  sequential loop (correct, per-row commit). Per-row version/history semantics are identical either way. */
+  /** Bulk upsert via the backend's one-transaction primitive (SQLite: one commit). */
   async bulkUpsert(records: MemoryRecord[]): Promise<MemoryRecord[]> {
     if (records.length === 0) return [];
-    if (this.storage.bulkSetMemory) return this.storage.bulkSetMemory(records);
-    const out: MemoryRecord[] = [];
-    for (const r of records) out.push(await this.storage.setMemory(r));
-    return out;
+    return this.storage.bulkSetMemory(records);
   }
 
   // ── Deletes ────────────────────────────────────────────────────────
@@ -145,17 +134,9 @@ export class LegacyMemoryAdapter implements MemoryStorageAdapter {
     return deleted;
   }
 
-  /** Delete a record's whole family under one owner. Uses the backend's one-statement subtree primitive
-   *  when present; else enumerates the subtree (one prefix read) and deletes each (fallback). */
+  /** Delete a record's whole family under one owner, by the backend's one-statement subtree primitive. */
   async deleteSubtree(ownerGaii: string, baseKey: string): Promise<number> {
-    if (this.storage.deleteMemorySubtree) return this.storage.deleteMemorySubtree(ownerGaii, baseKey);
-    const rows = await this.storage.listMemory(ownerGaii, { prefix: baseKey });
-    const refs = rows.filter(r => r.key === baseKey || r.key.startsWith(baseKey + '.'));
-    let deleted = 0;
-    for (const r of refs) {
-      if (await this.storage.deleteMemory(r.ownerGaii, r.key)) deleted++;
-    }
-    return deleted;
+    return this.storage.deleteMemorySubtree(ownerGaii, baseKey);
   }
 
   // ── History ────────────────────────────────────────────────────────

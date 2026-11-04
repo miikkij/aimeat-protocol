@@ -34,6 +34,8 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   2026-11-04 — No single-key delete for a storage without deleteMemorySubtree: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.14.1 — 2026-10-30 — A kit's list row says its reach (and organism), for the gallery's chips.
  *   v1.14.0 — 2026-10-30 — The KIT kind (kit.ts): get, list, adopt and recordUse answer a kit narrower
  *     than the node only inside its reach (a reader outside it meets a missing part), its record is
@@ -787,12 +789,8 @@ export class DesignBookService {
       throw new DesignBookError('PART_IN_USE',
         `"${id}" is adopted by ${usage} build${usage === 1 ? '' : 's'} whose history points at it — retire it instead of deleting it.`, 409);
     }
-    if (this.storage.deleteMemorySubtree) {
-      // The subtree takes the version history with it — deleted means gone, not haunting.
-      await this.storage.deleteMemorySubtree(this.bookOwner(), record.key);
-    } else {
-      await this.storage.deleteMemory(this.bookOwner(), record.key);
-    }
+    // The subtree takes the version history with it — deleted means gone, not haunting.
+    await this.storage.deleteMemorySubtree(this.bookOwner(), record.key);
     // And what the node remembered about telling the proposer it no longer passes (component-notice.ts).
     await this.storage.deleteMemory(this.bookOwner(), noticeKey(id));
     return { id, deleted: true };

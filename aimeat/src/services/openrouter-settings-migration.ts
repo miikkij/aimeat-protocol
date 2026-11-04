@@ -26,6 +26,8 @@
  * @usage
  *   migrateImplicitFreeModelOnce(storage, config.nodeId).catch(err => logger.error(…));
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-18 — The mark is claimed before the work (services/once-only-step.ts), and each
  *     owner's record is written on the version that was read, so a save made meanwhile stands
  *     (check:atomic-writes).
@@ -54,7 +56,7 @@ async function clearImplicitFreeModel(storage: Storage, gaii: string): Promise<b
         const rest = { ...prefs };
         delete rest.model;
         const next = { ...rec, key: SETTINGS_KEY, value: rest, version: rec.version + 1, updatedAt: new Date().toISOString() };
-        const written = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(next, rec.version) : (await storage.setMemory(next), true);
+        const written = !!await storage.setMemoryIfVersion(next, rec.version);
         if (written) return true;
     }
     throw new Error(`${gaii} ${SETTINGS_KEY} changed under every one of ${CAS_ATTEMPTS} attempts; the next boot tries again`);

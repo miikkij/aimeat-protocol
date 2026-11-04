@@ -14,6 +14,8 @@
  *   - setCorsHeaders(): writes Allow-Origin/Methods/Headers/Expose headers
  *
  * @version-history
+ *   2026-11-04 — No getMemory fallback for a storage without getMemoryMeta: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — A memory key's origin list is read from the record's metadata (getMemoryMeta), not
  *     the whole record with its value; the agent and the account through the request memo
  *     (services/request-memo.ts). Same origins, same answers (codebase analysis 2026-11-03, item C2).
@@ -150,11 +152,8 @@ async function resolveAllowedOrigins(
         // Phase 4: Memory-level — check if this is a memory request with a key
         const memoryKey = extractMemoryKey(req);
         if (memoryKey) {
-            // The record's metadata only: its value can be large and the route reads it itself. A
-            // store without the metadata read is asked for the record, as before.
-            const record = storage.getMemoryMeta
-                ? await storage.getMemoryMeta(memoryIdentity, memoryKey)
-                : await storage.getMemory(memoryIdentity, memoryKey);
+            // The record's metadata only: its value can be large and the route reads it itself.
+            const record = await storage.getMemoryMeta(memoryIdentity, memoryKey);
             if (record?.allowedOrigins?.length) {
                 return record.allowedOrigins;
             }

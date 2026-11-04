@@ -17,6 +17,8 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   2026-11-04 — No per-key loop for a storage without bulkBinMemory or bulkDeleteMemory: both are
+ *     required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — GET reads the page it answers with and the unread and total counts in SQL
  *     (readNotificationInbox); /:id/answered and POST /read with ids read the named rows by the key's
  *     end, and POST /read with all reads the unread rows. Same answers (codebase analysis 2026-11-03, item C7).
@@ -312,12 +314,9 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
     if (refs.length) {
       if (toBin) {
         const by = resolveIdentity(req.auth!, config.nodeId);
-        if (storage.bulkBinMemory) cleared = await storage.bulkBinMemory(refs, by);
-        else for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key, by)) cleared++; }
-      } else if (storage.bulkDeleteMemory) {
-        cleared = await storage.bulkDeleteMemory(refs);
+        cleared = await storage.bulkBinMemory(refs, by);
       } else {
-        for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key)) cleared++; }
+        cleared = await storage.bulkDeleteMemory(refs);
       }
       emitChange('notifications', ghii);
     }

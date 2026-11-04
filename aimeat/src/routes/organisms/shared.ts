@@ -8,6 +8,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-11-04 — The fallbacks for a storage without listMemoryKeysByPrefix, bulkDeleteMemory,
+ *     bulkSetMemory or getMemoryByKeysAnyOwner are gone: all four are required on Storage (codebase
+ *     analysis 2026-11-03, item D-e).
  *   2026-11-02 — publishDraft and publishDraftsBatch record the publisher in the memory write tally for
  *     the `.latest` they write, as every memory write door does: a member of another account who
  *     publishes over an owner's living-document config is its latest writer, so the unattended pulse
@@ -175,7 +178,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   // (cap/10) writes, not on every write once the cap is reached.
   const pruneDecisionLog = async (organismId: string, prefix: string): Promise<void> => {
     const cap = config.organismDecisionLogCap;
-    if (cap <= 0 || !storage.listMemoryKeysByPrefix || !storage.bulkDeleteMemory) return;
+    if (cap <= 0) return;
     try {
       const keys = await storage.listMemoryKeysByPrefix(prefix);
       if (keys.length <= cap) return;
@@ -492,13 +495,11 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // ONE bulk upsert (every version + latest), then ONE bulk delete (consumed drafts + collapsed
     // copies) — both inside ONE transaction. Publishing a record writes its new version, moves
     // .latest, prunes history past the retention window and consumes the draft; a failure between
-    // those left a version with no .latest, or a consumed draft whose publish never landed. The
-    // fallback loops (a backend without the bulk primitive) are N separate statements, which is
-    // exactly the case that needed the boundary most.
+    // those left a version with no .latest, or a consumed draft whose publish never landed.
     if (toUpsert.length || toDelete.length) {
       await storage.transaction(async () => {
-        if (toUpsert.length) { if (storage.bulkSetMemory) await storage.bulkSetMemory(toUpsert); else for (const r of toUpsert) await storage.setMemory(r); }
-        if (toDelete.length) { if (storage.bulkDeleteMemory) await storage.bulkDeleteMemory(toDelete); else for (const r of toDelete) await storage.deleteMemory(r.ownerGaii, r.key); }
+        if (toUpsert.length) await storage.bulkSetMemory(toUpsert);
+        if (toDelete.length) await storage.bulkDeleteMemory(toDelete);
       });
     }
     // Past every refusal and the write: the published documents' images may now be scoped to the
@@ -567,8 +568,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     canReadWsManifest(callerGaii, `organism.${id}.w.${ws}.meta.manifest`,
       await readWorkspaceMetaRecord(storage, id, ws, 'meta.manifest', config.nodeId));
 
-  /** Batch-fetch the manifest record of MANY workspaces in ONE cross-owner `key IN (…)` read (falls back
-   *  to a per-ws scan when the backend lacks the primitive). Returns wsId → the manifest copy that
+  /** Batch-fetch the manifest record of MANY workspaces in ONE cross-owner `key IN (…)` read. Returns wsId → the manifest copy that
    *  counts (workspaceMetaReader: the creator's, then a manager's; never the freshest whoever wrote it) —
    *  collapses the discovery list's per-workspace canReadWs manifest scans (N → 1). Pair with
    *  {@link canReadWsManifest} to resolve each workspace's access from the pre-fetched manifest without a
@@ -578,9 +578,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     if (wsIds.length === 0) return out;
     const reader = workspaceMetaReader(storage, id, config.nodeId);
     const keyOf = (ws: string) => `organism.${id}.w.${ws}.meta.manifest`;
-    const recs: MemoryRecord[] = storage.getMemoryByKeysAnyOwner ? await storage.getMemoryByKeysAnyOwner(wsIds.map(keyOf)) : [];
+    const recs: MemoryRecord[] = await storage.getMemoryByKeysAnyOwner(wsIds.map(keyOf));
     for (const ws of wsIds) {
-      const m = storage.getMemoryByKeysAnyOwner ? await reader.pick(ws, 'meta.manifest', recs) : await reader.read(ws, 'meta.manifest');
+      const m = await reader.pick(ws, 'meta.manifest', recs);
       if (m) out.set(ws, m);
     }
     return out;
@@ -589,15 +589,13 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   /** Distinct workspace-id count per organism, batched: ONE cross-owner key-IN read of every org's
    *  registry record (`organism.{id}.meta.workspaces` — one per member who created a workspace) instead
    *  of a listAllMemory scan per organism on the ?include=counts list view. Returns orgId → count
-   *  (0 for an org with no registry). Falls back to a per-org scan when the primitive is absent. */
+   *  (0 for an org with no registry). */
   const workspaceCountsByOrg = async (orgIds: string[]): Promise<Map<string, number>> => {
     const counts = new Map<string, number>(orgIds.map(id => [id, 0]));
     if (orgIds.length === 0) return counts;
     const keyToOrg = new Map(orgIds.map(id => [wsRegPrefix(id), id]));
     const idsByOrg = new Map<string, Set<string>>(orgIds.map(id => [id, new Set<string>()]));
-    const recs: MemoryRecord[] = storage.getMemoryByKeysAnyOwner
-      ? await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()])
-      : (await Promise.all(orgIds.map(id => storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 }).then(r => r.items)))).flat();
+    const recs: MemoryRecord[] = await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()]);
     for (const rec of recs) {
       const orgId = keyToOrg.get(rec.key);   // exact-key match (skips any `…workspaces.*` sibling)
       if (!orgId) continue;
@@ -617,9 +615,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const out = new Map<string, Map<string, string>>();
     if (orgIds.length === 0) return out;
     const keyToOrg = new Map(orgIds.map(id => [wsRegPrefix(id), id]));
-    const recs: MemoryRecord[] = storage.getMemoryByKeysAnyOwner
-      ? await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()])
-      : (await Promise.all(orgIds.map(id => storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 }).then(r => r.items)))).flat();
+    const recs: MemoryRecord[] = await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()]);
     for (const rec of recs) {
       const orgId = keyToOrg.get(rec.key);   // exact-key match
       if (!orgId) continue;

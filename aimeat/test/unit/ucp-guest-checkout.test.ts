@@ -77,11 +77,15 @@ function fakeStorage() {
   const mem = new Map<string, { value: unknown; key: string; ownerGaii: string; version: number; createdAt: string }>();
   const put = (o: string, k: string, v: unknown) => mem.set(`${o}|${k}`, { value: structuredClone(v), key: k, ownerGaii: o, version: 1, createdAt: '' });
   put('shop@node-1', 'commerce.psp', { secretKey: 'sk_test_shop' });
+  const setMemory = async (r: { ownerGaii: string; key: string; value: unknown }) => { put(r.ownerGaii, r.key, r.value); return r; };
   return {
     mem,
     getNodeKey: async () => nodeKey,
     getMemory: async (o: string, k: string) => { const r = mem.get(`${o}|${k}`); return r ? { ...r, value: structuredClone(r.value) } : null; },
-    setMemory: async (r: { ownerGaii: string; key: string; value: unknown }) => { put(r.ownerGaii, r.key, r.value); return r; },
+    setMemory,
+    // The conditional writes every Storage has (required since 2026-11-04), landing through setMemory.
+    createMemoryIfAbsent: async (r: { ownerGaii: string; key: string; value: unknown }) => (mem.has(`${r.ownerGaii}|${r.key}`) ? null : setMemory(r)),
+    setMemoryIfVersion: async (r: { ownerGaii: string; key: string; value: unknown }, v: number) => (mem.get(`${r.ownerGaii}|${r.key}`)?.version === v ? setMemory(r) : null),
     deleteMemory: async (o: string, k: string) => mem.delete(`${o}|${k}`),
     listMemoryKeysByPrefix: async (p: string) => [...mem.values()].filter((r) => r.key.startsWith(p)).map((r) => ({ ownerGaii: r.ownerGaii, key: r.key })),
     countMemory: async (owners: string[], opts?: { prefix?: string }) => [...mem.values()].filter((r) => owners.includes(r.ownerGaii) && (!opts?.prefix || r.key.startsWith(opts.prefix))).length,

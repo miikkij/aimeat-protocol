@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — No per-organism scan for a storage without getMemoryByKeysAnyOwner: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — PATCH /v1/agents/:name/runtime-source refuses the shared anonymous principal with 401
  *     AUTH_REQUIRED, as /tags does (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
  *   2026-10-27 — PATCH /v1/agents/:name/mode passes the caller to setAgentMode, which tells the owner
@@ -424,11 +426,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     const wsNames = new Map<string, string>();               // key: `${orgId}::${wsId}`
     // Workspace names: ALL orgs' registries in ONE cross-owner key-IN read (was a listAllMemory scan per org).
     const regByKey = new Map(orgIds.map(id => [`organism.${id}.meta.workspaces`, id]));
-    const regRecs = orgIds.length
-      ? (storage.getMemoryByKeysAnyOwner
-          ? await storage.getMemoryByKeysAnyOwner([...regByKey.keys()])
-          : (await Promise.all(orgIds.map(id => storage.listAllMemory({ prefix: `organism.${id}.meta.workspaces`, limit: 1000 }).then(r => r.items)))).flat())
-      : [];
+    const regRecs = orgIds.length ? await storage.getMemoryByKeysAnyOwner([...regByKey.keys()]) : [];
     for (const rec of regRecs) {
       const orgId = regByKey.get(rec.key);   // exact-key match
       if (!orgId) continue;

@@ -38,6 +38,8 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — `party.stopped`, `party.resumed`: a person registered to the app stopped or let in again (WP9d).
  *   2026-10-31 — `screenshot_public`: the owner's "show the screenshot to everyone" (secaudit2026oct31w2 round 10, W2-12).
  *   v1.11.1 — 2026-10-31 — A move between the active record and the archive (the roll on append, the
@@ -307,10 +309,6 @@ async function writeActive(
     key: appAuditKey(filename), ownerGaii: ownerGhii, value, visibility: 'owner', tags: ['app-audit', 'system'], ttlHours: null,
     version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
   };
-  if (!storage.setMemoryIfVersion || !storage.createMemoryIfAbsent) {
-    await storage.setMemory(record);
-    return true;
-  }
   const saved = existing
     ? await storage.setMemoryIfVersion(record, existing.version)
     : await storage.createMemoryIfAbsent(record);

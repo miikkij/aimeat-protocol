@@ -40,6 +40,8 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   2026-11-04 — A new id is always claimed with createMemoryIfAbsent: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The provider count reads at most MAX_OWNER_PROVIDERS + 1 rows (codebase analysis 2026-11-03, item C1).
  *   2026-10-18 — putOwnerProvider claims a new id with createMemoryIfAbsent and counts the account's
  *     providers after the claim, so MAX_OWNER_PROVIDERS is held on what is stored.
@@ -579,7 +581,7 @@ export async function putOwnerProvider(
   void _s; void _d;
   const providerValue = () => ({ spec: 'aimeat.decision-provider/v1', ...stored, updatedAt: new Date().toISOString() });
   let created = false;
-  if (!existing && storage.createMemoryIfAbsent) {
+  if (!existing) {
     // A new id is claimed (createMemoryIfAbsent) and the account's providers are counted after the
     // claim, the new one included, so the limit holds on what is stored when two adds run at once:
     // a claim past the limit is removed again and refused. A claim that finds the id taken meanwhile

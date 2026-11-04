@@ -24,6 +24,8 @@
  * @structure setWorkplace · clearWorkplace · shareFinishedWork
  * @usage await setWorkplace({ config, storage }, caller, 'morning-news', { organismId, workspaceId });
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a,
  *     decision "From an agent to an app", ruling 4).
  */
@@ -192,9 +194,7 @@ export async function shareFinishedWork(
         ...rec, visibility: 'workspace', workspaceRef: ref,
         version: rec.version + 1, updatedAt: new Date().toISOString(),
       };
-      const done = storage.setMemoryIfVersion
-        ? await storage.setMemoryIfVersion(next, rec.version)
-        : await storage.setMemory(next);
+      const done = await storage.setMemoryIfVersion(next, rec.version);
       if (done) shared += 1;
     }
     return shared;

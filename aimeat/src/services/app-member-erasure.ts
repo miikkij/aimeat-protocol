@@ -22,8 +22,7 @@
  *   FOR GOOD, NOT TO THE BIN. storage.deleteMemory moves a row to the bin, where it can be restored by
  *   key until the sweeper runs. An erased person's records must not come back that way, so this uses
  *   bulkDeleteMemory (a hard delete on both providers) and also takes rows that an earlier removal
- *   already put in the bin. The per-key fallback runs only on a storage without bulkDeleteMemory,
- *   the same as purgeExceptions (services/classification/exceptions.ts).
+ *   already put in the bin.
  *
  *   NOT HERE: the zero-priced exchange grants an approval issued (services/grant-sync.ts). They live
  *   in the metered-grant namespace, keyed by a hash of the consumer's GHII; the step in
@@ -31,6 +30,8 @@
  * @structure eraseAppMembership(storage, account) → AppMembershipErasure
  * @usage const counts = await eraseAppMembership(storage, 'bob');
  * @version-history
+ *   2026-11-04 — No per-key fallback for a storage without bulkDeleteMemory: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-01 — App roster invitations (`app-member-invite`, services/app-member-invites.ts)
  *     go too: the ones the account sent, every one of the apps it owned, and every one addressed to
  *     its verified address, found by the address hash on its identity record.
@@ -117,13 +118,10 @@ function appOwnerOf(row: MemoryRecord, segment: string): string {
   return slash > 0 ? accountOf(id.slice(0, slash)) : '';
 }
 
-/** Delete for good. Hard on both providers; the fallback is for a storage without the bulk call. */
+/** Delete for good. Hard on both providers. */
 async function hardDelete(storage: Storage, refs: Ref[]): Promise<number> {
   if (!refs.length) return 0;
-  if (storage.bulkDeleteMemory) return storage.bulkDeleteMemory(refs);
-  let n = 0;
-  for (const r of refs) if (await storage.deleteMemory(r.ownerGaii, r.key)) n++;
-  return n;
+  return storage.bulkDeleteMemory(refs);
 }
 
 /**

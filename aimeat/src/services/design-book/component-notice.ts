@@ -22,6 +22,8 @@
  * @structure COMPONENT_FAILING_NOTICE · noticeFailingComponents(storage, config)
  * @usage await noticeFailingComponents(storage, config);   // lifecycle.ts: the nightly round; service-init.ts: boot
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-18 — The notice record is a claim written on its version before the notice (check:atomic-writes).
  *   v1.0.0 — 2026-09-26 — Initial.
  */
@@ -47,8 +49,7 @@ function valueOf<T>(value: unknown): T | null {
 async function putBack(storage: Storage, notice: MemoryRecord, prior: MemoryRecord | null): Promise<void> {
   if (!prior) { await storage.deleteMemory(notice.ownerGaii, notice.key, notice.ownerGaii); return; }
   const back: MemoryRecord = { ...prior, version: notice.version + 1, updatedAt: new Date().toISOString() };
-  if (storage.setMemoryIfVersion) await storage.setMemoryIfVersion(back, notice.version);
-  else await storage.setMemory(back);
+  await storage.setMemoryIfVersion(back, notice.version);
 }
 
 /**
@@ -91,8 +92,8 @@ export async function noticeFailingComponents(storage: Storage, config: AimeatCo
       updatedAt: now,
     };
     const claimed = prior
-      ? (storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(notice, prior.version) : (await storage.setMemory(notice), true))
-      : (storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(notice) : (await storage.setMemory(notice), true));
+      ? !!await storage.setMemoryIfVersion(notice, prior.version)
+      : !!await storage.createMemoryIfAbsent(notice);
     if (!claimed) continue;
 
     let sent: Awaited<ReturnType<typeof notify>>;

@@ -53,6 +53,16 @@ function memoryStorage(): Storage {
         findApplicableSchema: async () => null,
         countMemory: async () => rows.size,
         sumMemoryBytes: async () => 0,
+        // Required on Storage since 2026-11-04: the kept totals and the conditional writes.
+        getMemoryTotals: async () => ({ keys: rows.size, bytes: 0 }),
+        createMemoryIfAbsent: async (r: MemoryRecord) => {
+            if (rows.has(`${r.ownerGaii}::${r.key}`)) return null;
+            rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+        },
+        setMemoryIfVersion: async (r: MemoryRecord, v: number) => {
+            if (rows.get(`${r.ownerGaii}::${r.key}`)?.version !== v) return null;
+            rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+        },
     } as unknown as Storage;
 }
 

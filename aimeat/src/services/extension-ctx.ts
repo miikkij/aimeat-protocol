@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.20.4 — 2026-10-31 — ctx.fetch refuses an unknown responseType before resolveOutboundSecrets,
  *     so the refused call does not bind a vault or shared secret to its host (secaudit 2026-10-31 inv-19).
  *   v1.20.3 — 2026-10-27 — ctx.memory.search runs one call at a time per run, queued, so a script that
@@ -524,14 +526,8 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 }
 
                 // Create-only. `createMemoryIfAbsent` answers null when another writer got there
-                // first; a backend without it falls back to the existence check we already read.
+                // first.
                 if (opts.ifVersion === 0) {
-                    if (!storage.createMemoryIfAbsent) {
-                        if (existing) return { ok: false, version: existing.version };
-                        const written = await storage.setMemory({ ...record, version: 1 });
-                        noteWrite();
-                        return { ok: true, version: written?.version ?? 1 };
-                    }
                     const created = await storage.createMemoryIfAbsent({ ...record, version: 1 });
                     if (created) { noteWrite(); return { ok: true, version: created.version }; }
                     const now2 = await storage.getMemory(extMemoryOwner, key);
@@ -540,14 +536,6 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
 
                 // Update-only, at exactly that version.
                 if (!existing) return { ok: false, version: null };
-                if (!storage.setMemoryIfVersion) {
-                    // No atomic update on this backend: refuse rather than pretend. A silent
-                    // last-write-wins here would be the very defect the guard was asked for.
-                    if (existing.version !== opts.ifVersion) return { ok: false, version: existing.version };
-                    const written = await storage.setMemory(record);
-                    noteWrite();
-                    return { ok: true, version: written?.version ?? record.version };
-                }
                 const swapped = await storage.setMemoryIfVersion(record, opts.ifVersion);
                 if (swapped) { noteWrite(); return { ok: true, version: swapped.version }; }
                 const current = await storage.getMemory(extMemoryOwner, key);

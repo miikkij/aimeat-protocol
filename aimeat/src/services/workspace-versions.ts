@@ -29,6 +29,8 @@
  *   const refs = await listVersionRefs(storage, base);
  *   const n = maxVersionOf(refs) + 1;
  * @version-history
+ *   2026-11-04 — No value scan or per-key delete for a storage without listMemoryKeysByPrefix or
+ *     bulkDeleteMemory: both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — compactWorkspaceVersions finds a record's space as the declared namespace the
  *     key continues (declaredNamespaceOf), so the history of a record whose id holds a dot keeps its
  *     space's window, and an append-only space's is never pruned (secaudit2026oct31w2 round 10b).
@@ -62,13 +64,10 @@ export function versionNumberOf(key: string, base: string): number | null {
 }
 
 /** VALUE-FREE list of one record's `.version.N` rows (active rows only — matching the default
- *  archive filter the old value-loading scan used). Uses the key-prefix address primitive when the
- *  backend has it; the fallback loads values (correct, just slower — no current backend needs it). */
+ *  archive filter the old value-loading scan used), by the key-prefix address primitive. */
 export async function listVersionRefs(storage: Storage, base: string): Promise<VersionRef[]> {
   const prefix = `${base}.version.`;
-  const addrs: Array<{ ownerGaii: string; key: string }> = storage.listMemoryKeysByPrefix
-    ? await storage.listMemoryKeysByPrefix(prefix)
-    : (await storage.listAllMemory({ prefix, limit: 10_000 })).items;
+  const addrs: Array<{ ownerGaii: string; key: string }> = await storage.listMemoryKeysByPrefix(prefix);
   const out: VersionRef[] = [];
   for (const a of addrs) {
     const n = versionNumberOf(a.key, base);
@@ -80,9 +79,7 @@ export async function listVersionRefs(storage: Storage, base: string): Promise<V
 /** ONE value-free scan of a whole namespace's version rows, grouped by record base
  *  (`{nsPrefix}{instance}`) — the batch-publish amortisation of {@link listVersionRefs}. */
 export async function versionRefsByBase(storage: Storage, nsPrefix: string): Promise<Map<string, VersionRef[]>> {
-  const addrs: Array<{ ownerGaii: string; key: string }> = storage.listMemoryKeysByPrefix
-    ? await storage.listMemoryKeysByPrefix(nsPrefix)
-    : (await storage.listAllMemory({ prefix: nsPrefix, limit: 100_000 })).items;
+  const addrs: Array<{ ownerGaii: string; key: string }> = await storage.listMemoryKeysByPrefix(nsPrefix);
   const byBase = new Map<string, VersionRef[]>();
   for (const a of addrs) {
     // `{nsPrefix}{instance}.version.{N}` — split on the LAST '.version.' so an instance id that
@@ -152,10 +149,7 @@ export async function pruneVersionsAfterPublish(
     const window = effectiveMaxVersions(config, opts.ot);
     const doomed = versionRefsToPrune(opts.refs, opts.publishedN, window);
     if (!doomed.length) return 0;
-    if (storage.bulkDeleteMemory) return await storage.bulkDeleteMemory(doomed.map(r => ({ ownerGaii: r.ownerGaii, key: r.key })));
-    let removed = 0;
-    for (const r of doomed) if (await storage.deleteMemory(r.ownerGaii, r.key)) removed++;
-    return removed;
+    return await storage.bulkDeleteMemory(doomed.map(r => ({ ownerGaii: r.ownerGaii, key: r.key })));
   } catch (err) {
     logger.warn(`Workspace version prune failed (publish succeeded): ${(err as Error).message}`);
     return 0;
@@ -241,8 +235,7 @@ export async function compactWorkspaceVersions(
 
   for (let i = 0; i < doomed.length; i += 500) {
     const chunk = doomed.slice(i, i + 500);
-    if (storage.bulkDeleteMemory) result.pruned += await storage.bulkDeleteMemory(chunk);
-    else for (const r of chunk) { if (await storage.deleteMemory(r.ownerGaii, r.key)) result.pruned++; }
+    result.pruned += await storage.bulkDeleteMemory(chunk);
   }
   if (result.pruned > 0) {
     logger.info(`Workspace version compaction: pruned ${result.pruned} of ${result.versionRowsScanned} history rows across ${result.recordsPruned} records${result.workspacesSkipped ? ` (${result.workspacesSkipped} workspaces skipped: no readable manifest)` : ''}`);

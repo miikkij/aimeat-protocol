@@ -25,6 +25,8 @@
  * @usage
  *   const key = await canonicalAppToolsKey(storage, ownerGhii, 'apps.nuotta.tools'); // 'apps.nuotta.html.tools'
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without createMemoryIfAbsent: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — A datapackage listing's surface names no app, so it is not read for one (plan D5.1).
  *   v1.1.0 — 2026-10-18 — The record is claimed before the work (services/once-only-step.ts), and a
  *     manifest is created under the filename key only if that key is still empty (createMemoryIfAbsent),
@@ -139,7 +141,7 @@ async function carryManifests(
             // Created only if the filename key is still empty: a manifest published there after the
             // check above stays, and this one is left for the owner like any other taken key.
             const carried = { ...rec, key: toKey, updatedAt: new Date().toISOString() };
-            const created = storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(carried) : (await storage.setMemory(carried), true);
+            const created = !!await storage.createMemoryIfAbsent(carried);
             if (!created) { taken(label); continue; }
             await reconcileAfterSourceWrite(storage, ownerGhii, toKey);
             await storage.deleteMemory(ownerGhii, summary.key, system);

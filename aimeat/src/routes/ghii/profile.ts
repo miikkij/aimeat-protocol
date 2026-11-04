@@ -6,6 +6,8 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — No per-user getMemory for a storage without getMemoryByKeysAnyOwner: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — PUT /v1/ghii checks its body with validateBody (models/write-body-schemas.ts): a
  *     too-long or junk display name, bio or avatar is a 400 naming the field.
  *   2026-10-26 — GET /v1/ghii/list on a node with members see each other on lists every active person of
@@ -104,9 +106,7 @@ export function registerProfileRoutes(
             for (const r of await nodeColleagues(storage, config.nodeId)) optInGaiis.add(r.ghii);
         } else if (others.length) {
             const keys = others.map(r => `profile.${r.username}.directory_listed`);
-            const recs = storage.getMemoryByKeysAnyOwner
-                ? await storage.getMemoryByKeysAnyOwner(keys)
-                : (await Promise.all(others.map(r => storage.getMemory(r.ghii, `profile.${r.username}.directory_listed`)))).filter((m): m is NonNullable<typeof m> => !!m);
+            const recs = await storage.getMemoryByKeysAnyOwner(keys);
             for (const m of recs) if (m.value === true) optInGaiis.add(m.ownerGaii);
         }
         const listed = all.filter(r => r.ownerName === callerOwner || optInGaiis.has(r.ghii));

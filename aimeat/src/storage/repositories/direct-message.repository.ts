@@ -7,6 +7,8 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   2026-11-04 -- getDirectMessagesByIds and listConversationsForOwners are required: both providers
+ *     implement them (codebase analysis 2026-11-03, item D-e).
  *   v1.7.0 -- 2026-10-26 -- Reactions on a single message (addMessageReaction, removeMessageReaction,
  *     listMessageReactions) and listDirectMessageCopies, which a reaction from another node checks against.
  *   v1.6.0 -- 2026-10-21 -- Group chat: updateConversation takes `invited` and `createdBy` (ConversationUpdate),
@@ -91,9 +93,9 @@ export interface DirectMessageRepository {
   /**
    * BULK PRIMITIVE (Phase 3) — many messages by id under ONE owner mailbox in one `IN (…)` query. Backs
    * the pending first-contact requests list (was getDirectMessage per pending contact). Returns the rows
-   * that exist; the caller indexes by `record.id` (the message id). Optional — falls back to a per-id loop.
+   * that exist; the caller indexes by `record.id` (the message id).
    */
-  getDirectMessagesByIds?(ids: string[], ownerGhii: string): Promise<DirectMessageRecord[]>;
+  getDirectMessagesByIds(ids: string[], ownerGhii: string): Promise<DirectMessageRecord[]>;
   /** Every mailbox copy of one message on this node, whoever's mailbox holds it. A reaction from
    *  another node names the message and the reactor, never the mailbox, so its check starts here. */
   listDirectMessageCopies(id: string): Promise<DirectMessageRecord[]>;
@@ -148,9 +150,9 @@ export interface DirectMessageRepository {
    * with a fleet paid one listConversations per agent). Same per-thread shape and semantics as
    * {@link listConversations}; keyed by ownerGhii (an owner with no threads is absent from the map).
    * Implemented as ONE grouped aggregate + ONE last-message + ONE subject query (window functions),
-   * independent of the owner count. Optional — a backend without it falls back to a per-owner loop.
+   * independent of the owner count.
    */
-  listConversationsForOwners?(ownerGhiis: string[]): Promise<Record<string, ConversationSummary[]>>;
+  listConversationsForOwners(ownerGhiis: string[]): Promise<Record<string, ConversationSummary[]>>;
   /** Mark a single message read (sets readAt + status='read'). Returns the updated row. */
   markMessageRead(id: string, ownerGhii: string): Promise<DirectMessageRecord | null>;
   /** Mark every inbound message in a conversation read. Returns count updated. */
