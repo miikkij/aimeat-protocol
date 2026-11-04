@@ -17,6 +17,9 @@
  * @usage pnpm exec vitest run test/unit/pg-read-retry.test.ts
  *        DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/pg-read-retry.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-05 — The sleep marker's last digit is never 0, so the SQL literal keeps it
+ *            whole and the search in pg_stat_activity finds the statement (it missed about one run
+ *            in ten).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item HA stage 3).
  */
 import { randomUUID } from 'node:crypto';
@@ -189,8 +192,12 @@ describe('dropLostConnections', () => {
 });
 
 describe.skipIf(!PG_URL)('read retry on PostgreSQL: a backend ended under a running statement', () => {
-  /** A sleep of about 3 s whose length names the statement in pg_stat_activity. */
-  const sleepMarker = (): string => `3.0${Math.floor(Math.random() * 9000) + 1000}`;
+  /**
+   * A sleep of about 3 s whose length names the statement in pg_stat_activity. The last digit is
+   * never 0: the SQL literal is written from Number(marker), which drops a trailing zero, and the
+   * search for the marker would then miss the statement.
+   */
+  const sleepMarker = (): string => `3.0${Math.floor(Math.random() * 9000) + 1000}${Math.floor(Math.random() * 9) + 1}`;
 
   /** Run `start`, end the backend that runs the statement marked `marker`, and answer what `start` settled to. */
   async function endUnder<T>(marker: string, start: () => Promise<T>): Promise<PromiseSettledResult<T>> {
