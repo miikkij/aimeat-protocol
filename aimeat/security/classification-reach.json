@@ -390,18 +390,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists instance namespace memory only to delete it."
     },
-    "src/services/extension-access/paywall.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The tool manifest, read to check the paywall binding."
-    },
-    "src/services/extension-access/priced-binding.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool manifests, read to list the priced tool bindings."
-    },
     "src/routes/federation-genesis-memory-read.ts": {
       "reads": {
         "getMemory": 1,
@@ -594,20 +582,6 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Intake form configuration records."
-    },
-    "src/services/organism-record-helpers.ts": {
-      "reads": {
-        "listAllMemory": 3
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Draft reopen copies internally, collapse deletes, and the organism meta.config."
-    },
-    "src/services/organism-gate.ts": {
-      "reads": {
-        "listMemoryKeysByPrefix": 1,
-        "listAllMemory": 3,
-        "getMemoryByKeysAnyOwner": 3
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
     },
     "src/routes/organisms/workspace-access.ts": {
       "reads": {
@@ -826,7 +800,7 @@
     },
     "src/services/ai-allowance.ts": {
       "reads": {
-        "getMemory": 3
+        "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter. The third read (2026-10-25, secaudit2026oct22) is the same counter, read once outside the per-account queue so a read that needs no starter grant does not wait in it."
     },
@@ -1208,6 +1182,13 @@
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.4), the node's own read: after a label rises, the levels of the records and files it covers are read (metadata, and a record's value only to write it back unchanged with the lower level) so that what is over its label's audience cap is lowered; nothing is returned to anyone. listStorageFiles (2026-10-18, L5): the metadata of the files in an app's own namespace when the app's label rises, no bytes."
     },
+    "src/services/classification-run/scan.ts": {
+      "reads": {
+        "getMemory": 2,
+        "getOwnerScopeMemory": 1
+      },
+      "why": "The node's own read (TARGET-082 V3): a record's text feeds the Content Classifier, which checks useForAi before any model sees it; nothing is returned to the caller but the label outcome. Since 2026-10-22 (secaudit 2026-10, v76) a record hidden from the caller is read only to learn that it is hidden, and the caller's own record at the same key is scanned in its place."
+    },
     "src/services/classification/default-caps-state.ts": {
       "reads": {
         "getMemory": 1
@@ -1256,13 +1237,6 @@
         "getMemory": 1
       },
       "why": "The node's own read (TARGET-082 V1): the owner's classification switch record, never shown to anyone."
-    },
-    "src/services/classification-run/scan.ts": {
-      "reads": {
-        "getMemory": 2,
-        "getOwnerScopeMemory": 1
-      },
-      "why": "The node's own read (TARGET-082 V3): a record's text feeds the Content Classifier, which checks useForAi before any model sees it; nothing is returned to the caller but the label outcome. Since 2026-10-22 (secaudit 2026-10, v76) a record hidden from the caller is read only to learn that it is hidden, and the caller's own record at the same key is scanned in its place."
     },
     "src/services/classification/system-record.ts": {
       "reads": {
@@ -1971,6 +1945,18 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A single-use pay-token record, consumed on read."
     },
+    "src/services/extension-access/paywall.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The tool manifest, read to check the paywall binding."
+    },
+    "src/services/extension-access/priced-binding.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool manifests, read to list the priced tool bindings."
+    },
     "src/services/extension-ctx.ts": {
       "reads": {
         "getMemory": 6,
@@ -2452,11 +2438,25 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Comments pass reader.show. 2026-09-30: deleteComment() reads one comment row to check its author before a soft delete; it hands no content to the caller (moved here unchanged from the DELETE route in routes/organisms/workspace-read.ts)."
     },
+    "src/services/organism-gate.ts": {
+      "reads": {
+        "listMemoryKeysByPrefix": 1,
+        "listAllMemory": 3,
+        "getMemoryByKeysAnyOwner": 3
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
+    },
     "src/services/organism-readme.ts": {
       "reads": {
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The README reaches callers through showOrganismReadme; getOrganismReadme feeds the update echo and read-to-update."
+    },
+    "src/services/organism-record-helpers.ts": {
+      "reads": {
+        "listAllMemory": 3
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Draft reopen copies internally, collapse deletes, and the organism meta.config."
     },
     "src/services/organism-search.ts": {
       "reads": {
@@ -2704,6 +2704,13 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The proactive-mode setting."
+    },
+    "src/services/process-lease.ts": {
+      "reads": {
+        "getMemory": 5,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-04 (codebase analysis wave 3, HA stage 2), the node's own read: the process leases and the held and sweep leases under lease.*, owned by the node's system identity; no person's content is read and nothing read here reaches a caller."
     },
     "src/services/provenance-embed/index.ts": {
       "reads": {
@@ -3114,7 +3121,7 @@
     },
     "src/services/workflow/lifecycle.ts": {
       "reads": {
-        "getMemory": 6
+        "getMemory": 5
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: System active-run and event-trigger indexes."
     },

@@ -617,9 +617,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     const out = new Map<string, Map<string, string>>();
     if (orgIds.length === 0) return out;
     const keyToOrg = new Map(orgIds.map(id => [wsRegPrefix(id), id]));
-    const recs: MemoryRecord[] = storage.getMemoryByKeysAnyOwner
-      ? await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()])
-      : (await Promise.all(orgIds.map(id => storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 }).then(r => r.items)))).flat();
+    const recs: MemoryRecord[] = await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()]);
     for (const rec of recs) {
       const orgId = keyToOrg.get(rec.key);   // exact-key match
       if (!orgId) continue;

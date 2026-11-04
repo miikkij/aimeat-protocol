@@ -9,6 +9,10 @@
       "reason": "REVIEWED 2026-11-04 — the suite is about the process, not a principal. It stops a node of its own and checks that a request in flight finishes, that readiness answers 503 while it drains, that a new connection is refused and that it exits 0. The one account it registers only opens a live stream; nothing it asserts depends on who asks.",
       "sha": "926d14f35e924f13"
     },
+    "test/e2e-two-process-leases.ts": {
+      "reason": "REVIEWED 2026-11-04 — the suite is about processes, not a principal. Two processes of one node on one database: a queued AI job runs once, a sweep runs once per round, and a killed process's job is finished by the other. One owner queues the job so there is a job to run; which process runs it changes nothing about who may read or cancel it, and another owner's job answering 404 on read and cancel is fenced in e2e-ai-jobs case 12.",
+      "sha": "1aa0e81a526f8a14"
+    },
     "test/e2e-boot-lock.ts": {
       "reason": "REVIEWED 2026-11-04 — the suite has no principal. Two processes boot on one empty database and both must answer readiness; no request in it carries a credential.",
       "sha": "e04d1079d9d67384"
