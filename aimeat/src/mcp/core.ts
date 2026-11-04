@@ -193,7 +193,7 @@ import { registerAdminNodeUpdateTools } from './admin-node-update.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
-import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
+import { resolveMcpWriteTarget } from '../services/write-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { presentMemory, classificationWarningOf } from '../services/classification/present-memory.js';

@@ -23,7 +23,7 @@ import {
     isOutsideWildcard, scopeIsCovered, uncoveredScopes,
 } from '../../src/utils/scope-coverage.js';
 import { NOT_IN_WILDCARD } from '../../public/views/profile/agents/scope-model.js';
-import { hasWriteReserved, hasWriteAsOwner } from '../../src/routes/memory/owner-target.js';
+import { hasWriteReserved, hasWriteAsOwner } from '../../src/services/write-target.js';
 
 describe('the wildcard rule', () => {
     it('a global wildcard covers an ordinary scope', () => {

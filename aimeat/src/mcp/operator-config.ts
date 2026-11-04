@@ -72,7 +72,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { logger } from '../utils/logger.js';
 import { checkScopeAddition, recordScopeAddition } from '../services/agent-scope-add.js';
-import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
+import { resolveMcpWriteTarget } from '../services/write-target.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { CAS_ATTEMPTS } from '../services/record-cas.js';
 import { recommendedModelsOf } from '../services/ai/policy-store.js';
@@ -301,7 +301,7 @@ export function registerOperatorConfigTools(
         async ({ daily_budget_usd, model, reasoning_model, execution_model, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
             // This tool writes into the OWNER's namespace, and the platform decides that move in one
-            // place: routes/memory/owner-target.ts. It answers two questions this door used to
+            // place: services/write-target.ts. It answers two questions this door used to
             // answer for itself, or not at all. memory:write-as-owner was checked here by hand. The
             // reserved-key guard was not checked anywhere: `openrouter.settings` is one of the keys
             // the server itself reads and trusts (the URL a decrypted AI key is sent to lives in

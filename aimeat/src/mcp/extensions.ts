@@ -103,12 +103,13 @@ import { getExtSecretKeys, maskSecretFields } from '../services/extension-secret
 import { usesSecretsOf } from '../services/extension-secret-uses.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { enforcePaywall } from '../routes/extensions/paywall.js';
-import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
+import { enforcePaywall } from '../services/extension-access/paywall.js';
+import { createRefusalRecorder, refusalText } from '../services/extension-access/metered-response.js';
 import { localAccountName } from '../utils/gaii.js';
 import { invokeExtensionAction } from '../services/extension-invoke.js';
 import { capabilitiesOfRecord } from '../services/extension-capability-declaration.js';
-import { canManageExtensionAs, installRoleRefusal, type ExtensionCaller } from '../routes/extensions/permissions.js';
+import { canManageExtensionAs, type ExtensionCaller } from '../services/extension-access/manage.js';
+import { installRoleRefusal } from '../services/extension-install-role.js';
 import { findExtension, placeExtensionInstall } from '../services/component-address.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { codeHoldRefusal, takeHoldOff } from '../services/extension-code-hold.js';

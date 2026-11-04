@@ -205,7 +205,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/routes/extensions/internal-pass.ts :: map :: passes": {
+    "src/services/extension-access/internal-pass.ts :: map :: passes": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -1204,6 +1204,10 @@
     "src/services/refinery/runs.ts :: map :: runs": {
       "count": 1,
       "reason": "DEBT"
+    },
+    "src/services/request-injector.ts :: map :: targets": {
+      "count": 1,
+      "reason": "This process's own Express app and listening server per port: a request the node makes to itself goes to the process that makes it, which a second process changes nothing in."
     },
     "src/services/request-nonce.ts :: map :: seen": {
       "count": 1,

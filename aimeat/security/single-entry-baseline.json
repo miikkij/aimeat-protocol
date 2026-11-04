@@ -688,6 +688,28 @@
         "why": "settleRefreshCookieWindowAtStart stores auth.refresh_cookie_legacy_until once at start when no source set it: the node's own write, no caller, and the row has no tighten-only rule."
       }
     },
-    "mail-send": {}
+    "mail-send": {},
+    "self-fetch": {
+      "src/services/app-artifact-lint.ts": {
+        "count": 2,
+        "why": "The publish-time asset probe (probeOne) and the cortex lib read (readNodeLib): anonymous server-side GETs of the node's own served paths, with appAssetProbe off in tests. Not a headless browser, as the codebase analysis listed them; they could take the in-process dispatch too, which D-j did not include."
+      },
+      "src/services/app-playtest.ts": {
+        "count": 1,
+        "why": "The headless browser loads the app page from this origin, and the page's relative URLs resolve against it; a browser needs a real socket."
+      },
+      "src/services/connect-tunnel.ts": {
+        "count": 1,
+        "why": "loopbackBase: the origin a tunnel frame's path is resolved against and pinned to (the SSRF guard in connect-tunnel-forward.ts). No request goes to it over a socket: the forward is dispatched in process."
+      },
+      "src/services/design-book/bench.ts": {
+        "count": 1,
+        "why": "The headless browser loads the bench page from this origin, and the kit's relative assets resolve against it; a browser needs a real socket."
+      },
+      "src/services/headless-network.ts": {
+        "count": 2,
+        "why": "The headless browser's own-origin list, and the base from which the node fetches (through safeFetch) what that browser asks of the node's own pages. Part of the headless rendering the codebase analysis left on the socket."
+      }
+    }
   }
 }

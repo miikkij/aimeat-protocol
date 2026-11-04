@@ -80,8 +80,8 @@ const aimeatHashRef: (s: string) => string =
 import { keepErrorMessage } from '../../middleware/internal-error-text.js';
 import { callerPrincipal } from '../../utils/gaii.js';
 import { callerOf } from '../../middleware/caller.js';
-import { INTERNAL_PASS_HEADER } from './internal-pass.js';
-import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
+import { INTERNAL_PASS_HEADER } from '../../services/extension-access/internal-pass.js';
+import { enforcePaywall, APP_TOOL_HEADER } from '../../services/extension-access/paywall.js';
 import type { EmailService } from '../../services/email.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { invokeExtensionAction } from '../../services/extension-invoke.js';

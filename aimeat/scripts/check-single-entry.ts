@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.9.0 — 2026-11-04 — Rule self-fetch: a request the node makes to itself goes through
+ *     services/request-injector.ts; the baseline is the headless-browser modules and the tunnel's
+ *     resolution origin (codebase analysis 2026-11-03, item D-j).
  *   v1.8.0 — 2026-11-04 — Rule mail-send: a mail goes out through sendMail (services/mail-gate.ts); the
  *     24 files that called the mail service directly moved onto it, so the baseline is empty. RULES is
  *     exported for its unit test (codebase analysis 2026-11-03, item B3).
@@ -187,6 +190,15 @@ export const RULES: Rule[] = [
     label: 'A route\'s caller is callerOf(req) (middleware/caller.ts), built once per request with its answers on it, not an object copied field by field from req.auth (C9)',
     pattern: /roles:req\.auth!?\.roles/,
     skipDirs: ['src/middleware/caller.ts', 'src/auth/'],
+  },
+  {
+    id: 'self-fetch',
+    label: 'A request the node makes to itself goes through services/request-injector.ts, in process with no socket; only the modules that load real pages in a headless browser address 127.0.0.1 on the node\'s port (codebase analysis 2026-11-03, D-j)',
+    // A template literal that addresses 127.0.0.1 on a port expression: `http://127.0.0.1:${config.port}`.
+    pattern: /127\.0\.0\.1:\$\{[\w.]*port\}/,
+    // The injector builds the origin. src/cli is the connector, a process of its own whose local
+    // daemon listens on a port of its own.
+    skipDirs: ['src/services/request-injector.ts', 'src/cli/'],
   },
   {
     id: 'sale-booking',

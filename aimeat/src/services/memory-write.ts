@@ -15,7 +15,7 @@
  *   scope gate, the schema lock, the optimistic-version check, the shadowing warning, the provenance
  *   stamp, the record shape, and the change event. NOT shared, because it genuinely belongs to one
  *   door: how a request is parsed, how a refusal is rendered, where the write TARGET comes from (the
- *   two resolvers already live together in routes/memory/owner-target.ts), and the HTTP-only
+ *   two resolvers already live together in services/write-target.ts), and the HTTP-only
  *   pre-checks a browser request carries — workspace access on `organism.*` keys and the ecosystem
  *   data-area allowlist, which are about who is knocking rather than about the write itself.
  *

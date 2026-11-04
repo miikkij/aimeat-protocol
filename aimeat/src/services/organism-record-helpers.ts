@@ -1,15 +1,17 @@
 /**
- * @file src/routes/organisms/record-helpers.ts
+ * @file src/services/organism-record-helpers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The organism/workspace helpers that need no config and no closure: the namespace write
  *   rule, the role ladder, the freshest-copy tie-break, the member-GHII normaliser and the fork
- *   collapse. Extracted from ./shared.ts by pure move on 2026-08-11 when that file passed the
- *   800-line limit; the bodies are byte-identical and ./shared.ts re-exports the public ones, so
- *   every existing import (including src/mcp/workspaces.ts) resolves unchanged.
+ *   collapse. Extracted from routes/organisms/shared.ts (now ./organism-gate.ts) by pure move on
+ *   2026-08-11 when that file passed the 800-line limit; the bodies are byte-identical, and
+ *   routes/organisms/shared.ts re-exports the public ones for the organism route groups.
  * @structure canWriteNamespaceRule · roleSatisfies · fresherRec · ownerGhiiOf · collapseKeyTo · revertRecordToDraft
- * @usage import { fresherRec, ownerGhiiOf } from './record-helpers.js';
+ * @usage import { fresherRec, ownerGhiiOf } from '../services/organism-record-helpers.js';
  * @version-history
+ *   2026-11-04 — Moved unchanged from routes/organisms/record-helpers.ts with the organism gate
+ *     (services/organism-gate.ts), which reads it (codebase analysis 2026-11-03, item D-f).
  *   2026-10-27 — readOrganismMetaValue: readOrganismConfig's rule for any organism-level meta record,
  *     which the gate policy's manifest read uses (secaudit2026oct26, organism-meta-first-store-order-copy).
  *   2026-10-25 — readOrganismConfig takes the newest copy of a current creator or admin of the
@@ -20,9 +22,9 @@
  *     in shared.ts keeps the refusal and calls this.
  *   v1.0.0 — 2026-08-11 — Extracted from shared.ts (max-file-lines); no behaviour change.
  */
-import type { MemoryRecord, Storage } from '../../storage/interface.js';
-import { logger } from '../../utils/logger.js';
-import { localAccountOf } from '../../utils/gaii.js';
+import type { MemoryRecord, Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
+import { localAccountOf } from '../utils/gaii.js';
 
 /**
  * Who may write in which namespace of a workspace: `meta.*` is the organism's own structure — its

@@ -1,5 +1,5 @@
 /**
- * @file src/routes/memory/owner-target.ts
+ * @file src/services/write-target.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description "Write this into the OWNER's namespace, not mine" — the one place that decides
@@ -23,20 +23,25 @@
  *   What this does NOT touch: `visibility`. Where a record lands and who may read it are different
  *   axes. A record written into the owner's namespace with `visibility:'public'` is exactly as
  *   public as it was before.
- * @structure resolveWriteTarget(req, config, ownerScopeRequested) → { gaii, delegatedOwnerWrite, reservedAllowed } | denial
+ * @structure resolveWriteTarget(req, config, ownerScopeRequested) → { gaii, delegatedOwnerWrite, reservedAllowed } | denial ·
+ *   resolveMcpWriteTarget(args) → { gaii } | denial · hasWriteAsOwner · hasWriteReserved
  * @usage
  *   const t = resolveWriteTarget(req, config, body.owner_scope === true);
  *   if ('deny' in t) { res.status(403).json(error(...t.deny)); return; }
  * @version-history
+ *   v1.1.0 — 2026-11-04 — Moved unchanged from routes/memory/owner-target.ts, so the MCP tools and the
+ *     routes import the decision from a service. resolveWriteTarget takes anything that carries the
+ *     verified token as `auth` (an Express request does), instead of the Express Request type
+ *     (codebase analysis 2026-11-03, item D-f).
  *   v1.0.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.0.1 — 2026-10-05 — hasWriteAsOwner is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.0.0 — 2026-08-08 — Initial.
  */
-import type { Request } from 'express';
-import type { AimeatConfig } from '../../config.js';
-import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
-import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import type { AimeatConfig } from '../config.js';
+import type { VerifiedToken } from '../auth/jwt.js';
+import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
+import { appMayWriteKey } from '../utils/reserved-keys.js';
 
 /**
  * The two scopes this module gates on. They are defined in utils/scope-coverage.ts — the one place
@@ -50,8 +55,8 @@ import { appMayWriteKey } from '../../utils/reserved-keys.js';
  * grants or approves scopes — ask utils/scope-coverage.ts. Two surfaces hand-rolled it and both
  * became a way for an agent to grant itself this scope with no owner involved.
  */
-export { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
-import { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
+export { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
+import { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
 
 export interface WriteTarget {
     /** The namespace the record will be written under. */
@@ -93,7 +98,7 @@ export function hasWriteReserved(scopes: string[] | undefined): boolean {
  * error — asking for what you are is not a mistake worth a 403.
  */
 export function resolveWriteTarget(
-    req: Request, config: AimeatConfig, ownerScopeRequested: boolean,
+    req: { auth?: VerifiedToken }, config: AimeatConfig, ownerScopeRequested: boolean,
 ): WriteTarget | WriteTargetDenied {
     const own = resolveIdentity(req.auth!, config.nodeId);
     const roles = req.auth!.roles ?? [];

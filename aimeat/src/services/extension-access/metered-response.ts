@@ -1,5 +1,5 @@
 /**
- * @file src/routes/extensions/metered-response.ts
+ * @file src/services/extension-access/metered-response.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Turning one {@link MeteredOutcome} into an HTTP response.
@@ -26,13 +26,15 @@
  *                         productRefusal wrote (secaudit 2026-10-31 inv-05).
  *   v1.5.0 — 2026-11-01 — `prepaid_ended`: an outside party's prepaid contract is used up, 402
  *                         PREPAID_ENDED (plan doc-mvwxcas3dom3, D5.4).
+ *   v1.5.1 — 2026-11-04 — Moved unchanged from routes/extensions/ with the paywall (codebase analysis
+ *                         2026-11-03, item D-f).
  */
 import type { AimeatConfig } from '../../config.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { formatMoneyMajor } from '../../commerce/money.js';
 import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
-import type { MeteredOutcome } from '../../services/metered-access.js';
+import type { MeteredOutcome } from '../metered-access.js';
 
 /** A refusal is anything that is neither a settled call, a free one, nor "you hold no right". */
 type Refusal = Exclude<MeteredOutcome, { kind: 'settled' } | { kind: 'free_owner' } | { kind: 'no_right' }>;

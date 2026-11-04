@@ -161,7 +161,7 @@ function ownerIdentityBehind(deps: MemoryBinDeps, req: MemoryBinRequest): string
 
 /**
  * Whether these scopes let the caller remove or put back THIS key under the owner's own identity.
- * The two words are the write's (routes/memory/owner-target.ts resolveMcpWriteTarget), so an agent
+ * The two words are the write's (services/write-target.ts resolveMcpWriteTarget), so an agent
  * removes under its owner exactly what it may write there: `memory:write-as-owner`, and
  * `memory:write-reserved` as well for a key the server reads and trusts.
  */

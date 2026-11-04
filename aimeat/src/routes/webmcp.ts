@@ -94,8 +94,8 @@ import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-a
 import type { MeteredEntitlement } from '../services/metered-entitlements.js';
 import { refuseAppToolInvokeWithoutWord } from './webmcp-invoke-gate.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
-import { respondMeteredRefusal } from './extensions/metered-response.js';
-import { mintInternalPass } from './extensions/internal-pass.js';
+import { respondMeteredRefusal } from '../services/extension-access/metered-response.js';
+import { mintInternalPass } from '../services/extension-access/internal-pass.js';
 import { logger } from '../utils/logger.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';

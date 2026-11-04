@@ -41,7 +41,7 @@ export interface MemoryWriteFanout {
 export interface MemoryWriteCaller {
     /** The principal that WROTE this. Provenance names this, never the namespace it lands in. */
     principal: string;
-    /** Namespace the record lands in, already resolved through routes/memory/owner-target.ts. */
+    /** Namespace the record lands in, already resolved through services/write-target.ts. */
     targetGaii: string;
     /** Scopes on the session. An owner or operator role passes without one, as requireScope does. */
     scopes: string[];

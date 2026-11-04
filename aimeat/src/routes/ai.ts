@@ -142,7 +142,7 @@ import { updatePrivateRecord } from '../services/private-record.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { isOperatorCaller } from '../services/operator-override.js';
-import { resolveWriteTarget } from './memory/owner-target.js';
+import { resolveWriteTarget } from '../services/write-target.js';
 import { parseGenRulesBypass } from '../services/ai/gen-rules.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the

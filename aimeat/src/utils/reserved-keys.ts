@@ -598,7 +598,7 @@ export function appMayWriteKey(
   if (isOwnerInPerson({ roles })) return true;
   if (!roles.includes('app') && !delegatedOwnerWrite) return true;
   // The owner can hand even these over, deliberately and per agent — see WRITE_RESERVED_SCOPE in
-  // routes/memory/owner-target.ts for why that grant is NOT part of the '*' bundle.
+  // services/write-target.ts for why that grant is NOT part of the '*' bundle.
   if (reservedAllowed) return true;
   return !isReservedServerKey(key);
 }

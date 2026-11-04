@@ -154,7 +154,7 @@ export async function collectWorkspace(
 
   // SECURITY (C-5): membership of the organism is not access to every workspace in it. The live read
   // decides per workspace, on its manifest record — an org manager reads all, the manifest's own
-  // owner reads theirs, anyone else needs authorizeRead to allow it (routes/organisms/shared.ts
+  // owner reads theirs, anyone else needs authorizeRead to allow it (services/organism-gate.ts
   // canReadWsManifest, and workspace-read.ts, which then serves the workspace all-or-nothing). The
   // bundle export used to skip that decision entirely and hand every active member every workspace,
   // including ones the organism's own workspace list reports to them as `access: 'none'`. Refusing

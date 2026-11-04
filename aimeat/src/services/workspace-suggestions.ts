@@ -43,7 +43,7 @@
  */
 import { v4 as uuidv4 } from 'uuid';
 import type { PendingApprovalRecord } from '../storage/interface.js';
-import { createOrganismHelpers } from '../routes/organisms/shared.js';
+import { createOrganismGate } from './organism-gate.js';
 import { expireOverdueApprovals, expireApproval, isOverdue } from './gate-expiry.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { canReadWorkspace } from './workspace-access.js';
@@ -376,7 +376,7 @@ export async function decideSuggestion(
         return refusal(gate.status, gate.code, 'Deciding this suggestion takes the permission to change what it changes, and this session does not hold it. Decide it from your own session instead.');
     }
 
-    const H = createOrganismHelpers(config, storage);
+    const H = createOrganismGate(config, storage);
     if (decision === 'decline') {
         const updated = await storage.updatePendingApproval(a.id, {
             status: 'rejected', decidedBy: caller.principal, decidedAt: nowIso,

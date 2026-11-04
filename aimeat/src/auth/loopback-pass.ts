@@ -29,8 +29,15 @@
  *   bearer still has to verify, and only the refusal of an MCP-bound token on REST stands down.
  *   It lives for the call that minted it (revoked in that call's `finally`) and at most TTL_MS.
  *
- *   Not single use, unlike routes/extensions/internal-pass.ts: one `aimeat_invoke` may make several
- *   REST calls for one capability, and every one of them is the same caller's.
+ *   Not single use, unlike services/extension-access/internal-pass.ts: one `aimeat_invoke` may make
+ *   several REST calls for one capability, and every one of them is the same caller's.
+ *
+ *   SINCE 2026-11-04 NOTHING IN THE NODE MINTS A PASS. The three tools dispatch their request in
+ *   process (services/request-injector.ts), with no socket, and the request's connection carries the
+ *   caller's mark (auth/injected-request.ts), which auth/mcp-token-on-rest.ts accepts as it accepted
+ *   the pass. The functions stay, and so does the check in mcp-token-on-rest.ts, because
+ *   test/unit/mcp-token-on-rest.test.ts asserts them directly; retiring them is the developer's call.
+ *   fromNodeMachine also answers false for an in-process request.
  * @structure LOOPBACK_PASS_HEADER · mintLoopbackPass(bearer) · revokeLoopbackPass(pass) ·
  *   loopbackPassCovers(pass, bearer, remoteAddress) · isLoopbackAddress(addr) · SELF_REQUEST_HEADER ·
  *   fromNodeMachine(req)
@@ -41,6 +48,9 @@
  *   // auth/mcp-token-on-rest.ts:
  *   if (loopbackPassCovers(req.header(LOOPBACK_PASS_HEADER), token, req.socket.remoteAddress)) accept();
  * @version-history
+ *   2026-11-04 — fromNodeMachine answers false for a request the node dispatched to itself in process
+ *     (auth/injected-request.ts), which replaces the loopback fetch with the pass for the three tools
+ *     (codebase analysis 2026-11-03, item D-j).
  *   2026-10-27 — fromNodeMachine also asks no forwarding header and a Host that names this machine, the
  *     rule services/setup-code.ts requestFromThisMachine held, so every setup-code route asks one
  *     function (secaudit2026oct26, loopback-socket-behind-local-proxy).
@@ -49,6 +59,7 @@
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-tokeni-ei-kelpaa-rest-reiteill-4-0-0-sta-ensin-kolme-mcp).
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { isInjectedRequest } from './injected-request.js';
 
 /** The header the node's own loopback request carries. Meaningless to an outside caller. */
 export const LOOPBACK_PASS_HEADER = 'x-aimeat-loopback-pass';
@@ -125,6 +136,7 @@ function loopbackHost(host: string | undefined): boolean {
  * (http://localhost or 127.0.0.1, no forwarder) still pass.
  */
 export function fromNodeMachine(req: { socket?: { remoteAddress?: string | null } | null; headers: Record<string, unknown> }): boolean {
+  if (isInjectedRequest(req)) return false;
   if (!isLoopbackAddress(req.socket?.remoteAddress)) return false;
   if (req.headers[SELF_REQUEST_HEADER] !== undefined || req.headers[LOOPBACK_PASS_HEADER] !== undefined) return false;
   if (FORWARDING_HEADERS.some(h => req.headers[h] !== undefined)) return false;

@@ -475,7 +475,7 @@ type Resolved = { d: DesiredListing; offering: Offering };
  * tool is listed and the action is skipped with `DUPLICATE_OF {app}/{tool}`: the tool is the product a
  * buyer contracts, and the action's own listing is a second card for the same call. A tool with
  * `lockedInput` is a different product and changes nothing here. Only the LISTING goes: the raw route
- * onto the action still honours its own `commercial` terms (routes/extensions/paywall.ts), untouched.
+ * onto the action still honours its own `commercial` terms (services/extension-access/paywall.ts), untouched.
  *
  * Delisting takes nothing from a buyer. A contract is an entitlement keyed on (consumer, ext, action)
  * with its price captured at accept, and no metered call reads the offering, so a contract signed

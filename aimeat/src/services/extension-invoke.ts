@@ -61,8 +61,8 @@ import type { Storage } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import type { EmailService } from './email.js';
 import type { CallerKind } from './caller-context.js';
-import type { PaywallResponder } from '../routes/extensions/metered-response.js';
-import type { enforcePaywall as EnforcePaywall } from '../routes/extensions/paywall.js';
+import type { PaywallResponder } from './extension-access/metered-response.js';
+import type { enforcePaywall as EnforcePaywall } from './extension-access/paywall.js';
 import { executeExtensionAction } from './extension-runtime.js';
 import { emitChange } from './event-bus.js';
 import { makeExtensionFiles } from './extension-files.js';
@@ -141,7 +141,7 @@ function producerKindOf(kind: CallerKind): 'app' | 'agent' | 'manual' {
 export interface ExtensionInvokeArgs {
   config: AimeatConfig;
   storage: Storage;
-  /** routes/extensions/paywall.ts enforcePaywall, passed in by the surface. */
+  /** services/extension-access/paywall.ts enforcePaywall, passed in by the surface. */
   enforcePaywall: typeof EnforcePaywall;
   /** `name`, `<owner>/<name>`, either with `@version`. */
   extRef: string;
@@ -278,7 +278,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
     return { kind: 'refused', status: 405, code: 'METHOD_NOT_ALLOWED', message: `Action "${actionId}" requires ${action.method}, got ${args.method}` };
   }
 
-  // Per-call paywall: owner-free / anti-abuse toll / priced payment (routes/extensions/paywall.ts).
+  // Per-call paywall: owner-free / anti-abuse toll / priced payment (services/extension-access/paywall.ts).
   // Cross-owner invocation is intended (an extension is a sellable capability), so the paywall is
   // what makes it safe: the owner and their own principals are free, everyone else pays or holds an
   // entitlement.

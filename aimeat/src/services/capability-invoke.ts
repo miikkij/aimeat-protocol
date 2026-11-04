@@ -3,9 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Invoke proxy: routes capability invocations to the correct underlying system: an
- *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
+ *   extension through the node's own route in process, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.10.1 - 2026-11-04 - The `extension` case sends its request to the node's own HTTP server in process
+ *     (services/request-injector.ts) instead of a fetch to 127.0.0.1, marked for the caller's token
+ *     (auth/injected-request.ts) instead of carrying a loopback pass. The route, its gates and the answer
+ *     are the same (codebase analysis 2026-11-03, item D-j).
  *   v1.10.0 - 2026-11-02 - An `mcp` source of another account over a server where each person signs in
  *     with their own account waits for the caller's account to allow it with one press (403
  *     MCP_CAPABILITY_NEEDS_APPROVAL naming the request; services/mcp-client/capability-consent.ts).
@@ -70,8 +74,8 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
-import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
-import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../auth/loopback-pass.js';
+import { INTERNAL_PASS_HEADER } from './extension-access/internal-pass.js';
+import { withInProcessFetch } from './request-injector.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
@@ -205,7 +209,7 @@ export async function invokeCapability(
   mode: 'normal' | 'raw' = 'normal',
   /**
    * One-shot proof that a route which knows the purchased product already settled this call.
-   * Minted in-process, single use, seconds long — see `routes/extensions/internal-pass.ts`.
+   * Minted in-process, single use, seconds long — see `services/extension-access/internal-pass.ts`.
    */
   internalPass?: string,
   /**
@@ -235,7 +239,7 @@ export async function invokeCapability(
       // installed and are encoded into the path.
       const segments = splitExtensionRef(capability.source.ref);
       // The ref is the registrant's: a bare name in it is the bare record, else the registrant's own
-      // extension of that name (services/component-address.ts). The loopback below carries the stored
+      // extension of that name (services/component-address.ts). The request below carries the stored
       // name, so the route reads the same record and never the caller's own of that name.
       const resolved = segments
         ? await resolveExtensionForCall(storage, segments.pinned, localAccountName(registrantOwnerGhii(capability.ownerGhii, config.nodeId)))
@@ -278,36 +282,33 @@ export async function invokeCapability(
       // `internalPass` (when present) tells the paywall on the other end that this call was already
       // settled by the route that knows which product was bought. Absent on every other path, so a
       // capability reached any other way is charged normally.
-      // The loopback pass (auth/loopback-pass.ts) says the node sent this request for the caller's
-      // own token. A session that signed in over MCP OAuth holds a token bound to the MCP endpoint,
-      // which `/v1/ext` refuses from 4.0.0 when it comes from outside; with the pass the route reads
-      // the same token, so the caller's identity, scopes and the paywall are as before.
-      const loopbackPass = mintLoopbackPass(jwt);
-      try {
-        const response = await fetch(`http://127.0.0.1:${config.port}/v1/ext/${extName}/${actionId}`, {
+      // The request goes to the node's own HTTP server in process (services/request-injector.ts),
+      // marked for the caller's own token (auth/injected-request.ts). A session that signed in over
+      // MCP OAuth holds a token bound to the MCP endpoint, which `/v1/ext` refuses from 4.0.0 when it
+      // comes from outside; with the mark the route reads the same token, so the caller's identity,
+      // scopes and the paywall are as before.
+      const { status, body } = await withInProcessFetch(config, { forBearer: jwt }, async (fetchIn) => {
+        const response = await fetchIn(`/v1/ext/${extName}/${actionId}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`,
-            [LOOPBACK_PASS_HEADER]: loopbackPass,
             ...(internalPass ? { [INTERNAL_PASS_HEADER]: internalPass } : {}),
           },
           body: JSON.stringify(input),
         });
-        const body = await response.json() as Record<string, unknown>;
+        return { status: response.status, body: await response.json() as Record<string, unknown> };
+      });
 
-        if (!body.ok) {
-          if (response.status === 401) {
-            throw Object.assign(
-              new Error(`Cannot invoke "${capability.id}": the caller's token was rejected (expired or revoked). Refresh the session token and call again.`),
-              { statusCode: 401, code: 'CALLER_TOKEN_INVALID' },
-            );
-          }
-          throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: response.status, code: 'EXTENSION_ERROR' });
+      if (!body.ok) {
+        if (status === 401) {
+          throw Object.assign(
+            new Error(`Cannot invoke "${capability.id}": the caller's token was rejected (expired or revoked). Refresh the session token and call again.`),
+            { statusCode: 401, code: 'CALLER_TOKEN_INVALID' },
+          );
         }
-        result = mode === 'raw' ? body : body.data;
-      } finally {
-        revokeLoopbackPass(loopbackPass);
+        throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: status, code: 'EXTENSION_ERROR' });
       }
+      result = mode === 'raw' ? body : body.data;
       break;
     }
 

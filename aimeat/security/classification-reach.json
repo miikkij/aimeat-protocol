@@ -390,13 +390,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists instance namespace memory only to delete it."
     },
-    "src/routes/extensions/paywall.ts": {
+    "src/services/extension-access/paywall.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The tool manifest, read to check the paywall binding."
     },
-    "src/routes/extensions/priced-binding.ts": {
+    "src/services/extension-access/priced-binding.ts": {
       "reads": {
         "listMemory": 1
       },
@@ -595,13 +595,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Intake form configuration records."
     },
-    "src/routes/organisms/record-helpers.ts": {
+    "src/services/organism-record-helpers.ts": {
       "reads": {
         "listAllMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Draft reopen copies internally, collapse deletes, and the organism meta.config."
     },
-    "src/routes/organisms/shared.ts": {
+    "src/services/organism-gate.ts": {
       "reads": {
         "listMemoryKeysByPrefix": 1,
         "listAllMemory": 3,

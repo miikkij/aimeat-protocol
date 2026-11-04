@@ -113,7 +113,7 @@ import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secr
 import { presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
-import { resolveWriteTarget } from './owner-target.js';
+import { resolveWriteTarget } from '../../services/write-target.js';
 import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OWNER_SCOPE, READ_AS_OWNER_NOTE } from '../../services/owner-scope-read.js';
 import { denyScope403 } from '../../auth/deny.js';
 import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../../services/memory-write-asks.js';

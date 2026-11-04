@@ -2,7 +2,7 @@
  * @file test/unit/paywall-app-tool-refusal-order.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The raw-invoke paywall (routes/extensions/paywall.ts) on an action that a priced
+ * @description The raw-invoke paywall (services/extension-access/paywall.ts) on an action that a priced
  *   app-tool sells. A call it refuses for a malformed or wrong product name, or for a money price with
  *   no contract held, is refused before the pacing is charged; a call settled on the caller's app-tool
  *   contract is paced once, by the contract at the metered chokepoint, and not again by the
@@ -19,8 +19,8 @@ import { randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { enforcePaywall } from '../../src/routes/extensions/paywall.js';
-import { createRefusalRecorder } from '../../src/routes/extensions/metered-response.js';
+import { enforcePaywall } from '../../src/services/extension-access/paywall.js';
+import { createRefusalRecorder } from '../../src/services/extension-access/metered-response.js';
 import { persistEntitlement, type MeteredEntitlement } from '../../src/services/metered-entitlements.js';
 import { clearCache } from '../../src/services/cache.js';
 

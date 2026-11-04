@@ -10,6 +10,9 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   2026-11-04 -- `setFetch` replaces `setNodeHeaders`: the node's own dispatcher sends its
+ *     requests in process (services/request-injector.ts) and needs no header of its own; nothing
+ *     else called `setNodeHeaders` (codebase analysis 2026-11-03, item D-j).
  *   v1.8.0 -- 2026-10-12 -- `setNodeHeaders`: headers sent only on a direct node-relative request.
  *     The node's loopback dispatcher sends its loopback pass there (auth/loopback-pass.ts), so a
  *     session bound to the MCP endpoint keeps reaching the REST routes from 4.0.0.
@@ -128,18 +131,17 @@ export class AimeatClient {
   hasTransport(): boolean { return this.transport !== null; }
 
   /**
-   * Headers sent on every node-relative request this client makes directly, never on an absolute
-   * URL and never through a transport. The node's own loopback dispatcher (services/node-invoke.ts)
-   * sets its loopback pass here (auth/loopback-pass.ts), which must not leave this host.
+   * The fetch this client's direct requests use: the platform's own unless one is set. The node's own
+   * dispatcher (services/node-invoke.ts) sets the in-process fetch of services/request-injector.ts,
+   * so its requests reach the node's routes with no socket; what is sent and read is unchanged.
    */
-  private nodeHeaders: Record<string, string> = {};
+  private fetchImpl: ((url: string, init: RequestInit) => Promise<Response>) | null = null;
 
-  /** Set the headers above. Replaces what was set before. */
-  setNodeHeaders(headers: Record<string, string>): void { this.nodeHeaders = { ...headers }; }
+  /** Set the fetch above. `null` restores the platform's fetch. */
+  setFetch(fetchImpl: ((url: string, init: RequestInit) => Promise<Response>) | null): void { this.fetchImpl = fetchImpl; }
 
-  private headers(token: string | null, nodeRelative = false): Record<string, string> {
+  private headers(token: string | null): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
-    if (nodeRelative) Object.assign(h, this.nodeHeaders);
     if (token) h['Authorization'] = `Bearer ${token}`;
     return h;
   }
@@ -270,9 +272,12 @@ export class AimeatClient {
       this.lastStatus = 401;
       return held as ApiResponse;
     }
+    // The node's own dispatcher sets an in-process fetch (setFetch); every other client uses the
+    // platform's, and this stays the one outbound call of the client.
+    const fetch = this.fetchImpl ?? globalThis.fetch;
     const res = await fetch(url, {
       method,
-      headers: this.headers(token, !path.startsWith('http')),
+      headers: this.headers(token),
       body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
     });
     this.lastStatus = res.status;

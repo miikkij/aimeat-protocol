@@ -8,7 +8,7 @@
         "aimeat/src/routes/agents/avatar.ts",
         "aimeat/src/data/agent-avatar-templates.ts"
       ],
-      "digest": "sha256:1154c40201046749e1eded5e"
+      "digest": "sha256:97ed01226a4e87fe789e0f94"
     },
     "node:aimeat-decide": {
       "reviewedOn": "2026-10-27",
@@ -267,7 +267,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:b30f73867762085c365cf042"
+      "digest": "sha256:9aa440c67456061c3e3349d6"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -296,13 +296,13 @@
       "digest": "sha256:e889ce5039a1ecdeff09bd30"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:5ad0707f9c990a8a8f97242d"
+      "digest": "sha256:250bb8a212ec74088b4ef3ad"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -324,17 +324,17 @@
       "digest": "sha256:622dba3980dc13c20bec75c6"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
         "aimeat/src/services/extension-manifest.ts",
-        "aimeat/src/routes/extensions/paywall.ts",
+        "aimeat/src/services/extension-access/paywall.ts",
         "aimeat/src/routes/extensions/crud.ts",
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:1540298cdf0a2e41b5d51471"
+      "digest": "sha256:88416f9f5363f6029bcd8b64"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-04",
@@ -371,7 +371,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:67a5b1f617782b9a44b48eed"
+      "digest": "sha256:e3be35a1bda9236c5e170cae"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-04",
@@ -385,7 +385,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:0385c7a145fa3ad23d0f2180",
+      "digest": "sha256:7972e11f6ed0df051427e700",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -641,7 +641,7 @@
       "aimeat/src/mcp/core-admin.ts": "487cb90f6512b381"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "3bbaaf7dd64ce153",
+      "aimeat/src/mcp/core.ts": "c4fa6569237b6090",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "66f1803515078196"
     },
     "node:manage-my-profile-data": {
@@ -659,7 +659,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "fdeb7962348bd8fd",
+      "aimeat/src/routes/ai.ts": "2fed3fb34f21a6e7",
       "aimeat/src/routes/ai-providers.ts": "41e102a20bb078b2",
       "aimeat/src/services/ai/routing.ts": "3ab2ace7eeab4d80"
     },
@@ -761,15 +761,15 @@
       "aimeat/src/services/build-extension-prompt.ts": "fdcfd38cd4fc64f5",
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/extension-manifest.ts": "fd3d70de8b81e457",
-      "aimeat/src/routes/extensions/paywall.ts": "e464e27b4cbca9aa",
+      "aimeat/src/services/extension-access/paywall.ts": "ae42068a8b036d98",
       "aimeat/src/routes/extensions/crud.ts": "723ee89afa7b5c7f",
-      "aimeat/src/routes/extensions/instances.ts": "d7ace6eb026fee79",
+      "aimeat/src/routes/extensions/instances.ts": "72b9b56f92022abe",
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "bb42109735a58663",
       "aimeat/src/routes/memory/key.ts": "1b7da6f1cdeaa1f0",
-      "aimeat/src/services/memory-bin.ts": "9fa3d0c47be934d5",
+      "aimeat/src/services/memory-bin.ts": "04b76c6727c43d29",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
       "aimeat/src/services/owner-erasure.ts": "bf2dbc341811d895",
@@ -797,7 +797,7 @@
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "f3ec18941ecc650d",
-      "aimeat/src/commerce/app-tool-catalog.ts": "310924ae6dd5e120",
+      "aimeat/src/commerce/app-tool-catalog.ts": "c2ddc40235643464",
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",
@@ -812,7 +812,7 @@
       "aimeat/src/routes/page-host.ts": "11cf872797b054ef"
     },
     "node:agent-avatar": {
-      "aimeat/src/services/agent-avatar.ts": "49799d63c4108b71",
+      "aimeat/src/services/agent-avatar.ts": "8b8cf0495ae391ff",
       "aimeat/src/routes/agents/avatar.ts": "412e3df74736e1bf",
       "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
     },

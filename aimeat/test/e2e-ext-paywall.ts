@@ -1,7 +1,7 @@
 /**
  * @file test/e2e-ext-paywall.ts
  * @description E2E for the priced raw-call paywall (design notes doc-r6tyr3o, roadmap
- *   rm-commercial-raw-calls). Proves the runtime invariants of routes/extensions/paywall.ts:
+ *   rm-commercial-raw-calls). Proves the runtime invariants of services/extension-access/paywall.ts:
  *   owner-free (both direct paths); a cross-owner call's morsels (`tollMorsels`, a 3.x `payMorsels`)
  *   are PACING: one charge, the burn rate's share burned and the rest credited to the owner;
  *   money channel → 402 (Phase 3 pending); insufficient balance → 402 with no partial debit;

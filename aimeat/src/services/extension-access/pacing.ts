@@ -1,5 +1,5 @@
 /**
- * @file src/routes/extensions/pacing.ts
+ * @file src/services/extension-access/pacing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The pacing charge on an uncontracted call: morsels per use that bound the RATE at which a
@@ -22,6 +22,8 @@
  *   const paced = await burnPacingToll({ config, storage, callerGaii, providerOwner, label, toll, res });
  *   if (!paced.ok) return { ok: false };   // 402 already sent
  * @version-history
+ *   v1.6.1 — 2026-11-04 — Moved unchanged from routes/extensions/ with the paywall (codebase analysis
+ *     2026-11-03, item D-f).
  *   v1.6.0 — 2026-10-31 — refusePacingShortfall: the raw-invoke paywall asks whether the caller covers
  *     the pacing before it asks a money-priced call for its pay token, so a caller short of morsels is
  *     told so before paying money for a call the pacing would refuse (secaudit 2026-10-31 inv-08).
@@ -51,10 +53,10 @@ import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
-import { chargePacing, type PacingCharge } from '../../services/metered-settlement.js';
+import { chargePacing, type PacingCharge } from '../metered-settlement.js';
 import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 
-export { resolvePacingToll } from '../../services/metered-settlement.js';
+export { resolvePacingToll } from '../metered-settlement.js';
 
 /**
  * Charge the pacing amount of one uncontracted use. The caller's own calls to their own capability are

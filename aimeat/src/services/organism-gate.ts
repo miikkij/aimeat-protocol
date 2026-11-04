@@ -1,0 +1,717 @@
+/**
+ * @file src/services/organism-gate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The organism and workspace gate the routes, the MCP tools and the services share.
+ *   `createOrganismGate(config, storage)` returns the closure-bound helpers (membership and role
+ *   checks, workspace registry lookups, draft publish and revert, share meta, the decision log) that
+ *   take no Express request or response; routes/organisms/shared.ts adds the Express forms (the gates
+ *   that send their own refusal, the invite-code middleware chain, the archive handler) for the
+ *   organism route groups.
+ * @structure createOrganismGate(config, storage) · OrganismGate · BatchPublishItemResult
+ * @usage const H = createOrganismGate(config, storage); await H.writeDecision(organismId, by, summary, refs);
+ * @version-history
+ *   2026-11-04 — The fallbacks for a storage without listMemoryKeysByPrefix, bulkDeleteMemory,
+ *     bulkSetMemory or getMemoryByKeysAnyOwner are gone: all four are required on Storage (codebase
+ *     analysis 2026-11-03, item D-e).
+ *   2026-11-04 — Moved unchanged from routes/organisms/shared.ts, which was extracted from
+ *     routes/organisms.ts (max-file-lines); the history below is that file's. The factory is
+ *     createOrganismGate and keeps the helpers that take no Express type; memberRole and
+ *     shareGateDenied take what they read (`auth`, and `headers` for the share token), which an
+ *     Express request satisfies. requireWsManager, requireOrgAdmin, codeInviteGuards,
+ *     requireOrgMember and archiveHandler stay in routes/organisms/shared.ts (codebase analysis
+ *     2026-11-03, item D-f).
+ *   2026-11-02 — publishDraft and publishDraftsBatch record the publisher in the memory write tally for
+ *     the `.latest` they write, as every memory write door does: a member of another account who
+ *     publishes over an owner's living-document config is its latest writer, so the unattended pulse
+ *     asks the owner before it reads or spends for it (secaudit2026nov02d round 13).
+ *   2026-10-30 — A published document's embedded images are bound by the publisher's principal too.
+ *   2026-10-30 — publishDraft and publishDraftsBatch bind every file a published value links with
+ *     /v1/pub, and the publisher controls, to the workspace (services/record-files.ts; Jouni, 2026-10-30).
+ *   2026-10-27 — readManifest takes the newest copy of a current creator or admin (readOrganismMetaValue),
+ *     and findWsEntry the registry copy that counts (workspaceRegistrations), not the first copy in store
+ *     order (secaudit2026oct26, organism-meta-first-store-order-copy).
+ *   2026-10-17 — SECURITY: shareGateDenied does not count a visitor from another node as signed in,
+ *     so an 'account' share is this node's accounts only (plan doc-mvcn6c7e4e5q, V0.5).
+ *   2026-10-16 — The public collectors are imported from services/workspace-public-collectors.ts,
+ *     where they moved unchanged.
+ *   2026-10-16 — readShareMeta, redactShare and memberRole delegate to services/workspace-share.ts,
+ *     which the share MCP tool runs too; the share has end dates (`until`). An HTML page publishes
+ *     under its own version window (services/html-page.ts htmlPageRetention).
+ *   2026-10-16 — archiveHandler calls organismArchiveOp (services/organism-archive-op.ts), which holds
+ *     the role rule, the target check, the fence, the archive and the timeline entry, so
+ *     aimeat_organism_archive runs the same operation. No change to what the route answers (QA audit D2-08).
+ *   v1.14.1 — 2026-10-13 — archiveHandler hands the session's scopes to the fenced-space rule: a
+ *     session that covers organism:direct archives and brings back a record of a space that names
+ *     extensions (ruled by the developer on 2026-10-13).
+ *   v1.14.0 — 2026-10-13 — archiveHandler asks the fenced-space rule (services/fenced-space.ts) for a
+ *     record or a space before it archives or brings back: a record space that names extensions
+ *     takes that from an agent only through one of them (ruled by the developer on 2026-10-13).
+ *   v1.13.3 — 2026-10-12 — The member consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
+ *   v1.13.2 — 2026-10-09 — The password gate admits a share token only when its password version
+ *     matches the share's current password (secrets audit 2026-10-09, S-6).
+ *   v1.13.1 — 2026-10-09 — archiveHandler asks archiveRoleOf (services/archive.ts), the same rule
+ *     ctx.workspace.archiveRecords asks. Same answer as memberRole for every caller.
+ *   v1.13.0 — 2026-10-06 — publishDraftsBatch takes `opts`: `createOnly` refuses an id that already has
+ *     a `.latest` (code EXISTS), `dryRun` decides every record and writes nothing. An expected version
+ *     the caller names is held in every space, not only in a requires_expected_version space (code
+ *     VERSION_CONFLICT). An id given twice is refused the second time (DUPLICATE_ID). The draft's
+ *     provenance record travels to `.version.N` and `.latest`, as publishDraft carries it, and a direct
+ *     value may name one (`aiProvenanceId`). Wish bulk-records-for-ai, 2026-10-06.
+ *   v1.12.0 — 2026-09-29 — publishDraft and publishDraftsBatch schedule write-time classification of
+ *     each published `.latest` (services/classify-on-write.ts, TARGET-082 V3).
+ *   v1.11.0 — 2026-09-29 — The share and member-record collectors moved to shared-public.ts
+ *     (max-file-lines) and take the classification reader (TARGET-082).
+ *   v1.10.2 — 2026-09-26 — The publisher's account and bareOwner come from localAccountName
+ *     (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local
+ *     namesake (secaudit 2026-09, F-1).
+ *   v1.10.1 — 2026-09-26 — publishDraftsBatch opens a document's embedded files to the workspace only
+ *     for the records that passed their refusals, after the batch has written (secaudit 2026-09, N1).
+ *   v1.10.0 — 2026-09-24 — canReadWs, readWsManifests, readWsManifestValue and readShareMeta read the
+ *     copy that counts (services/workspace-meta.ts), and both publish paths take the space's settings
+ *     from it; the first copy the store returned, or the freshest, had decided who reads and what is shared.
+ *   v1.9.0 — 2026-09-13 — publishDraft and publishDraftsBatch REFUSE a space the workspace manifest
+ *     does not declare (the developer's decision): `{ code: 'UNDECLARED_SPACE', refusal }`, returned
+ *     before the scan, the image scoping or any write. The warning they carried is gone.
+ *   v1.8.0 — 2026-09-13 — publishDraft and publishDraftsBatch return `warning` (UNDECLARED_SPACE) when
+ *     the workspace manifest declares no space for the namespace: the record is stored and no
+ *     workspace read lists it. The batch
+ *     publish's schema violations carry path, rule and params, so they name the refused property.
+ *   v1.7.0 — 2026-08-23 — Publishing consumes EVERY copy of the draft, not only the freshest one.
+ *     A draft is stored under whoever wrote it, so a record an agent proposed and its owner then
+ *     approved had two: the agent's under its GAII and the owner's under the GHII. Publishing
+ *     deleted one, the other survived, and a workspace read renders `draft || latest` — so the
+ *     record went on showing the PRE-DECISION value with an undecided badge for good. That is the
+ *     documented agent pattern breaking: an agent writes drafts, the owner reviews and publishes,
+ *     and the queue never empties. `.latest` already collapsed its forked copies; drafts did not.
+ *   v1.6.0 — 2026-07-18 — collectWsRecords: the share-agnostic published-records collector; the public
+ *     collector becomes a share-filter over it, and the new authenticated member-records route reads
+ *     through it gated by canReadWs (one collection code path, two authz gates — no drift).
+ *   v1.5.0 — 2026-07-17 — collectPublicRecords + PublicRecord type: the records-space analogue of
+ *     collectPublicDocs, gated by the same meta.share, for the generic no-auth public-records read.
+ *   v1.4.0 — 2026-07-16 — Version-bloat perf: publish/batch-publish/revert scans exclude `.version.N`
+ *     rows in SQL (excludeVersionRows) and compute maxN value-free (workspace-versions) — historic
+ *     full-copy values were loaded on every publish just to parse N out of the key names.
+ *   v1.3.0 — 2026-07-16 — workspaceNamesByOrg (id→name registry map per org, same batched read) for the
+ *     /waiting aggregate (Phase 3).
+ *   v1.2.0 — 2026-07-16 — workspaceCountsByOrg batches the ?include=counts list view's per-organism
+ *     registry scan into ONE cross-owner key-IN read (Phase 3).
+ *   v1.1.0 — 2026-07-16 — canReadWs split into pure canReadWsManifest + a scan; readWsManifests batches
+ *     the discovery list's per-workspace manifest scans into ONE cross-owner key-IN read (Phase 2 N×M).
+ *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
+ */
+import { v4 as uuidv4 } from 'uuid';
+import type { IncomingHttpHeaders } from 'node:http';
+import type { AimeatConfig } from '../config.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { VerifiedToken } from '../auth/jwt.js';
+import { verifyShareToken, shareTokenVersionOf } from './share-token.js';
+import { emitMemoryWritten } from './event-bus.js';
+import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
+import { scopeRecordFilesToWorkspace } from './record-files.js';
+import { isSameOwner, isGEAI, localAccountName } from '../utils/gaii.js';
+import { isNodeAccount } from './audience.js';
+import { authorizeRead } from './access-guard.js';
+import { ecoMayReadKey } from './ecosystem-access.js';
+import { validateMemoryWrite, validateValueAgainstSchema } from './schema-validator.js';
+import { validateArchiveTarget } from './organism-archive-op.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from './workspace-roles.js';
+import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from './workspace-versions.js';
+import { readPublishSpace, type UndeclaredSpaceRefusal } from './workspace-write-items.js';
+import { readWorkspaceMetaRecord, workspaceMetaReader, workspaceRegistrations } from './workspace-meta.js';
+import { createPublicCollectors } from './workspace-public-collectors.js';
+import { logger } from '../utils/logger.js';
+import { classifyAfterWrite } from './classify-on-write.js';
+
+import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft, readOrganismConfig, readOrganismMetaValue } from './organism-record-helpers.js';
+
+// The share shapes live in routes/organisms/share-types.ts (a type-only import).
+import type { ResolvedShare } from '../routes/organisms/share-types.js';
+import { readShareMetaOf, redactShareOf, memberRoleOf } from './workspace-share.js';
+import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
+import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
+
+export type OrganismGate = ReturnType<typeof createOrganismGate>;
+
+/** What publishDraftsBatch decided for one id. `code` says why a record failed: NO_DRAFT (nothing to
+ *  publish), INVALID (the locked schema or the space's write guard), EXISTS (createOnly), VERSION_CONFLICT
+ *  (the expected version the caller named), DUPLICATE_ID (the id came twice in one batch). */
+export interface BatchPublishItemResult {
+  instance: string; ok: boolean; version?: number; skipped?: boolean;
+  code?: 'NO_DRAFT' | 'INVALID' | 'EXISTS' | 'VERSION_CONFLICT' | 'DUPLICATE_ID';
+  violations?: unknown;
+}
+
+/** The closure-bound helpers shared by every organism route group, MCP tool and service. Created once per router. */
+export function createOrganismGate(config: AimeatConfig, storage: Storage) {
+  // ── Gate primitive helpers ──
+
+  // Active membership keyed by bare owner name (or org agent) — returns { role } or null. The rule is
+  // services/workspace-share.ts memberRoleOf, which the share MCP tool asks too.
+  const memberRole = (req: { auth?: VerifiedToken }, organism: { agentGaiis: string[] }, id: string): Promise<string | null> =>
+    memberRoleOf(storage, organism, id, { sub: req.auth!.sub, owner: req.auth!.owner });
+
+  // Read the organism's manifest value (for gate policy): the newest copy of a current creator or
+  // admin, as readOrganismConfig reads meta.config. The first copy in store order decided, whoever
+  // wrote it and whatever their role now (secaudit2026oct26).
+  const readManifest = (id: string): Promise<unknown> => readOrganismMetaValue(storage, id, 'meta.manifest');
+
+  // Append a signed-by-convention decision-log entry (the audit/Prove trail), then bound the log so it
+  // can't grow without limit. Every gate action (publish/batch-publish/auto-approve/gate-approval) writes
+  // one of these `meta.decisions.<uuid>` rows; left uncapped a busy app (e.g. a CRM publishing hundreds of
+  // records a day) fills the organism owner's memory quota with immortal audit rows that a record delete
+  // never touches. We keep the most recent `organismDecisionLogCap` entries per organism (0 = unlimited).
+  const writeDecision = async (organismId: string, by: string, summary: string, refs: string[]): Promise<void> => {
+    const did = uuidv4();
+    const now = new Date().toISOString();
+    const prefix = `organism.${organismId}.meta.decisions.`;
+    await storage.setMemory({
+      key: `${prefix}${did}`,
+      ownerGaii: by,
+      value: { ts: now, kind: 'decision', by, summary, refs },
+      visibility: 'private', tags: ['gate'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+    await pruneDecisionLog(organismId, prefix);
+  };
+
+  // Keep the organism's gate-audit log at or below the configured cap. Cheap common case: one value-free
+  // key scan (the log is bounded, so ~cap rows). Only when over cap do we load the tiny values to order by
+  // recency and bulk-delete the oldest — pruning back below the cap by a margin so this runs about once per
+  // (cap/10) writes, not on every write once the cap is reached.
+  const pruneDecisionLog = async (organismId: string, prefix: string): Promise<void> => {
+    const cap = config.organismDecisionLogCap;
+    if (cap <= 0) return;
+    try {
+      const keys = await storage.listMemoryKeysByPrefix(prefix);
+      if (keys.length <= cap) return;
+      const margin = Math.max(1, Math.floor(cap / 10));
+      const target = cap - margin;                         // prune down to here
+      const { items } = await storage.listAllMemory({ prefix, limit: keys.length });
+      items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+      const toRemove = items.slice(0, Math.max(0, items.length - target)).map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
+      if (toRemove.length) await storage.bulkDeleteMemory(toRemove);
+    } catch (err) { logger.warn('pruneDecisionLog: best-effort: the audit write already succeeded; a prune failure must not fail the gate', { error: String(err) }); }
+  };
+
+  // Read the organism's runtime config entry (organism.{id}.meta.config) — UI-editable; absent = defaults.
+  const readConfig = (organismId: string) => readOrganismConfig(storage, organismId);
+
+  // Delegates to the module-level rule below, which the MCP workspace tools also use.
+  const canWriteNamespace = canWriteNamespaceRule;
+
+  // Publish a draft: snapshot organism.{id}.{ns}.{instance}.draft → a new .version.N and .latest.
+  // Schema-validated (the draft must be a valid object). Returns the new version number.
+  // TARGET-009 S1: expectedVersion carries the publisher's optimistic lock into the write guards
+  // (a namespace with requires_expected_version refuses a publish over a version it didn't read).
+  /**
+   * EVERY copy of this record's draft, across all the identities that may hold one.
+   *
+   * A workspace record can have a draft under more than one same-owner identity, because a draft is
+   * stored under whoever WROTE it: an agent writing into its owner's workspace stores the draft
+   * under its own GAII, and the owner reviewing it in an app stores theirs under the owner GHII.
+   * Publishing picked the freshest and consumed only that one, so the other survived — and since a
+   * workspace read renders `draft || latest`, the record went on showing the PRE-DECISION value
+   * with an undecided draft badge for good.
+   *
+   * That is the documented agent pattern breaking: an agent writes drafts, the owner reviews and
+   * publishes, and the queue never empties. Found on 2026-08-23 by promoting a research finding in
+   * the company brain and watching it stay in the queue with the fact already written.
+   * `.latest` already collapses its forked copies the same way (see the batch path); drafts did not.
+   */
+  const draftCopies = (items: MemoryRecord[], base: string): MemoryRecord[] =>
+    items.filter(r => r.key === `${base}.draft`);
+
+  const publishDraft = async (
+    organismId: string, ws: string | undefined, namespace: string, instance: string, publisher: string,
+    expectedVersion?: number | null,
+  ): Promise<{ ok: true; version: number; skipped?: boolean } | { ok: false; code: 'NO_DRAFT' | 'INVALID'; violations?: unknown } | { ok: false; code: 'UNDECLARED_SPACE'; refusal: UndeclaredSpaceRefusal }> => {
+    const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
+    const base = `${wsRoot}.${namespace}.${instance}`;
+    const ownerGhii = ownerGhiiOf(publisher);
+    // A space the workspace manifest does not declare is refused first, before the image scoping
+    // below changes a single file's visibility (the developer's decision, 2026-09-13).
+    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace, { nodeId: config.nodeId });
+    if (refusal) return { ok: false, code: 'UNDECLARED_SPACE', refusal };
+    // Value-free version handling: skip `.version.N` rows in the scan (their full values were loaded
+    // just to find maxN) — the version numbers come from the key names alone (listVersionRefs below).
+    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
+    const draft = items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+    if (!draft) return { ok: false, code: 'NO_DRAFT' };
+
+    // Scope embedded document images to this workspace (members-only) + rewrite to /v1/pub before the
+    // draft becomes the published copy — so a shared doc's images load for members without going public.
+    // The URLs are rewritten with NO workspaceRef, so nothing is opened yet: passing it makes every
+    // embedded file readable by the workspace's members as a side effect, and the line below can
+    // still refuse the publish. Same ordering defect as the draft door, same fix (doc-images.ts
+    // scopeDocImagesToWorkspace). The rewritten URL is identical either way.
+    const draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
+
+    // An HTML page is checked without the node's own page fields (services/html-page.ts).
+    const docSpace = pubOt?.mode === 'document' || (!pubOt?.mode && pubOt?.kind === 'document');
+    const validation = await validateMemoryWrite(`${base}.latest`, schemaViewOfDocument(draftValue, docSpace), storage, { viaPublish: true, expectedVersion });
+    if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
+
+    // Past the refusal: the document is being published, so its images may be scoped to the members
+    // who are about to be able to read it, and every file it links; only what the publisher controls
+    // (services/record-files.ts).
+    const publishWriter = { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii };
+    if (ws) await scopeDocImagesToWorkspace(storage, config, draftValue, publishWriter, `${organismId}/${ws}`);
+    if (ws) await scopeRecordFilesToWorkspace(storage, draftValue, publishWriter, `${organismId}/${ws}`);
+
+    const versionRefs = await listVersionRefs(storage, base);
+    const maxN = maxVersionOf(versionRefs);
+    const now = new Date().toISOString();
+    const vis = draft.visibility;
+    const tags = draft.tags ?? [];
+    const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+
+    // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
+    // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
+    // .latest or firing the Tracked-Response side effect.
+    if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
+      for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
+      return { ok: true, version: maxN, skipped: true };
+    }
+    // Honour the manifest's `versioned` flag (default true): a `versioned:false` space (e.g. a request
+    // queue) keeps only .latest — no immutable per-publish history.
+    const versioned = pubOt?.versioned !== false;
+    const n = maxN + 1;
+
+    // TARGET-058. Publishing MOVES the content, so the statement about how it was made moves with
+    // it. Without this the draft carried a provenance record and `.latest` — the copy the workspace
+    // read serves and the visible label is rendered from — carried none, so publishing was where an
+    // agent-written record quietly became origin-unstated.
+    //
+    // Carried, not re-minted: the record says how the content was MADE, and publishing does not
+    // change that. One caveat worth stating rather than hiding — normalizeDocValueImages() above may
+    // have rewritten embedded image URLs, so on those documents the record's `contentHash` describes
+    // the draft bytes rather than the published ones. The authorship statement stays true; only the
+    // byte-level detection join is approximate, and re-minting here would have to invent a
+    // declaration nobody made.
+    const provenanceId = draft.aiProvenanceId ?? undefined;
+
+    if (versioned) {
+      await storage.setMemory({
+        key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue,
+        ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
+        visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+      });
+      // Retention: prune history beyond the space's window (append-only spaces never pruned). An HTML
+      // page keeps at most five: it can fill a whole memory value, and every version is a full copy.
+      await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: docSpace && isHtmlPageValue(draftValue) ? htmlPageRetention(pubOt, config) : pubOt });
+    }
+    // .latest (current state) is owned by a member's GHII — ONE owner per key, so it never forks into
+    // per-agent duplicates a read then has to disambiguate. Preserve the record's existing owner
+    // (normalised to their GHII — never a raw agent GAII); a brand-new record is owned by the publisher's
+    // GHII. The immutable .version.N above keeps the publisher's attribution. collapseKeyTo removes any
+    // copy of .latest left under another identity.
+    const latestOwner = existingLatest ? ownerGhiiOf(existingLatest.ownerGaii) : ownerGhii;
+    await storage.setMemory({
+      key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue,
+      ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
+      visibility: vis, tags, ttlHours: null,
+      version: (existingLatest?.version ?? 0) + 1,
+      createdAt: existingLatest?.createdAt ?? now, updatedAt: now,
+    });
+    await collapseKeyTo(storage, `${base}.latest`, latestOwner);
+    // Who wrote it, as every memory write door records: the publisher, which may be a member of
+    // another account writing over the holder's record (the living pulse reads this; secaudit2026nov02d).
+    recordMemoryTouch({ ownerGaii: latestOwner, key: `${base}.latest`, writerPrincipal: publisher, kind: 'write' });
+    // Memory Contracts (reactive): publishing a watched record fires Tracked Response evaluation
+    // (gated O(1) on the track-registry in the subscriber).
+    emitMemoryWritten(latestOwner, `${base}.latest`);
+    // Write-time classification of the published record (TARGET-082 V3): scheduled, never awaited.
+    classifyAfterWrite({ storage, config }, latestOwner, `${base}.latest`, draftValue);
+    // Consume the draft — it was the proposal-for-publishing; now it's a frozen version + the new
+    // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
+    // shows a stale draft alongside the identical published copy.) EVERY copy: see draftCopies.
+    for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
+    return { ok: true, version: n };
+  };
+
+  // BATCH publish (data-access redesign, Phase 2): publish MANY drafts in ONE workspace+namespace as one
+  // operation. Semantics are byte-for-byte those of publishDraft above — schema/write-guard validation
+  // (viaPublish + optimistic lock), the `versioned` flag, the unchanged-republish change-guard, the
+  // .version.N (publisher-owned) + .latest (GHII-owned) attribution, the collapse of forked .latest
+  // copies, and draft consumption — but the shared reads are amortised (ONE namespace scan + ONE manifest
+  // read for the whole batch) and the writes/deletes are committed together (ONE bulkSetMemory + ONE
+  // bulkDeleteMemory), instead of the per-record scan + individual setMemory/deleteMemory pipeline that a
+  // 520-record CADENCE import ran as ~11k separate operations. Auth (membership, meta.* role, archive,
+  // publish gate) is publishRecordsBatchOp's (services/workspace-tool-ops.ts), which the batch route
+  // and ctx.workspace.publishRecords both call; this is the data operation.
+  const publishDraftsBatch = async (
+    organismId: string, ws: string | undefined, namespace: string, instances: string[], publisher: string,
+    expectedVersions?: Record<string, number | null>,
+    // DRAFT-LESS import: when a value is supplied per instance, publish it DIRECTLY (no draft to read or
+    // consume). An import has the final values, so this collapses N draft-writes + N publishes into ONE
+    // request. Interactive edits still use the draft flow (no directValues).
+    directValues?: Record<string, { value: unknown; visibility?: MemoryRecord['visibility']; aiProvenanceId?: string }>,
+    // createOnly: refuse an id that already has a .latest (an import that must not overwrite).
+    // dryRun: decide every record exactly as a real run would, then write nothing and emit nothing.
+    opts?: { createOnly?: boolean; dryRun?: boolean },
+  ): Promise<{ results: BatchPublishItemResult[]; refusal?: UndeclaredSpaceRefusal }> => {
+    const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
+    const ownerGhii = ownerGhiiOf(publisher);
+    const nsPrefix = `${wsRoot}.${namespace}.`;
+    // ONE manifest read (`versioned`, the UNDECLARED_SPACE refusal) + ONE scan of the namespace for the
+    // entire batch. The whole batch is one namespace, so an undeclared space refuses all of it, before
+    // the scan and before any record is touched (the developer's decision, 2026-09-13).
+    const { ot: pubOt, refusal } = await readPublishSpace(storage, organismId, ws, namespace, { nodeId: config.nodeId });
+    if (refusal) return { results: [], refusal };
+    // excludeVersionRows: the batch needs each record's .draft/.latest VALUES but only the version
+    // NUMBERS — those come from ONE value-free key scan (versionRefsByBase below).
+    const { items: allRows } = await storage.listAllMemory({ prefix: nsPrefix, limit: 100000, excludeVersionRows: true });
+    const versionsByBase = await versionRefsByBase(storage, nsPrefix);
+    const versioned = pubOt?.versioned !== false;
+    // Retention window for this namespace (0 = keep all; append-only spaces resolve to 0).
+    const pruneWindow = effectiveMaxVersions(config, pubOt);
+    const docSpace = pubOt?.mode === 'document' || (!pubOt?.mode && pubOt?.kind === 'document');
+
+    // AMORTISE the per-record validation: the write-guard policy and the applicable schema are the SAME
+    // for every record in one namespace, so resolve them ONCE (was a manifest read + a .latest read + a
+    // schema lookup PER record inside validateMemoryWrite — O(N) storage round-trips that dominated the
+    // publish; the batch already holds each record's existing .latest from the namespace scan above). The
+    // policy comes straight off the objectType we already read — no second manifest scan.
+    const policy = pubOt && (pubOt.create_only === true || pubOt.requires_expected_version === true)
+      ? { createOnly: pubOt.create_only === true, requiresExpectedVersion: pubOt.requires_expected_version === true }
+      : null;
+    const schemaRec = instances.length ? await storage.findApplicableSchema(`${nsPrefix}${instances[0]}.latest`) : null;
+    let schemaToValidate: Record<string, unknown> | null = null;
+    if (schemaRec) {
+      schemaToValidate = { ...(schemaRec.schemaJson as Record<string, unknown>) };
+      if (schemaRec.schemaMode === 'strict' && schemaToValidate.type === 'object') schemaToValidate.additionalProperties = false;
+    }
+
+    const now = new Date().toISOString();
+    const toUpsert: MemoryRecord[] = [];
+    const toDelete: { ownerGaii: string; key: string }[] = [];
+    const toEmit: Array<{ owner: string; key: string; value: unknown }> = [];
+    // The values of the records that passed every refusal, whose embedded files are opened to the
+    // workspace's members once the batch has written (see the loop).
+    const toScope: unknown[] = [];
+    const results: BatchPublishItemResult[] = [];
+    // An id given twice in one batch would write the same version key twice in one bulk write; the
+    // first occurrence is decided, every later one is refused.
+    const seen = new Set<string>();
+
+    for (const instance of instances) {
+      if (seen.has(instance)) {
+        results.push({ instance, ok: false, code: 'DUPLICATE_ID', violations: [{ message: `id "${instance}" appears more than once in this batch; only its first occurrence was decided`, path: '/' }] });
+        continue;
+      }
+      seen.add(instance);
+      const base = `${nsPrefix}${instance}`;
+      const items = allRows.filter(r => r.key === base || r.key.startsWith(`${base}.`));
+      // Draft-less import: use the supplied value as the source; else read the record's .draft.
+      const direct = directValues ? directValues[instance] : undefined;
+      const draft = direct
+        ? { value: direct.value, ownerGaii: publisher, visibility: (direct.visibility ?? 'owner') as MemoryRecord['visibility'], tags: [] as string[], aiProvenanceId: direct.aiProvenanceId }
+        : items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+      if (!draft) { results.push({ instance, ok: false, code: 'NO_DRAFT' }); continue; }
+      // The statement about how the content was made travels with it, as publishDraft carries it.
+      const provenanceId = draft.aiProvenanceId ?? undefined;
+      const existingLatestEarly = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+      // createOnly is the CALLER's demand for this batch, so it is decided before the change-guard: an
+      // identical record that already exists is still a record that exists.
+      if (opts?.createOnly && existingLatestEarly) {
+        results.push({ instance, ok: false, code: 'EXISTS', violations: [{ schema_rule: 'create_only', message: `record "${instance}" already exists (version ${existingLatestEarly.version}); create-only refused it, nothing was written`, path: '/' }] });
+        continue;
+      }
+      // The URLs are rewritten with NO workspaceRef, so nothing is opened yet: passing it makes every
+      // embedded file readable by the workspace's members as a side effect, and this record's own
+      // refusals below (append-only, expected version, schema) can still refuse it. Opened after the
+      // batch has written, for the records that passed, as publishDraft does (N1).
+      const draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
+      const expectedVersion = expectedVersions?.[instance] ?? null;
+
+      const maxN = maxVersionOf(versionsByBase.get(base) ?? []);
+      const existingLatest = existingLatestEarly;
+      const vis = draft.visibility;
+      const tags = draft.tags ?? [];
+
+      // Change-guard: an unchanged re-publish just consumes the draft (no new version/latest, no side
+      // effect). Runs FIRST — a byte-identical write is never a guard conflict (mirrors checkWriteGuard).
+      if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
+        if (!direct) for (const d of draftCopies(items, base)) toDelete.push({ ownerGaii: d.ownerGaii, key: `${base}.draft` });
+        toScope.push(draftValue);
+        results.push({ instance, ok: true, version: maxN, skipped: true });
+        continue;
+      }
+      // Write-guard (in-memory, from the ONCE-loaded policy + the already-loaded existingLatest) — same
+      // decisions checkWriteGuard makes, without the per-record manifest + .latest reads.
+      if (policy) {
+        if (policy.createOnly && existingLatest) {
+          results.push({ instance, ok: false, code: 'INVALID', violations: [{ schema_rule: 'write_guard_conflict', message: `record "${instance}" already exists in append-only namespace "${namespace}"`, path: '/' }] });
+          continue;
+        }
+        if (policy.requiresExpectedVersion) {
+          const badNew = !existingLatest && expectedVersion != null && expectedVersion !== 0;
+          const badMissing = existingLatest && expectedVersion == null;
+          const badMismatch = existingLatest && expectedVersion != null && expectedVersion !== existingLatest.version;
+          if (badNew || badMissing || badMismatch) {
+            results.push({ instance, ok: false, code: 'INVALID', violations: [{ schema_rule: badMissing ? 'write_guard_version_required' : 'write_guard_version_mismatch', message: `expected_version does not match for "${instance}" (current ${existingLatest?.version ?? 0})`, path: '/' }] });
+            continue;
+          }
+        }
+      }
+      // An expected version the caller NAMED is a compare-and-swap in every space, not only in a
+      // requires_expected_version one: 0 means "must not exist yet", N means "must be at version N".
+      // null, or no entry, names no expectation.
+      if (typeof expectedVersion === 'number' && !policy?.requiresExpectedVersion) {
+        const current = existingLatest?.version ?? 0;
+        if (current !== expectedVersion) {
+          results.push({ instance, ok: false, code: 'VERSION_CONFLICT', violations: [{ schema_rule: 'expected_version', message: `expected version ${expectedVersion} for "${instance}", current is ${current}; nothing was written, read it again and retry`, path: '/' }] });
+          continue;
+        }
+      }
+      // Schema (in-memory, from the ONCE-compiled schema) — no per-record findApplicableSchema round-trip.
+      if (schemaToValidate) {
+        // An HTML page is checked without the node's own page fields (services/html-page.ts).
+        const sv = validateValueAgainstSchema(schemaViewOfDocument(draftValue, docSpace), schemaToValidate);
+        if (!sv.ok) { results.push({ instance, ok: false, code: 'INVALID', violations: sv.violations ?? (sv.errors ?? []).map(m => ({ message: m })) }); continue; }
+      }
+      const n = maxN + 1;
+      if (versioned) {
+        toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, ...(provenanceId ? { aiProvenanceId: provenanceId } : {}), visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+        // Retention: history rows beyond the window ride the batch's ONE bulk delete; an HTML page keeps at most five.
+        const window = docSpace && isHtmlPageValue(draftValue) ? effectiveMaxVersions(config, htmlPageRetention(pubOt, config)) : pruneWindow;
+        for (const r of versionRefsToPrune(versionsByBase.get(base) ?? [], n, window)) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
+      }
+      // .latest is owned by a member GHII (never a raw agent GAII) — ONE owner per key. A brand-new
+      // record is owned by the publisher's GHII; an existing one keeps its (GHII-normalised) owner. The
+      // explicit version is what setMemory INSERTs; on an in-place UPDATE setMemory recomputes it — same
+      // as publishDraft, since bulkSetMemory reuses setMemory verbatim.
+      const latestOwner = existingLatest ? ownerGhiiOf(existingLatest.ownerGaii) : ownerGhii;
+      toUpsert.push({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, ...(provenanceId ? { aiProvenanceId: provenanceId } : {}), visibility: vis, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+      // Collapse: any pre-existing .latest copy under a DIFFERENT owner is removed (single-owner key).
+      for (const r of items) if (r.key === `${base}.latest` && r.ownerGaii !== latestOwner) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
+      // Consume the draft (none for a direct import) — EVERY copy of it, see draftCopies.
+      if (!direct) for (const d of draftCopies(items, base)) toDelete.push({ ownerGaii: d.ownerGaii, key: `${base}.draft` });
+      toEmit.push({ owner: latestOwner, key: `${base}.latest`, value: draftValue });
+      toScope.push(draftValue);
+      results.push({ instance, ok: true, version: n });
+    }
+    // A dry run has decided every record; it stops before the first write.
+    if (opts?.dryRun) return { results };
+
+    // ONE bulk upsert (every version + latest), then ONE bulk delete (consumed drafts + collapsed
+    // copies) — both inside ONE transaction. Publishing a record writes its new version, moves
+    // .latest, prunes history past the retention window and consumes the draft; a failure between
+    // those left a version with no .latest, or a consumed draft whose publish never landed.
+    if (toUpsert.length || toDelete.length) {
+      await storage.transaction(async () => {
+        if (toUpsert.length) await storage.bulkSetMemory(toUpsert);
+        if (toDelete.length) await storage.bulkDeleteMemory(toDelete);
+      });
+    }
+    // Past every refusal and the write: the published documents' images may now be scoped to the
+    // members who can read them. A record the batch refused opens nothing.
+    const batchWriter = { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii };
+    if (ws) for (const v of toScope) {
+      await scopeDocImagesToWorkspace(storage, config, v, batchWriter, `${organismId}/${ws}`);
+      await scopeRecordFilesToWorkspace(storage, v, batchWriter, `${organismId}/${ws}`);
+    }
+    // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
+    // ...and schedule write-time classification of each (TARGET-082 V3), never awaited.
+    for (const e of toEmit) {
+      recordMemoryTouch({ ownerGaii: e.owner, key: e.key, writerPrincipal: publisher, kind: 'write' });
+      emitMemoryWritten(e.owner, e.key);
+      classifyAfterWrite({ storage, config }, e.owner, e.key, e.value);
+    }
+    return { results };
+  };
+
+  // Reopen a published record for editing (copy .latest → .draft): ./organism-record-helpers.ts
+  // revertRecordToDraft, moved there unchanged on 2026-09-13 (max-file-lines). Reopening WRITES a
+  // draft, so a space the manifest does not declare is refused here first, as a publish is.
+  const revertToDraft = async (
+    organismId: string, ws: string | undefined, namespace: string, instance: string, reverter: string,
+  ): Promise<{ ok: true } | { ok: false; code: 'NO_LATEST' | 'DRAFT_EXISTS' } | { ok: false; code: 'UNDECLARED_SPACE'; refusal: UndeclaredSpaceRefusal }> => {
+    const { refusal } = await readPublishSpace(storage, organismId, ws, namespace);
+    if (refusal) return { ok: false, code: 'UNDECLARED_SPACE', refusal };
+    return revertRecordToDraft(storage, organismId, ws, namespace, instance, reverter);
+  };
+
+  // ── Workspace access (per-workspace, creator-controlled, consent-backed) ──
+
+  const wsRegPrefix = (id: string) => `organism.${id}.meta.workspaces`;
+  const bareOwner = (gaii: string) => localAccountName(gaii);
+
+  /** Find a workspace's registry entry across every member's registry (one key per owner): the copy
+   *  that counts (services/workspace-meta-read.ts workspaceRegistrations), never the first in store
+   *  order, which let a since-demoted admin's copy name its writer the creator (secaudit2026oct26). */
+  const findWsEntry = async (id: string, ws: string): Promise<{ id: string; name?: string; createdBy?: string; createdAt?: string; ownerGaii: string } | null> => {
+    const reg = (await workspaceRegistrations(storage, id, { archived: 'exclude' })).get(ws);
+    return reg ? { ...(reg.entry as { id: string; name?: string; createdBy?: string; createdAt?: string }), ownerGaii: reg.record.ownerGaii } : null;
+  };
+
+  /** The read-authz decision for a workspace given its ALREADY-FETCHED manifest record (or null when the
+   *  workspace has no manifest). Factored out of {@link canReadWs} so a batch caller resolving N
+   *  workspaces from ONE cross-owner multi-key read and the single-ws caller share ONE authz code path —
+   *  no drift. For a GEAI (callerGaii is the eco: sub, unchanged by resolveIdentity) a matching 'read'
+   *  data-area grant is also required — model A / strict, so a GEAI riding its owner's membership honours
+   *  the owner-selected read scope. */
+  const canReadWsManifest = async (callerGaii: string, manKey: string, man: MemoryRecord | null): Promise<boolean> => {
+    if (!man) return false;
+    let allowed: boolean;
+    if (man.ownerGaii === callerGaii || isSameOwner(man.ownerGaii, callerGaii)) {
+      allowed = true;
+    } else {
+      const d = await authorizeRead(storage, config, { ownerGaii: man.ownerGaii, accessorGaii: callerGaii, resourceKey: man.key, visibility: man.visibility, groupId: man.groupId, action: 'read' });
+      allowed = d.allowed;
+    }
+    if (allowed && isGEAI(callerGaii)) allowed = await ecoMayReadKey(storage, callerGaii, manKey);
+    return allowed;
+  };
+
+  /** Can this accessor read the workspace's content (i.e. its manifest)? One manifest scan, then the
+   *  shared {@link canReadWsManifest} decision. */
+  const canReadWs = async (id: string, ws: string, callerGaii: string): Promise<boolean> =>
+    canReadWsManifest(callerGaii, `organism.${id}.w.${ws}.meta.manifest`,
+      await readWorkspaceMetaRecord(storage, id, ws, 'meta.manifest', config.nodeId));
+
+  /** Batch-fetch the manifest record of MANY workspaces in ONE cross-owner `key IN (…)` read. Returns wsId → the manifest copy that
+   *  counts (workspaceMetaReader: the creator's, then a manager's; never the freshest whoever wrote it) —
+   *  collapses the discovery list's per-workspace canReadWs manifest scans (N → 1). Pair with
+   *  {@link canReadWsManifest} to resolve each workspace's access from the pre-fetched manifest without a
+   *  second round-trip. */
+  const readWsManifests = async (id: string, wsIds: string[]): Promise<Map<string, MemoryRecord>> => {
+    const out = new Map<string, MemoryRecord>();
+    if (wsIds.length === 0) return out;
+    const reader = workspaceMetaReader(storage, id, config.nodeId);
+    const keyOf = (ws: string) => `organism.${id}.w.${ws}.meta.manifest`;
+    const recs: MemoryRecord[] = await storage.getMemoryByKeysAnyOwner(wsIds.map(keyOf));
+    for (const ws of wsIds) {
+      const m = await reader.pick(ws, 'meta.manifest', recs);
+      if (m) out.set(ws, m);
+    }
+    return out;
+  };
+
+  /** Distinct workspace-id count per organism, batched: ONE cross-owner key-IN read of every org's
+   *  registry record (`organism.{id}.meta.workspaces` — one per member who created a workspace) instead
+   *  of a listAllMemory scan per organism on the ?include=counts list view. Returns orgId → count
+   *  (0 for an org with no registry). */
+  const workspaceCountsByOrg = async (orgIds: string[]): Promise<Map<string, number>> => {
+    const counts = new Map<string, number>(orgIds.map(id => [id, 0]));
+    if (orgIds.length === 0) return counts;
+    const keyToOrg = new Map(orgIds.map(id => [wsRegPrefix(id), id]));
+    const idsByOrg = new Map<string, Set<string>>(orgIds.map(id => [id, new Set<string>()]));
+    const recs: MemoryRecord[] = await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()]);
+    for (const rec of recs) {
+      const orgId = keyToOrg.get(rec.key);   // exact-key match (skips any `…workspaces.*` sibling)
+      if (!orgId) continue;
+      const set = idsByOrg.get(orgId)!;
+      for (const w of ((rec.value as { workspaces?: Array<{ id?: string }> } | null)?.workspaces ?? [])) {
+        if (w.id) set.add(w.id);
+      }
+    }
+    for (const [id, set] of idsByOrg) counts.set(id, set.size);
+    return counts;
+  };
+
+  /** workspace-id → name map per organism, batched with the SAME ONE cross-owner key-IN registry read as
+   *  {@link workspaceCountsByOrg}. Backs the "Waiting for you" aggregate's ws-name lookup (was a registry
+   *  scan per organism-with-approvals). Returns orgId → Map(wsId → name); an org with no registry is absent. */
+  const workspaceNamesByOrg = async (orgIds: string[]): Promise<Map<string, Map<string, string>>> => {
+    const out = new Map<string, Map<string, string>>();
+    if (orgIds.length === 0) return out;
+    const keyToOrg = new Map(orgIds.map(id => [wsRegPrefix(id), id]));
+    const recs: MemoryRecord[] = storage.getMemoryByKeysAnyOwner
+      ? await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()])
+      : (await Promise.all(orgIds.map(id => storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 }).then(r => r.items)))).flat();
+    for (const rec of recs) {
+      const orgId = keyToOrg.get(rec.key);   // exact-key match
+      if (!orgId) continue;
+      let names = out.get(orgId);
+      if (!names) { names = new Map<string, string>(); out.set(orgId, names); }
+      for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string }> } | null)?.workspaces ?? [])) {
+        if (w.id && !names.has(w.id)) names.set(w.id, w.name ?? w.id);
+      }
+    }
+    return out;
+  };
+
+  /** Create a consent grant if an equivalent active one doesn't already exist (idempotent). */
+  const ensureConsent = async (ownerGaii: string, dataPattern: string, recipient: string, purpose: string): Promise<void> => {
+    const existing = await storage.listConsents(ownerGaii, { status: 'active' });
+    if (existing.some(c => c.dataPattern === dataPattern && c.recipient === recipient)) return;
+    const now = new Date().toISOString();
+    await storage.createConsent({ id: uuidv4(), ownerGaii, dataPattern, recipient, purpose, scope: 'local', expires: null, status: 'active', grantedAt: now, revokedAt: null });
+  };
+
+  // Workspace member roles delegate to the ONE shared service (services/workspace-roles.ts) so the REST
+  // routes, the MCP tools, and the invitation-accept path share a single authority path (no parallel
+  // ad-hoc mechanism). These thin wrappers keep the route-local call sites terse.
+  /** Set a member's role, stamping provenance (source + grantedBy) for the members listing. */
+  const setWorkspaceRole = (creatorGhii: string, id: string, ws: string, grantee: string, role: WsRole, source: WsGrantSource, grantedBy: string) =>
+    grantWorkspaceRole(storage, config, { creatorGhii, orgId: id, ws, grantee, role, source, grantedBy });
+  const revokeWorkspaceRole = (creatorGhii: string, id: string, ws: string, grantee: string) =>
+    revokeWsRoleSvc(storage, config, { creatorGhii, orgId: id, ws, grantee });
+  /** Map the creator's active grants → each member's current role + provenance for a workspace. */
+  const memberRolesForWs = (creatorGhii: string, id: string, ws: string): Promise<Map<string, WsMemberRole>> =>
+    listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: id, ws });
+
+  // ── Document-space public sharing (meta.share) ──
+
+  // The copy that counts (services/workspace-meta.ts), so a member's own copy shares nothing. Read,
+  // shown and set in services/workspace-share.ts, which the share MCP tool runs too.
+  const readShareMeta = (id: string, ws: string): Promise<ResolvedShare> => readShareMetaOf(storage, config, id, ws);
+
+  /** The share state as the API is allowed to show it — the password hash and the feed key's hash NEVER leave the server. */
+  const redactShare = (share: ResolvedShare): Record<string, unknown> => redactShareOf(share);
+
+  /** Gate the NO-AUTH public read path by the share's access mode. Returns null when allowed,
+   *  else the 401 error code + message the caller should send. Assumes the caller has already
+   *  established that something IS shared (404 no-disclosure runs first). */
+  const shareGateDenied = async (
+    req: { auth?: VerifiedToken; headers: IncomingHttpHeaders }, organism: { agentGaiis: string[] }, id: string, ws: string, share: ResolvedShare,
+  ): Promise<{ code: string; message: string } | null> => {
+    if (share.access === 'open') return null;
+    // A session signed in on ANOTHER node is a visitor here, not an account of this node: 'account'
+    // means this node's accounts and their agents (plan doc-mvcn6c7e4e5q, V0.5).
+    const authed = isNodeAccount(req.auth);
+    if (share.access === 'account') {
+      return authed ? null : { code: 'SHARE_ACCOUNT_REQUIRED', message: 'Sign in to view these shared documents' };
+    }
+    // The members of this workspace's own organism (plan doc-mvcn6c7e4e5q V3.4): the same membership
+    // the workspace read asks, through memberRole.
+    if (share.access === 'organism') {
+      if (!authed) return { code: 'SHARE_ACCOUNT_REQUIRED', message: 'Sign in to view these shared documents' };
+      return await memberRole(req, organism, id) ? null : { code: 'SHARE_MEMBERS_ONLY', message: 'These documents are shared with the members of this organisation only' };
+    }
+    // access === 'password': a valid share token for THIS org+ws, or an authenticated org member.
+    const rawToken = req.headers['x-share-token'];
+    const token = typeof rawToken === 'string' ? rawToken : undefined;
+    if (token) {
+      try {
+        const v = await verifyShareToken(token);
+        // The token names the password it was unlocked with; after a change it opens nothing.
+        if (v.org === id && v.ws === ws && share.passwordHash && v.pwv === shareTokenVersionOf(share.passwordHash)) return null;
+      // eslint-disable-next-line aimeat/no-silent-catch -- invalid/expired token falls through to the 401
+      } catch { /* invalid/expired token falls through to the 401 */ }
+    }
+    if (authed && await memberRole(req, organism, id)) return null;
+    return { code: 'SHARE_PASSWORD_REQUIRED', message: 'This share is password-protected' };
+  };
+
+  // The published content a share hands out, and the member read of records (workspace-public-collectors.ts).
+  const { isDocPublic, readWsManifestValue, collectPublicDocs, collectWsRecords, collectPublicRecords, docsToMarkdown } = createPublicCollectors(storage, config);
+
+  // Normalize an `agent` body field (full GAII or bare name → full GAII under the given owner).
+  const toAgentGaii = (agent: unknown, owner: string): string => {
+    const s = String(agent || '').trim();
+    return s.includes('#') ? s : `${s}#${owner}@${config.nodeId}`;
+  };
+
+  // requireWsManager, requireOrgAdmin, codeInviteGuards, requireOrgMember and archiveHandler take an
+  // Express request and response: routes/organisms/shared.ts adds them for the route groups.
+  return {
+    memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft,
+    wsRegPrefix, bareOwner, findWsEntry, canReadWs, canReadWsManifest, readWsManifests, workspaceCountsByOrg, workspaceNamesByOrg, ensureConsent,
+    setWorkspaceRole, revokeWorkspaceRole, memberRolesForWs,
+    readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, collectPublicRecords, collectWsRecords, docsToMarkdown,
+    toAgentGaii,
+    validateArchiveTarget,
+  };
+}

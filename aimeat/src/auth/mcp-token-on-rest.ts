@@ -15,10 +15,12 @@
  *   WHAT IS NOT JUDGED HERE.
  *   - The MCP surface itself: `/v1/mcp`, `/mcp`, `/v2/mcp/<role>` and the MCP OAuth routes under
  *     `/v1/mcp/` take the token in every release.
- *   - The node's own loopback request for an MCP tool (auth/loopback-pass.ts): `aimeat_invoke`,
- *     `aimeat_capabilities_invoke` and `aimeat_app_tool_invoke` send the session's bearer to the REST
- *     routes with a pass this process minted for that bearer, and that request is accepted, not
- *     counted, in every release.
+ *   - The node's own request for an MCP tool: `aimeat_invoke`, `aimeat_capabilities_invoke` and
+ *     `aimeat_app_tool_invoke` send the session's bearer to the REST routes in process
+ *     (services/request-injector.ts), on a connection marked for that bearer
+ *     (auth/injected-request.ts), and that request is accepted, not counted, in every release. A
+ *     request with a loopback pass this process minted for the bearer (auth/loopback-pass.ts) is
+ *     accepted the same way; nothing in the node mints one since 2026-11-04.
  *   - A token without an audience. The node's chat and the commerce fulfilment mint MCP-flavoured
  *     tokens (`mcp_client`) without one for REST use, so `mcp_client` alone does not bind a token.
  * @structure MCP_TOKEN_ON_REST_REMOVED_IN · isMcpSurfacePath · isMcpBoundToken · mcpTokenOnRestVerdict ·
@@ -27,6 +29,8 @@
  *   const verdict = mcpTokenOnRestVerdict(req, token, verified, config);
  *   if (verdict === 'refuse') { denyInvalidToken(req, res, MCP_TOKEN_ON_REST_MESSAGE); return; }
  * @version-history
+ *   v1.1.0 — 2026-11-04 — The node's in-process request for the caller's bearer (auth/injected-request.ts)
+ *     is accepted as the loopback pass was (codebase analysis 2026-11-03, item D-j).
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-tokeni-ei-kelpaa-rest-reiteill-4-0-0-sta-ensin-kolme-mcp,
  *     ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan item 8, Core 2026-11 MCP-07).
  */
@@ -36,6 +40,7 @@ import type { VerifiedToken } from './jwt.js';
 import { namesMcpResource, mcpResourceOf } from '../mcp/oauth-binding.js';
 import { removedFrom, noteDeprecatedUse } from '../services/deprecation.js';
 import { LOOPBACK_PASS_HEADER, loopbackPassCovers } from './loopback-pass.js';
+import { injectedRequestCovers } from './injected-request.js';
 
 /** The release from which a REST route refuses a token bound to the MCP endpoint. */
 export const MCP_TOKEN_ON_REST_REMOVED_IN = '4.0.0';
@@ -75,6 +80,7 @@ export function mcpTokenOnRestVerdict(
 ): 'accept' | 'deprecated' | 'refuse' {
   if (!config || !isMcpBoundToken(verified, config)) return 'accept';
   if (isMcpSurfacePath(req.path)) return 'accept';
+  if (injectedRequestCovers(req, token)) return 'accept';
   if (loopbackPassCovers(req.header(LOOPBACK_PASS_HEADER), token, req.socket?.remoteAddress)) return 'accept';
   if (removedFrom(MCP_TOKEN_ON_REST_REMOVED_IN, version)) return 'refuse';
   noteDeprecatedUse({

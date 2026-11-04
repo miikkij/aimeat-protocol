@@ -38,7 +38,7 @@ import { logPartyRead } from '../services/parties/activity.js';
 import type { DatapackageReader } from '../services/datapackage/audience.js';
 import { meterPackageRead } from '../services/datapackage/contract-read.js';
 import type { MeteredOutcome } from '../services/metered-access.js';
-import { meteredRefusalText } from './extensions/metered-response.js';
+import { meteredRefusalText } from '../services/extension-access/metered-response.js';
 import { logger } from '../utils/logger.js';
 
 export interface PartyReadOpts {

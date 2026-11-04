@@ -29,7 +29,8 @@ import { getEncryptionKey } from '../../services/encryption.js';
 import {
   getInstanceSecretKeys, encryptSecretFields, maskSecretFields, preserveMaskedSecrets, stripClientEncryptedValues,
 } from '../../services/extension-secrets.js';
-import { mayManageInstalledExt, canSeeExtensionInstanceAs } from './permissions.js';
+import { mayManageInstalledExt } from './permissions.js';
+import { canSeeExtensionInstanceAs } from '../../services/extension-access/manage.js';
 import { findExtension } from '../../services/component-address.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
