@@ -7113,6 +7113,7 @@
     "expired": "Tämä pyyntö on vanhentunut.",
     "newScope": "uusi",
     "area": {
+      "agent": "agenttiesi luominen ja poistaminen",
       "memory": "tallentamasi tiedot",
       "storage": "täällä säilyttämäsi tiedostot",
       "catalogue": "julkinen hakemisto",

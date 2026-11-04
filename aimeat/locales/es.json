@@ -5895,6 +5895,7 @@
     "expired": "Esta petición ha caducado.",
     "newScope": "nuevo",
     "area": {
+      "agent": "crear y eliminar tus agentes",
       "memory": "tus datos guardados",
       "storage": "los archivos que guardas aquí",
       "catalogue": "el catálogo público",
