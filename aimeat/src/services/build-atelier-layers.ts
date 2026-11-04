@@ -22,6 +22,8 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.4.0 — 2026-11-04 — The motion section is a part of its own: the look table grew past one tool
+ *     result when the office and corporate looks arrived.
  *   v1.3.0 — 2026-10-29 — "The structure page: the person follows the build" (build-structure-step.ts)
  *     is served in `libraries`, and that part's index line names it: `start` has no room for it.
  *   v1.2.0 — 2026-10-17 — "Data, in short" and "What the review always catches" moved from `start`
@@ -34,7 +36,7 @@
  */
 import { MAX_PART_CHARS } from './build-app-layers.js';
 
-export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'look';
+export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns' | 'look' | 'motion';
 
 /** In reading order. `what` is the line the first part shows for each of the others. */
 export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
@@ -43,7 +45,8 @@ export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
   { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, AI inside the app, data (personal, team and public) and what the review always catches. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist. It also says how to start the app\'s structure page, the link you give the person first.' },
   { id: 'book', what: 'REQUIRED before any code: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
-  { id: 'look', what: 'The look presets, the one ambient layer, effects, motion and imagery. Read it before you change anything the genre did not decide for you.' },
+  { id: 'look', what: 'The look presets, the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
+  { id: 'motion', what: 'What already moves, the attention gesture, and the controls that answer the hand. Read it before you make anything move.' },
 ];
 
 /**
@@ -90,7 +93,7 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'The look': 'look',
   'The ambient: the one layer allowed to move at idle': 'look',
   'Effects: still on the words, a moment on a cue, living only behind them': 'look',
-  'Motion, and the moment something needs the eye': 'look',
+  'Motion, and the moment something needs the eye': 'motion',
   'Imagery': 'look',
 };
 

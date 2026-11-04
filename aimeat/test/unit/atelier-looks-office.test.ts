@@ -18,7 +18,7 @@ import { validateUiLayout } from '../../src/services/app-ui/validate.js';
 import { unservedFirstFamily } from '../../src/services/app-ui/signature-tokens.js';
 import { ratio, runMatrix } from '../../src/services/atelier-contrast.js';
 import { deriveBrandTokens } from '../../src/services/design-book/kit-brand.js';
-import { kitSnippet, validateKitBody } from '../../src/services/design-book/kit.js';
+import { kitPreviewHtml, kitSnippet, validateKitBody } from '../../src/services/design-book/kit.js';
 import { DesignBookError } from '../../src/services/design-book/errors.js';
 import { lookStage } from '../../src/services/design-book/preview-stages.js';
 import { emitLooksCss } from '../../tools/build-atelier-looks.js';
@@ -117,6 +117,16 @@ describe('a kit from one brand colour', () => {
   it('refuses a colour that is no colour, and a kit that gives both doors', () => {
     expect(() => validateKitBody({ reach: 'own', look: 'konserni', brand: 'red' })).toThrow(DesignBookError);
     expect(() => validateKitBody({ reach: 'own', look: 'konserni', brand: '#0b6b53', tokens: { '--ak-accent': '#0e7c66/#7fd8c4' } })).toThrow(/not both/);
+  });
+
+  it('previews in the real shell without ornaments, on the five-figure page with them', () => {
+    const plain = kitPreviewHtml({ title: 'Yritys</script>', summary: 's', body: validateKitBody({ reach: 'own', look: 'konserni', brand: '#0b6b53' }) }, 'dark');
+    expect(plain).toContain('K.app({');
+    expect(plain).toContain('"look":"konserni"');
+    expect(plain).toContain('data-theme="dark"');
+    expect(plain).not.toContain('Yritys</script>');
+    const worn = kitPreviewHtml({ title: 'Y', summary: 's', body: validateKitBody({ reach: 'own', look: 'konserni', ornament: { set: 'modern' } }) });
+    expect(worn).toContain('class="kit-bar"');
   });
 
   it('never takes the worked-out record from the caller', () => {

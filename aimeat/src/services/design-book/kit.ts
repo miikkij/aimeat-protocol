@@ -28,6 +28,9 @@
  *   const body = validateKitBody({ reach: 'own', look: 'editorial', tokens: { '--ak-accent': '#1d4ed8/#93c5fd' } });
  *   if (!(await kitReadable(storage, nodeId, part, readerOwnerGhii))) throw notFound;
  * @version-history
+ *   v1.3.0 — 2026-11-04 — A kit with no ornament set previews as a working screen in the real app shell,
+ *     because what makes the office looks theirs (the tabs, the numbered contents, the bar in the
+ *     company's colour) is the shell's, and the five-figure screen has none of it.
  *   v1.2.0 — 2026-11-04 — `brand`: one colour, from which kit-brand.ts works out the accent, the words on
  *     it and the accent as text per mode, proven on the kit's look. The head stylesheet carries those
  *     pairs on the look's element too, where a look re-declares the accent as text.
@@ -265,12 +268,12 @@ function kitPreviewCss(tokens: Record<string, string>): string {
     if (name === '--ak-accent' && value.includes('/')) {
       const [l, d] = value.split('/').map(s => s.trim());
       plain.push(`--ak-accent: ${l};`);
-      dark = `:root[data-theme="dark"], :root[data-theme="dark"] body[data-ak-look] { --ak-accent: ${d || l}; }`;
+      dark = `:root[data-theme="dark"], :root[data-theme="dark"] .ak-app[data-ak-look], :root[data-theme="dark"] body[data-ak-look] { --ak-accent: ${d || l}; }`;
     } else {
       plain.push(`${name}: ${value};`);
     }
   }
-  return [`:root, body[data-ak-look] { ${plain.join(' ')} }`, dark, derivedPairsCss(tokens)].filter(Boolean).join('\n');
+  return [`:root, .ak-app[data-ak-look], body[data-ak-look] { ${plain.join(' ')} }`, dark, derivedPairsCss(tokens)].filter(Boolean).join('\n');
 }
 
 /**
@@ -283,6 +286,7 @@ export function kitPreviewHtml(part: { title: string; summary: string; body: unk
   const body = part.body as KitBody;
   const css = body.tokens && Object.keys(body.tokens).length ? kitPreviewCss(body.tokens) : '';
   const set = body.ornament?.set;
+  if (!set) return kitWorkingScreen(part.title, body, css, theme);
   const spec = JSON.stringify({ set: set ?? null, palette: body.ornament?.palette ?? 'set' }).replace(/</g, '\\u003c');
   const facts = [`look ${body.look}`, body.brand ? `brand ${body.brand}` : '', body.genre ? `starts from ${body.genre}` : '', set ? `ornaments ${set}` : ''].filter(Boolean).join(' · ');
   return [
@@ -309,6 +313,45 @@ export function kitPreviewHtml(part: { title: string; summary: string; body: unk
     '</scr' + 'ipt></body></html>',
   ].join('\n');
 }
+
+/**
+ * The preview of a kit that wears no ornaments: one working screen in the real app shell, with its
+ * side column, a heading, a marked proposal, a table, figures and actions. The words are the page's
+ * own constants; only the kit's title and logo come from the part, as JSON with "<" escaped.
+ */
+function kitWorkingScreen(title: string, body: KitBody, css: string, theme: 'light' | 'dark'): string {
+  const spec = JSON.stringify({ title, look: body.look, logo: body.logo ?? null }).replace(/</g, '\\u003c');
+  return [
+    `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
+    `<style>${css}</style></head><body>`,
+    '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
+    '<script>',
+    `var SPEC = ${spec};`,
+    KIT_WORKING_SCREEN_JS,
+    '</scr' + 'ipt></body></html>',
+  ].join('\n');
+}
+
+const KIT_WORKING_SCREEN_JS = [
+  'var K = AIMEAT.atelier; var none = function () {};',
+  'var item = function (id, label, group, extra) { var o = { id: id, label: label, onPick: none }; if (group) o.group = group; for (var k in extra || {}) o[k] = extra[k]; return o; };',
+  'var a = K.app({ title: SPEC.title, look: SPEC.look, logo: SPEC.logo || undefined, nav: "side", navLabel: "Pages", requireLogin: false, navItems: [',
+  '  item("now", "Where you stand"), item("cal", "Calendar"), item("msg", "Messages", null, { count: 2 }), item("money", "Money"),',
+  '  item("cust", "Customers", "More"), item("ai", "AI help", "More"), item("set", "Settings", "More") ],',
+  '  onReady: function () {',
+  '    if (a.nav) a.nav.set({ value: "ai" });',
+  '    K.hero({ target: a.main, title: "AI help", sub: "The AI suggests and you decide. Nothing is recorded before you have looked at the rows.", parts: SPEC.look === "vuosikertomus" ? { before: "06" } : {} });',
+  '    K.callout({ target: a.main, tone: "warn", text: "Remove health details before you paste text. The text goes to an AI model." });',
+  '    var s = K.section({ target: a.main, title: "Check the suggestions" });',
+  '    var p = document.createElement("p"); p.append("15 Dec at 12, "); var m = document.createElement("mark"); m.textContent = "a time with the harbour office"; p.append(m); p.append(", 200 €"); s.body.appendChild(p);',
+  '    K.table({ target: s.body, columns: [{ key: "d", label: "Day" }, { key: "t", label: "Entry" }, { key: "n", label: "Sum", align: "right" }], rows: [{ id: 1, d: "15 Dec", t: "Harbour office", n: "200 €" }, { id: 2, d: "20 Nov", t: "Order the receipt rolls", n: "" }, { id: 3, d: "3 Nov", t: "Sale at the trade fair", n: "120 €" }] });',
+  '    K.statRow({ target: a.main, tiles: [{ id: "a", label: "Suggested", value: 3 }, { id: "b", label: "Recorded", value: 0 }, { id: "c", label: "Together", value: 320, unit: "€" }] });',
+  '    var bar = document.createElement("div"); bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap"; a.main.appendChild(bar);',
+  '    [["ak-btn ak-btn--primary", "Add the chosen"], ["ak-btn", "Tell me where I stand"]].forEach(function (x) { var b = document.createElement("button"); b.className = x[0]; b.textContent = x[1]; bar.appendChild(b); });',
+  '  } });',
+].join('\n');
 
 /** The kit page's own pieces: the bar with the logo, and the line of what the kit carries. */
 const KIT_STAGE_CSS = [
