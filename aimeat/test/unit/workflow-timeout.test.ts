@@ -15,6 +15,15 @@ function memStorage(opts?: { stepAgent?: Partial<AgentRecord> | null }): Storage
   return {
     getMemory: async (owner: string, key: string) => map.get(k(owner, key)) ?? null,
     setMemory: async (rec: MemoryRecord) => { map.set(k(rec.ownerGaii, rec.key), rec); return rec; },
+    // The conditional writes Storage requires (record-cas.ts updateRecord).
+    createMemoryIfAbsent: async (rec: MemoryRecord) => {
+      if (map.has(k(rec.ownerGaii, rec.key))) return null;
+      map.set(k(rec.ownerGaii, rec.key), rec); return rec;
+    },
+    setMemoryIfVersion: async (rec: MemoryRecord, expected: number) => {
+      if (map.get(k(rec.ownerGaii, rec.key))?.version !== expected) return null;
+      map.set(k(rec.ownerGaii, rec.key), rec); return rec;
+    },
     listMemory: async (owner: string, opts2?: { prefix?: string }) => {
       const prefix = opts2?.prefix ?? '';
       return [...map.values()].filter(r => r.ownerGaii === owner && r.key.startsWith(prefix));

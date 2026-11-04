@@ -37,6 +37,15 @@ function memStorage(): Storage & { tasks: unknown[] } {
     tasks,
     getMemory: async (owner: string, key: string) => map.get(k(owner, key)) ?? null,
     setMemory: async (rec: MemoryRecord) => { map.set(k(rec.ownerGaii, rec.key), rec); return rec; },
+    // The conditional writes Storage requires (record-cas.ts updateRecord).
+    createMemoryIfAbsent: async (rec: MemoryRecord) => {
+      if (map.has(k(rec.ownerGaii, rec.key))) return null;
+      map.set(k(rec.ownerGaii, rec.key), rec); return rec;
+    },
+    setMemoryIfVersion: async (rec: MemoryRecord, expected: number) => {
+      if (map.get(k(rec.ownerGaii, rec.key))?.version !== expected) return null;
+      map.set(k(rec.ownerGaii, rec.key), rec); return rec;
+    },
     deleteMemory: async (owner: string, key: string) => map.delete(k(owner, key)),
     listMemory: async (owner: string, opts?: { prefix?: string }) => {
       const prefix = opts?.prefix ?? '';

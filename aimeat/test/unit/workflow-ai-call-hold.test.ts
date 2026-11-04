@@ -121,6 +121,13 @@ function memStorage(onSet?: (rec: MemoryRecord) => Promise<void>): Storage {
             if (onSet) await onSet(rec);
             return rec;
         },
+        // The conditional writes Storage requires (record-cas.ts updateRecord), through setMemory above.
+        async createMemoryIfAbsent(rec: MemoryRecord) {
+            return map.has(k(rec.ownerGaii, rec.key)) ? null : this.setMemory(rec);
+        },
+        async setMemoryIfVersion(rec: MemoryRecord, expected: number) {
+            return map.get(k(rec.ownerGaii, rec.key))?.version === expected ? this.setMemory(rec) : null;
+        },
         deleteMemory: async (owner: string, key: string) => map.delete(k(owner, key)),
         listMemory: async (owner: string, o?: { prefix?: string }) => listed(r => r.ownerGaii === owner, o?.prefix),
         listMemoryForOwners: async (owners: string[], o?: { prefix?: string }) => listed(r => owners.includes(r.ownerGaii), o?.prefix),

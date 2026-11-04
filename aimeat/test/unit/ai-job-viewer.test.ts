@@ -21,6 +21,9 @@
  *   v1.0.1 — 2026-10-21 — The stub storage and config answer the result-key checks a start makes
  *     before any cost (services/ai-jobs/result-precheck.ts). The suite failed to start because its
  *     setup no longer matched production; no assertion changed.
+ *   v1.0.2 — 2026-11-04 — The stub storage answers createMemoryIfAbsent and setMemoryIfVersion, which
+ *     the job index now writes with (codebase analysis 2026-11-03, items D-e and HA 2.5). The suite
+ *     failed to start because its setup no longer matched production; no assertion changed.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
@@ -54,6 +57,15 @@ function memoryStorage(): Storage {
     return {
         getMemory: async (owner: string, key: string) => rows.get(`${owner}::${key}`) ?? null,
         setMemory: async (r: MemoryRecord) => { rows.set(`${r.ownerGaii}::${r.key}`, r); return r; },
+        // The conditional writes the job index takes (services/ai-jobs/store.ts through record-cas.ts).
+        createMemoryIfAbsent: async (r: MemoryRecord) => {
+            if (rows.has(`${r.ownerGaii}::${r.key}`)) return null;
+            rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+        },
+        setMemoryIfVersion: async (r: MemoryRecord, expected: number) => {
+            if (rows.get(`${r.ownerGaii}::${r.key}`)?.version !== expected) return null;
+            rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+        },
         deleteMemory: async (owner: string, key: string) => rows.delete(`${owner}::${key}`),
         listMemory: async (owner: string, opts: { prefix?: string } = {}) => [...rows.values()]
             .filter(r => r.ownerGaii === owner && r.key.startsWith(opts.prefix ?? '')),
