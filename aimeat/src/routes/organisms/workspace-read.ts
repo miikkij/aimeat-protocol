@@ -82,7 +82,7 @@ import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/stru
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { loadServedProvenanceMany } from '../../services/ai-provenance-marks.js';
 import { provenanceForWrite, ProvenanceScopeError } from '../../services/ai-provenance.js';
-import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 import { fresherRec } from './shared.js';
 import { sharedPublishedProvenanceIds } from '../../services/share-provenance.js';

@@ -44,8 +44,8 @@ import {
     CompanyError, createCompany, updateCompany, requireOwnCompany, companyAddress,
     type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
-import { toDeclaredProvenance, type AiProvenanceToolInput } from './ai-provenance-input.js';
-import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { toDeclaredProvenance, type AiProvenanceToolInput } from '../services/ai-provenance-input.js';
+import { writeProvenanceEcho } from '../services/ai-provenance-result.js';
 import { setCompanyFrontPageGated, publishCompanyPortfolioGated } from '../services/company/company-publish-gate.js';
 import { publishAskedFields } from '../services/app-publish-gate.js';
 import type { CallerContext } from '../services/caller-context.js';

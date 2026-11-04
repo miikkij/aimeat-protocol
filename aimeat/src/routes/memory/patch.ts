@@ -94,7 +94,7 @@ import { tallyWriterOf } from '../../services/data-map/tally-writer.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';

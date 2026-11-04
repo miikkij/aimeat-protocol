@@ -41,7 +41,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
 import type { CompanyRecord, NewCompanyInput, CompanyFrontPage } from '../../models/company-schemas.js';
-import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../../routes/subdomains.js';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../subdomain-names.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, type DeclaredProvenance } from '../ai-provenance.js';
 

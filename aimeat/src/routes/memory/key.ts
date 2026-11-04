@@ -80,7 +80,7 @@ import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryUpdateSchema, validateBody } from '../../models/schemas.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { emitRecordChange } from '../../services/event-bus.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';

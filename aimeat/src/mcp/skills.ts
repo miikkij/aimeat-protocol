@@ -76,8 +76,8 @@ import { readerForAgent, readerFor } from '../services/classification/reader.js'
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { toolError } from './tool-error.js';
-import { toDeclaredProvenance } from './ai-provenance-input.js';
-import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+import { writeProvenanceEcho } from '../services/ai-provenance-result.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
 import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';

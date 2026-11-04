@@ -111,7 +111,7 @@ import { resolveIdentity, isSameOwner, localAccountName, isOwnerInPerson } from 
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai-provenance-marks.js';
-import { toDeclaredProvenance } from '../mcp/ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

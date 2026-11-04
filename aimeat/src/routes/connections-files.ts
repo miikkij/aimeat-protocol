@@ -47,7 +47,7 @@ import { driveFileText, storeDriveFile } from '../services/connections/drive-fil
 import { writeResource, loadStoredBytes, type WritePayload } from '../services/connections/write.js';
 import { readerFor } from '../services/classification/reader.js';
 import { explainReadThrough } from './connections-read-through.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 
 /** The most text a write may carry inline; anything larger is a stored file (from_key). */
 const MAX_INLINE_TEXT = 4 * 1024 * 1024;

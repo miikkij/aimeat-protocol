@@ -64,7 +64,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { annotationsFor } from './annotations.js';
-import { toDeclaredProvenance } from './ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookKits } from '../services/design-book/kit-defaults.js';

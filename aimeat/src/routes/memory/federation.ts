@@ -50,7 +50,7 @@ import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../
 import { logger } from '../../utils/logger.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { sign } from '../../auth/keypair.js';
 import { audienceProof, deliveryProof } from '../../services/signed-node-request.js';
 import type { MemoryRouteCtx } from './shared.js';

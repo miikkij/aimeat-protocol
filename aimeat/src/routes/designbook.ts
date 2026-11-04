@@ -75,7 +75,7 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
 import type { WriteProvenance } from '../services/app-ui/service.js';
 import { DesignBookService } from '../services/design-book/service.js';
 import { partProvenanceIds } from '../services/design-book/part-provenance.js';

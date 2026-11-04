@@ -178,7 +178,7 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { isOrganismVisibilityWord, STORED_VISIBILITY_WORDS } from '../utils/visibility-words.js';
 import { isStoredVisibility } from '../services/organism-visibility.js';

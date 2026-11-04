@@ -17,6 +17,8 @@
  * @usage  pnpm check:locales           (exit 1 on any violation)
  *         pnpm check:locales --list    (coverage only, always exit 0)
  * @version-history
+ *   v1.4.1 — 2026-11-04 — Reads APP_GRANTABLE_SCOPES from src/services/app-grant-vocabulary.ts, where
+ *     the file moved (codebase analysis 2026-11-03, item D-d).
  *   v1.4.0 — 2026-09-12 — missingBlockWords(): the Portal page prints a name and a sentence for
  *     every part a page can be built from, so each block id in the surface-layout registry needs
  *     surface.blocks.<id>.label and .summary in en.json. Before this, the summary had no locale key
@@ -100,7 +102,7 @@ function missingBlockWords(en: Record<string, unknown>): string[] {
 
 /**
  * Same shape of guarantee for the app-grant consent screen. Its source of truth is
- * APP_GRANTABLE_SCOPES in src/routes/app-grant-vocabulary.ts: every scope an app may request must
+ * APP_GRANTABLE_SCOPES in src/services/app-grant-vocabulary.ts: every scope an app may request must
  * have a
  * plain-language sentence in en.json (the app-context override tree first, the shared agent tree
  * as fallback — the exact chain consent-vocab.js resolves) and every scope FAMILY must have an
@@ -109,10 +111,10 @@ function missingBlockWords(en: Record<string, unknown>): string[] {
  */
 function missingAppGrantSentences(en: Record<string, unknown>): string[] {
   const routePath = join(dirname(fileURLToPath(import.meta.url)), '..',
-    'src', 'routes', 'app-grant-vocabulary.ts');
+    'src', 'services', 'app-grant-vocabulary.ts');
   const src = readFileSync(routePath, 'utf-8');
   const block = src.match(/APP_GRANTABLE_SCOPES: Record<string, string> = \{([\s\S]*?)\n\};/);
-  if (!block) return ['(check-locales cannot find APP_GRANTABLE_SCOPES in src/routes/app-grant-vocabulary.ts — the parser needs updating)'];
+  if (!block) return ['(check-locales cannot find APP_GRANTABLE_SCOPES in src/services/app-grant-vocabulary.ts — the parser needs updating)'];
   const out: string[] = [];
   const families = new Set<string>();
   for (const m of block[1].matchAll(/'([a-z-]+):([a-z-]+)':/g)) {

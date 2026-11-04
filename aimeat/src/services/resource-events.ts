@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/resource-events.ts
+ * @file src/services/resource-events.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The resource change event bus, extracted from mcp/index.ts by pure move. REST routes,
@@ -15,8 +15,11 @@
  *   change; new code imports from here.
  * @structure resourceEvents · ResourceChangeEvent · emitResourceUpdated(agentGaii, uri) ·
  *   emitResourceListChanged(agentGaii)
- * @usage import { emitResourceUpdated } from '../mcp/resource-events.js';
+ * @usage import { emitResourceUpdated } from '../services/resource-events.js';
  * @version-history
+ *   v1.0.1 — 2026-11-04 — Moved unchanged from src/mcp/ to src/services/: routes and services import
+ *     it, and a route or a service that imports from src/mcp/ is a layer edge the dependency rules
+ *     refuse (codebase analysis 2026-11-03, item D-b).
  *   v1.0.0 — 2026-09-05 — Extracted from mcp/index.ts (a pure move; the bodies are verbatim).
  */
 import { EventEmitter } from 'node:events';

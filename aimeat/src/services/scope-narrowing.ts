@@ -25,7 +25,7 @@
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { flushScopeUse, readScopeUse, writeScopeUse, wildcardStatus, type WildcardStatus } from './scope-use.js';
 import { emitChange } from './event-bus.js';
-import { emitToolListChanged } from '../mcp/resource-events.js';
+import { emitToolListChanged } from './resource-events.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 
 export type NarrowOutcome =

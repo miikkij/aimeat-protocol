@@ -104,7 +104,7 @@
 import type { AimeatConfig } from '../config.js';
 import { extractInlineScripts, moduleGoalAvailable, parseSource, selfTest } from '../utils/inline-script-parse.js';
 import { logger } from '../utils/logger.js';
-import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
+import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
 import { registerIsOwed } from './app-build-level-meta.js';
 import { undeclaredScopeFindings } from './app-scope-needs.js';
 import { readTextCapped } from '../utils/read-capped.js';

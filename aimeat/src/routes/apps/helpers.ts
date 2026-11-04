@@ -36,7 +36,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { AppDevAct, DelegatedDev } from '../../services/app-dev-grant.js';
 import { error } from '../../middleware/envelope.js';
-import { ensureAppSubdomain } from '../subdomains.js';
+import { ensureAppSubdomain } from '../../services/subdomain-names.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { appOriginScheme, resolveAppUrls } from '../../services/app-urls.js';

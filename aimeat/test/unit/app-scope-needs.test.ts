@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { scanScopeNeeds, cortexLibRefs, undeclaredScopeNeeds, undeclaredScopeFindings, SCOPE_NEED_WORDS } from '../../src/services/app-scope-needs.js';
-import { APP_GRANTABLE_SCOPES } from '../../src/routes/app-grant-vocabulary.js';
+import { APP_GRANTABLE_SCOPES } from '../../src/services/app-grant-vocabulary.js';
 
 describe('the words a finding names', () => {
     it('are all words an app grant can hold, so the sign-in can ask for each', () => {

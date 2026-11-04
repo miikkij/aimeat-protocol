@@ -145,7 +145,7 @@ import { scopeRecordFilesToWorkspace } from './record-files.js';
 import { normalizeWriteItems, resolveWriteItem, resolveSpaceNamespace, type ResolvedWriteItem } from './workspace-write-items.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
 import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js';
-import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
+import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput, storeHeldProvenance, type DeclaredProvenance } from './ai-provenance.js';
 import { mediaKindOfValue, type AiProvenanceLevel, type AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes, documentContentBytes } from '../utils/memory-content.js';

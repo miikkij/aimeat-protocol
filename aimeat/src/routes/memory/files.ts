@@ -64,7 +64,7 @@ import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
 import { STORED_VISIBILITY_WORDS } from '../../utils/visibility-words.js';
 import { isStoredVisibility, organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { success, error } from '../../middleware/envelope.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
 import { versionedAddress } from '../../utils/http-range.js';
 import { emitRecordChange } from '../../services/event-bus.js';

@@ -105,8 +105,8 @@ import { taskOutcome } from '../services/task-outcome.js';
 import { setWorkplace, clearWorkplace, workplaceView } from '../services/agent-workplace.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { completeTask, failTask, declineTask } from '../services/agent-task-fanout.js';
-import { toDeclaredProvenance } from './ai-provenance-input.js';
-import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+import { writeProvenanceEcho } from '../services/ai-provenance-result.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAgentTaskTools(

@@ -46,7 +46,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { agentGaiiFromIdentifier, mayActOnAgent, isOwnerInPerson, isForeignPrincipal, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { emitResourceUpdated } from '../mcp/index.js';
+import { emitResourceUpdated } from '../services/resource-events.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { createAgentDataAccessOverviewService } from '../services/db/agent-data-access-overview-db-service.js';

@@ -104,7 +104,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { tallyWriterOf } from '../../services/data-map/tally-writer.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
 import { isServiceOwnedKey, isOwnerRemovableServiceKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';

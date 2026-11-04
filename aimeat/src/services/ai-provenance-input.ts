@@ -1,5 +1,5 @@
 /**
- * @file src/mcp/ai-provenance-input.ts
+ * @file src/services/ai-provenance-input.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `ai_provenance` parameter every MCP write tool accepts, defined ONCE (TARGET-058
@@ -31,7 +31,7 @@
  *   - parseDeclaredProvenanceInput() — validate + map for a surface with no zod layer (a REST body,
  *                               a presigned token's meta)
  * @usage
- *   import { aiProvenanceInput, toDeclaredProvenance } from './ai-provenance-input.js';
+ *   import { aiProvenanceInput, toDeclaredProvenance } from '../services/ai-provenance-input.js';
  *   mcp.tool('aimeat_memory_write', descriptionFor('aimeat_memory_write'),
  *     { key: z.string(), value: z.any(), ...aiProvenanceInput },
  *     annotationsFor('aimeat_memory_write'),
@@ -41,6 +41,9 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.6.1 — 2026-11-04 — Moved unchanged from src/mcp/ to src/services/: 24 routes and the
+ *     connector's dispatch read it, and none of them may import from src/mcp/ (codebase analysis
+ *     2026-11-03, item D-b).
  *   v1.6.0 — 2026-10-31 — toDeclaredProvenance maps `rules_followed` (the generation rules a declarer followed).
  *   v1.5.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.4.0 — 2026-10-08 — toDeclaredProvenance maps `media_kind`, `media_type` and `resembles_real`.
@@ -60,7 +63,7 @@
 import { z } from 'zod';
 import { INPUT_LIMITS } from '../models/input-limits.js';
 import { AiProvenanceBlockSchema } from '../tool-catalog/ai-provenance-schema.js';
-import type { DeclaredProvenance } from '../services/ai-provenance.js';
+import type { DeclaredProvenance } from './ai-provenance.js';
 
 // The sentence appended to every write tool's description lives in the catalog and is re-exported
 // here so there is exactly one copy of it.

@@ -7,8 +7,11 @@
  *   extraction when that file passed 800 lines; nothing else changed, and the route still owns every
  *   decision made WITH this list.
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
- * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
+ * @usage import { APP_GRANTABLE_SCOPES } from '../services/app-grant-vocabulary.js';
  * @version-history
+ *   2026-11-04 — Moved unchanged from routes/ to services/: build-app-prompt.ts read it through
+ *     routes/app-grants.ts, which closed a 14-file run-time import cycle, and two more services read
+ *     it from routes/ (codebase analysis 2026-11-03, item D-d).
  *   2026-11-02 — exchange:invoke, split out of exchange:write: calling an app tool, askable by an app.
  *   2026-10-23 — exchange:read and exchange:write, askable by an app. EXCHANGE (the marketplace app)
  *     could not show a signed-in person's contracts, work or listings, nor contract, post a need or

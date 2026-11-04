@@ -74,7 +74,7 @@ import type { KnowledgeHelpers } from './helpers.js';
 import { validateManifest } from './manifest-validator.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from '../../services/ai-provenance.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
-import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
 import { memoryContentBytes } from '../../utils/memory-content.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';

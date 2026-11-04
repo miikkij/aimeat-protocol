@@ -33,10 +33,10 @@ import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.j
 import { publishSkill, SkillAccessError, type SkillScope } from '../services/skills.js';
 import { parseSkillVisibility } from '../services/skill-audience.js';
 import { ProvenanceScopeError } from '../services/ai-provenance.js';
-import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceListChanged } from '../services/resource-events.js';
 import { skillPublishAsk, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';

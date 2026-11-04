@@ -121,7 +121,7 @@ import { runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js'
 import { scheduleStorageFileRefusal } from './schedule-file-access.js';
 import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, type TaskWake } from './scheduler-agent-task.js';
-import { emitResourceUpdated } from '../mcp/resource-events.js';
+import { emitResourceUpdated } from './resource-events.js';
 import { claimCronFire } from './scheduler-fire-claim.js';
 import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './scheduler-run-limit.js';
 import { onFailedRun, noteSuccess, tellScheduleOwner, isOneShot, oneShotFailedReason } from './scheduler-failures.js';

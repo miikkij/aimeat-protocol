@@ -77,7 +77,7 @@ import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
-import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../../services/resource-events.js';
 import { cached, TTL } from '../../services/cache.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
@@ -91,7 +91,7 @@ import { presentMemories } from '../../services/classification/present-memory.js
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { warningField } from '../../services/classification-exits.js';
-import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
 import { organismReadableRecords } from '../../services/organism-namespace-access.js';

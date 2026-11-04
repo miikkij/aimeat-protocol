@@ -74,7 +74,7 @@ import { requireEncryptionKey } from '../services/connections/credential.js';
 import { startAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { readResource } from '../services/connections/read.js';
 import { storeMailAttachment, type StoreAttachmentInput } from '../services/connections/attachment-store.js';
-import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../services/resource-events.js';
 import { listSendAsAliases } from '../services/connections/send-mail.js';
 import { connectionHoldersOf, listUsableConnections, requireUsableConnection, mailboxHolderFor, readAsOwnerRefusal } from '../services/connections/access.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
