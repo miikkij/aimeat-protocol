@@ -1,6 +1,6 @@
 # 07 Security
 
-> Checked against AIMEAT node 4.2.0 (commit ddec0f144) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 348be27af) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the security officer and the architect who must approve AIMEAT. It says how the node separates principals, which settings are safe as shipped and which are not, how sign-in, input, CORS, secrets and dependencies are handled, how to report a vulnerability, and what security work has been done. The live state of one node is on its admin Security page; this page says what to look for there. Threats and their residual risk are in [08 Threat model](08-threat-model.md); the production checklist is in [09 Hardening guide](09-hardening-guide.md).
 
@@ -96,8 +96,9 @@ Sign-in policy in detail (tenant allowlist, registration modes, SAML, SCIM) is i
 
 ## Input handling and validation
 
-- Request bodies are validated with Zod schemas; every string has a length limit chosen by what the field holds. `pnpm check:string-bounds` refuses an unbounded string and `pnpm check:write-validation` refuses a new writing route without a schema ([Security practices](../coding-guidelines/security.md)).
+- Request bodies are validated with Zod schemas; every string has a length limit chosen by what the field holds. `pnpm check:string-bounds` refuses an unbounded string and `pnpm check:write-validation` refuses a new writing route without a schema ([Security practices](../coding-guidelines/security.md)). The writing routes that were already there without a schema on 2026-10-27 are listed in `aimeat/security/write-validation-baseline.json`, and that list may only shrink.
 - A NUL character or a lone UTF-16 surrogate anywhere in the body, query or path is refused before any route runs ([Security practices](../coding-guidelines/security.md)).
+- Every JSON request body on a route that `openapi.yaml` gives a body schema is compared with that schema before the route runs. In this version the comparison only observes: a body that does not match is written to the log as one warning line with the route, the field and the reason (never the value) and counted, and the request is answered exactly as before. No route refuses a request on it yet; a route that does is listed in `aimeat/src/data/openapi-body-modes.ts` and answers 400 with the field named (`aimeat/src/middleware/openapi-body-guard.ts`).
 - SQL goes through prepared statements (SQLite) or Kysely parameters (PostgreSQL) ([Security practices](../coding-guidelines/security.md)).
 - A request path with a dotfile segment is refused with 403 before the static handlers, `.well-known` excepted (`aimeat/src/server-bootstrap/static-files.ts`, asserted by `aimeat/test/e2e-static-hardening.ts`).
 - Every outbound HTTP call to a URL that is not a constant goes through `safeFetch`, which checks the address and every DNS answer, and re-checks every redirect hop (`aimeat/src/utils/url-validator.ts`).
@@ -198,6 +199,7 @@ What the repository records, without numbers it does not state:
 - The node's own pages and API send no `Permissions-Policy`, COOP, COEP or CORP; only the HTML page host and stored files send some of them.
 - Encryption at rest covers stored secrets, not the content of records and files. Disk or database encryption for content is the operator's job.
 - The node does not terminate TLS; the reverse proxy must.
+- The comparison of request bodies with `openapi.yaml` refuses nothing yet. Writing routes without a schema of their own (listed in `aimeat/security/write-validation-baseline.json`) still accept a body the contract would not, until their route is switched to refuse in `aimeat/src/data/openapi-body-modes.ts`.
 - EUDIW verification is blocked at startup until holder binding and replay defences exist ([Threat model](../security/threat-model.md)).
 - The audit reports with exploit detail are not public, so an outside reviewer can verify the fixes only through the tests and the code.
 - No commissioned outside penetration test is recorded. An adopting organisation's own security team has tested its production node; the organisation is not named and its report is not published ([verification matrix](../security/verification-matrix.md#what-the-probe-sessions-established)).

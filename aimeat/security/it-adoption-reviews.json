@@ -204,7 +204,7 @@
         "aimeat/src/server-bootstrap/drain.ts",
         "aimeat/src/services/notification-sweeps.ts"
       ],
-      "digest": "sha256:6010dd9159ea501a141c874b"
+      "digest": "sha256:23f18313567e28d8d0642945"
     },
     "README.md": {
       "reviewedOn": "2026-11-03",
@@ -407,7 +407,7 @@
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "41f44d4c72ded9c2",
       "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
-      "aimeat/src/services/notification-sweeps.ts": "125eb3d628e50014"
+      "aimeat/src/services/notification-sweeps.ts": "5082dafa253ebfb1"
     }
   }
 }

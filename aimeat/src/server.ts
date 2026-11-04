@@ -15,6 +15,9 @@
  * @version-history
  *   2026-11-04 — createServer marks the process ready (services/node-lifecycle.ts) after the routes are mounted, for GET /v1/health/ready (HA stage 1).
  *   2026-11-04 — The guard and the admin route share services.maintenance, which re-reads storage (codebase analysis 2026-11-03, item A8).
+ *   2026-11-04 — openapiBodyGuard() after inputJunkGuard(): the JSON body is compared with openapi.yaml
+ *     in observe mode, which logs and counts a mismatch and refuses nothing (codebase analysis
+ *     2026-11-03, item B5).
  *   2026-11-01 — trailRecorder() after optionalAuth: every authenticated REST change is a line in the
  *     place's trail ("Rakennamme kanssasi", part C).
  *   2026-10-27 — inputJunkGuard() before idempotency(): a NUL or a lone surrogate in the body, the query
@@ -70,6 +73,7 @@ import { optionalAuth } from './auth/middleware.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { inputJunkGuard } from './middleware/input-junk.js';
+import { openapiBodyGuard } from './middleware/openapi-body-guard.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { trailRecorder } from './middleware/trail-recorder.js';
@@ -333,6 +337,12 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // runs: no storage keeps either as sent (middleware/input-junk.ts). After the rate limits, so a
   // flood of junk still counts against them.
   app.use(inputJunkGuard(config.nodeId));
+
+  // The JSON body of a route openapi.yaml gives a body schema is compared with that schema. Every
+  // route observes: a mismatch is logged and counted and the request goes on unchanged; a route in
+  // data/openapi-body-modes.ts (none today) would be answered 400 (middleware/openapi-body-guard.ts).
+  // After the junk guard, so the body it reads is one the node keeps as sent.
+  app.use(openapiBodyGuard(config.nodeId));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency(config.nodeId));
