@@ -25,6 +25,8 @@
  *   const out = await crewPublish({ storage, config }, caller, 'json-demo', doc);
  *   if (!out.ok) return renderRefusal(out);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-15 — Every publishing path (publish, seed, restore) checks the browser site list: its shape, and
  *     a changed list only from the owner in person (browserListRefusal; feature-list audit 73).
  *   v1.3.0 — 2026-10-15 — A trial and a validation refuse an app grant (refuseAppRun), as every change
@@ -39,7 +41,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { buildGAII, isOwnerInPerson } from '../utils/gaii.js';
 import { browserDomainsError } from './crew-browser-domains.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import {
   readCrewState, saveCrewDraft, discardCrewDraft, publishCrewDef, readCrewRevision, crewKeysFor,
   CREW_VERSION_WINDOW, type CrewState,
@@ -146,7 +148,7 @@ type AskOutcome = { ok: true; result: unknown } | CrewRefusal;
 export async function askCrew(
   config: AimeatConfig, agent: AgentRecord, capability: string, input: unknown, caller: string, timeoutMs: number,
 ): Promise<AskOutcome> {
-  const mgr = getActiveConnectTunnelManager();
+  const mgr = nodeContext().tunnel;
   if (!mgr || !mgr.isConnected(agent.gaii)) {
     return {
       ok: false, status: 409, code: 'AGENT_OFFLINE',
@@ -210,7 +212,7 @@ export async function crewState(deps: CrewDeps, caller: CrewCaller, identifier: 
   if (!target.ok) return target;
   const { agent } = target;
   const state = await readCrewState(deps.storage, agent);
-  const mgr = getActiveConnectTunnelManager();
+  const mgr = nodeContext().tunnel;
   return {
     ok: true,
     agent: agent.name,
@@ -251,7 +253,7 @@ export async function crewTryStart(deps: CrewDeps, caller: CrewCaller, identifie
   if (isStopped(agent)) {
     return { ok: false, status: 409, code: 'AGENT_STOPPED', message: `${agent.displayName ?? agent.name} is stopped, so it does not run a trial. Start the agent, then try again.` };
   }
-  const mgr = getActiveConnectTunnelManager();
+  const mgr = nodeContext().tunnel;
   if (!mgr || !mgr.isConnected(agent.gaii)) {
     return { ok: false, status: 409, code: 'AGENT_OFFLINE', message: `${agent.name} is not connected right now, so it cannot run a trial. Start its runtime (aimeat connect serve) and try again.` };
   }
@@ -470,7 +472,7 @@ export async function crewSeedAuthored(
 async function chooseSeedValidator(
   deps: CrewDeps, caller: CrewCaller, agent: AgentRecord, validateWith?: string,
 ): Promise<{ ok: true; validator: AgentRecord } | CrewRefusal> {
-  const mgr = getActiveConnectTunnelManager();
+  const mgr = nodeContext().tunnel;
   if (mgr?.isConnected(agent.gaii)) return { ok: true, validator: agent };
 
   if (validateWith) {

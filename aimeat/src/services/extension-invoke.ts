@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-04 — The running AI job service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveAiJobService (codebase analysis 2026-11-03, item D-i).
  *   v1.5.0 -- 2026-11-01 -- Caller kind `party` with `party`: a person registered to an app runs the
  *     extension that gates that app, and only that one (403 PARTY_NOT_FOR_EXTENSION, the same for an
  *     extension that does not exist), never a priced action (403 PARTY_CANNOT_PAY), with ctx.caller
@@ -76,7 +78,8 @@ import { resolveGatedApp } from './members-only.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, unavailableEmail, sandboxLimits } from './extension-ctx.js';
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 import { attachExtensionWorkspace, workspaceRefusalFor, type ExtensionWorkspaceCapability } from './extension-workspace.js';
-import { maybeExtensionAi, getActiveAiJobService } from './ai-jobs/index.js';
+import { maybeExtensionAi } from './ai-jobs/index.js';
+import { nodeContext } from './node-context.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from './call-timing.js';
 import { countCapabilityCall } from './capability-record.js';
@@ -365,7 +368,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
       }),
       // Background model calls are billed to the INSTALLER, read from the record, never the caller.
       ai: maybeExtensionAi({
-        service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
+        service: nodeContext().aiJobs, extName: ext.name, extOwner: ext.installedBy,
         nodeId: config.nodeId, createdBy: caller.gaii,
         // The code's writer invoking its own extension: its jobs read what it may read (v75).
         installedByPrincipal: ext.installedByPrincipal, caller,

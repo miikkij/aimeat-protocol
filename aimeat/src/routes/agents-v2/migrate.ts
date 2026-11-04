@@ -31,6 +31,8 @@
  * @structure registerAgentV2MigrateRoutes(router, config, storage)
  * @usage registerAgentV2MigrateRoutes(router, config, storage);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.2.1 — 2026-10-13 — The move is forwarded by a daemon principal that holds agent:write when the
  *     daemon has one (services/agent-enrolment-offer.ts enrolTarget), as POST /v1/agents/v2/enrol asks
  *     that word from 4.0.0.
@@ -48,7 +50,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { credentialHealthForOwner } from '../../services/agent-credential-health.js';
 import { connectedDaemons } from '../../services/basic-agents.js';
 import { enrolTarget } from '../../services/agent-enrolment-offer.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { nodeContext } from '../../services/node-context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ENROL_CAPABILITY } from './basic-agents.js';
 import { MAX_CARDS_PER_SUBMIT } from './enrolment.js';
@@ -284,7 +286,7 @@ export function registerAgentV2MigrateRoutes(router: Router, config: AimeatConfi
 
     let enrolResult: { ok: boolean; result: unknown };
     try {
-      enrolResult = await getActiveConnectTunnelManager()!.invokeOnPrincipal(
+      enrolResult = await nodeContext().tunnel!.invokeOnPrincipal(
         await enrolTarget(storage, chosen),
         { capability: ENROL_CAPABILITY, input: offer, caller: `${owner}@${config.nodeId}` },
         ENROL_INVOKE_TIMEOUT_MS,

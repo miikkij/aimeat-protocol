@@ -40,6 +40,8 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-11-02 — An agent_task schedule takes `deliver`: "owner" on create and edit ("none" on edit takes
  *     it off), and the node then hands each finished task's result to the owner
  *     (services/task-result-delivery.ts).
@@ -112,7 +114,8 @@ import { isKeptExtensionSchedule } from './schedule-extension-keep.js';
 import { findExtension } from './component-address.js';
 import { aiScheduleInputRefusal } from './schedule-ai-read.js';
 import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './schedule-instruction-hold.js';
-import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
+import type { Scheduler, JobOutcome } from './scheduler.js';
+import { nodeContext } from './node-context.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
 import { withDeliver } from './task-result-delivery.js';
 import { dropNotifyOfAgent } from './delivery-crew.js';
@@ -567,7 +570,7 @@ export async function createScheduleRecord(
     const created = await storage.createScheduledJob(base);
     // Arming the live clock is part of creating a schedule, not a courtesy the door does afterwards:
     // a stored row nobody registered does nothing until the next restart.
-    if (created.enabled) (deps.scheduler ?? getActiveScheduler())?.addJob(created);
+    if (created.enabled) (deps.scheduler ?? nodeContext().scheduler)?.addJob(created);
     emitChange('scheduler');
     return { ok: true, schedule: created };
 }
@@ -710,7 +713,7 @@ export async function updateScheduleRecord(
     }
     const updated = await storage.updateScheduledJob(id, updates);
     if (!hold && instructed) await clearInstructionHold(storage, config.nodeId, id);
-    await (deps.scheduler ?? getActiveScheduler())?.reschedule(id);
+    await (deps.scheduler ?? nodeContext().scheduler)?.reschedule(id);
     emitChange('scheduler');
     return { ok: true, schedule: updated, ...(asked ?? {}) };
 }
@@ -728,7 +731,7 @@ export async function deleteScheduleRecord(
     if (!canManageSchedule(caller, ownerScope, job)) {
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Not allowed to delete this schedule' };
     }
-    (deps.scheduler ?? getActiveScheduler())?.removeJob(id);
+    (deps.scheduler ?? nodeContext().scheduler)?.removeJob(id);
     await storage.deleteScheduledJob(id);
     emitChange('scheduler');
     return { ok: true, schedule: job };
@@ -767,7 +770,7 @@ export async function triggerScheduleRecord(
         && (caller.isApp || !!caller.appGrant || caller.isEcosystem === true)
         && await isKeptExtensionSchedule(storage, config.nodeId, job.id);
     if (scopeRefusal && !keptForThisApp) return { ok: false, ...scopeRefusal };
-    const scheduler = deps.scheduler ?? getActiveScheduler();
+    const scheduler = deps.scheduler ?? nodeContext().scheduler;
     if (!scheduler) {
         return {
             ok: false, status: 503, code: 'SCHEDULER_UNAVAILABLE',

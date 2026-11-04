@@ -15,13 +15,15 @@
  * @structure EMAIL_RE · noticeSuperseded · noticeWithdrawn · mailParties
  * @usage void noticeSuperseded(deps, ownerGhii, name, previousHash, newHash);
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.0.1 — 2026-11-04 — A notice goes through mail-gate.ts sendMail as a third-party mail (codebase
  *     analysis 2026-11-03, item B3).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.2).
  */
 import type { ConsentRecord, Storage } from '../../storage/interface.js';
 import { bare } from './contract.js';
-import { getActiveEmailService } from '../email.js';
+import { nodeContext } from '../node-context.js';
 import { sendMail } from '../mail-gate.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -42,7 +44,7 @@ const SHARE_NOTICE_BOUND = 'The node\'s own notice of a publish or a withdrawal 
 async function mailParties(
     deps: StoreDeps, ownerGhii: string, shares: ConsentRecord[], subject: string, body: (partyName: string) => string,
 ): Promise<number> {
-    const mail = getActiveEmailService();
+    const mail = nodeContext().email;
     if (!mail?.enabled || !shares.length) return 0;
     const parties = (await readParties(deps.storage, ownerGhii)).parties;
     let sent = 0;

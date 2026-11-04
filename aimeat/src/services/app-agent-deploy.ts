@@ -22,6 +22,8 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-28 — The start decision reads the runner's record as it is: the node no longer narrows an
  *     agent holding `*` by itself (Jouni, 2026-10-28).
  *   2026-10-20 — createAppAgentTask asks the shared start decision (decideTaskStart over startFactsOf)
@@ -50,7 +52,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord, AgentTaskRecord, AgentTaskScope, AppRecord } from '../storage/interface.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from './resource-events.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { deployedAgentName } from '../models/crew-def-schemas.js';
 import { presentOfferPacing, type Offer } from '../models/offer-schemas.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
@@ -402,7 +404,7 @@ export async function appAgentInstances(
   const deployedName = deployedAgentName(agentName, appId);
   const all = await storage.listAgents();
   const now = Date.now();
-  const tunnels = getActiveConnectTunnelManager();
+  const tunnels = nodeContext().tunnel;
   const candidates = all.filter(a =>
     (a.name === deployedName || (a.name === agentName && a.owner === app.ownerName))
     && !(a.tags ?? []).includes('unlisted'));

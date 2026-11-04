@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-04 — for_ai_agents says which connection path to take, the rules of the sign-in and what
  *     each failure means: a Codex session wandered between OAuth and the device flow, asked about a
@@ -107,7 +109,7 @@ import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-pack
 import { buildLlmsHumanPages, buildLlmsOptionalPages, findPublicPage } from '../data/public-pages.js';
 import { injectStaticPageHead } from '../utils/page-head.js';
 import { buildGettingStarted } from '../data/getting-started.js';
-import { getActiveEmailService } from '../services/email.js';
+import { nodeContext } from '../services/node-context.js';
 import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
 import { buildFirstSteps } from '../services/first-steps.js';
 import { apexOnly } from './agent-docs.js';
@@ -663,7 +665,7 @@ export function bootstrapRouter(
       },
 
       getting_started: buildGettingStarted(base, bootstrapInstruction, config.anonymousMode,
-        !!getActiveEmailService()?.enabled),
+        !!nodeContext().email?.enabled),
 
       ...BOOTSTRAP_ENDPOINT_CATALOGUE,
 

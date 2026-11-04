@@ -27,6 +27,8 @@
  *   applyAppInvitesForVerifiedEmail
  * @usage await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii);
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.3.1 — 2026-11-04 — The invitation mail goes through mail-gate.ts sendMail as a third-party mail
  *     (codebase analysis 2026-11-03, item B3).
  *   v1.3.0 — 2026-10-18 — putInvite writes on the record's version (app-members.ts updateAppRecord).
@@ -43,7 +45,7 @@ import { slugOf, sameApp, accountOf, updateAppRecord } from './app-members.js';
 import { approveMember, appStem } from './app-member-approve.js';
 import { appMemberInviteEmail, type NoticeLang } from './app-member-notices.js';
 import { inviteEmailHash } from './invitations.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
 import { mintAppInviteLink, cancelAppInviteLinks } from './app-invite-link.js';
 import type { AimeatConfig } from '../config.js';
@@ -166,7 +168,7 @@ export async function sendAppInvite(
     logger.warn('app-member-invites: the sign-up link was not made, the email links to the app', { error: String(err) });
   }
   let emailSent = false;
-  const mail = getActiveEmailService();
+  const mail = nodeContext().email;
   if (mail?.enabled) {
     const { subject, html, text } = appMemberInviteEmail(input.lang, {
       inviter: input.inviterName, app: appStem(input.filename), role: input.role, appUrl: input.appUrl, acceptUrl,

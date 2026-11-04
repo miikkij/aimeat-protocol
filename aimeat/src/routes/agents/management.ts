@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-29 -- PATCH /v1/agents/:name/scopes lets the owner's agent holding agent:permissions-add add
  *     words it holds itself to a sibling, and tells the owner on the account feed and in the bell
  *     (services/agent-scope-add.ts; wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
@@ -99,7 +101,7 @@ import { fireHook } from '../../utils/fire-hook.js';
 import { executeHooks } from '../../services/hooks.js';
 import { emitChange } from '../../services/event-bus.js';
 import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { nodeContext } from '../../services/node-context.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { announceScopes } from './announce-scopes.js';
 import { registerRekeyRoute } from './rekey.js';
@@ -669,7 +671,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // call. Same shape as deactivating an account (owner-lifecycle.ts §7), and outside any
     // transaction for the same reason: closing a socket is not a storage write and cannot roll back.
     try {
-      getActiveConnectTunnelManager()?.closeForGaii(agent.gaii);
+      nodeContext().tunnel?.closeForGaii(agent.gaii);
     } catch (err) {
       logger.warn('deleteAgent: tunnel close failed', { gaii: agent.gaii, error: String(err) });
     }

@@ -23,6 +23,8 @@
  * @structure createTask() · listTasks() · getTask() · setTaskStatus() · cancelTask()
  * @usage const out = await createTask(storage, config, req.auth!, req.body);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.2.0 — 2026-10-11 — createTask() refuses a task for a stopped agent, AGENT_STOPPED: a v2 task
  *     has no state to wait in (agent-stop-rules.ts).
  *   v1.1.0 — 2026-10-08 — setTaskStatus() stamps the result and closing message of a task that settles
@@ -39,7 +41,7 @@ import { V2_TASK_STATUSES } from '../storage/types/agent-v2-tasks.js';
 import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { validateTaskInput, validateStatusInput, allowedFrom, isTerminal } from '../models/agent-v2-task.js';
 import { resolveRecipient, type Principal, type OpResult } from './agent-v2-messaging-ops.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { emitDelivery, emitTaskMoved } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
@@ -66,7 +68,7 @@ function notify(target: string, kind: string, task: AgentV2TaskRecord): void {
     });
   }
   try {
-    if (getActiveConnectTunnelManager()?.isConnected(target)) {
+    if (nodeContext().tunnel?.isConnected(target)) {
       emitDelivery({ target, kind, id: task.taskId, payload: { taskId: task.taskId, status: task.status, contextId: task.contextId } });
     }
   } catch (err) {

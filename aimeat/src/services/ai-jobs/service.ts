@@ -17,11 +17,13 @@
  *   shape — bytes written before the name was claimed, a paywall standing down before comparing the
  *   coordinate, a response sent before the work it announced — and each was found by reading the
  *   ORDER rather than the presence of the checks.
- * @structure AiJobService · setActiveAiJobService/getActiveAiJobService
+ * @structure AiJobService · setActiveAiJobService (the running service is nodeContext().aiJobs)
  * @usage
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.19.1 -- 2026-11-04 -- The running service is held by services/node-context.ts; getActiveAiJobService is gone and
+ *     setActiveAiJobService writes the context (codebase analysis 2026-11-03, item D-i).
  *   v1.19.0 -- 2026-11-04 -- A job's index entry names the process that runs it; the restart pass moved to reclaim.ts and
  *     leaves a job another live process runs alone, and an adoption pass takes over the jobs of a process that ended
  *     (codebase analysis 2026-11-03, item HA 2.5).
@@ -125,6 +127,7 @@ import { findExtension, namespacedName } from '../component-address.js';
 import { markStopped } from './restart.js';
 import { reclaimJobs, ADOPT_MS, type ReclaimDeps } from './reclaim.js';
 import { processLeaseReady, thisProcess } from '../process-lease.js';
+import { provideNodeService } from '../node-context.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
     addToActiveIndex, removeFromActiveIndex,
@@ -736,10 +739,8 @@ export class AiJobService implements AiJobStarter {
 }
 
 /**
- * Process-wide handle to the active service. Set once during service init so surfaces created
- * per-request (the MCP server, the sandbox context) can reach it without threading the instance
- * through every signature — the same shape `getActiveScheduler()` uses.
+ * The node's running service is `nodeContext().aiJobs` (services/node-context.ts), set once during
+ * service init, so surfaces created per request (the MCP server, the sandbox context) reach it. This
+ * setter stays for the unit tests that put a test service in its place.
  */
-let _activeAiJobService: AiJobService | null = null;
-export function setActiveAiJobService(service: AiJobService): void { _activeAiJobService = service; }
-export function getActiveAiJobService(): AiJobService | null { return _activeAiJobService; }
+export function setActiveAiJobService(service: AiJobService): void { provideNodeService('aiJobs', service); }

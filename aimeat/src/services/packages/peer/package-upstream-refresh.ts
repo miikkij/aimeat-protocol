@@ -25,6 +25,8 @@
  * @usage
  *   const outcomes = await refreshInstalledPackages({ storage, config, peers }, { owner }, { notify: false });
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   v1.5.0 — 2026-10-05 — The renewal notice links to the seller at the address this node's peer record
  *     holds, never the repository's `sold_by_url` (secaudit 2026-10, PKG-12).
  *   v1.4.0 — 2026-10-02 — A copy of a version the repository withdrew has its extensions switched off and
@@ -53,7 +55,7 @@ import { logger } from '../../../utils/logger.js';
 import { stripTrailingSlashes } from '../../../utils/url-validator.js';
 import { firstNoticeFor } from '../compose/package-notices.js';
 import { actOnWithdrawn } from '../compose/package-withdrawals.js';
-import { getActiveScheduler } from '../../scheduler.js';
+import { nodeContext } from '../../node-context.js';
 
 
 /** What the owner reads when the update service has ended. */
@@ -132,7 +134,7 @@ async function repositoryNotices(deps: RefreshDeps, instances: PackageInstanceRe
             for (const w of Array.isArray(row.withdrawn) ? row.withdrawn : []) {
                 if (typeof w.version !== 'string' || typeof w.reason !== 'string') continue;
                 for (const { inst } of installs.filter(i => i.groupId === row.group_id && i.version === w.version)) {
-                    await actOnWithdrawn({ storage, config, scheduler: getActiveScheduler() }, inst, { version: w.version, reason: w.reason.slice(0, 1000) });
+                    await actOnWithdrawn({ storage, config, scheduler: nodeContext().scheduler }, inst, { version: w.version, reason: w.reason.slice(0, 1000) });
                 }
             }
             if (!opts.notify) continue;

@@ -19,6 +19,8 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.4.5 — 2026-11-01 — helloMcp leaves out a proof key the node's own chat or basic agents wrote.
  *   v1.4.4 — 2026-10-19 — The card's agent carries `avatar` (services/agent-avatar.ts), null when it has none.
  *   v1.4.3 — 2026-10-18 — The portfolio keys come from services/portfolio-config.ts.
@@ -51,7 +53,7 @@ import { portfolioStandaloneUrl } from '../routes/portfolio.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import type { AgentOnboardingRecord } from '../storage/types/agents-messaging.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
@@ -198,7 +200,7 @@ async function readHomeStateInScope(
     // A daemon holding an agent's socket is that agent being available right now, which the home
     // has to know before it calls anybody stale: a spawn agent's runtime lives only while a worker
     // runs, so its lastSeen is old whenever it is between jobs.
-    const connected = new Set(getActiveConnectTunnelManager()?.principalsForOwner(owner) ?? []);
+    const connected = new Set(nodeContext().tunnel?.principalsForOwner(owner) ?? []);
     const healthByGaii = computeAgentHealthMany(agents, onboardingByGaii, nowMs, connected);
 
     const worst = agents.length

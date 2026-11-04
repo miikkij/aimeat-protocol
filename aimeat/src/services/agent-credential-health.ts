@@ -23,12 +23,14 @@
  * @structure CredentialHealth · credentialHealthForOwner(storage, config, agents)
  * @usage const health = await credentialHealthForOwner(storage, config, agents);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V3: the Agents section).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { readCardJws } from './agent-card.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -96,7 +98,7 @@ export async function credentialHealthForOwner(
     liveByGaii.set(s.gaii, { count: seen.count + 1, latest: Math.max(seen.latest, ends) });
   }
 
-  const tunnels = getActiveConnectTunnelManager();
+  const tunnels = nodeContext().tunnel;
 
   for (const agent of agents) {
     const live = liveByGaii.get(agent.gaii);

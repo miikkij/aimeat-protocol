@@ -2103,51 +2103,6 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/scheduler-remote-jobs.ts",
-    "to": "src/services/workflow/engine.ts",
-    "unresolvedTo": "./workflow/engine.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "warn",
-      "name": "no-circular-type-only"
-    },
-    "cycle": [
-      {
-        "name": "src/services/workflow/engine.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/workflow/lifecycle.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/scheduler.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      },
-      {
-        "name": "src/services/scheduler-remote-jobs.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
     "from": "src/services/schema-validator.ts",
     "to": "src/services/write-guards.ts",
     "unresolvedTo": "./write-guards.js",

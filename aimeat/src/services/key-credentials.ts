@@ -16,6 +16,8 @@
  * @structure IssuedKeyCredentials; issueFirstLoginKeyCredentials(storage, config, ghii).
  * @usage const cred = await issueFirstLoginKeyCredentials(storage, config, ghiiRecord); // null if N/A
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.0.1 — 2026-11-04 — The credentials mail goes through mail-gate.ts sendMail as sign-in mail
  *     (codebase analysis 2026-11-03, item B3).
  *   v1.0.0 — 2026-07-07 — Initial (TARGET-011 VIP-session: real login + clear credentials).
@@ -24,7 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { hashPassword } from './password.js';
 import { generateReadablePassword } from '../utils/password-generation.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { sendMail } from './mail-gate.js';
 import { logger } from '../utils/logger.js';
 
@@ -65,7 +67,7 @@ export async function issueFirstLoginKeyCredentials(
 
     // Deliver by email too (best effort — the credentials are already in the login response).
     let emailSent = false;
-    const emailSvc = getActiveEmailService();
+    const emailSvc = nodeContext().email;
     const to = ghii.notificationEmail || inv.email;
     if (emailSvc?.enabled && to) {
       const org = inv.organismId ? await storage.getOrganism(inv.organismId) : null;

@@ -31,6 +31,8 @@
  *   tellPermissionAnswer(deps, agent, words, outcome, by) · sendPermissionAsk(deps, ownerGhii, agent, words, call?)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The mail goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-04 — The mail's address is asked of owner-mail-address.ts provenOwnerAddress, which also
  *     compares it with the proven hash (codebase analysis 2026-11-03, item A9).
@@ -54,7 +56,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AgentRecord } from '../storage/types/identity.js';
 import { notify, type NotifyInput } from './notify.js';
 import { readNotificationSettings, appendMailLog } from './notification-settings.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { sendMail } from './mail-gate.js';
 import { wrapHtml } from './email-templates.js';
@@ -259,7 +261,7 @@ export async function sendPermissionAsk(
         ? withheldDmNotice(agent, words, deps.config.baseUrl)
         : permissionAskNotice(agent, words, deps.config.baseUrl);
     await notify(deps.storage, ownerGhii, notice);
-    const email = getActiveEmailService();
+    const email = nodeContext().email;
     if (!email?.enabled) return;
     const ghii = await deps.storage.getGHII(ownerGhii);
     const to = provenOwnerAddress(ghii);

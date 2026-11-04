@@ -25,6 +25,7 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   2026-11-04 -- The running manager is nodeContext().tunnel (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-10-31 -- A dm.inbound reaches an identity without messages:read as an arrival notice (secaudit2026oct31w2 round 10).
  *   2026-10-16 -- closeForGaii takes 'rekeyed' (connect-tunnel-revocation.ts; QA audit F03b-01).
  *   v2.7.0 -- 2026-10-12 -- A connection carries what its connector's crew runtime honours (X-AIMEAT-Features), and a record is not sent to an agent retired from the workspace (connect-tunnel-push.ts).
@@ -140,6 +141,7 @@ import { revokeByToken, revokeByGaii, revokeByOwner, type GaiiCutReason } from '
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel-connection.js';
 import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel-hooks.js';
+import { nodeContext, provideNodeService } from './node-context.js';
 
 
 /**
@@ -787,14 +789,12 @@ export class ConnectTunnelManager {
       this.clearSubscriptions(principal);
     }
     this.stats.activeConnections = 0;
-    if (_active === this) _active = null;
+    if (nodeContext().tunnel === this) provideNodeService('tunnel', null);
     logger.info('ConnectTunnelManager shut down');
   }
 }
 
-// Process-wide active manager — lets a lightweight read-only stats route expose
-// connection metrics (the single-socket invariant test reads them) without
-// threading the instance through the route-mounting plumbing.
-let _active: ConnectTunnelManager | null = null;
-export function setActiveConnectTunnelManager(m: ConnectTunnelManager | null): void { _active = m; }
-export function getActiveConnectTunnelManager(): ConnectTunnelManager | null { return _active; }
+// The running manager is `nodeContext().tunnel` (services/node-context.ts), so a read-only stats route
+// exposes connection metrics (the single-socket invariant test reads them) without threading the
+// instance through route mounting. This setter stays for the unit tests that put in a test manager.
+export function setActiveConnectTunnelManager(m: ConnectTunnelManager | null): void { provideNodeService('tunnel', m); }

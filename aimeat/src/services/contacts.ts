@@ -26,6 +26,8 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v2.7.1 — 2026-10-31 — removeContact refuses a blocked contact (409 BLOCKED) before it removes
  *     anything. A linked person's card and the app handles had been removed first and the 409 came
  *     after, so the refusal left a removal half done (secaudit 2026-10-31 inv-15).
@@ -68,7 +70,7 @@ import type { OutboundContactRecord, OutboundContactLink } from '../models/outbo
 import { conversationIdFor } from '../utils/messaging.js';
 import { emitChange } from './event-bus.js';
 import { inviteEmailHash } from './invitations.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { ensureContact, updateContactCard, sendOutbound, OutboundError } from './outbound/outbound-service.js';
 import { revokeContactHandles } from './contact-handles.js';
 import { parseGaiiLoose, localAccountName, ownerCoordinate } from '../utils/gaii.js';
@@ -702,7 +704,7 @@ export async function resolveContactEmail(storage: Storage, asker: string, email
   countAddressLookup(asker);
   const rec = await storage.getGHIIByEmailHash(inviteEmailHash(clean));
   if (rec) return { found: true, ghii: rec.ghii, owner: localAccountName(rec.ghii), display_name: rec.displayName ?? null };
-  return { found: false, can_invite: !!getActiveEmailService()?.enabled };
+  return { found: false, can_invite: !!nodeContext().email?.enabled };
 }
 
 /**

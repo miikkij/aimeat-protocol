@@ -11,6 +11,8 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-29 — aimeat_extension_activate refuses an extension whose code a package brought in under
  *     install role operator until an operator allows it, as the REST door does; an operator's activate
  *     is that approval (services/extension-code-hold.ts; secaudit2026oct26 round 8c).
@@ -116,7 +118,7 @@ import { codeHoldRefusal, takeHoldOff } from '../services/extension-code-hold.js
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
 } from '../services/extension-lifecycle.js';
-import { getActiveScheduler } from '../services/scheduler.js';
+import { nodeContext } from '../services/node-context.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { annotationsFor } from './annotations.js';
@@ -410,7 +412,7 @@ export function registerExtensionsTools(
             }
 
             const record = built.record;
-            const scheduler = getActiveScheduler();
+            const scheduler = nodeContext().scheduler;
 
             // The record under that name, as before (services/component-address.ts): the bare record,
             // whoever holds it (the owner check below refuses another account's), else the caller's
@@ -536,7 +538,7 @@ export function registerExtensionsTools(
                 // it looked installed, active and idle. One implementation, in
                 // services/extension-lifecycle.ts.
                 const updated = await activateExtension(
-                    { storage, config, scheduler: getActiveScheduler() }, isOperator ? await takeHoldOff(storage, ext) : ext, getAgentGaii(),
+                    { storage, config, scheduler: nodeContext().scheduler }, isOperator ? await takeHoldOff(storage, ext) : ext, getAgentGaii(),
                 );
 
                 // Trigger capability aggregation so the extension appears immediately
@@ -648,7 +650,7 @@ export function registerExtensionsTools(
                 // The status and the scheduled jobs together. This tool wrote only the status, so a
                 // deactivated extension kept firing on its cron until somebody deactivated it again
                 // over HTTP.
-                await deactivateExtension({ storage, config, scheduler: getActiveScheduler() }, name);
+                await deactivateExtension({ storage, config, scheduler: nodeContext().scheduler }, name);
 
                 logger.info(`Extension deactivated via MCP: ${name}`, { by: getAgentGaii() });
 
@@ -695,7 +697,7 @@ export function registerExtensionsTools(
                 // extension uninstalled by an agent left cron jobs firing against a name that no
                 // longer resolved and left its data unreachable. DELETE /v1/extensions/:name has
                 // cleaned all three since it was written; both doors now call the same function.
-                await uninstallExtension({ storage, config, scheduler: getActiveScheduler() }, name);
+                await uninstallExtension({ storage, config, scheduler: nodeContext().scheduler }, name);
 
                 logger.info(`Extension deleted via MCP: ${name}`, { by: getAgentGaii() });
 

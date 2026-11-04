@@ -34,6 +34,8 @@
  *   reportErasureLeftoverSchedulesOnce() · deleteLeftoverSchedule()
  * @usage await reportErasureLeftoverSchedulesOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   2026-11-04 -- The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, owner-erasure:agent-made-schedules-survive-and-rebind;
  *     developer decision 2026-10-25).
  */
@@ -42,7 +44,7 @@ import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
 import { recordSecurityIncident, type IncidentEntry } from './security-incident.js';
-import { getActiveScheduler } from './scheduler.js';
+import { nodeContext } from './node-context.js';
 import { emitChange } from './event-bus.js';
 
 /** The record under `system@<nodeId>` that says this node has run the step. */
@@ -128,7 +130,7 @@ export async function reportErasureLeftoverSchedulesOnce(
 export async function deleteLeftoverSchedule(storage: Storage, _config: AimeatConfig, entry: IncidentEntry): Promise<string> {
   const job = await storage.getScheduledJob(entry.id);
   if (!job) return 'the schedule was gone already';
-  getActiveScheduler()?.removeJob(entry.id);
+  nodeContext().scheduler?.removeJob(entry.id);
   await storage.deleteScheduledJob(entry.id);
   emitChange('scheduler');
   return `the schedule "${job.displayName || job.name}" was deleted`;

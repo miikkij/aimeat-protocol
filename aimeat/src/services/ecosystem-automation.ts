@@ -21,6 +21,8 @@
  *   - matchesKeyGlob(glob, key) — the tiny prefix/`*` matcher (reuses the workflow globToRegExp)
  * @usage import { runAutomationRecipesForWrite } from '../services/ecosystem-automation.js';
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-09-28 — An organism that admits only listed agents is not auto-attached to; the owner lists the agent.
  *   v1.0.0 — 2026-06-15 — Created for ecosystem-app automation recipes (feature B4): data-published →
  *     materialise an agent task per configured agent.
@@ -32,7 +34,7 @@
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { globToRegExp } from './workflow/signal-eval.js';
-import { getActiveScheduler } from './scheduler.js';
+import { nodeContext } from './node-context.js';
 import { localAccountOf, buildGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { agentAccessOf } from './organism-agent-access.js';
@@ -150,7 +152,7 @@ export async function runAutomationRecipesForWrite(
   const matching = recipes.filter(r => r.enabled && r.trigger?.kind === 'data-published' && matchesKeyGlob(r.trigger.keyGlob, key));
   if (!matching.length) return;
 
-  const scheduler = getActiveScheduler();
+  const scheduler = nodeContext().scheduler;
   if (!scheduler) {
     logger.warn('automation recipe matched but scheduler unavailable — cannot wake agents', { owner, key });
     return;

@@ -9,6 +9,8 @@
  *   lease, process-lease.ts).
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   2026-11-04 — set/getActiveScheduler removed: the running scheduler is nodeContext().scheduler
+ *     (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The start-up @activate run is claimed: a process starting while another live process
  *     holds the lease `scheduler.activate` does not run the @activate jobs again; one process runs them
  *     at every start as before (codebase analysis 2026-11-03, item HA 2.7).
@@ -136,14 +138,8 @@ import { deactivatedAccountSkip } from './account-deactivated.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
-/**
- * Process-wide handle to the active Scheduler. Set once during service init so
- * surfaces created per-request (e.g. the MCP server) can register/reschedule a
- * job on the live cron without threading the instance through every signature.
- */
-let _activeScheduler: Scheduler | null = null;
-export function setActiveScheduler(scheduler: Scheduler): void { _activeScheduler = scheduler; }
-export function getActiveScheduler(): Scheduler | null { return _activeScheduler; }
+// The node's running Scheduler is `nodeContext().scheduler` (services/node-context.ts), set once during
+// service init, so a surface made per request (the MCP server) reaches the live cron.
 
 // The result types live in scheduler-types.ts (max-file-lines); re-exported so importers stay as they are.
 import type { JobTrigger, JobRunResult, JobOutcome } from './scheduler-types.js';

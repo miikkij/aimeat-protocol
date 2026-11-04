@@ -27,6 +27,8 @@
  * @structure AgreementEvent · tellAgreement()
  * @usage const told = await tellAgreement(deps, agreement, 'sent', { pdf });
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.0.3 — 2026-11-04 — Both sides' mail goes through mail-gate.ts sendMail: the contact the operator
  *     wrote and the operator's own address as operator mail, a counterparty account's proven address as
  *     an owner mail (codebase analysis 2026-11-03, item B3).
@@ -40,7 +42,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { notify } from './notify.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { sendMail, type MailIntent, type MailMessage } from './mail-gate.js';
 import { wrapHtml, esc } from './email-templates.js';
@@ -201,7 +203,7 @@ export async function tellAgreement(deps: Deps, a: Agreement, ev: AgreementEvent
     const base = deps.config.baseUrl.replace(/\/$/, '');
     const cpLink = a.counterparty.account ? `/v1/profile?tab=agreements#agreements/${a.id}` : null;
     const opLink = `/v1/admin?tab=compliance#agreements/${a.id}`;
-    const email = getActiveEmailService();
+    const email = nodeContext().email;
     const created = a.history.find(h => h.event === 'created');
     const operatorAccount = created?.by && created.by.includes('@') && !created.by.includes('#') ? created.by : null;
 

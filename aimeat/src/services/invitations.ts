@@ -21,6 +21,8 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The emailed-invitation limit is counted in the node's storage (takeInviteEmailOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 — The invitation mail goes through mail-gate.ts sendMail with the account turn, or the install set's reason (codebase analysis 2026-11-03, item B3).
  *   2026-10-31 — The in-app notice of an email invitation links by the invitation's id, not the raw
@@ -75,7 +77,7 @@ import type { Storage, OrganismRecord, OrganismMembershipRecord } from '../stora
 import type { InvitationRecord, InvitationWorkspaceGrant } from '../storage/repositories/invitation.repository.js';
 import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
@@ -352,7 +354,7 @@ export async function createEmailInvitation(
   }
 
   // Send the invitation email (best-effort; a disabled transport returns false).
-  const emailSvc = getActiveEmailService();
+  const emailSvc = nodeContext().email;
   let emailSent = false;
   if (emailSvc?.enabled) {
     emailSent = await sendMail(emailSvc, { kind: 'third-party', to: cleanEmail, count }, { form: 'invite', args: {

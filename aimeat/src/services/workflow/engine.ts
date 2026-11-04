@@ -13,12 +13,12 @@
  *   docs/plans/2026-06-13-agent-workflows-node-plan.md §4.
  * @structure
  *   - WorkflowEngine — startRun / onTaskTerminal / sweep / resumeInflight / start / stop
- *   - setActiveWorkflowEngine / getActiveWorkflowEngine — process-wide handle (so the task route +
- *     scheduler reach the live engine without threading it through every signature)
+ *   - the running engine is nodeContext().workflow (services/node-context.ts), so the task route +
+ *     scheduler reach the live engine without threading it through every signature
  *   - computeReadySteps / runOutcome — pure decision helpers (exported for tests)
  * @usage
  *   const engine = new WorkflowEngine(config, storage);
- *   setActiveWorkflowEngine(engine); engine.setWebhookDispatcher(d); await engine.start();
+ *   provideNodeService('workflow', engine); engine.setWebhookDispatcher(d); await engine.start();
  * @version-history
  *   v1.0.0 — 2026-06-13 — Phase 4: state machine (signals-only + full-live), dispatch, task-terminal
  *     advance, notBefore-backoff retry + timeout via the watchdog sweep, restart recovery.
@@ -122,6 +122,7 @@
  *   v1.25.0 — 2026-11-04 — A `workspace.rows` event another process produced starts no run here: the process that appended starts it, once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   v1.26.0 -- 2026-11-04 -- The run lock holds across processes (engine-lock.ts); one process runs the watchdog per minute;
  *     resumeInflight clears open model calls only when no other process runs (codebase analysis 2026-11-03, item HA 2.6).
+ *   v1.26.1 — 2026-11-04 — The running engine is nodeContext().workflow (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -167,9 +168,8 @@ export { isAgentReachable } from './engine-reachability.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
-let _active: WorkflowEngine | null = null;
-export function setActiveWorkflowEngine(e: WorkflowEngine): void { _active = e; }
-export function getActiveWorkflowEngine(): WorkflowEngine | null { return _active; }
+// The node's running engine is `nodeContext().workflow` (services/node-context.ts), set once during
+// service init, so the task route and the scheduler reach it without threading it through.
 
 /** Default wait for a human-input step's answer: lives in engine-human.ts, exported here for the routes. */
 export { HUMAN_TIMEOUT_MIN_DEFAULT } from './engine-human.js';

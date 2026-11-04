@@ -6,6 +6,8 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The key mail goes through mail-gate.ts sendMail as a third-party mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-02 — A code key answers 403 PASSWORD_SIGN_IN_OFF when the password sign-in policy refuses
  *     a new password (services/sign-in-policy.ts; IT review): its code is the account's password.
@@ -93,7 +95,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { hashPassword } from '../../services/password.js';
 import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, emailHashOf } from '../../services/owner-provisioning.js';
-import { getActiveEmailService } from '../../services/email.js';
+import { nodeContext } from '../../services/node-context.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
@@ -666,7 +668,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     await storage.createInvitation(invitation);
 
     // Email the code + landing link (best-effort; a disabled transport returns false).
-    const emailSvc = getActiveEmailService();
+    const emailSvc = nodeContext().email;
     let emailSent = false;
     if (emailSvc?.enabled) {
       emailSent = await sendMail(emailSvc, { kind: 'third-party', to: cleanEmail, count: { uncounted: KEY_MAIL_BOUND } }, { form: 'key-invite', args: {

@@ -6,6 +6,8 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.15.0 — 2026-11-04 — The workflow-end mail goes through notification-create.ts mailOwnerFrom:
  *     only to a proven address, within the per-sender daily limit (email.reports_per_sender_day), and
  *     still logged as workflow_end (codebase analysis 2026-11-03, item A2).
@@ -89,7 +91,7 @@ import { logger } from '../../utils/logger.js';
 import { globToRegExp } from './signal-eval.js';
 import { collectSignalKeys, type ResolvedStep } from './store.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
-import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
+import { nodeContext } from '../node-context.js';
 import { emitDelivery } from '../event-bus.js';
 import { runExtensionActionAsSystem } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
@@ -248,7 +250,7 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
   const stepId = step.id;
   const caller = run.principal && (run.principal.kind === 'agent' || run.principal.kind === 'ecosystem') ? run.principal.id : ownerGhii;
   const fire = async (): Promise<boolean> => {
-    const mgr = getActiveConnectTunnelManager();
+    const mgr = nodeContext().tunnel;
     if (!mgr) return false;
     if (action.kind === 'trigger-geai') {
       const reply = await mgr.invokeOnPrincipal(action.geai, { capability: action.capability, input: action.input ?? {}, caller });

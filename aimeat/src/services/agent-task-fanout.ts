@@ -38,6 +38,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   v1.10.0 — 2026-11-02 — A completed task whose schedule said deliver: "owner" has its result handed to
  *     the owner by the node (services/task-result-delivery.ts).
  *   v1.9.0 — 2026-10-31 — The onboarding smoke test does not reach the owner's home feed when it
@@ -74,7 +76,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { recordTaskCompleted, recordTaskFailed } from './activity-recorder.js';
-import { getActiveWorkflowEngine } from './workflow/engine.js';
+import { nodeContext } from './node-context.js';
 import { notifyAutomationTaskComplete } from './ecosystem-automation-notify.js';
 import { deliverTaskResult } from './task-result-delivery.js';
 import { processAutomationAdvisories } from './ecosystem-automation-advisories.js';
@@ -189,7 +191,7 @@ export async function afterTaskCompleted(
     }
 
     // If this task was dispatched by a workflow, advance that run (output check → next step).
-    getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
+    nodeContext().workflow?.onTaskTerminal(task, 'done')
         .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));
 
     // If this task does a work of an agent goal, the goal records the result and moves on.
@@ -237,7 +239,7 @@ export async function afterTaskFailed(
         link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
         data: { agent: task.agentGaii.split('#')[0], title: task.title ?? '' },
     }, deps.config);
-    getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
+    nodeContext().workflow?.onTaskTerminal(task, 'failed')
         .catch(e => logger.error('workflow advance on task fail failed', { taskId: task.id, error: String(e) }));
     void onGoalTaskSettled(deps, task, 'failed', '');
 }
@@ -522,7 +524,7 @@ export async function declineTask(
         data: { agent: task.agentGaii.split('#')[0], title: task.title ?? '', reason: why.slice(0, 280) },
     }, deps.config);
     // The step a workflow dispatched this task for has ended; the engine judges it by its output.
-    getActiveWorkflowEngine()?.onTaskTerminal(task, 'declined')
+    nodeContext().workflow?.onTaskTerminal(task, 'declined')
         .catch(e => logger.error('workflow advance on task decline failed', { taskId: task.id, error: String(e) }));
     void onGoalTaskSettled(deps, task, 'declined', why);
     return { ok: true, task: updated ?? task };

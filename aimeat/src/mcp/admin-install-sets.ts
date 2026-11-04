@@ -14,6 +14,8 @@
  * @structure registerAdminInstallSetTools(mcp, storage, config, peers, getAgentGaii, scopes)
  * @usage registered from src/mcp/register-all.ts
  * @version-history
+ *   2026-11-04 — The running scheduler is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveScheduler (codebase analysis 2026-11-03, item D-i).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -33,7 +35,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { applyInstallSet, listAppliedSets } from '../services/install-set-apply.js';
-import { getActiveScheduler } from '../services/scheduler.js';
+import { nodeContext } from '../services/node-context.js';
 import { saleConfigNeeds, saleGrant, saleRevoke, saleOffer, saleClaim, claimPackageHere } from '../services/packages/sale/package-sale-client.js';
 import { readCatalogue, readRequests, setCatalogueEntry } from '../services/packages/sale/package-sale-catalogue.js';
 import { decideSaleRequest, reviewSale } from '../services/packages/sale/package-sale-checkout.js';
@@ -54,7 +56,7 @@ export function registerAdminInstallSetTools(
         const agentGaii = getAgentGaii();
         if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
         if (action === 'list') return text({ install_sets: await listAppliedSets(storage) });
-        const out = await applyInstallSet({ storage, config, peers, scheduler: getActiveScheduler() ?? undefined }, {
+        const out = await applyInstallSet({ storage, config, peers, scheduler: nodeContext().scheduler ?? undefined }, {
             installSet: install_set, secrets, dryRun: action === 'plan', appliedBy: agentGaii,
         });
         if (!out.ok) return { ...toolError(out.code, out.problems ? `${out.message} ${out.problems.join(' | ')}` : out.message) };

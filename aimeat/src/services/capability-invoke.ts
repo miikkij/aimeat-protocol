@@ -6,6 +6,8 @@
  *   extension through the node's own route in process, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.10.1 - 2026-11-04 - The `extension` case sends its request to the node's own HTTP server in process
  *     (services/request-injector.ts) instead of a fetch to 127.0.0.1, marked for the caller's token
  *     (auth/injected-request.ts) instead of carrying a loopback pass. The route, its gates and the answer
@@ -76,7 +78,7 @@ import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { INTERNAL_PASS_HEADER } from './extension-access/internal-pass.js';
 import { withInProcessFetch } from './request-injector.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
 import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
@@ -454,7 +456,7 @@ export async function invokeCapability(
       if (refusal) throw Object.assign(new Error(refusal.message), refusal);
       const owner = localAccountName(callerGhii);
       const geai = buildGEAI(app, owner, config.nodeId);
-      const mgr = getActiveConnectTunnelManager();
+      const mgr = nodeContext().tunnel;
       if (!mgr) {
         throw Object.assign(new Error('Connector tunnel unavailable'), { statusCode: 503, code: 'TUNNEL_UNAVAILABLE' });
       }

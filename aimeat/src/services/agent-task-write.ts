@@ -42,6 +42,8 @@
  *   const r = await createTask({ storage, config, webhook }, { agent, agentGaii, agentName, creator, body, actor });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-10-28 — createTask and applyProposedPlan decide on the agent record as it is: the node no
  *     longer narrows an agent holding `*` by itself (Jouni, 2026-10-28).
  *   2026-10-18 — createTask and applyProposedPlan read the agent through startFactsOf
@@ -79,7 +81,7 @@ import { resolveTaskFileInputs } from './task-files.js';
 import type { FileRefAccessor } from './file-refs.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { emitChange, emitDelivery } from './event-bus.js';
-import { getActiveWorkflowEngine } from './workflow/engine.js';
+import { nodeContext } from './node-context.js';
 import { logger } from '../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -288,7 +290,7 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
     // storage.createAgentTask directly and use a different scope, so they do not fire this.
     const orderedOfferId = record.scope?.find((s: AgentTaskScope) => s.name === 'offer_id')?.value;
     if (orderedOfferId) {
-        getActiveWorkflowEngine()?.onOfferOrdered(record.ownerGaii, orderedOfferId)
+        nodeContext().workflow?.onOfferOrdered(record.ownerGaii, orderedOfferId)
             .catch(e => logger.error('workflow event trigger (offer.ordered) failed', { offerId: orderedOfferId, error: String(e) }));
     }
 

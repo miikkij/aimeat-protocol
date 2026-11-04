@@ -22,7 +22,7 @@
  *   The pending surface reuses the EXISTING ecosystem-apps owner surface (the same place the owner
  *   already lists pending app integrations and per-app data) backed by owner-namespace memory — it is
  *   NOT a new approval inbox subsystem. The delivery reuses the EXACT eco-capability tunnel path the
- *   schedule executor uses (`getActiveConnectTunnelManager().invokeOnPrincipal(geai, {...})`).
+ *   schedule executor uses (`nodeContext().tunnel.invokeOnPrincipal(geai, {...})`).
  *
  *   Best-effort + fully isolated: every failure here is logged and swallowed so it can never break the
  *   task-completion path that calls the drain.
@@ -44,10 +44,12 @@
  *   v1.1.0 — 2026-09-29 — Immediate delivery passes the outbox through the classification leave()
  *     (external, to the app); a classified advisory stays in the outbox and is logged with the
  *     reason (TARGET-082 V4).
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { buildGEAI, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { systemReader } from './classification/reader.js';
@@ -104,7 +106,7 @@ function advisoryIdOf(advisory: unknown, fallbackKey: string): string {
 /**
  * B8 — deliver one `support-advisory@1` payload into the app's guidance sink by invoking the app's
  * `deliver-advisory` capability over the connector tunnel. Reuses the EXACT path the schedule executor
- * uses (getActiveConnectTunnelManager + invokeOnPrincipal on the `eco:<app>#<owner>@<node>` principal).
+ * uses (nodeContext().tunnel + invokeOnPrincipal on the `eco:<app>#<owner>@<node>` principal).
  *
  * Returns a typed outcome instead of throwing so both callers (the immediate drain + the approve route)
  * can decide what to do with the outbox/pending key:
@@ -118,7 +120,7 @@ export async function deliverAdvisory(
   ownerName: string,
   advisory: unknown,
 ): Promise<DeliveryOutcome> {
-  const mgr = getActiveConnectTunnelManager();
+  const mgr = nodeContext().tunnel;
   if (!mgr) {
     return { state: 'offline-retry', reason: 'connect-tunnel unavailable' };
   }

@@ -29,6 +29,8 @@
  *   deliveringSchedule(storage, task) · deliverTaskResult(storage, config, task, message)
  * @usage void deliverTaskResult(storage, config, task, message).catch(…);
  * @version-history
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.1.1 — 2026-11-03 — When the agent has used today's mail limit, the bell entry says the result was
  *     not mailed, what the limit is and which Config setting the operator changes (secaudit2026nov02d
  *     round 13b).
@@ -48,7 +50,7 @@ import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 import type { AimeatConfig } from '../config.js';
 import { notify } from './notify.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { mailOwnerFrom, ownerMailLimitReached } from './notification-create.js';
 import { notificationEmailUnverified } from './owner-mail-address.js';
 import { displayPrefsFor, formatForPerson, type DisplayPrefs } from './display-prefs.js';
@@ -224,7 +226,7 @@ export async function deliverTaskResult(
     const locale = ghii?.locale || config.siteLinks?.defaultLocale || 'en';
     const prefs = await displayPrefsFor(storage, ownerGhii);
     const heading = `${task.title} – ${dayOf(prefs, task.completedAt ?? task.createdAt, locale, job.timezone ?? (entry ? zoneOf(entry) : undefined))}`;
-    const mail = getActiveEmailService();
+    const mail = nodeContext().email;
     // The result is mailed only to an address the owner confirmed (owner-mail-address.ts). When the
     // address is not confirmed, the bell says so and where to confirm it.
     const unverified = !!mail?.enabled && notificationEmailUnverified(ghii);

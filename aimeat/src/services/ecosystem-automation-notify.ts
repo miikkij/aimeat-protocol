@@ -46,10 +46,12 @@
  *     proven hash (codebase analysis 2026-11-03, item A9).
  *   v1.3.2 — 2026-11-04 — The report mail goes through mail-gate.ts sendMail as an owner mail
  *     (codebase analysis 2026-11-03, item B3).
+ *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  */
 import type { Storage, AgentTaskRecord, MemoryRecord, GHIIRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { provenOwnerAddress, notificationEmailUnverified } from './owner-mail-address.js';
 import { sendMail } from './mail-gate.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';
@@ -276,7 +278,7 @@ export async function notifyAutomationTaskComplete(
     }
 
     // ── Channel 2: email (only if SMTP configured + owner opted in with an email) ──
-    const emailSvc = getActiveEmailService();
+    const emailSvc = nodeContext().email;
     if (!emailSvc || !emailSvc.enabled) {
       logger.info('automation report email skipped (not configured)', { owner: ownerName, recipe: auto.recipeId });
       return;

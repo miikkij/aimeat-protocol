@@ -22,6 +22,8 @@
  *   import { describeBasicAgents } from '../services/basic-agents.js';
  *   const view = await describeBasicAgents(config, storage, req.auth!.owner);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.5.0 — 2026-10-19 — Each basic agent that is an agent record carries its `avatar`
  *     (services/agent-avatar.ts), so the route and aimeat_agent_basics_get answer the same.
  *   v1.4.0 — 2026-10-12 — A connected daemon carries what its connector said the crew runtime
@@ -37,7 +39,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { addItem, listItems } from './open-items.js';
 import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
 import { logger } from '../utils/logger.js';
@@ -121,7 +123,7 @@ export function residentRunnable(owner: string, installId?: string | null): bool
  * grouping, so a machine holding only apps is not reported as a daemon at all.
  */
 export function connectedDaemons(owner: string): ConnectedDaemon[] {
-  const tunnels = getActiveConnectTunnelManager();
+  const tunnels = nodeContext().tunnel;
   if (!tunnels) return [];
   return tunnels.daemonsForOwner(owner)
     .map(d => ({ ...d, principals: d.principals.filter(p => !p.startsWith('eco:')) }))

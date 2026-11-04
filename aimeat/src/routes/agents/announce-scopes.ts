@@ -9,6 +9,8 @@
  * @structure announceScopes(gaii) · widenAndAnnounce(storage, config, agent)
  * @usage announceScopes(updated.gaii);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.1.0 — 2026-11-02 — widenAndAnnounce: a store place's default, announced when it adds a word.
  *   v1.0.0 — 2026-10-17 — Pure extraction from ./management.ts
  *     (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
@@ -16,7 +18,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { emitToolListChanged } from '../../services/resource-events.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { nodeContext } from '../../services/node-context.js';
 import { widenForPlace } from '../../services/place-agent-scopes.js';
 
 /**
@@ -34,7 +36,7 @@ export function announceScopes(gaii: string): void {
   // word while every call it made was refused for lacking it. This frame asks for a fresh mint and
   // nothing else — it must never be auth_revoked, which stops the identity, because then ADDING a
   // permission would kill the agent.
-  getActiveConnectTunnelManager()?.notifyScopesChanged(gaii);
+  nodeContext().tunnel?.notifyScopesChanged(gaii);
 }
 
 /**

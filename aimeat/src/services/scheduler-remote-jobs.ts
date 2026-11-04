@@ -34,12 +34,13 @@
  *     carries the maker's identity as caller instead of the owner's (secaudit 2026-10). The `ai`
  *     job moved to services/scheduler-ai-job.ts, where it can write through the shared memory write
  *     service without a module cycle.
+ *   2026-11-04 — The running workflow engine and connector tunnel manager are read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveWorkflowEngine, getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { JobRunResult } from './scheduler.js';
-import { getActiveWorkflowEngine } from './workflow/engine.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 import { buildGEAI, localAccountName } from '../utils/gaii.js';
 import { scheduleActor } from './schedule-actor.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -53,7 +54,7 @@ export async function runWorkflowJob(job: ScheduledJobRecord): Promise<JobRunRes
   const owner = job.ownerScope;
   const workflowId = (job.input as { workflowId?: string } | undefined)?.workflowId;
   if (!owner || !workflowId) throw new Error(`workflow job "${job.id}" missing ownerScope/workflowId`);
-  const engine = getActiveWorkflowEngine();
+  const engine = nodeContext().workflow;
   if (!engine) return { reads: [], writes: [], skipped: true, skipReason: 'workflow engine not started' };
   const result = await engine.startRun(owner, localAccountName(owner), workflowId, { mode: 'full-live' });
   if ('error' in result) throw new Error(`workflow run failed to start: ${result.error.join('; ')}`);
@@ -103,7 +104,7 @@ export async function runEcoCapabilityJob(
   const geai = buildGEAI(app, ownerName, config.nodeId);
   const caller = actor.isOwner ? `${ownerName}@${config.nodeId}` : actor.principal;
 
-  const mgr = getActiveConnectTunnelManager();
+  const mgr = nodeContext().tunnel;
   if (!mgr) {
     // No tunnel server running — skip rather than error (nothing to invoke against).
     return { reads: [], writes: [], skipped: true, skipReason: 'connect-tunnel unavailable' };

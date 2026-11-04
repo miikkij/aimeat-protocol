@@ -16,6 +16,8 @@
  * @structure NarrowOutcome · narrowAgent()
  * @usage const out = await narrowAgent(storage, `${owner}@${nodeId}`, agent);
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.1.1 — 2026-10-28 — Only the owner's press or their AI's call narrows: the node's own narrowing
  *     (services/scope-auto-narrow.ts) is removed.
  *   v1.1.0 — 2026-10-18 — One narrowing at a time per agent, on the agent as it is when its turn
@@ -26,7 +28,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { flushScopeUse, readScopeUse, writeScopeUse, wildcardStatus, type WildcardStatus } from './scope-use.js';
 import { emitChange } from './event-bus.js';
 import { emitToolListChanged } from './resource-events.js';
-import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { nodeContext } from './node-context.js';
 
 export type NarrowOutcome =
     | { ok: true; agent: AgentRecord; status: WildcardStatus }
@@ -72,7 +74,7 @@ async function narrowNow(storage: Storage, ownerGhii: string, gaii: string): Pro
     delete record.agents[agent.name];
     await writeScopeUse(storage, ownerGhii, record);
     emitToolListChanged(updated.gaii);
-    getActiveConnectTunnelManager()?.notifyScopesChanged(updated.gaii);
+    nodeContext().tunnel?.notifyScopesChanged(updated.gaii);
     emitChange('agents');
     return { ok: true, agent: updated, status };
 }

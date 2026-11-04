@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No per-organism scan for a storage without getMemoryByKeysAnyOwner: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — PATCH /v1/agents/:name/runtime-source refuses the shared anonymous principal with 401
@@ -98,7 +100,7 @@ import {
 } from '../../services/agent-profile-write.js';
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { nodeContext } from '../../services/node-context.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 import { credentialHealthForOwner, summariseCredentialHealth } from '../../services/agent-credential-health.js';
 import { portRedirectFor } from '../../services/agent-port-redirect.js';
@@ -243,7 +245,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // One clock for the whole page: two cards in one response must not straddle a threshold and
     // then disagree about what time it is. The connected set comes with it, because a spawn agent
     // parked on its daemon's socket is available now and its lastSeen is days old by design.
-    const connected = new Set(getActiveConnectTunnelManager()?.principalsForOwner(req.auth!.owner) ?? []);
+    const connected = new Set(nodeContext().tunnel?.principalsForOwner(req.auth!.owner) ?? []);
     const health = computeAgentHealthMany(agents, onboardingByGaii, Date.now(), connected);
 
     // Whether the credential still works is a different question from whether the agent is healthy:

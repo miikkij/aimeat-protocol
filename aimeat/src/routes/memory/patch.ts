@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The 501 NOT_SUPPORTED answers for a storage without setMemoryIfVersion or
  *     createMemoryIfAbsent are gone: both are required on Storage, so no node reached them (codebase
  *     analysis 2026-11-03, item D-e).
@@ -102,7 +104,7 @@ import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
 import { reconcileAfterSourceWrite } from '../../services/exchange-projection.js';
-import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
+import { nodeContext } from '../../services/node-context.js';
 import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
@@ -506,7 +508,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     emitRecordChange('memory', record.ownerGaii, record.visibility, ...(priorVisibility ? [priorVisibility] : []));
     if (key.startsWith('organism.')) emitChange('organisms');
-    getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
+    nodeContext().workflow?.onMemoryWrite(gaii, key)
       .catch(e => logger.error('workflow event trigger (memory.patch) failed', { key, error: String(e) }));
     emitEcosystemMemoryWrite(storage, config, gaii, key)
       .catch(e => logger.error('ecosystem outbound (memory.patch) failed', { key, error: String(e) }));

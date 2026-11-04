@@ -14,6 +14,8 @@
  *   - DELETE /v1/ecosystem/subscriptions   — owner removes a subscription (?app=&event=)
  * @usage app.use(ecosystemEventsRouter(config, storage));
  * @version-history
+ *   2026-11-04 — The running workflow engine and connector tunnel manager are read from nodeContext() (services/node-context.ts) in place of
+ *     getActiveWorkflowEngine, getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.3.0 — 2026-11-01 — POST /subscriptions refuses a match of more than 16 fields (400, an event
  *     carries two) and a list past quota.memory_max_value_size_kb (413, naming the DELETE route and the
  *     setting); subscriptions are kept per owner (secaudit2026oct31w2 round 12,
@@ -32,8 +34,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { parseGEAI, buildGEAI } from '../utils/gaii.js';
-import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
-import { getActiveConnectTunnelManager } from '../services/connect-tunnel.js';
+import { nodeContext } from '../services/node-context.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemory } from '../services/classification/present-memory.js';
@@ -92,7 +93,7 @@ export function ecosystemEventsRouter(config: AimeatConfig, storage: Storage): R
 
     // Audit log (per-GEAI, capped) then fuel the workflow engine's ecosystem.event triggers.
     await appendInboundEcosystemLog(storage, geai, { event, version, timestamp: new Date().toISOString(), data });
-    getActiveWorkflowEngine()?.onEcosystemEvent(app, event, version, ownerGhii, data)
+    nodeContext().workflow?.onEcosystemEvent(app, event, version, ownerGhii, data)
       .catch(e => logger.error('ecosystem.event trigger dispatch failed', { app, event, error: String(e) }));
 
     res.json(success(config.nodeId, { accepted: true, app, event, version }));
@@ -176,7 +177,7 @@ export function ecosystemEventsRouter(config: AimeatConfig, storage: Storage): R
     }
     const geai = buildGEAI(ref.app, req.auth!.owner, config.nodeId);
     const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
-    const mgr = getActiveConnectTunnelManager();
+    const mgr = nodeContext().tunnel;
     if (!mgr) {
       res.json(success(config.nodeId, { read_through_unavailable: true, reason: 'tunnel_unavailable', cached }));
       return;
