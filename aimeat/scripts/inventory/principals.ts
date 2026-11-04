@@ -26,6 +26,9 @@
  * @structure PRINCIPALS · GUARD_EFFECTS · principalsFor(guards) · scopesFrom(guards)
  * @usage const { principals, unknown } = principalsFor(['requireAuth()', "requireScope('memory:write')"]);
  * @version-history
+ *   v1.4.0 — 2026-11-04 — acceptCredential (src/auth/credential-strategies.ts) narrows a door to the new
+ *     class 'outside-credential', or to that plus the unauthenticated classes when its kind admits a
+ *     request with no credential (codebase analysis 2026-11-03, item B8).
  *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts) joins the authorization gates and
  *     its word is read as a demand; requireScopeUnlessSelf gets a guard effect instead of reading as unknown.
  *   v1.2.0 — 2026-10-01 — requireScopeOrOwnApp joins the authorization gates (auth/app-own-gate.ts): requireScope,
@@ -34,6 +37,7 @@
  *     reads, for the owner in person, an app on messages:read and an agent on messages:read-as-owner.
  *   v1.0.0 — 2026-09-03 — Initial (wish-invarianttiauditointi, phase 1).
  */
+import { CREDENTIAL_KINDS, type CredentialKindInfo } from '../../src/auth/credential-kinds.js';
 
 /** Every class of caller that can arrive at a door. Order is widest-reach first. */
 export const PRINCIPALS = [
@@ -54,6 +58,12 @@ export const PRINCIPALS = [
     'app',
     /** An ecosystem app (GEAI), writing into its own eco: namespace. */
     'ecosystem',
+    /**
+     * A credential that is not a node session (a data space participant, an outside party, an app
+     * party, a UCP platform), verified by the strategy the door declares with acceptCredential()
+     * (src/auth/credential-strategies.ts). Only that guard narrows a set to it.
+     */
+    'outside-credential',
 ] as const;
 
 export type Principal = typeof PRINCIPALS[number];
@@ -134,6 +144,12 @@ export const GUARD_EFFECTS: Record<string, { admits: Principal[] | null; note?: 
      * down rather than leaving to whoever reads the row next.
      */
     requireLocalSession: { admits: null, note: 'cuts on federated vs local, not on principal class' },
+    /**
+     * A declared credential strategy (src/auth/credential-strategies.ts). What it admits depends on
+     * its kind, the first argument, resolved by strategyAdmits() from src/auth/credential-kinds.ts: the
+     * outside credential alone, or that plus a caller with none when the kind admits one.
+     */
+    acceptCredential: { admits: null, note: 'resolved by the kind argument; see strategyAdmits()' },
 
     // ── Not gates. Present so they are not mistaken for unknown. ──
     /** Serves only on the apex host; a host check, not a caller check. */
@@ -165,6 +181,17 @@ export const GUARD_EFFECTS: Record<string, { admits: Principal[] | null; note?: 
     validateBody: { admits: null },
     express: { admits: null },
 };
+
+/**
+ * The classes `acceptCredential('<kind>', …)` admits, or null for a kind src/auth/credential-kinds.ts
+ * does not name (the row is then unknown, never open). A kind that lets a request with no credential
+ * through admits the two unauthenticated classes too, so its door stays on the open-writes list.
+ */
+export function strategyAdmits(kind: string | undefined): Principal[] | null {
+    if (!kind || !Object.hasOwn(CREDENTIAL_KINDS, kind)) return null;
+    const info: CredentialKindInfo = CREDENTIAL_KINDS[kind as keyof typeof CREDENTIAL_KINDS];
+    return info.admitsNoCredential ? ['unauthenticated', 'anonymous-identity', 'outside-credential'] : ['outside-credential'];
+}
 
 /** `requireRole('operator')` → the classes that role names. */
 function fromRole(role: string): Principal[] {
@@ -213,6 +240,10 @@ export function principalsFor(guards: GuardCall[]): PrincipalResult {
         if (guard.name === 'requireOperatorPrincipal') scopes.push(...guard.args.filter(a => a.includes(':')));
 
         let admits = effect.admits;
+        if (guard.name === 'acceptCredential') {
+            admits = strategyAdmits(guard.args[0]);
+            if (admits === null) { unknown.push(`acceptCredential(${guard.args[0] ?? ''})`); continue; }
+        }
         if (guard.name === 'requireRole' && guard.args[0]) admits = fromRole(guard.args[0]);
         if (guard.name === 'requireRoleOrScope' && guard.args[0]) {
             // role OR scope, so the set is the role's classes UNION everyone who could hold a scope.

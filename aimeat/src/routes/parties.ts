@@ -11,6 +11,8 @@
  *   or a principal of the owner holding party:manage). The party's endpoints (/v1/parties/me*,
  *   /v1/parties/token) take a party credential only, read by services/parties/verify.ts: HTTP Basic
  *   (user `<owner>/<name>`, password the key) or a party token. A party credential is never req.auth.
+ *   The /me endpoints declare it with acceptCredential('party') (auth/credential-strategies.ts); the
+ *   token endpoint reads it itself, because it answers in the OAuth error shape and takes the form body.
  *   The /me routes are registered before /:name, and "me", "token" and "share" are not party names.
  * @structure
  *   - GET/POST   /v1/parties                         the owner's parties; make one (its key shown once)
@@ -31,6 +33,8 @@
  *   - POST /v1/admin/parties/:owner/:name/stop, /resume   the operator, for abuse (D2.9)
  * @usage app.use(partiesRouter(config, storage))
  * @version-history
+ *   2026-11-04 — The /me endpoints declare the credential strategy acceptCredential('party') instead of
+ *     calling partyOf() first in each handler; same answers (codebase analysis 2026-11-03, item B8).
  *   v1.1.0 — 2026-11-01 — The one-time share link: POST /v1/parties/:name/invite, the recipient's
  *     preview and redeem, and `email` on POST /v1/parties/share (services/parties/invite.ts; WP9b).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3).
@@ -41,6 +45,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, requireOperator } from '../auth/middleware.js';
 import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
 import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { deny403 } from '../auth/deny.js';
@@ -73,19 +78,9 @@ export function partiesRouter(config: AimeatConfig, storage: Storage): Router {
     // The owner's endpoints: a node session of the account, and party:manage for anyone but the owner in person.
     const owner = [requireAuth(), refuseAnonymousPrincipal(), requireScope('party:manage')];
 
-    /** The verified party on this request, or null with the 401 or 403 sent. */
-    const partyOf = async (req: Request, res: Response): Promise<PartyContext | null> => {
-        const cred = partyCredentialOf(req);
-        if (!cred) {
-            res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Sign in with the name and the key the owner gave you.', undefined, {
-                basic_user: '<owner>/<party name>', basic_password: 'the party key', token_endpoint: '/v1/parties/token',
-            }));
-            return null;
-        }
-        const v = await verifyParty(deps, cred);
-        if (!v.ok) { res.status(v.status).json(error(config.nodeId, v.code, v.message)); return null; }
-        return v.ctx;
-    };
+    // The party's own endpoints declare acceptCredential('party') (auth/credential-strategies.ts), which
+    // answers 401 with no or a wrong credential and 403 for a stopped party; the handler reads the party.
+    const partyOf = (req: Request): PartyContext => credentialOf(req, 'party');
 
     // ── The party's own endpoints (before /:name) ──
 
@@ -133,25 +128,20 @@ export function partiesRouter(config: AimeatConfig, storage: Storage): Router {
         render(req, res, await redeemInvite(deps, body.code, body));
     });
 
-    router.get('/v1/parties/me', async (req, res) => {
-        const ctx = await partyOf(req, res);
-        if (ctx) render(req, res, await partyMe(deps, ctx));
+    router.get('/v1/parties/me', acceptCredential('party', deps), async (req, res) => {
+        render(req, res, await partyMe(deps, partyOf(req)));
     });
-    router.post('/v1/parties/me/keys/rotate', validateBody(EmptyPartyBodySchema, config.nodeId), async (req, res) => {
-        const ctx = await partyOf(req, res);
-        if (ctx) render(req, res, await rotatePartyKey(deps, ctx));
+    router.post('/v1/parties/me/keys/rotate', validateBody(EmptyPartyBodySchema, config.nodeId), acceptCredential('party', deps), async (req, res) => {
+        render(req, res, await rotatePartyKey(deps, partyOf(req)));
     });
-    router.get('/v1/parties/me/shares/:id/connection', async (req, res) => {
-        const ctx = await partyOf(req, res);
-        if (ctx) render(req, res, await partyConnection(deps, ctx, String(req.params.id)));
+    router.get('/v1/parties/me/shares/:id/connection', acceptCredential('party', deps), async (req, res) => {
+        render(req, res, await partyConnection(deps, partyOf(req), String(req.params.id)));
     });
-    router.post('/v1/parties/me/shares/:id/accept', validateBody(EmptyPartyBodySchema, config.nodeId), async (req, res) => {
-        const ctx = await partyOf(req, res);
-        if (ctx) render(req, res, await acceptShareTerms(deps, ctx, String(req.params.id)));
+    router.post('/v1/parties/me/shares/:id/accept', validateBody(EmptyPartyBodySchema, config.nodeId), acceptCredential('party', deps), async (req, res) => {
+        render(req, res, await acceptShareTerms(deps, partyOf(req), String(req.params.id)));
     });
-    router.post('/v1/parties/me/shares/:id/decline', validateBody(EmptyPartyBodySchema, config.nodeId), async (req, res) => {
-        const ctx = await partyOf(req, res);
-        if (ctx) render(req, res, await declineShare(deps, ctx, String(req.params.id)));
+    router.post('/v1/parties/me/shares/:id/decline', validateBody(EmptyPartyBodySchema, config.nodeId), acceptCredential('party', deps), async (req, res) => {
+        render(req, res, await declineShare(deps, partyOf(req), String(req.params.id)));
     });
 
     // ── The owner's endpoints ──

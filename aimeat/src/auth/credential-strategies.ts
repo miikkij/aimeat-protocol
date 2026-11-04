@@ -1,0 +1,195 @@
+/**
+ * @file src/auth/credential-strategies.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The credentials that are not a node session, verified in the auth layer instead of in
+ *   each handler (codebase analysis 2026-11-03, item B8; security-architecture.md finding 7).
+ *
+ *   A route that takes such a credential declares it in its middleware chain:
+ *
+ *     router.post('/dsp/2025-1/negotiations/request', acceptCredential('dsp-participant', { config, process: 'negotiation' }), handler)
+ *
+ *   The strategy reads the request, verifies the credential with the one verifier its kind has, and
+ *   either puts the typed principal on the request (`req.credential`, read with credentialOf()) and
+ *   calls next(), or sends the refusal and ends the request. The handler no longer verifies anything.
+ *
+ *   SAME ANSWERS AS BEFORE. Each strategy is the helper its routes called first in their handler,
+ *   moved here unchanged: the same verifier, the same status, the same body, the same log line. The
+ *   middleware sits where the call was, after the route's body validation, so a request that failed
+ *   either check before fails the same one now. test/unit/credential-strategies-table.test.ts holds the
+ *   answers of the code before this file existed and compares every row.
+ *
+ *   NEVER req.auth. A participant, a party or a platform is not a node session. These paths are left
+ *   alone by the global auth middleware (takesDataspaceCredential, takesPartyToken), and a strategy
+ *   neither reads nor sets req.auth.
+ * @structure CredentialPrincipals · StrategyOptions · acceptCredential(kind, options) · credentialOf(req, kind)
+ * @usage
+ *   router.get(path, acceptCredential('dsp-participant', { config, process: 'catalog' }), (req, res) => {
+ *     const participant = credentialOf(req, 'dsp-participant');
+ *   });
+ * @version-history
+ *   v1.3.0 — 2026-11-04 — 'ucp-platform' and 'ucp-platform-signed': a UCP platform on the guest
+ *     checkout, and ucpRawBody (codebase analysis 2026-11-03, item B8).
+ *   v1.2.0 — 2026-11-04 — 'app-party': a person registered to one app (codebase analysis 2026-11-03, item B8).
+ *   v1.1.0 — 2026-11-04 — 'party': an outside party on /v1/parties/me* (codebase analysis 2026-11-03, item B8).
+ *   v1.0.0 — 2026-11-04 — Initial: the Dataspace Protocol participant (codebase analysis 2026-11-03, item B8).
+ */
+import type { Request, Response, NextFunction } from 'express';
+import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import type { CredentialKind } from './credential-kinds.js';
+import { error } from '../middleware/envelope.js';
+import { verifyDspRequest, type Participant } from '../services/dataspace/verifier.js';
+import { catalogError, negotiationError, transferError } from '../services/dataspace/contract.js';
+import { partyCredentialOf, verifyParty, type PartyContext } from '../services/parties/verify.js';
+import { appPartyFromRequest, type AppPartyCtx } from '../services/app-parties/service.js';
+import { parseUcpAgent, platformProfile } from '../services/ucp/platform-profile.js';
+import { verifyMessage } from '../services/ucp/http-signatures.js';
+import { logger } from '../utils/logger.js';
+
+/** The principal each kind puts on the request. */
+export interface CredentialPrincipals {
+    'dsp-participant': Participant;
+    party: PartyContext;
+    'app-party': AppPartyCtx;
+    'ucp-platform': UcpPlatform;
+    'ucp-platform-signed': UcpPlatform;
+}
+
+/** A UCP platform: the profile its UCP-Agent header names, whose keys verified the signature when one was sent. */
+export interface UcpPlatform { profileUrl: string }
+
+/** What each kind's strategy is built with at the route. */
+export interface StrategyOptions {
+    /** `process` picks the DSP error body: a catalog error, or a negotiation or transfer error naming the :pid. */
+    'dsp-participant': { config: AimeatConfig; process: 'catalog' | 'negotiation' | 'transfer' };
+    party: { storage: Storage; config: AimeatConfig };
+    /** The app is the route's :owner and :filename. */
+    'app-party': { storage: Storage; config: AimeatConfig };
+    'ucp-platform': { config: AimeatConfig };
+    'ucp-platform-signed': { config: AimeatConfig };
+}
+
+/** A principal on the request, tagged with its kind. */
+export type AcceptedCredential = { [K in CredentialKind]: { kind: K; principal: CredentialPrincipals[K] } }[CredentialKind];
+
+declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace Express {
+        interface Request {
+            /** Set by acceptCredential() when the route's declared credential verified. */
+            credential?: AcceptedCredential;
+        }
+    }
+}
+
+/** Verifies one request: the principal, or null when the refusal has been sent. */
+type Verify<K extends CredentialKind> = (req: Request, res: Response) => Promise<CredentialPrincipals[K] | null>;
+type Strategy<K extends CredentialKind> = (options: StrategyOptions[K]) => Verify<K>;
+
+/** The Dataspace Protocol participant (was participantOf() in routes/dsp/index.ts). */
+const dspParticipant: Strategy<'dsp-participant'> = ({ config, process }) => async (req, res) => {
+    const v = await verifyDspRequest(config, req.headers.authorization);
+    if (v.ok) return v.participant;
+    logger.info('dataspace: a DSP request was refused its credential', { path: req.path, reason: v.reason });
+    const pid = String(req.params.pid ?? '');
+    res.status(401).json(process === 'catalog'
+        ? catalogError('UNAUTHORIZED', v.reason)
+        : process === 'negotiation' ? negotiationError(pid, '', 'UNAUTHORIZED', v.reason) : transferError(pid, '', 'UNAUTHORIZED', v.reason));
+    return null;
+};
+
+/** An outside party of an owner (was partyOf() in routes/parties.ts). */
+const outsideParty: Strategy<'party'> = (deps) => async (req, res) => {
+    const cred = partyCredentialOf(req);
+    if (!cred) {
+        res.status(401).json(error(deps.config.nodeId, 'AUTH_REQUIRED', 'Sign in with the name and the key the owner gave you.', undefined, {
+            basic_user: '<owner>/<party name>', basic_password: 'the party key', token_endpoint: '/v1/parties/token',
+        }));
+        return null;
+    }
+    const v = await verifyParty(deps, cred);
+    if (!v.ok) { res.status(v.status).json(error(deps.config.nodeId, v.code, v.message)); return null; }
+    return v.ctx;
+};
+
+/**
+ * A person registered to the app the route names, without an account (was partyOf() in
+ * routes/app-parties.ts). An admitted request is marked private, no-store, as it was there.
+ */
+const appParty: Strategy<'app-party'> = (deps) => async (req, res) => {
+    const ref = { owner: String(req.params.owner ?? ''), filename: String(req.params.filename ?? '') };
+    const v = await appPartyFromRequest(deps, ref, req);
+    if (!v.ok) { res.status(v.status).json(error(deps.config.nodeId, v.code, v.message)); return null; }
+    res.setHeader('Cache-Control', 'private, no-store');
+    return v.ctx;
+};
+
+/** The raw body as it arrived, for the digest a UCP signature covers (server.ts keeps it on /ucp/ paths). */
+export function ucpRawBody(req: Request): Buffer | null {
+    const r = (req as Request & { rawBody?: Buffer }).rawBody;
+    if (Buffer.isBuffer(r)) return r;
+    return req.body && Object.keys(req.body as object).length ? Buffer.from(JSON.stringify(req.body)) : null;
+}
+
+/**
+ * A UCP 2026-08-25 platform (was platformOf() in routes/ucp-checkout.ts): the profile UCP-Agent names,
+ * after the signature, when the request has one, checked out against that profile's keys. `mustSign`
+ * refuses an unsigned request. The checkout's own switch is read first, as it was: with commerce off
+ * every endpoint answers 503 whatever the request carries. Answers are UCP protocol errors, `{ code, content }`.
+ */
+const ucpPlatform = (mustSign: boolean) => ({ config }: { config: AimeatConfig }): ((req: Request, res: Response) => Promise<UcpPlatform | null>) => {
+    // Read once when the route is built, as the router did.
+    const allowHttp = config.baseUrl.startsWith('http://');
+    return async (req, res) => {
+        const protocolError = (status: number, code: string, content: string): null => { res.status(status).json({ code, content }); return null; };
+        if (!config.commerceEnabled) return protocolError(503, 'unavailable', 'Checkout is switched off on this node.');
+        const profileUrl = parseUcpAgent(req.get('ucp-agent'), allowHttp);
+        if (!profileUrl) return protocolError(400, 'invalid_profile_url', 'UCP-Agent must name the platform profile: profile="https://…".');
+        const signed = req.get('signature-input') !== undefined || req.get('signature') !== undefined;
+        if (!signed && mustSign) return protocolError(401, 'signature_missing', 'This request must be signed by the platform (RFC 9421).');
+        if (signed) {
+            const profile = await platformProfile(profileUrl);
+            if (!profile) return protocolError(424, 'profile_unreachable', 'The platform profile could not be fetched to check the signature.');
+            const headers: Record<string, string | undefined> = {};
+            for (const [k, v] of Object.entries(req.headers)) headers[k.toLowerCase()] = Array.isArray(v) ? v.join(', ') : v;
+            const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+            const r = verifyMessage({ method: req.method, url, headers }, ucpRawBody(req), profile.keys);
+            if (!r.ok) return protocolError(r.code === 'digest_mismatch' || r.code === 'algorithm_unsupported' ? 400 : 401, r.code, 'The request signature did not verify.');
+        }
+        return { profileUrl };
+    };
+};
+
+const STRATEGIES: { [K in CredentialKind]: Strategy<K> } = {
+    'dsp-participant': dspParticipant,
+    party: outsideParty,
+    'app-party': appParty,
+    'ucp-platform': ucpPlatform(false),
+    'ucp-platform-signed': ucpPlatform(true),
+};
+
+/**
+ * The middleware that admits a request carrying a verified credential of `kind`. A refusal is sent by
+ * the strategy and the chain stops; a verifier that throws reaches the error handler as the same throw
+ * from the handler did.
+ */
+export function acceptCredential<K extends CredentialKind>(kind: K, options: StrategyOptions[K]) {
+    const verify = (STRATEGIES[kind] as Strategy<K>)(options);
+    return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        const principal = await verify(req, res);
+        if (principal === null) return;
+        req.credential = { kind, principal } as AcceptedCredential;
+        next();
+    };
+}
+
+/**
+ * The principal acceptCredential(kind) put on this request. Throws when the route declared no such
+ * strategy: that is a wiring mistake in the route file, and a 500 is the right answer to it.
+ */
+export function credentialOf<K extends CredentialKind>(req: Request, kind: K): CredentialPrincipals[K] {
+    const c = req.credential;
+    if (!c || c.kind !== kind) throw new Error(`credentialOf: this route declares no acceptCredential('${kind}')`);
+    return c.principal as CredentialPrincipals[K];
+}

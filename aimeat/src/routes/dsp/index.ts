@@ -12,9 +12,10 @@
  *   effect without a restart.
  *
  *   WHO IS CALLING. The version endpoint takes no credential (DSP: unversioned and unauthenticated).
- *   Every other endpoint asks the DSP verifier (services/dataspace/verifier.ts) for the participant
- *   first; the global auth middleware leaves these paths alone (takesDataspaceCredential), and req.auth
- *   is never set or read here. A request with no valid credential is 401 on every endpoint; a valid
+ *   Every other endpoint declares acceptCredential('dsp-participant') (auth/credential-strategies.ts),
+ *   which asks the DSP verifier (services/dataspace/verifier.ts) for the participant before the
+ *   handler runs; the global auth middleware leaves these paths alone (takesDataspaceCredential), and
+ *   req.auth is never set or read here. A request with no valid credential is 401 on every endpoint; a valid
  *   participant asking for a process of another participant is 404, as DSP has unauthorized access.
  *   Then the body is checked against DspMessageSchema, and a body of the wrong shape is 400.
  * @structure
@@ -33,6 +34,9 @@
  *   - POST /dsp/2025-1/transfers/:pid/{start,completion,suspension,termination}
  * @usage app.use(dspRouter(config, storage))
  * @version-history
+ *   2026-11-04 — The participant is verified by the declared credential strategy
+ *     acceptCredential('dsp-participant') instead of participantOf() in each handler; same answers
+ *     (codebase analysis 2026-11-03, item B8).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8).
  */
 import express, { Router } from 'express';
@@ -42,7 +46,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { DspMessageSchema } from '../../models/dataspace-schemas.js';
 import { DSP_PATH, DSP_VERSION, catalogError, negotiationError, transferError } from '../../services/dataspace/contract.js';
-import { verifyDspRequest, type Participant } from '../../services/dataspace/verifier.js';
+import type { Participant } from '../../services/dataspace/verifier.js';
+import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { CATALOG_PAGE, catalogJson, datasetFor, datasetJson, visibleDatasets } from '../../services/dataspace/catalog.js';
 import { tckDataset, tckDatasets } from '../../services/dataspace/tck.js';
 import { tckModeOn } from '../../services/dataspace/settings.js';
@@ -69,14 +74,12 @@ export function dspRouter(config: AimeatConfig, storage: Storage): Router {
     const errorBody = (kind: Kind, code: string, reason: string, pid = '') =>
         kind === 'catalog' ? catalogError(code, reason) : kind === 'negotiation' ? negotiationError(pid, '', code, reason) : transferError(pid, '', code, reason);
 
-    /** The participant of the request, or the 401 sent. */
-    const participantOf = async (req: Request, res: Response, kind: Kind): Promise<Participant | null> => {
-        const v = await verifyDspRequest(config, req.headers.authorization);
-        if (v.ok) return v.participant;
-        logger.info('dataspace: a DSP request was refused its credential', { path: req.path, reason: v.reason });
-        res.status(401).json(errorBody(kind, 'UNAUTHORIZED', v.reason, pidOf(req)));
-        return null;
-    };
+    // The participant is verified by the route's acceptCredential('dsp-participant') (auth/credential-strategies.ts),
+    // which answers the 401 in the DSP error shape of `process`; each handler reads it with credentialOf().
+    const catalog = { config, process: 'catalog' } as const;
+    const negotiation = { config, process: 'negotiation' } as const;
+    const transfer = { config, process: 'transfer' } as const;
+    const participantOf = (req: Request): Participant => credentialOf(req, 'dsp-participant');
     /** Send the 400 of a body that is not a DSP message. */
     const invalid = (res: Response, kind: Kind, err: z.ZodError, pid = ''): void => {
         res.status(400).json(errorBody(kind, 'INVALID_MESSAGE', `The message does not have the DSP shape: ${err.issues.map(i => `${i.path.join('.') || '(body)'} ${i.message}`).join('; ').slice(0, 400)}`, pid));
@@ -110,9 +113,8 @@ export function dspRouter(config: AimeatConfig, storage: Storage): Router {
     router.use(DSP_PATH, off, express.json({ type: ['application/json', 'application/ld+json'], limit: '1mb' }));
 
     // ── Catalog ──
-    router.post('/dsp/2025-1/catalog/request', async (req, res) => {
-        const participant = await participantOf(req, res, 'catalog');
-        if (!participant) return;
+    router.post('/dsp/2025-1/catalog/request', acceptCredential('dsp-participant', catalog), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'catalog', m.error); return; }
         const msg = m.data as Record<string, unknown>;
@@ -129,9 +131,8 @@ export function dspRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(catalogJson(config, page));
     });
 
-    router.get('/dsp/2025-1/catalog/datasets/:id', async (req, res) => {
-        const participant = await participantOf(req, res, 'catalog');
-        if (!participant) return;
+    router.get('/dsp/2025-1/catalog/datasets/:id', acceptCredential('dsp-participant', catalog), async (req, res) => {
+        const participant = participantOf(req);
         const id = String(req.params.id ?? '');
         const ds = (tckModeOn(config) ? tckDataset(id) : null) ?? await datasetFor(deps, participant, id);
         if (!ds) { res.status(404).json(catalogError('NOT_FOUND', 'No such dataset for this participant.')); return; }
@@ -139,82 +140,70 @@ export function dspRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // ── Contract negotiation ──
-    router.post('/dsp/2025-1/negotiations/request', async (req, res) => {
-        const participant = await participantOf(req, res, 'negotiation');
-        if (!participant) return;
+    router.post('/dsp/2025-1/negotiations/request', acceptCredential('dsp-participant', negotiation), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'negotiation', m.error); return; }
         send(res, await requestNegotiation(deps, participant, m.data as Record<string, unknown>));
     });
-    router.get('/dsp/2025-1/negotiations/:pid', async (req, res) => {
-        const participant = await participantOf(req, res, 'negotiation');
-        if (participant) send(res, await readNegotiationFor(deps, participant, pidOf(req)));
+    router.get('/dsp/2025-1/negotiations/:pid', acceptCredential('dsp-participant', negotiation), async (req, res) => {
+        send(res, await readNegotiationFor(deps, participantOf(req), pidOf(req)));
     });
-    router.post('/dsp/2025-1/negotiations/:pid/request', async (req, res) => {
-        const participant = await participantOf(req, res, 'negotiation');
-        if (!participant) return;
+    router.post('/dsp/2025-1/negotiations/:pid/request', acceptCredential('dsp-participant', negotiation), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'negotiation', m.error, pidOf(req)); return; }
         send(res, await counterOffer(deps, participant, pidOf(req), m.data as Record<string, unknown>));
     });
-    router.post('/dsp/2025-1/negotiations/:pid/events', async (req, res) => {
-        const participant = await participantOf(req, res, 'negotiation');
-        if (!participant) return;
+    router.post('/dsp/2025-1/negotiations/:pid/events', acceptCredential('dsp-participant', negotiation), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'negotiation', m.error, pidOf(req)); return; }
         send(res, await negotiationEvent(deps, participant, pidOf(req), m.data as Record<string, unknown>));
     });
-    router.post('/dsp/2025-1/negotiations/:pid/agreement/verification', async (req, res) => {
-        const participant = await participantOf(req, res, 'negotiation');
-        if (!participant) return;
+    router.post('/dsp/2025-1/negotiations/:pid/agreement/verification', acceptCredential('dsp-participant', negotiation), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'negotiation', m.error, pidOf(req)); return; }
         send(res, await verifyAgreement(deps, participant, pidOf(req), m.data as Record<string, unknown>));
     });
-    router.post('/dsp/2025-1/negotiations/:pid/termination', async (req, res) => {
-        const participant = await participantOf(req, res, 'negotiation');
-        if (!participant) return;
+    router.post('/dsp/2025-1/negotiations/:pid/termination', acceptCredential('dsp-participant', negotiation), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'negotiation', m.error, pidOf(req)); return; }
         send(res, await terminateNegotiation(deps, participant, pidOf(req), m.data as Record<string, unknown>));
     });
 
     // ── Transfer process ──
-    router.post('/dsp/2025-1/transfers/request', async (req, res) => {
-        const participant = await participantOf(req, res, 'transfer');
-        if (!participant) return;
+    router.post('/dsp/2025-1/transfers/request', acceptCredential('dsp-participant', transfer), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'transfer', m.error); return; }
         send(res, await requestTransfer(deps, participant, m.data as Record<string, unknown>));
     });
-    router.get('/dsp/2025-1/transfers/:pid', async (req, res) => {
-        const participant = await participantOf(req, res, 'transfer');
-        if (participant) send(res, await readTransferFor(deps, participant, pidOf(req)));
+    router.get('/dsp/2025-1/transfers/:pid', acceptCredential('dsp-participant', transfer), async (req, res) => {
+        send(res, await readTransferFor(deps, participantOf(req), pidOf(req)));
     });
-    router.post('/dsp/2025-1/transfers/:pid/start', async (req, res) => {
-        const participant = await participantOf(req, res, 'transfer');
-        if (!participant) return;
+    router.post('/dsp/2025-1/transfers/:pid/start', acceptCredential('dsp-participant', transfer), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'transfer', m.error, pidOf(req)); return; }
         send(res, await transferMessage(deps, participant, pidOf(req), 'start', m.data as Record<string, unknown>));
     });
-    router.post('/dsp/2025-1/transfers/:pid/completion', async (req, res) => {
-        const participant = await participantOf(req, res, 'transfer');
-        if (!participant) return;
+    router.post('/dsp/2025-1/transfers/:pid/completion', acceptCredential('dsp-participant', transfer), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'transfer', m.error, pidOf(req)); return; }
         send(res, await transferMessage(deps, participant, pidOf(req), 'completion', m.data as Record<string, unknown>));
     });
-    router.post('/dsp/2025-1/transfers/:pid/suspension', async (req, res) => {
-        const participant = await participantOf(req, res, 'transfer');
-        if (!participant) return;
+    router.post('/dsp/2025-1/transfers/:pid/suspension', acceptCredential('dsp-participant', transfer), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'transfer', m.error, pidOf(req)); return; }
         send(res, await transferMessage(deps, participant, pidOf(req), 'suspension', m.data as Record<string, unknown>));
     });
-    router.post('/dsp/2025-1/transfers/:pid/termination', async (req, res) => {
-        const participant = await participantOf(req, res, 'transfer');
-        if (!participant) return;
+    router.post('/dsp/2025-1/transfers/:pid/termination', acceptCredential('dsp-participant', transfer), async (req, res) => {
+        const participant = participantOf(req);
         const m = DspMessageSchema.safeParse(req.body ?? {});
         if (!m.success) { invalid(res, 'transfer', m.error, pidOf(req)); return; }
         send(res, await transferMessage(deps, participant, pidOf(req), 'termination', m.data as Record<string, unknown>));

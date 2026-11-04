@@ -22,6 +22,9 @@
  * @structure ucpCheckoutRouter
  * @usage router.use(ucpCheckoutRouter(config, storage)); // from commerceUcpRouter
  * @version-history
+ *   2026-11-04 — The platform is verified by the declared credential strategy acceptCredential('ucp-platform')
+ *     (the orders read: 'ucp-platform-signed') instead of platformOf() in each handler; same answers
+ *     (codebase analysis 2026-11-03, item B8).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.2 — 2026-10-25 — PUT, complete and cancel answer 404 for a checkout that is absent or another
@@ -43,8 +46,7 @@ import {
   completeGuestCheckout, sellerPaymentHandlers, toUcpCheckout, toUcpOrder, readUcpOrder, sellerOfSessionId, sellerOfLines,
   guestCheckoutExists, type UcpGuestSession,
 } from '../commerce/ucp-guest-checkout.js';
-import { parseUcpAgent, platformProfile } from '../services/ucp/platform-profile.js';
-import { verifyMessage } from '../services/ucp/http-signatures.js';
+import { acceptCredential, credentialOf, ucpRawBody } from '../auth/credential-strategies.js';
 
 // Written out on every route, not built from UCP_VERSION, so the contract check (check:openapi-routes)
 // sees each path; a version change edits them together with openapi.yaml.
@@ -52,7 +54,10 @@ import { verifyMessage } from '../services/ucp/http-signatures.js';
 export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const limit = rateLimit({ windowMs: 60_000, max: 120, keyBy: 'ip' });
-  const allowHttp = config.baseUrl.startsWith('http://');
+  // The platform is verified by the route's acceptCredential (auth/credential-strategies.ts): 'ucp-platform'
+  // takes an unsigned request and checks a signed one, 'ucp-platform-signed' refuses an unsigned one.
+  const platform = { config } as const;
+  const profileOf = (req: Request): string => credentialOf(req, 'ucp-platform').profileUrl;
 
   const protocolError = (res: Response, status: number, code: string, content: string): void => {
     res.status(status).json({ code, content });
@@ -73,34 +78,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     protocolError(res, 500, 'internal_error', 'The checkout could not be handled.');
   };
 
-  /** The raw body as it arrived, for the digest a signature covers. */
-  const rawOf = (req: Request): Buffer | null => {
-    const r = (req as Request & { rawBody?: Buffer }).rawBody;
-    if (Buffer.isBuffer(r)) return r;
-    return req.body && Object.keys(req.body as object).length ? Buffer.from(JSON.stringify(req.body)) : null;
-  };
-
-  /**
-   * The platform profile a request names, after its signature (when it has one) checked out
-   * against that profile's keys. `mustSign` refuses an unsigned request.
-   */
-  async function platformOf(req: Request, res: Response, mustSign: boolean): Promise<string | null> {
-    if (!config.commerceEnabled) { protocolError(res, 503, 'unavailable', 'Checkout is switched off on this node.'); return null; }
-    const profileUrl = parseUcpAgent(req.get('ucp-agent'), allowHttp);
-    if (!profileUrl) { protocolError(res, 400, 'invalid_profile_url', 'UCP-Agent must name the platform profile: profile="https://…".'); return null; }
-    const signed = req.get('signature-input') !== undefined || req.get('signature') !== undefined;
-    if (!signed && mustSign) { protocolError(res, 401, 'signature_missing', 'This request must be signed by the platform (RFC 9421).'); return null; }
-    if (signed) {
-      const profile = await platformProfile(profileUrl);
-      if (!profile) { protocolError(res, 424, 'profile_unreachable', 'The platform profile could not be fetched to check the signature.'); return null; }
-      const headers: Record<string, string | undefined> = {};
-      for (const [k, v] of Object.entries(req.headers)) headers[k.toLowerCase()] = Array.isArray(v) ? v.join(', ') : v;
-      const url = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-      const r = verifyMessage({ method: req.method, url, headers }, rawOf(req), profile.keys);
-      if (!r.ok) { protocolError(res, r.code === 'digest_mismatch' || r.code === 'algorithm_unsupported' ? 400 : 401, r.code, 'The request signature did not verify.'); return null; }
-    }
-    return profileUrl;
-  }
+  /** The raw body as it arrived, for the digest a signature covers and the replay's body hash. */
+  const rawOf = ucpRawBody;
 
   /**
    * Idempotency: the stored answer to a repeated key, or a 409 for the same key with another body.
@@ -153,9 +132,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     res.status(status).json(body);
   }
 
-  router.post('/ucp/2026-08-25/checkout-sessions', limit, async (req, res) => {
-    const profileUrl = await platformOf(req, res, false);
-    if (!profileUrl) return;
+  router.post('/ucp/2026-08-25/checkout-sessions', limit, acceptCredential('ucp-platform', platform), async (req, res) => {
+    const profileUrl = profileOf(req);
     let release = async (): Promise<void> => undefined;
     try {
       const body = (req.body ?? {}) as { line_items?: unknown; buyer?: unknown };
@@ -168,9 +146,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     } catch (e) { await release(); fail(res, e); }
   });
 
-  router.get('/ucp/2026-08-25/checkout-sessions/:id', limit, async (req, res) => {
-    const profileUrl = await platformOf(req, res, false);
-    if (!profileUrl) return;
+  router.get('/ucp/2026-08-25/checkout-sessions/:id', limit, acceptCredential('ucp-platform', platform), async (req, res) => {
+    const profileUrl = profileOf(req);
     try {
       await answer(res, 200, await readGuestCheckout(storage, config, String(req.params.id), profileUrl), async () => undefined);
     } catch (e) { fail(res, e); }
@@ -187,9 +164,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     return true;
   }
 
-  router.put('/ucp/2026-08-25/checkout-sessions/:id', limit, async (req, res) => {
-    const profileUrl = await platformOf(req, res, false);
-    if (!profileUrl) return;
+  router.put('/ucp/2026-08-25/checkout-sessions/:id', limit, acceptCredential('ucp-platform', platform), async (req, res) => {
+    const profileUrl = profileOf(req);
     const id = String(req.params.id);
     if (await refusedAsAbsent(res, id, profileUrl)) return;
     const r = await replay(req, res, sellerOfSessionId(id, config), profileUrl);
@@ -200,9 +176,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     } catch (e) { await r.release(); fail(res, e); }
   });
 
-  router.post('/ucp/2026-08-25/checkout-sessions/:id/complete', limit, async (req, res) => {
-    const profileUrl = await platformOf(req, res, false);
-    if (!profileUrl) return;
+  router.post('/ucp/2026-08-25/checkout-sessions/:id/complete', limit, acceptCredential('ucp-platform', platform), async (req, res) => {
+    const profileUrl = profileOf(req);
     const id = String(req.params.id);
     if (await refusedAsAbsent(res, id, profileUrl)) return;
     const r = await replay(req, res, sellerOfSessionId(id, config), profileUrl);
@@ -212,9 +187,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     } catch (e) { await r.release(); fail(res, e); }
   });
 
-  router.post('/ucp/2026-08-25/checkout-sessions/:id/cancel', limit, async (req, res) => {
-    const profileUrl = await platformOf(req, res, false);
-    if (!profileUrl) return;
+  router.post('/ucp/2026-08-25/checkout-sessions/:id/cancel', limit, acceptCredential('ucp-platform', platform), async (req, res) => {
+    const profileUrl = profileOf(req);
     const id = String(req.params.id);
     if (await refusedAsAbsent(res, id, profileUrl)) return;
     const r = await replay(req, res, sellerOfSessionId(id, config), profileUrl);
@@ -224,9 +198,8 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     } catch (e) { await r.release(); fail(res, e); }
   });
 
-  router.get('/ucp/2026-08-25/orders/:id', limit, async (req, res) => {
-    const profileUrl = await platformOf(req, res, true);
-    if (!profileUrl) return;
+  router.get('/ucp/2026-08-25/orders/:id', limit, acceptCredential('ucp-platform-signed', platform), async (req, res) => {
+    const profileUrl = credentialOf(req, 'ucp-platform-signed').profileUrl;
     try {
       res.json(toUcpOrder(await readUcpOrder(storage, config, String(req.params.id), profileUrl), config));
     } catch (e) { fail(res, e); }
