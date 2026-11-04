@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-docs-schemas.ts
+ * @file src/services/compliance/docs-schemas.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The shapes of the compliance documents beside the AI use-case register (plan
@@ -17,6 +17,7 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.4.2 — 2026-11-05 — Moved unchanged from src/services/compliance-docs-schemas.ts to src/services/compliance/docs-schemas.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.4.1 — 2026-11-01 — A review's id takes a colon: it is the finding's id, and a finding about one
  *     organism or one owner names it after a colon, so those findings could not be reviewed (WP9b).
  *   v1.4.0 — 2026-11-01 — The document `intermediation` (Data Governance Act 2022/868): the provider's
@@ -30,7 +31,7 @@
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.1, C4.1, C4.3, C5.1, C5.2, C6).
  */
 import { z } from 'zod';
-import { INPUT_LIMITS } from '../models/input-limits.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 
 /** The documents, in the order the surfaces list them. */
 export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks', 'intermediation'] as const;

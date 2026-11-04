@@ -23,9 +23,9 @@ import type { AimeatConfig } from '../../src/config.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
 import { beneficiaryEligibility, putApproval } from '../../src/commerce/beneficiary-release.js';
 import { grantAccountant, listAccountants, resolveFinanceOwner } from '../../src/services/finance/accountant-access.js';
-import { writeNewAgreement } from '../../src/services/compliance-agreements.js';
-import { counterpartyHolds } from '../../src/services/compliance-agreements-access.js';
-import { OptionsSchema, type Agreement } from '../../src/services/compliance-agreements-schemas.js';
+import { writeNewAgreement } from '../../src/services/compliance/agreements.js';
+import { counterpartyHolds } from '../../src/services/compliance/agreements-access.js';
+import { OptionsSchema, type Agreement } from '../../src/services/compliance/agreements-schemas.js';
 
 requirePostgresWhenAsked('name-bound-grants-erasure');
 

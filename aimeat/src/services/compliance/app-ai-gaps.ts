@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-app-ai-gaps.ts
+ * @file src/services/compliance/app-ai-gaps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The AI Act gaps an app's own statements reveal: an app that uses AI and is in no
@@ -14,14 +14,15 @@
  * @structure appAiGaps()
  * @usage const gaps = await appAiGaps(storage, config, usecases, ownerGhii);
  * @version-history
+ *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-app-ai-gaps.ts to src/services/compliance/app-ai-gaps.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-28 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { appAiSignals } from './compliance-app-signals.js';
-import type { ComplianceUseCase } from './compliance-register.js';
-import { readAppDataMap } from './data-map/data-map-store.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { appAiSignals } from './app-signals.js';
+import type { ComplianceUseCase } from './register.js';
+import { readAppDataMap } from '../data-map/data-map-store.js';
 
 /** How many apps are read, as the records-of-processing gaps read them. */
 const APP_SCAN = 1000;

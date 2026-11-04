@@ -1,10 +1,10 @@
 /**
- * @file src/services/compliance-register.ts
+ * @file src/services/compliance/register.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The written half of the operator's compliance picture: what this node is used for,
  *   and how each use is classified. The derived half — provenance, consent, AI usage — lives in
- *   services/compliance-report.ts, and the report is the difference between the two.
+ *   services/compliance/report.ts, and the report is the difference between the two.
  *
  *   THE QUESTION SET IS DATA, AND THE CLASSIFIER PROVES IT. `classifyUseCase` knows no question id
  *   and no class name: it reads `implies` off whatever set it was handed, picks the most severe hit
@@ -35,6 +35,7 @@
  *   const q = await readQuestionnaire(storage, config.nodeId);
  *   const verdict = classifyUseCase(useCase, q);
  * @version-history
+ *   v1.5.1 — 2026-11-05 — Moved unchanged from src/services/compliance-register.ts to src/services/compliance/register.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.5.0 — 2026-10-29 — A question may carry `askedWhen`, a condition on another question's
  *     answer; one whose condition is not met is not asked (`notAsked` in the verdict, askedQuestions).
  *     A stored set takes the shipped conditions for the questions it holds as shipped. Jouni: the
@@ -49,9 +50,9 @@
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { z } from 'zod';
-import { INPUT_LIMITS } from '../models/input-limits.js';
-import type { Storage } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
+import type { Storage } from '../../storage/interface.js';
+import { emitChange } from '../event-bus.js';
 
 export const QUESTIONNAIRE_KEY = 'compliance.questionnaire';
 export const USECASES_KEY = 'compliance.usecases';
@@ -513,7 +514,7 @@ export async function effectiveQuestionnaire(
   storage: Storage, nodeId: string,
 ): Promise<ComplianceQuestionnaire> {
   const stored = await readQuestionnaire(storage, nodeId);
-  const { COMPLIANCE_QUESTIONNAIRE_SEED, builtInQuestionIds } = await import('../data/compliance-questionnaire.js');
+  const { COMPLIANCE_QUESTIONNAIRE_SEED, builtInQuestionIds } = await import('../../data/compliance-questionnaire.js');
   if (!stored) return COMPLIANCE_QUESTIONNAIRE_SEED;
   // A set stored before the shipped questions had conditions (2026-10-29) takes them for every
   // question it still holds as shipped. A question somebody reworded keeps what they wrote, and

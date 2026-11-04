@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-ask-makers.ts
+ * @file src/services/compliance/ask-makers.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node asks the maker of an app that uses AI to answer the EU AI Act questions for
@@ -29,22 +29,23 @@
  *   (compliance-app-reach.ts), so an app with no map, a map in words the node does not know, or
  *   unsaid personal data that others can read is asked about in the same message, AI or not.
  * @version-history
+ *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-ask-makers.ts to src/services/compliance/ask-makers.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.1.0 — 2026-10-29 — Only the questions the node asks of an app count as open (askedWhen); an
  *     app whose data map cannot say who sees its data is asked to fix it in the same message.
  *   v1.0.0 — 2026-10-28 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { appAiSignals } from './compliance-app-signals.js';
-import { appReach } from './compliance-app-reach.js';
-import { askedQuestions, effectiveQuestionnaire, readUseCases, systemGhiiFor } from './compliance-register.js';
-import { readAppDataMap } from './data-map/data-map-store.js';
-import { findOperatorGhii } from './operators.js';
-import { sendDirectMessage } from './message-send.js';
-import { updateRecord } from './record-cas.js';
-import { createT, toLocale } from '../i18n.js';
-import { localAccountName } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { appAiSignals } from './app-signals.js';
+import { appReach } from './app-reach.js';
+import { askedQuestions, effectiveQuestionnaire, readUseCases, systemGhiiFor } from './register.js';
+import { readAppDataMap } from '../data-map/data-map-store.js';
+import { findOperatorGhii } from '../operators.js';
+import { sendDirectMessage } from '../message-send.js';
+import { updateRecord } from '../record-cas.js';
+import { createT, toLocale } from '../../i18n.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
 
 /** Days before the same app is asked again. */
 export const REASK_DAYS = 14;

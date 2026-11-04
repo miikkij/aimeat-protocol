@@ -87,7 +87,7 @@ import { agentBarred } from '../../services/organism-agent-access.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
 import { purgeExceptions } from '../../services/classification/exceptions.js';
-import { removeComplianceDocs } from '../../services/compliance-docs.js';
+import { removeComplianceDocs } from '../../services/compliance/docs.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';

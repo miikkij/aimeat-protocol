@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-schemas.ts
+ * @file src/services/compliance/agreements-schemas.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The shape of a data processing agreement (GDPR art. 28) as the node keeps it (plan
@@ -19,6 +19,7 @@
  *   the inferred types · MEASURE_AREAS
  * @usage const parsed = CreateInputSchema.safeParse(body);
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-agreements-schemas.ts to src/services/compliance/agreements-schemas.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-31 — A review's level may be `test`: a PDF signed elsewhere whose valid signatures all chain to the EU reference wallet's test roots (secaudit2026oct26 outside-02b).
  *   2026-10-29 — A version and an agreement may be `test-signed`: signed in test, not in force, on a node
  *     running production settings (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
@@ -29,8 +30,8 @@
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.1).
  */
 import { z } from 'zod';
-import { INPUT_LIMITS } from '../models/input-limits.js';
-import { isValidEmail } from '../utils/email-validator.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 
 /** The state of one version, in order. `review` means a signed copy arrived and waits for a person. */
 /**

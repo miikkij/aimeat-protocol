@@ -30,7 +30,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { systemGhiiFor } from '../compliance-register.js';
+import { systemGhiiFor } from '../compliance/register.js';
 import { notify } from '../notify.js';
 import { componentBench, componentDigest } from './component.js';
 import { noticeKey, PART_KEY_PREFIX, PART_KEY_RE, type DesignBookPart } from './service.js';

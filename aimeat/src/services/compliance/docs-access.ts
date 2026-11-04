@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-docs-access.ts
+ * @file src/services/compliance/docs-access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may read and who may change a compliance document of a scope (plan
@@ -23,15 +23,16 @@
  *   const a = await complianceDocAccess(storage, { sub, owner, roles, scopes }, scope, 'write');
  *   if (!a.ok) return res.status(a.status).json(error(nodeId, a.code, a.message));
  * @version-history
+ *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-docs-access.ts to src/services/compliance/docs-access.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1).
  */
-import type { Storage } from '../storage/interface.js';
-import { isForeignPrincipal, localAccountName } from '../utils/gaii.js';
-import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
-import { actsForSomeone, askOperator, type OperatorCaller } from './operator-principal.js';
-import { agentBarred } from './organism-agent-access.js';
-import { isOrgManager } from './workspace-access.js';
-import type { ComplianceScope } from './compliance-docs.js';
+import type { Storage } from '../../storage/interface.js';
+import { isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
+import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
+import { actsForSomeone, askOperator, type OperatorCaller } from '../operator-principal.js';
+import { agentBarred } from '../organism-agent-access.js';
+import { isOrgManager } from '../workspace-access.js';
+import type { ComplianceScope } from './docs.js';
 
 export type DocAccess =
   | { ok: true; by: string; operator: boolean; ownerName: string }

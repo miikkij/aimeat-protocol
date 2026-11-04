@@ -28,7 +28,7 @@
  *     undocumented-model path, which is the headline half of the report.
  */
 import { describe, it, expect } from 'vitest';
-import { buildComplianceReport } from '../../src/services/compliance-report.js';
+import { buildComplianceReport } from '../../src/services/compliance/report.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 
@@ -65,7 +65,7 @@ function storageWith(opts: {
 
   return {
     listAllMemoryMeta: async (q: { prefix: string }) => ({ items: Object.keys(memory).filter(k => k.startsWith(q.prefix)).map(key => ({ key })) }),
-    // The records of processing the report's `processing` half lists (services/compliance-docs.ts): none here.
+    // The records of processing the report's `processing` half lists (services/compliance/docs.ts): none here.
     listAllMemory: async () => ({ items: [], total: 0 }),
     // The parties records the data intermediation section reads by key (services/data-intermediation/findings.ts): none here.
     getMemoryByKeysAnyOwner: async () => [],

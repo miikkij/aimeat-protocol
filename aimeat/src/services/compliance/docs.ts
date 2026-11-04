@@ -1,10 +1,10 @@
 /**
- * @file src/services/compliance-docs.ts
+ * @file src/services/compliance/docs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where the compliance documents of plan doc-mvlftkh9zmc9 are kept, for which scope, and
  *   how one is read, replaced, appended to and removed. Who may do any of it is decided in
- *   services/compliance-docs-access.ts; what a valid document is, in compliance-docs-schemas.ts.
+ *   services/compliance/docs-access.ts; what a valid document is, in compliance-docs-schemas.ts.
  *
  *   THREE SCOPES (decisions 10.1, 10.6, 10.10). The node's own documents, an organism's (its creator
  *   or admins keep them) and an app's (its owner keeps them). Which documents a scope has:
@@ -36,15 +36,16 @@
  *   v1.1.0 — 2026-10-24 — patchDocItem(): one entry changed in place, the rest untouched (C7.7).
  *   v1.2.0 — 2026-11-01 — The document `intermediation`, at the node and organism scopes (plan
  *     doc-mvwxcas3dom3, D7.2).
+ *   v1.2.1 — 2026-11-05 — Moved unchanged from src/services/compliance-docs.ts to src/services/compliance/docs.ts (codebase analysis 2026-11-03, item D-h).
  */
-import type { Storage } from '../storage/interface.js';
-import { appSlug } from '../utils/gaii.js';
-import { emitChange } from './event-bus.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { systemGhiiFor } from './compliance-register.js';
+import type { Storage } from '../../storage/interface.js';
+import { appSlug } from '../../utils/gaii.js';
+import { emitChange } from '../event-bus.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { systemGhiiFor } from './register.js';
 import {
   emptyDoc, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs, type ComplianceRequest,
-} from './compliance-docs-schemas.js';
+} from './docs-schemas.js';
 
 export type ComplianceScope =
   | { kind: 'node' }

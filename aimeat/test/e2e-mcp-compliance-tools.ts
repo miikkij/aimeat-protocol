@@ -7,7 +7,7 @@
  *   aimeat_compliance_register_read, aimeat_compliance_register_write and aimeat_compliance_snapshot.
  *
  *   WHY THIS SUITE EXISTS. src/mcp/compliance.ts asks the same question the HTTP routes ask, through
- *   complianceRefusal() in services/compliance-access.ts, and that call is the only thing between an
+ *   complianceRefusal() in services/compliance/access.ts, and that call is the only thing between an
  *   agent session and the report of every account's AI activity: aimeat_compliance_report has no
  *   permission word in the catalog, so every session is offered it and the handler decides. No test
  *   called any of the four tools over MCP (QA audit F17-01), so removing the gate call, or changing

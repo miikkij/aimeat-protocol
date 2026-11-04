@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-docs-ops.ts
+ * @file src/services/compliance/docs-ops.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operations on the compliance documents of plan doc-mvlftkh9zmc9, written once for
@@ -20,28 +20,29 @@
  * @usage
  *   const out = await writeDocOp(deps, caller, 'registers', { scope: 'organism', organism_id }, body, { dryRun });
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-docs-ops.ts to src/services/compliance/docs-ops.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-27 — The register floors take the caller as the keeper whose organisms a register may move
  *     (secaudit2026oct26, compliance-docs:register-containers-not-bound-to-scope).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1–C7.1).
  *   v1.1.0 — 2026-10-24 — patchItemOp() (C7.7).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { COMPLIANCE_DOMAINS } from '../data/compliance-domains.js';
-import { COMPLIANCE_FRAMEWORKS } from '../data/compliance-frameworks.js';
-import { NOT_LEGAL_ADVICE } from '../data/compliance-questionnaire.js';
-import { readNodePolicy } from './classification/policy.js';
-import { packStatus } from './classification/packs.js';
-import type { OperatorCaller } from './operator-principal.js';
-import { complianceDocAccess } from './compliance-docs-access.js';
-import { patchDocItem, readDoc, scopeAllows, writeDoc, SCOPES_OF, type ComplianceScope } from './compliance-docs.js';
-import { applyDomainFloors } from './compliance-domain-floor.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { COMPLIANCE_DOMAINS } from '../../data/compliance-domains.js';
+import { COMPLIANCE_FRAMEWORKS } from '../../data/compliance-frameworks.js';
+import { NOT_LEGAL_ADVICE } from '../../data/compliance-questionnaire.js';
+import { readNodePolicy } from '../classification/policy.js';
+import { packStatus } from '../classification/packs.js';
+import type { OperatorCaller } from '../operator-principal.js';
+import { complianceDocAccess } from './docs-access.js';
+import { patchDocItem, readDoc, scopeAllows, writeDoc, SCOPES_OF, type ComplianceScope } from './docs.js';
+import { applyDomainFloors } from './domain-floor.js';
 import {
   appRegisterDraft, derivedProcessors, frameworkVerdicts, nodeRegistersDraft, organismRegisterDraft, processorsView, transfersOf,
-} from './compliance-derived.js';
-import { scopeGaps, nodeOnlyGaps } from './compliance-scope-gaps.js';
-import { DOC_SCHEMAS, isComplianceDocKind, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs } from './compliance-docs-schemas.js';
+} from './derived.js';
+import { scopeGaps, nodeOnlyGaps } from './scope-gaps.js';
+import { DOC_SCHEMAS, isComplianceDocKind, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs } from './docs-schemas.js';
 
 export class ComplianceDocError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); this.name = 'ComplianceDocError'; }

@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-render.ts
+ * @file src/services/compliance/agreements-render.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The text and the PDF of one version of a data processing agreement (plan
@@ -17,12 +17,13 @@
  * @structure LABELS · canonicalText() · textHashOf() · versionTag() · renderAgreementPdf()
  * @usage const text = canonicalText(agreement, version); const pdf = await renderAgreementPdf(agreement, version);
  * @version-history
+ *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-agreements-render.ts to src/services/compliance/agreements-render.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D2.1).
  */
 import { createHash } from 'node:crypto';
 import PDFDocument from 'pdfkit';
-import { SCC_2021_915, SCC_2021_915_SHA256 } from '../data/legal/eu-scc-2021-915.js';
-import { MEASURE_AREAS, type Agreement, type AgreementParty, type AgreementVersion } from './compliance-agreements-schemas.js';
+import { SCC_2021_915, SCC_2021_915_SHA256 } from '../../data/legal/eu-scc-2021-915.js';
+import { MEASURE_AREAS, type Agreement, type AgreementParty, type AgreementVersion } from './agreements-schemas.js';
 
 type Lang = 'fi' | 'en';
 

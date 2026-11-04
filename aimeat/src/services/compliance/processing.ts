@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-processing.ts
+ * @file src/services/compliance/processing.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The part of the operator's compliance report that plan doc-mvlftkh9zmc9 adds: the
@@ -13,6 +13,7 @@
  * @structure ProcessingSummary · PROCESSING_LIMITS · buildProcessingSummary()
  * @usage const p = await buildProcessingSummary({ storage, config });   // { summary, gaps, limits }
  * @version-history
+ *   v1.2.1 — 2026-11-05 — Moved unchanged from src/services/compliance-processing.ts to src/services/compliance/processing.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.2.0 — 2026-10-29 — `apps` and `apps_by_reach`: every app in one line, with who can see its
  *     personal data and its AI use (compliance-apps-overview.ts), for the report's app table.
  *   v1.1.0 — 2026-10-26 — registers.drafts counts the registers the node can draft where none is
@@ -20,17 +21,17 @@
  *   v1.0.1 — 2026-10-25 — The limit app-scan-listed-only is gone: the scan reads every app now.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.5, C3.6, C4, C5, C6, C7).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { readNodePolicy } from './classification/policy.js';
-import { packStatus, type PackStatus } from './classification/packs.js';
-import { listDocs, readDoc } from './compliance-docs.js';
-import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } from './compliance-derived.js';
-import { nodeWideScopeGaps, type ScopeGap } from './compliance-scope-gaps.js';
-import { registerDrafts } from './compliance-register-drafts.js';
-import type { ComplianceRegister } from './compliance-docs-schemas.js';
-import { appsOverview, type ComplianceAppRow } from './compliance-apps-overview.js';
-import type { AppReach } from './compliance-app-reach.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { readNodePolicy } from '../classification/policy.js';
+import { packStatus, type PackStatus } from '../classification/packs.js';
+import { listDocs, readDoc } from './docs.js';
+import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } from './derived.js';
+import { nodeWideScopeGaps, type ScopeGap } from './scope-gaps.js';
+import { registerDrafts } from './register-drafts.js';
+import type { ComplianceRegister } from './docs-schemas.js';
+import { appsOverview, type ComplianceAppRow } from './apps-overview.js';
+import type { AppReach } from './app-reach.js';
 
 export interface ProcessingSummary {
   registers: {

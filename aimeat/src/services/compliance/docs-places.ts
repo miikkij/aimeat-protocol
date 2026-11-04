@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-docs-places.ts
+ * @file src/services/compliance/docs-places.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description One kind of compliance document across every place that keeps it, for the operator
@@ -18,21 +18,22 @@
  * @structure readAllPlacesOp()
  * @usage const out = await readAllPlacesOp(deps, caller, 'registers');
  * @version-history
+ *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-docs-places.ts to src/services/compliance/docs-places.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.1.0 — 2026-10-26 — Registers: a place that keeps none and has a draft (the installation's own,
  *     an app with personal data) answers the draft, `draft: true` and `may_write: false`.
  *   v1.0.1 — 2026-10-25 — A parked or hidden app is named by its filename too (adminView listing).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.7).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { appSlug, localAccountName } from '../utils/gaii.js';
-import type { OperatorCaller } from './operator-principal.js';
-import { complianceDocAccess } from './compliance-docs-access.js';
-import { listDocs, readDoc, scopeAllows, type ComplianceScope } from './compliance-docs.js';
-import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } from './compliance-derived.js';
-import { COMPLIANCE_DOC_KINDS, isComplianceDocKind, type ComplianceDocKind, type ComplianceDocs } from './compliance-docs-schemas.js';
-import { ComplianceDocError } from './compliance-docs-ops.js';
-import { registerDrafts } from './compliance-register-drafts.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { appSlug, localAccountName } from '../../utils/gaii.js';
+import type { OperatorCaller } from '../operator-principal.js';
+import { complianceDocAccess } from './docs-access.js';
+import { listDocs, readDoc, scopeAllows, type ComplianceScope } from './docs.js';
+import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } from './derived.js';
+import { COMPLIANCE_DOC_KINDS, isComplianceDocKind, type ComplianceDocKind, type ComplianceDocs } from './docs-schemas.js';
+import { ComplianceDocError } from './docs-ops.js';
+import { registerDrafts } from './register-drafts.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 

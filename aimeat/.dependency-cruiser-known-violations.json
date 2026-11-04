@@ -1244,8 +1244,8 @@
   {
     "type": "cycle",
     "from": "src/data/compliance-questionnaire.ts",
-    "to": "src/services/compliance-register.ts",
-    "unresolvedTo": "../services/compliance-register.js",
+    "to": "src/services/compliance/register.ts",
+    "unresolvedTo": "../services/compliance/register.js",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -1257,7 +1257,7 @@
     },
     "cycle": [
       {
-        "name": "src/services/compliance-register.ts",
+        "name": "src/services/compliance/register.ts",
         "dependencyTypes": [
           "local",
           "type-only",

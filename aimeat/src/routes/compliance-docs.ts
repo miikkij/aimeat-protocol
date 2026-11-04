@@ -5,7 +5,7 @@
  * @description The compliance documents over REST (plan doc-mvlftkh9zmc9): the records of processing,
  *   the processors, the data subject requests, the breaches, the impact assessments and the framework
  *   answers, of the node, of an organism and of an app. Each route names the caller and the scope and
- *   hands both to services/compliance-docs-ops.ts, which the MCP tools call too, so who may do what
+ *   hands both to services/compliance/docs-ops.ts, which the MCP tools call too, so who may do what
  *   and what a valid document is are decided once.
  *
  *   THE WORDS. compliance:read to read and compliance:write to write, which no wildcard carries. An
@@ -33,8 +33,8 @@ import type { OperatorCaller } from '../services/operator-principal.js';
 import { callerOf } from '../middleware/caller.js';
 import {
   ComplianceDocError, catalogOp, draftOp, gapsOp, patchItemOp, readDocOp, writeDocOp,
-} from '../services/compliance-docs-ops.js';
-import { readAllPlacesOp } from '../services/compliance-docs-places.js';
+} from '../services/compliance/docs-ops.js';
+import { readAllPlacesOp } from '../services/compliance/docs-places.js';
 
 export function complianceDocsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

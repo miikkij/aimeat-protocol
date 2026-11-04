@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-draft.ts
+ * @file src/services/compliance/draft.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node writes the first draft of its own use-case register, out of what it already
@@ -40,6 +40,7 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.3.1 — 2026-11-05 — Moved unchanged from src/services/compliance-draft.ts to src/services/compliance/draft.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.3.0 — 2026-10-29 — An app that uses AI with no employment or biometric data in its map gets
  *     "none of these" proposed as its Annex III area, so only the transparency questions are asked
  *     of it (askedWhen); each entry carries its verdict, and the count left to answer is of the
@@ -60,15 +61,15 @@
  *     node where a name repeated.
  *   v1.0.0 — 2026-08-23 — BR-02. Replaces the per-model proposal list.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import type { AiProvenanceListQuery, AiProvenanceRecordRow } from '../storage/types/ai-provenance.js';
-import type { ComplianceAnswerSource, ComplianceUseCase } from './compliance-register.js';
-import { classifyUseCase, effectiveQuestionnaire, readUseCases, type ComplianceRiskVerdict } from './compliance-register.js';
-import { appAiSignals } from './compliance-app-signals.js';
-import { readAppDataMap } from './data-map/data-map-store.js';
-import type { AiActStatement } from './data-map/data-map-types.js';
-import { localAccountName } from '../utils/gaii.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import type { AiProvenanceListQuery, AiProvenanceRecordRow } from '../../storage/types/ai-provenance.js';
+import type { ComplianceAnswerSource, ComplianceUseCase } from './register.js';
+import { classifyUseCase, effectiveQuestionnaire, readUseCases, type ComplianceRiskVerdict } from './register.js';
+import { appAiSignals } from './app-signals.js';
+import { readAppDataMap } from '../data-map/data-map-store.js';
+import type { AiActStatement } from '../data-map/data-map-types.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 /** Provenance rows read per draft. Bounded: this is a page of recent activity, not a scan. */
 const PROVENANCE_SAMPLE = 2000;

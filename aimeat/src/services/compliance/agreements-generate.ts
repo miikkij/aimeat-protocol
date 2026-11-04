@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-generate.ts
+ * @file src/services/compliance/agreements-generate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Fills the four annexes of a data processing agreement from what the node already holds
@@ -21,18 +21,19 @@
  * @structure GeneratedAnnexes · generateAnnexes() · operatorParty() · measuresFromConfig() · subprocessorsFor() · DEFAULT_PROCESSING
  * @usage const g = await generateAnnexes({ storage, config }, input);
  * @version-history
+ *   v1.0.2 — 2026-11-05 — Moved unchanged from src/services/compliance-agreements-generate.ts to src/services/compliance/agreements-generate.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.1 — 2026-11-02 — The security measures name the password lock only when auth.sign_in_lockout is on.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.3).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { isValidEmail } from '../utils/email-validator.js';
-import { readDoc } from './compliance-docs.js';
-import { derivedProcessors, processorsView } from './compliance-derived.js';
-import type { ComplianceProcessor, ComplianceRegister } from './compliance-docs-schemas.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { isValidEmail } from '../../utils/email-validator.js';
+import { readDoc } from './docs.js';
+import { derivedProcessors, processorsView } from './derived.js';
+import type { ComplianceProcessor, ComplianceRegister } from './docs-schemas.js';
 import {
   MEASURE_AREAS, type AgreementAnnexes, type AgreementCreateInput, type AgreementParty, type MeasureArea,
-} from './compliance-agreements-schemas.js';
+} from './agreements-schemas.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type Lang = 'fi' | 'en';

@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-access.ts
+ * @file src/services/compliance/agreements-access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may read and who may act on a data processing agreement (plan doc-mvmr4i2wdk0p).
@@ -16,19 +16,20 @@
  * @structure AgreementRole · operatorAccess() · counterpartyHolds() · agreementAccess() · ownerGhiiOf()
  * @usage const who = await agreementAccess(deps, caller, agreement, 'read');
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-agreements-access.ts to src/services/compliance/agreements-access.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-27 — The counterparty is the account that held the name when the operator named it
  *     (counterpartyHolds); a later holder of a released name gets 404 (secaudit2026oct26,
  *     compliance-agreements:counterparty-bound-by-reusable-account-name).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { isForeignPrincipal, localAccountName } from '../utils/gaii.js';
-import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
-import { actsForSomeone, type OperatorCaller } from './operator-principal.js';
-import { complianceDocAccess } from './compliance-docs-access.js';
-import type { Agreement } from './compliance-agreements-schemas.js';
-import { heldSince } from './account-instance.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { isForeignPrincipal, localAccountName } from '../../utils/gaii.js';
+import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
+import { actsForSomeone, type OperatorCaller } from '../operator-principal.js';
+import { complianceDocAccess } from './docs-access.js';
+import type { Agreement } from './agreements-schemas.js';
+import { heldSince } from '../account-instance.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 

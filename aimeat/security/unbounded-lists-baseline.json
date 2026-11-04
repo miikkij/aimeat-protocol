@@ -245,10 +245,10 @@
     "src/services/classification/default-caps.ts": {
       "listOwners": 1
     },
-    "src/services/compliance-draft.ts": {
+    "src/services/compliance/draft.ts": {
       "listAgents": 1
     },
-    "src/services/compliance-monthly-job.ts": {
+    "src/services/compliance/monthly-job.ts": {
       "listOwners": 1
     },
     "src/services/config-at-rest-rows.ts": {

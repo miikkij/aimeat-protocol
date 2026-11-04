@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-domain-floor.ts
+ * @file src/services/compliance/domain-floor.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A register's data domains raise the classification of the containers it names (plan
@@ -29,19 +29,20 @@
  *     organism or one the register's keeper creates or administers; any other is reported
  *     'not-in-scope', with nothing read or written (secaudit2026oct26,
  *     compliance-docs:register-containers-not-bound-to-scope).
+ *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-domain-floor.ts to src/services/compliance/domain-floor.ts (codebase analysis 2026-11-03, item D-h).
  */
-import type { ContentLabelTarget } from '../storage/interface.js';
-import type { AimeatConfig } from '../config.js';
-import { ownerGhiiOf, localAccountOf } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
-import { complianceDomainById } from '../data/compliance-domains.js';
-import { labelById, type ClassificationPolicy } from './classification/defaults.js';
-import { classificationActiveFor, ownerOfScope, policyFor } from './classification/policy.js';
-import { appTarget, organismTarget, workspaceTarget } from './classification/containers.js';
-import { readContentLabel, setLabel, type LabelActor, type ClassificationDeps } from './classification/labels.js';
-import type { ComplianceScope } from './compliance-docs.js';
-import type { ComplianceRegister } from './compliance-docs-schemas.js';
-import { isOrgManager } from './workspace-access.js';
+import type { ContentLabelTarget } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { ownerGhiiOf, localAccountOf } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { complianceDomainById } from '../../data/compliance-domains.js';
+import { labelById, type ClassificationPolicy } from '../classification/defaults.js';
+import { classificationActiveFor, ownerOfScope, policyFor } from '../classification/policy.js';
+import { appTarget, organismTarget, workspaceTarget } from '../classification/containers.js';
+import { readContentLabel, setLabel, type LabelActor, type ClassificationDeps } from '../classification/labels.js';
+import type { ComplianceScope } from './docs.js';
+import type { ComplianceRegister } from './docs-schemas.js';
+import { isOrgManager } from '../workspace-access.js';
 
 export interface FloorOutcome {
   register: string;

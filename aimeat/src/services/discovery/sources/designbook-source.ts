@@ -24,7 +24,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { Storage, MemoryRecord } from '../../../storage/interface.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
 import { normalizeVisibility, toFullOwner } from '../normalize.js';
-import { systemGhiiFor } from '../../compliance-register.js';
+import { systemGhiiFor } from '../../compliance/register.js';
 import { PART_KEY_PREFIX, PART_KEY_RE, type DesignBookPart } from '../../design-book/service.js';
 import { componentBench } from '../../design-book/component.js';
 

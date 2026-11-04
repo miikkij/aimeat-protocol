@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-derived.ts
+ * @file src/services/compliance/derived.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the node can say about the compliance documents from what it already holds, so
@@ -23,6 +23,7 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.5.3 — 2026-11-05 — Moved unchanged from src/services/compliance-derived.ts to src/services/compliance/derived.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.5.2 — 2026-11-01 — The note also names the model that reads pictures, when it is another one.
  *   v1.5.1 — 2026-11-01 — A region row's note names the node's default model (Jouni, 2026-11-01 02.54).
  *   v1.5.0 — 2026-11-01 — Each OpenRouter region row carries its transfer basis (eu: adequacy for the
@@ -44,10 +45,10 @@
  *     a cloud region ("Sweden Central (EU/EEA)") is read for the member state in it.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.3, C1.4, C1.6, C4.1, C4.2, C6).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { nodeAiProviders, NODE_OPENROUTER_ID } from './ai/providers.js';
-import { nodePictureModel, nodeTextModel, regionModeOf, regionsInUse, REGION_COUNTRY, REGION_HOSTS, type OpenRouterRegion } from './ai/openrouter-region.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { nodeAiProviders, NODE_OPENROUTER_ID } from '../ai/providers.js';
+import { nodePictureModel, nodeTextModel, regionModeOf, regionsInUse, REGION_COUNTRY, REGION_HOSTS, type OpenRouterRegion } from '../ai/openrouter-region.js';
 
 /** What each region's transfer basis rests on, as the records of processing state it. */
 const REGION_TRANSFER_NOTE: Readonly<Record<OpenRouterRegion, string>> = {
@@ -55,13 +56,13 @@ const REGION_TRANSFER_NOTE: Readonly<Record<OpenRouterRegion, string>> = {
   us: 'Prompts and answers are processed in the United States, under the SCC in OpenRouter\'s data processing agreement.',
   any: 'Prompts and answers can be processed by the model\'s provider in any country; transfers outside the EEA rest on the SCC in OpenRouter\'s data processing agreement.',
 };
-import { readAppDataMap } from './data-map/data-map-store.js';
-import { appAiSignals } from './compliance-app-signals.js';
-import { appReach, type AppReachReading } from './compliance-app-reach.js';
-import { classifyUseCase, type ComplianceRiskVerdict } from './compliance-register.js';
-import { COMPLIANCE_FRAMEWORKS } from '../data/compliance-frameworks.js';
-import type { ComplianceFrameworkAnswers, ComplianceProcessor, ComplianceRegister } from './compliance-docs-schemas.js';
-import type { DataMapRow } from './data-map/data-map-types.js';
+import { readAppDataMap } from '../data-map/data-map-store.js';
+import { appAiSignals } from './app-signals.js';
+import { appReach, type AppReachReading } from './app-reach.js';
+import { classifyUseCase, type ComplianceRiskVerdict } from './register.js';
+import { COMPLIANCE_FRAMEWORKS } from '../../data/compliance-frameworks.js';
+import type { ComplianceFrameworkAnswers, ComplianceProcessor, ComplianceRegister } from './docs-schemas.js';
+import type { DataMapRow } from '../data-map/data-map-types.js';
 
 const EVIDENCE = 'evidence' as const;
 

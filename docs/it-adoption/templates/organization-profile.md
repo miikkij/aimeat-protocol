@@ -30,14 +30,14 @@ Fill this profile first: the other templates and the numbered pages refer to it.
 | Supervisory authority | [ORGANIZATION] *Name and URL of the data protection authority for the operator.* | `AIMEAT_OPERATOR_SUPERVISORY_NAME`, `AIMEAT_OPERATOR_SUPERVISORY_URL` |
 | Upstream project security contact | Fixed: the maintainer named in `.github/SECURITY.md` | Reports about AIMEAT itself, not about your installation |
 
-The operator name and email feed the controller field of the node's own register drafts (`aimeat/src/services/compliance-derived.ts`).
+The operator name and email feed the controller field of the node's own register drafts (`aimeat/src/services/compliance/derived.ts`).
 
 ## 3. Installation environment
 
 | Field | Answer | AIMEAT fact and source |
 |---|---|---|
 | Hosting model | [ORGANIZATION] *On-premises, private cloud or public cloud, and the provider.* | AIMEAT needs no vendor-hosted component; it is one Node.js process ([02 Architecture](../02-architecture.md)) |
-| Hosting provider and location | [ORGANIZATION] *Provider name and country, e.g. "own data centre, Finland".* | `AIMEAT_OPERATOR_HOSTING_NAME`, `AIMEAT_OPERATOR_HOSTING_LOCATION`; the node lists the hosting as a processor when set (`aimeat/src/services/compliance-derived.ts`) |
+| Hosting provider and location | [ORGANIZATION] *Provider name and country, e.g. "own data centre, Finland".* | `AIMEAT_OPERATOR_HOSTING_NAME`, `AIMEAT_OPERATOR_HOSTING_LOCATION`; the node lists the hosting as a processor when set (`aimeat/src/services/compliance/derived.ts`) |
 | Installation method | [ORGANIZATION] *npm package, from source, Docker, or systemd unit.* | npm, source and Docker: [upgrading](../../operations/upgrading.md); unit file `aimeat/deploy/aimeat.service`; images `aimeat/Dockerfile`, `aimeat/docker-compose.yml` |
 | Operating system | [ORGANIZATION] *Distribution and version, e.g. "Ubuntu 24.04 LTS".* | The unit file assumes Linux with systemd and libjemalloc2 (`aimeat/deploy/aimeat.service`) |
 | Node.js runtime | [ORGANIZATION] *Installed version; must satisfy the engines field.* | Node.js 24.22.1 or newer (`aimeat/package.json`, `engines`) |
@@ -70,7 +70,7 @@ The operator name and email feed the controller field of the node's own register
 | Other providers | [ORGANIZATION] *Each provider, its base URL and its data processing agreement.* | Operator records `AIMEAT_AI_PROVIDERS`; vendor types reach only fixed addresses, narrowed with `AIMEAT_AI_PROVIDER_TYPES` (`aimeat/src/services/ai/providers.ts`) |
 | Local models on the server | [ORGANIZATION] *lmstudio, ollama, llamacpp, or none.* | `AIMEAT_AI_BUILTIN_PROVIDERS`; a provider counts as local at a loopback address, or, for a provider the operator configures, at an internal origin listed in `AIMEAT_AI_PROVIDER_EGRESS`, although the data then crosses the network (`aimeat/src/services/ai/providers.ts`) |
 | Hosts an AI base URL may point at | [ORGANIZATION] *Comma-separated host allowlist.* | `AIMEAT_AI_PROVIDER_ALLOWLIST`; empty triggers a startup warning on a public node (`aimeat/.env.example`) |
-| Email relay | [ORGANIZATION] *SMTP host, port, and whether it is an outside provider.* | `AIMEAT_SMTP_HOST`; listed as a processor when set (`aimeat/src/services/compliance-derived.ts`); [bookkeeping, email delivery](../../operations/bookkeeping.md) |
+| Email relay | [ORGANIZATION] *SMTP host, port, and whether it is an outside provider.* | `AIMEAT_SMTP_HOST`; listed as a processor when set (`aimeat/src/services/compliance/derived.ts`); [bookkeeping, email delivery](../../operations/bookkeeping.md) |
 
 Detail and the transfer consequences: [06 AI and models](../06-ai-and-models.md).
 
@@ -84,7 +84,7 @@ Classification is off on a new node (`AIMEAT_CLASSIFICATION`, values `off`, `own
 | Your own labels inside those levels | [ORGANIZATION] *Label names, the level each sits in, and who may read it.* | Labels with an audience and detection rules, at node, owner or organism level (`aimeat/src/services/classification/levels.ts`) |
 | Finnish security classes (TL IV to TL I) | [ORGANIZATION] *yes or no, and the highest class switched on (upTo).* | Pack `tl` (`aimeat/src/data/classification-packs.ts`) |
 | NATO classes (NATO RESTRICTED to COSMIC TOP SECRET) | [ORGANIZATION] *yes or no, and the highest class switched on.* | Pack `nato` (`aimeat/src/data/classification-packs.ts`) |
-| Accreditation of this installation | [ORGANIZATION] *Accreditation decision and authority, or "not accredited".* | The packs mark and restrict content; they do not make the node an accredited system (`aimeat/src/services/compliance-processing.ts`, limit `not-accredited`) |
+| Accreditation of this installation | [ORGANIZATION] *Accreditation decision and authority, or "not accredited".* | The packs mark and restrict content; they do not make the node an accredited system (`aimeat/src/services/compliance/processing.ts`, limit `not-accredited`) |
 
 ## 7. Applicable regulations
 

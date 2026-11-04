@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements.ts
+ * @file src/services/compliance/agreements.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Where the node keeps its data processing agreements and how one is read and changed
@@ -19,6 +19,7 @@
  *   finalizeNotices() · releaseCounterpartyAccount() · historyEntry()
  * @usage const a = await updateAgreement(storage, nodeId, id, cur => ({ ...cur, ... }));
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-agreements.ts to src/services/compliance/agreements.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-29 — statusOf and summaryOf read a version signed only in test (`test-signed`): the agreement
  *     reads `test-signed` unless an earlier version is in force, and the operator acts next
  *     (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
@@ -28,12 +29,12 @@
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.1, D2.3).
  */
 import { randomBytes } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { emitChange } from './event-bus.js';
-import { updateRecord, UNCHANGED } from './record-cas.js';
-import { systemGhiiFor } from './compliance-register.js';
-import { AgreementSchema, type Agreement, type AgreementStatus, type AgreementVersion } from './compliance-agreements-schemas.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { emitChange } from '../event-bus.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { systemGhiiFor } from './register.js';
+import { AgreementSchema, type Agreement, type AgreementStatus, type AgreementVersion } from './agreements-schemas.js';
 
 export const AGREEMENT_PREFIX = 'compliance.agreement.';
 const ID = /^dpa-[a-z0-9]{6,20}$/;

@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-08-23 — Initial: the four caller shapes, either side of the operator line.
  */
 import { describe, it, expect } from 'vitest';
-import { complianceRefusal } from '../../src/services/compliance-access.js';
+import { complianceRefusal } from '../../src/services/compliance/access.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 const SCOPE = 'compliance:read';

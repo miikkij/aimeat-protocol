@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   askedQuestions, classifyUseCase, effectiveQuestionnaire, QuestionnaireSchema, type ComplianceQuestionnaire,
-} from '../../src/services/compliance-register.js';
+} from '../../src/services/compliance/register.js';
 import { COMPLIANCE_QUESTIONNAIRE_SEED } from '../../src/data/compliance-questionnaire.js';
 import { askedQuestions as pageAsked } from '../../public/views/admin/compliance-tab.gaps.js';
 import type { Storage } from '../../src/storage/interface.js';

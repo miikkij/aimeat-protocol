@@ -65,7 +65,7 @@
 import { DESIGN_BOOK_GEOMETRY_JS } from './measure.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { systemGhiiFor } from '../compliance-register.js';
+import { systemGhiiFor } from '../compliance/register.js';
 import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.js';
 import { takeHeadlessSlot, HEADLESS_BUSY_MESSAGE } from '../headless-slots.js';
 import { serveDocumentOnce, type HeadlessRoutable } from '../headless-network.js';

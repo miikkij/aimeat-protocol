@@ -163,4 +163,4 @@ What the repository does not answer. Each one names who can answer it; most are 
 
 ### [Template: record of processing activities (GDPR Article 30)](templates/processing-record.md)
 
-- OPEN: How long does the node keep the sign-in and security log and the AI usage ledger in its database, and is either one pruned by a scheduled job? The node's drafts for `node-security-log` and `node-ai-usage` state no retention (`aimeat/src/services/compliance-derived.ts`). The maintainer named in `.github/SECURITY.md` can answer.
+- OPEN: How long does the node keep the sign-in and security log and the AI usage ledger in its database, and is either one pruned by a scheduled job? The node's drafts for `node-security-log` and `node-ai-usage` state no retention (`aimeat/src/services/compliance/derived.ts`). The maintainer named in `.github/SECURITY.md` can answer.

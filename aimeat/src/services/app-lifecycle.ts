@@ -131,7 +131,7 @@ import type { AppOwnerScope } from './app-owner-scope.js';
 import { publishExposure } from './app-publish-exposure.js';
 import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
 import type { PublishAsk } from './publish-requests/ask.js';
-import { removeComplianceDocs } from './compliance-docs.js';
+import { removeComplianceDocs } from './compliance/docs.js';
 import { holdAppLabels } from './held-app-labels.js';
 import { deleteAppPlan } from './app-plan.js';
 import { managedIntakeForms } from './app-intake-forms.js';

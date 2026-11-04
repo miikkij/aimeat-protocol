@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-notify.ts
+ * @file src/services/compliance/agreements-notify.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Every step of a data processing agreement tells the party it concerns (plan
@@ -27,6 +27,7 @@
  * @structure AgreementEvent · tellAgreement()
  * @usage const told = await tellAgreement(deps, agreement, 'sent', { pdf });
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-agreements-notify.ts to src/services/compliance/agreements-notify.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.0.3 — 2026-11-04 — Both sides' mail goes through mail-gate.ts sendMail: the contact the operator
@@ -38,17 +39,17 @@
  *     (owner-mail-address.ts); `contactEmail` is unchanged (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D4.3).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { notify } from './notify.js';
-import { nodeContext } from './node-context.js';
-import { provenOwnerAddress } from './owner-mail-address.js';
-import { sendMail, type MailIntent, type MailMessage } from './mail-gate.js';
-import { wrapHtml, esc } from './email-templates.js';
-import { displayPrefsFor, formatForPerson } from './display-prefs.js';
-import { inForce, newest } from './compliance-agreements.js';
-import type { Agreement } from './compliance-agreements-schemas.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { notify } from '../notify.js';
+import { nodeContext } from '../node-context.js';
+import { provenOwnerAddress } from '../owner-mail-address.js';
+import { sendMail, type MailIntent, type MailMessage } from '../mail-gate.js';
+import { wrapHtml, esc } from '../email-templates.js';
+import { displayPrefsFor, formatForPerson } from '../display-prefs.js';
+import { inForce, newest } from './agreements.js';
+import type { Agreement } from './agreements-schemas.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type Lang = 'fi' | 'en';

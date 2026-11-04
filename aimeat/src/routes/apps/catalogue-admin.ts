@@ -86,7 +86,7 @@ import { stripLegalContent } from '../../services/app-legal.js';
 import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
-import { removeComplianceDocs } from '../../services/compliance-docs.js';
+import { removeComplianceDocs } from '../../services/compliance/docs.js';
 import { listedScreenshotUrl } from './open.js';
 
 export function registerCatalogueAdminRoutes(

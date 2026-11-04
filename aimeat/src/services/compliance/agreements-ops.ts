@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-ops.ts
+ * @file src/services/compliance/agreements-ops.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The operations on data processing agreements (plan doc-mvmr4i2wdk0p, D1–D4), written
@@ -17,35 +17,36 @@
  *   endOp · deletionDoneOp · breachNoticeOp · documentOp · changedParts
  * @usage const out = await createOp(deps, caller, body, { dryRun: true });
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-agreements-ops.ts to src/services/compliance/agreements-ops.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-27 — createOp and patchOp record when the counterparty account was named
  *     (counterpartyNamedAt); patchOp checks a new counterparty account as createOp does; mineOp lists
  *     only agreements whose counterparty is the account that holds the name now (secaudit2026oct26,
  *     compliance-agreements:counterparty-bound-by-reusable-account-name).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1–D4).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import type { CallerContext } from './caller-context.js';
-import { UNCHANGED } from './record-cas.js';
-import { writeStorageFile } from './storage-file-write.js';
-import { createRequest } from './docsign/records.js';
-import { documentHash } from './docsign/records.js';
-import { SCC_2021_915_SHA256 } from '../data/legal/eu-scc-2021-915.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import type { CallerContext } from '../caller-context.js';
+import { UNCHANGED } from '../record-cas.js';
+import { writeStorageFile } from '../storage-file-write.js';
+import { createRequest } from '../docsign/records.js';
+import { documentHash } from '../docsign/records.js';
+import { SCC_2021_915_SHA256 } from '../../data/legal/eu-scc-2021-915.js';
 import {
   CreateInputSchema, PatchInputSchema, OptionsSchema,
   type Agreement, type AgreementAnnexes, type AgreementCreateInput, type AgreementVersion,
-} from './compliance-agreements-schemas.js';
+} from './agreements-schemas.js';
 import {
   historyEntry, inForce, listAgreements, newAgreementId, newest, readAgreement, statusOf, summaryOf, updateAgreement, writeNewAgreement,
-} from './compliance-agreements.js';
-import { AgreementError, agreementAccess, counterpartyHolds, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
-import { generateAnnexes, measuresFromConfig, operatorParty, subprocessorsFor } from './compliance-agreements-generate.js';
-import { canonicalText, renderAgreementPdf, textHashOf } from './compliance-agreements-render.js';
-import { tellAgreement } from './compliance-agreements-notify.js';
-import { syncDocsign } from './compliance-agreements-sign.js';
-import { readDoc } from './compliance-docs.js';
-import { derivedProcessors, processorsView } from './compliance-derived.js';
+} from './agreements.js';
+import { AgreementError, agreementAccess, counterpartyHolds, operatorAccess, ownerGhiiOf } from './agreements-access.js';
+import { generateAnnexes, measuresFromConfig, operatorParty, subprocessorsFor } from './agreements-generate.js';
+import { canonicalText, renderAgreementPdf, textHashOf } from './agreements-render.js';
+import { tellAgreement } from './agreements-notify.js';
+import { syncDocsign } from './agreements-sign.js';
+import { readDoc } from './docs.js';
+import { derivedProcessors, processorsView } from './derived.js';
 
 export type Deps = { storage: Storage; config: AimeatConfig };
 

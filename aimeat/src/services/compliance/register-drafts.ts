@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-register-drafts.ts
+ * @file src/services/compliance/register-drafts.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The registers the node can draft and nobody has stored yet, for the operator's
@@ -14,17 +14,18 @@
  * @structure APP_SCAN · registerDrafts() · appPartiesRegister()
  * @usage const drafts = await registerDrafts({ storage, config }, await listDocs(storage, nodeId, 'registers'));
  * @version-history
+ *   v1.1.1 — 2026-11-05 — Moved unchanged from src/services/compliance-register-drafts.ts to src/services/compliance/register-drafts.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.1.0 — 2026-11-01 — An app with people registered to it as outside parties, or with its signup
  *     open, drafts a register of them (appPartiesRegister; plan doc-mvwxcas3dom3, D4.4).
  *   v1.0.0 — 2026-10-26 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { appSlug, localAccountName } from '../utils/gaii.js';
-import type { ComplianceScope } from './compliance-docs.js';
-import { appRegisterDraft, nodeRegistersDraft } from './compliance-derived.js';
-import type { ComplianceRegister } from './compliance-docs-schemas.js';
-import { readAppParties, signupOpen } from './app-parties/store.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { appSlug, localAccountName } from '../../utils/gaii.js';
+import type { ComplianceScope } from './docs.js';
+import { appRegisterDraft, nodeRegistersDraft } from './derived.js';
+import type { ComplianceRegister } from './docs-schemas.js';
+import { readAppParties, signupOpen } from '../app-parties/store.js';
 
 /** How many apps are read, as the gap scan reads them (compliance-scope-gaps.ts). */
 const APP_SCAN = 1000;

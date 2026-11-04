@@ -24,7 +24,7 @@
 import type { Storage } from '../storage/interface.js';
 import { deleteApprovalOf } from '../commerce/beneficiary-release.js';
 import { removeAccountantEverywhere } from './finance/accountant-access.js';
-import { releaseCounterpartyAccount } from './compliance-agreements.js';
+import { releaseCounterpartyAccount } from './compliance/agreements.js';
 
 /** Clear the three records for the erased `name`. Answers what changed, per kind. */
 export async function eraseNameBoundGrants(

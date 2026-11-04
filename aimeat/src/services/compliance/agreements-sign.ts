@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-sign.ts
+ * @file src/services/compliance/agreements-sign.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How a data processing agreement gets its signatures (plan doc-mvmr4i2wdk0p, D3), four
@@ -24,6 +24,7 @@
  * @structure docsignLevel · signedLine · signedPdfLevel · acceptedCopyLevel · testSignaturesInForce · completeIfSigned · syncDocsign · signedCopyOp · confirmOp
  * @usage const a = await syncDocsign(deps, agreement);
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-agreements-sign.ts to src/services/compliance/agreements-sign.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-31 — A PDF signed elsewhere whose only valid signatures chain to the EU reference wallet's test roots is reviewed and recorded with the level `test`, not `advanced` (signedPdfLevel); on production settings the version it completes is `test-signed`, as a test wallet signature's is (secaudit2026oct26 outside-02b).
  *   2026-10-29 — On a node running production settings (test mode and dev mode off), a version a test wallet signature completed is `test-signed`, signed in test and not in force: the version before it stays in force and no in-force notice goes out. Test and development settings keep the round 8 flow (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — A wallet signature on the EU reference wallet's test roots is recorded with the level `test`, not `advanced`, and its history line and the in-force line say it has no legal effect; the flow is unchanged (secaudit2026oct26, syncDocsign:test-anchor-wallet-signature-as-advanced).
@@ -35,23 +36,23 @@
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D3).
  */
 import { createHash } from 'node:crypto';
-import type { AimeatConfig } from '../config.js';
-import { writeStorageFile } from './storage-file-write.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import type { CallerContext } from './caller-context.js';
-import { UNCHANGED } from './record-cas.js';
-import { readRequestRecord } from './docsign/records.js';
-import { readOwnFile } from './docsign/files.js';
-import { validatePdf, type ValidationReport } from './docsign/validate.js';
-import { completeForOwner } from './ai/completion.js';
-import { readerFor } from './classification/reader.js';
-import { fileTarget } from './classification/labels.js';
-import type { Agreement, AgreementReview, AgreementSignature, AgreementVersion } from './compliance-agreements-schemas.js';
-import { historyEntry, newest, readAgreement, updateAgreement } from './compliance-agreements.js';
-import { AgreementError, agreementAccess, counterpartyHolds, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
-import { versionTag } from './compliance-agreements-render.js';
-import { tellAgreement } from './compliance-agreements-notify.js';
+import type { AimeatConfig } from '../../config.js';
+import { writeStorageFile } from '../storage-file-write.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import type { CallerContext } from '../caller-context.js';
+import { UNCHANGED } from '../record-cas.js';
+import { readRequestRecord } from '../docsign/records.js';
+import { readOwnFile } from '../docsign/files.js';
+import { validatePdf, type ValidationReport } from '../docsign/validate.js';
+import { completeForOwner } from '../ai/completion.js';
+import { readerFor } from '../classification/reader.js';
+import { fileTarget } from '../classification/labels.js';
+import type { Agreement, AgreementReview, AgreementSignature, AgreementVersion } from './agreements-schemas.js';
+import { historyEntry, newest, readAgreement, updateAgreement } from './agreements.js';
+import { AgreementError, agreementAccess, counterpartyHolds, operatorAccess, ownerGhiiOf } from './agreements-access.js';
+import { versionTag } from './agreements-render.js';
+import { tellAgreement } from './agreements-notify.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 type Party = 'controller' | 'processor';

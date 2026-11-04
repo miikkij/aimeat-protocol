@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-monthly-job.ts
+ * @file src/services/compliance/monthly-job.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The scheduled monthly compliance report: build last month, store it, tell the
@@ -34,6 +34,7 @@
  *   - saveComplianceSnapshot(config, storage, opts) — keep the report as it stands right now
  * @usage registered as the core handler `compliance-report-monthly` in services/core-jobs.ts
  * @version-history
+ *   2026-11-05 — Moved unchanged from src/services/compliance-monthly-job.ts to src/services/compliance/monthly-job.ts (codebase analysis 2026-11-03, item D-h).
  *   2026-10-16 — The months to write are decided by the newest stored monthly report: a late run
  *     makes up the month it owes (at most three), a month already stored is not written or
  *     announced again (QA audit E4-07).
@@ -44,13 +45,13 @@
  *     report, so a person who wanted this moment had to wait for the first of next month.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { buildComplianceReport } from './compliance-report.js';
-import { writeStoredReport, snapshotIdFor, listStoredReports } from './compliance-register.js';
-import { notify } from './notify.js';
-import { logger } from '../utils/logger.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { buildComplianceReport } from './report.js';
+import { writeStoredReport, snapshotIdFor, listStoredReports } from './register.js';
+import { notify } from '../notify.js';
+import { logger } from '../../utils/logger.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
 
 /** `YYYY-MM` of the calendar month before `now`, in UTC. */
 export function previousMonth(now: Date): string {

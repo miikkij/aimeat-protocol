@@ -23,7 +23,7 @@ import {
   regionChoiceFor, decideRegion, regionsInUse, allowedRegions, resetRegionModelsForTests,
   regionModeOf, regionSettingsOf, euOnlyModelFor, EU_ONLY_TEXT_MODEL, freeModelOf, freeLastResortOf, regionDeclaration, nodeTextModel, nodePictureModel,
 } from '../../src/services/ai/openrouter-region.js';
-import { derivedProcessors } from '../../src/services/compliance-derived.js';
+import { derivedProcessors } from '../../src/services/compliance/derived.js';
 import { nodeOpenRouterKey } from '../../src/services/ai/node-openrouter-key.js';
 import { nodeAiProviders, NODE_OPENROUTER_ID } from '../../src/services/ai/providers.js';
 import { aiRegionNotice } from '../../src/services/privacy-ai-region.js';

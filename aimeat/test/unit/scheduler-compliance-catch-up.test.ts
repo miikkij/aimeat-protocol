@@ -29,16 +29,16 @@ vi.mock('../../src/utils/logger.js', async (importOriginal) => {
 vi.mock('../../src/services/notify.js', () => ({
     notify: vi.fn(async (_s: unknown, _to: string, input: { title: string }) => { told.push(input.title); return {}; }),
 }));
-vi.mock('../../src/services/compliance-report.js', () => ({
+vi.mock('../../src/services/compliance/report.js', () => ({
     buildComplianceReport: vi.fn(async () => ({ gaps: [], register: { usecases: [] } })),
 }));
-vi.mock('../../src/services/compliance-register.js', () => ({
+vi.mock('../../src/services/compliance/register.js', () => ({
     writeStoredReport: vi.fn(async (_s: unknown, _n: string, id: string) => { written.push(id); }),
     snapshotIdFor: vi.fn(() => 'x'),
     listStoredReports: vi.fn(async () => storedReports),
 }));
 
-const { runComplianceMonthlyReport, monthsOwed } = await import('../../src/services/compliance-monthly-job.js');
+const { runComplianceMonthlyReport, monthsOwed } = await import('../../src/services/compliance/monthly-job.js');
 
 const storage = { listOwners: async () => [{ name: 'op', roles: ['owner', 'operator'] }] } as unknown as Storage;
 const config = { nodeId: 'node-test' } as AimeatConfig;

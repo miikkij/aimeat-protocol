@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-agreements-gaps.ts
+ * @file src/services/compliance/agreements-gaps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What the node's data processing agreements leave open, and the hourly sweep that keeps
@@ -17,22 +17,23 @@
  * @structure AgreementGap · agreementGaps() · sweepAgreements() · scheduleAgreementSweep()
  * @usage const gaps = await agreementGaps(deps);
  * @version-history
+ *   v1.1.1 -- 2026-11-05 -- Moved unchanged from src/services/compliance-agreements-gaps.ts to src/services/compliance/agreements-gaps.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.1.0 -- 2026-11-04 -- The hourly sweep runs in one node process per round (process-lease.ts
  *     claimedSweep; codebase analysis 2026-11-03, item HA 2.7).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D4).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
-import { claimedSweep } from './process-lease.js';
-import { UNCHANGED } from './record-cas.js';
-import { readDoc } from './compliance-docs.js';
-import { derivedProcessors, processorsView } from './compliance-derived.js';
-import { MEASURE_AREAS, type Agreement } from './compliance-agreements-schemas.js';
-import { finalizeNotices, historyEntry, inForce, listAgreements, newest, statusOf, updateAgreement } from './compliance-agreements.js';
-import { subprocessorsFor } from './compliance-agreements-generate.js';
-import { tellAgreement } from './compliance-agreements-notify.js';
-import { syncDocsign } from './compliance-agreements-sign.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { logger } from '../../utils/logger.js';
+import { claimedSweep } from '../process-lease.js';
+import { UNCHANGED } from '../record-cas.js';
+import { readDoc } from './docs.js';
+import { derivedProcessors, processorsView } from './derived.js';
+import { MEASURE_AREAS, type Agreement } from './agreements-schemas.js';
+import { finalizeNotices, historyEntry, inForce, listAgreements, newest, statusOf, updateAgreement } from './agreements.js';
+import { subprocessorsFor } from './agreements-generate.js';
+import { tellAgreement } from './agreements-notify.js';
+import { syncDocsign } from './agreements-sign.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 const DAY = 86_400_000;

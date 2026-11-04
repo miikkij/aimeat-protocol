@@ -50,7 +50,7 @@ import {
 import { isValidAgentName } from '../../utils/gaii.js';
 import { complianceDomainById } from '../../data/compliance-domains.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { appAiSignals } from '../compliance-app-signals.js';
+import { appAiSignals } from '../compliance/app-signals.js';
 
 /** Findings, worst first. The order is the order a reader should care. */
 export const FINDING_CODES = [

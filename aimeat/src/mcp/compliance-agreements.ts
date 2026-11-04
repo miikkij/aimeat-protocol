@@ -21,12 +21,12 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { withCaughtError } from './tool-fault.js';
-import { AgreementError, operatorAccess } from '../services/compliance-agreements-access.js';
+import { AgreementError, operatorAccess } from '../services/compliance/agreements-access.js';
 import {
   breachNoticeOp, createOp, deletionDoneOp, documentOp, endOp, getOp, listOp, mineOp, newVersionOp, noticeOp, objectOp, patchOp, sendOp,
-} from '../services/compliance-agreements-ops.js';
-import { confirmOp, signedCopyOp } from '../services/compliance-agreements-sign.js';
-import { agreementGaps } from '../services/compliance-agreements-gaps.js';
+} from '../services/compliance/agreements-ops.js';
+import { confirmOp, signedCopyOp } from '../services/compliance/agreements-sign.js';
+import { agreementGaps } from '../services/compliance/agreements-gaps.js';
 
 export function registerComplianceAgreementTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
   const deps = { storage, config };

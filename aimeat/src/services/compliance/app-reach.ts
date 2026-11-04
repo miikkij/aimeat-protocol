@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-app-reach.ts
+ * @file src/services/compliance/app-reach.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who can see an app's personal data, read from the app's own data map: nobody (it is
@@ -32,9 +32,10 @@
  * @structure AppReach · REACH_ORDER · AppReachReading · appReach()
  * @usage const r = appReach(map); if (r.reach === 'self') // no app register
  * @version-history
+ *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-app-reach.ts to src/services/compliance/app-reach.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-29 — Initial.
  */
-import type { DataMap, DataMapRow } from './data-map/data-map-types.js';
+import type { DataMap, DataMapRow } from '../data-map/data-map-types.js';
 
 /**
  * Who can see the app's personal data. `none`: it is not kept on the node (no personal data, or

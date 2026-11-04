@@ -45,16 +45,16 @@ import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor, type MapCheck } from './data-map-check.js';
 import { DATA_MAP_SPEC, type AiActStatement, type DataMap, type DataMapStamp, type InvitesStatement, type RegistersStatement } from './data-map-types.js';
 import { readAppParties, signupOpen } from '../app-parties/store.js';
-import { appAiSignals } from '../compliance-app-signals.js';
-import { askedQuestions, effectiveQuestionnaire, type ComplianceQuestion } from '../compliance-register.js';
+import { appAiSignals } from '../compliance/app-signals.js';
+import { askedQuestions, effectiveQuestionnaire, type ComplianceQuestion } from '../compliance/register.js';
 import { builtInQuestionIds } from '../../data/compliance-questionnaire.js';
 import { parseAppScopes } from '../protected-resource.js';
 import type { CallerContext } from '../caller-context.js';
 import { readsAsOwner, visibleToSameOwnerReader, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
 import { organismReadableRecords } from '../organism-namespace-access.js';
 import { ecoMayReadKey } from '../ecosystem-access.js';
-import { readDoc } from '../compliance-docs.js';
-import type { ComplianceRegister } from '../compliance-docs-schemas.js';
+import { readDoc } from '../compliance/docs.js';
+import type { ComplianceRegister } from '../compliance/docs-schemas.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };

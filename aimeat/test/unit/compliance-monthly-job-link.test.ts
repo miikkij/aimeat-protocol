@@ -23,16 +23,16 @@ const sent: Array<{ to: string; link?: string }> = [];
 vi.mock('../../src/services/notify.js', () => ({
   notify: vi.fn(async (_s: unknown, to: string, input: { link?: string }) => { sent.push({ to, link: input.link }); return {}; }),
 }));
-vi.mock('../../src/services/compliance-report.js', () => ({
+vi.mock('../../src/services/compliance/report.js', () => ({
   buildComplianceReport: vi.fn(async () => ({ gaps: [{}], register: { usecases: [] } })),
 }));
-vi.mock('../../src/services/compliance-register.js', () => ({
+vi.mock('../../src/services/compliance/register.js', () => ({
   writeStoredReport: vi.fn(async () => {}),
   snapshotIdFor: vi.fn(() => 'x'),
   listStoredReports: vi.fn(async () => []),
 }));
 
-const { runComplianceMonthlyReport } = await import('../../src/services/compliance-monthly-job.js');
+const { runComplianceMonthlyReport } = await import('../../src/services/compliance/monthly-job.js');
 
 /** The paths the SPA router serves a view on, read from its route table in spa.html. */
 function spaRoutes(): Set<string> {

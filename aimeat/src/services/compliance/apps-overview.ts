@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-apps-overview.ts
+ * @file src/services/compliance/apps-overview.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Every app on the node in one line each, for the operator's report: who can see its
@@ -13,14 +13,15 @@
  * @structure ComplianceAppRow · appsOverview()
  * @usage const { apps, by_reach } = await appsOverview({ storage, config });
  * @version-history
+ *   v1.0.1 — 2026-11-05 — Moved unchanged from src/services/compliance-apps-overview.ts to src/services/compliance/apps-overview.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-29 — Initial.
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { readAppDataMap } from './data-map/data-map-store.js';
-import { appAiSignals } from './compliance-app-signals.js';
-import { appReach, REACH_ORDER, type AppReach } from './compliance-app-reach.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { readAppDataMap } from '../data-map/data-map-store.js';
+import { appAiSignals } from './app-signals.js';
+import { appReach, REACH_ORDER, type AppReach } from './app-reach.js';
 
 /** How many apps are read, as the records-of-processing gaps read them. */
 const APP_SCAN = 1000;

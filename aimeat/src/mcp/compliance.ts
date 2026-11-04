@@ -5,7 +5,7 @@
  * @description The node MCP surface for the operator's compliance report and the register behind it.
  *
  *   IT ASKS THE SAME QUESTION THE HTTP DOOR ASKS, of the same function. The decision lives in
- *   services/compliance-access.ts and both doors call it: the route through
+ *   services/compliance/access.ts and both doors call it: the route through
  *   requireOperatorPrincipal(), this through complianceRefusal(). A tool surface and an HTTP door
  *   that gate differently is invariant 15, and it has already happened once here with
  *   organism:write.
@@ -48,20 +48,20 @@ import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '.
 
 /** The word the owner's slice asks of an agent, the one GET /v1/compliance/report/mine asks. */
 const OWN_ACTIVITY_SCOPE = 'wallet:read';
-import { complianceRefusal } from '../services/compliance-access.js';
-import { buildComplianceReport, MONTH_RE } from '../services/compliance-report.js';
-import { draftRegisterFromActivity } from '../services/compliance-draft.js';
+import { complianceRefusal } from '../services/compliance/access.js';
+import { buildComplianceReport, MONTH_RE } from '../services/compliance/report.js';
+import { draftRegisterFromActivity } from '../services/compliance/draft.js';
 import {
   QuestionnaireSchema, UseCasesSchema, effectiveQuestionnaire, readUseCases,
   writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport, storedReportKind,
-} from '../services/compliance-register.js';
-import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
+} from '../services/compliance/register.js';
+import { saveComplianceSnapshot } from '../services/compliance/monthly-job.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import {
   ComplianceDocError, catalogOp, draftOp, gapsOp, patchItemOp, readDocOp, writeDocOp,
-} from '../services/compliance-docs-ops.js';
-import { readAllPlacesOp } from '../services/compliance-docs-places.js';
+} from '../services/compliance/docs-ops.js';
+import { readAllPlacesOp } from '../services/compliance/docs-places.js';
 
 /** The parts that are the operator's AI Act register; every other part is a scoped document. */
 const OPERATOR_PARTS = new Set(['draft', 'usecases', 'questionnaire']);

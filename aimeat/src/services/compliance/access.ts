@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-access.ts
+ * @file src/services/compliance/access.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Who may read and who may change the node's compliance surface — the decision itself,
@@ -30,6 +30,7 @@
  *   const refusal = await complianceRefusal(storage, { gaii, scopes }, COMPLIANCE_READ_SCOPE);
  *   if (refusal) return refuse(refusal);
  * @version-history
+ *   v1.2.2 — 2026-11-05 — Moved unchanged from src/services/compliance-access.ts to src/services/compliance/access.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.2.1 — 2026-09-26 — The identity check names the account with localAccountName (utils/gaii.ts),
  *     the one cut of an identity to an account name (secaudit 2026-09, F-1). Nothing it answers changed.
  *   v1.2.0 — 2026-09-24 — The decision is services/operator-principal.ts askOperator(), the one
@@ -39,9 +40,9 @@
  *     list happens to be empty — a zero-scope agent of an operator passed the old gate.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
-import type { Storage } from '../storage/interface.js';
-import { localAccountName } from '../utils/gaii.js';
-import { askOperator } from './operator-principal.js';
+import type { Storage } from '../../storage/interface.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { askOperator } from '../operator-principal.js';
 
 export interface ComplianceCaller {
   /** The principal as it identifies itself: a GAII, a GEAI, or a bare owner GHII. */

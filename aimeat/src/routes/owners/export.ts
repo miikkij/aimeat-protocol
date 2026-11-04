@@ -76,7 +76,7 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { scopeOrganism } from '../../services/classification/policy.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import { exportExtraSections, exportAgentMessages } from './export-sections.js';
-import { appendRequest } from '../../services/compliance-docs.js';
+import { appendRequest } from '../../services/compliance/docs.js';
 import { logger } from '../../utils/logger.js';
 import { isValidGHII } from '../../utils/gaii.js';
 import { serviceNamespaceOf } from '../../utils/service-namespace.js';

@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-scope-gaps.ts
+ * @file src/services/compliance/scope-gaps.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The gaps in the compliance documents of plan doc-mvlftkh9zmc9: what a register, an
@@ -19,6 +19,7 @@
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   v1.3.1 — 2026-11-05 — Moved unchanged from src/services/compliance-scope-gaps.ts to src/services/compliance/scope-gaps.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.3.0 — 2026-10-29 — An app's gaps follow who can see its data (compliance-app-reach.ts): an app
  *     whose data only its user sees gets no register, notice or domain gap, an unsaid row matters only
  *     when others can read it, and a map whose location or readers words the node cannot read is its
@@ -34,21 +35,21 @@
  *     overdue request's evidence names its subject, which the pages show instead of its id.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.5, C1.6, C2, C3.6, C4, C5, C6).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { appSlug, localAccountName } from '../utils/gaii.js';
-import { complianceDomainById } from '../data/compliance-domains.js';
-import { readNodePolicy } from './classification/policy.js';
-import { packStatus } from './classification/packs.js';
-import { listDocs, readDoc, type ComplianceScope } from './compliance-docs.js';
-import { applyDomainFloors } from './compliance-domain-floor.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { appSlug, localAccountName } from '../../utils/gaii.js';
+import { complianceDomainById } from '../../data/compliance-domains.js';
+import { readNodePolicy } from '../classification/policy.js';
+import { packStatus } from '../classification/packs.js';
+import { listDocs, readDoc, type ComplianceScope } from './docs.js';
+import { applyDomainFloors } from './domain-floor.js';
 import {
   appRegisterDraft, derivedProcessors, frameworkVerdicts, inEea, processorsView,
-} from './compliance-derived.js';
-import { UNCLASSIFIED } from './compliance-register.js';
-import { appAiSignals } from './compliance-app-signals.js';
-import { readAppDataMap } from './data-map/data-map-store.js';
-import type { ComplianceBreach, ComplianceDpia, ComplianceRegister, ComplianceRequest } from './compliance-docs-schemas.js';
+} from './derived.js';
+import { UNCLASSIFIED } from './register.js';
+import { appAiSignals } from './app-signals.js';
+import { readAppDataMap } from '../data-map/data-map-store.js';
+import type { ComplianceBreach, ComplianceDpia, ComplianceRegister, ComplianceRequest } from './docs-schemas.js';
 
 export type ScopeGapKind =
   | 'register-without-legal-basis' | 'register-without-special-basis' | 'register-without-retention'

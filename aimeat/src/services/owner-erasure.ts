@@ -93,7 +93,7 @@ import { eraseAppPlansOf } from './app-plan.js';
 import { eraseAppRoadmapsOf } from './app-roadmap.js';
 import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 import { uninstallExtension } from './extension-lifecycle.js';
-import { appendRequest, removeAppDocsOfOwner } from './compliance-docs.js';
+import { appendRequest, removeAppDocsOfOwner } from './compliance/docs.js';
 import { eraseNameBoundGrants } from './name-bound-grants-erasure.js';
 import { serviceNamespaceOf } from '../utils/service-namespace.js';
 import { isValidGHII } from '../utils/gaii.js';

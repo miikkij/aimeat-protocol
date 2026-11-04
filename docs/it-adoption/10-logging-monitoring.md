@@ -39,7 +39,7 @@ Faults: an MCP tool that failed inside the node logs `[mcp-fault]`, a REST reque
 | Workflow and action run log | 30 days | `AIMEAT_EXECUTION_LOG_RETENTION_DAYS` | `aimeat/src/config-data-access.ts` |
 | Decision records | 365 days | `AIMEAT_DECIDE_RETENTION_DAYS` | `aimeat/.env.example` |
 | App audit log | keep all, older entries archived per year | `AIMEAT_APP_AUDIT_KEEP` (0 keeps all) | `aimeat/.env.example` |
-| Kept compliance reports | stored as records with their version history; the monthly job prunes nothing | none found | `aimeat/src/services/compliance-monthly-job.ts` |
+| Kept compliance reports | stored as records with their version history; the monthly job prunes nothing | none found | `aimeat/src/services/compliance/monthly-job.ts` |
 
 Records in the database are in every database backup, so the backup retention in [11 Backup and recovery](11-backup-recovery.md) extends these periods.
 

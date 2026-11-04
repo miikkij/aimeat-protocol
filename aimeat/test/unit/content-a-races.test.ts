@@ -38,7 +38,7 @@ import { calibratorRouter } from '../../src/routes/calibrator.js';
 import { knowledgeRouter } from '../../src/routes/knowledge.js';
 import { DesignBookReasons, REASONS_KEY_PREFIX, MADE_KEY, OWNER_NOTES_PREFIX } from '../../src/services/design-book/reasons.js';
 import { DesignBookService, partKey, USAGE_KEY_PREFIX } from '../../src/services/design-book/service.js';
-import { systemGhiiFor } from '../../src/services/compliance-register.js';
+import { systemGhiiFor } from '../../src/services/compliance/register.js';
 import { addKnowledgePackageEntry } from '../../src/services/knowledge-package-entry.js';
 import { setKnowledgeEntryVisibility } from '../../src/services/knowledge-sharing.js';
 import { attachContributionProof, packProofsKey } from '../../src/services/contribution-proofs.js';

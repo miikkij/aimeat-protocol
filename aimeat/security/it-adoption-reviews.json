@@ -153,10 +153,10 @@
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-04",
       "watches": [
-        "aimeat/src/services/compliance-derived.ts",
+        "aimeat/src/services/compliance/derived.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts"
       ],
-      "digest": "sha256:681876df8071fe5a96125740"
+      "digest": "sha256:477cef5b8601d583a01009b8"
     },
     "15-operations-runbook.md": {
       "reviewedOn": "2026-11-04",
@@ -213,7 +213,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:4565598f16b6d289265b3562"
+      "digest": "sha256:a5ef70a029007ee00790c8a7"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -247,9 +247,9 @@
     "templates/processing-record.md": {
       "reviewedOn": "2026-11-04",
       "watches": [
-        "aimeat/src/services/compliance-derived.ts"
+        "aimeat/src/services/compliance/derived.ts"
       ],
-      "digest": "sha256:989ed95714d78ee5ef5c04c9"
+      "digest": "sha256:8ddee3b0981dd9025fd7655a"
     },
     "templates/regulated-sector-addendum.md": {
       "reviewedOn": "2026-11-01",
@@ -361,8 +361,8 @@
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "c79f3a0670fd31eb"
     },
     "14-compliance-mapping.md": {
-      "aimeat/src/services/compliance-derived.ts": "d04b929ecc35d3dc",
-      "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
+      "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",
+      "aimeat/src/tool-catalog/definitions/compliance.ts": "cd22016e2f0dccb7"
     },
     "15-operations-runbook.md": {
       "docs/operations/production-deployment.md": "9c0c46739bbcfbd3",
@@ -393,7 +393,7 @@
       "aimeat/src/data/classification-packs.ts": "ffbb4b6a6349fce1"
     },
     "templates/processing-record.md": {
-      "aimeat/src/services/compliance-derived.ts": "d04b929ecc35d3dc"
+      "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53"
     },
     "templates/regulated-sector-addendum.md": {
       "aimeat/src/services/docsign/statement.ts": "65d24a2c3e04407e"
@@ -415,7 +415,7 @@
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "421322a53cf4d276",
+      "aimeat/security/process-local-baseline.json": "295bb61dbdb21da8",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",

@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-app-signals.ts
+ * @file src/services/compliance/app-signals.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description What an app's own statements say about its place in the compliance documents: does it
@@ -24,6 +24,7 @@
  * @structure DOMAIN_WORDS · ANNEX3_BY_DOMAIN · AppAiSignals · appAiSignals()
  * @usage const s = appAiSignals(map, app.manifest?.aiPosture);
  * @version-history
+ *   v1.0.3 — 2026-11-05 — Moved unchanged from src/services/compliance-app-signals.ts to src/services/compliance/app-signals.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.2 — 2026-10-29 — "candidates" alone and "fingerprint" alone no longer read as employment or
  *     biometric data: on aimeat.io's maps they were a comic's image candidates and a game save's
  *     fingerprint, and four games read as high-risk candidates.
@@ -31,8 +32,8 @@
  *     orgnode.example it listed two apps that call no model.
  *   v1.0.0 — 2026-10-28 — Initial.
  */
-import type { DataMap, DataMapRow } from './data-map/data-map-types.js';
-import type { AppAiPosture } from './app-ai-posture.js';
+import type { DataMap, DataMapRow } from '../data-map/data-map-types.js';
+import type { AppAiPosture } from '../app-ai-posture.js';
 
 /**
  * One domain's vocabulary as a pattern. A term ending in `*` is a stem and takes any letters after

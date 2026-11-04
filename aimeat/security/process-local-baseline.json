@@ -601,7 +601,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/compliance-agreements-gaps.ts :: interval :: scheduleAgreementSweep": {
+    "src/services/compliance/agreements-gaps.ts :: interval :: scheduleAgreementSweep": {
       "count": 1,
       "reason": "DEBT"
     },

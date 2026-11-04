@@ -1,5 +1,5 @@
 /**
- * @file src/services/compliance-report.ts
+ * @file src/services/compliance/report.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node operator's compliance picture: the trail the node kept, the register the
@@ -35,6 +35,7 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.5.1 — 2026-11-05 — Moved unchanged from src/services/compliance-report.ts to src/services/compliance/report.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.5.0 — 2026-11-01 — `data_intermediation`, section 12 (Data Governance Act 2022/868): the setting,
  *     the notification record, the findings and the Article 12 checklist, in both rings
  *     (services/data-intermediation/report.ts; plan doc-mvwxcas3dom3, D7).
@@ -52,21 +53,21 @@
  *     or a copyright holder (the font manager, services/themes/fonts.ts), in the node-wide report.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
-import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { FontService } from './themes/fonts.js';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { FontService } from '../themes/fonts.js';
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
   type AiTransparencyReport,
-} from './ai-transparency-report.js';
+} from '../ai-transparency-report.js';
 import {
   classifyUseCase, effectiveQuestionnaire, readUseCases, UNCLASSIFIED,
   type ComplianceQuestionnaire, type ComplianceRiskVerdict, type ComplianceUseCase,
-} from './compliance-register.js';
-import { buildProcessingSummary, type ProcessingSummary } from './compliance-processing.js';
-import { appAiGaps } from './compliance-app-ai-gaps.js';
-import type { ScopeGap } from './compliance-scope-gaps.js';
-import { buildDataIntermediationSection, type DataIntermediationSection } from './data-intermediation/report.js';
+} from './register.js';
+import { buildProcessingSummary, type ProcessingSummary } from './processing.js';
+import { appAiGaps } from './app-ai-gaps.js';
+import type { ScopeGap } from './scope-gaps.js';
+import { buildDataIntermediationSection, type DataIntermediationSection } from '../data-intermediation/report.js';
 
 /** How far back the rollup's hot window reaches before rows move to the archive. */
 const USAGE_HOT_WINDOW_DAYS = 90;

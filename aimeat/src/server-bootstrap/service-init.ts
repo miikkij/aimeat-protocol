@@ -179,7 +179,7 @@ import { errorFields } from '../utils/error-fields.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.js';
-import { scheduleAgreementSweep } from '../services/compliance-agreements-gaps.js';
+import { scheduleAgreementSweep } from '../services/compliance/agreements-gaps.js';
 import { scheduleGoalSweep } from '../services/goals/goals-sweep.js';
 import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
