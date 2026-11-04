@@ -24,6 +24,8 @@
  *   - POST /v1/operator/notify-owner        one notice to the owners, once per code (operator)
  * @usage app.use(buildWithYouRouter(config, storage));   // server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.1 — 2026-11-04 — The wrong-password count is kept in the node's storage (checkAdminPasswordOnNode;
+ *     codebase analysis 2026-11-03, HA stage 2).
  *   v1.2.0 — 2026-11-04 — The admin password is checked by checkAdminPassword (services/admin-password.ts),
  *     whose count of wrong passwords per address the admin setup pages and seed-examples share; this
  *     route's own counter and compare are gone, and the 429 says when to try again (codebase analysis
@@ -43,7 +45,7 @@ import { INPUT_LIMITS } from '../models/input-limits.js';
 import { BuildError, operatorHandOp, operatorPendingOp, readOp, submitOp } from '../services/build-with-you.js';
 import { readOwnTrail, readTrail, TrailError } from '../services/place-trail.js';
 import { NotifyOwnerError, notifyOwnerOnce } from '../services/operator-notify-owner.js';
-import { checkAdminPassword, adminPasswordLimitedMessage } from '../services/admin-password.js';
+import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/admin-password.js';
 
 const field = z.string().trim().min(1).max(INPUT_LIMITS.line);
 // The four fields flat or under `spec` (the shape GET's `send` shows); submitOp names a missing one.
@@ -94,8 +96,8 @@ export function buildWithYouRouter(config: AimeatConfig, storage: Storage): Rout
   // as it needs; while an address is over the count every password is refused, the right one too, so
   // guessing gains nothing from the window.
   /** The node's admin password in X-Admin-Password, or else `gate`: the operator gate every operator route takes. */
-  const passwordOr = (gate: (req: Request, res: Response, next: NextFunction) => unknown) => (req: Request, res: Response, next: NextFunction): void => {
-    const check = checkAdminPassword(config, req.ip ?? '', req.headers['x-admin-password']);
+  const passwordOr = (gate: (req: Request, res: Response, next: NextFunction) => unknown) => async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const check = await checkAdminPasswordOnNode(config, req.ip ?? '', req.headers['x-admin-password']);
     if (check.kind === 'missing') { void gate(req, res, next); return; }
     if (check.kind === 'ok') { next(); return; }
     if (check.kind === 'limited') {

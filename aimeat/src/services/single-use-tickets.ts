@@ -13,66 +13,57 @@
  *   Extracted from routes/sse.ts, where the SSE ticket map lived, so the WebSocket ticket is the same
  *   mechanism and not a second one (secrets audit 2026-10-09, d3).
  *
- *   In memory and per process: a ticket is minted and spent within seconds by the same client against
- *   the same node, so it never needs to survive a restart or reach another process.
- * @structure SingleUseTicketStore<T> · createSingleUseTicketStore<T>() · one shared sweep timer
+ *   IN THE NODE'S STORAGE since 2026-11-04 (services/ephemeral-claims.ts): a ticket minted through one
+ *   process opens the connection on another, which a load balancer in front of two processes does
+ *   about half the time. The row names neither the ticket nor the bearer it carries (the id is a hash,
+ *   the payload sealed under a key only the ticket opens). `mint` keeps the ticket in this process
+ *   only, for a caller that cannot wait (a unit test); every route issues with `issue`.
+ * @structure SingleUseTicketStore<T> · createSingleUseTicketStore<T>(kind, codec?)
  * @usage
- *   const tickets = createSingleUseTicketStore<{ sub: string }>();
- *   const id = tickets.mint({ sub }, 30_000);   // hand `id` to the client
- *   const data = tickets.take(id);              // null when unknown, expired or already taken
+ *   const tickets = createSingleUseTicketStore<{ sub: string }>('sse-ticket');
+ *   const id = await tickets.issue({ sub }, 30_000);   // hand `id` to the client
+ *   const data = await tickets.take(id);               // null when unknown, expired or already taken
  * @version-history
+ *   v1.1.0 — 2026-11-04 — Kept in the node's storage (oneTimeStore); `issue` for the routes, `take` is
+ *     async, `mint` stays for this process only (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-10-09 — Extracted from routes/sse.ts and made generic, for the WebSocket ticket
  *     (secrets audit 2026-10-09, d3).
  */
 import { randomBytes } from 'node:crypto';
+import { oneTimeStore, type ClaimCodec } from './ephemeral-claims.js';
 
 export interface SingleUseTicketStore<T> {
-  /** Mint a ticket carrying `data` for `ttlMs` milliseconds. Returns the opaque ticket (64 hex). */
+  /** Mint a ticket carrying `data` for `ttlMs` milliseconds, in this process only. Returns the opaque ticket (64 hex). */
   mint(data: T, ttlMs: number): string;
+  /** Mint a ticket carrying `data` for `ttlMs` milliseconds, valid on every process of the node. */
+  issue(data: T, ttlMs: number): Promise<string>;
   /**
    * Spend a ticket: returns its data and deletes it, or null when it is unknown or expired. A ticket
    * is deleted on the first presentation whatever the outcome, so it can never be used twice.
    */
-  take(ticket: string | null | undefined): T | null;
-  /** Live tickets held, expired ones not yet swept included. */
-  size(): number;
+  take(ticket: string | null | undefined): Promise<T | null>;
 }
 
-interface Entry { data: unknown; expires: number }
-
-/** Every store, so one timer sweeps them all. */
-const stores = new Set<Map<string, Entry>>();
-let sweeper: ReturnType<typeof setInterval> | null = null;
-
-function ensureSweeper(): void {
-  if (sweeper) return;
-  sweeper = setInterval(() => {
-    const now = Date.now();
-    for (const map of stores) {
-      for (const [id, e] of map) if (e.expires < now) map.delete(id);
-    }
-  }, 60_000);
-  // The timer only frees memory; it must not keep a test process or a CLI alive.
-  sweeper.unref?.();
-}
-
-export function createSingleUseTicketStore<T>(): SingleUseTicketStore<T> {
-  const map = new Map<string, Entry>();
-  stores.add(map);
-  ensureSweeper();
+/** The tickets of one kind. `kind` names them in the node's storage. */
+export function createSingleUseTicketStore<T>(kind: string, codec?: ClaimCodec<T>): SingleUseTicketStore<T> {
+  const store = oneTimeStore<T>(kind, codec);
   return {
     mint(data: T, ttlMs: number): string {
       const id = randomBytes(32).toString('hex');
-      map.set(id, { data, expires: Date.now() + ttlMs });
+      store.here.put(id, data, Date.now() + ttlMs);
       return id;
     },
-    take(ticket: string | null | undefined): T | null {
-      if (typeof ticket !== 'string' || ticket.length === 0) return null;
-      const e = map.get(ticket);
-      if (!e) return null;
-      map.delete(ticket);
-      return e.expires < Date.now() ? null : (e.data as T);
+    async issue(data: T, ttlMs: number): Promise<string> {
+      const id = randomBytes(32).toString('hex');
+      await store.put(id, data, Date.now() + ttlMs);
+      return id;
     },
-    size(): number { return map.size; },
+    async take(ticket: string | null | undefined): Promise<T | null> {
+      if (typeof ticket !== 'string' || ticket.length === 0) return null;
+      // A ticket minted in this process is found here; every other one in the node's storage.
+      const e = store.here.take(ticket) ?? await store.take(ticket);
+      if (!e) return null;
+      return e.expiresAt < Date.now() ? null : e.data;
+    },
   };
 }

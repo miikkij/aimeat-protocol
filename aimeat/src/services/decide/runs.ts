@@ -37,6 +37,7 @@
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  *   const run = await getDecideRun(storage, caller.gaii, id, runViewerOf(caller));
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (requireAiCallTurnOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.7.1 — 2026-10-25 — A run an agent started or resumed reads the owner's records with a reader for
  *     that agent (caller.readerAs), so its clearance and the labels' audience apply (secaudit2026oct22).
  *   v1.7.0 — 2026-10-22 — A caller that does not read as the owner reads only the records the memory
@@ -82,7 +83,7 @@ import { readAiRecords } from '../ai-inputs.js';
 import { systemReader, readerForCaller, warningsNote, type ContentReader } from '../classification/reader.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { ClassificationError } from '../classification/labels.js';
-import { requireAiCallTurn } from '../account-limits.js';
+import { requireAiCallTurnOnNode } from '../account-limits.js';
 import { ownerScopeView, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
 
 const RUN_PREFIX = 'decide.runs.';
@@ -355,7 +356,7 @@ export async function startDecideRun(
   }
   // POST /v1/ai/decide/runs and aimeat_decide_run both arrive here: a run is one AI call started on
   // a request, counted against the account before the run record is written.
-  requireAiCallTurn(config, caller.gaii, caller.limit);
+  await requireAiCallTurnOnNode(config, caller.gaii, caller.limit);
   validateInput(input);
   if (input.rule !== undefined) {
     // Refused here, once, rather than a thousand times in the background: the rule is not there, is
@@ -484,7 +485,7 @@ export async function resumeDecideRun(
   if (active.has(id)) return run;
   if (run.state === 'done') return run;
   // A resume starts the work again: counted once, as the start was, before anything is written.
-  requireAiCallTurn(config, caller.gaii, caller.limit);
+  await requireAiCallTurnOnNode(config, caller.gaii, caller.limit);
   // Failed items get another chance too: the reason they failed (money, a key) may be fixed now.
   for (const [k, r] of Object.entries(run.results)) if (r.error) delete run.results[k];
   run.state = 'running';

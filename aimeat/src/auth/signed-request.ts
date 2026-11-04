@@ -26,10 +26,14 @@
  *   - spendSignature(signature) — the single-use half; true the first time, false ever after
  * @usage
  *   if (!signatureTimestampFresh(timestamp)) return refuse('Timestamp too old or too far in the future');
- *   if (!spendSignature(signature)) return refuse('That signature has already been used');
+ *   if (!await spendSignature(signature)) return refuse('That signature has already been used');
  * @version-history
+ *   v1.1.0 — 2026-11-04 — spendSignature spends in the node's storage, so a signature spent on one
+ *     process is refused on another; resetSpentSignatures is removed, nothing called it (codebase
+ *     analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-09-06 — Written for review item 2.3: a replayable signature in a GET query string.
  */
+import { spendOnce } from '../services/ephemeral-claims.js';
 
 /**
  * How far from now a signed timestamp may sit, in either direction.
@@ -47,34 +51,15 @@ export function signatureTimestampFresh(timestamp: string, windowMs = SIGNATURE_
 }
 
 /**
- * Signatures already spent, and when they stop being worth remembering.
+ * Claim a signature. True the first time it is seen, false every time after, on every process of the
+ * node: the spend is a row in the node's storage (services/ephemeral-claims.ts, kind 'signature'), as
+ * the OAuth authorization codes beside it are. Until 2026-11-04 both were Maps in one process, and
+ * this comment said they were one decision; they moved together.
  *
- * PROCESS-LOCAL, and that is the same assumption the door it guards already makes: the OAuth
- * authorization codes beside it are an in-memory Map too, so a second process could not redeem one
- * anyway. If this node is ever fronted by more than one process without sticky routing, both need
- * to move to storage together, and this comment is the reminder that they are one decision.
- *
- * An entry only has to outlive the freshness window: past it the timestamp check refuses on its
- * own, so nothing is gained by remembering longer.
+ * A spend only has to outlive the freshness window: past it the timestamp check refuses on its own,
+ * so nothing is gained by remembering longer.
  */
-const spent = new Map<string, number>();
-
-/**
- * Claim a signature. True the first time it is seen, false every time after.
- *
- * Expired entries are dropped on the way through rather than on a timer: this map is touched only
- * by requests that already carry a valid signature, so it grows at the rate someone is actually
- * authenticating and a sweep on each call costs nothing worth measuring.
- */
-export function spendSignature(signature: string, windowMs = SIGNATURE_WINDOW_MS): boolean {
+export function spendSignature(signature: string, windowMs = SIGNATURE_WINDOW_MS): Promise<boolean> {
     const now = Date.now();
-    for (const [sig, expiresAt] of spent) if (expiresAt <= now) spent.delete(sig);
-    if (spent.has(signature)) return false;
-    spent.set(signature, now + windowMs);
-    return true;
-}
-
-/** Testing only: forget every spent signature, so one suite cannot poison the next. */
-export function resetSpentSignatures(): void {
-    spent.clear();
+    return spendOnce('signature', String(signature), now + windowMs, now);
 }

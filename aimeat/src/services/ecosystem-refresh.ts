@@ -20,6 +20,7 @@
  * @structure ECO_REAPPROVAL_SECONDS · ecoProofMessage · EcoRefreshDecision · ecosystemRefreshDecision
  * @usage const d = await ecosystemRefreshDecision({ geai, publicKey, authTime, iat, timestamp, signature, now, maxChainSeconds, ttlSeconds });
  * @version-history
+ *   v1.0.1 — 2026-11-04 — The renewal signature is spent in the node's storage (spendSignature is async), so another process refuses it too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S-2).
  */
 import { verify } from '../auth/keypair.js';
@@ -69,7 +70,7 @@ export async function ecosystemRefreshDecision(input: {
   }
   const valid = signatureTimestampFresh(timestamp)
     && await verify(publicKey, ecoProofMessage(geai, timestamp), signature)
-    && spendSignature(signature);
+    && await spendSignature(signature);
   if (!valid) {
     return {
       ok: false, status: 401, code: 'ECO_KEY_PROOF_INVALID',

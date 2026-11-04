@@ -14,6 +14,8 @@
  * @structure aiCallLimit(config)
  * @usage router.post('/v1/ai/complete', requireAuth(), aiCallLimit(config), handler)
  * @version-history
+ *   v1.1.0 — 2026-11-04 — Counts with takeAiCallOnNode, in the node's storage, so every process draws
+ *     on one count (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.2 — 2026-10-20 — The 401 asks isAnonymousPrincipal, so it refuses the minted anonymous token
  *     too (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.1 — 2026-10-07 — A request without real authentication gets 401 instead of passing uncounted (code scanning alert 1700).
@@ -22,20 +24,20 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { takeAiCall } from '../services/account-limits.js';
+import { takeAiCallOnNode } from '../services/account-limits.js';
 import { error } from './envelope.js';
 import { deny401 } from '../auth/deny.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
 export function aiCallLimit(config: AimeatConfig) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
     // Every mount sits after requireAuth(), which refuses both cases. A mount without it refuses here
     // rather than letting the call through uncounted.
     if (!req.auth || isAnonymousPrincipal(req.auth)) {
       deny401(req, res, 'Authentication required');
       return;
     }
-    const turn = takeAiCall(config, resolveIdentity(req.auth, config.nodeId));
+    const turn = await takeAiCallOnNode(config, resolveIdentity(req.auth, config.nodeId));
     if (turn.ok) return next();
     res.setHeader('Retry-After', String(turn.retryAfterSec));
     res.status(429).json(error(config.nodeId, turn.code, turn.message, 429, { retry_after_sec: turn.retryAfterSec }));

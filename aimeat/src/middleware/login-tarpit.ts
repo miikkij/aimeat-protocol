@@ -33,6 +33,9 @@
  * @structure loginTarpit(config) · noteCredentialOutcome (internal, via res 'finish')
  * @usage router.post('/v1/ghii/login', loginTarpit(config), rateLimit({...}), handler)
  * @version-history
+ *   2026-11-04 — The count per address is kept in the node's storage (windowCounter 'login-tarpit'), so
+ *     N processes are one tarpit; the same free failures, steps, wall and window (codebase analysis
+ *     2026-11-03, HA stage 2). currentDelayMs is async.
  *   2026-10-16 — Marks the response as recorded, so middleware/refusal-recorder.ts does not write the
  *     same refusal twice (QA audit S1-02).
  *   v1.0.0 — 2026-08-17 — Initial: growing per-IP delay on the credential doors.
@@ -43,6 +46,7 @@ import { ipRateKey } from './rate-limit.js';
 import { getStats } from '../services/stats.js';
 import { recordAuthFailure, markRefusalRecorded, type AuthFailureContext } from '../services/auth-audit.js';
 import { logger } from '../utils/logger.js';
+import { windowCounter } from '../services/ephemeral-claims.js';
 
 /**
  * The account name the caller tried, when the door takes one.
@@ -70,38 +74,49 @@ function auditContext(req: Request): AuthFailureContext {
   };
 }
 
-interface FailBucket {
-  /** Refusals seen from this key inside the current window. */
-  fails: number;
-  /** When the count decays to nothing if nothing else arrives. */
-  resetAt: number;
+/**
+ * One count for the whole node: an attacker moving between the login and the code door is one
+ * campaign, and giving each door its own count would let them pay the entry price twice over. Each
+ * key's count is the refusals inside its window (`count`) and when it decays to nothing if nothing
+ * else arrives (`expiresAt`), kept in the node's storage (services/ephemeral-claims.ts), so a
+ * guesser whose requests a load balancer spreads over N processes meets one tarpit, not N.
+ */
+const buckets = windowCounter('login-tarpit');
+
+// process-local: the outcome writes this process started and has not finished, per key. A request
+// from the same address waits for them, so it reads its own last outcome as the in-memory count gave
+// it; another process reads the stored count.
+const writing = new Map<string, Promise<void>>();
+
+/** Run `fn` after the writes this process already started for `key`, and remember it until it ends. */
+function writeInTurn(key: string, fn: () => Promise<unknown>): void {
+  const run = (writing.get(key) ?? Promise.resolve()).then(fn).then(() => undefined, (err: unknown) => {
+    logger.warn('login-tarpit: the count could not be written; the next attempt reads the last one written', { key, error: String(err) });
+  });
+  writing.set(key, run);
+  void run.then(() => { if (writing.get(key) === run) writing.delete(key); });
 }
 
-/** One store for the whole process: an attacker moving between the login and the code door is one
- *  campaign, and giving each door its own count would let them pay the entry price twice over. */
-const buckets = new Map<string, FailBucket>();
+/** The key's live count after this process's own writes: refusals in a window not yet ended. */
+async function liveFails(key: string, now: number): Promise<{ fails: number; resetAt: number }> {
+  await writing.get(key);
+  const b = await buckets.read(key);
+  return b && now <= b.expiresAt ? { fails: b.count, resetAt: b.expiresAt } : { fails: 0, resetAt: now };
+}
 
 /** How many requests are currently asleep here. The cap on this is what stops the tarpit from
- *  being the denial of service it exists to prevent. */
+ *  being the denial of service it exists to prevent. Per process, as the sockets it guards are. */
 let sleeping = 0;
 
-const cleanup = setInterval(() => {
-  const now = Date.now();
-  for (const [key, b] of buckets) if (now > b.resetAt) buckets.delete(key);
-}, 60_000);
-cleanup.unref();
-
-/** Test seam: forget every penalty. */
+/** Test seam: forget every penalty this process holds in memory. */
 export function resetLoginTarpit(): void {
-  buckets.clear();
+  buckets.here.clearAll();
   sleeping = 0;
 }
 
 /** What this key would wait for its NEXT refusal, in ms. Exported for the operator surface. */
-export function currentDelayMs(config: AimeatConfig, key: string): number {
-  const b = buckets.get(key);
-  if (!b || Date.now() > b.resetAt) return 0;
-  return delayFor(config, b.fails);
+export async function currentDelayMs(config: AimeatConfig, key: string): Promise<number> {
+  return delayFor(config, (await liveFails(key, Date.now())).fails);
 }
 
 /**
@@ -134,9 +149,6 @@ export function loginTarpit(config: AimeatConfig) {
     markRefusalRecorded(res);
 
     const key = ipRateKey(req.ip ?? req.socket?.remoteAddress);
-    const now = Date.now();
-    const bucket = buckets.get(key);
-    const fails = bucket && now <= bucket.resetAt ? bucket.fails : 0;
 
     // Count the outcome once the response is written. 401/403/429 are the refusals worth counting;
     // a 400 is a malformed request rather than a wrong guess, and counting it would let a client
@@ -148,8 +160,6 @@ export function loginTarpit(config: AimeatConfig) {
       // part an operator wants to see. It is NOT counted as a new failure: penalising somebody for
       // being penalised would make the window grow on its own and never let a shared address out.
       const walled = res.statusCode === 429;
-      const b = buckets.get(key);
-      const live = b && Date.now() <= b.resetAt ? b : null;
       if (walled) {
         recordAuthFailure(auditContext(req), {
           status: 401, code: 'ATTEMPTS_REFUSED',
@@ -168,27 +178,32 @@ export function loginTarpit(config: AimeatConfig) {
           // it is what an attacker chose to send. The password never appears, in any form.
           reason: `credential refused at ${req.path}${usernameTried(req) ? ` for "${usernameTried(req)}"` : ''}`,
         });
-        const next: FailBucket = {
-          fails: (live?.fails ?? 0) + 1,
-          resetAt: Date.now() + config.loginTarpitWindowMs,
-        };
-        buckets.set(key, next);
-        if (next.fails === config.loginTarpitBlockAfter) {
-          // Once per campaign, not once per guess: the point of the line is that an operator can
-          // see a campaign start without the log becoming the flood.
-          logger.warn('login-tarpit: credential guessing from one address has reached the refusal threshold', {
-            key, fails: next.fails, path: req.path,
-          });
-        }
-      } else if (res.statusCode < 400 && live) {
-        // A credential that worked clears the penalty. The person who mistyped twice and then got
+        // One more inside a live window, or 1 in a new one; the window ends a full window from now.
+        writeInTurn(key, async () => {
+          const at = Date.now();
+          const counted = await buckets.bump(key, { now: at, windowMs: config.loginTarpitWindowMs, staleBefore: at, sliding: true });
+          if (counted.count === config.loginTarpitBlockAfter) {
+            // Once per campaign, not once per guess: the point of the line is that an operator can
+            // see a campaign start without the log becoming the flood.
+            logger.warn('login-tarpit: credential guessing from one address has reached the refusal threshold', {
+              key, fails: counted.count, path: req.path,
+            });
+          }
+        });
+      } else if (res.statusCode < 400) {
+        // A credential that worked clears a live penalty. The person who mistyped twice and then got
         // it right should not be slower for the next hour.
-        buckets.delete(key);
+        writeInTurn(key, async () => {
+          const b = await buckets.read(key);
+          if (b && Date.now() <= b.expiresAt) await buckets.clear(key);
+        });
       }
     });
 
+    const now = Date.now();
+    const { fails, resetAt } = await liveFails(key, now);
     if (fails >= config.loginTarpitBlockAfter) {
-      const retryAfterSec = Math.ceil(((bucket?.resetAt ?? now) - now) / 1000);
+      const retryAfterSec = Math.ceil((resetAt - now) / 1000);
       getStats()?.increment('login_tarpit_blocked_total');
       res.setHeader('Retry-After', Math.max(1, retryAfterSec));
       res.status(429).json({

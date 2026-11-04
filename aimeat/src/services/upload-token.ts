@@ -12,6 +12,9 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.14.0 — 2026-11-04 — The short upload addresses are kept in the node's storage (oneTimeStore
+ *     'upload-handle') until the token expires, so an address issued on one process is accepted on
+ *     another; the five-minute sweep timer is gone (codebase analysis 2026-11-03, HA stage 2).
  *   v1.13.0 — 2026-11-01 — PRESIGNED_META_KEYS.storage carries `page_writer`, the writer of the welcome
  *     page key as the mint knew it (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   v1.12.0 — 2026-10-20 — The token carries its issue time to the millisecond (`iat_ms`) and, when the
@@ -59,6 +62,7 @@ import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { sessionStorage } from '../auth/node-auth.js';
 import { isGEAI } from '../utils/gaii.js';
+import { oneTimeStore } from './ephemeral-claims.js';
 
 // ── Key management (initialized from jwt.ts node keys) ──
 
@@ -91,28 +95,22 @@ export type UploadSpendStore = Pick<Storage, 'revokeTokenIfAbsent'>;
  * A handle has no words to paraphrase and is short enough that a copy error is visible. The JWT
  * stays the authority; it just stops being the address.
  *
- * In memory on purpose: a lost handle (a restart, another process) behaves exactly like an expired
- * one — ask for a fresh URL. It can only ever fail closed. The single-use record is NOT here; it is
- * a row (SPENT_PREFIX above), because a raw JWT replayed on another process must fail closed too.
+ * In the node's storage (services/ephemeral-claims.ts, kind 'upload-handle') since 2026-11-04, so an
+ * address issued by one process is accepted by another, which is where a load balancer sends about
+ * half of the PUTs. The row names neither the address nor the token (a hash, and a payload sealed
+ * under a key only the address opens), and it goes when the token expires. It still fails closed: an
+ * address the node no longer holds answers as an expired one. The single-use record is NOT here; it
+ * is a row of its own (SPENT_PREFIX above), because a raw JWT replayed on another process must fail
+ * closed too.
  */
-const handles = new Map<string, { token: string; exp: number }>();
+const handles = oneTimeStore<{ token: string; exp: number }>('upload-handle');
 
 /** Anything shorter than a JWT and starting `u_` is an address, not a token. */
 const HANDLE_RE = /^u_[A-Za-z0-9_-]{10,40}$/;
 
-let _cleanupInterval: ReturnType<typeof setInterval> | null = null;
-
 export function initUploadTokenKeys(privateKey: CryptoKey, publicKey: CryptoKey): void {
     _privateKey = privateKey;
     _publicKey = publicKey;
-
-    if (_cleanupInterval) clearInterval(_cleanupInterval);
-    _cleanupInterval = setInterval(() => {
-        const now = Math.floor(Date.now() / 1000);
-        for (const [handle, entry] of handles) {
-            if (entry.exp < now) handles.delete(handle);
-        }
-    }, 5 * 60 * 1000);
 }
 
 // ── Types ──
@@ -240,7 +238,8 @@ export function buildUploadMeta(
 export async function generateUploadToken(payload: UploadTokenPayload, ttlSeconds: number = 3600): Promise<string> {
     const jwt = await signUploadToken(payload, ttlSeconds);
     const handle = 'u_' + randomBytes(12).toString('base64url');
-    handles.set(handle, { token: jwt, exp: Math.floor(Date.now() / 1000) + ttlSeconds });
+    const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+    await handles.put(handle, { token: jwt, exp }, exp * 1000);
     return handle;
 }
 
@@ -310,7 +309,7 @@ export async function verifyUploadToken(tokenOrHandle: string, store: UploadSpen
     // credential itself, so a JWT minted before handles existed still completes.
     let token = tokenOrHandle;
     if (HANDLE_RE.test(tokenOrHandle)) {
-        const entry = handles.get(tokenOrHandle);
+        const entry = (await handles.get(tokenOrHandle))?.data;
         if (!entry) {
             throw new UploadTokenError('TOKEN_EXPIRED',
                 'This upload URL is no longer valid (expired, already used, or the node restarted). Request a fresh one rather than editing this address.');

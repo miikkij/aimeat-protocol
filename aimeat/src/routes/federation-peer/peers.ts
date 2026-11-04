@@ -5,6 +5,7 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The single use of a signed heartbeat or presence message is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.14.0 — 2026-10-31 — A peer's settlement ceiling: settlement_ceiling on GET /peers, on PUT
  *     /peers/:nodeId, and its own door PUT /peers/:nodeId/settlement-ceiling (a whole number, "none",
  *     or "node"; services/settlement-ceiling.ts; secaudit2026oct31w2 round 10, W2-4).
@@ -63,7 +64,7 @@ import { logger } from '../../utils/logger.js';
 import { PeeringDecisionSchema, PeerSettlementCeilingSchema, validateBody } from '../../models/schemas.js';
 import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
+import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../../services/presence.js';
@@ -307,7 +308,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             const stale = await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
                 signed: messageToVerify, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
                 publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-            })) ?? signedMessageRefusal(from_node_id, timestamp, signature);
+            })) ?? await signedMessageRefusalOnNode(from_node_id, timestamp, signature);
             if (stale) { res.status(stale.status).json(error(config.nodeId, stale.code, stale.message)); return; }
 
             peer.lastSeen = new Date().toISOString();
@@ -374,7 +375,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             signed: presenceSignString(from_node_id, timestamp, updates as PresenceUpdate[]),
             audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
             publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-        })) : null) ?? signedMessageRefusal(from_node_id, timestamp, String(signature));
+        })) : null) ?? await signedMessageRefusalOnNode(from_node_id, timestamp, String(signature));
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         presence.applyRemoteUpdates(from_node_id, updates as PresenceUpdate[]);

@@ -5,6 +5,7 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The single use of a signed introduction is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-10-29 — A peering request nobody answered in federation.peering_request_days (30, 0 never)
  *     expires: the introduction sweeps expired rows before it stores one, and the status route answers
  *     404 for an expired request and deletes it (services/peering-request-expiry.ts; secaudit2026oct26
@@ -60,7 +61,7 @@ import { PeeringRequestSchema, validateBody } from '../../models/schemas.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
 import {
-    signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal, SERVICE_SUMMARY_PURPOSE,
+    signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal, SERVICE_SUMMARY_PURPOSE,
 } from '../../services/signed-node-request.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -300,7 +301,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         const replayed = await pinnedRefusal(pin, req.body ?? {}, provenSince => audienceRefusal({
             signed: messageToVerify, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
             publicKey: public_key, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-        })) ?? signedMessageRefusal(node_id, timestamp, signature);
+        })) ?? await signedMessageRefusalOnNode(node_id, timestamp, signature);
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         // Check if already a peer (allow re-introduction if depeering/offline). This is a pure

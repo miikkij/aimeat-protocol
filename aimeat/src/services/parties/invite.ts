@@ -33,6 +33,7 @@
  * @structure INVITE_TTL_DAYS · inviteLinkOf · sendShareLink · shareAndSend · previewInvite · redeemInvite
  * @usage const out = await sendShareLink(ctx, 'matti', { share, email, locale });
  * @version-history
+ *   v1.2.1 — 2026-11-04 — The mail allowance is counted in the node's storage (takeMailSendOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.2.1 — 2026-11-04 — The link mail goes through mail-gate.ts sendMail as a third-party mail with the
  *     account turn taken before the write (codebase analysis 2026-11-03, item B3).
  *   v1.2.0 — 2026-11-04 — sendShareLink (and so shareAndSend) counts a mailed link with takeMailSend
@@ -48,7 +49,7 @@ import type { CallerContext } from '../caller-context.js';
 import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { getActiveEmailService } from '../email.js';
-import { takeMailSend, MAIL_SEND_LIMIT } from '../account-limits.js';
+import { takeMailSendOnNode, MAIL_SEND_LIMIT } from '../account-limits.js';
 import { sendMail, type AccountTurnTaken } from '../mail-gate.js';
 import { logger } from '../../utils/logger.js';
 import { EMAIL_RE } from '../datapackage/share-notices.js';
@@ -154,7 +155,7 @@ export async function sendShareLink(
     const mail = getActiveEmailService();
     let counted: AccountTurnTaken | null = null;
     if (mail?.enabled) {
-        const turn = takeMailSend(c.ownerGhii);
+        const turn = await takeMailSendOnNode(c.ownerGhii);
         if (turn.ok) counted = turn;
         else {
             return {

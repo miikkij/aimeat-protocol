@@ -5,6 +5,7 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The single use of a signed trust notice is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.5.2 — 2026-10-23 — A ban that removes the peer also revokes its approved peering requests, so a key
  *     exchange cannot re-admit it (Core FED-15; secaudit2026oct22).
  *   v1.5.1 — 2026-10-18 — A peer's trust notice is stored on the version read (setMemoryIfVersion), and
@@ -30,7 +31,7 @@ import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
 import {
-    deliveryRefusal, pinnedRefusal, federationPeerProofPin, audienceRefusal, signedMessageRefusal,
+    deliveryRefusal, pinnedRefusal, federationPeerProofPin, audienceRefusal, signedMessageRefusalOnNode,
 } from '../../services/signed-node-request.js';
 import { TRUST_ADVISORY_TYPES, trustNoticeSignString } from '../../services/federation-trust-notice.js';
 
@@ -191,7 +192,7 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
         const refusal = await audienceRefusal({
             signed, audience: body.audience, audienceSignature: body.audience_signature,
             publicKey: gate.peer.publicKey, thisNodeId: config.nodeId, required: true,
-        }) ?? signedMessageRefusal(source_node, timestamp, signature);
+        }) ?? await signedMessageRefusalOnNode(source_node, timestamp, signature);
         if (refusal) { res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message)); return; }
 
         // One stored notice per sending peer, target and kind: a repeat replaces it, and one peer holds at

@@ -13,7 +13,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/routes/admin/setup-register.ts"
       ],
-      "digest": "sha256:5b3071458107c92a9f3799e7"
+      "digest": "sha256:fbdb6458260a45e799b225f9"
     },
     "01-overview.md": {
       "reviewedOn": "2026-11-03",
@@ -204,7 +204,7 @@
         "aimeat/src/server-bootstrap/drain.ts",
         "aimeat/src/services/notification-sweeps.ts"
       ],
-      "digest": "sha256:dd3b24db452b54147ef7fcdf"
+      "digest": "sha256:544eb5712ec149ae4ab86317"
     },
     "README.md": {
       "reviewedOn": "2026-11-03",
@@ -266,7 +266,7 @@
       "aimeat/src/services/config-schema-seo.ts": "b88168360d49fb08",
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
       "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
-      "aimeat/src/routes/admin/setup-register.ts": "1a37cc4a1707f7dd"
+      "aimeat/src/routes/admin/setup-register.ts": "b31b2af26f35b077"
     },
     "01-overview.md": {
       ".github/SECURITY.md": "3298fcc91e6ba5ee",
@@ -393,17 +393,17 @@
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
       "aimeat/src/services/once-only-step.ts": "08156126e71309f0",
       "aimeat/src/services/event-bus.ts": "f73b40db41597ad5",
-      "aimeat/src/mcp/oauth.ts": "66a8f23e8c8562ae",
+      "aimeat/src/mcp/oauth.ts": "73561bbd01827214",
       "aimeat/src/mcp/legacy-sessions.ts": "4784fea1f0026443",
-      "aimeat/src/services/passkeys.ts": "57fd388e3fb070ef",
+      "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "2f42b114f3d2e845",
+      "aimeat/src/services/ai-jobs/service.ts": "057c1fe56320598d",
       "aimeat/src/services/config-apply.ts": "91fae249f6d8349e",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "da7737fbca0b141f",
+      "aimeat/security/process-local-baseline.json": "7327b10e4eaa53f7",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "41f44d4c72ded9c2",
       "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",

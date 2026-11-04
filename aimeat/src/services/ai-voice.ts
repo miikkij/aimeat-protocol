@@ -6,6 +6,7 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (requireAiCallTurnOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.12.1 - 2026-10-31 - The speech price is read from OpenRouter's in-region hosts too (isOpenRouterApiUrl).
  *   v1.12.0 - 2026-10-08 - The reply and the speech take `agent`, passed to prepareAiCall: a voice call an
  *     agent makes is attributed to the agent, as a completion is.
@@ -64,7 +65,7 @@ import { emitChange } from './event-bus.js';
 import { appSpentToday, appQuotaFor } from './ai-app-id.js';
 import type { CallerClass } from './ai/policy.js';
 import { resolveTtsVoice } from './ai-model-defaults.js';
-import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from './account-limits.js';
 
 function policyCallerOf(o: VoicePolicyCaller): VoicePolicyCaller {
   return {
@@ -168,7 +169,7 @@ async function settled(storage: Storage, config: AimeatConfig, gaii: string, pla
 
 export async function streamReply(storage: Storage, config: AimeatConfig, gaii: string, options: ReplyOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
   // POST /v1/ai/stream and aimeat_voice_reply both arrive here: one count per account, before any spend.
-  requireAiCallTurn(config, gaii, options.limit);
+  await requireAiCallTurnOnNode(config, gaii, options.limit);
   const first = await prepareAiCall(storage, config, gaii, {
     model: options.model, appId: options.app_id, ...policyCallerOf(options),
     ...(options.provider ? { provider: options.provider, fallback: false } : {}),
@@ -254,7 +255,7 @@ async function speechPrice(plan: AiCallPlan): Promise<number | undefined> {
 
 export async function streamSpeech(storage: Storage, config: AimeatConfig, gaii: string, options: SpeakOptions, signal: AbortSignal, emit: VoiceEmit): Promise<void> {
   // POST /v1/ai/speak and aimeat_voice_speak both arrive here: one count per account, before any spend.
-  requireAiCallTurn(config, gaii, options.limit);
+  await requireAiCallTurnOnNode(config, gaii, options.limit);
   // A spoken reply asks for the speech capability: the owner's policy list for speech applies to it.
   const first = await prepareAiCall(storage, config, gaii, {
     op: 'speak', model: options.model, appId: options.app_id, capability: 'speech', ...policyCallerOf(options),

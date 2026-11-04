@@ -158,7 +158,7 @@ What the repository does not answer. Each one names who can answer it; most are 
 ### [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md)
 
 - OPEN: Has the project run one node as an active process with a standby, under load, and with which load balancer rules? The maintainer named in `.github/SECURITY.md` can answer.
-- OPEN: Will the short sign-in steps (MCP OAuth codes, app grant codes, passkey ceremonies, WebSocket tickets), the replay cache and the start-up reconciliation of AI jobs and workflow runs move to the database, so that several processes can serve without routing the sign-in paths to one process? The maintainer can answer.
+- OPEN: Will the start-up reconciliation of AI jobs and workflow runs, and the idempotency keys, move to the database, so that several processes can serve without affinity? The short sign-in steps and the replay caches moved there on 2026-11-04. The maintainer can answer.
 - OPEN: Can a person signed in from a peer node through cross-node sign-in be a member of an organism on this node, and which workspace operations are open to such a member? The maintainer can answer.
 
 ### [Template: record of processing activities (GDPR Article 30)](templates/processing-record.md)

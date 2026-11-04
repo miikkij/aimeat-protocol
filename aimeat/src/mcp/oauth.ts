@@ -4,14 +4,16 @@
  * SPDX-License-Identifier: MIT
  * @description MCP OAuth 2.1 endpoints (Dynamic Client Registration, authorize, browser consent,
  *   approval check, token exchange/refresh, revocation, RFC 8414/9728 metadata). Extracted from
- *   src/mcp/index.ts to satisfy max-file-lines. Authorization codes stay in-memory (short-lived,
- *   single-use); clients, refresh tokens, and approvals are persisted to storage.
+ *   src/mcp/index.ts to satisfy max-file-lines. Authorization codes are one-time values every process
+ *   of the node sees (services/ephemeral-claims.ts); clients, refresh tokens and approvals are rows.
  * @structure
  *   - registerOAuthRoutes() — registers all OAuth 2.1 routes on the MCP router
  * @usage
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   2026-11-04 — Authorization codes are kept in the node's storage (oneTimeStore 'mcp-oauth-code'), so a
+ *     code issued on one process is redeemed on another (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-01 — The browser path passes OAuth's ui_locales to the consent page as `lang`, so a
  *     Finnish buyer's sign-in from their place opens in Finnish.
  *   2026-10-27 — An authorization code carries its issue time, and the exchange refuses a code from
@@ -84,12 +86,14 @@ import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client
 import { redirectUriRegistered } from './oauth-redirect.js';
 import { registerOAuthConsentInfo } from './oauth-consent-info.js';
 import { LOCALES } from '../i18n.js';
+import { oneTimeStore } from '../services/ephemeral-claims.js';
 import {
     hasUnknownResource, mcpOAuthLaxLive, mcpResourceOf, noteLaxUse, pkceRefusal, resourceRefusal, resourceValues,
 } from './oauth-binding.js';
 
-// OAuth 2.1 — authorization codes stay in-memory (short-lived, single-use).
-// Clients, refresh tokens, and approvals are persisted to storage.
+// OAuth 2.1: an authorization code lives 10 minutes and is used once. Its row is kept a day past
+// that, so a late exchange still answers "expired" rather than "invalid", as the in-memory map did.
+const CODE_ROW_KEPT_MS = 24 * 60 * 60_000;
 interface AuthorizationCode {
     code: string;
     clientId: string;
@@ -131,8 +135,8 @@ const DCR_MAX_REDIRECT_LENGTH = 2048;
 
 /** Register the OAuth 2.1 endpoints on the MCP router. */
 export function registerOAuthRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
-    // OAuth 2.1 — only auth codes are in-memory (short-lived, single-use)
-    const authCodes = new Map<string, AuthorizationCode>();
+    // Authorization codes: one-time values in the node's storage, seen by every process.
+    const authCodes = oneTimeStore<AuthorizationCode>('mcp-oauth-code');
 
     // ── OAuth 2.1 Endpoints ──
 
@@ -291,7 +295,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 res.status(401).json({ error: 'access_denied', error_description: 'Timestamp too old or too far in the future' });
                 return;
             }
-            if (!spendSignature(signature)) {
+            if (!await spendSignature(signature)) {
                 res.status(401).json({ error: 'access_denied', error_description: 'That signature has already been used. Sign a new timestamp.' });
                 return;
             }
@@ -321,7 +325,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 expiresAt: Date.now() + 600_000,
                 issuedAt: new Date().toISOString(),
             };
-            authCodes.set(code, authCode);
+            await authCodes.put(code, authCode, authCode.expiresAt + CODE_ROW_KEPT_MS);
             noteIssuedCode(config, codeChallenge, resources);
 
             if (redirectUri) {
@@ -489,7 +493,8 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         // client_name is what the consent page read from its query, which a link can set, so it
         // never names the client on the token (secaudit2026oct22, consent-identity-from-request).
         const resolvedClientName = client?.clientName || viaUrl?.clientName || client_id;
-        authCodes.set(code, {
+        const codeExpiresAt = Date.now() + 600_000;
+        await authCodes.put(code, {
             code,
             clientId: client_id,
             clientName: resolvedClientName,
@@ -500,9 +505,9 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             codeChallenge: code_challenge,
             codeChallengeMethod: code_challenge ? 'S256' : undefined,
             resources: consentResources,
-            expiresAt: Date.now() + 600_000,
+            expiresAt: codeExpiresAt,
             issuedAt: new Date().toISOString(),
-        });
+        }, codeExpiresAt + CODE_ROW_KEPT_MS);
         noteIssuedCode(config, code_challenge, consentResources);
 
         // The record of what the owner approved: this client, as this agent, with the agent's own
@@ -571,14 +576,12 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
 
-            const authCode = authCodes.get(code);
+            // Code is single-use: taken on the first presentation, whatever follows.
+            const authCode = typeof code === 'string' && code ? (await authCodes.take(code))?.data : undefined;
             if (!authCode) {
                 res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid or expired authorization code' });
                 return;
             }
-
-            // Code is single-use
-            authCodes.delete(code);
 
             if (authCode.expiresAt < Date.now()) {
                 res.status(400).json({ error: 'invalid_grant', error_description: 'Authorization code expired' });

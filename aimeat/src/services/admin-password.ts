@@ -17,14 +17,19 @@
  *   the right one too, so a guess gains nothing from the window. A right password is not counted, so
  *   the fleet service reads a place as often as it needs.
  *
- *   PER PROCESS, as every limiter here (services/rate-buckets.ts).
- * @structure AdminPasswordCheck · checkAdminPassword(config, address, input) · adminPasswordLimitedMessage(check) ·
+ *   ACROSS PROCESSES. The routes ask checkAdminPasswordOnNode, which keeps the count in the node's
+ *   storage (services/ephemeral-claims.ts), so N processes allow the count once, not N times. The
+ *   synchronous checkAdminPassword gives the same answers from this process's memory.
+ * @structure AdminPasswordCheck · checkAdminPassword(config, address, input) ·
+ *   checkAdminPasswordOnNode(config, address, input) · adminPasswordLimitedMessage(check) ·
  *   resetAdminPasswordMisses()
  * @usage
- *   const pw = checkAdminPassword(config, req.ip ?? '', req.headers['x-admin-password']);
+ *   const pw = await checkAdminPasswordOnNode(config, req.ip ?? '', req.headers['x-admin-password']);
  *   if (pw.kind === 'limited') { res.setHeader('Retry-After', String(pw.retryAfterSec)); ... 429 }
  *   if (pw.kind !== 'ok') { ... 401 }
  * @version-history
+ *   v1.1.0 — 2026-11-04 — checkAdminPasswordOnNode: the count in the node's storage, and the routes ask
+ *     it (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-11-04 — Initial: the three compares and two counters moved here (codebase analysis
  *     2026-11-03, item A12).
  */
@@ -32,6 +37,8 @@ import { timingSafeEqual } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import { getStats } from './stats.js';
 import { getPromMetrics } from './prometheus.js';
+import { windowCounter } from './ephemeral-claims.js';
+import type { EphemeralCount } from '../storage/repositories/ephemeral-claim.repository.js';
 
 /** What one check answers. `missing`: no password was sent, which is not counted as a guess. */
 export type AdminPasswordCheck =
@@ -40,9 +47,14 @@ export type AdminPasswordCheck =
   | { kind: 'wrong' }
   | { kind: 'limited'; retryAfterSec: number; max: number; windowSec: number };
 
-/** Wrong passwords per address, in the current window. */
-// process-local: each process counts wrong passwords on its own, so N processes allow N times the limit.
-const misses = new Map<string, { count: number; until: number }>();
+/**
+ * Wrong passwords per address, in the current window: a window counter (services/ephemeral-claims.ts)
+ * that every process of the node shares through checkAdminPasswordOnNode. The synchronous
+ * checkAdminPassword counts in this process's memory only.
+ */
+const misses = windowCounter('admin-password-miss');
+
+type AdminPasswordConfig = Pick<AimeatConfig, 'adminPassword' | 'adminAuthRateLimitMax' | 'adminAuthRateLimitWindowMs'>;
 
 function matches(input: string, expected: string): boolean {
   const a = Buffer.from(input);
@@ -50,29 +62,45 @@ function matches(input: string, expected: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/**
- * Check `input` against the node's admin password, counting a wrong one against `address`.
- * Only a non-empty password is a guess: a request that sends none is `missing` and counts nothing.
- */
-export function checkAdminPassword(
-  config: Pick<AimeatConfig, 'adminPassword' | 'adminAuthRateLimitMax' | 'adminAuthRateLimitWindowMs'>,
-  address: string,
-  input: unknown,
-): AdminPasswordCheck {
+/** The answer before a wrong password is counted: missing, limited, ok, or null for a wrong one. */
+function decide(config: AdminPasswordConfig, input: unknown, seen: EphemeralCount | null, now: number): AdminPasswordCheck | null {
   if (typeof input !== 'string' || !input) return { kind: 'missing' };
-  const now = Date.now();
   const max = config.adminAuthRateLimitMax;
-  const windowMs = config.adminAuthRateLimitWindowMs;
-  const seen = misses.get(address);
-  if (seen && seen.until > now && seen.count >= max) {
+  if (seen && seen.expiresAt > now && seen.count >= max) {
     getStats()?.increment('rate_limit_hits_total');
     getPromMetrics()?.rateLimitHitsTotal.inc();
-    return { kind: 'limited', retryAfterSec: Math.ceil((seen.until - now) / 1000), max, windowSec: Math.round(windowMs / 1000) };
+    return { kind: 'limited', retryAfterSec: Math.ceil((seen.expiresAt - now) / 1000), max, windowSec: Math.round(config.adminAuthRateLimitWindowMs / 1000) };
   }
   if (config.adminPassword && matches(input, config.adminPassword)) return { kind: 'ok' };
-  const fresh = !seen || seen.until <= now;
-  if (misses.size > 10_000) for (const [k, v] of misses) if (v.until <= now) misses.delete(k);
-  misses.set(address, { count: fresh ? 1 : seen.count + 1, until: fresh ? now + windowMs : seen.until });
+  return null;
+}
+
+/**
+ * How a wrong password is counted: a window that ended at or before now starts again at 1 and ends
+ * windowMs from now; otherwise the count rises and the window keeps its end.
+ */
+const missCount = (config: AdminPasswordConfig, now: number) => ({ now, windowMs: config.adminAuthRateLimitWindowMs, staleBefore: now + 1 });
+
+/**
+ * Check `input` against the node's admin password, counting a wrong one against `address` in this
+ * process only. Only a non-empty password is a guess: a request that sends none is `missing` and
+ * counts nothing. The routes ask checkAdminPasswordOnNode.
+ */
+export function checkAdminPassword(config: AdminPasswordConfig, address: string, input: unknown): AdminPasswordCheck {
+  const now = Date.now();
+  const answer = decide(config, input, typeof input === 'string' && input ? misses.here.read(address) : null, now);
+  if (answer) return answer;
+  misses.here.bump(address, missCount(config, now));
+  return { kind: 'wrong' };
+}
+
+/** checkAdminPassword counted across every process of the node: the same count, limit and answers. */
+export async function checkAdminPasswordOnNode(config: AdminPasswordConfig, address: string, input: unknown): Promise<AdminPasswordCheck> {
+  if (typeof input !== 'string' || !input) return { kind: 'missing' };
+  const now = Date.now();
+  const answer = decide(config, input, await misses.read(address), now);
+  if (answer) return answer;
+  await misses.bump(address, missCount(config, now));
   return { kind: 'wrong' };
 }
 
@@ -83,7 +111,7 @@ export function adminPasswordLimitedMessage(check: { retryAfterSec: number; max:
     + 'The operator sets the count in Admin, Config ("Admin auth rate limit (max per window)").';
 }
 
-/** Forget every count. For a test that needs a clean start. */
+/** Forget every count this process holds. For a test that needs a clean start. */
 export function resetAdminPasswordMisses(): void {
-  misses.clear();
+  misses.here.clearAll();
 }

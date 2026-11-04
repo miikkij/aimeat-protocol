@@ -20,6 +20,7 @@
  *   key can be tested again; a pass marks it `ok` and records when it was tested.
  * @structure testProvider · silentWav
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (requireAiCallTurnOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.3.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.2.0 — 2026-10-05 — `caller` is required: every call says who asks (secaudit 2026-10, AI-3).
  *   v1.1.0 — 2026-09-28 — Speech and embeddings are testable (V5 of the System 2 plan).
@@ -38,7 +39,7 @@ import { persistHealth } from './provider-store.js';
 import { providerIdOf } from '../ai-provider-common.js';
 import type { CallerClass } from './policy.js';
 import type { AiCapability } from './types.js';
-import { requireAiCallTurn } from '../account-limits.js';
+import { requireAiCallTurnOnNode } from '../account-limits.js';
 
 const TESTABLE: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'transcription', 'speech', 'embed'];
 const APP_ID = 'ai-provider-test';
@@ -92,7 +93,7 @@ export async function testProvider(
   // One test is one AI call started on a request: POST /v1/ai/providers/:id/test and
   // aimeat_ai_provider_test both arrive here, and count against the account before the health is
   // cleared or anything is spent. The inner call below is then 'exempt', so it is not counted twice.
-  requireAiCallTurn(config, gaii, undefined);
+  await requireAiCallTurnOnNode(config, gaii, undefined);
   // What the process knew no longer holds: the owner is testing, maybe after a new key.
   clearHealth(gaii, id);
   const who = {

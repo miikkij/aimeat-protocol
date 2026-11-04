@@ -5,6 +5,7 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The single use of a signed message is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-10-27 — normalizeInboundAttachments moved to ./inbound-attachments.ts unchanged (max-file-lines).
  *   2026-10-27 — Replicate stores a record time more than five minutes ahead of this node's clock as
  *     the time the replica arrived, so the retention sweep ages it on this node's clock; a person
@@ -96,7 +97,7 @@ import type { PeerInfo } from '../../services/federation.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { verify } from '../../auth/keypair.js';
 import {
-    signedMessageRefusal, audienceRefusal, deliveryRefusal, pinnedRefusal, federationPeerProofPin,
+    signedMessageRefusalOnNode, audienceRefusal, deliveryRefusal, pinnedRefusal, federationPeerProofPin,
 } from '../../services/signed-node-request.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
@@ -130,7 +131,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         const refusal = await pinnedRefusal(await federationPeerProofPin(storage, audience.peer), audience.body, provenSince => audienceRefusal({
             signed: audience.signed, audience: audience.body.audience, audienceSignature: audience.body.audience_signature,
             publicKey: audience.peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-        })) ?? signedMessageRefusal(sourceNode, timestamp, signature);
+        })) ?? await signedMessageRefusalOnNode(sourceNode, timestamp, signature);
         if (refusal) res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
         return !!refusal;
     };

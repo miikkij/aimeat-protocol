@@ -14,12 +14,13 @@
  *     the blast radius is exactly what the user approved, never the full session.
  * @structure
  *   - APP_GRANTABLE_SCOPES — the scope vocabulary an app may request (+ i18n-able descriptions)
- *   - in-memory pendingRequests / authCodes maps (short-TTL, like MCP auth codes)
+ *   - pendingRequests / authCodes: short-lived one-time values in the node's storage (services/ephemeral-claims.ts)
  *   - appGrantsRouter(config, storage): GET /authorize, GET /request/:id, POST /authorize-consent,
  *     POST /token, the silent bridge. The owner's list / narrow / spend-cap / revoke doors are
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-11-04 — The pending authorize requests and the authorization codes are kept in the node's storage (oneTimeStore 'app-grant-request' and 'app-grant-code'), so a request or code made on one process is used on another; lifetimes and answers are unchanged (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-02 — The silent bridge answers login_required with reason two_step_setup_required for a session the required two-step policy ends on refresh, and mints no grant from it (secaudit2026nov02d round 13).
  *   2026-11-02 — GET /v1/app-grants/authorize from an app's draft origin reads the draft when the app was never published; it answered 404 APP_NOT_FOUND, so the owner could not sign in to a draft (services/app-origin-target.ts appRecordForAuthorize).
  *   2026-10-31 — GET /v1/app-grants/authorize carries the app's `lang` (en, fi, es) to the consent page (v27 P1).
@@ -168,6 +169,7 @@ import { logger } from '../utils/logger.js';
 import { APP_GRANTABLE_SCOPES } from '../services/app-grant-vocabulary.js';
 import { isPackageApp } from '../services/packages/install/package-approvals.js';
 import { LOCALES } from '../i18n.js';
+import { oneTimeStore, type ClaimEntry } from '../services/ephemeral-claims.js';
 export { APP_GRANTABLE_SCOPES, PORTFOLIO_GRANT_SCOPES };
 
 /**
@@ -268,8 +270,10 @@ function verifyPkce(codeVerifier: string, codeChallenge: string, method: 'S256' 
 export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  const pendingRequests = new Map<string, PendingRequest>();
-  const authCodes = new Map<string, AuthCode>();
+  const pendingRequests = oneTimeStore<PendingRequest>('app-grant-request');
+  const authCodes = oneTimeStore<AuthCode>('app-grant-code');
+  /** The value of a stored entry while it is valid (expiresAt after now), else undefined. */
+  const live = <T extends { expiresAt: number }>(e: ClaimEntry<T> | null): T | undefined => (e && e.data.expiresAt > Date.now() ? e.data : undefined);
 
   /**
    * The stored scopes, trimmed to what the app declares now — or null when nothing changes.
@@ -284,13 +288,6 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!declared) return null;
     const kept = narrowToDeclared(stored, declared, ownerAdded, await appAllowanceWords(storage, target));
     return kept.length === stored.length ? null : kept;
-  }
-
-  // Sweep expired entries lazily on each authorize/token call (cheap; bounded maps).
-  function sweep() {
-    const now = Date.now();
-    for (const [k, v] of pendingRequests) if (v.expiresAt <= now) pendingRequests.delete(k);
-    for (const [k, v] of authCodes) if (v.expiresAt <= now) authCodes.delete(k);
   }
 
   /**
@@ -350,7 +347,6 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
   // ── GET /v1/app-grants/authorize ── app sends the owner's browser here to start the grant.
   router.get('/v1/app-grants/authorize', async (req: Request, res: Response) => {
-    sweep();
     const app = String(req.query.app ?? '').trim();
     const responseType = String(req.query.response_type ?? 'code');
     const redirectUri = String(req.query.redirect_uri ?? '').trim();
@@ -435,7 +431,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // page and authorize-consent read this, as the silent bridge does (package-approvals.ts).
     const packageApp = await isPackageApp(storage, app.slice(0, slash), app);
     const requestId = `agreq-${randomBytes(18).toString('hex')}`;
-    pendingRequests.set(requestId, {
+    await pendingRequests.put(requestId, {
       requestId, app, appName: appRecord.manifest?.name || app.slice(slash + 1),
       appIcon: appRecord.manifest?.icon || '', appDescription: appRecord.manifest?.description || '',
       appOrigin: rd.origin, scopes: withAllowance(requested, await appAllowanceWords(storage, app)), redirectUri, state, codeChallenge,
@@ -447,7 +443,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
         ? appRecord.manifest.publishedBy
         : byAnotherAuthorsApp(appRecord.manifest?.publishedByApp, app.slice(0, slash)) ? appRecord.manifest.publishedByApp : '',
       expiresAt: Date.now() + REQUEST_TTL_MS,
-    });
+    }, Date.now() + REQUEST_TTL_MS);
 
     // Send the owner to the trusted apex consent page (SPA route) to review + approve. The app's
     // language rides along, so the page, its sign-in dialog and the mailed link are in it (v27 P1).
@@ -456,9 +452,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── GET /v1/app-grants/request/:requestId ── consent UI fetches what's being requested (display).
-  router.get('/v1/app-grants/request/:requestId', (req: Request, res: Response) => {
-    sweep();
-    const pending = pendingRequests.get(req.params.requestId as string);
+  router.get('/v1/app-grants/request/:requestId', async (req: Request, res: Response) => {
+    const pending = live(await pendingRequests.get(req.params.requestId as string));
     if (!pending) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Authorization request not found or expired'));
     }
@@ -488,14 +483,13 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
   });
 
   // ── POST /v1/app-grants/authorize-consent ── owner approves on aimeat.io (authenticated SPA).
-  router.post('/v1/app-grants/authorize-consent', requireAuth(), requireRole('owner'), (req: Request, res: Response) => {
-    sweep();
+  router.post('/v1/app-grants/authorize-consent', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
     const requestId = String(req.body?.request_id ?? '');
-    const pending = pendingRequests.get(requestId);
+    // Taken whatever follows: a request is decided once.
+    const pending = live(await pendingRequests.take(requestId));
     if (!pending) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Authorization request not found or expired'));
     }
-    pendingRequests.delete(requestId);
 
     // Optional "Advanced" scope subset: the user may approve FEWER scopes than requested, never more.
     const requestedSubset: unknown = req.body?.scopes;
@@ -512,12 +506,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const appOwner = pending.app.includes('/') ? pending.app.slice(0, pending.app.indexOf('/')) : '';
     const own = pending.originBound && !!appOwner && owner === appOwner && !pending.packageApp;
     const code = `agc-${randomBytes(24).toString('hex')}`;
-    authCodes.set(code, {
+    await authCodes.put(code, {
       code, app: pending.app, appName: pending.appName, appOrigin: pending.appOrigin,
       owner, gaii, scopes: grantedScopes, shown: pending.scopes, redirectUri: pending.redirectUri,
       state: pending.state, codeChallenge: pending.codeChallenge, codeChallengeMethod: pending.codeChallengeMethod,
       own, expiresAt: Date.now() + CODE_TTL_MS,
-    });
+    }, Date.now() + CODE_TTL_MS);
 
     const url = new URL(pending.redirectUri);
     url.searchParams.set('code', code);
@@ -706,16 +700,14 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
   // ── POST /v1/app-grants/token ── the app (cross-origin, CORS *) exchanges code / refreshes.
   router.post('/v1/app-grants/token', async (req: Request, res: Response) => {
-    sweep();
     const grantType = String(req.body?.grant_type ?? '');
 
     if (grantType === 'authorization_code') {
       const code = String(req.body?.code ?? '');
       const verifier = String(req.body?.code_verifier ?? '');
       const redirectUri = String(req.body?.redirect_uri ?? '');
-      const ac = authCodes.get(code);
+      const ac = live(await authCodes.take(code)); // single-use: taken whatever follows
       if (!ac) return res.status(400).json(error(config.nodeId, 'INVALID_GRANT', 'Invalid or expired authorization code'));
-      authCodes.delete(code); // single-use
       if (ac.redirectUri !== redirectUri) {
         return res.status(400).json(error(config.nodeId, 'INVALID_GRANT', 'redirect_uri mismatch'));
       }

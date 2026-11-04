@@ -5,6 +5,7 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The single use of a signed memory-list request is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.6.2 — 2026-10-27 — POST /v1/federation/memory/list refuses a person whose account is
  *     deactivated (403 ACCOUNT_DISABLED, asked after the consent), and a peer under this node's own id
  *     lists nobody here as its own people (secaudit2026oct26).
@@ -47,7 +48,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { verify } from '../../auth/keypair.js';
 import { syncRemoteTemplates } from '../../services/federation-remote-templates.js';
 import {
-    signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal,
+    signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal,
 } from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation-auth-consent.js';
@@ -271,7 +272,7 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
         const replayed = await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
             signed: listPayload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
             publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-        })) ?? signedMessageRefusal(String(requesting_node), timestamp, String(signature));
+        })) ?? await signedMessageRefusalOnNode(String(requesting_node), timestamp, String(signature));
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
         // Whose inventory, after the peer has proved who it is and before anything is read.
