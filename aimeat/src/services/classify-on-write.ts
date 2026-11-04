@@ -62,12 +62,12 @@ import { activePolicies } from './classification/reader.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
-/** The shape of services/classification/classifier.ts classifyText, as far as this file uses it. */
+/** The shape of services/classification-run/classifier.ts classifyText, as far as this file uses it. */
 export type WriteClassifier = (
   deps: Deps, target: ContentLabelTarget, text: string, opts: { useModel?: boolean; policy?: ClassificationPolicy },
 ) => Promise<unknown>;
 
-/** The shape of services/classification/classifier.ts enqueue, as far as this file uses it. */
+/** The shape of services/classification-run/classifier.ts enqueue, as far as this file uses it. */
 export type WriteQueue = (deps: Deps, targets: readonly ContentLabelTarget[], opts: { origin: 'write' }) => Promise<void>;
 
 /** The most text the classifier is given from one value. */

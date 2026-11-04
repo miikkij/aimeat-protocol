@@ -1,5 +1,5 @@
 /**
- * @file src/services/classification/classifier.ts
+ * @file src/services/classification-run/classifier.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Content Classifier (TARGET-082 V3, spec §7): judges how sensitive a piece of
@@ -44,6 +44,9 @@
  *   firstJsonObject()
  * @usage const out = await classifyText(deps, target, text);
  * @version-history
+ *   v2.1.1 — 2026-11-04 — Moved unchanged from services/classification/, which it imports through
+ *     that family's index: the classifier calls the AI, and the AI path reads labels, so it sits
+ *     outside the family the index covers (codebase analysis 2026-11-03, item D-g).
  *   v2.1.0 — 2026-10-25 — secaudit2026oct22: classifyText spends an organism's rule time from the
  *     budget of the account that holds it (budgetAccountOf, read once a minute per organism), and an
  *     item whose rules a budget skipped goes to the queue for another rule pass (`deferred`; a queued
@@ -69,12 +72,11 @@ import { decideForOwner } from '../decide/service.js';
 import { completeForOwner } from '../ai/completion.js';
 import { createScrubber } from '../decide/scrub.js';
 import { organismOwners } from '../organism-ownership.js';
-import type { ClassificationLabel, ClassificationPolicy } from './defaults.js';
-import { runRules } from './detect.js';
-import { ownerOfScope, scopeOrganism } from './policy.js';
-import { ClassificationError, setLabel, type LabelActor, type SetLabelResult } from './labels.js';
-import { activePolicies, systemReader } from './reader.js';
-import { readSystem, UNCHANGED, updateSystem } from './system-record.js';
+import {
+  ClassificationError, activePolicies, ownerOfScope, readSystem, runRules, scopeOrganism, setLabel, systemReader,
+  UNCHANGED, updateSystem,
+  type ClassificationLabel, type ClassificationPolicy, type LabelActor, type SetLabelResult,
+} from '../classification/index.js';
 import { OWNER_CALLER } from '../ai/caller-context.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };

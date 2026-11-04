@@ -220,7 +220,7 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/classification.ts': "services/classification/labels.ts, whose setLabel and reviewLabel "
         + "emit 'classification' on every label row they store, and services/classification/policy-admin.ts, "
         + "whose writePolicy and reviewPolicy emit 'classification' on every stored change to a level. "
-        + 'The scan action (services/classification/scan.ts) judges a few keys at once through '
+        + 'The scan action (services/classification-run/scan.ts) judges a few keys at once through '
         + 'classifier.ts, which labels through setLabel, and queues the rest for the hourly job, which '
         + 'labels the same way: the emit comes from the same line two hops below the tool. The REST routes '
         + '(routes/classification.ts), the connector and the CLI dispatch reach the same functions.',

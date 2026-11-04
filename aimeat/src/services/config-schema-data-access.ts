@@ -32,7 +32,7 @@ import { DATASPACE_CONFIG_FIELDS } from './config-schema-dataspace.js';
 type DataAccessKey = keyof ReturnType<typeof dataAccessDefaults>;
 
 /**
- * The classification switch (services/classification/switch.ts): off, owner, all from open to strict.
+ * The classification switch (services/classification-run/switch.ts): off, owner, all from open to strict.
  * Turning it off, or from all to owner, gives protection away, so an AI does not make that change.
  */
 const CLASSIFICATION_TIGHTEN: TightenOnly = {

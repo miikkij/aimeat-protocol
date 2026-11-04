@@ -23,11 +23,11 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AgentRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { labelActorOf, memoryTarget, readContentLabel, setLabel, targetOf, type LabelActor } from '../../src/services/classification/labels.js';
-import { scanContent } from '../../src/services/classification/scan.js';
+import { scanContent } from '../../src/services/classification-run/scan.js';
 import { explorerQueryOf, listLabels } from '../../src/services/classification/explorer.js';
 import { readAuditLog } from '../../src/services/classification/policy-admin.js';
 import { makeException, readExceptions } from '../../src/services/classification/exception-admin.js';
-import { readQueue } from '../../src/services/classification/classifier.js';
+import { readQueue } from '../../src/services/classification-run/classifier.js';
 import { READ_AS_OWNER_NOTE } from '../../src/services/owner-scope-read.js';
 import { labelActorReadsAll } from '../../src/services/classification/owner-scope-labels.js';
 

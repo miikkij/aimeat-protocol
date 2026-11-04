@@ -1,5 +1,5 @@
 /**
- * @file src/services/classification/audience-settle.ts
+ * @file src/services/classification-run/audience-settle.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description When a label rises, content already shown wider than the new label's audience cap is
@@ -44,6 +44,9 @@
  * @structure LoweredItem · settleAudienceAfterRise() · registerAudienceSettle()
  * @usage registerAudienceSettle(storage, config);   // once, at boot (server-bootstrap/routes-loader.ts)
  * @version-history
+ *   v1.2.2 — 2026-11-04 — Moved unchanged from services/classification/, which it imports through
+ *     that family's index: settling an audience writes the containers, and the containers read labels,
+ *     so it sits outside the family the index covers (codebase analysis 2026-11-03, item D-g).
  *   v1.2.1 — 2026-10-20 — Says where a binned record is held to the cap: on the restore, not here
  *     (services/memory-bin.ts restoreLevel; secaudit 2026-10). No behaviour change.
  *   v1.2.0 — 2026-10-18 — A memory record is lowered on the version that was read (setMemoryIfVersion,
@@ -66,17 +69,13 @@ import { generateAccessCode } from '../app-publish-exposure.js';
 import { appAudienceOf } from '../app-publish-gate.js';
 import { readShareMetaOf, setWorkspaceShareOp, type SetShareBody } from '../workspace-share.js';
 import { findWorkspaceRegistration, workspaceRegistrations } from '../workspace-meta-read.js';
-import { labelById, type ClassificationLabel } from './defaults.js';
-import { effectiveLabels } from './effective.js';
-import { activeExceptionsFor } from './exceptions.js';
-import { onLabelRaised, type LabelRaise } from './label-core.js';
-import { documentContentKeys, memoryTarget, targetId } from './label-rows.js';
-import { fileTarget } from './labels.js';
-import { appTarget, boardTarget, organismTarget, workspaceTarget } from './containers.js';
-import { classificationActiveFor, policyFor, scopeOrganism } from './policy.js';
-import { recordClassificationAudit } from './audit.js';
-import { audienceOfOrganism, audienceOfShareAccess, audienceOfVisibility } from './audience-cap.js';
-import { AUDIENCE_LEVEL_WORDS, capAllows, storedLevel, type AudienceLevel } from './audience-levels.js';
+import {
+  activeExceptionsFor, appTarget, AUDIENCE_LEVEL_WORDS, audienceOfOrganism, audienceOfShareAccess, audienceOfVisibility,
+  boardTarget, capAllows, classificationActiveFor, documentContentKeys, effectiveLabels, fileTarget, labelById,
+  memoryTarget, onLabelRaised, organismTarget, policyFor, recordClassificationAudit, scopeOrganism, storedLevel,
+  targetId, workspaceTarget,
+  type AudienceLevel, type ClassificationLabel, type LabelRaise,
+} from '../classification/index.js';
 
 type Ctx = { storage: Storage; config: AimeatConfig };
 

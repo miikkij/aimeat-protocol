@@ -22,7 +22,7 @@ import { writeMemoryRecord } from '../../src/services/memory-write.js';
 import { writeWorkspaceRecord } from '../../src/services/workspace-write.js';
 import { classifyAfterWrite, flushWriteClassification, pendingWriteClassifications, setWriteClassifier } from '../../src/services/classify-on-write.js';
 import { runClassificationQueueJob, installWriteClassifier } from '../../src/services/classification-queue-job.js';
-import { enqueue, readQueue } from '../../src/services/classification/classifier.js';
+import { enqueue, readQueue } from '../../src/services/classification-run/classifier.js';
 import { memoryTarget, fileTarget } from '../../src/services/classification/labels.js';
 
 vi.mock('../../src/services/decide/service.js', () => ({
@@ -100,7 +100,7 @@ describe('write-time classification', () => {
 
   it('past the in-process limit a write waits in the persistent queue instead of being dropped (finding 6)', async () => {
     let judged = 0;
-    const { enqueue } = await import('../../src/services/classification/classifier.js');
+    const { enqueue } = await import('../../src/services/classification-run/classifier.js');
     setWriteClassifier(async () => { judged++; }, enqueue);
     // All scheduled in one tick, so the worker has not started: forty owners fill the 2000 places
     // (50 each, the per-owner limit), and the 2001st write is past the limit.
@@ -115,7 +115,7 @@ describe('write-time classification', () => {
 
   it('one owner holds at most 50 writes in process; the rest wait in the persistent queue by address', async () => {
     let judged = 0;
-    const { enqueue } = await import('../../src/services/classification/classifier.js');
+    const { enqueue } = await import('../../src/services/classification-run/classifier.js');
     setWriteClassifier(async () => { judged++; }, enqueue);
     for (let i = 0; i < 60; i++) classifyAfterWrite(deps(), ALICE, `big.${i}`, 'x'.repeat(10_000));
     // POSITIVE CONTROL: another owner's write is still judged in process.
