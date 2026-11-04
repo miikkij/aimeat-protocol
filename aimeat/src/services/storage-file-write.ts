@@ -32,6 +32,7 @@
  *   - groupBindingRefusal() — a group file names its group
  *   - writeStorageFile() — the inline write, in order, with the fence first
  *   - mintStorageUploadUrl() — the presigned representation of the same write
+ *   - heldFile() — the file a key names, by its short key too, for the delete and the visibility change
  *   - removeStorageFile() — the delete, sharing the same key fence and change events
  *   - changeStorageFileVisibility() — the visibility change both PATCH routes and the publish
  *     request's applier make
@@ -42,6 +43,7 @@
  *   v1.15.0 — 2026-11-04 — groupBindingRefusal(): the write and the presigned mint refuse visibility
  *     'group' with no group id with 400 INVALID_INPUT, and the visibility change refuses 'group' on a
  *     file that has no group. Such a file was stored and opened to nobody (Jouni, 2026-11-04).
+ *     heldFile(): the short-key lookup the delete and the visibility change each wrote out.
  *   2026-11-04 — A stored file is announced with emitRecordChangePriorUnknown: the same streams hear
  *     it, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   v1.14.0 — 2026-11-01 — The file hooks moved by extraction to ./storage-file-hooks.ts (line limit) and
@@ -481,6 +483,19 @@ export type StorageFileDeleteResult =
     | StorageDeleteRefusal;
 
 /**
+ * The file `asked` names in `ownerGaii`'s namespace, without its bytes. The account's own extension's
+ * file named by its short key is stored under the stored name (services/component-address.ts
+ * ownExtensionFileKey), tried only when the key as written names no file. With no file, `key` is `asked`.
+ */
+async function heldFile(storage: Storage, ownerGaii: string, asked: string): Promise<{ key: string; file: StorageFileRecord | null }> {
+    const direct = await storage.getStorageFileMeta(ownerGaii, asked);
+    if (direct) return { key: asked, file: direct };
+    const stored = await ownExtensionFileKey(storage, asked, localAccountName(ownerGaii));
+    const found = stored ? await storage.getStorageFileMeta(ownerGaii, stored) : null;
+    return found && stored ? { key: stored, file: found } : { key: asked, file: null };
+}
+
+/**
  * Remove one file from `ownerGaii`'s namespace. Irreversible: there is no version history behind a
  * stored file the way there is behind a memory record, so what this deletes is gone.
  *
@@ -507,17 +522,9 @@ export async function removeStorageFile(
     const fenced = checkKey(ownerGaii, asked) ?? await pageKeyWriteRefusal(deps, ownerGaii, asked, writer);
     if (fenced) return fenced;
 
-    // The account's own extension's file named by its short key is stored under the stored name
-    // (services/component-address.ts ownExtensionFileKey); tried only when the key as written names no file.
     // Metadata only: a delete needs the row, not the bytes. Reading the bytes downloaded a whole file
     // from an object store just to remove it, and a row whose object had gone could not be deleted.
-    let key = asked;
-    let existing = await storage.getStorageFileMeta(ownerGaii, key);
-    if (!existing) {
-        const stored = await ownExtensionFileKey(storage, key, localAccountName(ownerGaii));
-        const found = stored ? await storage.getStorageFileMeta(ownerGaii, stored) : null;
-        if (found && stored) { existing = found; key = stored; }
-    }
+    const { key, file: existing } = await heldFile(storage, ownerGaii, asked);
     if (!existing) {
         return {
             ok: false, status: 404, code: 'NOT_FOUND',
@@ -707,19 +714,15 @@ export async function changeStorageFileVisibility(
 ): Promise<StorageVisibilityResult> {
     const { storage, config } = deps;
     // The account's own extension's file by its short key, as removeStorageFile reads it.
-    const key = await storage.getStorageFileMeta(ownerGaii, asked)
-        ? asked : (await ownExtensionFileKey(storage, asked, localAccountName(ownerGaii))) ?? asked;
+    const { key, file } = await heldFile(storage, ownerGaii, asked);
     // 'group' keeps the group the file has, and this change cannot name one. A file with none would
     // open to nobody, so it is refused. A file that is not there falls through to the 404 below.
-    if (requested === 'group') {
-        const file = await storage.getStorageFileMeta(ownerGaii, key);
-        if (file && !file.groupId) {
-            return {
-                ok: false, status: 400, code: 'INVALID_INPUT',
-                message: 'This file has no group, and changing its visibility cannot give it one, so visibility "group" would open it to nobody. '
-                    + 'Upload it again with visibility "group" and group_id, or send visibility "workspace" with workspace_refs.',
-            };
-        }
+    if (requested === 'group' && file && !file.groupId) {
+        return {
+            ok: false, status: 400, code: 'INVALID_INPUT',
+            message: 'This file has no group, and changing its visibility cannot give it one, so visibility "group" would open it to nobody. '
+                + 'Upload it again with visibility "group" and group_id, or send visibility "workspace" with workspace_refs.',
+        };
     }
     // 'organism:<id>' names an organism the file owner's account is an active member of.
     const audience = await organismVisibilityRefusal(storage, requested, { identity: ownerGaii, ...(opts.federated !== undefined ? { federated: opts.federated } : {}) });
