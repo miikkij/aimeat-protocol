@@ -15,6 +15,9 @@
  *   switching it off makes every agent's scopes advisory, which whoever runs the node decides.
  * @structure ACCESS_CONFIG_FIELDS
  * @version-history
+ *   2026-11-04 — The sign-in policy rows and mcp.capability_use_approval carry `aiMayOnlyTighten`: the order
+ *     of their values and the refusal an AI gets for a looser one, worded as before (codebase analysis
+ *     2026-11-03, item B4).
  *   v1.4.0 — 2026-11-03 — mcp.capability_use_approval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL: off, operators,
  *     ask; default operators), mutable, read on every call. A change that loosens it is refused to an AI
  *     credential (services/mcp-client/capability-use-setting.ts, asked by config-admin-view.ts).
@@ -32,10 +35,31 @@
  */
 // Typed by the keys alone, not AimeatConfig, which would close an import cycle through
 // config-types.ts; config-schema.ts checks each key against AimeatConfig where it spreads the rows.
-import type { ConfigFieldShape } from './config-field-def.js';
+import type { ConfigFieldShape, TightenOnly } from './config-field-def.js';
 import { isEmptyOrHttpUrl, oneOf } from './config-schema-validators.js';
 import { TWO_STEP_REQUIRED_VALUES, PASSWORD_SIGN_IN_VALUES, SIGN_IN_LOCKOUT_VALUES } from '../config-types-account-security.js';
-import { MCP_CAPABILITY_USE_APPROVAL_VALUES } from '../config-types-agent-access.js';
+import { MCP_CAPABILITY_USE_APPROVAL_VALUES, CAPABILITY_USE_APPROVAL_LABEL } from '../config-types-agent-access.js';
+
+/**
+ * The sign-in policy (services/sign-in-policy.ts): an AI may only make these stricter, and the three are
+ * judged as one group, so in a request that weakens two of them the first in the request is answered.
+ */
+const signInPolicy = (path: string, order: readonly string[]): TightenOnly => ({
+  order, group: 'sign-in policy',
+  refusal: (from, to) => ({ message: `Changing ${path} from ${from} to ${to} makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves.` }),
+});
+
+/** mcp.capability_use_approval (services/mcp-client/capability-use-setting.ts): a looser value asks fewer people. */
+const CAPABILITY_USE_APPROVAL_TIGHTEN: TightenOnly = {
+  order: MCP_CAPABILITY_USE_APPROVAL_VALUES,
+  refusal: (from, to) => ({
+    details: { setting: 'mcp.capability_use_approval', from, to },
+    message: `The setting "${CAPABILITY_USE_APPROVAL_LABEL}" decides who is asked before another account's tool acts as a person `
+      + `on a server where each person signs in with their own account. Changing it from ${from} to ${to} asks fewer people, `
+      + 'so an AI does not make that change. The node\'s operator makes it signed in themselves, under Admin, Config. '
+      + 'An AI may make it stricter: from off to operators, or from operators to ask.',
+  }),
+};
 
 const whole = (min: number) => (v: unknown): boolean => typeof v === 'number' && Number.isInteger(v) && v >= min;
 const bool = (v: unknown): boolean => typeof v === 'boolean';
@@ -60,9 +84,9 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   { key: 'ecoJwtTtlSeconds', dotPath: 'auth.eco_jwt_ttl_seconds', envVar: 'AIMEAT_ECO_JWT_TTL', type: 'number', validate: whole(1), immutable: false, description: 'How long an ecosystem app\'s token lasts, in seconds (default 7776000, 90 days)', range: '60-31536000' },
 
   // ── Which sign-ins a person may use (services/sign-in-policy.ts) ──
-  { key: 'twoStepRequired', dotPath: 'auth.two_step_required', envVar: 'AIMEAT_TWO_STEP_REQUIRED', type: 'string', ...oneOf(...TWO_STEP_REQUIRED_VALUES), immutable: false, description: 'Who must use two-step sign-in: off (nobody is made to), operators (accounts with the operator role) or everyone. A password or emailed-link sign-in of such an account without a code app set up asks the person to set one up before it opens. A passkey and a sign-in through an identity provider count as two-step. A signed-in session of such an account with no code app, passkey or identity provider link ends at its next renewal, so the person signs in again and sets it up. An AI cannot lower it' },
-  { key: 'passwordSignIn', dotPath: 'auth.password_sign_in', envVar: 'AIMEAT_PASSWORD_SIGN_IN', type: 'string', ...oneOf(...PASSWORD_SIGN_IN_VALUES), immutable: false, description: 'Who may sign in with a password: on (everyone), operators (only accounts with the operator role, as a way in when other ways fail) or off (nobody: people use a passkey, the organisation\'s sign-in or an emailed sign-in link). Off and operators also refuse a new password: password registration, invitations with a password, and password reset. Off is refused while no operator has a passkey or an identity provider link. An AI cannot open it wider' },
-  { key: 'signInLockout', dotPath: 'auth.sign_in_lockout', envVar: 'AIMEAT_SIGN_IN_LOCKOUT', type: 'string', ...oneOf(...SIGN_IN_LOCKOUT_VALUES), immutable: false, description: 'Whether wrong passwords and wrong two-step codes lock an account for a while: off (default, nothing is counted and nobody is locked out) or on (AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS and _MINUTES, AIMEAT_TOTP_MAX_FAILED and AIMEAT_TOTP_LOCKOUT_SECONDS then decide when and how long). A lock also lets anyone who knows a username keep its owner out; with it off, the per-address delay and the login rate limit bound guessing. An AI cannot switch it off' },
+  { key: 'twoStepRequired', dotPath: 'auth.two_step_required', envVar: 'AIMEAT_TWO_STEP_REQUIRED', type: 'string', ...oneOf(...TWO_STEP_REQUIRED_VALUES), aiMayOnlyTighten: signInPolicy('auth.two_step_required', TWO_STEP_REQUIRED_VALUES), immutable: false, description: 'Who must use two-step sign-in: off (nobody is made to), operators (accounts with the operator role) or everyone. A password or emailed-link sign-in of such an account without a code app set up asks the person to set one up before it opens. A passkey and a sign-in through an identity provider count as two-step. A signed-in session of such an account with no code app, passkey or identity provider link ends at its next renewal, so the person signs in again and sets it up. An AI cannot lower it' },
+  { key: 'passwordSignIn', dotPath: 'auth.password_sign_in', envVar: 'AIMEAT_PASSWORD_SIGN_IN', type: 'string', ...oneOf(...PASSWORD_SIGN_IN_VALUES), aiMayOnlyTighten: signInPolicy('auth.password_sign_in', PASSWORD_SIGN_IN_VALUES), immutable: false, description: 'Who may sign in with a password: on (everyone), operators (only accounts with the operator role, as a way in when other ways fail) or off (nobody: people use a passkey, the organisation\'s sign-in or an emailed sign-in link). Off and operators also refuse a new password: password registration, invitations with a password, and password reset. Off is refused while no operator has a passkey or an identity provider link. An AI cannot open it wider' },
+  { key: 'signInLockout', dotPath: 'auth.sign_in_lockout', envVar: 'AIMEAT_SIGN_IN_LOCKOUT', type: 'string', ...oneOf(...SIGN_IN_LOCKOUT_VALUES), aiMayOnlyTighten: signInPolicy('auth.sign_in_lockout', SIGN_IN_LOCKOUT_VALUES), immutable: false, description: 'Whether wrong passwords and wrong two-step codes lock an account for a while: off (default, nothing is counted and nobody is locked out) or on (AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS and _MINUTES, AIMEAT_TOTP_MAX_FAILED and AIMEAT_TOTP_LOCKOUT_SECONDS then decide when and how long). A lock also lets anyone who knows a username keep its owner out; with it off, the per-address delay and the login rate limit bound guessing. An AI cannot switch it off' },
 
   // ── Sign in with Google ──
   { key: 'googleOAuthEnabled', dotPath: 'auth.google_enabled', envVar: 'AIMEAT_GOOGLE_OAUTH_ENABLED', type: 'boolean', validate: bool, immutable: false, applies: 'restart', description: 'Offer "Sign in with Google"' },
@@ -89,6 +113,6 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   { key: 'maxEcoScopes', dotPath: 'scopes.max_eco_scopes', envVar: 'AIMEAT_MAX_ECO_SCOPES', type: 'object', list: true, validate: words, immutable: false, description: 'The most an ecosystem app may be granted; * allows any permission the owner approves' },
   { key: 'sameOwnerAutoApprove', dotPath: 'agents.same_owner_auto_approve', envVar: 'AIMEAT_SAME_OWNER_AUTO_APPROVE', type: 'boolean', validate: bool, immutable: false, description: 'An agent connected by its own owner, or by one of the owner\'s agents, is approved without a second press. Never across owners, never with more permissions' },
   { key: 'mcpEnforceScopes', dotPath: 'mcp.enforce_scopes', envVar: 'AIMEAT_MCP_ENFORCE_SCOPES', type: 'boolean', validate: bool, immutable: true, description: 'Refuse an MCP tool an agent holds no permission for. Off only logs the call, so every agent can use every tool. Set by whoever runs the node, in the environment' },
-  { key: 'mcpCapabilityUseApproval', dotPath: 'mcp.capability_use_approval', envVar: 'AIMEAT_MCP_CAPABILITY_USE_APPROVAL', type: 'string', ...oneOf(...MCP_CAPABILITY_USE_APPROVAL_VALUES), immutable: false, description: 'Whether a capability another account published asks first when it runs a tool on an MCP server where each person signs in with their own account, where it acts as the person who uses it. ask: the first use of every other account\'s capability asks that person once, with one press; it costs a press for each new one, the operator\'s own included. operators (default): a capability of an account with the operator role runs without asking and every other account\'s asks once; the operator already holds every right on the node, so this gives no protection away. off: nothing asks, and another account\'s capability runs on the person\'s own sign-in there; it costs the person their say over which tool acts as them. Read on every call. An AI cannot lower it' },
+  { key: 'mcpCapabilityUseApproval', dotPath: 'mcp.capability_use_approval', envVar: 'AIMEAT_MCP_CAPABILITY_USE_APPROVAL', type: 'string', ...oneOf(...MCP_CAPABILITY_USE_APPROVAL_VALUES), aiMayOnlyTighten: CAPABILITY_USE_APPROVAL_TIGHTEN, immutable: false, description: 'Whether a capability another account published asks first when it runs a tool on an MCP server where each person signs in with their own account, where it acts as the person who uses it. ask: the first use of every other account\'s capability asks that person once, with one press; it costs a press for each new one, the operator\'s own included. operators (default): a capability of an account with the operator role runs without asking and every other account\'s asks once; the operator already holds every right on the node, so this gives no protection away. off: nothing asks, and another account\'s capability runs on the person\'s own sign-in there; it costs the person their say over which tool acts as them. Read on every call. An AI cannot lower it' },
   { key: 'mcpTaskAfterMs', dotPath: 'mcp.task_after_ms', envVar: 'AIMEAT_MCP_TASK_AFTER_MS', type: 'number', validate: v => whole(0)(v) && (v as number) <= 600000, immutable: false, description: 'A tool call from an AI client that supports MCP tasks and runs longer than this many milliseconds answers at once with a task the client checks later (0 = every such call)', range: '0-600000' },
 ];

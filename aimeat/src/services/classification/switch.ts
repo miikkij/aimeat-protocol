@@ -25,6 +25,10 @@
  * @usage
  *   const out = await setClassificationSwitch({ storage, config }, { auth: req.auth!, scopes }, 'all');
  * @version-history
+ *   v1.2.0 — 2026-11-04 — The order and the refusal's words moved onto the setting's row
+ *     (config-schema-data-access.ts), judged by config-strictness.ts; the write names the caller to
+ *     applyConfigChanges, which asks the same rule. The answers are the same (codebase analysis
+ *     2026-11-03, item B4).
  *   v1.1.0 — 2026-10-18 — A switch from off to owner or all makes the default caps offer of a node that
  *     ran before, when it waits (default-caps.ts, plan doc-mvdipuyqraas, L5.1).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review: the switch over MCP, and recorded).
@@ -34,6 +38,7 @@ import type { ClassificationMode } from '../../config-data-access.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ConfigProvenance } from '../config-provenance.js';
 import { applyConfigChanges } from '../config-apply.js';
+import { settingLoosens, looseningRefusal } from '../config-strictness.js';
 import { isSealed, sealRefusal } from '../config-sealing.js';
 import { emitChange } from '../event-bus.js';
 import { askOperator } from '../operator-principal.js';
@@ -61,19 +66,22 @@ export interface SwitchCaller {
   app?: string;
 }
 
-/** Whether moving the switch from `from` to `to` gives protection away. */
+/**
+ * Whether moving the switch from `from` to `to` gives protection away: off, owner, all from open to
+ * strict, the order on the setting's row (config-schema-data-access.ts).
+ */
 export function switchLoosens(from: string, to: string): boolean {
-  return (to === 'off' && from !== 'off') || (from === 'all' && to === 'owner');
+  return settingLoosens(CLASSIFICATION_MODE_PATH, from, to);
 }
 
 /**
  * The refusal an AI credential gets for a loosening switch change, or null when the change may
- * proceed. A person's own session is never refused here.
+ * proceed. A person's own session is never refused here. Worded by the row and judged by
+ * config-strictness.ts, as every config write path does.
  */
 export function switchRefusal(caller: SwitchCaller, from: string, to: string): ClassificationError | null {
-  if (!switchLoosens(from, to) || readerKindOf(caller) === 'human') return null;
-  return new ClassificationError('PERSON_REQUIRED', 403,
-    `Changing classification from ${from} to ${to} gives protection away, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves.`);
+  const r = looseningRefusal(caller, CLASSIFICATION_MODE_PATH, from, to);
+  return r ? new ClassificationError(r.code, r.status, r.message) : null;
 }
 
 /** Keep one switch change in the audit log. Never throws, never awaits (audit.ts). */
@@ -120,7 +128,7 @@ export async function setClassificationSwitch(
   if (from === next) return { applied: false, mode: next, from };
   const refusal = switchRefusal(caller, from, next);
   if (refusal) throw refusal;
-  const { errors } = await applyConfigChanges(deps, [{ path: CLASSIFICATION_MODE_PATH, value: next }]);
+  const { errors } = await applyConfigChanges({ ...deps, caller }, [{ path: CLASSIFICATION_MODE_PATH, value: next }]);
   if (errors.length) {
     throw new ClassificationError('NOT_SAVED', 500, errors.map(e => e.reason).join(' '));
   }

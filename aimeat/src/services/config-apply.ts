@@ -8,9 +8,18 @@
  *   /v1/admin/config) unchanged, so that a second door that changes settings (Themes & Styles'
  *   "who chooses", PUT /v1/themes/policy and aimeat_theme_policy_set) goes through the same code.
  *   The sealed-path refusal stays with the caller: it answers before anything is applied.
- * @structure ConfigChange · ConfigApplyResult · applyConfigChanges(deps, changes)
- * @usage const r = await applyConfigChanges({ config, storage, provenance }, [{ path, value }]);
+ *
+ *   THE RULE ON THE ROW. A setting whose row says an AI may only make it stricter (`aiMayOnlyTighten`,
+ *   config-strictness.ts) is judged here for the credential in `deps.caller`, before anything in the
+ *   request is written, and resetConfigValue judges the removal of its saved value. Every setting row
+ *   is written through storeConfigValue (check:single-entry rule config-write).
+ * @structure ConfigChange · ConfigApplyResult · ConfigWriteDeps · storeConfigValue · applyConfigChanges(deps, changes) ·
+ *   ConfigResetResult · resetConfigValue(deps, path)
+ * @usage const r = await applyConfigChanges({ config, storage, provenance, caller: req.auth }, [{ path, value }]);
  * @version-history
+ *   2026-11-04 — `deps.caller` and the tighten-only check before anything is written; resetConfigValue,
+ *     which DELETE /v1/admin/config/:path calls instead of storage; storeConfigValue, the one writer of
+ *     a setting row (codebase analysis 2026-11-03, item B4).
  *   2026-10-25 — A row with `applies: 'restart'` is stored and not written to the running config; the
  *     answer names it, and the Config tab says the node runs with the old value until it restarts.
  *   2026-10-16 — A refused value is answered with the row's `refusal` when it has one (eudiw.enabled; QA audit D6-01).
@@ -34,6 +43,8 @@ import { isSecretField } from './config-sealing.js';
 import { sealSettingForStorage } from './config-at-rest-rows.js';
 import { withinStatedRange, RANGE_ENFORCED, rangeKindOf, numericRangeOf, asList } from './config-schema-validators.js';
 import { syncRateLimitTiers } from './config-rate-limit-sync.js';
+import { requestLooseningRefusal, resetRefusal, type TightenRefusal } from './config-strictness.js';
+import type { ReaderCredential } from './classification/reader-kind.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 
 export interface ConfigChange { path?: unknown; value?: unknown }
@@ -41,15 +52,37 @@ export interface ConfigApplyResult {
     /** `applies: 'restart'`: stored, and the running value stays the old one until the next start. */
     applied: { path: string; old_value: unknown; new_value: unknown; secret?: true; applies?: 'restart' }[];
     errors: { path: string; reason: string }[];
+    /**
+     * A change an AI may not make (config-strictness.ts): nothing in the request was written, and
+     * `errors` names the setting too, so a caller that reads only `errors` sees that nothing applied.
+     */
+    refused?: TightenRefusal;
+}
+
+/** Who asks for the write: the request's or the tool session's credential (classification/reader-kind.ts reads it). */
+export interface ConfigWriteDeps { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance; caller?: ReaderCredential | null }
+
+/**
+ * Store one setting's raw text, a secret row encrypted with the node key (config-at-rest.ts). The one
+ * place a setting row is written; the rule checks are the caller's (applyConfigChanges, or an import
+ * whose values the caller did not choose: the Consul import and `aimeat config import`).
+ */
+export async function storeConfigValue(storage: Pick<Storage, 'setConfigValue'>, config: AimeatConfig, path: string, raw: string): Promise<void> {
+    await storage.setConfigValue(path, sealSettingForStorage(path, raw, config));
 }
 
 export async function applyConfigChanges(
-    deps: { config: AimeatConfig; storage: Storage; provenance?: ConfigProvenance },
+    deps: ConfigWriteDeps,
     changes: ConfigChange[],
 ): Promise<ConfigApplyResult> {
     const { config, storage, provenance } = deps;
     const applied: ConfigApplyResult['applied'] = [];
     const errors: ConfigApplyResult['errors'] = [];
+
+    // A setting an AI may only make stricter (its row's `aiMayOnlyTighten`) is refused a looser value
+    // before anything in the request is written. A write that names no caller is judged as an AI's.
+    const refused = requestLooseningRefusal(deps.caller, config, changes);
+    if (refused) return { applied, errors: [{ path: refused.path, reason: refused.message }], refused };
 
     for (const change of changes) {
         const { path, value: sent } = change ?? {};
@@ -90,7 +123,7 @@ export async function applyConfigChanges(
         // nobody investigates a success.
         try {
             // A secret row is stored encrypted (services/config-at-rest.ts; secrets audit 2026-10-09, S4b).
-            await storage.setConfigValue(path, sealSettingForStorage(path, serializeFieldValue(mapping, value), config));
+            await storeConfigValue(storage, config, path, serializeFieldValue(mapping, value));
         } catch (e) {
             logger.error('admin-config: a change could not be persisted, so it was not applied', { path, error: String(e) });
             errors.push({
@@ -121,4 +154,19 @@ export async function applyConfigChanges(
     // A saved rate limit reaches the running limiters now, not at the next restart; so does the log level.
     if (applied.length > 0) { syncRateLimitTiers(config); setLogLevel(config.logLevel); }
     return { applied, errors };
+}
+
+export type ConfigResetResult = { ok: true } | { ok: false; status: number; code: string; message: string; details: Record<string, unknown> };
+
+/**
+ * Remove a setting's saved value, so it falls back to the server's files, the environment or the
+ * default at the next start (DELETE /v1/admin/config/:path). An AI credential is refused it for a
+ * setting it may only make stricter (config-strictness.ts resetRefusal), before storage is touched. The
+ * sealed and unknown paths are the caller's to answer first; the running value is not changed here.
+ */
+export async function resetConfigValue(deps: Pick<ConfigWriteDeps, 'storage' | 'caller'>, path: string): Promise<ConfigResetResult> {
+    const refusal = resetRefusal(deps.caller, path);
+    if (refusal) return { ok: false, ...refusal };
+    await deps.storage.deleteConfigValue(path);
+    return { ok: true };
 }

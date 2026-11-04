@@ -16,41 +16,36 @@
  *   WHO CHANGES IT. A change to a more open value asks fewer people, so an AI credential is refused it
  *   with PERSON_REQUIRED, the way the sign-in policy is guarded (sign-in-policy.ts
  *   signInPolicyChangeRefusal, the same reader-kind test). A change to a stricter value applies from
- *   an AI too. config-admin-view.ts asks this before anything in a request is applied.
+ *   an AI too. Every config write and reset path asks the rule (config-strictness.ts) before anything in a
+ *   request is applied.
  * @structure CAPABILITY_USE_APPROVAL_PATH · CAPABILITY_USE_APPROVAL_LABEL · capabilityUseApprovalLoosens ·
  *   capabilityUseApprovalChangeRefusal
  * @usage
  *   const refused = capabilityUseApprovalChangeRefusal(caller, config.mcpCapabilityUseApproval, change.value);
  * @version-history
+ *   v1.1.0 — 2026-11-04 — The order and the refusal's words moved onto the setting's row
+ *     (config-schema-access.ts), judged by config-strictness.ts, which every config write and reset path
+ *     asks; the answers are the same (codebase analysis 2026-11-03, item B4).
  *   v1.0.0 — 2026-11-03 — Initial (secaudit2026nov02d round 13b).
  */
-import { MCP_CAPABILITY_USE_APPROVAL_VALUES } from '../../config-types-agent-access.js';
-import { readerKindOf } from '../classification/reader-kind.js';
+import { CAPABILITY_USE_APPROVAL_LABEL } from '../../config-types-agent-access.js';
+import { settingLoosens, looseningRefusal } from '../config-strictness.js';
 import type { PolicyCaller, PolicyRefusal } from '../sign-in-policy.js';
 
 export const CAPABILITY_USE_APPROVAL_PATH = 'mcp.capability_use_approval';
 /** The setting's name as the Config tab shows it in English (dashboard.cfg_mcp_capability_use_approval). */
-export const CAPABILITY_USE_APPROVAL_LABEL = 'Ask before another account\'s tool uses a person\'s sign-in';
+export { CAPABILITY_USE_APPROVAL_LABEL };
 
-const strictness = (value: unknown): number =>
-  typeof value === 'string' ? (MCP_CAPABILITY_USE_APPROVAL_VALUES as readonly string[]).indexOf(value) : -1;
-
-/** Whether moving the setting from `from` to `to` asks fewer people. */
+/** Whether moving the setting from `from` to `to` asks fewer people (the row's order, off to operators to ask). */
 export function capabilityUseApprovalLoosens(from: unknown, to: unknown): boolean {
-  const a = strictness(from);
-  const b = strictness(to);
-  return a >= 0 && b >= 0 && b < a;
+  return settingLoosens(CAPABILITY_USE_APPROVAL_PATH, from, to);
 }
 
-/** The refusal an AI credential gets for a change that asks fewer people, or null. */
+/**
+ * The refusal an AI credential gets for a change that asks fewer people, or null. Worded by the
+ * setting's row (config-schema-access.ts) and judged by config-strictness.ts, as every write path does.
+ */
 export function capabilityUseApprovalChangeRefusal(caller: PolicyCaller, from: unknown, to: unknown): (PolicyRefusal & { details: Record<string, unknown> }) | null {
-  if (!capabilityUseApprovalLoosens(from, to) || readerKindOf(caller) === 'human') return null;
-  return {
-    status: 403, code: 'PERSON_REQUIRED',
-    details: { setting: CAPABILITY_USE_APPROVAL_PATH, from, to },
-    message: `The setting "${CAPABILITY_USE_APPROVAL_LABEL}" decides who is asked before another account's tool acts as a person `
-      + `on a server where each person signs in with their own account. Changing it from ${String(from)} to ${String(to)} asks fewer people, `
-      + 'so an AI does not make that change. The node\'s operator makes it signed in themselves, under Admin, Config. '
-      + 'An AI may make it stricter: from off to operators, or from operators to ask.',
-  };
+  const r = looseningRefusal(caller, CAPABILITY_USE_APPROVAL_PATH, from, to);
+  return r ? { status: r.status, code: r.code, details: r.details ?? {}, message: r.message } : null;
 }

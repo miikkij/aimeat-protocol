@@ -43,6 +43,9 @@
  *   const off = passwordSignInRefusal(config);           // before the password is read
  *   if (off) { res.status(off.status).json(error(config.nodeId, off.code, off.message)); return; }
  * @version-history
+ *   v1.4.0 — 2026-11-04 — The three settings' order and the refusal's words moved onto their rows
+ *     (config-schema-access.ts), judged by config-strictness.ts, which every config write and reset path
+ *     asks; the answers are the same (codebase analysis 2026-11-03, item B4).
  *   v1.3.0 — 2026-11-02 — auth.sign_in_lockout is a setting an AI may turn on and not off (signInPolicyLoosens).
  *   v1.2.0 — 2026-11-02 — Under `operators` the refusal says the password is the operators' only, which
  *     agrees with the sign-in dialog's line; under `off` it says the server takes none (browser check).
@@ -52,9 +55,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
-import { PASSWORD_SIGN_IN_VALUES, SIGN_IN_LOCKOUT_VALUES, TWO_STEP_REQUIRED_VALUES } from '../config-types-account-security.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
-import { readerKindOf } from './classification/reader-kind.js';
+import { settingLoosens, looseningRefusal } from './config-strictness.js';
 import { twoStepArmed } from './passkeys.js';
 
 export const TWO_STEP_REQUIRED_PATH = 'auth.two_step_required';
@@ -73,19 +75,12 @@ type PolicyConfig = Pick<AimeatConfig, 'twoStepRequired' | 'passwordSignIn'>;
 /** The other ways in, named in every refusal of a password. */
 const OTHER_WAYS = 'Sign in with a passkey, with your organisation\'s sign-in, or with a sign-in link sent to your email.';
 
-/** Index of a value in its open-to-strict order, or -1 for a value the setting does not take. */
-function strictness(path: string, value: unknown): number {
-  const order: readonly string[] = path === TWO_STEP_REQUIRED_PATH ? TWO_STEP_REQUIRED_VALUES
-    : path === PASSWORD_SIGN_IN_PATH ? PASSWORD_SIGN_IN_VALUES
-      : path === SIGN_IN_LOCKOUT_PATH ? SIGN_IN_LOCKOUT_VALUES : [];
-  return typeof value === 'string' ? order.indexOf(value) : -1;
-}
+/** The three settings of the policy; each row carries its open-to-strict order (config-schema-access.ts). */
+const POLICY_PATHS: readonly string[] = [TWO_STEP_REQUIRED_PATH, PASSWORD_SIGN_IN_PATH, SIGN_IN_LOCKOUT_PATH];
 
-/** Whether moving one of these settings from `from` to `to` gives protection away. */
+/** Whether moving one of these settings from `from` to `to` gives protection away. False for any other setting. */
 export function signInPolicyLoosens(path: string, from: unknown, to: unknown): boolean {
-  const a = strictness(path, from);
-  const b = strictness(path, to);
-  return a >= 0 && b >= 0 && b < a;
+  return POLICY_PATHS.includes(path) && settingLoosens(path, from, to);
 }
 
 /** The credential asking for the change, as the config route and the MCP tool carry it. */
@@ -96,9 +91,10 @@ export interface PolicyCaller { roles?: string[]; via?: string; anonymous?: bool
  * session is never refused here; a value the setting does not take is left to the validator.
  */
 export function signInPolicyChangeRefusal(caller: PolicyCaller, path: string, from: unknown, to: unknown): PolicyRefusal | null {
-  if (!signInPolicyLoosens(path, from, to) || readerKindOf(caller) === 'human') return null;
-  return { status: 403, code: 'PERSON_REQUIRED',
-    message: `Changing ${path} from ${String(from)} to ${String(to)} makes signing in to this server less safe, so an AI does not make it. The operator makes it on the admin Config page, signed in themselves.` };
+  if (!POLICY_PATHS.includes(path)) return null;
+  // Worded by the row and judged by config-strictness.ts, as every config write path does.
+  const r = looseningRefusal(caller, path, from, to);
+  return r ? { status: r.status, code: r.code, message: r.message } : null;
 }
 
 /** Whether the two-step policy covers this account. `owner` is the stored account record. */

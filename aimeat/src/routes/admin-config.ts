@@ -18,6 +18,9 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-11-04 -- DELETE removes the saved value through resetConfigValue, which asks the setting's own
+ *     row whether an AI may reset it; the Consul import writes through storeConfigValue. The answers are
+ *     the same (codebase analysis 2026-11-03, item B4).
  *   2026-11-03 -- DELETE refuses an AI credential PERSON_REQUIRED for a setting it may only make stricter
  *     (resetNodeSettingRefusal), as PUT does for a looser value (secaudit2026nov02d round 13b).
  *   2026-10-25 -- GET's list and PUT's checks moved to services/config-admin-view.ts unchanged, so the
@@ -70,8 +73,8 @@ import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV } from '../services/config-schema.js';
 import { planConsulExport } from '../services/consul-export.js';
-import { sealSettingForStorage } from '../services/config-at-rest-rows.js';
-import { buildConfigView, changeNodeSettings, resetNodeSettingRefusal } from '../services/config-admin-view.js';
+import { storeConfigValue, resetConfigValue } from '../services/config-apply.js';
+import { buildConfigView, changeNodeSettings } from '../services/config-admin-view.js';
 import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
@@ -137,14 +140,14 @@ export function adminConfigRouter(
             return;
         }
         // A setting an AI may only make stricter is not reset by an AI either: the value it falls back to
-        // can be less strict (services/config-admin-view.ts resetNodeSettingRefusal).
-        const personOnly = resetNodeSettingRefusal(req.auth!, path);
-        if (personOnly) {
-            res.status(personOnly.status).json(error(config.nodeId, personOnly.code, personOnly.message, undefined, personOnly.details));
+        // can be less strict. resetConfigValue asks the setting's row before storage is touched
+        // (services/config-apply.ts, config-strictness.ts).
+        const reset = await resetConfigValue({ storage, caller: req.auth! }, path);
+        if (!reset.ok) {
+            res.status(reset.status).json(error(config.nodeId, reset.code, reset.message, undefined, reset.details));
             return;
         }
 
-        await storage.deleteConfigValue(path);
         const actorGaii = resolveIdentity(req.auth!, config.nodeId);
         recordOperatorNodeAct({ operatorGhii: ownerGhiiOf(actorGaii), actorGaii, area: 'config', action: 'reset', meta: { paths: path, count: 1 } });
 
@@ -230,11 +233,13 @@ export function adminConfigRouter(
         // The node is running, so a row read once at start is stored and waits for the next start.
         const { applied, sealed, atRestart } = applyConsulValues(config, values, { running: true });
 
-        // Persist to DB if available
+        // Persist to DB if available. The values are the ones in the operator's Consul, which the caller
+        // did not choose here, so the tighten-only rule of applyConfigChanges is not asked; whether it
+        // should be for an AI caller is an open question (codebase analysis 2026-11-03, item B4).
         if (storage.supportsConfigPersistence()) {
             for (const dotPath of [...applied, ...atRestart]) {
                 // A secret row is stored encrypted, as PUT stores it (services/config-at-rest.ts).
-                await storage.setConfigValue(dotPath, sealSettingForStorage(dotPath, values[dotPath], config));
+                await storeConfigValue(storage, config, dotPath, values[dotPath]);
             }
             if (provenance) { provenance.markDatabase(applied); provenance.markDatabaseAtRestart(atRestart); }
         } else if (provenance) provenance.markConsulAtRestart(atRestart);

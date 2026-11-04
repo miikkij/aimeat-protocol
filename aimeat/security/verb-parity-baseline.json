@@ -1,0 +1,258 @@
+{
+  "note": "scripts/check-verb-parity.ts: per route path whose writing verbs name different guards, each verb's guards as the script reads them and why the difference is right. Seeded 2026-11-04 (codebase analysis 2026-11-03, B4); UNTRIAGED is the seeding's placeholder for a difference nobody has decided yet. requireRole('agent') admits an agent, the owner and the operator; requireRole('owner') admits the owner and the operator, not an agent (auth/middleware.ts). The list only shrinks.",
+  "paths": {
+    "/v1/agents/:/tasks/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireRole('owner')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireReadiness('standard',config,storage)"
+        ]
+      },
+      "why": "UNTRIAGED: PATCH (routes/agent-tasks/lifecycle.ts, the agent updating its task) asks the agent's readiness level and no scope; DELETE (the same file) admits the owner and the operator only. Lead, not decided."
+    },
+    "/v1/agents/v2/connectors/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireOwnerPrincipal()"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireScope('agent:write')"
+        ]
+      },
+      "why": "UNTRIAGED: PATCH (routes/agents-v2/connectors.ts, rename or settings) admits a principal holding agent:write; DELETE admits the owner in person only (requireOwnerPrincipal). Lead, not decided."
+    },
+    "/v1/apps/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('app:manage')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireScope('app:write')"
+        ]
+      },
+      "why": "Designed: app:manage is the word for deleting an app, forking one and removing a template, app:write the word for changing one (services/scope-vocabulary-migration.ts); deleting asks the stronger word."
+    },
+    "/v1/apps/:/:/roadmap": {
+      "verbs": {
+        "PATCH": [
+          "requireAuth()",
+          "requireScope('app:write')"
+        ],
+        "POST": [
+          "requireAuth()",
+          "requireScope('social:write')"
+        ]
+      },
+      "why": "Designed (routes/apps/roadmap.ts): POST leaves a wish on somebody's app, the same kind of act as a board post, so it asks social:write and no right over the app; PATCH opens or closes the wishes, the owner's own decision, so it asks app:write and the handler checks the owner."
+    },
+    "/v1/contacts/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireLocalSession()",
+          "requireRole('agent')",
+          "requireScope('messages:send')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireLocalSession()",
+          "requireRole('owner')"
+        ]
+      },
+      "why": "UNTRIAGED: PATCH (routes/contacts.ts) admits the owner and the operator only; DELETE also admits the owner's agent holding messages:send. Lead from the codebase analysis 2026-11-03 finding 12, not decided."
+    },
+    "/v1/ghii": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireOwnerPrincipal()"
+        ],
+        "POST": [],
+        "PUT": [
+          "requireAuth()",
+          "requireScope('memory:write-reserved')"
+        ]
+      },
+      "why": "Three different acts on one path: POST registers a new account, so there is no credential yet (registrationLimit and the registration mode in provisionOwner guard it); PUT changes the profile (memory:write-reserved); DELETE erases the account, the owner in person only."
+    },
+    "/v1/groups/:/members/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireRole('agent')",
+          "requireScope('consent:groups')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireRole('owner')"
+        ]
+      },
+      "why": "UNTRIAGED: PATCH (routes/sharing-groups.ts, a member's role) admits the owner and the operator only; DELETE (remove a member) also admits the owner's agent holding consent:groups. Lead, not decided."
+    },
+    "/v1/memory/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireExternalPrincipal()",
+          "requireScope('memory:delete')",
+          "workspaceAccess"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireExternalPrincipal()",
+          "requireScope('memory:write')",
+          "workspaceAccess"
+        ],
+        "PUT": [
+          "requireAuth()",
+          "requireExternalPrincipal()",
+          "requireScope('memory:write')",
+          "workspaceAccess"
+        ]
+      },
+      "why": "Designed (security invariant 8, docs/coding-guidelines/security-development-dna.md): DELETE moves the record to the deleted-memory bin, where the owner restores it, and asks memory:delete; writing asks memory:write."
+    },
+    "/v1/memory/:/schema": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('memory:write')"
+        ],
+        "PUT": [
+          "requireAuth()"
+        ]
+      },
+      "why": "UNTRIAGED: PUT (routes/schemas.ts) checks in the handler that the caller has the owner role or is the operator (isOperatorCaller), with an entry in route-scope-exemptions.json; DELETE asks memory:write and admits an agent holding it. Lead, not decided."
+    },
+    "/v1/notifications": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('memory:delete')"
+        ],
+        "POST": [
+          "requireAuth()",
+          "requireScope('notifications:send')"
+        ]
+      },
+      "why": "Two different acts on one path (routes/notifications.ts): POST sends a notification (notifications:send); DELETE removes the caller's own notification records, which are memory records under the owner's notification prefix (memory:delete)."
+    },
+    "/v1/organisms/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireRole('agent')",
+          "requireScope('organism:write','memory:purge')"
+        ],
+        "PUT": [
+          "requireAuth()",
+          "requireRole('agent')",
+          "requireScope('organism:write')"
+        ]
+      },
+      "why": "Designed (security invariant 8): deleting an organism cannot be undone, so it asks memory:purge beside organism:write."
+    },
+    "/v1/organisms/:/workspace": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireRole('agent')",
+          "requireScope('organism:write','memory:purge')"
+        ],
+        "PUT": [
+          "requireAuth()",
+          "requireRole('agent')",
+          "requireScope('organism:write')"
+        ]
+      },
+      "why": "Designed (security invariant 8): wiping a workspace cannot be undone, so it asks memory:purge beside organism:write."
+    },
+    "/v1/organisms/:/workspace/rows/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('organism:write','memory:purge')"
+        ],
+        "POST": [
+          "requireAnyScope('organism:write','organism:rows')",
+          "requireAuth()"
+        ]
+      },
+      "why": "Designed (security invariant 8): removing workspace rows asks memory:purge beside organism:write; appending rows takes organism:write or the narrower organism:rows (routes/organisms/workspace-rows.ts)."
+    },
+    "/v1/packages/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('app:manage')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireScope('app:write')"
+        ]
+      },
+      "why": "Designed: deleting asks app:manage and changing asks app:write, as for an app (services/scope-vocabulary-migration.ts)."
+    },
+    "/v1/packages/:/versions/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('app:manage')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireScope('app:write')"
+        ]
+      },
+      "why": "Designed: deleting asks app:manage and changing asks app:write, as for an app (services/scope-vocabulary-migration.ts)."
+    },
+    "/v1/schedules/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireRestScope('memory:write')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireRestScope('workflow:write')"
+        ]
+      },
+      "why": "UNTRIAGED: PATCH (routes/schedules.ts) asks workflow:write and DELETE asks memory:write; an agent holding memory:write without workflow:write may delete a schedule it may not change. Lead from the codebase analysis 2026-11-03 finding 12, not decided."
+    },
+    "/v1/templates/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('app:manage')"
+        ],
+        "PATCH": [
+          "requireAuth()",
+          "requireScope('app:write')"
+        ]
+      },
+      "why": "Designed: app:manage is the word for removing a template (services/scope-vocabulary-migration.ts), app:write for changing one."
+    },
+    "/v1/workflows/:": {
+      "verbs": {
+        "DELETE": [
+          "requireAuth()",
+          "requireScope('workflow:write')"
+        ],
+        "PUT": [
+          "requireAuth()",
+          "requireLocalSession()",
+          "requireScope('workflow:write')"
+        ]
+      },
+      "why": "UNTRIAGED: PUT (routes/workflows.ts) asks a session of this node (requireLocalSession, no visitor from another node) and workflow:write; DELETE asks workflow:write only. Lead from the codebase analysis 2026-11-03 finding 12, not decided."
+    }
+  }
+}
