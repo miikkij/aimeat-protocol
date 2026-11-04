@@ -4,9 +4,14 @@
  * SPDX-License-Identifier: MIT
  * @description Internal Scheduler System for AIMEAT — centralized cron-based job scheduler.
  *   Both core services and sandboxed extensions register jobs here.
- *   Supports special @activate trigger: runs on extension activation AND every server startup.
+ *   Supports special @activate trigger: runs on extension activation AND every start of the node
+ *   (with several processes on one database, at the start of the process that holds the start-up
+ *   lease, process-lease.ts).
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   2026-11-04 — The start-up @activate run is claimed: a process starting while another live process
+ *     holds the lease `scheduler.activate` does not run the @activate jobs again; one process runs them
+ *     at every start as before (codebase analysis 2026-11-03, item HA 2.7).
  *   2026-10-25 — A fire for a deactivated account is skipped with outcome `stopped` and a run-log line
  *     that names the deactivation; the job is kept and runs again after reactivation
  *     (services/account-deactivated.ts; secaudit2026oct22, owner-deactivation:background-work-keeps-acting).
@@ -123,6 +128,7 @@ import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, type TaskWake } from './scheduler-agent-task.js';
 import { emitResourceUpdated } from './resource-events.js';
 import { claimCronFire } from './scheduler-fire-claim.js';
+import { takeHeldLease } from './process-lease.js';
 import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './scheduler-run-limit.js';
 import { onFailedRun, noteSuccess, tellScheduleOwner, isOneShot, oneShotFailedReason } from './scheduler-failures.js';
 import { missedFire, missedMessage, type MissedFire } from './scheduler-catch-up.js';
@@ -244,11 +250,19 @@ export class Scheduler {
 
     logger.info(`Scheduler started with ${jobs.length} enabled jobs (${activateJobs.length} @activate, ${missed.length} with a missed fire)`);
 
-    // Run @activate jobs sequentially after scheduler is running
-    if (activateJobs.length > 0) {
-      this.runActivateJobsList(activateJobs).catch(err =>
-        logger.error('Scheduler @activate jobs failed', { error: String(err) }));
-    }
+    // Run @activate jobs sequentially after scheduler is running. Once per start of the node: when
+    // another live process holds the start-up lease, it ran them at its own start and this process
+    // does not run them again. One process always holds it at its start (process-lease.ts). Taken
+    // whether or not there are any, so a process that starts later beside it knows the node is up.
+    takeHeldLease(this.storage, this.config, 'scheduler.activate').then(mine => {
+      if (activateJobs.length === 0) return;
+      if (!mine) {
+        logger.info(`Scheduler: another node process ran the ${activateJobs.length} @activate job(s) at its start; not running them again`);
+        return;
+      }
+      return this.runActivateJobsList(activateJobs);
+    }).catch(err =>
+      logger.error('Scheduler @activate jobs failed', { error: String(err) }));
 
     if (missed.length > 0) {
       this.catchUpTimer = setTimeout(() => {

@@ -12,6 +12,8 @@
  * @structure SWEEP_MS · sweepGoals() · sweepOne() · scheduleGoalSweep()
  * @usage scheduleGoalSweep({ storage, config });   // server-bootstrap/service-init.ts
  * @version-history
+ *   v1.5.0 -- 2026-11-04 -- The minute sweep runs in one node process per round (process-lease.ts
+ *     claimedSweep; codebase analysis 2026-11-03, item HA 2.7).
  *   v1.4.0 — 2026-10-29 — A model work whose question on spending the AI allowance was declined or
  *     expired stops (goals-model-spend.ts settleModelSpendAsks; secaudit2026oct26 round 8c).
  *   v1.3.0 — 2026-10-27 — A model work whose question on a private record was declined or expired
@@ -36,6 +38,7 @@ import { settleModelReadAsks } from './goals-model-reach.js';
 import { settleModelSpendAsks } from './goals-model-spend.js';
 import { onAiJobFinished } from '../ai-jobs/finished-listeners.js';
 import { deactivatedAccountSkip } from '../account-deactivated.js';
+import { claimedSweep } from '../process-lease.js';
 import { GOAL_PREFIX, MAX_ATTEMPTS, MODEL_TAKER, goalSettled, type GoalRecord } from './goals-types.js';
 
 export const SWEEP_MS = 60_000;
@@ -150,7 +153,9 @@ export function scheduleGoalSweep(deps: GoalDeps): void {
     const settled = await settleModelJob(deps, job);
     if (settled && !(await deactivatedAccountSkip(deps.storage, settled.ownerGhii))) await advanceGoal(deps, settled.ownerGhii, settled.goalId);
   });
-  const run = () => { sweepGoals(deps).catch(err => logger.warn('goal sweep failed', { error: String(err) })); };
+  // One node process per round (process-lease.ts); a round's start is also marked on the goal's version.
+  const run = claimedSweep(deps.storage, deps.config, 'goals', SWEEP_MS,
+    () => { sweepGoals(deps).catch(err => logger.warn('goal sweep failed', { error: String(err) })); });
   setTimeout(run, 30_000);
   setInterval(run, SWEEP_MS);
 }

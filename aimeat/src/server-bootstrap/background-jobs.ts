@@ -31,6 +31,8 @@
  *     codebase analysis 2026-11-03, HA 1.5).
  *   v1.4.0 — 2026-11-04 — The tracked-response listener returns for a write another process made, so
  *     one write is evaluated once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
+ *   v1.5.0 — 2026-11-04 — Boot starts this process's lease first (services/process-lease.ts; codebase analysis
+ *     2026-11-03, item HA 2.5).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -55,6 +57,7 @@ import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.
 import { backfillDependencyMap } from '../services/dependency-map.js';
 import { backfillComponentVersions } from '../services/component-versions.js';
 import { resumeOutbox } from '../services/outbox.js';
+import { startProcessLease } from '../services/process-lease.js';
 
 export interface BackgroundJobDeps {
   config: AimeatConfig;
@@ -74,6 +77,11 @@ export function startBackgroundJobs(deps: BackgroundJobDeps): void {
     config, storage, peers, scheduler, workflowEngine, aiJobService,
     webhookDispatcher, pushService, emailService,
   } = deps;
+
+  // This process's lease (services/process-lease.ts): first, so every claim below names a process
+  // the others can see alive. The claims wait for its first write.
+  startProcessLease(storage, config)
+    .catch(err => logger.error('Process lease failed to start', { error: String(err) }));
 
   // Seed core scheduled jobs (idempotent — only creates if not already present)
   seedCoreScheduledJobs(config, storage).catch(err =>

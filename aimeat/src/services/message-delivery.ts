@@ -12,6 +12,7 @@
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
  * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
  * @version-history
+ *   v1.7.0 -- 2026-11-04 -- The retry sweep runs in one node process per round (process-lease.ts claimedSweep; codebase analysis 2026-11-03, item HA 2.7).
  *   v1.6.0 -- 2026-10-17 -- The payload carries sentByAgent / sentByAgentName, the agent that sent the message in the sender's name.
  *   v1.5.0 -- 2026-10-06 -- A read receipt carries a delivery proof: the peer and the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.4.0 -- 2026-10-06 -- A message names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
@@ -42,6 +43,7 @@ import { logger } from '../utils/logger.js';
 import { sweepReferenceAttachments } from './attachment-duplication.js';
 import { peerTakesMessages } from './federation-peer-gate.js';
 import { peerFetch } from '../utils/peer-fetch.js';
+import { claimedSweep } from './process-lease.js';
 
 export interface DeliveryCtx {
   config: AimeatConfig;
@@ -222,7 +224,8 @@ export function startMessageRetryJob(config: AimeatConfig, storage: Storage, pee
     await storage.pruneMessageDeliveryLogs(10000).catch(err => { logger.warn('sweep: continuing after a suppressed failure', { error: String(err) }); });
   }
 
-  return setInterval(() => {
+  // One node process per round (process-lease.ts), so a queued message is not sent by two at once.
+  return setInterval(claimedSweep(storage, config, 'message-retry', config.messageRetryIntervalMs, () => {
     sweep().catch(err => logger.error('message retry sweep failed', { error: (err as Error).message }));
-  }, config.messageRetryIntervalMs);
+  }), config.messageRetryIntervalMs);
 }

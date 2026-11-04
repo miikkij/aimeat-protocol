@@ -15,6 +15,8 @@
  *   - EventTrigger type
  * @usage import { syncWorkflowTriggers, readEventTriggers } from './lifecycle.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-04 -- reconcileActiveRun changes the active-run index on its version: two runs saved at once
+ *     lost one entry before, in one process or two (codebase analysis 2026-11-03, item HA 2.6).
  *   v1.1.0 — 2026-10-13 — A workflow's triggers belong to its owner AND its id. The backing schedule
  *     was `wf-sched:<workflow id>` and the two event indexes were cleared by workflow id alone, so a
  *     second owner who saved or deleted a workflow with the same id took over, or removed, the first
@@ -30,6 +32,7 @@ import type { Scheduler } from '../scheduler.js';
 import type { WorkflowDef, WorkflowRun } from '../../models/workflow-schemas.js';
 import { getRun } from './store.js';
 import { dropWaitingEvents } from './engine-coalesce.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 const EVENT_INDEX_KEY = 'workflows.eventindex';
 const ECO_EVENT_INDEX_KEY = 'workflows.ecoeventindex';
@@ -72,25 +75,18 @@ export async function readActiveRuns(storage: Storage, nodeId: string): Promise<
   return Array.isArray(arr) ? arr : [];
 }
 
-async function writeActiveRuns(storage: Storage, nodeId: string, entries: ActiveRun[]): Promise<void> {
-  const systemGhii = systemGhiiFor(nodeId);
-  const existing = await storage.getMemory(systemGhii, ACTIVE_KEY);
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key: ACTIVE_KEY, ownerGaii: systemGhii, value: entries,
-    visibility: 'private', tags: ['workflow-index'], ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now, updatedAt: now,
-  });
-}
-
-/** Add/remove a run from the active-run index based on its status (in-flight ⇒ present). */
+/**
+ * Add/remove a run from the active-run index based on its status (in-flight ⇒ present). Changed on
+ * the index's version, so two runs saved at once (in one process or two) keep each other's entries.
+ */
 export async function reconcileActiveRun(storage: Storage, nodeId: string, ownerGhii: string, run: WorkflowRun): Promise<void> {
   const inFlight = run.status === 'running' || run.status === 'waiting-step';
-  const entries = await readActiveRuns(storage, nodeId);
-  const has = entries.some(e => e.runId === run.runId);
-  if (inFlight && !has) await writeActiveRuns(storage, nodeId, [...entries, { ownerGhii, workflowId: run.workflowId, runId: run.runId }]);
-  else if (!inFlight && has) await writeActiveRuns(storage, nodeId, entries.filter(e => e.runId !== run.runId));
+  await updateRecord(storage, systemGhiiFor(nodeId), ACTIVE_KEY, v => (Array.isArray(v) ? v as ActiveRun[] : []), entries => {
+    const has = entries.some(e => e.runId === run.runId);
+    if (inFlight && !has) return [...entries, { ownerGhii, workflowId: run.workflowId, runId: run.runId }];
+    if (!inFlight && has) return entries.filter(e => e.runId !== run.runId);
+    return UNCHANGED;
+  }, { tag: 'workflow-index' });
 }
 
 // ── event-trigger index (system namespace; the engine's roster) ──────────────────

@@ -288,12 +288,12 @@
       "digest": "sha256:44200f52e9f0fe14dec8313b"
     },
     "node:set-up-content-pipeline": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/lifecycle.ts"
       ],
-      "digest": "sha256:e889ce5039a1ecdeff09bd30"
+      "digest": "sha256:08dfb8dd0ba387e489e9a4e8"
     },
     "node:configure-routing": {
       "reviewedOn": "2026-11-04",
@@ -407,7 +407,7 @@
         "aimeat/src/services/workflow/lifecycle.ts",
         "aimeat/src/mcp/workflows.ts"
       ],
-      "digest": "sha256:dd87be8aab072cf195f86746"
+      "digest": "sha256:0cff4619e0f762e0783027bc"
     },
     "node:aimeat-bookkeeping": {
       "reviewedOn": "2026-11-01",
@@ -453,7 +453,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:6a4772607eba2384f8005ce4"
+      "digest": "sha256:075b71f26a6eb772a8d7c9d3"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -656,7 +656,7 @@
     },
     "node:set-up-content-pipeline": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
-      "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
+      "aimeat/src/services/workflow/lifecycle.ts": "2618cea800a5c7ed"
     },
     "node:configure-routing": {
       "aimeat/src/routes/ai.ts": "4d0c1ad976f29d5e",
@@ -672,7 +672,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/mcp/agent-schedules.ts": "e765a5170e850f1e",
-      "aimeat/src/services/scheduler.ts": "ed3f7c9855612e94",
+      "aimeat/src/services/scheduler.ts": "cc788f060eb6f00a",
       "aimeat/src/services/ai/route-plan.ts": "3972a5cb00aab986"
     },
     "node:aimeat-game-apps": {
@@ -786,7 +786,7 @@
     "node:aimeat-workflow-decisions": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/services/workflow/engine-human.ts": "63bfdbf288e0782d",
-      "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29",
+      "aimeat/src/services/workflow/lifecycle.ts": "2618cea800a5c7ed",
       "aimeat/src/mcp/workflows.ts": "cfe244d336c1b03c"
     },
     "node:aimeat-bookkeeping": {

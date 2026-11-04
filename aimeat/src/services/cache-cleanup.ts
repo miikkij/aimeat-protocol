@@ -19,6 +19,8 @@
  *   - CleanupResult / FEDERATION_PREFIXES: result shape and the scanned key prefixes
  *
  * @version-history
+ *   2026-11-04 — The hourly cycle runs in one node process per round (process-lease.ts claimedSweep;
+ *     codebase analysis 2026-11-03, item HA 2.7).
  *   2026-11-04 — setMemoryIfVersion called without a presence check: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — A row dated more than five minutes ahead of this node's clock is rewritten with the
@@ -37,6 +39,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { NONCE_WINDOW_MS } from './request-nonce.js';
+import { claimedSweep } from './process-lease.js';
 
 export interface CleanupResult {
   federatedRemoved: number;
@@ -212,16 +215,16 @@ export function startCacheCleanupJob(
 
   logger.info('Cache cleanup scheduler started (hourly)');
 
-  // Initial cleanup after 30s to avoid startup contention
-  setTimeout(() => {
+  // Initial cleanup after 30s to avoid startup contention. One node process per round (process-lease.ts).
+  setTimeout(claimedSweep(storage, config, 'cache-cleanup', INTERVAL_MS, () => {
     runCleanupCycle(config, storage).catch(err => {
       logger.error('Initial cache cleanup failed', { error: (err as Error).message });
     });
-  }, 30_000);
+  }), 30_000);
 
-  return setInterval(() => {
+  return setInterval(claimedSweep(storage, config, 'cache-cleanup', INTERVAL_MS, () => {
     runCleanupCycle(config, storage).catch(err => {
       logger.error('Cache cleanup cycle failed', { error: (err as Error).message });
     });
-  }, INTERVAL_MS);
+  }), INTERVAL_MS);
 }

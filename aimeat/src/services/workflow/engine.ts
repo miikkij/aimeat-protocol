@@ -120,6 +120,8 @@
  *   v1.23.0 — 2026-10-22 — An answer whose write was refused turns its step red, and the owner is told as for any failed step (secaudit 2026-10, r66).
  *   v1.24.0 — 2026-10-27 — A run whose account is deactivated dispatches no step until reactivation (secaudit2026oct26).
  *   v1.25.0 — 2026-11-04 — A `workspace.rows` event another process produced starts no run here: the process that appended starts it, once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
+ *   v1.26.0 -- 2026-11-04 -- The run lock holds across processes (engine-lock.ts); one process runs the watchdog per minute;
+ *     resumeInflight clears open model calls only when no other process runs (codebase analysis 2026-11-03, item HA 2.6).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -154,6 +156,8 @@ import {
 import { refuseTriggerStart, clearRefusal } from './trigger-authority.js';
 import { runPrincipalAtStart, dispatchGate } from './dispatch-authority.js';
 import { resumeRuns } from './engine-resume.js';
+import { RunLock } from './engine-lock.js';
+import { claimedSweep, otherProcessAlive } from '../process-lease.js';
 import { aiCallerForStart } from './ai-caller.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep,
@@ -185,13 +189,15 @@ export class WorkflowEngine {
   private webhookDispatcher?: WebhookDispatcher;
   private pushService?: PushService;
   private emailService?: EmailService;
-  /** Per-run serialization: advancing the same run from two task completions is a RMW race. */
-  private locks = new Map<string, Promise<void>>();
+  /** Per-run serialization, in this process and across processes (engine-lock.ts); `locks` is its in-process chain. */
+  private lock: RunLock;
+  get locks(): Map<string, Promise<void>> { return this.lock.locks; }
   private sweepTimer?: ReturnType<typeof setInterval>;
 
   constructor(config: AimeatConfig, storage: Storage) {
     this.config = config;
     this.storage = storage;
+    this.lock = new RunLock(storage, config);
   }
 
   setWebhookDispatcher(d: WebhookDispatcher): void { this.webhookDispatcher = d; }
@@ -218,23 +224,18 @@ export class WorkflowEngine {
     await startOrphans(this.triggerDeps()).catch(err => logger.error('workflow waiting events not started', { error: String(err) }));
     if (!this.sweepTimer) {
       onRowsAppendedEvent(this.rowsHandler);
-      this.sweepTimer = setInterval(() => { this.sweep().catch(err => logger.error('workflow sweep failed', { error: String(err) })); }, 60_000);
+      // One process runs the watchdog per minute (process-lease.ts claimSweepTick).
+      this.sweepTimer = setInterval(claimedSweep(this.storage, this.config, 'workflow-watchdog', 60_000,
+        () => { this.sweep().catch(err => logger.error('workflow sweep failed', { error: String(err) })); }), 60_000);
       this.sweepTimer.unref?.();
     }
   }
 
   stop(): void { if (this.sweepTimer) { clearInterval(this.sweepTimer); this.sweepTimer = undefined; offRowsAppendedEvent(this.rowsHandler); } }
 
-  /** Run a single run's mutation under its lock (serializes concurrent advances). */
+  /** Run a single run's mutation under its lock (serializes concurrent advances, engine-lock.ts). */
   private async withLock<T>(runId: string, fn: () => Promise<T>): Promise<T> {
-    const prev = this.locks.get(runId) ?? Promise.resolve();
-    let release!: () => void;
-    const gate = new Promise<void>(r => { release = r; });
-    const queued = prev.then(() => gate);
-    this.locks.set(runId, queued);
-    await prev;
-    try { return await fn(); }
-    finally { release(); if (this.locks.get(runId) === queued) this.locks.delete(runId); }
+    return this.lock.run(runId, fn);
   }
 
   // ── start a run ──────────────────────────────────────────────────────────────
@@ -659,6 +660,8 @@ export class WorkflowEngine {
     return resumeRuns({
       storage: this.storage, nodeId: this.config.nodeId, readActiveRuns, withLock: (id, fn) => this.withLock(id, fn),
       persist: (o, r) => this.persist(o, r), onTaskTerminal: (t, s) => this.onTaskTerminal(t, s),
+      // The open calls ended with the stopped process only when no other process runs: another one's are live.
+      othersAlive: () => otherProcessAlive(this.storage, this.config),
     });
   }
 

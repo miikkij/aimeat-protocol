@@ -17,11 +17,14 @@
  * @structure AgreementGap · agreementGaps() · sweepAgreements() · scheduleAgreementSweep()
  * @usage const gaps = await agreementGaps(deps);
  * @version-history
+ *   v1.1.0 -- 2026-11-04 -- The hourly sweep runs in one node process per round (process-lease.ts
+ *     claimedSweep; codebase analysis 2026-11-03, item HA 2.7).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D4).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { claimedSweep } from './process-lease.js';
 import { UNCHANGED } from './record-cas.js';
 import { readDoc } from './compliance-docs.js';
 import { derivedProcessors, processorsView } from './compliance-derived.js';
@@ -122,9 +125,10 @@ export async function sweepAgreements(deps: Deps, now = Date.now()): Promise<{ r
  * calls this once). Hourly because the shortest clock is a day.
  */
 export function scheduleAgreementSweep(deps: Deps): void {
-  const run = () => {
+  // One node process per round (process-lease.ts); each reminder is also marked on its version.
+  const run = claimedSweep(deps.storage, deps.config, 'agreements', 3_600_000, () => {
     sweepAgreements(deps).catch(err => logger.warn('agreements sweep failed', { error: String(err) }));
-  };
+  });
   setTimeout(run, 150_000);
   setInterval(run, 3_600_000);
 }

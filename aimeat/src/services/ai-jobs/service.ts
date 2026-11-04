@@ -22,6 +22,9 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.19.0 -- 2026-11-04 -- A job's index entry names the process that runs it; the restart pass moved to reclaim.ts and
+ *     leaves a job another live process runs alone, and an adoption pass takes over the jobs of a process that ended
+ *     (codebase analysis 2026-11-03, item HA 2.5).
  *   2026-11-04 — The AI call limit is counted in the node's storage (takeAiCallOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.18.0 -- 2026-11-04 -- A stopping node marks its running jobs (markStoppingJobs) and the next start queues a marked
  *     job again once (restart.ts); writeResult moved to write-result.ts unchanged (codebase analysis 2026-11-03, item HA 1.4).
@@ -119,10 +122,12 @@ import { fileJobPictureRequest } from './picture-request.js';
 import { takeAiCallOnNode } from '../account-limits.js';
 import { emitAiJobFinished } from './finished-listeners.js';
 import { findExtension, namespacedName } from '../component-address.js';
-import { restartDecision, markStopped } from './restart.js';
+import { markStopped } from './restart.js';
+import { reclaimJobs, ADOPT_MS, type ReclaimDeps } from './reclaim.js';
+import { processLeaseReady, thisProcess } from '../process-lease.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
-    readActiveIndex, addToActiveIndex, removeFromActiveIndex,
+    addToActiveIndex, removeFromActiveIndex,
 } from './store.js';
 import {
     AiJobError,
@@ -155,6 +160,8 @@ export class AiJobService implements AiJobStarter {
     private readonly live = new Map<string, LiveEntry>();
     /** Set by markStoppingJobs: the process is ending, so no job starts a model call. */
     private stopping = false;
+    /** The adoption pass (reclaim.ts), started by reconcileAfterRestart. */
+    private adoptTimer?: ReturnType<typeof setInterval>;
 
     constructor(config: AimeatConfig, storage: Storage, emailService?: EmailService) {
         this.config = config;
@@ -275,7 +282,10 @@ export class AiJobService implements AiJobStarter {
         this.live.set(job.id, { job, controller: new AbortController(), prompt, finished, resolveFinished });
 
         await writeJob(this.storage, job);
-        await addToActiveIndex(this.storage, this.config.nodeId, { jobId: job.id, ownerGhii });
+        // The entry names this process, after its lease is written, so no other process takes the job
+        // for one whose process ended (reclaim.ts).
+        await processLeaseReady(this.config);
+        await addToActiveIndex(this.storage, this.config.nodeId, { jobId: job.id, ownerGhii, by: thisProcess(this.config) });
 
         // Not awaited: the whole point is that a start returns before the work does. Nothing in this
         // design ever holds an HTTP request for the duration of a model call.
@@ -658,6 +668,7 @@ export class AiJobService implements AiJobStarter {
      */
     async markStoppingJobs(): Promise<number> {
         this.stopping = true;
+        if (this.adoptTimer) { clearInterval(this.adoptTimer); this.adoptTimer = undefined; }
         let marked = 0;
         for (const entry of this.live.values()) {
             const job = markStopped(entry.job);
@@ -677,63 +688,39 @@ export class AiJobService implements AiJobStarter {
      * a live process can advance has to be reconciled by the process that replaces it.
      */
     async reconcileAfterRestart(): Promise<{ failed: number; requeued: number }> {
-        const refs = await readActiveIndex(this.storage, this.config.nodeId);
-        let failed = 0, requeued = 0;
-
-        for (const ref of refs) {
-            let job = await readJob(this.storage, ref.ownerGhii, ref.jobId);
-            if (!job) { await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId); continue; }
-
-            if (job.state === 'running') {
-                const decision = restartDecision(job);
-                if (decision.action === 'requeue') {
-                    job = decision.job;
-                    await writeJob(this.storage, job);
-                } else {
-                    await foldIntoLog(this.storage, {
-                        ...job, state: 'failed', finished_at: new Date().toISOString(),
-                        error: { code: 'node_restarted', message: decision.message },
-                    });
-                    await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId);
-                    failed++;
-                    continue;
-                }
-            }
-
-            if (job.state === 'queued') {
-                try {
-                    // Held to the start's rule about the keys first: a job queued before the rule
-                    // existed must not come back reading or writing a record the node keeps.
-                    this.assertKeysInReach(job);
-                    this.assertOpFields(job);
-                    // Re-assembled rather than carried: the assembled prompt lives in the dead
-                    // process's heap, and the record has the fields it was built from.
-                    const { prompt, warnings } = await this.prepareInput(job.owner, job);
-                    if (warnings) job.classification_warnings = warnings;
-                    let resolveFinished!: () => void;
-                    const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
-                    this.live.set(job.id, { job, controller: new AbortController(), prompt, finished, resolveFinished });
-                    void this.run(job.id);
-                    requeued++;
-                } catch (err) {
-                    await foldIntoLog(this.storage, {
-                        ...job, state: 'failed', finished_at: new Date().toISOString(),
-                        error: { code: 'node_restarted', message: `The node restarted and this queued job could not be rebuilt: ${(err as Error).message}` },
-                    });
-                    await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId);
-                    failed++;
-                }
-                continue;
-            }
-
-            // Terminal in storage but still indexed: the fold crashed between the two writes.
-            await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId);
+        // Only the jobs no live process holds; a job another live process runs is left to it
+        // (reclaim.ts). Then, while this process runs, the jobs of a process that ends are taken over.
+        const result = await reclaimJobs(this.reclaimDeps(), 'boot');
+        if (!this.adoptTimer && !this.stopping) {
+            // process-local: this process looks for the jobs of a process that ended; the claim is on the stored index.
+            this.adoptTimer = setInterval(() => {
+                if (this.stopping) return;
+                reclaimJobs(this.reclaimDeps(), 'adopt').catch(err => logger.warn('[ai-jobs] adoption pass failed', { error: String(err) }));
+            }, ADOPT_MS);
+            this.adoptTimer.unref?.();
         }
+        return result;
+    }
 
-        if (failed || requeued) {
-            logger.info(`[ai-jobs] restart reconciliation: ${failed} failed (node_restarted), ${requeued} requeued`);
-        }
-        return { failed, requeued };
+    private reclaimDeps(): ReclaimDeps {
+        return {
+            storage: this.storage, config: this.config,
+            isLive: id => this.live.has(id),
+            enqueue: async job => {
+                // Held to the start's rule about the keys first: a job queued before the rule
+                // existed must not come back reading or writing a record the node keeps.
+                this.assertKeysInReach(job);
+                this.assertOpFields(job);
+                // Re-assembled rather than carried: the assembled prompt lives in the dead
+                // process's heap, and the record has the fields it was built from.
+                const { prompt, warnings } = await this.prepareInput(job.owner, job);
+                if (warnings) job.classification_warnings = warnings;
+                let resolveFinished!: () => void;
+                const finished = new Promise<void>(resolve => { resolveFinished = resolve; });
+                this.live.set(job.id, { job, controller: new AbortController(), prompt, finished, resolveFinished });
+                void this.run(job.id);
+            },
+        };
     }
 
     /** The nightly prune of the folded day logs, for every owner that has any. */

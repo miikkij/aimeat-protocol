@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-04 -- e2e-two-process-leases.ts joins the list (not the guard tier): two processes of one node on one database run an AI job once, a sweep once per round, and take a killed process's jobs over (codebase analysis 2026-11-03, item HA 2.5-2.7).
  *   2026-11-04 -- e2e-two-process-bus.ts joins the list (not the guard tier): two processes of one node on one PostgreSQL database share the event bus (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 -- e2e-app-versions-access.ts joins the list (not the guard tier): an app's version list answers what the app's read answers for that caller, and carries no content (codebase analysis 2026-11-03, item A1).
  *   2026-11-02 -- e2e-dsp-agreements.ts joins the list (not the guard tier): what a Dataspace agreement grants and books, and the process room (secaudit2026nov02d round 13).
@@ -1031,6 +1032,10 @@ const ALL_SUITES = [
     // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
     'test/e2e-scim-users.ts',
     'test/e2e-ai-jobs.ts',
+    // Two processes of one node on one database: a queued AI job runs once, a sweep runs once per
+    // round, and a killed process's jobs are taken over after its lease runs out (codebase analysis
+    // 2026-11-03, HA 2.5-2.7). Own nodes on 28861 and 28862, the provider stub on 28863.
+    'test/e2e-two-process-leases.ts',
     // What a model may be handed of the owner's data, by whom (secaudit 2026-10, r49, v74, v75). Own node on 28963.
     'test/e2e-ai-input-reach.ts',
     // A scheduled AI job reads what its maker may read, and a schedule stored before that rule keeps

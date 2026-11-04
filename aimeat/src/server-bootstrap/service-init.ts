@@ -11,6 +11,9 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-04 — The federation book, the memory bin, the lapsed memberships, the AI-disclosure sweep and both notification
+ *     sweeps run in one node process per round (services/process-lease.ts claimedSweep; codebase analysis 2026-11-03,
+ *     item HA 2.7). One process runs each of them exactly as before.
  *   2026-11-04 — The event bus between the node's processes starts last (./bus-relay-start.ts), and a stored peer row becomes the in-memory peer through services/federation-peer-reload.ts peerInfoFromRow, moved there unchanged (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — setupAnonymousIdentity moved unchanged to ./anonymous-identity.ts (800-line limit after the HA stage 1 merge).
  *   2026-11-04 — createEmailService gets storage, so mail retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
@@ -167,6 +170,7 @@ import { createEmailService, setActiveEmailService } from '../services/email.js'
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
+import { claimedSweep } from '../services/process-lease.js';
 import { errorFields } from '../utils/error-fields.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
@@ -532,7 +536,8 @@ export async function initializeServices(
   if (config.crossFederationEnabled !== false) {
     const isPrimary = !config.genesisUrl;
     const BOOK_INTERVAL_MS = 120_000;
-    const tick = () => {
+    // One process per round, as every sweep below (services/process-lease.ts claimSweepTick).
+    const tick = claimedSweep(storage, config, 'federation-book', BOOK_INTERVAL_MS, () => {
       if (isPrimary) {
         assembleBook(config, storage, peers).catch(err => logger.warn('Federation book assembly failed', { error: String(err) }));
       } else {
@@ -540,7 +545,7 @@ export async function initializeServices(
           if (r.applied) logger.info('Federation book mirrored from genesis', { version: r.book_version });
         }).catch(err => logger.warn('Federation book pull failed', { error: String(err) }));
       }
-    };
+    });
     setTimeout(tick, 15_000); // initial run shortly after boot
     setInterval(tick, BOOK_INTERVAL_MS);
   }
@@ -556,17 +561,17 @@ export async function initializeServices(
   // indexed range scan over the small set that is in the bin at all.
   {
     const BIN_SWEEP_MS = 3_600_000;
-    const binSweep = () => { void sweepMemoryBin(storage, config); };
+    const binSweep = claimedSweep(storage, config, 'memory-bin', BIN_SWEEP_MS, () => { void sweepMemoryBin(storage, config); });
     setTimeout(binSweep, 60_000);   // once after boot, so a restart closes anything overdue
     setInterval(binSweep, BIN_SWEEP_MS);
   }
 
   {
     const SWEEP_INTERVAL_MS = 3_600_000;
-    const sweep = () => {
+    const sweep = claimedSweep(storage, config, 'app-member-lapse', SWEEP_INTERVAL_MS, () => {
       sweepLapsedMemberships(storage, config)
         .catch(err => logger.warn('app-member sweep failed', { error: String(err) }));
-    };
+    });
     setTimeout(sweep, 45_000); // once shortly after boot, so a restart closes anything overdue
     setInterval(sweep, SWEEP_INTERVAL_MS);
   }
@@ -580,10 +585,10 @@ export async function initializeServices(
   // person who publishes a lot is told once rather than nagged.
   {
     const DISCLOSURE_SWEEP_MS = 6 * 3_600_000;
-    const disclosureSweep = () => {
+    const disclosureSweep = claimedSweep(storage, config, 'ai-disclosure', DISCLOSURE_SWEEP_MS, () => {
       sweepUndisclosedPublicContent(storage, config)
         .catch(err => logger.warn('ai-disclosure sweep failed', { error: String(err) }));
-    };
+    });
     setTimeout(disclosureSweep, 90_000);
     setInterval(disclosureSweep, DISCLOSURE_SWEEP_MS);
   }
@@ -601,16 +606,16 @@ export async function initializeServices(
   // only owners who wrote a settings record, so a node where nobody did runs them for nothing.
   {
     const HELD_MS = 5 * 60_000;
-    const held = () => {
+    const held = claimedSweep(storage, config, 'notification-held', HELD_MS, () => {
       sweepHeldPushes(storage, config, getNotifyPushService(), 6)
         .catch(err => logger.warn('notification held-push sweep failed', { error: String(err) }));
-    };
+    });
     setTimeout(held, 60_000);
     setInterval(held, HELD_MS);
-    const digest = () => {
+    const digest = claimedSweep(storage, config, 'notification-digest', 3_600_000, () => {
       sweepNotificationDigests(storage, config)
         .catch(err => logger.warn('notification digest sweep failed', { error: String(err) }));
-    };
+    });
     setTimeout(digest, 120_000);
     setInterval(digest, 3_600_000);
   }
