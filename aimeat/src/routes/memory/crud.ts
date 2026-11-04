@@ -85,7 +85,7 @@ import { cached, TTL } from '../../services/cache.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { resolveWriteTarget } from './owner-target.js';
+import { resolveWriteTarget } from '../../services/write-target.js';
 import { resolveIdentity, isForeignPrincipal, isOwnerInPerson, localAccountName } from '../../utils/gaii.js';
 import { exchangeOutcome } from '../../services/exchange-projection.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, MEMORY_LIST_MAX_LIMIT } from './shared.js';
@@ -141,7 +141,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const ownerScopeWrite = (req.body ?? {}).owner_scope === true;
 
     // Owner sessions use GHII identity (owner@nodeId) for memory storage. An agent lands under its
-    // own GAII unless it asked for the owner namespace AND holds the scope (see owner-target.ts).
+    // own GAII unless it asked for the owner namespace AND holds the scope (see services/write-target.ts).
     const target = resolveWriteTarget(req, config, ownerScopeWrite);
     if ('deny' in target) {
       res.status(403).json(error(config.nodeId, target.deny.code, target.deny.message));

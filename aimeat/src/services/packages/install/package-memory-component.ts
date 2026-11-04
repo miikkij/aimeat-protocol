@@ -154,8 +154,8 @@ export interface ComponentWriteCaller {
 /**
  * The words the memory door asks of this caller for a write into the owner's namespace: none for the
  * owner in person, memory:write for an app grant (its own namespace IS the owner's), and memory:write
- * plus memory:write-as-owner for a principal writing there from outside it (routes/memory/
- * owner-target.ts), which is an agent.
+ * plus memory:write-as-owner for a principal writing there from outside it (services/
+ * write-target.ts), which is an agent.
  */
 export function memoryWordsFor(caller: ComponentWriteCaller, ownerGhii: string): string[] {
     if (isOwnerInPerson(caller)) return [];

@@ -7,7 +7,7 @@
  *   THE MISTAKE THIS EXISTS TO UNDO. The first cut of this inventory looked only at `requireScope()`
  *   on a route and the MCP tool table, and reported six words as having zero doors. Two of the six
  *   were wrong: `account:security` is enforced INSIDE `requireOwnerPrincipal()` (middleware.ts:467)
- *   and `memory:write-as-owner` INSIDE a handler (routes/memory/owner-target.ts:119). Neither is a
+ *   and `memory:write-as-owner` INSIDE a handler (services/write-target.ts). Neither is a
  *   `requireScope` call, and both are real gates.
  *
  *   So a word is demanded in at least three shapes, and a detector that knows one of them produces

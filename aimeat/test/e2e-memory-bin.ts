@@ -267,7 +267,7 @@ console.log('\nAn agent and a record stored under its owner\'s own identity');
 // owner's identity with owner_scope, and its delete of three older records in the same namespace
 // answered 404. The service looked under the caller and under the owner's agents and never under the
 // owner's own identity, while the tool description promised that reach. The reach is the write's:
-// owner_scope asked per request, and memory:write-as-owner held (routes/memory/owner-target.ts).
+// owner_scope asked per request, and memory:write-as-owner held (services/write-target.ts).
 const OWNER_HELD = 'bin.ownerheld';
 let delegateTok = '';
 let plainTok = '';

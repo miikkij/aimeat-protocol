@@ -6,7 +6,7 @@
  *   namespace. The record exists = the agent has an avatar.
  *
  *   WHY A MEMORY RECORD. An agent writes into its own namespace by default
- *   (routes/memory/owner-target.ts), so the key is per agent with no new field, no migration and no
+ *   (services/write-target.ts), so the key is per agent with no new field, no migration and no
  *   new MCP tool: `aimeat_memory_write { key: "agent.avatar", value: { svg } | { emoji } }` is the
  *   whole write path, on every surface that already writes memory (Jouni, 2026-10-19). The owner sets
  *   one for an agent through PUT /v1/agents/:name/avatar, which writes the same record.

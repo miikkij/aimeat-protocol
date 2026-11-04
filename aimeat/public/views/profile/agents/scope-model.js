@@ -99,7 +99,7 @@
 
 /**
  * Scopes that `*` deliberately does NOT carry, mirroring the server: hasWriteReserved() in
- * src/routes/memory/owner-target.ts tests the EXACT string, while every other scope check honours
+ * src/services/write-target.ts tests the EXACT string, while every other scope check honours
  * the wildcard. "Full access" is one click, and nobody clicking it is deciding that an agent may
  * point their decrypted AI key at a URL of its choosing — so that one costs its own tick.
  */
@@ -234,7 +234,7 @@ export const SCOPE_DOMAINS = [
   // ask for it per call, so granting it changes nothing on its own.
   // write-reserved: ALSO the keys the server itself trusts (openrouter.* / ai-usage.* /
   // profile.*). For an agent that administers the account. Not in '*' on purpose — see
-  // WRITE_RESERVED_SCOPE in src/routes/memory/owner-target.ts. It is a MODIFIER on write-as-owner:
+  // WRITE_RESERVED_SCOPE in src/services/write-target.ts. It is a MODIFIER on write-as-owner:
   // on its own it lifts a block on writes the agent is not making.
   // purge — delete shared workspace records for good (2026-10-02). `delete` can be undone for a grace
   //   window and `purge` cannot, so they are two ticks; an agent holding `purge` has every task wait.

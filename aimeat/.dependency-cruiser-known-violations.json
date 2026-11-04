@@ -16,20 +16,6 @@
   {
     "type": "dependency",
     "from": "src/mcp/core.ts",
-    "to": "src/routes/memory/owner-target.ts",
-    "unresolvedTo": "../routes/memory/owner-target.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/mcp/core.ts",
     "to": "src/routes/memory/shared.ts",
     "unresolvedTo": "../routes/memory/shared.js",
     "dependencyTypes": [
@@ -130,20 +116,6 @@
     "from": "src/mcp/extensions.ts",
     "to": "src/routes/extensions/permissions.ts",
     "unresolvedTo": "../routes/extensions/permissions.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/mcp/operator-config.ts",
-    "to": "src/routes/memory/owner-target.ts",
-    "unresolvedTo": "../routes/memory/owner-target.js",
     "dependencyTypes": [
       "local",
       "import"
