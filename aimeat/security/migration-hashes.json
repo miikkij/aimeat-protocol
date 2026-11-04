@@ -124,6 +124,7 @@
     "0120_released_component_names.sql": "f28afbc14de44fcc1cd96e49d6987cc7ca5ebf5d645a8435780c41a0435590a1",
     "0121_storage_file_blob_ref.sql": "4485731364abb435b5902cb2c900247b94144526b3e3c74d56cf1ff640bb1edd",
     "0122_settlement_once.sql": "84f54bd490dfb3ad17126167d94e6cc10b724662cb1fecf6ceaa95784a626f85",
-    "0123_mcp_user_credentials.sql": "fed3971af336ebe584ae22740db1e9bccdb57180e071029be8c49d707aa60676"
+    "0123_mcp_user_credentials.sql": "fed3971af336ebe584ae22740db1e9bccdb57180e071029be8c49d707aa60676",
+    "0124_memory_query_indexes.sql": "01d94887b5ba6ef505261e0589275072e55069dc9376e32ea923cc552fc6b283"
   }
 }
