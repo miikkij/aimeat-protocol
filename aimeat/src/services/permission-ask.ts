@@ -27,6 +27,9 @@
  * @usage
  *   const text = permissionAskText({ baseUrl: config.baseUrl, agentGaii, tool: 'aimeat_dm_send', words: ['messages:send'] });
  * @version-history
+ *   2026-11-04 — scopesBehindRecord reads the agent through the request memo (./request-memo.ts), so
+ *     the MCP endpoint's stale-grant check shares the revocation check's read (codebase analysis
+ *     2026-11-03, item C2).
  *   v1.2.0 — 2026-11-03 — allowAddressFor: the address for a refusal a service writes (the content
  *     service's permission words).
  *   v1.1.0 — 2026-10-18 — OPERATOR_WORDS, the words the refusal notice for the agent's page leaves out
@@ -41,6 +44,7 @@ import {
 import { logger } from '../utils/logger.js';
 import { POWERFUL_AGENT_SCOPES } from '../config-posture.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { memoGetAgent } from './request-memo.js';
 import { createT, type Locale } from '../i18n.js';
 
 /**
@@ -109,7 +113,7 @@ export function plainPermission(word: string, locale: Locale = 'en'): string | n
  * read leaves the token working as it did.
  */
 export async function scopesBehindRecord(storage: Storage, gaii: string, tokenScopes: readonly string[]): Promise<string[]> {
-  const agent = await storage.getAgent(gaii).catch((err: unknown) => {
+  const agent = await memoGetAgent(storage, gaii).catch((err: unknown) => {
     logger.warn('permission-ask: the agent record could not be read; the token stays as it is', { gaii, error: String(err) });
     return null;
   });

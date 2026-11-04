@@ -12,7 +12,8 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
- *   v1.12.0 — 2026-10-29 — installFileStores wraps the storage before the perf-trace Proxy: stored files
+ *   2026-11-04 — installRequestMemo prepares the storage for the request memo (services/request-memo.ts),
+ *     after the file stores and before the perf-trace Proxy (codebase analysis 2026-11-03, item C2). *   v1.12.0 — 2026-10-29 — installFileStores wraps the storage before the perf-trace Proxy: stored files
  *     keep their bytes in an S3 or Azure Blob store when one is set (services/file-store/).
  *   v1.11.1 — 2026-10-25 — The refresh cookie's migration window (auth.refresh_cookie_legacy_until) is
  *     set once at start when no source gave it (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
@@ -56,6 +57,7 @@ import type { AimeatConfig, HookName } from '../config.js';
 import { applyConfigOverrides } from '../config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import { instrumentStorage } from '../services/perf-trace.js';
+import { installRequestMemo } from '../services/request-memo.js';
 import { ConfigProvenance, bindConfigProvenance } from '../services/config-provenance.js';
 import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from '../services/config-schema.js';
 import { createConsulConfigService, applyConsulValues } from '../services/consul-config.js';
@@ -99,6 +101,9 @@ export async function initializeConfig(
   // set one (services/file-store/). The wrapper reads the config on every file, so the overrides
   // applied below and later changes on the Config tab take effect without a restart.
   installFileStores(database, config);
+  // The request memo (services/request-memo.ts): every write through this storage drops what the
+  // request memoised, so only a storage prepared here is memoised at all.
+  installRequestMemo(database);
   const storage = instrumentStorage(database, config.perfTrace);
   const storageLabels: Record<string, string> = {
     memory: 'in-memory (data will not persist across restarts)',

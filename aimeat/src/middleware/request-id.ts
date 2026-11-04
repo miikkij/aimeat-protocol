@@ -22,6 +22,10 @@
  *   - requestIdMiddleware(): sets/generates the id, echoes the header, opens the log context
  *
  * @version-history
+ *   2026-11-04 — The context carries the request's scope (utils/request-context.ts RequestScope): open
+ *     while the request is answered, closed when the response finishes or the connection closes. The
+ *     request memo and the request-path statement limit read it (codebase analysis 2026-11-03, items
+ *     C2 and C8).
  *   2026-10-16 — One id for header, envelope and log (generateRequestId when the client sends none
  *     or one of an unsafe shape); the caller is read from req.auth when a line is written (QA audit
  *     E1-05, F5-09, E3-07).
@@ -31,7 +35,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { requestContext } from '../utils/request-context.js';
-import type { RequestContext } from '../utils/request-context.js';
+import type { RequestContext, RequestScope } from '../utils/request-context.js';
 import { generateRequestId } from '../utils/tracking-code.js';
 
 declare global {
@@ -77,6 +81,14 @@ export function requestIdMiddleware() {
         else res.setHeader(name, value);
       },
     };
+
+    // The request's life: open now, closed once the answer is sent or the client went away. The memo
+    // goes with it, so work the request left running reads storage itself (services/request-memo.ts).
+    const scope: RequestScope = { open: true };
+    ctx.scope = scope;
+    const close = () => { scope.open = false; scope.memo = undefined; };
+    res.once('finish', close);
+    res.once('close', close);
 
     requestContext.run(ctx, () => next());
   };

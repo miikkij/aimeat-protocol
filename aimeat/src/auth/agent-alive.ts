@@ -27,6 +27,9 @@
  * @structure agentGone(storage, verified) → boolean
  * @usage if (await agentGone(sessionStorage(), verified)) return true;
  * @version-history
+ *   2026-11-04 — The agent record is read through the request memo (services/request-memo.ts): the
+ *     other checks of the same request that read it get the same answer without a second read
+ *     (codebase analysis 2026-11-03, item C2).
  *   v1.1.0 — 2026-10-25 — A credential issued before the agent's credentialsValidAfter (set by a key
  *     rotation) counts as gone too (secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.0.0 — 2026-10-20 — Initial. The agent question in auth/middleware.ts credentialRevoked, in
@@ -36,6 +39,7 @@ import type { Storage } from '../storage/interface.js';
 import type { VerifiedToken } from './jwt.js';
 import { isForeignPrincipal, parseGaiiLoose } from '../utils/gaii.js';
 import { madeAfter, tokenIssuedAt } from './credential-age.js';
+import { memoGetAgent } from '../services/request-memo.js';
 
 /**
  * Is the agent this credential acts for gone, or newer than the credential?
@@ -43,8 +47,9 @@ import { madeAfter, tokenIssuedAt } from './credential-age.js';
  * Returns false, with no storage read, for every principal the question does not apply to. The
  * guards are ordered so the cheap ones run first: the role list decides before anything touches
  * storage, and a credential whose `sub` does not name an agent (`agent#owner@node`) is not looked
- * up at all. One keyed read per agent request otherwise, uncached for the reason the checks beside
- * it are uncached: an owner pressing Delete means now.
+ * up at all. One keyed read per agent request otherwise, uncached across requests for the reason the
+ * checks beside it are uncached: an owner pressing Delete means now. Inside one request the read is
+ * shared with the other checks that read the same agent (services/request-memo.ts).
  */
 export async function agentGone(storage: Storage | null, verified: VerifiedToken): Promise<boolean> {
   if (!storage || verified.anonymous || isForeignPrincipal(verified)) return false;
@@ -60,7 +65,7 @@ export async function agentGone(storage: Storage | null, verified: VerifiedToken
   // services/access-token.ts resolvePat asks the account question for it.
   if (verified.via === 'pat') return false;
   if (parseGaiiLoose(verified.sub).agent === '') return false;
-  const agent = await storage.getAgent(verified.sub);
+  const agent = await memoGetAgent(storage, verified.sub);
   if (!agent) return true;
   const issued = tokenIssuedAt(verified);
   if (madeAfter(agent.createdAt, issued)) return true;

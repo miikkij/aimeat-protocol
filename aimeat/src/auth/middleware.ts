@@ -16,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-11-04 — optionalAuth notes the JWT it verified and found not revoked on the request
+ *     (./verified-on-request.ts), so the MCP endpoint takes that check instead of repeating it
+ *     (codebase analysis 2026-11-03, item C2).
  *   2026-11-01 — optionalAuth leaves the Dataspace Protocol paths (/dsp/2025-1) to their own verifier:
  *     no session, no anonymous identity (services/dataspace/verifier.ts; plan doc-mvwxcas3dom3, D8.5).
  *   2026-11-01 — optionalAuth recognises an outside party's token by its prefix (aimeat_party_,
@@ -152,6 +155,7 @@ import { deny401, deny403, denyScope403, denyInvalidToken } from './deny.js';
 import { mcpTokenOnRestVerdict, MCP_TOKEN_ON_REST_MESSAGE } from './mcp-token-on-rest.js';
 import { credentialRevoked } from './credential-revoked.js';
 import { withCurrentScopes } from './effective-scopes.js';
+import { noteVerifiedJwt } from './verified-on-request.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 import { PARTY_TOKEN_PREFIX, takesPartyToken } from '../services/parties/contract.js';
@@ -374,6 +378,8 @@ export function optionalAuth(opts: OptionalAuthOptions = {}) {
             denyInvalidToken(req, res, MCP_TOKEN_ON_REST_MESSAGE);
             return;
           }
+          // The MCP endpoint takes this check instead of making it again (./verified-on-request.ts).
+          noteVerifiedJwt(req, token, verified);
           // The scope list on the token is what the agent held when it was minted; the record is
           // what it holds now. Narrowed here, once, so every door downstream — routes, the MCP
           // surface, the tunnel's forwarded calls — reads the same answer without asking again.

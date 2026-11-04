@@ -8,6 +8,8 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-11-04 — getMemoryMeta: one record's metadata without its value (codebase analysis 2026-11-03,
+ *     item C2).
  *   2026-10-31 — listKeyActivity, over repos/memory.ts (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
  *     (secaudit 2026-10-31 inv-24).
@@ -225,6 +227,16 @@ export const memoryMethods = {
       return null;
     }
     return record;
+  },
+
+  // getMemory without the value (codebase analysis 2026-11-03, item C2): the same row test, META_COLS.
+  // An expired row answers null as getMemory does; the TTL sweep and getMemory delete it.
+  async getMemoryMeta(this: SqliteStorage, ownerGaii: string, key: string): Promise<MemoryMetaRow | null> {
+    const row = this.db.prepare(`SELECT ${META_COLS} FROM memory WHERE ownerGaii = ? AND key = ? AND deletedAt IS NULL`).get(ownerGaii, key) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    const ttlHours = row.ttlHours as number | null;
+    if (ttlHours && Date.now() > new Date(row.createdAt as string).getTime() + ttlHours * 3_600_000) return null;
+    return rowToMeta(row);
   },
 
   async listMemory(this: SqliteStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]> {

@@ -12,6 +12,9 @@
  *   callAuthority(auth) → both, for the remote MCP chokepoint
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   2026-11-04 -- The agent and the owner record are read through the request memo
+ *     (services/request-memo.ts): the revocation check of the same request already read them, and
+ *     the answer is shared. Uncached across requests, as before (codebase analysis 2026-11-03, item C2).
  *   v1.5.0 -- 2026-10-20 -- withCurrentScopes narrows a visitor from another node too: its token's
  *     scopes intersected with what its home peer may grant now (./visitor-peer.ts visitorPeerScopes),
  *     so narrowing a peer's federation_auth_scopes reaches live visitor sessions at once and never
@@ -38,6 +41,7 @@ import type { VerifiedToken } from './jwt.js';
 import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
+import { memoGetAgent, memoGetOwner } from '../services/request-memo.js';
 import { visitorPeerScopes } from './visitor-peer.js';
 
 /**
@@ -87,8 +91,9 @@ export function intersectScopes(token: readonly string[], record: readonly strin
  * current permission means a word can only ever be taken away here, never added. Adding one still
  * requires a fresh credential, which is what the `scopes_changed` push asks a connector to get.
  *
- * UNCACHED, for the same reason the revocation check beside it is uncached and says so: an owner
- * pressing "remove" means now. It costs one keyed read on a request that already makes one.
+ * UNCACHED across requests, for the same reason the revocation check beside it is uncached and says
+ * so: an owner pressing "remove" means now. Inside one request it shares the revocation check's read
+ * of the same record (services/request-memo.ts), so it costs no read of its own.
  */
 export async function withCurrentScopes(storage: Storage | null, v: VerifiedToken): Promise<VerifiedToken> {
   v = await withCurrentOperatorRole(storage, v);
@@ -109,7 +114,7 @@ export async function withCurrentScopes(storage: Storage | null, v: VerifiedToke
   if (!storage || v.anonymous || !v.roles.includes('agent')) return v;
   if (v.roles.includes('owner') || v.roles.includes('ecosystem')) return v;
 
-  const agent = await storage.getAgent(v.sub).catch((err: unknown) => {
+  const agent = await memoGetAgent(storage, v.sub).catch((err: unknown) => {
     // Never silently: if this read fails the request proceeds on the token's own scopes, which is
     // the pre-2026-09-06 behaviour, and an operator has to be able to see that it happened.
     logger.warn('effective-scopes: the agent record could not be read; proceeding on the token\'s own scopes', { sub: v.sub, error: String(err) });
@@ -143,7 +148,7 @@ export async function withCurrentScopes(storage: Storage | null, v: VerifiedToke
  */
 export async function withCurrentOperatorRole(storage: Storage | null, v: VerifiedToken): Promise<VerifiedToken> {
   if (!storage || v.anonymous || isForeignPrincipal(v) || !v.owner || !v.roles.includes('operator')) return v;
-  const owner = await storage.getOwner(v.owner).catch((err: unknown) => {
+  const owner = await memoGetOwner(storage, v.owner).catch((err: unknown) => {
     logger.warn('effective-scopes: the owner record could not be read; proceeding on the token\'s own roles', { owner: v.owner, error: String(err) });
     return null;
   });
