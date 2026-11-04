@@ -8,6 +8,7 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-04 — for_ai_agents says which connection path to take, the rules of the sign-in and what
  *     each failure means: a Codex session wandered between OAuth and the device flow, asked about a
  *     mail that could not come, and read none of it here (Jouni, 2026-11-04). option_b_manual told the
@@ -407,9 +408,10 @@ export function bootstrapRouter(
               },
             } : {}),
             app_building: {
-              note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder via aimeat_skill_get. Starter skeletons: GET /v1/app-templates. Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
-              build_prompt: `${base}/v1/prompts/build-app`,
-              builder_skill: 'node:aimeat-app-builder (aimeat_skill_get) — the paved-path workflow skill',
+              note: 'A new app is built on the Atelier track, forked from a genre. FIRST fetch its build spec: GET /v1/prompts/build-app-atelier (?format=txt for raw text, ?idea=<what to build>), or over MCP aimeat_handbook_get { tier: "build-app-atelier" }, in parts. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder-atelier via aimeat_skill_get. GET /v1/prompts/build-app and the T1/T2/T3 shells at GET /v1/app-templates are the Classic track, for an app already on it or when the owner asks for it. Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
+              build_prompt: `${base}/v1/prompts/build-app-atelier`,
+              classic_build_prompt: `${base}/v1/prompts/build-app`,
+              builder_skill: 'node:aimeat-app-builder-atelier (aimeat_skill_get) — the paved-path workflow skill',
               starter_templates_endpoint: `${base}/v1/app-templates`,
               pitfalls_endpoint: `${base}/v1/appdev/pitfalls`,
               research_overview: `${base}/v1/appdev/overview (MCP: aimeat_appdev_overview) — ONE call: your apps, packs with per-model proofs, templates, pitfalls`,

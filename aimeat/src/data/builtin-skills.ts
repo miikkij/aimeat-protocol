@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-02 -- aimeat-node-guide: the operator's sign-in policy (two-step required, password sign-in off).
  *   2026-11-01 -- aimeat-node-guide: an agent keeps the node id and the node's address with its key and
  *     signs a return proof only toward that address (secaudit2026oct31w2 round 11).
@@ -405,8 +406,9 @@ from the node library.
 
 ## Build and publish apps
 
-- \`GET /v1/prompts/build-app\` (public; \`?format=txt\` for plain text) — the canonical guided
-  prompt for building a single-file HTML app on this node.
+- \`GET /v1/prompts/build-app-atelier\` (public; \`?format=txt\` for plain text) — the canonical guided
+  prompt for building a new app on this node. \`GET /v1/prompts/build-app\` is the Classic track's,
+  for an app already on it.
 - \`GET /v1/app-templates\` — starter scaffolds. Publish with \`POST /v1/apps\`;
   browse the catalog at \`/v1/appcat\`. Apps can bind skills that teach agents to
   drive them — check \`GET /v1/apps/{owner}/{filename}/skills\` before operating any app.

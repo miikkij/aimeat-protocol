@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-01 — aimeat_consent_grant takes a party recipient with pinned_version, allow_url_key and
  *     terms_required: a named share of a data package (plan doc-mvwxcas3dom3, D3.4).
  *   2026-10-29 — The two operator propose-then-confirm tools moved unchanged to ./operator-config.ts (max-file-lines).
@@ -521,7 +522,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_appdev_overview',
-        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder first), curated pitfalls, every active learned pitfall you can read (your own and those other owners shared, critical first), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and list the pitfalls your model wrote first (it never hides one). Flow: research (this) → frame → propose to the user → build.',
+        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder-atelier first), curated pitfalls, every active learned pitfall you can read (your own and those other owners shared, critical first), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and list the pitfalls your model wrote first (it never hides one). Flow: research (this) → frame → propose to the user → build.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'AppDev Research Overview', readOnlyHint: true },

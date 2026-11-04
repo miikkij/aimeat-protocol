@@ -15,5 +15,5 @@ The build copies this directory to `dist/docs/`. Guidance for an AI (scheduling,
 contracts, AI in apps) is a built-in skill every node serves (`aimeat_skill_get`), not a file here.
 
 In an installed package, repository-relative links may be unavailable. Use the
-node's `/llms.txt`, `/v1/docs`, `/v1/spec` and `/v1/prompts/build-app` for served
+node's `/llms.txt`, `/v1/docs`, `/v1/spec` and `/v1/prompts/build-app-atelier` for served
 documentation, and `aimeat config` for the installed CLI's configuration.

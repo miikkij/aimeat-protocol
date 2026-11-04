@@ -4765,8 +4765,8 @@ components:
         skill:
           type: string
           description: The skill carrying the whole workflow. Present on everything but `ok`.
-          example: node:aimeat-app-builder
-        spec_url: { type: string, example: https://aimeat.io/v1/prompts/build-app }
+          example: node:aimeat-app-builder-atelier
+        spec_url: { type: string, example: https://aimeat.io/v1/prompts/build-app-atelier }
       required: [status, message]
 
     AppArtifactFinding:
@@ -16322,7 +16322,7 @@ paths:
       description: >-
         The paste-able flow prompt a user gives an MCP-connected coding agent (Claude Code,
         OpenHands, Cursor) so every AIMEAT app build follows research → frame → propose →
-        build → finish instead of coding cold: load node:aimeat-app-builder, call
+        build → finish instead of coding cold: load node:aimeat-app-builder-atelier, call
         aimeat_appdev_overview, frame the tier/packs/iam decision, propose, build, then finish
         with agent face + template proposal + pitfall report. The user can always skip. Public.
       tags:
@@ -18120,7 +18120,7 @@ paths:
       description: >-
         One compact research surface for building apps ON AIMEAT: the caller's existing apps,
         library packs (per-model proof summaries), T1/T2/T3 app-shell templates, loadable
-        skills (node:aimeat-app-builder first), curated pitfalls, every active learned pitfall
+        skills (node:aimeat-app-builder-atelier first), curated pitfalls, every active learned pitfall
         the caller can read (their own owner scope and other owners' shared entries, critical
         first), and prior template proposals. Indexes only with drill-down pointers; ?sections=
         for a partial fetch, ?model= marks proven packs and lists the learned pitfalls that model
@@ -37525,7 +37525,8 @@ paths:
                 spec_token:
                   type: string
                   description: >
-                    The `spec_token` from GET /v1/prompts/build-app — the digest of the build spec
+                    The `spec_token` from GET /v1/prompts/build-app-atelier, or from
+                    GET /v1/prompts/build-app for an app on the Classic track — the digest of the build spec
                     this app was written against. Honoured in BOTH modes (with `mode: presigned` it
                     rides in the signed upload token). Omitting it publishes anyway and answers
                     `spec_check.status: missing`; an out-of-date one answers `stale`.

@@ -19,6 +19,7 @@
  * @usage
  *   import { NEW_AGENT_MD } from './new-agent.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.3.0 — 2026-10-14 — The ideas the home offers, for a person who does not yet know what to ask
  *     for: tier "home-ideas", the same list the home reads (services/home-ideas.ts). Additive.
  *   v1.2.0 — 2026-10-11 — Step 4, after the agent is made: its first run, where its work goes
@@ -55,7 +56,7 @@ runs it on the person's own connector.
    then on is shared with that workspace's members. When they want an app that shows the agent's
    work, read \`aimeat_handbook_get { tier: "build-app/agent/<name>" }\` (the agent, how to read its
    work, the structure of its latest result, and the data map row that ties the app to it) and
-   then the build specification, tier "build-app". \`aimeat_app_agent_tie\` ties an app that
+   then the build specification, tier "build-app-atelier". \`aimeat_app_agent_tie\` ties an app that
    already exists to an agent, and \`aimeat_app_agent_untie\` takes the tie away.
 
 When the person does not yet know what agent or app to ask for, \`aimeat_handbook_get { tier: "home-ideas" }\`

@@ -27,6 +27,7 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.3.0 — 2026-09-05 — THE RECIPE AND THE ACCEPTANCE (wish-atelier-always-excellent, part 4):
  *     the served Atelier spec carries the four customisation doors, `describe()`, the fork's price
  *     and the five copy-paste patterns; an Atelier publish answers with an `acceptance` line
@@ -167,7 +168,7 @@ const publish = (token: string, body: Record<string, unknown>) =>
         // The remedy has to be IN the answer, or the agent has to guess where the spec lives.
         assert((r.body.data.spec_check.message as string).includes('/v1/prompts/build-app'),
             'the message does not name the spec URL');
-        assert(r.body.data.spec_check.skill === 'node:aimeat-app-builder',
+        assert(r.body.data.spec_check.skill === 'node:aimeat-app-builder-atelier',
             `the answer must name the skill: ${JSON.stringify(r.body.data.spec_check)}`);
     });
 

@@ -6,6 +6,7 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-25 -- GET /v1/portal/prompts/:promptId names only the cortexes the caller may see (visibleCortexes;
  *     secaudit2026oct22).
  *   2026-10-21 -- The hello-page funnel marker asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
@@ -303,7 +304,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       prompt,
       system_prompt: prompt,
     }, [
-      { description: 'The canonical build spec', method: 'GET', url: '/v1/prompts/build-app' },
+      { description: 'The build spec for a new app', method: 'GET', url: '/v1/prompts/build-app-atelier' },
       { description: 'The one-call research surface (MCP: aimeat_appdev_overview)', method: 'GET', url: '/v1/appdev/overview' },
       { description: 'Curated pitfalls', method: 'GET', url: '/v1/appdev/pitfalls' },
     ]));

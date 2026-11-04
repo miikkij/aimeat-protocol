@@ -69,7 +69,7 @@ their connection path until an authorized migration changes them.
 
 **Apps** — hosted mini-apps run origin-isolated on `*.apps.<node>` and reach your data only through **app grants** (scoped, consented tokens). Browse `/v1/apps`; SDK libs at `/v1/libs`.
 
-**Building an app** — apps are single-file HTML. Start from `GET /v1/prompts/build-app` (the canonical spec) and `GET /v1/app-templates` (T1 pure client · T2 +cortex · T3 +extension). If you have MCP tools, load the `node:aimeat-app-builder` skill and call `aimeat_appdev_overview` **first** — the owner's existing apps and the recorded pitfalls are usually the fastest correct starting point.
+**Building an app** — apps are single-file HTML. A new app is built on the Atelier track: start from `GET /v1/prompts/build-app-atelier` (over MCP, `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts). `GET /v1/prompts/build-app` and the `GET /v1/app-templates` shells (T1 pure client · T2 +cortex · T3 +extension) are the Classic track, for an app already on it or when the owner asks for it. If you have MCP tools, load the `node:aimeat-app-builder-atelier` skill and call `aimeat_appdev_overview` **first** — the owner's existing apps and the recorded pitfalls are usually the fastest correct starting point.
 
 **Tasks & workflows**: the owner queues work for their own agents as **tasks** (`/v1/agents/{name}/tasks`, `draft → queued → active → done`; key-holding v2 agents use `/v1/agents/v2/tasks`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run work on a clock.
 

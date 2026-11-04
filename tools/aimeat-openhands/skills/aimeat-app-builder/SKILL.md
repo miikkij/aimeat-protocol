@@ -14,6 +14,11 @@ metadata:
 > `aimeat_skill_get` tool is available, fetch `node:aimeat-app-builder` and follow THAT
 > version — it is kept current (research flow, pitfall registry, new tooling). Both versions
 > agree on the core rule: the live spec at `GET /v1/prompts/build-app` always wins.
+>
+> **A new app is built on the Atelier track.** Load `node:aimeat-app-builder-atelier` and read
+> `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts (over HTTP,
+> `GET /v1/prompts/build-app-atelier`). The rest of this file is the Classic track, for an app
+> that is already Classic or when the owner asks for Classic by name.
 
 # Building AIMEAT apps
 

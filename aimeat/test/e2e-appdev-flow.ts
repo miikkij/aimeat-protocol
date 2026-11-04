@@ -38,7 +38,8 @@ await test('GET /v1/prompts/appdev-flow serves the flow (json)', async () => {
     assert(body.data.id === 'appdev-flow', 'wrong id');
     const p = body.data.prompt as string;
     assert(/research → frame → propose → build → finish/.test(p), 'flow phases missing');
-    assert(/node:aimeat-app-builder/.test(p), 'builder skill missing');
+    assert(/node:aimeat-app-builder-atelier/.test(p), 'the Atelier builder skill missing');
+    assert(/\/v1\/prompts\/build-app-atelier/.test(p), 'the Atelier build spec missing');
     assert(/aimeat_appdev_overview/.test(p), 'overview tool missing');
     assert(/aimeat_app_template_propose/.test(p), 'template propose missing');
     assert(/aimeat_appdev_pitfall_report/.test(p), 'pitfall report missing');
@@ -93,7 +94,9 @@ await test('bootstrap app_building carries research_overview + flow_prompt + bui
     const app = body.data?.for_ai_assistants?.paths?.build_an_app?.app_building;
     assert(/aimeat_appdev_overview/.test(app?.research_overview ?? ''), 'research_overview missing');
     assert(/appdev-flow/.test(app?.flow_prompt ?? ''), 'flow_prompt missing');
-    assert(/aimeat-app-builder/.test(app?.builder_skill ?? ''), 'builder_skill missing');
+    assert(/aimeat-app-builder-atelier/.test(app?.builder_skill ?? ''), 'builder_skill does not name the Atelier skill');
+    assert(/\/v1\/prompts\/build-app-atelier$/.test(app?.build_prompt ?? ''), `build_prompt does not name the Atelier spec: ${app?.build_prompt}`);
+    assert(/\/v1\/prompts\/build-app$/.test(app?.classic_build_prompt ?? ''), `classic_build_prompt missing: ${app?.classic_build_prompt}`);
     assert(/appdev\/pitfalls/.test(app?.pitfalls_endpoint ?? ''), 'pitfalls_endpoint missing');
 });
 

@@ -70,13 +70,13 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:b2e9269a4790d4086cbc21ae",
+      "digest": "sha256:0fcb452f71876e5d6e93fe97",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -134,13 +134,13 @@
       "digest": "sha256:0616f65dadb980487d16a50a"
     },
     "node:aimeat-app-builder": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/services/node-templates.ts",
         "aimeat/src/services/app-spec-gate.ts"
       ],
-      "digest": "sha256:ffa29db256af3de8766ea339",
+      "digest": "sha256:16e2e35238fb3e4fabb1ec41",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
@@ -262,12 +262,12 @@
       "digest": "sha256:52ebcd099c3f0297a44fc1f2"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:12f508aa0d881cacc735ccac"
+      "digest": "sha256:1099221fc8481d06dc07fecc"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -566,7 +566,7 @@
     "node:aimeat-app-builder": {
       "aimeat/src/services/build-app-layers.ts": "b97c2e397914a7ba",
       "aimeat/src/services/node-templates.ts": "bcf0b92f35579c1e",
-      "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
+      "aimeat/src/services/app-spec-gate.ts": "1c415a82078c0a0f"
     },
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "512d403da4e7befa",
@@ -642,7 +642,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "e1f1561f60340d7c",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "21a02556dfd7c4f3"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "66f1803515078196"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
@@ -742,7 +742,7 @@
     "node:aimeat-guided-journey": {
       "aimeat/src/services/journey-state.ts": "f7e77e3ec980d153",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
-      "aimeat/public/views/home/journey-prompts.js": "429f406334ba193e"
+      "aimeat/public/views/home/journey-prompts.js": "24765a8656779b80"
     },
     "node:aimeat-organisms": {
       "aimeat/src/data/organism-shapes.ts": "e876d870cd931846",

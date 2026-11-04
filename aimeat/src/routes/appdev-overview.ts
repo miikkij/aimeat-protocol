@@ -9,6 +9,7 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-20 — SECURITY: GET /v1/appdev/overview hands the overview the caller's view (principal and
  *     readsAsOwner), so an agent without memory:read-as-owner no longer reads its owner's or its
  *     siblings' private learned pitfalls and template records there (secaudit 2026-10, v56 shape).
@@ -68,7 +69,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
       { description: 'Curated pitfalls', method: 'GET', url: '/v1/appdev/pitfalls' },
       { description: 'Library pack detail', method: 'GET', url: '/v1/library-packs/{id}' },
       { description: 'App template detail', method: 'GET', url: '/v1/app-templates/{id}' },
-      { description: 'The canonical build spec', method: 'GET', url: '/v1/prompts/build-app' },
+      { description: 'The build spec for a new app', method: 'GET', url: '/v1/prompts/build-app-atelier' },
     ]));
   });
 

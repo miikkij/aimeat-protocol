@@ -31,6 +31,7 @@
  * @usage
  *   cd aimeat && pnpm cold-agent --suite skills --model sonnet --runs 3
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-09-18 — Initial: 7 skills, 30 sentences, 6 of them needing no skill.
  *   v1.1.0 — 2026-09-19 — Every entry-point skill has sentences now: 21 skills, 71 sentences. A case
  *     may accept more than one skill, and a name is matched as a whole word. Sub-skills reached only
@@ -43,10 +44,10 @@ export interface SkillCase { expect: string | string[] | null; say: string }
 
 export const SKILL_CASES: SkillCase[] = [
     // Building an app
-    { expect: 'aimeat-app-builder', say: 'Can you make me a little app for tracking which plants I have watered?' },
-    { expect: 'aimeat-app-builder', say: 'I need a page where my football team can see who is bringing the snacks each week.' },
-    { expect: 'aimeat-app-builder', say: 'Build a simple expense splitter I can open on my phone.' },
-    { expect: 'aimeat-app-builder', say: 'My app looks broken on mobile. Can you fix it and publish it again?' },
+    { expect: 'aimeat-app-builder-atelier', say: 'Can you make me a little app for tracking which plants I have watered?' },
+    { expect: 'aimeat-app-builder-atelier', say: 'I need a page where my football team can see who is bringing the snacks each week.' },
+    { expect: 'aimeat-app-builder-atelier', say: 'Build a simple expense splitter I can open on my phone.' },
+    { expect: ['aimeat-app-builder-atelier', 'aimeat-app-builder'], say: 'My app looks broken on mobile. Can you fix it and publish it again?' },
     // Games
     { expect: 'aimeat-phaser', say: 'I want to make a little platform game for my kid.' },
     { expect: 'aimeat-phaser', say: 'Could you build a space shooter where the ship follows my finger?' },
@@ -113,8 +114,8 @@ export const SKILL_CASES: SkillCase[] = [
     { expect: ['aimeat-game-apps', 'aimeat-phaser'], say: 'I want a fast particle toy with thousands of dots that follow the mouse.' },
     { expect: ['aimeat-game-apps', 'aimeat-phaser'], say: 'Which game engine should we use here for a card battler?' },
     // The designed track
-    { expect: ['aimeat-app-builder-atelier', 'aimeat-app-builder'], say: 'Build me a good-looking dashboard for my sales numbers, with a proper design, not a default look.' },
-    { expect: ['aimeat-app-builder-atelier', 'aimeat-app-builder'], say: 'I want an app that looks like a magazine, for my travel notes.' },
+    { expect: 'aimeat-app-builder-atelier', say: 'Build me a good-looking dashboard for my sales numbers, with a proper design, not a default look.' },
+    { expect: 'aimeat-app-builder-atelier', say: 'I want an app that looks like a magazine, for my travel notes.' },
     // The first minutes with a new person, and the conversation skills
     { expect: 'aimeat-first-conversation', say: 'Hi. I just connected this. What is it and what should I do first?' },
     { expect: 'aimeat-first-conversation', say: 'My friend told me to try this. I have no idea where to start.' },

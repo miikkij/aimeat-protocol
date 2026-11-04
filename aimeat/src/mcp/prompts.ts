@@ -10,6 +10,7 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
@@ -151,7 +152,7 @@ export function registerPromptsTools(
                 const ctx = await buildAppAgentContext({ config, storage }, ownerName, tierKey.slice('build-app/agent/'.length),
                     readerForAgent({ storage, config }, getAgentGaii(), session.scopes));
                 if (!ctx.ok) return toolError(ctx.code, ctx.message);
-                const next = 'Next: read the build specification, aimeat_handbook_get { tier: "build-app" }.';
+                const next = 'Next: read the build specification, aimeat_handbook_get { tier: "build-app-atelier" }.';
                 return { content: [{ type: 'text' as const, text: `${ctx.text}\n${next}\n` }] };
             }
             if (tierKey === 'build-app' || tierKey.startsWith('build-app/')) {

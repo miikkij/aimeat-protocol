@@ -15,8 +15,9 @@
  *   reachableAgents · handToAgent
  * @usage
  *   import { addOpenItem } from '/js/services/open-items.js';
- *   await addOpenItem({ title, prompt_ref: 'build-app', origin: 'home.rooms.create' });
+ *   await addOpenItem({ title, prompt_ref: 'build-app-atelier', origin: 'home.rooms.create' });
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-08-09 — Replaces services/intents.js. One key on the server, a flipped state
  *     instead of open→done, and a count endpoint the header can poll cheaply.
  */

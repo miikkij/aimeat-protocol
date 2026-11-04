@@ -3921,13 +3921,13 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         <div id="pb-improving" class="pb-improving" style="display:none"></div>
         <!-- The TRACK is the first decision, and the two guides never mix (TARGET-074). -->
         <div class="pb-track" id="pb-track" role="radiogroup">
-          <label class="pb-trackcard is-on" id="pb-track-classic">
-            <input type="radio" name="pb-track" value="classic" checked>
+          <label class="pb-trackcard" id="pb-track-classic">
+            <input type="radio" name="pb-track" value="classic">
             <span class="pb-trackname" data-i18n="pb.trackClassic">Classic</span>
-            <span class="pb-trackdesc" data-i18n="pb.trackClassicDesc">The proven way: templates, capability packs, the familiar clean style.</span>
+            <span class="pb-trackdesc" data-i18n="pb.trackClassicDesc">For an app already on Classic: templates, capability packs, the familiar clean style.</span>
           </label>
-          <label class="pb-trackcard" id="pb-track-atelier">
-            <input type="radio" name="pb-track" value="atelier">
+          <label class="pb-trackcard is-on" id="pb-track-atelier">
+            <input type="radio" name="pb-track" value="atelier" checked>
             <span class="pb-trackname" data-i18n="pb.trackAtelier">Atelier</span>
             <span class="pb-tracknew" data-i18n="pb.trackNew">new</span>
             <span class="pb-trackdesc" data-i18n="pb.trackAtelierDesc">The new track: living looks, layouts your AI can rearrange later, motion built in.</span>
@@ -4405,7 +4405,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "pb.improve": "Improve This App",
       "pb.descPh": "Describe what the app should do, or what changes to make...",
       "pb.trackClassic": "Classic",
-      "pb.trackClassicDesc": "The proven way: templates, capability packs, the familiar clean style.",
+      "pb.trackClassicDesc": "For an app already on Classic: templates, capability packs, the familiar clean style.",
       "pb.trackAtelier": "Atelier",
       "pb.trackAtelierDesc": "The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.",
       "pb.trackNew": "new",
@@ -5507,7 +5507,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "pb.improve": "Paranna tätä sovellusta",
       "pb.descPh": "Kuvaile mitä sovelluksen tulisi tehdä, tai mitä muutoksia haluat...",
       "pb.trackClassic": "Perinteinen",
-      "pb.trackClassicDesc": "Tuttu ja varma tapa: aloituspohjat, kyvykkyyspaketit, siisti perustyyli.",
+      "pb.trackClassicDesc": "Apille, joka on jo Classic-radalla: aloituspohjat, kyvykkyyspaketit, siisti perustyyli.",
       "pb.trackAtelier": "Atelier",
       "pb.trackAtelierDesc": "Uusi rata: elävät tyylit (sanomalehti, galleria, neonkonsoli…), asettelut joita tekoälysi voi järjestellä myöhemmin julkaisematta uudelleen, liike valmiina.",
       "pb.trackNew": "uusi",
@@ -7282,7 +7282,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     cortexEditorExtName = null;
   }
   var pbSourceApp = null;
-  var pbTrack = "classic";
+  var pbTrack = "atelier";
   function pbApplyTrackUi() {
     var classicExtras = document.getElementById("pb-classic-extras");
     if (classicExtras) classicExtras.style.display = pbTrack === "atelier" ? "none" : "";
@@ -7298,7 +7298,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     window.pbTemplate = null;
     var tplSel0 = document.getElementById("pb-template");
     if (tplSel0) tplSel0.value = "";
-    pbTrack = pbSourceApp && pbSourceApp.track === "atelier" ? "atelier" : "classic";
+    pbTrack = !pbSourceApp || pbSourceApp.track === "atelier" ? "atelier" : "classic";
     var trackRow = document.getElementById("pb-track");
     if (trackRow) {
       trackRow.style.display = pbSourceApp ? "none" : "";

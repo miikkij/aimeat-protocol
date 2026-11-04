@@ -10,6 +10,7 @@
  * @structure FLOW_* string constants + buildResearchStep()/buildFinishChecklist() fragments
  * @usage import { FLOW_SKIP_PHRASE, buildResearchStep } from './appdev-flow-constants.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 7).
  */
 
@@ -22,6 +23,7 @@ export const FLOW_SKIP_PHRASE = 'just build it the usual way' as const;
 /** Canonical tool names of the flow (single source for every prompt surface). */
 export const FLOW_TOOLS = {
     skill: 'node:aimeat-app-builder',
+    atelierSkill: 'node:aimeat-app-builder-atelier',
     skillGet: 'aimeat_skill_get',
     overview: 'aimeat_appdev_overview',
     pitfallList: 'aimeat_appdev_pitfall_list',

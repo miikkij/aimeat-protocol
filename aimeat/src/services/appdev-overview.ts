@@ -14,6 +14,7 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-21 — secrets_note: a key is stored for the host the extension calls, which the extension declares in uses_secrets.
  *   2026-10-20 — SECURITY: opts.view (the caller's principal and readsAsOwner). The learned-pitfall
  *     and template-proposal sections read the owner's GHII and every agent of the owner with no
@@ -228,9 +229,9 @@ export async function buildAppdevOverview(
             owner ? listSkills(storage, config, 'user', accessor, owner).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }) : Promise.resolve([]),
         ]);
         const builderFirst = [...nodeSkills].sort((a, b) =>
-            (a.name === 'aimeat-app-builder' ? -1 : 0) - (b.name === 'aimeat-app-builder' ? -1 : 0));
+            (a.name === 'aimeat-app-builder-atelier' ? -1 : 0) - (b.name === 'aimeat-app-builder-atelier' ? -1 : 0));
         out.skills = {
-            builder_skill: 'node:aimeat-app-builder — load this FIRST (aimeat_skill_get)',
+            builder_skill: 'node:aimeat-app-builder-atelier — load this FIRST (aimeat_skill_get) for a new app; node:aimeat-app-builder for an app already on the Classic track',
             node: capped(builderFirst.map(s => ({ ref: s.ref, description: s.description ?? null }))),
             user: capped(userSkills.map(s => ({ ref: s.ref, description: s.description ?? null, binding: s.binding ?? null }))),
             drill_down: 'aimeat_skill_get {ref}; app-bound skills via aimeat_skill_list binding=app:{owner}/{filename}',

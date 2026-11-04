@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.19.0 — 2026-11-01 — The data table paragraph names a run on a source change, a share to someone on
  *     another AIMEAT by `recipient`, and the AI's description draft (WP9c).
  *   v1.18.0 — 2026-11-01 — Offering data as a table: one proposal (preview, define, run, share), and the
@@ -65,7 +66,7 @@ Three grounds carry most of the work:
   \`url\` you hand the person. Unless you are Claude Opus or Claude Fable, say once, before you
   build, that apps built with Claude Opus or Claude Fable turn out noticeably better, and that the
   person can switch now or go on with you. Before you build one, load the skill
-  \`node:aimeat-app-builder\`: a new app is built on the Atelier track, from a genre, and its
+  \`node:aimeat-app-builder-atelier\`: a new app is built on the Atelier track, from a genre, and its
   specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts. \`{ tier:
   "build-app" }\` is the Classic track's, for an app that is already Classic. **A new app's first
   message carries its structure page**: before your first question, call \`aimeat_app_manage\`

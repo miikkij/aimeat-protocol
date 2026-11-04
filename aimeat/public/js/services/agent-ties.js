@@ -22,6 +22,7 @@
  *   draftAppOptions · plainOption · buildRequest · readFullBuildPrompt · WHO
  * @usage import { draftAppOptions, buildRequest } from '/js/services/agent-ties.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.2.0 — 2026-10-12 — readWatchableSpaces(organismId, workspaceId), for an agent that works
  *     when a record is published in a workspace.
  *   v1.1.0 — 2026-10-12 — readTieChoices({ tools: true }) asks for each app's tools as well.
@@ -156,7 +157,7 @@ export function buildRequest(option, worker, who) {
     '',
     'Read two things first, in this order:',
     `1. aimeat_handbook_get { tier: "build-app/agent/${worker.name}" } : the agent, how to read its work, what its latest result looks like, and the data map row that ties the app to it.`,
-    '2. aimeat_handbook_get { tier: "build-app" } : the build specification of this AIMEAT.',
+    '2. aimeat_handbook_get { tier: "build-app-atelier" } : the build specification of this AIMEAT.',
     '',
     'Then build the app, publish it, and write its data map with the row from step 1. Give me the address of the app when it is open.',
   ].join('\n');

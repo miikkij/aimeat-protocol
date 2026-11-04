@@ -11,7 +11,7 @@ build-app spec, built single-file AIMEAT apps, and **published them live over MC
 
 | Piece | What it does |
 |-------|--------------|
-| `skills/aimeat-app-builder/` | An always-available OpenHands **skill**. Its golden rule: fetch `GET /v1/prompts/build-app` from the node at runtime (canonical, never drifts) → build one HTML file → verify locally → publish via the `aimeat_app_publish` MCP tool → return the live URL. Kills the hallucinated-`src` failure mode. |
+| `skills/aimeat-app-builder/` | An always-available OpenHands **skill**. A new app follows `node:aimeat-app-builder-atelier` from the node. Its golden rule for a Classic app: fetch `GET /v1/prompts/build-app` from the node at runtime (canonical, never drifts) → build one HTML file → verify locally → publish via the `aimeat_app_publish` MCP tool → return the live URL. Kills the hallucinated-`src` failure mode. |
 | `config.toml.template` | Preconfigured **MCP** (AIMEAT `/v2/mcp/appdev`, bearer token) + **LLM** (Kimi via OpenRouter) + **microagent pruning**. Rendered to a git-ignored `config.toml` with your secrets. |
 | `runtime/Dockerfile` + `scripts/build-runtime.sh` | Build a thin **custom agent-server runtime image** that bakes the skill into the container the app spawns. Required — see "How the skill reaches the agent" below. |
 | `nginx/openhands.conf.example` | Reverse-proxy template (TLS + **Basic Auth** + WebSocket) for exposing the UI on a subdomain. OpenHands has **no login of its own** — this auth gate is mandatory before any internet exposure. |

@@ -7,6 +7,7 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.4.1 — 2026-10-24 — cortexArg and the bar's card markup moved to cortex-card.js; the card's
  *     and the owner's edit button's onclick argument is JS-escaped with cortexArg (secaudit2026oct22).
  *   v1.4.0 — 2026-09-24 — The owner's edit door in the popup's footer is the library's action link
@@ -355,9 +356,9 @@ function closeCortexEditor() {
 
 var pbSourceApp = null; // app being improved (null = new app mode)
 // The TRACK is the first decision and the guides never mix (TARGET-074): Classic reads
-// /v1/prompts/build-app, Atelier reads /v1/prompts/build-app-atelier. Classic stays the
-// default until measured evidence says otherwise.
-var pbTrack = 'classic';
+// /v1/prompts/build-app, Atelier reads /v1/prompts/build-app-atelier. A new app
+// starts on Atelier; Classic stays selectable.
+var pbTrack = 'atelier';
 
 function pbApplyTrackUi() {
   var classicExtras = document.getElementById('pb-classic-extras');
@@ -379,9 +380,9 @@ function openPromptBuilder(app) {
   if (tplSel0) tplSel0.value = '';
 
   // The track: improving an app inherits ITS track (recorded in the manifest at publish);
-  // a new app starts on Classic and the person chooses. The picker hides in improve mode,
+  // a new app starts on Atelier and the person may choose Classic. The picker hides in improve mode,
   // because an existing app's track is a fact, not a choice.
-  pbTrack = (pbSourceApp && pbSourceApp.track === 'atelier') ? 'atelier' : 'classic';
+  pbTrack = (!pbSourceApp || pbSourceApp.track === 'atelier') ? 'atelier' : 'classic';
   var trackRow = document.getElementById('pb-track');
   if (trackRow) {
     trackRow.style.display = pbSourceApp ? 'none' : '';

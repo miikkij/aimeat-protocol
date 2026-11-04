@@ -11,6 +11,7 @@
  * @structure AppDevTab — state, loads, handlers, the ctx bag, render
  * @usage registered in views/profile.js TABS as id 'appdev'.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v2.0.0 — 2026-09-03 — The poster face (design canvas "AppDev: tieto ja kiihdytys", direction A).
  *     On the production node the page was 117 cards in one column, 13 429 px, two checkboxes as
  *     the only filter, and the 88 kB build prompt fetched on every open. The filed pitfalls now
@@ -233,7 +234,7 @@ export default function AppDevTab({ showToast }) {
         showToast?.(a('offWorklistToast'));
       } else {
         const title = a(id === 'flow' ? 'flowTitle' : 'buildTitle');
-        const item = await addOpenItem({ title, kind: 'app', prompt_ref: id === 'build' ? 'build-app' : null, origin: 'appdev.' + id });
+        const item = await addOpenItem({ title, kind: 'app', prompt_ref: id === 'build' ? 'build-app-atelier' : null, origin: 'appdev.' + id });
         setOpenItems({ ...openItems, [id]: item });
         showToast?.(a('toWorklistToast', { title }));
       }

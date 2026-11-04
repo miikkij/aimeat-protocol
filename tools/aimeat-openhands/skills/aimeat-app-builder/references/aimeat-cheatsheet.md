@@ -5,7 +5,7 @@ conflict. This file is a quick offline reminder of the shape of a working app.
 
 It shows the **Classic** track only (daisyUI, Tailwind, the `aimeat-ui-*` cortex). The node has a
 second track, **Atelier**, with looks, genres and layouts an AI can rearrange later; a new app is
-usually built on it. Its specification is `GET /v1/prompts/build-app-atelier`.
+built on it. Its specification is `GET /v1/prompts/build-app-atelier`.
 
 ## Minimal head (node libraries)
 
