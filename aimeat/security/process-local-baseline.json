@@ -1,0 +1,1633 @@
+{
+  "note": "Process-local state and timers in aimeat/src (scripts/check-process-local.ts). Seeded 2026-11-04 from the code of that day (codebase analysis 2026-11-03, HA stage 1). Each entry is a count per file, kind and name, and the reason it is per process; DEBT means known, not judged yet. A count may only fall: a new one needs a `// process-local: <what breaks with a second process>` marker and an entry here with that reason, and a fallen count is lowered here.",
+  "entries": {
+    "src/services/admin-password.ts :: map :: misses": {
+      "count": 1,
+      "reason": "Each process counts wrong admin passwords on its own, so N active processes allow N times the limit; one active process plus a standby keeps the limit as set."
+    },
+    "src/services/classification/audit.ts :: let :: soonTimer": {
+      "count": 1,
+      "reason": "The timer that writes this process's own buffered audit rows within 1 s; no other process reads it."
+    },
+    "src/services/consent-audit-buffer.ts :: let :: soonTimer": {
+      "count": 1,
+      "reason": "The timer that writes this process's own buffered audit rows within 1 s; no other process reads it."
+    },
+    "src/services/outbox.ts :: map :: handlers": {
+      "count": 1,
+      "reason": "Every process registers the same send handlers at boot; a second process has its own identical copy."
+    },
+    "src/services/outbox.ts :: set :: inFlight": {
+      "count": 1,
+      "reason": "This process's own attempts; other processes see the claim on the stored entry, not this set."
+    },
+    "src/services/outbox.ts :: let :: stopping": {
+      "count": 1,
+      "reason": "This process is stopping; another process takes over through the stored claims."
+    },
+    "src/services/outbox.ts :: let :: known": {
+      "count": 1,
+      "reason": "What this process releases at its own stop."
+    },
+    "src/auth/jwt.ts :: interval :: initRevocationStorage": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/jwt.ts :: let :: _onTokenRevoked": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/jwt.ts :: let :: nodePrivateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/jwt.ts :: let :: nodePublicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/jwt.ts :: map :: cleanupSweeps": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/jwt.ts :: map :: revocationCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/loopback-pass.ts :: map :: passes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/middleware.ts :: map :: _lastSeenCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/signed-request.ts :: map :: spent": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/auth/ws-upgrade.ts :: let :: lastQueryTokenNoticeDay": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/commerce/payment-handlers.ts :: map :: registry": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/commerce/sellable-resolvers.ts :: map :: registry": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/commerce/test-money-handler.ts :: map :: holds": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/data/atelier-ambients.ts :: map :: byId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/data/atelier-effects.ts :: map :: byId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/data/atelier-looks.ts :: map :: byId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/data/atelier-ornament-sets.ts :: map :: byId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/data/atelier-ornaments.ts :: map :: byId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/i18n.ts :: map :: translations": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/mcp/apps-ui.ts :: let :: cachedPage": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/mcp/apps-ui.ts :: let :: pageUnavailable": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/mcp/legacy-sessions.ts :: interval :: legacySessions": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/mcp/oauth-binding.ts :: map :: lastNoticeDay": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/mcp/public-catalogue.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/mcp/session-registry.ts :: map :: openSessions": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/middleware/idempotency.ts :: interval :: <module>": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/middleware/idempotency.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/middleware/login-tarpit.ts :: interval :: <module>": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/middleware/login-tarpit.ts :: let :: sleeping": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/middleware/login-tarpit.ts :: map :: buckets": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/models/validation-issues.ts :: set :: REASONS": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/admin-monitoring.ts :: interval :: pollForApprovalAndComplete": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/admin-seo.ts :: let :: keyCheck": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/apps-backup.ts :: map :: backupCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/auth.ts :: interval :: authRouter": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/auth.ts :: map :: challenges": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/chat.ts :: interval :: chatRouter": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/chat.ts :: map :: stoppers": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/chat.ts :: set :: running": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/discover.ts :: set :: VALID_TYPES": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/extensions/internal-pass.ts :: map :: passes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/federation-peer/introduce.ts :: set :: unsignedSummaryPeersLogged": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/federation-peer/lifecycle.ts :: let :: cachedSummaryHash": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/federation-peer/lifecycle.ts :: let :: summaryHashExpiry": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/libs/sdk-serve.ts :: map :: bundleCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/openrouter.ts :: map :: modelCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/personal.ts :: let :: anchorQueue": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/public-events.ts :: interval :: publicEventsRouter": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/saml-login.ts :: map :: lastLoginStamp": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/scim.ts :: map :: lastScimStamp": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/site.ts :: let :: storeTiersCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/sse.ts :: interval :: sseRouter": {
+      "count": 2,
+      "reason": "DEBT"
+    },
+    "src/routes/sse.ts :: let :: visitorStreams": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/routes/sse.ts :: map :: visitorStreamsByIp": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/server-bootstrap/service-init.ts :: interval :: initializeServices": {
+      "count": 6,
+      "reason": "DEBT"
+    },
+    "src/server-bootstrap/static-files.ts :: let :: nodeRobotsTxt": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/account-events.ts :: set :: firstUseSeen": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/account-limits.ts :: map :: aiCallLimiters": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-enrolment-offer.ts :: set :: offering": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-face.ts :: map :: facesInFlight": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-mcp-touch.ts :: map :: lastWrite": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-pending-enrolment.ts :: map :: scheduled": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-pending-enrolment.ts :: set :: inFlight": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-refusals.ts :: let :: openedListener": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-refusals.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-refusals.ts :: map :: chains": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/agent-refusals.ts :: map :: slots": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai-client-families.ts :: map :: VARIANT_BY_ID": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai-disclosure-author.ts :: set :: traced": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai-jobs/finished-listeners.ts :: set :: listeners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai-jobs/service.ts :: let :: _activeAiJobService": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai-voice.ts :: map :: speechPrices": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/catalog/store.ts :: let :: meta": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/catalog/store.ts :: map :: byType": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/gen-rules-store.ts :: let :: boundConfig": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/gen-rules-store.ts :: let :: modesCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/health.ts :: let :: now": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/health.ts :: map :: state": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/node-key-balance.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/node-key-balance.ts :: let :: lastRecheck": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/node-key-balance.ts :: let :: spentSince": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/node-key-hold.ts :: let :: heldOnNode": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/node-key-hold.ts :: map :: heldByAccount": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/openrouter-region.ts :: map :: inFlight": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/openrouter-region.ts :: map :: lists": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/policy-store.ts :: let :: recommendedCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/policy-store.ts :: map :: appModelsCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/providers.ts :: let :: overrideCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ai/roles.ts :: map :: lastNoted": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/api-index.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/app-audit-archive.ts :: let :: boundConfig": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/app-isolation.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/app-playtest.ts :: let :: playtestsRunning": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/app-playtest.ts :: map :: playtestHistory": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/app-ui/layouts.ts :: map :: byId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/app-ui/registry.ts :: map :: byId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/atelier-contrast.ts :: let :: sheetsCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/auth-audit.ts :: let :: filePath": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/auth-audit.ts :: let :: maxBytes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/auth-audit.ts :: let :: warned": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/build-app-prompt.ts :: map :: specTokenCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/build-atelier-prompt.ts :: map :: tokenCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/build-with-you.ts :: interval :: startBuildWithYou": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/build-with-you.ts :: let :: stopConfig": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/build-with-you.ts :: let :: stopListener": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/build-with-you.ts :: let :: sweepTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/build-with-you.ts :: set :: offered": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/cache-cleanup.ts :: interval :: startCacheCleanupJob": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/cache.ts :: interval :: <module>": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/cache.ts :: let :: evictions": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/cache.ts :: let :: sweepTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/cache.ts :: map :: byTag": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/cache.ts :: map :: store": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/calendar-lib.ts :: let :: lib": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/call-timing.ts :: interval :: recordCallDuration": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/call-timing.ts :: let :: timer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/call-timing.ts :: map :: pending": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/catalogue-sync.ts :: map :: peerSyncStates": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/chat-agent-pool.ts :: interval :: ensureTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/chat-session.ts :: map :: earlierRunsEnded": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/chat-session.ts :: map :: sessionTokens": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: interval :: initClassificationAudit": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: let :: evidence": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: let :: flushing": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: let :: refusedEvidence": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: let :: routine": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/audit.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/classifier.ts :: let :: draining": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/classifier.ts :: map :: budgetAccounts": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/detect.ts :: map :: compiled": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/detect.ts :: map :: scopeSpent": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classification/detect.ts :: set :: saidOnce": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classify-on-write.ts :: let :: classifier": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classify-on-write.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classify-on-write.ts :: let :: overflowFlush": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classify-on-write.ts :: let :: saidUnset": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classify-on-write.ts :: let :: worker": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classify-on-write.ts :: let :: writeQueue": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/classify-on-write.ts :: map :: pendingByOwner": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/compliance-agreements-gaps.ts :: interval :: scheduleAgreementSweep": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/config-admin-view.ts :: set :: PERSON_ONLY_LOOSENING": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/connect-tunnel-hooks.ts :: set :: closeListeners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/connect-tunnel-hooks.ts :: set :: listeners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/connect-tunnel.ts :: interval :: startHeartbeatMonitor": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/connect-tunnel.ts :: let :: _active": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/connections/media-handoff.ts :: map :: held": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/connector-registry.ts :: map :: chains": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/connector-registry.ts :: map :: scheduled": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consent-audit-buffer.ts :: interval :: initConsentAuditBuffer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consent-audit-buffer.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consent-audit-buffer.ts :: let :: flushing": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consent-audit-buffer.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consent-audit-buffer.ts :: let :: queue": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consent-audit-buffer.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consent.ts :: interval :: startConsentExpiryJob": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/consul-config.ts :: interval :: startWatching": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/contact-handles.ts :: map :: handles": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/intake.ts :: let :: dropped": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/intake.ts :: let :: installed": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/intake.ts :: let :: worker": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/intake.ts :: map :: pendingByOwner": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/intake.ts :: map :: waiting": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/media-read-bounded.ts :: interval :: start": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/media-read-bounded.ts :: let :: nextId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/media-read-bounded.ts :: let :: paths": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/content/scan.ts :: map :: scans": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/cortex-seeder.ts :: let :: shipped": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/crew-ops.ts :: map :: tries": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-intermediation/gate.ts :: let :: running": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-map/write-tally-buffer.ts :: interval :: initWriteTallyBuffer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-map/write-tally-buffer.ts :: let :: droppedSinceLastWarning": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-map/write-tally-buffer.ts :: let :: flushing": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-map/write-tally-buffer.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-map/write-tally-buffer.ts :: let :: pending": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-map/write-tally-buffer.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/data-map/write-tally-buffer.ts :: set :: knownPairs": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/datapackage/audience-record.ts :: let :: pointerStateRecorded": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/datapackage/audience-record.ts :: let :: ruleInForce": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/dataproduct/on-change.ts :: map :: nodes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/dataspace/did-resolve.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/dataspace/store.ts :: map :: lastSweep": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/dataspace/verifier.ts :: map :: seen": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/decide/pacer.ts :: map :: windows": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/decide/runs.ts :: map :: active": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/dependency-map.ts :: let :: packNeedles": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/deprecation.ts :: map :: lastNoticeDay": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/design-book/component-scan.ts :: set :: BETWEEN_RULES": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/design-book/component-scan.ts :: set :: WORD_TOKENS": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/design-book/component.ts :: map :: BENCHED": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/design-book/component.ts :: map :: PAGE_AT_RULES": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/design-book/preview-token.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/design-book/preview-token.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/device-return-proof.ts :: map :: spentHere": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/directory.ts :: let :: directoryNotifier": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/directory.ts :: let :: nodeDirectoryService": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/chain.ts :: let :: anchorCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/chain.ts :: let :: caFetcher": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/chain.ts :: let :: testRoots": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/eudi.ts :: let :: credCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/eudi.ts :: map :: sessions": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/records.ts :: map :: locks": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/records.ts :: map :: pendingIntents": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/revocation.ts :: let :: fetchBytes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/revocation.ts :: map :: crlCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/trust-list.ts :: let :: fetcher": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/trust-list.ts :: let :: lotlCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/docsign/trust-list.ts :: map :: territories": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/download-token.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/download-token.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/draft-token.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/draft-token.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/email-templates.ts :: let :: nodeFooter": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/email.ts :: let :: _activeEmailService": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/encryption.ts :: map :: fallbackKeys": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/exchange-projection.ts :: map :: lastReconcile": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/extension-run-slots.ts :: let :: inUse": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/extension-run-slots.ts :: map :: byAccount": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/extension-run-slots.ts :: set :: slotWaiters": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/feature-map.ts :: let :: pagesCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation-helpers.ts :: map :: peerKeyCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation.ts :: interval :: startHeartbeatJob": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation.ts :: let :: onPeerRecovery": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation.ts :: map :: gaiiCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation.ts :: map :: peerCatalogueHashes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation.ts :: map :: peerFailures": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation.ts :: map :: peerSummaryHashes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/federation.ts :: set :: signedSummaryPeers": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/file-store/file-store-specs.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/file-text/pdf-bounded.ts :: interval :: readPdfBounded": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/file-text/pdf-bounded.ts :: let :: unpdfPath": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/finance/finvoice-operator.ts :: map :: mockSubmissions": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/finance/vat-codes.ts :: let :: seeded": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/goals/goals-sweep.ts :: interval :: scheduleGoalSweep": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/goose-chat-config.ts :: let :: warnedOperatorFile": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/goose-chat-config.ts :: map :: checkedRoots": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/headless-slots.ts :: let :: running": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/hook-log.ts :: let :: chain": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/intake-daily-count.ts :: map :: chains": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/intake-thread-retention.ts :: map :: chains": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/internet-opening/opening-registry.ts :: let :: openApps": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/internet-opening/opening-registry.ts :: let :: openForms": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/marketplace-fee.ts :: map :: operatorCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/mcp-agent-admission.ts :: map :: lastContact": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/mcp-build-inputs.ts :: let :: supportRoute": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/mcp-build-inputs.ts :: map :: guidanceByOwner": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/mcp-client/pool.ts :: interval :: startSweeper": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/memory-replication.ts :: map :: enqueueListeners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/memory-replication.ts :: map :: replicationState": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/message-delivery.ts :: interval :: startMessageRetryJob": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/mydata-receipt.ts :: let :: regionByName": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/node-capabilities.ts :: let :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/node-lifecycle.ts :: let :: phase": {
+      "count": 1,
+      "reason": "Each process answers its own readiness; nothing to share."
+    },
+    "src/services/node-lifecycle.ts :: set :: drainableStreams": {
+      "count": 1,
+      "reason": "The open live streams of this process, ended when this process drains; another process holds its own."
+    },
+    "src/services/node-update-check.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/node-update-check.ts :: let :: inflight": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/notification-create.ts :: map :: emailsSent": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/notify.ts :: let :: pushService": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/notify.ts :: map :: throttle": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/onboarding-funnel.ts :: set :: seenActivatedOwners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/onboarding-funnel.ts :: set :: seenChatTurnOwners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/onboarding-funnel.ts :: set :: seenHelloOwners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/onboarding-funnel.ts :: set :: seenMcpOwners": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/openrouter-key.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/operator-confirm.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/operator-confirm.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/operator-confirm.ts :: map :: usedTokens": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/operator-place.ts :: let :: codeByLocalName": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/packages/peer/package-peer-register.ts :: map :: lastTry": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/page-body-live.ts :: let :: changelog": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/page-body-live.ts :: map :: helpFiles": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/page-frame-token.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/page-frame-token.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/parties/activity.ts :: map :: pending": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/parties/activity.ts :: map :: windows": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/parties/token.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/parties/token.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/passkeys.ts :: map :: pending": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/person-zone.ts :: map :: zones": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/personal-tunnel.ts :: interval :: startHeartbeatMonitor": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/place-trail.ts :: let :: toolInfo": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/portfolio-members.ts :: let :: membersCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/portfolio-read-hold.ts :: set :: marked": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/presence.ts :: interval :: init": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/prometheus.ts :: let :: _promMetrics": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/prompt-ownership.ts :: map :: SEED_BY_ID": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/provenance-embed/archive.ts :: let :: running": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/quota-alarm.ts :: map :: lastNotified": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/rate-buckets.ts :: interval :: rateBuckets": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/realtime-manager.ts :: interval :: startCleanupJob": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/refinery/runs.ts :: map :: runs": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/request-nonce.ts :: map :: seen": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/saml-sp.ts :: map :: instanceCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scheduler.ts :: let :: _activeScheduler": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/schema-validator.ts :: map :: firstErrorCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/schema-validator.ts :: map :: validatorCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scim-users.ts :: let :: declared": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scope-narrowing.ts :: map :: queue": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scope-use.ts :: interval :: initScopeUse": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scope-use.ts :: let :: inFlight": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scope-use.ts :: let :: pending": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scope-use.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/scope-use.ts :: let :: timer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/screenshot-capture.ts :: interval :: startScreenshotAutoCapture": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/screenshot-capture.ts :: let :: offUntil": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/screenshot-capture.ts :: let :: running": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/screenshot-capture.ts :: let :: timer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/screenshot-capture.ts :: map :: onDemandHistory": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/secret-records.ts :: set :: SECRET_RECORD_KEYS": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/settings-explain.ts :: set :: TERM_SET": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/share-token.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/share-token.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/signals/page-views.ts :: map :: notMeasured": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/signals/signal-service.ts :: let :: streamsVersion": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/signals/signal-service.ts :: map :: keyLocks": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/single-use-tickets.ts :: interval :: ensureSweeper": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/single-use-tickets.ts :: let :: sweeper": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/single-use-tickets.ts :: set :: stores": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/site-sync.ts :: interval :: startSiteSyncJob": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/stats.ts :: interval :: init": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/stats.ts :: let :: _instance": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/structure-snapshot.ts :: map :: structureLocks": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/surface-layout/registry.ts :: map :: BY_ID": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-health.ts :: let :: activeSyncCount": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-health.ts :: let :: isThrottled": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-health.ts :: let :: throttleReason": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-health.ts :: let :: totalSyncAttempts": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-health.ts :: let :: totalSyncFailures": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-scheduler.ts :: let :: batchedPeerIds": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-scheduler.ts :: let :: batchTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/sync-scheduler.ts :: map :: memoryDrainTimers": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/system-fault-report.ts :: map :: seen": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/task-start-migrations.ts :: set :: BASIC_NAMES": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: interval :: initTelemetryBuffer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: let :: activityDeltas": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: let :: flushing": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: let :: lastSeen": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: let :: statsDeltas": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/telemetry-buffer.ts :: map :: ring": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/font-registry.ts :: let :: added": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/fonts-base.ts :: let :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/fonts.ts :: map :: locks": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/service.ts :: let :: snapshotCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/service.ts :: set :: RESERVED_IDS": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/shapes.ts :: let :: builtinCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/shapes.ts :: set :: SHAPE_NAMES": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/styles.ts :: let :: builtinCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/themes/tokens.ts :: set :: TOKEN_NAMES": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/track-registry.ts :: map :: watched": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/tracked-response.ts :: interval :: startTrackedResponseReconciler": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/tracked-response.ts :: set :: inFlight": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ucp/platform-profile.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ucp/ucp-keys.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/ui-library/entries-shapes.ts :: set :: UNUSED_SHAPES": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/upload-token.ts :: interval :: initUploadTokenKeys": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/upload-token.ts :: let :: _cleanupInterval": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/upload-token.ts :: let :: _privateKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/upload-token.ts :: let :: _publicKey": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/upload-token.ts :: map :: handles": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/rollup-cuts.ts :: map :: BY_STREAM": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/usage-buffer.ts :: interval :: initUsageBuffer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/usage-buffer.ts :: let :: buffer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/usage-buffer.ts :: let :: droppedSinceLastWarning": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/usage-buffer.ts :: let :: flushing": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/usage-buffer.ts :: let :: flushTimer": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/usage-buffer.ts :: let :: storageRef": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/usage/usage-settings.ts :: let :: bound": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/visibility/behaviour-settings.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/visibility/visibility-counter.ts :: map :: placeOwnerCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/visibility/visibility-counter.ts :: set :: liveStorages": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/visibility/visibility-settings.ts :: let :: tagsInUse": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/visibility/visibility-settings.ts :: let :: tagsInUseAt": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/visibility/visibility-settings.ts :: let :: tagsInUseStorage": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/visibility/visibility-settings.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/web-bot-auth.ts :: let :: privateKeyBytes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/web-bot-auth.ts :: let :: statePromise": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/workflow/engine-coalesce.ts :: map :: chains": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/workflow/engine.ts :: interval :: start": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/workflow/engine.ts :: let :: _active": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/workflow/step-write.ts :: let :: sharedWrite": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/services/workflow/trigger-authority.ts :: map :: locks": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/storage/node-key-at-rest.ts :: let :: configured": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/storage/node-key-at-rest.ts :: map :: opened": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/storage/schema-lock-cache.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/storage/schema-lock-cache.ts :: let :: loadedAtMs": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/tool-catalog/definitions.ts :: map :: definitionByName": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/tool-catalog/zod-shape.ts :: map :: shapes": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/app-frame-assets.ts :: map :: cache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/app-protect.ts :: map :: baseCache": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/app-sw-source.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/build-stamp.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/build-stamp.ts :: let :: running": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/gaii.ts :: let :: thisNodeId": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/outbound-connect-guard.ts :: let :: dispatcher": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/serial-by-key.ts :: map :: pending": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/url-validator.ts :: let :: outboundSigner": {
+      "count": 1,
+      "reason": "DEBT"
+    },
+    "src/utils/version.ts :: let :: cached": {
+      "count": 1,
+      "reason": "DEBT"
+    }
+  }
+}

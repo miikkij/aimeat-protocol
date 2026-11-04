@@ -2,7 +2,7 @@
   "about": "When each page of docs/it-adoption/ was last read against the code it describes, and which files that code is. pnpm check:it-adoption fails when a watched file changes after the review, so whoever changed the code re-reads the page an organisation's IT signs off against. The watches are the few files where a change most likely changes what IT is told; that a named setting or MCP tool still exists is checked separately on every page. Re-stamp after reading with: pnpm check:it-adoption --record <page>. Reasoning: aimeat/scripts/check-it-adoption.ts.",
   "pages": {
     "00-go-live-checklist.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/routes/setup.ts",
         "aimeat/src/services/setup-code.ts",
@@ -13,10 +13,10 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/routes/admin/setup-register.ts"
       ],
-      "digest": "sha256:5cacb9d241186223bd8b7928"
+      "digest": "sha256:8324d36451a2ff15be2fc0b8"
     },
     "01-overview.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         ".github/SECURITY.md",
         "docs/coding-guidelines/environment-configs.md",
@@ -25,16 +25,17 @@
       "digest": "sha256:9823b75b60d5dd8f313cb74f"
     },
     "02-architecture.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/storage/storage-factory.ts",
         "aimeat/deploy/aimeat.service",
         "aimeat/Dockerfile",
         "aimeat/src/services/ai/openrouter-region.ts",
         "docs/operations/production-deployment.md",
-        "aimeat/src/services/connections/providers-files.ts"
+        "aimeat/src/services/connections/providers-files.ts",
+        "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:bb838670e0031d31abe453f2"
+      "digest": "sha256:bce6eeddda4db5d405e93fa4"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-02",
@@ -155,15 +156,15 @@
       "digest": "sha256:e9751f0e853fafe0054c79ca"
     },
     "15-operations-runbook.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "docs/operations/production-deployment.md",
         "aimeat/deploy/aimeat.service"
       ],
-      "digest": "sha256:60255f4da7f7db43f6d9710c"
+      "digest": "sha256:8ebc0a60039c62ef6118c2a3"
     },
     "16-known-limitations.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "docs/known_gaps.md",
         "docs/security/threat-model.md",
@@ -182,7 +183,7 @@
       "digest": "sha256:4a124591b51f02e11c124e14"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -196,12 +197,17 @@
         "aimeat/src/services/operator-access-audit.ts",
         "aimeat/src/config-private-host.ts",
         "docs/operations/federation.md",
-        "docs/coding-guidelines/environment-configs.md"
+        "docs/coding-guidelines/environment-configs.md",
+        "aimeat/security/process-local-baseline.json",
+        "aimeat/src/storage/providers/postgres-kysely/migrate.ts",
+        "aimeat/src/services/maintenance-cache.ts",
+        "aimeat/src/server-bootstrap/drain.ts",
+        "aimeat/src/services/notification-sweeps.ts"
       ],
-      "digest": "sha256:89200184b2d088c3fbe8038b"
+      "digest": "sha256:1d9dbfc9c115609e329ebb6c"
     },
     "README.md": {
-      "reviewedOn": "2026-11-02",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "docs/operations/README.md"
       ],
@@ -256,7 +262,7 @@
       "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
       "aimeat/src/services/setup-code.ts": "c964751fae8c0c54",
       "aimeat/src/config-types-account-security.ts": "c3ce3a30afc3150e",
-      "aimeat/src/services/config-schema-email.ts": "6995deed15ed78dd",
+      "aimeat/src/services/config-schema-email.ts": "be675d32baed906e",
       "aimeat/src/services/config-schema-seo.ts": "b88168360d49fb08",
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
       "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105",
@@ -270,10 +276,11 @@
     "02-architecture.md": {
       "aimeat/src/storage/storage-factory.ts": "fd01b973fcdeec83",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
-      "aimeat/Dockerfile": "d2a16dcfe98bf7f5",
+      "aimeat/Dockerfile": "a730e25abfdcb643",
       "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
-      "docs/operations/production-deployment.md": "f36fca30fbc34332",
-      "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0"
+      "docs/operations/production-deployment.md": "1b871ac99c027b8a",
+      "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",
+      "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1"
     },
     "03-shared-responsibility.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
@@ -346,7 +353,7 @@
       "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
     },
     "15-operations-runbook.md": {
-      "docs/operations/production-deployment.md": "f36fca30fbc34332",
+      "docs/operations/production-deployment.md": "1b871ac99c027b8a",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577"
     },
     "16-known-limitations.md": {
@@ -395,7 +402,12 @@
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
-      "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961"
+      "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
+      "aimeat/security/process-local-baseline.json": "3f9aeb820cb6ded1",
+      "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "0674971f4a490dd3",
+      "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
+      "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
+      "aimeat/src/services/notification-sweeps.ts": "125eb3d628e50014"
     }
   }
 }

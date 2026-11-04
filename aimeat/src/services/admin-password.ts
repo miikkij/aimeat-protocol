@@ -41,6 +41,7 @@ export type AdminPasswordCheck =
   | { kind: 'limited'; retryAfterSec: number; max: number; windowSec: number };
 
 /** Wrong passwords per address, in the current window. */
+// process-local: each process counts wrong passwords on its own, so N processes allow N times the limit.
 const misses = new Map<string, { count: number; until: number }>();
 
 function matches(input: string, expected: string): boolean {

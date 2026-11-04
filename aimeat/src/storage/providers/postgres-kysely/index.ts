@@ -15,6 +15,8 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-04 — The migrations run under the boot lock, and bootLock() takes it for the boot seeding
+ *     (migrate.ts takeBootLock; codebase analysis 2026-11-03, HA stage 1).
  *   2026-10-25 — Zoneless timestamps are UTC on any host: Date parameters are sent in UTC, a zoneless
  *     value is read as UTC, and the session zone is UTC (./utc-timestamps.ts). A time written inside
  *     the autumn fold hour had read back one hour early on a host east of UTC (secaudit2026oct22).
@@ -46,7 +48,7 @@ import { UTC_SESSION_OPTIONS, useUtcInputDates, utcTypeParsers } from './utc-tim
 import type { MemoryRecord, Storage } from '../../interface.js';
 import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import type { DB } from './db-types.js';
-import { runMigrations } from './migrate.js';
+import { runMigrationsLocked, takeBootLock } from './migrate.js';
 import { checkServerVersion } from './server-version.js';
 import { logger } from '../../../utils/logger.js';
 import { memoryMethods } from './methods/memory.js';
@@ -174,7 +176,16 @@ export class PostgresKyselyStorage {
       });
     });
     this.rootDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: this.pool }) });
-    this.ready = checkServerVersion(this.pool).then(() => runMigrations(this.pool));
+    // Under the boot lock: a second process booting at the same time waits, then finds the files applied.
+    this.ready = checkServerVersion(this.pool).then(() => runMigrationsLocked(this.pool));
+  }
+
+  /**
+   * Take the boot lock for the boot seeding (server-bootstrap/service-init.ts), so two processes
+   * that start together seed one after the other. See the contract on `Storage.bootLock`.
+   */
+  bootLock(): Promise<() => Promise<void>> {
+    return takeBootLock(this.pool);
   }
 
   /** The handle every method uses: the transaction bound to this async context, else the pool. */

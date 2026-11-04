@@ -20,6 +20,9 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-11-04 — GET /v1/health/live and /v1/health/ready are open (HA stage 1). The route list is read
+ *     asynchronously: the synchronous read held the event loop past the node's keep-alive timeout, and
+ *     the first request after it failed with ECONNRESET on the closed pooled socket.
  *   2026-11-03 — POST /v1/ghii/login/two-step/start and /finish are open: the two-step setup a covered
  *     account finishes mid sign-in, on the setup token the password step gave (4fc091e8d).
  *   2026-11-01 — GET /v1/dataset/{}/{} is open: the public dataset page's shell, which in this mode carries
@@ -42,7 +45,8 @@
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
-import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
+import { spawn, execFile, type ChildProcess } from 'node:child_process';
+import { promisify } from 'node:util';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostRequest } from './helpers/host-request.js';
@@ -119,7 +123,7 @@ const OPEN_CODE_ROUTES = new Set<string>([
     'POST /v1/federation/ping', 'POST /v1/federation/presence', 'POST /v1/federation/replicate', 'POST /v1/federation/retract', 'POST /v1/federation/route', 'POST /v1/federation/settle',
     'POST /v1/federation/settle/outbound', 'POST /v1/federation/storage/grant', 'POST /v1/federation/templates/sync', 'POST /v1/federation/test', 'POST /v1/federation/trust-advisory',
     // The node describing itself to machines.
-    'GET /v1/health', 'GET /v1/build', 'GET /v1/spec', 'GET /llms.txt', 'GET /llms-full.txt', 'GET /AGENTS.md', 'GET /agents.txt', 'GET /auth.md', 'GET /skill.md', 'GET /openapi.json',
+    'GET /v1/health', 'GET /v1/health/live', 'GET /v1/health/ready', 'GET /v1/build', 'GET /v1/spec', 'GET /llms.txt', 'GET /llms-full.txt', 'GET /AGENTS.md', 'GET /agents.txt', 'GET /auth.md', 'GET /skill.md', 'GET /openapi.json',
     'GET /v1/libs', 'GET /v1/libs/aimeat-auth.js', 'GET /v1/libs/aimeat-{}.js', 'GET /v1/libs/portfolio-standalone.js', 'GET /v1/libs/test-harness',
     // The node's own documents a signed-in person's new tab opens, and what a browser sends with no
     // session by necessity: the live stream (its ticket) and a provider's redirect (state + cookie).
@@ -128,8 +132,11 @@ const OPEN_CODE_ROUTES = new Set<string>([
     'GET /v1/events', 'GET /v1/connections/callback',
 ]);
 
-function codeRoutes(): Array<{ method: string; path: string }> {
-    const out = execFileSync(process.execPath, ['--import', 'tsx', 'scripts/check-openapi-routes.ts', '--list'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+// Asynchronous on purpose: listing the routes takes about five seconds, the node's keep-alive timeout.
+// A synchronous call held the event loop while the node closed the idle pooled socket, so the first
+// request after it went out on that closed socket and failed with ECONNRESET.
+async function codeRoutes(): Promise<Array<{ method: string; path: string }>> {
+    const { stdout: out } = await promisify(execFile)(process.execPath, ['--import', 'tsx', 'scripts/check-openapi-routes.ts', '--list'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
     const rows: Array<{ method: string; path: string }> = [];
     for (const line of out.split('\n')) {
         const m = /^[ !-] (GET|POST|PUT|PATCH|DELETE) (\S+)/.exec(line);
@@ -183,7 +190,7 @@ async function main() {
         });
 
         await test('EVERY route the code declares refuses a stranger with 401 SIGN_IN_REQUIRED, outside the reviewed open list', async () => {
-            const routes = codeRoutes();
+            const routes = await codeRoutes();
             assert(routes.length > 1000, `the route list looks short: ${routes.length}`);
             const { isOpenRoute } = await import('../src/middleware/content-access-gate.js');
             const openDeclared: string[] = [];

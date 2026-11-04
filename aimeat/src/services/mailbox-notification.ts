@@ -17,6 +17,8 @@
  *   v1.1.0 -- 2026-05-01 -- Add email channel, notification templates, quiet hours
  *   v1.2.0 -- 2026-05-21 -- Add stats counter instrumentation (mailbox_notif_sent, mailbox_notif_failed, mailbox_notif_blocked)
  *   v1.3.0 -- 2026-07-02 -- Mailbox web push carries a click URL (/v1/profile?tab=nodes)
+ *   v1.4.0 -- 2026-11-04 -- The email transport takes email.ts smtpTransportOptions(), with the SMTP time
+ *     limits (codebase analysis 2026-11-03, HA stage 1).
  */
 
 import { createRequire } from 'node:module';
@@ -25,6 +27,7 @@ import type { Storage, MailboxItemRecord, PersonalPushSubscriptionRecord, Notifi
 import { logger } from '../utils/logger.js';
 import { resolveTemplate } from './notification-templates.js';
 import { getStats } from './stats.js';
+import { smtpTransportOptions } from './email.js';
 
 const require = createRequire(import.meta.url);
 
@@ -106,18 +109,7 @@ export class MailboxNotificationService {
     if (config.smtpHost && config.smtpUser) {
       try {
         const nodemailer = require('nodemailer') as typeof import('nodemailer');
-        this.emailTransport = nodemailer.createTransport({
-          host: config.smtpHost,
-          port: config.smtpPort,
-          secure: config.smtpSecure,
-          auth: {
-            user: config.smtpUser,
-            pass: config.smtpPass ?? '',
-          },
-          tls: {
-            rejectUnauthorized: config.smtpRejectUnauthorized,
-          },
-        });
+        this.emailTransport = nodemailer.createTransport(smtpTransportOptions(config));
         logger.info('MailboxNotificationService: email transport initialized');
       } catch (err) {
         logger.warn('MailboxNotificationService: failed to initialize email transport', { error: String(err) });

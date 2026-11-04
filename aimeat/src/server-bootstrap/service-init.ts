@@ -11,7 +11,9 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-04 — setupAnonymousIdentity moved unchanged to ./anonymous-identity.ts (800-line limit after the HA stage 1 merge).
  *   2026-11-04 — createEmailService gets storage, so mail retries go through the stored outbox (codebase analysis 2026-11-03, HA 1.5).
+ *   2026-11-04 — The maintenance state is services/maintenance-cache.ts: re-read from storage, so a CLI stop reaches the running node (codebase analysis 2026-11-03, item A8). The boot seeding runs under the boot lock (./boot-seed-lock.ts; HA stage 1).
  *   2026-11-01 — The schedule kinds handed to the Scheduler moved to ./schedule-kinds.ts, which adds dataproduct (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-29 — The peer registry is made with peerRegistry(config.nodeId), so gatePeer refuses this node's own id at every door (secaudit2026oct26 round 8c).
  *   2026-10-27 — A stored peer with this node's own id is not loaded into the peer registry, with a log line (secaudit2026oct26).
@@ -112,11 +114,12 @@
  *     applied install set names a repository (services/install-set-trust.ts).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MaintenanceState } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
+import { loadMaintenanceCache, type MaintenanceCache } from '../services/maintenance-cache.js';
+import { holdBootLock } from './boot-seed-lock.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
-import { generateKeyPair } from '../auth/keypair.js';
-import { enableAnonymousAuth } from '../auth/middleware.js';
+import { setupAnonymousIdentity } from './anonymous-identity.js';
 import { registerVisitorPeers } from '../auth/visitor-peer.js';
 import { startHeartbeatJob, setOnPeerRecovery, peerRegistry } from '../services/federation.js';
 import { startScreenshotAutoCapture } from '../services/screenshot-capture.js';
@@ -172,7 +175,6 @@ import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 import { refreshOpenings } from '../services/internet-opening/opening-registry.js';
 import { registerScheduleKinds } from './schedule-kinds.js';
-import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { bindLegacyExtensionSecrets } from '../services/extension-secrets.js';
 import { sealLegacyTransportSecrets } from '../services/mcp-client/transport-secrets.js';
 import { removeDeletedAgentsConnections } from '../services/connections/agent-orphans.js';
@@ -181,8 +183,7 @@ import { sealPlaintextTotpSecrets } from '../services/totp.js';
 import { sealPlaintextConfigSecrets } from '../services/config-at-rest-rows.js';
 
 export interface ServiceInitResult {
-  maintenanceCache: MaintenanceState;
-  setMaintenanceCache: (state: MaintenanceState) => void;
+  maintenance: MaintenanceCache;
   directoryService: DirectoryService;
   peers: Map<string, PeerInfo>;
   networkDirectory: Map<string, ServiceSummary>;
@@ -203,15 +204,15 @@ export async function initializeServices(
   config: AimeatConfig,
   storage: Storage,
 ): Promise<ServiceInitResult> {
-  // Maintenance mode cache — loaded once from storage, updated on toggle
-  let maintenanceCache: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
-  try {
-    maintenanceCache = await storage.getMaintenanceMode();
-  } catch (err) { logger.warn('initializeServices: default to disabled', { error: String(err) }); }
+  // Maintenance mode: read at boot, set by the operator's switch, and re-read from storage so a stop
+  // the CLI or another process made reaches this one (services/maintenance-cache.ts).
+  const maintenance = await loadMaintenanceCache(storage);
 
   // Initialize node keys asynchronously
   initializeNode(config, storage);
 
+  // The boot seeding below runs under the boot lock: a second process starting now waits (PostgreSQL).
+  const bootSeeds = await holdBootLock(storage);
   // Anonymous mode: auto-create anonymous owner + agent if not already present
   if (config.anonymousMode) {
     await setupAnonymousIdentity(config, storage);
@@ -246,38 +247,38 @@ export async function initializeServices(
   registerScheduleKinds(scheduler, storage, config);
 
   // Seed standardized profile schemas — Phase 0.4
-  seedProfileSchemas(storage, `system@${config.nodeId}`)
+  bootSeeds.track(seedProfileSchemas(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} profile schemas`); })
-    .catch(err => logger.error('Failed to seed profile schemas', errorFields(err)));
+    .catch(err => logger.error('Failed to seed profile schemas', errorFields(err))));
 
   // Seed CSM template schemas from docs/csm-examples/ — Phase 0.2
-  seedCsmTemplates(storage, `system@${config.nodeId}`)
+  bootSeeds.track(seedCsmTemplates(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} CSM schemas`); })
-    .catch(err => logger.error('Failed to seed CSM schemas', errorFields(err)));
+    .catch(err => logger.error('Failed to seed CSM schemas', errorFields(err))));
 
   // Seed the generic manifest-format schema (organism.*.meta.manifest) — Phase 3
-  seedManifestSchema(storage, `system@${config.nodeId}`)
+  bootSeeds.track(seedManifestSchema(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info('Seeded manifest-format schema'); })
-    .catch(err => logger.error('Failed to seed manifest schema', errorFields(err)));
+    .catch(err => logger.error('Failed to seed manifest schema', errorFields(err))));
 
   // Seed organism template bundles (project object-type CSMs) globally — Phase 3
-  seedTemplateBundles(storage, `system@${config.nodeId}`)
+  bootSeeds.track(seedTemplateBundles(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} template-bundle CSMs`); })
-    .catch(err => logger.error('Failed to seed template bundles', errorFields(err)));
+    .catch(err => logger.error('Failed to seed template bundles', errorFields(err))));
 
   // Seed the Design Book's first published parts: the six leiskat, benched like any proposal —
   // a fresh node's Book is never an empty shelf (TARGET-074 phase 5). Then the bench this build
   // runs reads every stored component again, and a proposer whose part no longer passes is told
   // once: a deploy is what changes the bench.
-  seedDesignBook(storage, config)
+  bootSeeds.track(seedDesignBook(storage, config)
     .catch(err => logger.error('Failed to seed the Design Book', errorFields(err)))
     .then(() => noticeFailingComponents(storage, config))
-    .catch(err => logger.error('Failed to bench the Design Book\'s stored components again', errorFields(err)));
+    .catch(err => logger.error('Failed to bench the Design Book\'s stored components again', errorFields(err))));
 
   // Seed knowledge packager prompt templates
-  seedKnowledgeTemplates(storage, `system@${config.nodeId}`)
+  bootSeeds.track(seedKnowledgeTemplates(storage, `system@${config.nodeId}`)
     .then(() => logger.info('Knowledge prompt templates seeded'))
-    .catch(err => logger.error('Failed to seed knowledge templates', errorFields(err)));
+    .catch(err => logger.error('Failed to seed knowledge templates', errorFields(err))));
 
   // AWAITED, unlike the seeders around it, and for the same reason setupAnonymousIdentity above is:
   // a request can arrive for this the moment the port opens. `GET /v1/prompts/playbook/:id` and
@@ -332,27 +333,27 @@ export async function initializeServices(
     .catch(err => logger.error('Failed to seed built-in skills', { error: String(err) }));
 
   // Auto-install bundled cortex extensions (aimeat-ui-*, aimeat-canvas, aimeat-charts)
-  seedBundledCortexes(storage, `system@${config.nodeId}`, { nodeId: config.nodeId })
+  bootSeeds.track(seedBundledCortexes(storage, `system@${config.nodeId}`, { nodeId: config.nodeId })
     .then(count => { if (count > 0) logger.info(`Auto-installed ${count} bundled cortex extensions`); })
-    .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) }));
+    .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) })));
 
   // The extensions the node SHIPS (living-hooks, vocab-finto). Installed and switched on when
   // missing, updated in place when this build is newer, and every value an owner set is carried
   // across the update. NOT awaited, deliberately: boot must not wait on it, and a node whose
   // shipped extensions have not landed yet still answers every other door.
-  seedBuiltinExtensions(storage, config, scheduler)
+  bootSeeds.track(seedBuiltinExtensions(storage, config, scheduler)
     .then(r => {
       if (r.installed.length) logger.info(`Built-in extensions installed: ${r.installed.join(', ')}`);
       if (r.updated.length) logger.info(`Built-in extensions updated: ${r.updated.join(', ')}`);
       if (r.refused.length) logger.error(`Built-in extensions NOT available: ${r.refused.join(', ')}`);
     })
-    .catch(err => logger.error('Failed to seed built-in extensions', { error: String(err) }));
+    .catch(err => logger.error('Failed to seed built-in extensions', { error: String(err) })));
 
   // Auto-seed bundled example packages (digital-signage, aimeat-iam, …) into the catalog so
   // every user can install them without an operator running `aimeat seed`. Idempotent.
-  seedExamplePackages(storage, `system@${config.nodeId}`)
+  bootSeeds.track(seedExamplePackages(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Auto-seeded ${count} example package(s)`); })
-    .catch(err => logger.error('Failed to seed example packages', { error: String(err) }));
+    .catch(err => logger.error('Failed to seed example packages', { error: String(err) })));
 
   // Grandfather existing principals onto the scope words added 2026-08-10. An MCP tool with a scope
   // entry is REMOVED from an agent that lacks it, and those 73 tools had no entry until now, so
@@ -363,7 +364,7 @@ export async function initializeServices(
   // Then, once per node, the operator's full-access agents get operator:admin and keep the admin
   // tools (services/operator-admin-migration.ts). Chained AFTER the vocabulary, never beside it: both
   // rewrite an agent's whole scope list, and side by side one could write over the other.
-  migrateScopeVocabulary(storage, config.nodeId)
+  bootSeeds.track(migrateScopeVocabulary(storage, config.nodeId)
     .then(({ agents, appGrants }) => {
       if (agents > 0 || appGrants > 0) {
         logger.info(`Scope vocabulary: grandfathered ${agents} agent(s) and ${appGrants} app grant(s)`);
@@ -376,27 +377,27 @@ export async function initializeServices(
         logger.info(`operator:admin: given to ${granted.reduce((n, g) => n + g.agents.length, 0)} full-access agent(s) of ${granted.length} operator account(s)`);
       }
     })
-    .catch(err => logger.error('Failed to give operator:admin to the operator\'s full-access agents; the next boot tries again', { error: String(err) }));
+    .catch(err => logger.error('Failed to give operator:admin to the operator\'s full-access agents; the next boot tries again', { error: String(err) })));
 
   // Reading a connected mailbox took its own word on 2026-09-24, and no existing grant was given it.
   // Once per node, each owner whose apps held connections:use beside a mailbox this node can read is
   // told so in one notice, with a button per app that lets it read again, and each owner whose agents
   // held it by name beside a mailbox of their own in another, with a button per agent that does the
   // same. The marker it leaves keeps it from repeating.
-  migrateMailReadConsent(storage, config)
-    .catch(err => logger.error('Failed to send the mail read notice', { error: String(err) }));
+  bootSeeds.track(migrateMailReadConsent(storage, config)
+    .catch(err => logger.error('Failed to send the mail read notice', { error: String(err) })));
 
   // The task-start rulings of 2026-10-02, once per node each (services/task-start-migrations.ts): the
   // basic agents nobody has set start their tasks by themselves, and each owner is told once; an app
   // grant that held memory:delete keeps deleting its records now that that takes memory:purge.
-  migrateBasicAgentsTaskStartOnce(storage, config)
-    .catch(err => logger.error('Failed to switch the basic agents to start on their own; the next boot tries again', { error: String(err) }));
-  grantPurgeToAppGrantsOnce(storage, config.nodeId)
-    .catch(err => logger.error('Failed to give memory:purge to app grants; the next boot tries again', { error: String(err) }));
+  bootSeeds.track(migrateBasicAgentsTaskStartOnce(storage, config)
+    .catch(err => logger.error('Failed to switch the basic agents to start on their own; the next boot tries again', { error: String(err) })));
+  bootSeeds.track(grantPurgeToAppGrantsOnce(storage, config.nodeId)
+    .catch(err => logger.error('Failed to give memory:purge to app grants; the next boot tries again', { error: String(err) })));
   // The own-key model ruling of 2026-10-02 (services/openrouter-settings-migration.ts): the free
   // router a key-only save wrote as the owner's model is cleared, so the node's default applies.
-  migrateImplicitFreeModelOnce(storage, config.nodeId)
-    .catch(err => logger.error('Failed to clear the implicit free model from AI settings; the next boot tries again', { error: String(err) }));
+  bootSeeds.track(migrateImplicitFreeModelOnce(storage, config.nodeId)
+    .catch(err => logger.error('Failed to clear the implicit free model from AI settings; the next boot tries again', { error: String(err) })));
   // The once-only keep steps: older app extension schedules keep firing, and the agents, ecosystem
   // apps and published apps keep the scope words they used before each word was asked
   // (server-bootstrap/once-only-keep-steps.ts).
@@ -405,31 +406,32 @@ export async function initializeServices(
   // Encrypt the payment secrets of every seller record written before they were stored sealed.
   // Until this runs, a plain Stripe key is readable through the generic memory doors
   // (commerce/psp-secrets.ts). Idempotent.
-  sealStoredPspRecords(storage, config)
+  bootSeeds.track(sealStoredPspRecords(storage, config)
     .then(count => { if (count > 0) logger.info(`Encrypted the payment secrets of ${count} seller record(s)`); })
-    .catch(err => logger.error('Failed to encrypt stored payment secrets', { error: String(err) }));
+    .catch(err => logger.error('Failed to encrypt stored payment secrets', { error: String(err) })));
 
   // Once per node, an app tool manifest written under a name that is not its app's filename moves to
   // the filename key, so both app catalogues show it (services/app-tools-key.ts).
-  migrateAppToolsKeysOnce(storage, config)
+  bootSeeds.track(migrateAppToolsKeysOnce(storage, config)
     .then(({ ran, moved, left }) => {
       if (ran && (moved.length || left.length)) logger.info(`App tool manifests: ${moved.length} carried over to the app filename, ${left.length} left for the owner`);
     })
-    .catch(err => logger.error('Failed to carry app tool manifests over to the app filename; the next boot tries again', { error: String(err) }));
+    .catch(err => logger.error('Failed to carry app tool manifests over to the app filename; the next boot tries again', { error: String(err) })));
 
   // Data hygiene: legacy publish paths stored app ownerName as the full GHII
   // (owner@node). The catalog "my apps" filter and the by-owner-name delete
   // sweep both key on the bare name, so those rows were stranded as
   // unmanageable "community" apps. Normalize them to the bare owner name (idempotent). Only this
   // node's own suffix is stripped: a visitor's home name stays whole, or it names the local namesake.
-  storage.normalizeAppOwnerNames(config.nodeId)
+  bootSeeds.track(storage.normalizeAppOwnerNames(config.nodeId)
     .then(count => { if (count > 0) logger.info(`Normalized ${count} legacy app ownerName row(s) to bare owner names`); })
     // After ownerName is bare, fold any ownerGaii buckets the same owner forked
     // across identity forms (dashboard bare name vs MCP/PAT full GHII) into one
     // canonical record so publishes from any identity update the same app.
     .then(() => storage.mergeForkedAppBuckets())
     .then(count => { if (count && count > 0) logger.info(`Merged ${count} forked app bucket row(s) into canonical owner buckets`); })
-    .catch(err => logger.error('Failed to normalize/merge app owner buckets', { error: String(err) }));
+    .catch(err => logger.error('Failed to normalize/merge app owner buckets', { error: String(err) })));
+  bootSeeds.done();
 
   // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
   const directoryService = new DirectoryService(config, storage);
@@ -708,8 +710,7 @@ export async function initializeServices(
   }
 
   return {
-    maintenanceCache,
-    setMaintenanceCache: (state: MaintenanceState) => { Object.assign(maintenanceCache, state); },
+    maintenance,
     directoryService,
     peers,
     networkDirectory,
@@ -721,80 +722,4 @@ export async function initializeServices(
     workflowEngine,
     aiJobService,
   };
-}
-
-/** Set up the anonymous owner + agent + GHII for anonymous mode. Normal auth still works alongside. */
-async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): Promise<void> {
-  const ANON_OWNER = 'anonymous';
-  const ANON_AGENT_NAME = 'shared';
-  const ANON_GAII = `${ANON_AGENT_NAME}#${ANON_OWNER}@${config.nodeId}`;
-
-  try {
-    // Create anonymous owner if doesn't exist
-    const owner = await storage.getOwner(ANON_OWNER);
-    if (!owner) {
-      const kp = await generateKeyPair();
-      await storage.createOwner({
-        name: ANON_OWNER,
-        displayName: 'Anonymous Node',
-        publicKey: kp.publicKey,
-        roles: ['owner'],
-        createdAt: new Date().toISOString(),
-      });
-      logger.info('Anonymous owner created');
-    }
-
-    // Create anonymous agent if doesn't exist
-    const agent = await storage.getAgent(ANON_GAII);
-    if (!agent) {
-      const kp = await generateKeyPair();
-      await storage.createAgent({
-        name: ANON_AGENT_NAME,
-        owner: ANON_OWNER,
-        gaii: ANON_GAII,
-        displayName: 'Shared Anonymous Agent',
-        description: 'Shared agent for anonymous mode — all AI agents share this identity and memory space',
-        capabilities: ['memory', 'actions', 'catalogue'],
-        // THE RECORD CARRIES WHAT THE MINT HANDS OUT. It carried nothing, which was invisible while
-        // a token's own scopes were the answer; auth/effective-scopes.ts made the record the truth
-        // for every agent, so an empty list here meant the anonymous token was refused everywhere
-        // it had worked the day before. Named in one place (ANONYMOUS_SCOPES) so the two cannot
-        // drift again.
-        defaultScopes: [...ANONYMOUS_SCOPES],
-        publicKey: kp.publicKey,
-        trustScore: 50,
-        morselBalance: config.welcomeBonus,
-        createdAt: new Date().toISOString(),
-        lastSeen: new Date().toISOString(),
-      });
-      logger.info('Anonymous agent created', { gaii: ANON_GAII });
-    }
-
-    // Create anonymous GHII if doesn't exist — system identity for anonymous chat sessions
-    const ANON_GHII = `${ANON_OWNER}@${config.nodeId}`;
-    const existingGhii = await storage.getGHII(ANON_GHII);
-    if (!existingGhii) {
-      const now = new Date().toISOString();
-      await storage.createGHII({
-        username: ANON_OWNER,
-        nodeId: config.nodeId,
-        ghii: ANON_GHII,
-        displayName: 'Anonymous',
-        verificationLevel: 0,
-        ownerName: ANON_OWNER,
-        totpEnabled: false,
-        trustScore: 50,
-        morselBalance: 0,
-        createdAt: now,
-        updatedAt: now,
-      });
-      logger.info('Anonymous GHII created', { ghii: ANON_GHII });
-    }
-
-    // Enable the anonymous auth fallback in middleware, for this node only
-    enableAnonymousAuth(ANON_GAII, ANON_OWNER, config.nodeId);
-    logger.info('Anonymous mode enabled — unauthenticated requests use shared identity', { gaii: ANON_GAII });
-  } catch (err) {
-    logger.error('Failed to setup anonymous identity', errorFields(err));
-  }
 }

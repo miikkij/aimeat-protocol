@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-04: check:process-local, module-level runtime state and timers as a shrink-only list (codebase analysis 2026-11-03, HA stage 1).
  *  - 2026-11-01: check:it-adoption, every page of the IT adoption package was read against the code it describes, and the settings and tools it names exist.
  *  - 2026-11-01: check:datapackage-pointer-reads, a data package's audience is read from the service's record, not from latest.json (secaudit2026oct31w2).
  *  - 2026-10-27: check:string-bounds (every Zod string bounded, zero allowed) and check:write-validation (writing routes read their body through a schema; seeded ratchet).
@@ -93,6 +94,7 @@ export const FAST_CHECKS = [
     { script: 'check:string-bounds', label: 'Every Zod string under src/ has a length limit from models/input-limits.ts' },
     { script: 'check:write-validation', label: 'Every writing route that reads a body checks it with a schema, or is listed; the list only shrinks' },
     { script: 'check:unbounded-lists', label: 'No new storage list without a bound, no new whole-table read, and no Postgres take-first read without LIMIT 1; the list only shrinks' },
+    { script: 'check:process-local', label: 'No new module-level runtime state or timer without a process-local marker and a baseline entry; the list only shrinks' },
     { script: 'check:storage-conformance', label: 'No new storage repository without a two-provider case, and the methods those cases call only rise' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
     // 2026-10-01, after the peer-registration incident: who writes a federation peer, and who trusts

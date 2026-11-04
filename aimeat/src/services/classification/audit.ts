@@ -95,6 +95,7 @@ const MAX_EVIDENCE = 50_000;
 
 let storageRef: Storage | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+// process-local: the timer that writes this process's own buffered rows within 1 s; nothing is shared.
 let soonTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
 /** Waiting rows, by address, in insertion order (a Map keeps it), so the oldest go first.

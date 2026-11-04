@@ -40,6 +40,7 @@ const MAX_QUEUE = 10_000;
 
 let storageRef: Storage | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+// process-local: the timer that writes this process's own buffered rows within 1 s; nothing is shared.
 let soonTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
 let queue: ConsentAuditEntry[] = [];

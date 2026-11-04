@@ -12,9 +12,11 @@
  *   why it can never detect staleness: it always reports the source. This one resolves a single
  *   path inside dist/ and nowhere else, so "no stamp" unambiguously means "not running from dist".
  * @structure readBuildStamp(): BuildStamp | null; checkBuildFreshness(): BuildFreshness;
- *   runningBuild(): RunningBuild
+ *   runningBuild(): RunningBuild; pageBuildId(build, processStamp): string
  * @usage import { checkBuildFreshness } from '../utils/build-stamp.js';
  * @version-history
+ *   v1.3.0 — 2026-11-04 — pageBuildId(): the served pages' stamp from a clean stamped build's commit
+ *     and built_at, the per-process value otherwise (codebase analysis 2026-11-03, item A7).
  *   v1.2.0 — 2026-10-11 — runningBuild(): the commit this process runs, from the stamp or, from
  *     source, from the checkout's HEAD. Served by GET /v1/build and GET /v1/health.
  *   v1.1.0 — 2026-08-02 — Detect a published install by the absence of `src/` rather than by all
@@ -191,6 +193,24 @@ export function describeRunningBuild(freshness: BuildFreshness, checkoutHead: ()
   }
   const head = checkoutHead();
   return { commit: head, commit_source: head ? 'git' : null, dirty: null, built_at: stamp?.built_at ?? null, state: freshness.state };
+}
+
+/**
+ * The stamp the served pages carry (the `?v=` on every first-party module and stylesheet, and the
+ * build the live stream's `hello` names). It names the CODE, so two processes on one build, and
+ * one process restarted on the same build, answer the same stamp and an open page does not reload.
+ *
+ * Only a stamped dist/ built from a clean commit names its code: its pages are dist/public, copied
+ * at build time, so the commit and `built_at` identify the bytes served. Everything else answers
+ * `processStamp`, the per-process value, so cache busting keeps working where the served files
+ * can change without a new stamp: a source checkout (tsx, `dirty` unknown), a build from a dirty
+ * tree, an install with no commit.
+ */
+export function pageBuildId(build: RunningBuild, processStamp: string): string {
+  if (build.commit_source !== 'stamp' || build.dirty !== false || !build.commit || !build.built_at) return processStamp;
+  const builtMs = Date.parse(build.built_at);
+  if (!Number.isFinite(builtMs)) return processStamp;
+  return `${build.commit.slice(0, 12).toLowerCase()}.${builtMs.toString(36)}`;
 }
 
 let running: RunningBuild | undefined;

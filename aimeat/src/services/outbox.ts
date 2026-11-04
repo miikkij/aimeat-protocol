@@ -76,11 +76,15 @@ interface StoredEntry {
 
 // process-local: the identity of this process in a claim, and the handlers registered at boot.
 const PROCESS_ID = randomUUID();
+// process-local: every process registers the same handlers at boot; nothing is lost with a second one.
 const handlers = new Map<OutboxKind, OutboxHandler<unknown>>();
 /** Keys this process is attempting right now; releaseOutbox leaves these with their holder. */
+// process-local: this process's own attempts; the claim on the stored entry is what other processes see.
 const inFlight = new Set<string>();
+// process-local: this process is stopping; another process takes over through the stored claims.
 let stopping = false;
 /** Where this process kept or resumed entries, for releaseOutbox at shutdown. */
+// process-local: what this process releases at its own stop.
 let known: { storage: Storage; nodeId: string } | null = null;
 
 const sleep = (ms: number) => new Promise<void>(resolve => { const t = setTimeout(resolve, ms); t.unref?.(); });

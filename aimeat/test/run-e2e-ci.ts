@@ -1799,6 +1799,14 @@ const ALL_SUITES = [
     // content (codebase analysis 2026-11-03, item A1).
     'test/e2e-app-versions-access.ts',
     'test/e2e-maintenance-access.ts',
+    // A maintenance stop made by the CLI (another process) reaches the running node (codebase analysis 2026-11-03, A8).
+    'test/e2e-maintenance-cli.ts',
+    // The liveness and readiness probes, and /v1/health as before (codebase analysis 2026-11-03, HA stage 1).
+    'test/e2e-health-probes.ts',
+    // A stop drains first: a request in flight finishes, readiness 503, live streams end, exit 0 (HA stage 1).
+    'test/e2e-graceful-shutdown.ts',
+    // Two processes started together on one empty PostgreSQL database both boot (the boot lock; HA stage 1).
+    'test/e2e-boot-lock.ts',
     'test/e2e-package-update-widening.ts',
     'test/e2e-memory-bin-purge.ts',
     'test/e2e-docsign-caller-refusals.ts',

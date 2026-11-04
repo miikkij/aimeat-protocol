@@ -3035,6 +3035,15 @@
      "plain": "The Email page What your address is for, your connected mailboxes, what left through the node to your customers, and switches for the emails the node sends you. Account › Email"
     },
     {
+     "slug": "g-12-the-node-s-own-mail-server",
+     "cells": [
+      "<strong>The node's own mail server</strong>",
+      "The operator names one SMTP server, and the node sends its sign-in codes, invitations, notices and digests through it, trying a failed send three more times. One attempt waits 10 seconds for the server to connect and 10 for its greeting, and gives up after 60 seconds of silence, so a mail server that stops answering does not hold the person who is waiting for the mail. The operator changes the two limits on the Config tab or through chat. Limits: the time limits are read at start; 0 keeps the mail library's own 2 and 10 minutes.",
+      "<code>email.smtp_host</code> and the other <code>email.smtp_*</code> settings, <code>email.smtp_connect_timeout_ms</code>, <code>email.smtp_socket_timeout_ms</code>"
+     ],
+     "plain": "The node's own mail server The operator names one SMTP server, and the node sends its sign-in codes, invitations, notices and digests through it, trying a failed send three more times. One attempt waits 10 seconds for the server to connect and 10 for its greeting, and gives up after 60 seconds of silence, so a mail server that stops answering does not hold the person who is waiting for the mail. The operator changes the two limits on the Config tab or through chat. Limits: the time limits are read at start; 0 keeps the mail library's own 2 and 10 minutes. email.smtp_host and the other email.smtp_* settings, email.smtp_connect_timeout_ms, email.smtp_socket_timeout_ms"
+    },
+    {
      "slug": "g-12-link-previews",
      "cells": [
       "<strong>Link previews</strong>",
@@ -3943,10 +3952,10 @@
      "slug": "g-19-which-code-the-node-runs",
      "cells": [
       "<strong>Which code the node runs</strong>",
-      "The node says which commit it runs, where it read that (the build stamp of the installed package, or the checkout it was started from), whether the running build is older than the code on disk, and when the process started. To know whether a fix is live, check that its commit is an ancestor of this one. Limits: an install with neither a build stamp nor a git checkout, such as a container image built without one, reports no commit.",
-      "<code>GET /v1/build</code> (<code>commit</code>, <code>commit_source</code>, <code>state</code>, <code>started_at</code>), <code>GET /v1/health</code> (<code>data.build</code>)"
+      "The node says which commit it runs, where it read that (the build stamp of the installed package, or the checkout it was started from), whether the running build is older than the code on disk, and when the process started. To know whether a fix is live, check that its commit is an ancestor of this one. A process manager and a load balancer get two probes that cost the same on every node: liveness, and readiness, which answers 503 while the process boots, while it drains after a stop signal and when its database does not answer. Limits: an install with neither a build stamp nor a git checkout, such as a container image built without one, reports no commit.",
+      "<code>GET /v1/build</code> (<code>commit</code>, <code>commit_source</code>, <code>state</code>, <code>started_at</code>), <code>GET /v1/health</code> (<code>data.build</code>), <code>GET /v1/health/live</code>, <code>GET /v1/health/ready</code>"
      ],
-     "plain": "Which code the node runs The node says which commit it runs, where it read that (the build stamp of the installed package, or the checkout it was started from), whether the running build is older than the code on disk, and when the process started. To know whether a fix is live, check that its commit is an ancestor of this one. Limits: an install with neither a build stamp nor a git checkout, such as a container image built without one, reports no commit. GET /v1/build (commit, commit_source, state, started_at), GET /v1/health (data.build)"
+     "plain": "Which code the node runs The node says which commit it runs, where it read that (the build stamp of the installed package, or the checkout it was started from), whether the running build is older than the code on disk, and when the process started. To know whether a fix is live, check that its commit is an ancestor of this one. A process manager and a load balancer get two probes that cost the same on every node: liveness, and readiness, which answers 503 while the process boots, while it drains after a stop signal and when its database does not answer. Limits: an install with neither a build stamp nor a git checkout, such as a container image built without one, reports no commit. GET /v1/build (commit, commit_source, state, started_at), GET /v1/health (data.build), GET /v1/health/live, GET /v1/health/ready"
     },
     {
      "slug": "g-19-people-and-roles",
@@ -4865,6 +4874,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 497
+  "rows": 498
  }
 }

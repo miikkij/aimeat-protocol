@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.2.0 (commit 2f3ff9d10) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit a463a1e3b) on 2026-11-03. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 
@@ -8,7 +8,7 @@ This page is for the architect and the network or firewall owner. It names the c
 
 | Component | Required | What it is | Source |
 |---|---|---|---|
-| Node process | Yes | A Node.js process (engine `>=24.22.1`), plain HTTP on `AIMEAT_PORT` (40050). With `AIMEAT_BIND_HOST` empty it listens on every address. Several processes of one node can share one PostgreSQL database, with the per-process limits on [18](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database) | `aimeat/package.json`, `aimeat/src/index.ts`, `aimeat/.env.example` |
+| Node process | Yes | A Node.js process (engine `>=24.22.1`), plain HTTP on `AIMEAT_PORT` (40050). With `AIMEAT_BIND_HOST` empty it listens on every address. One active process with a standby on one PostgreSQL database is supported; more than one active process is not supported yet ([18](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database)) | `aimeat/package.json`, `aimeat/src/index.ts`, `aimeat/.env.example` |
 | Reverse proxy | Yes, on any shared network | nginx, Caddy or a cloud load balancer. Holds TLS, passes `Host`, WebSocket upgrades and unbuffered streams | [Production deployment](../operations/production-deployment.md) |
 | Database | Yes | PostgreSQL 16 or 17 (`AIMEAT_STORAGE=postgres-kysely`, `DATABASE_URL`), or SQLite (`AIMEAT_STORAGE=sqlite`, `AIMEAT_SQLITE_PATH`). The node warns below PostgreSQL 16 and starts | `aimeat/src/storage/providers/postgres-kysely/server-version.ts`, `aimeat/src/storage/storage-factory.ts` |
 | File store | No | Stored file bytes: in the database (the default), in S3 or an S3-compatible service, or in Azure Blob (`AIMEAT_FILE_STORE`, `AIMEAT_FILE_STORE_S3_ENDPOINT`, `AIMEAT_FILE_STORE_AZURE_ACCOUNT`) | `aimeat/src/storage/blob/s3-client.ts`, `aimeat/src/storage/blob/azure-client.ts`, `aimeat/.env.example` |
@@ -72,7 +72,7 @@ Solid lines are always present. Dotted lines exist only when the setting in the 
 | Proxy trust | `AIMEAT_TRUST_PROXY`: a hop count or the proxy's address. The node reads `Host` as sent and does not trust `X-Forwarded-Host` | [Production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
 | WebSocket | `/v1/realtime/ws`, `/v1/connect/tunnel` (agents' connector tunnel), `/v1/personal/tunnel` (personal nodes). The node closes an upgrade on any other path. Use a long read timeout | [Production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through), [Connector forward tunnel](../connector-forward-tunnel.md) |
 | Streams (SSE and MCP) | `/v1/events`, `/v1/public/events`, `/v1/agui/...`, the chat turn, `/v1/llm/chat/completions`, `/v1/ai/stream`, `/v1/ai/speak`, and MCP at `/v1/mcp` and `/mcp`. Turn proxy buffering off and use a long read timeout | [Production deployment](../operations/production-deployment.md#what-the-proxy-must-pass-through) |
-| Health | `GET /v1/health` (read `status`, it answers 200 also when degraded) and `GET /v1/build`, no sign-in | [Production deployment](../operations/production-deployment.md#health-checks) |
+| Health | `GET /v1/health/live` and `GET /v1/health/ready` (the probes, by HTTP code), `GET /v1/health` (read `status`, it answers 200 also when degraded) and `GET /v1/build`, no sign-in | [Production deployment](../operations/production-deployment.md#health-checks) |
 | Metrics | `GET /v1/metrics` for Prometheus, off by default (`AIMEAT_METRICS_ENABLED`), operator token by default (`AIMEAT_METRICS_ACCESS`) | [Observability guide](../../aimeat/docs/observability-guide.md) |
 | Cloud AI clients | A remote MCP connector in a cloud AI service connects from that vendor's servers, so a node that must serve such clients must be reachable from the internet. Local clients (Claude Code, VS Code, Cursor) connect from the workstation | [Anthropic: custom connectors using remote MCP](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) |
 | Browser-to-browser media | Browsers receive STUN servers from the node (`AIMEAT_STUN_SERVERS`, default `stun:stun.l.google.com:19302`) and contact them themselves; this is client egress, not node egress | `aimeat/src/config.ts` |
@@ -172,11 +172,11 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 | V8 heap ceiling, Docker | 2048 MB; keep it under the container's memory limit | `aimeat/Dockerfile` |
 | Measured resident memory | 250 to 450 MB steady state with jemalloc, in one recorded trace | `aimeat/Dockerfile` |
 | Database versions tested | PostgreSQL 16 and 17 | `aimeat/src/storage/providers/postgres-kysely/server-version.ts` |
-| Restart policy | Restart after 5 s; stop after five starts in five minutes; 30 s stop timeout | `aimeat/deploy/aimeat.service` |
+| Restart policy | Restart after 5 s; stop after five starts in five minutes; 30 s stop timeout. On a stop signal the node refuses new connections, answers readiness 503, gives requests in flight up to 5 s, writes its buffers and exits 0 ([production deployment](../operations/production-deployment.md#process-manager)) | `aimeat/deploy/aimeat.service`, `aimeat/src/server-bootstrap/drain.ts` |
 
 The repository documents no minimum CPU, memory or disk size.
 
-**A node grows up first, and out by more nodes.** One process serves a node in the shape the guides describe, and the code's design notes say the platform grows by more nodes, each its own, federated (`aimeat/src/services/passkeys.ts`). Several processes of one node can share one PostgreSQL database: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`), a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`), and the processes take one node key. What stays in each process is listed with its consequence on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); in short:
+**A node grows up first, and out by more nodes.** One process serves a node in the shape the guides describe, and the code's design notes say the platform grows by more nodes, each its own, federated (`aimeat/src/services/passkeys.ts`). The supported shape is one active process and a standby on one PostgreSQL database; more than one active process is not supported yet. Processes of one node that share a database already claim some work in it: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`), a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`), and the processes take one node key. What stays in each process is listed with its consequence on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); in short:
 
 - rate limiters and the node-key spending hold are per process (`aimeat/src/services/ai/node-key-hold.ts`);
 - the replay cache for signed requests and the OAuth authorization codes are in process memory, and the code says both must move to storage before more than one process can serve without sticky routing (`aimeat/src/auth/signed-request.ts`);
@@ -196,14 +196,14 @@ For availability, use a process manager restart, one active process with a stand
 
 ## Limits
 
-- Several node processes on one database share the data and the scheduled work, but live updates, rate limits, short sign-in steps and Config page changes stay per process, and the project records no test of that shape behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
+- More than one active node process is not supported yet: live updates, rate limits, short sign-in steps and Config page changes stay per process. One active process with a standby is supported, and the project records no test of a standby taking over behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
 - The repository documents no minimum CPU, memory or disk size; the only figures are the heap ceilings and memory limits in `aimeat/deploy/aimeat.service` and `aimeat/Dockerfile` and one measured trace.
 - With `AIMEAT_STORAGE` unset, the node runs on an in-memory database and loses all data at restart; `aimeat validate` warns but the node starts (`aimeat/src/utils/env-validator.ts`, `aimeat/src/storage/storage-factory.ts`).
 - With `AIMEAT_BIND_HOST` empty the node listens on every address; the firewall must keep the port closed to everything but the proxy.
 - Two outbound calls are on by default on a fresh node: the new-version check to `registry.npmjs.org` and `unpkg.com`, and the weekly model catalogue refresh from `models.dev`, `openrouter.ai` and `raw.githubusercontent.com`.
 - Link previews let any signed-in person make the node fetch any public address, and the node reads the `client_id` URL that any MCP client presents; a host-only egress allowlist breaks these features for hosts not listed.
 - The code has no support for an outbound HTTP proxy; no proxy agent is configured for the node's own fetch calls.
-- The Docker image has no `HEALTHCHECK`, and neither compose file keeps the node key on a volume ([Production deployment](../operations/production-deployment.md#process-manager)).
+- Neither compose file keeps the node key on a volume, and the Docker image's `HEALTHCHECK` (`/v1/health/ready`) asks 127.0.0.1, so a node bound to another address needs its own ([Production deployment](../operations/production-deployment.md#process-manager)).
 - Calls to OpenRouter carry `HTTP-Referer: https://aimeat.io` and `X-Title: AIMEAT` (`aimeat/src/services/ai/adapters/sdk.ts`, `aimeat/src/services/openrouter.ts`): OpenRouter sees the software name, not the organisation.
 - The default STUN server handed to browsers is Google's (`stun:stun.l.google.com:19302`, `aimeat/src/config.ts`); change `AIMEAT_STUN_SERVERS` if browsers must not contact it.
 - No Docker image is published by the project; the image is built from `aimeat/Dockerfile`.

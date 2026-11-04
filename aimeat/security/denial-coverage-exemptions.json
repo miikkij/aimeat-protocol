@@ -1,6 +1,18 @@
 {
   "note": "Registered E2E suites with no refusal of a second principal. `exempt`: suites that assert no refusal at all (seeded 2026-08-15). `anonymous_only`: suites whose only refusal is an anonymous 401 (seeded 2026-10-16, QA audit P3-08). Both were seeded from the state of their day so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
   "exempt": {
+    "test/e2e-health-probes.ts": {
+      "reason": "REVIEWED 2026-11-04 — the probes have no principal. GET /v1/health/live and /v1/health/ready answer every caller the same, with no credential, because a load balancer and a process manager ask them; there is no second principal whose answer could differ. The suite's one signed-in case is the maintenance stop, where a plain owner's data route answers 503 while both probes stay 200; who may switch the stop is fenced in e2e-maintenance-access.",
+      "sha": "bf177a90a3d5003f"
+    },
+    "test/e2e-graceful-shutdown.ts": {
+      "reason": "REVIEWED 2026-11-04 — the suite is about the process, not a principal. It stops a node of its own and checks that a request in flight finishes, that readiness answers 503 while it drains, that a new connection is refused and that it exits 0. The one account it registers only opens a live stream; nothing it asserts depends on who asks.",
+      "sha": "926d14f35e924f13"
+    },
+    "test/e2e-boot-lock.ts": {
+      "reason": "REVIEWED 2026-11-04 — the suite has no principal. Two processes boot on one empty database and both must answer readiness; no request in it carries a credential.",
+      "sha": "e04d1079d9d67384"
+    },
     "test/e2e-record-spec-pointers.ts": {
       "reason": "REVIEWED 2026-10-11 — the suite has no principal. It opens the record contracts a `spec` field names (GET /v1/specs/{name}, the /docs/specs/ redirect, /v1/spec, /v1/tracked-responses/spec) with no credentials, because a node or an AI reading someone's record must be able to open what it follows. The documents are the same for every caller by design, so there is no second principal whose answer could differ. The fence it does assert is that a name outside the public contracts (PUBLIC_CONTRACTS in services/contract-docs.ts, five since 2026-10-11) answers 404, and that a path climbing out of docs/specs does too.",
       "sha": "c88af40ebf88abe0"

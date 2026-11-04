@@ -12,6 +12,7 @@
  *   - maintenancePageHtml(nodeId, message): renders the auto-refreshing maintenance page
  *
  * @version-history
+ *   v1.2.2 — 2026-11-04 — GET /v1/health/live and /v1/health/ready pass a maintenance stop, as /v1/health does (codebase analysis 2026-11-03, HA stage 1).
  *   v1.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-12 — The maintenance page in the house face (design canvas "AIMEAT Admin
@@ -64,6 +65,9 @@ export function setupGuards(
     if (
       p === '/' ||
       p === '/v1/health' ||
+      // The probes a load balancer acts on: during a stop the process is up and serves the
+      // maintenance answer, so taking it out of rotation would turn that answer into no answer.
+      p === '/v1/health/live' || p === '/v1/health/ready' ||
       p.startsWith('/v1/admin') ||
       p.startsWith('/v1/spec') ||
       p.startsWith('/.well-known') ||

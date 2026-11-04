@@ -12,7 +12,8 @@
  *   DIRECTORY — it works from here only because portal-spa.ts is portal.ts's sibling.
  *
  * @structure
- *   - BUILD_ID            — per-process cache-busting stamp
+ *   - PROCESS_BUILD_ID    — the process's own start stamp (GET /v1/build)
+ *   - BUILD_ID            — the served pages' cache-busting stamp, named after the code
  *   - publicSiteLinks()   — the site-link block injected as window.__SITE
  *   - serveSpa()          — the shell, with head metadata, nonces and cache busting
  *   - stampAssets()       — the build stamp on every importmap module and stylesheet link
@@ -21,6 +22,9 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.15.0 — 2026-11-04 — BUILD_ID names the code (a clean stamped build's commit and built_at), so
+ *     a restart on the same build no longer reloads every open page; PROCESS_BUILD_ID keeps the
+ *     per-process stamp for GET /v1/build (codebase analysis 2026-11-03, item A7).
  *   v1.14.0 — 2026-11-03 — serveSpa() sets the session hint cookie on a request that carries the refresh
  *     cookie and no hint (restoreSessionHint), so a session from before the hint restores at boot.
  *   v1.13.0 — 2026-10-31 — A step of signing in (data/sign-in-steps.ts) is served with the static footer
@@ -70,6 +74,7 @@ import { signedInOnly } from '../config-visibility.js';
 import { restoreSessionHint } from '../services/owner-session.js';
 import { buildGlossaryBody } from './glossary.js';
 import { SIGN_IN_STEP_PATHS } from '../data/sign-in-steps.js';
+import { pageBuildId, runningBuild } from '../utils/build-stamp.js';
 
 /**
  * The site-link block handed to the browser, with empty entries dropped so the injected
@@ -106,13 +111,23 @@ function devLinksShown(config: AimeatConfig, routePath?: string): boolean {
 const __dirname_portal = dirname(fileURLToPath(import.meta.url));
 
 /**
- * Unique token set once when the server process starts.
- * Used as a query-string version stamp on all first-party ES module URLs so
- * that every server restart busts the browser's ES-module cache automatically.
- * (HTTP ETag/no-cache alone is insufficient — browsers keep modules in the
- *  module registry for the entire session regardless of HTTP headers.)
+ * The process's own stamp: its start time in base 36. GET /v1/build answers it as `build` (and its
+ * time as `started_at`), so two calls that answer two values reached two processes.
  */
-export const BUILD_ID = Date.now().toString(36);
+export const PROCESS_BUILD_ID = Date.now().toString(36);
+
+/**
+ * The stamp the served pages carry: a query-string version on all first-party ES module and
+ * stylesheet URLs, and the build the live stream's `hello` names (routes/sse.ts). New code busts
+ * the browser's ES-module cache, because browsers keep modules in the module registry for the
+ * whole session whatever the HTTP headers say.
+ *
+ * It names the code (utils/build-stamp.ts pageBuildId): a clean stamped build answers the same
+ * value in every process and after every restart, so a restart on the same code, or a stream that
+ * lands on the standby, does not reload every open page. A source checkout and a dirty build keep
+ * the per-process value, so a restart there still busts the cache.
+ */
+export const BUILD_ID = pageBuildId(runningBuild(), PROCESS_BUILD_ID);
 
 /**
  * Serve spa.html with:

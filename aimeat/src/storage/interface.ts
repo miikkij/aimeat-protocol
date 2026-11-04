@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   v1.11.0 — 2026-11-04 — bootLock(): the lock two booting processes of one node take in turn
+ *     (PostgreSQL only; codebase analysis 2026-11-03, HA stage 1).
  *   v1.10.0 — 2026-10-16 — savepoint(): a tolerant step inside a transaction that undoes only its
  *     own writes when it fails, so a caught failure no longer turns the COMMIT into a ROLLBACK on
  *     PostgreSQL (QA audit E6-01).
@@ -234,4 +236,13 @@ export interface Storage extends
    * in `savepoint()`; the error still reaches the caller's catch.
    */
   savepoint<T>(fn: () => Promise<T>): Promise<T>;
+
+  /**
+   * Take the node's BOOT LOCK and answer the function that gives it back. Two processes of one node
+   * on one database that start together hold it in turn: each migrates under it (the provider does
+   * that itself) and seeds under it (server-bootstrap/service-init.ts), so neither seeds while the
+   * other does. PostgreSQL only: a session advisory lock on a connection of its own. A provider with
+   * one process per database (SQLite, memory) has none, and the caller goes on without it.
+   */
+  bootLock?(): Promise<() => Promise<void>>;
 }

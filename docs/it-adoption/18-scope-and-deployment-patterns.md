@@ -1,6 +1,6 @@
 # 18 Scope and deployment patterns
 
-> Checked against AIMEAT node 4.2.0 (commit 52eac18dd) on 2026-11-03. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 0fc46b7c9) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the architect, IT and the system owner of the adopting organisation. It says what an AIMEAT node is built to do and what it leaves to other systems, and the deployment patterns that follow from that: one node, several node processes on one database, many separate nodes, a node of one's own, and the services that run beside a node. It then states availability and operator access from that architecture. Read it before [02 Architecture](02-architecture.md) when the question is "how big must this be, and how many".
 
@@ -29,7 +29,7 @@ Heavy work runs as separate services that read from and write to the node: model
 flowchart LR
   subgraph A[One organisation node]
     LB[Load balancer] --> P1[Node process]
-    LB -.-> P2[Second process<br/>optional]
+    LB -.-> P2[Standby process<br/>optional]
     P1 --> DB[(PostgreSQL)]
     P2 -.-> DB
   end
@@ -47,7 +47,7 @@ Each box with its own database is a separate node with its own data, its own ope
 | Pattern | Use it when | Section |
 |---|---|---|
 | One node | One organisation, one operator, one set of rules | [One node for an organisation](#one-node-for-an-organisation) |
-| Several processes on one database | One node must survive the loss of one process or host | [Several node processes on one database](#several-node-processes-on-one-database) |
+| One active process and a standby on one database | One node must survive the loss of one process or host | [Several node processes on one database](#several-node-processes-on-one-database) |
 | Many nodes | Units, partners or people need their own data, operator or rules | [Many nodes](#many-nodes) |
 | A node of one's own | A person or a small team needs content no other operator can read | [A personal or local node](#a-personal-or-local-node) |
 | Services around a node | The work is heavy, or belongs to a system the organisation already runs | [Services around a node](#services-around-a-node) |
@@ -61,6 +61,8 @@ Each box with its own database is a separate node with its own data, its own ope
 **What it does not give.** A host or database failure is an outage until the process runs again or the database is restored ([11 Backup and recovery](11-backup-recovery.md)). Every team on the node shares one operator and one set of node settings.
 
 ## Several node processes on one database
+
+**What is supported.** One active process and a standby: the load balancer sends all traffic to one process, and a second process with the same `.env` waits on a second host and takes the traffic when the first stops. **More than one active process is not supported yet**: the state in the table below stays in each process, and the project has not moved it to the database. The maintainer ruled this on 2026-11-04, and the code says the same (`docs/coding-guidelines/architecture.md`, read-cache layer). Every new piece of per-process state or timer in the code is counted by `pnpm check:process-local` against `aimeat/security/process-local-baseline.json`, which asks each new one what breaks with a second process.
 
 Several processes of one node can run against one PostgreSQL database with the same settings, and they see the same data. The code records that aimeat.io has run two processes on one database: the same workflow fire started twice, 1 ms and 15 ms apart, on 2026-10-02 and 2026-10-03, and the scheduler claim below was written for it (`aimeat/src/services/scheduler-fire-claim.ts`, `aimeat/src/services/once-only-step.ts`).
 
@@ -77,6 +79,13 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The node key: two processes that start without a key file adopt one key | `aimeat/src/auth/node-keys.ts` |
 | Sign-in through an outside identity provider (the OIDC login round is a stored nonce), device authorization requests, MCP OAuth clients, refresh tokens and approvals, spent upload tokens, spent agent return proofs | `aimeat/src/routes/oauth-login.ts`, `aimeat/src/routes/agents/device-auth.ts`, `aimeat/src/mcp/oauth.ts`, `aimeat/src/routes/upload.ts`, `aimeat/src/services/device-return-proof.ts` |
 | Messages and tasks for an agent wait in storage and go out with the backlog when the agent's tunnel connects | `aimeat/src/services/connect-tunnel-push.ts` |
+| Processes that start together migrate and seed one after the other: the boot lock is a PostgreSQL advisory lock, and a process waits for it up to 60 s | `aimeat/src/storage/providers/postgres-kysely/migrate.ts`, `aimeat/src/server-bootstrap/boot-seed-lock.ts` |
+| Maintenance mode: a stop switched on by `aimeat maintenance on` or through another process reaches every process within 5 s | `aimeat/src/services/maintenance-cache.ts` |
+| The pages' build stamp names the code, so a page whose live stream reaches the standby does not reload | `aimeat/src/utils/build-stamp.ts` |
+| A stop drains: `GET /v1/health/ready` answers 503, new connections are refused, requests in flight get 5 s, and the process exits 0, so the load balancer moves to the standby | `aimeat/src/server-bootstrap/drain.ts`, `aimeat/src/routes/health.ts` |
+| A webhook or mail whose first attempt failed keeps its retries in a stored outbox, each attempt claimed on the record's version, so a restart resumes it and two processes send it once | `aimeat/src/services/outbox.ts`, `aimeat/src/services/email-outbox.ts` |
+| The notification digest and the held pushes claim before they send: the digest bookmark and the held marks move on their version first, so two processes send one digest | `aimeat/src/services/notification-sweeps.ts` |
+| Consent and classification audit rows are written within 1 s of the decision, and at a stop | `aimeat/src/services/consent-audit-buffer.ts`, `aimeat/src/services/classification/audit.ts` |
 
 ### What stays in each process, and what follows
 
@@ -93,6 +102,11 @@ Several processes of one node can run against one PostgreSQL database with the s
 | The setup code of a node without an operator | Each process prints its own code | Run the first setup with one process | `aimeat/src/services/setup-code.ts` |
 | AI jobs and workflow runs in flight. At start, a process treats every AI job left `running` as left behind by a restart and fails it, except a job that a stopping process marked at SIGTERM, which it queues again once; it starts again every `queued` one; the workflow engine clears the open model calls of every run. The per-run lock is in the process, and the run record is written without a version check. A job cancelled through another process is marked cancelled in storage while its own process keeps it running | Starting or restarting one process fails the AI jobs the others are running (`node_restarted`), can run a queued job in two processes, and two processes can advance one workflow run at the same moment | Start and restart all processes together, outside working hours; or run one active process and keep the second as a standby | `aimeat/src/services/ai-jobs/service.ts`, `aimeat/src/server-bootstrap/background-jobs.ts`, `aimeat/src/services/workflow/engine.ts` |
 | The retry sweep of cross-node messages runs in every process, without a claim | Two processes can try the same delivery at the same moment | Accept a possible repeat delivery to a peer, or run one active process | `aimeat/src/services/message-delivery.ts` |
+| The tickets of the live stream (`POST /v1/events/ticket`, then `GET /v1/events?ticket=`), the replay cache of signed requests between nodes, and the short handle of a presigned upload (`upload_url`) | A ticket or handle minted on one process is refused on another, and a signed request between nodes can be replayed once per process within its 5 minutes | Run one active process | `aimeat/src/routes/sse.ts`, `aimeat/src/services/request-nonce.ts`, `aimeat/src/services/upload-token.ts` |
+| The list of federation peers and the apps open to the internet on a closed node, loaded at start | An emergency removal of a peer, or a closed internet opening, reaches only the process that made it; another process keeps the old list until it starts again | Run one active process; a standby that takes over loads the lists from the database at its start | `aimeat/src/services/federation-peer-remove.ts`, `aimeat/src/services/internet-opening/opening-registry.ts` |
+| Realtime rooms, chunked uploads in progress, the stop handle of a chat turn, who is online, and the watch list of tracked responses | A room, an upload or a chat turn exists only in the process that opened it; presence counts only that process's streams; a tracked response is watched by the process that created it until the reconciler finds it | Run one active process; a takeover loses rooms and unfinished uploads, and the clients start them again | `aimeat/src/services/realtime-manager.ts`, `aimeat/src/storage/chunked-upload-store.ts`, `aimeat/src/routes/chat.ts`, `aimeat/src/services/presence.ts`, `aimeat/src/services/track-registry.ts` |
+| The per-account limits (mail, invitations, AI calls), the per-owner ceiling of queued AI jobs and the extension run slots | Each process counts on its own | Run one active process | `aimeat/src/services/account-limits.ts`, `aimeat/src/services/ai-jobs/service.ts`, `aimeat/src/services/extension-run-slots.ts` |
+| Jobs scheduled `@activate` run at every start of every process, without a claim | A standby that starts runs them again | Write `@activate` work so a second run changes nothing | `aimeat/src/services/scheduler.ts` |
 
 The code's own design notes state one process per node: "a node is one process" and the platform "grows by there being more nodes, each its own, federated" (`aimeat/src/services/passkeys.ts`), and the AI key hold is "per process, like every limiter here: a node runs one process" (`aimeat/src/services/ai/node-key-hold.ts`). The database claims above are the parts that already hold when two processes run.
 
@@ -100,8 +114,8 @@ The code's own design notes state one process per node: "a node is one process" 
 
 | Shape | What it gives | What it does not |
 |---|---|---|
-| **One active process and a standby.** The load balancer sends all traffic to one process; a second host has the same `.env` and starts its process when the health check of the first fails (`GET /v1/health`, read `status`) | Recovery from the loss of a host in the time it takes a process to start, with none of the per-process effects above, because one process serves at a time. A standby process that runs while it waits also runs the background work and the start reconciliation; a stopped standby does not | Protection against the loss of the database: use PostgreSQL's own standby for that ([11 Backup and recovery](11-backup-recovery.md)) |
-| **Several active processes.** Traffic spread over the processes, with affinity per client, the sign-in paths routed to one process, and the limits divided | Capacity beyond one process, and service through the loss of one process | Live updates across processes, and AI jobs that survive the start of another process (table above) |
+| **One active process and a standby (supported).** The load balancer sends all traffic to one process and reads `GET /v1/health/ready`; a second host has the same `.env` and its process takes the traffic when the first one's readiness fails. A stop drains the active process first (readiness 503, new connections refused, requests in flight finished), so a planned switch loses no request | Recovery from the loss of a host in the time it takes a process to start, with none of the per-process effects above, because one process serves at a time. A standby process that runs while it waits also runs the background work and the start reconciliation; a stopped standby does not | Protection against the loss of the database: use PostgreSQL's own standby for that ([11 Backup and recovery](11-backup-recovery.md)) |
+| **Several active processes (not supported yet).** Traffic spread over the processes, with affinity per client, the sign-in paths routed to one process, and the limits divided | Capacity beyond one process, and service through the loss of one process | Everything in the table above: live updates across processes, sign-in steps, peer and opening lists, limits, and AI jobs that survive the start of another process |
 
 The project records no test of either shape behind a load balancer; the database claims are covered by unit tests (`aimeat/test/unit/scheduler-fire-claim.test.ts`, `aimeat/test/unit/scheduler-catch-up.test.ts`, `aimeat/test/unit/once-only-keep-steps.test.ts`, `aimeat/test/unit/node-key-path.test.ts`).
 
@@ -155,7 +169,7 @@ Every outbound call these make is listed, with its setting, on [02 Architecture]
 |---|---|---|
 | What does an outage of one node stop? | The people and agents of that node lose the web UI, MCP and REST of that node, and its apps. Stored data is not touched. Peers keep working, and messages to the node wait at the senders. Scheduled jobs wait: at the next start a daily or longer core job runs once to catch up, and a person's missed schedule is written to its run log as skipped | `aimeat/src/services/scheduler-catch-up.ts`, `aimeat/src/services/message-delivery.ts` |
 | Why does the node stay small? | It holds refined knowledge and the state that apps show. Model inference and heavy processing run in other services, so a heavy job cannot take the knowledge store down with it, and a node outage does not stop those services' own work | [Services around a node](#services-around-a-node) |
-| How is one host's loss covered? | One active process with a standby on a second host, or several active processes with the limits above | [Several node processes on one database](#several-node-processes-on-one-database) |
+| How is one host's loss covered? | One active process with a standby on a second host; several active processes are not supported yet | [Several node processes on one database](#several-node-processes-on-one-database) |
 | How is the blast radius kept small? | Separate nodes for units, partners or people: an outage, a setting or a breach on one node stays on it | [Many nodes](#many-nodes) |
 | How is the database covered? | PostgreSQL's own standby and WAL archiving, and backups with a tested restore; the RTO and RPO tiers are on page 11 | [11 Backup and recovery](11-backup-recovery.md#proposed-rto-and-rpo) |
 
@@ -175,8 +189,9 @@ Content that must stay out of every other operator's reach belongs on a node its
 
 ## Limits
 
-- The project records no test of several node processes on one database behind a load balancer, and no failover test of a standby process. The database claims that make two processes safe for scheduled work, start steps and the node key are covered by unit tests only.
-- With several processes: live updates, the read cache, rate limits, the sign-in tarpit, the AI key hold, short sign-in steps, 2025-era MCP sessions, idempotency keys and the setup code stay in one process; a Config page change reaches the other processes at their next start; the start of a process fails the AI jobs the others run; and the workflow run lock is per process (table above).
+- More than one active process is not supported yet. One active process with a standby is.
+- The project records no test of several node processes behind a load balancer, and no failover test of a standby process. Two processes starting together on one empty database are tested (`aimeat/test/e2e-boot-lock.ts`), and so is the drain of a stop (`aimeat/test/e2e-graceful-shutdown.ts`); the database claims for scheduled work, start steps and the node key are covered by unit tests.
+- With several processes: live updates, the read cache, rate limits and the per-account limits, the sign-in tarpit, the AI key hold, short sign-in steps, live stream tickets, the replay caches, presigned upload handles, the peer and internet-opening lists, realtime rooms, chunked uploads, 2025-era MCP sessions, idempotency keys and the setup code stay in one process; a Config page change reaches the other processes at their next start; the start of a process fails the AI jobs the others run; and the workflow run lock is per process (table above).
 - The `relay` and `mirror` node types are not established for replication or redundancy ([Environment examples](../coding-guidelines/environment-configs.md#relay-and-mirror-types)).
 - Federation does not fail one node over to another and does not copy private records. An organism lives on one node.
 - The operator of a node can read the records of the people on it; the node records each read and does not prevent it.
@@ -184,6 +199,6 @@ Content that must stay out of every other operator's reach belongs on a node its
 
 ## Open questions
 
-- OPEN: Has the project run one node as several processes on one PostgreSQL database behind a load balancer, or as an active process with a standby, under load, and with which load balancer rules? The maintainer named in `.github/SECURITY.md` can answer.
+- OPEN: Has the project run one node as an active process with a standby, under load, and with which load balancer rules? The maintainer named in `.github/SECURITY.md` can answer.
 - OPEN: Will the short sign-in steps (MCP OAuth codes, app grant codes, passkey ceremonies, WebSocket tickets), the replay cache and the start-up reconciliation of AI jobs and workflow runs move to the database, so that several processes can serve without routing the sign-in paths to one process? The maintainer can answer.
 - OPEN: Can a person signed in from a peer node through cross-node sign-in be a member of an organism on this node, and which workspace operations are open to such a member? The maintainer can answer.

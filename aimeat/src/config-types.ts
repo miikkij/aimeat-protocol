@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.31.0 — 2026-11-04 — The SMTP fields moved to config-types-smtp.ts (SmtpConfig, mixed in) unchanged
+ *     (max-file-lines), with smtpConnectTimeoutMs and smtpSocketTimeoutMs (codebase analysis 2026-11-03, HA stage 1).
  *   v1.30.0 — 2026-11-02 — emailReportsPerSenderDay (secaudit2026nov02d round 13).
  *   v1.29.0 — 2026-11-02 — appPartySignupsPerHour and appPartyPendingHours (secaudit2026nov02d round 13).
  *   v1.28.0 — 2026-11-02 — partyPurchasesPerHour (AIMEAT_PARTY_PURCHASES_PER_HOUR; secaudit2026nov02d round 13).
@@ -126,6 +128,7 @@ export type { SiteContact, SiteLinksConfig } from './config-types-site-links.js'
 import type { AiCapabilityConfig } from './config-types-ai.js';
 import type { SitePresenceConfig } from './config-site-presence.js';
 import type { SocialLoginConfig } from './config-types-social-login.js';
+import type { SmtpConfig } from './config-types-smtp.js';
 import type { ConnectionsConfig } from './config-types-connections.js';
 import type { McpProxyConfig } from './config-types-mcp-proxy.js';
 import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
@@ -148,7 +151,7 @@ import type { NodeLimitsConfig } from './config-node-limits.js';
 import type { FileStoreConfig } from './config-file-store.js';
 import type { DataspaceConfig } from './config-dataspace.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig, DataspaceConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig, DataspaceConfig, SmtpConfig {
   port: number;
   baseUrl: string;
   /**
@@ -574,20 +577,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   /** How long the Crew tab's "Try" waits for a running crew to finish one trial run (invoke over the tunnel). */
   crewTryTimeoutMs: number;
 
-  // Email / SMTP (Phase 1.1)
-  smtpHost: string | null;
-  smtpPort: number;
-  smtpUser: string | null;
-  smtpPass: string | null;
-  smtpFrom: string;
-  /** The Reply-To of a report an agent or an app mails its owner; null: replies go to the From. */
-  smtpReplyTo: string | null;
-  /** Mails one agent or app may cause its owner in 24 hours (notification-create.ts mailOwnerFrom); 0: no limit. */
-  emailReportsPerSenderDay: number;
-  smtpSecure: boolean;
-  smtpRejectUnauthorized: boolean;
-  emailConfirmationRequired: boolean;
-  emailEnabled: boolean;
+  // Email / SMTP (Phase 1.1): SmtpConfig, config-types-smtp.ts
 
   // Match Notifications (Phase 1.6)
 

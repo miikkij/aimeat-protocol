@@ -1,6 +1,6 @@
 # 15 Operations runbook
 
-> Checked against AIMEAT node 4.2.0 (commit 005a52e35) on 2026-11-02. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit a463a1e3b) on 2026-11-03. Maintained with the code: see the README for how.
 
 How an AIMEAT node is installed, configured and run day to day, what to do when a common symptom appears, and who is responsible for what. It is for the operator (the account with the node's admin role, `docs/coding-guidelines/identity-model.md`) and for the IT and security staff behind that account. The order of first-time steps is on [00 Go-live checklist](00-go-live-checklist.md); this page is what comes after, plus the short install sequence.
 
@@ -13,7 +13,7 @@ The full procedure is in [build and operate a node](../coding-guidelines/getting
 1. Prepare the host: Node.js 24, PostgreSQL (or a SQLite file location), a reverse proxy with TLS, and the DNS names from [00 Go-live checklist, phase 2](00-go-live-checklist.md#phase-2-dns-and-tls).
 2. Install one of three ways: the npm package (`npx aimeat init`, then `npx aimeat start`), a source build (`pnpm build`, `pnpm start` in `aimeat/`), or Docker (`aimeat/Dockerfile` with `aimeat/docker-compose.yml` for PostgreSQL or `aimeat/docker-compose.sqlite.yml` for SQLite).
 3. Write `.env` (or the process manager's environment) with the decisions from [00 Go-live checklist, phases 1 and 3](00-go-live-checklist.md#phase-1-decide-before-install). `aimeat init` generates the keys; never run it again on an existing node, because it writes a new configuration ([upgrading](../operations/upgrading.md#the-update)).
-4. Run under a process manager: `aimeat/deploy/aimeat.service` for systemd carries the restart policy, memory limits and stop timeout. On Docker, put the key directory on a volume (`AIMEAT_NODE_KEY_PATH`) and add a `HEALTHCHECK` that calls `/v1/health`; the image has none ([production deployment, process manager](../operations/production-deployment.md#process-manager)).
+4. Run under a process manager: `aimeat/deploy/aimeat.service` for systemd carries the restart policy, memory limits and stop timeout. On Docker, put the key directory on a volume (`AIMEAT_NODE_KEY_PATH`); the image's `HEALTHCHECK` calls `/v1/health/ready` on 127.0.0.1, so a node bound to another address (`AIMEAT_BIND_HOST`) needs its own ([production deployment, process manager](../operations/production-deployment.md#process-manager)).
 5. Run `aimeat validate`, start the node, copy the setup code from the start log, create the operator account ([00 Go-live checklist, phase 4](00-go-live-checklist.md#phase-4-first-start)).
 6. Take the first backup and test the restore before anyone else signs up ([backup and restore](../operations/backup-and-restore.md)).
 
@@ -125,8 +125,8 @@ R responsible, A accountable, C consulted, I informed. An organism is AIMEAT's s
 | A person's own data: export, delete, leave | I | | C | | R/A |
 
 ## Limits
-- The operations guides describe one node process per database. Several processes on one database, and what stays per process, are described on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); the project records no test of that shape behind a load balancer.
-- The Docker image has no health check and the compose files keep no volume for the node's key directory; both are the installer's job ([production deployment, process manager](../operations/production-deployment.md#process-manager)).
+- The operations guides describe one node process per database. One active process with a standby is supported, more than one active process is not supported yet, and what stays per process is listed on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); the project records no test of a standby taking over behind a load balancer.
+- The compose files keep no volume for the node's key directory; that is the installer's job. The image's health check asks `/v1/health/ready` on 127.0.0.1 ([production deployment, process manager](../operations/production-deployment.md#process-manager)).
 - Logs go to standard output only (one console transport in `aimeat/src/utils/logger.ts`), as JSON when `NODE_ENV=production` (set in `aimeat/Dockerfile`, not in `aimeat/deploy/aimeat.service`). There is no built-in SIEM or syslog forwarder; the process manager or a log shipper must carry them.
 - `aimeat backup` and the admin backup are partial JSON exports, not node backups; the real backup is the database, `.env` and the key file ([backup and restore](../operations/backup-and-restore.md#what-is-not-a-backup)).
 - Going back to an older version needs the backup taken before the update; an older version does not undo database changes ([upgrading](../operations/upgrading.md#the-update)).

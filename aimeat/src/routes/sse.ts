@@ -14,6 +14,8 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   2026-11-04 -- A stop ends the stream at once (services/node-lifecycle.ts endOnDrain), so the
+ *     server closes and the process exits 0 (codebase analysis 2026-11-03, HA stage 1).
  *   2026-10-25 -- secaudit2026oct22: the ticket keeps the bearer it was minted with
  *     (auth/stream-credential.ts), and the stream asks again whether the node honours it: before a
  *     change frame when the last answer is over 5 s old, and every 60 s while idle. A revoked
@@ -84,6 +86,7 @@ import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-dom
 import { isOrganismMember, type AudienceAuth } from '../services/audience.js';
 import { streamCredentialOf, streamCredentialRevoked, type StreamCredential } from '../auth/stream-credential.js';
 import { logger } from '../utils/logger.js';
+import { endOnDrain } from '../services/node-lifecycle.js';
 
 interface Ticket {
   sub: string;
@@ -263,6 +266,8 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       'X-Accel-Buffering': 'no',
     });
     res.flushHeaders();
+    // A stop ends this stream at once, so the server can close; the page reconnects by itself.
+    endOnDrain(res);
 
     // res.flush() is added by the compression middleware; SSE is excluded from
     // compression (see server.ts), but we still flush defensively so no proxy
