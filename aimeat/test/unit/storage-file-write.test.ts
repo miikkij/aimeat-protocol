@@ -8,6 +8,7 @@
  * @structure Three describes: writeStorageFile(), mintStorageUploadUrl() and removeStorageFile().
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-file-write.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-04 — The write and the mint refuse visibility 'group' with no group id.
  *   v1.1.1 — 2026-10-29 — The fake storage answers getMemory: the quota now asks whether the owner keeps
  *     files in storage of their own (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.1.0 — 2026-09-24 — A7-2: the write and the mint refuse an app's icon and screenshot keys;
@@ -118,6 +119,15 @@ describe('writeStorageFile', () => {
         expect(createStorageFile).not.toHaveBeenCalled();
     });
 
+    it('refuses a group file that names no group, and stores nothing', async () => {
+        for (const groupId of [undefined, '', '   ', 7 as unknown as string]) {
+            const out = await writeStorageFile(deps, OWNER, { key: 'a.png', data: bytes(8), visibility: 'group', groupId });
+            expect(out, `groupId ${String(groupId)}`).toMatchObject({ ok: false, status: 400, code: 'INVALID_INPUT' });
+            expect(!out.ok && out.message).toContain('group_id');
+        }
+        expect(createStorageFile).not.toHaveBeenCalled();
+    });
+
     it('keeps groupId and workspaceRef on the visibility that uses them', async () => {
         await writeStorageFile(deps, OWNER, { key: 'a.png', data: bytes(8), visibility: 'private', groupId: 'grp-1', workspaceRef: 'org-1/ws-1' });
         expect(stored().groupId).toBeUndefined();
@@ -165,6 +175,12 @@ describe('mintStorageUploadUrl', () => {
             group_id: 'grp-1', workspace_refs: 'org-1/ws-1',
         });
         expect(out.ok && out.uploadUrl).toBe('https://node.example/v1/upload/u_stub-handle');
+    });
+
+    it('mints no URL for a group file that names no group', async () => {
+        const out = await mintStorageUploadUrl(deps, OWNER, { key: 'a.png', visibility: 'group' });
+        expect(out).toMatchObject({ ok: false, status: 400, code: 'INVALID_INPUT' });
+        expect(generateUploadToken).not.toHaveBeenCalled();
     });
 
     it('advertises the operator ceiling, not a constant', async () => {

@@ -29,6 +29,7 @@
  * @structure
  *   - StorageWriteDeps / StorageFileInput / StorageFileWriteResult — the contract
  *   - APP_OWNED_KEYS / appOwnedKeyRefusal() — the keys only an app's own doors write
+ *   - groupBindingRefusal() — a group file names its group
  *   - writeStorageFile() — the inline write, in order, with the fence first
  *   - mintStorageUploadUrl() — the presigned representation of the same write
  *   - removeStorageFile() — the delete, sharing the same key fence and change events
@@ -38,6 +39,9 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.15.0 — 2026-11-04 — groupBindingRefusal(): the write and the presigned mint refuse visibility
+ *     'group' with no group id with 400 INVALID_INPUT, and the visibility change refuses 'group' on a
+ *     file that has no group. Such a file was stored and opened to nobody (Jouni, 2026-11-04).
  *   2026-11-04 — A stored file is announced with emitRecordChangePriorUnknown: the same streams hear
  *     it, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   v1.14.0 — 2026-11-01 — The file hooks moved by extraction to ./storage-file-hooks.ts (line limit) and
@@ -319,6 +323,23 @@ function checkKey(ownerGaii: string, key: string): KeyRefusal | null {
     return null;
 }
 
+/**
+ * A group file names its group. Stored without one it is readable by nobody but its owner
+ * (consent.ts answers missing_group_id), and the uploader learns nothing, so it is refused here with
+ * what to send instead. Exported for the upload routes that check a request before the shared write:
+ * POST /v1/memory/files and the chunked init. The value may come straight from a JSON body, so anything
+ * but a non-blank string names no group.
+ */
+export function groupBindingRefusal(visibility: unknown, groupId: unknown): KeyRefusal | null {
+    if (visibility !== 'group' || (typeof groupId === 'string' && groupId.trim())) return null;
+    return {
+        ok: false, status: 400, code: 'INVALID_INPUT',
+        message: 'visibility "group" requires group_id, the id of a sharing group whose members will read the file '
+            + '(aimeat_group_list or GET /v1/groups lists yours). Without a group the file opens to nobody. '
+            + 'To share it with a workspace, send visibility "workspace" with workspace_refs. To keep it to yourself, send "private".',
+    };
+}
+
 /** Store one file under `ownerGaii`, with every gate and side effect the capability carries. */
 export async function writeStorageFile(
     deps: StorageWriteDeps,
@@ -347,6 +368,9 @@ export async function writeStorageFile(
             message: 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"',
         };
     }
+    // The same for a group file that names no group, on the level the node settled on.
+    const unbound = groupBindingRefusal(visibility, input.groupId);
+    if (unbound) return unbound;
     // 'organism:<id>' names an organism the account owning this namespace is an active member of.
     const audience = await organismVisibilityRefusal(storage, visibility, { identity: ownerGaii });
     if (audience) return { ok: false, ...audience };
@@ -599,6 +623,8 @@ export async function mintStorageUploadUrl(
         ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, writer);
     if (fenced) return fenced;
     // Refused at the mint as at the write, so no URL is handed out for a file that cannot land.
+    const unbound = groupBindingRefusal(input.visibility, input.groupId);
+    if (unbound) return unbound;
     const audience = await organismVisibilityRefusal(deps.storage, input.visibility, { identity: ownerGaii });
     if (audience) return { ok: false, ...audience };
     if (input.provenance) {
@@ -683,6 +709,18 @@ export async function changeStorageFileVisibility(
     // The account's own extension's file by its short key, as removeStorageFile reads it.
     const key = await storage.getStorageFileMeta(ownerGaii, asked)
         ? asked : (await ownExtensionFileKey(storage, asked, localAccountName(ownerGaii))) ?? asked;
+    // 'group' keeps the group the file has, and this change cannot name one. A file with none would
+    // open to nobody, so it is refused. A file that is not there falls through to the 404 below.
+    if (requested === 'group') {
+        const file = await storage.getStorageFileMeta(ownerGaii, key);
+        if (file && !file.groupId) {
+            return {
+                ok: false, status: 400, code: 'INVALID_INPUT',
+                message: 'This file has no group, and changing its visibility cannot give it one, so visibility "group" would open it to nobody. '
+                    + 'Upload it again with visibility "group" and group_id, or send visibility "workspace" with workspace_refs.',
+            };
+        }
+    }
     // 'organism:<id>' names an organism the file owner's account is an active member of.
     const audience = await organismVisibilityRefusal(storage, requested, { identity: ownerGaii, ...(opts.federated !== undefined ? { federated: opts.federated } : {}) });
     if (audience) return { ok: false, ...audience };

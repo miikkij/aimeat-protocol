@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-11-04 -- Init refuses visibility 'group' with no group_id before any chunk (storage-file-write.ts
+ *     groupBindingRefusal); complete asks again at the shared write.
  *   2026-11-01 -- Init refuses a company's page key to a caller the company page route would refuse,
  *     before any chunk, and complete asks again at the shared write (services/storage-page-keys.ts;
  *     secaudit2026oct31w2 round 11).
@@ -57,7 +59,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/mid
 import { success, error } from '../middleware/envelope.js';
 import { emitRecordChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { appOwnedKeyRefusal, writeStorageFile } from '../services/storage-file-write.js';
+import { appOwnedKeyRefusal, groupBindingRefusal, writeStorageFile } from '../services/storage-file-write.js';
 import { pageKeyWriteRefusal, pageWriterOf } from '../services/storage-page-keys.js';
 import { organismVisibilityRefusal } from '../services/organism-visibility.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
@@ -118,6 +120,11 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         if (visibility === 'workspace' && !workspaceRef) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
                 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"'));
+            return;
+        }
+        const unbound = groupBindingRefusal(level, group_id);
+        if (unbound) {
+            res.status(unbound.status).json(error(config.nodeId, unbound.code, unbound.message));
             return;
         }
 

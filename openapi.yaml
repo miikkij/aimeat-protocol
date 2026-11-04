@@ -27757,7 +27757,7 @@ paths:
                         type: string
                 group_id:
                   type: string
-                  description: 'For `visibility: group`.'
+                  description: 'Required with `visibility: group`; refused with 400 INVALID_INPUT without it.'
                 store:
                   type: string
                   maxLength: 100
@@ -27816,6 +27816,9 @@ paths:
     patch:
       operationId: updateMemoryFileVisibility
       summary: Update memory file visibility
+      description: >
+        Change a file's visibility, as PATCH /v1/storage/{key}/visibility does. `group` keeps the
+        group the file already has, and is refused with 400 INVALID_INPUT on a file that has none.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -29951,7 +29954,7 @@ paths:
                   $ref: '#/components/schemas/UploadVisibility'
                 group_id:
                   type: string
-                  description: Sharing group ID (required when visibility is 'group')
+                  description: Sharing group ID. Required when visibility is 'group'; refused with 400 INVALID_INPUT without it.
                 workspace_refs:
                   type: array
                   items:
@@ -30005,7 +30008,7 @@ paths:
                   $ref: '#/components/schemas/UploadVisibility'
                 group_id:
                   type: string
-                  description: Sharing group ID (required when visibility is 'group')
+                  description: Sharing group ID. Required when visibility is 'group'; refused with 400 INVALID_INPUT without it.
       responses:
         '200':
           description: >
@@ -30087,7 +30090,8 @@ paths:
         and by hash, and the answer carries it as `ai_provenance`. Takes every visibility the upload
         takes: `workspace` with workspace_refs (re)binds the file, `organism:<organism id>` shares it
         with that organism's active members and needs the file owner's account to be one (400
-        NOT_ORGANISM_MEMBER otherwise), and `group` keeps the group the file already has.
+        NOT_ORGANISM_MEMBER otherwise), and `group` keeps the group the file already has and is
+        refused with 400 INVALID_INPUT on a file that has none.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -35871,7 +35875,7 @@ paths:
                   type: integer
                 group_id:
                   type: string
-                  description: The group a `group` file is shared with.
+                  description: The group a `group` file is shared with. Required with visibility `group`; refused with 400 INVALID_INPUT without it.
                 workspace_ref:
                   type: string
                   description: For a `workspace` file, one or more "<organismId>/<workspaceId>" separated by spaces.
