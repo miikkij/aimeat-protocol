@@ -55,6 +55,11 @@ accepted patterns: (a) store it under a **synthetic system identity** the way ne
 templates do (`__network_policy__`, `SITE_OWNER_GAII`) so no owner-scoped principal can address it; or
 (b) enforce a **reserved-key denylist** on `POST/PUT /v1/memory` for non-owner-session principals
 (`openrouter.*`, `ai-usage.*`, `profile.*`, …).
+A record that one service keeps **for an account** uses the per-account form of (a): the account's service
+namespace `svc:<owner>@<node>`, read and written only through `serviceRecords<T>(storage, prefix)`
+(`services/service-records.ts`). No memory route reads or writes it, the account's data export carries it
+and the account erasure removes it. `SERVICE_OWNED_KEY_PREFIXES` (the owner-namespace keys no memory route
+writes) may only shrink; `pnpm check:trusted-keys` refuses a new entry (codebase analysis 2026-11-03, B6).
 *Why:* an app the owner granted `memory:write` can otherwise poison the owner's own config (e.g. redirect
 where the AI key is sent). **Never mix user-data and security-load-bearing config in the same free-write namespace.**
 

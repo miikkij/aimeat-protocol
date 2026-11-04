@@ -13,6 +13,9 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   2026-11-04 — `memories` carries the account's service namespace records after its own records
+ *     (services/service-records.ts); none exist before a service writes one, so the export is unchanged
+ *     until then (codebase analysis 2026-11-03, item B6).
  *   2026-10-23 — An export logs itself as a done data subject request in the node's request list
  *     (plan doc-mvlftkh9zmc9, C4.3).
  *   2026-10-15 — Five parts the export lacked (export-sections.ts): `published_apps`,
@@ -75,6 +78,8 @@ import { isOperatorCaller, operatorOverride } from '../../services/operator-over
 import { exportExtraSections, exportAgentMessages } from './export-sections.js';
 import { appendRequest } from '../../services/compliance-docs.js';
 import { logger } from '../../utils/logger.js';
+import { isValidGHII } from '../../utils/gaii.js';
+import { serviceNamespaceOf } from '../../utils/service-namespace.js';
 
 /** One work item this identity was to do, as the export shows it: the other side is the requester. */
 function workProvidedView(w: WorkRecord) {
@@ -417,7 +422,14 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     let ownerMemories: unknown[] = [];
     let ownerFiles: unknown[] = [];
     if (ghii) {
-      const memories = await exportable(await storage.listMemory(ghii));
+      // The records this node's services keep for the account in its service namespace are the
+      // account's too (services/service-records.ts), and no memory route reads them, so this export
+      // carries them beside the account's own; a key the account's own namespace also holds is
+      // shown once, from there.
+      const own = await storage.listMemory(ghii);
+      const ownKeys = new Set(own.map(m => m.key));
+      const kept = isValidGHII(ghii) ? (await storage.listMemory(serviceNamespaceOf(ghii))).filter(m => !ownKeys.has(m.key)) : [];
+      const memories = await exportable([...own, ...kept]);
       ownerMemories = memories.map(m => ({
         key: m.key,
         // A credential comes out as `{ configured: true }`, the same as at every other door. The

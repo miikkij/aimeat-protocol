@@ -21,6 +21,8 @@
  *   deleteMemoryRecord() · restoreLevel() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-11-04 — An operator's ?owner= naming an account's service namespace is refused with
+ *     SERVICE_RECORD, for delete and restore (codebase analysis 2026-11-03, item B6).
  *   2026-10-31 — A restore lowered on a closed node stores its level in the same UPDATE that clears
  *     the tombstone (storage.restoreMemory with a visibility). lowerRestored wrote it afterwards on the
  *     record's version and gave up when every attempt lost, which left the record at the level it went
@@ -92,13 +94,15 @@ import { isRaiseToPublic } from './publish-gate.js';
 import { memoryTarget } from './classification/label-rows.js';
 import { closedNodeLevel } from './closed-node-level.js';
 import type { MemoryRecord } from '../storage/interface.js';
+import { isServiceNamespace } from '../utils/service-namespace.js';
+import { serviceRecordRefusal } from '../utils/own-door-keys.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
 export interface MemoryBinRefusal {
   ok: false;
   code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
-    | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE'
+    | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD'
     | LegacyPacingWriteRefusal['code'];
   message: string;
   /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
@@ -254,6 +258,12 @@ export async function bulkDeleteKeyRefusal(
  * binned before its space became append-only could be put back past the space's write path.
  */
 async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'delete' | 'restore'): Promise<MemoryBinRefusal | null> {
+  // An account's service namespace (services/service-records.ts) is removed from and put back into
+  // by its service only, so an operator's ?owner= naming it is refused, whatever the key.
+  if (isServiceNamespace(req.ownerOverride)) {
+    const refusal = serviceRecordRefusal(req.ownerOverride as string);
+    return { ok: false, code: 'SERVICE_RECORD', message: refusal.message, status: 403 };
+  }
   // A service-owned key (utils/reserved-keys.ts) is neither deleted nor put back by anyone, the
   // account owner and an operator naming another namespace included. Removing the classification
   // policy switched classification off for its owner without the proposal a person must accept

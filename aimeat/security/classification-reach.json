@@ -610,10 +610,10 @@
     },
     "src/routes/owners/export.ts": {
       "reads": {
-        "listMemory": 2,
+        "listMemory": 3,
         "listStorageFiles": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-04 (codebase analysis 2026-11-03, B6): the third listMemory reads the account's service namespace and passes the same exportable() presentation as the account's own records."
     },
     "src/routes/page-host.ts": {
       "reads": {
@@ -1873,6 +1873,14 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-11-01 (secaudit2026oct31w2 round 12), the node's own read: the node-wide ecosystem subscription record under the node's system identity, read once at boot to move each entry to its owner's list. No content is shown to anyone."
+    },
+    "src/services/service-records.ts": {
+      "reads": {
+        "getMemory": 6,
+        "listMemory": 2,
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, B6), the node's own reads: a service's records in an account's service namespace (and, until a prefix's move step has run, the same key in the account's own namespace), read by the one service that writes them, the move step's marker under the node's system identity, and the rows the move step copies. The values go back to that service, never to a caller; the routes that show them (the GDPR export) present them through the classification reader."
     },
     "src/services/entitlement-erasure.ts": {
       "reads": {
