@@ -15,6 +15,8 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-04 — busWire(): NOTIFY and a LISTEN connection of its own for the event bus between this
+ *     node's processes (./bus-wire.ts; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — The migrations run under the boot lock, and bootLock() takes it for the boot seeding
  *     (migrate.ts takeBootLock; codebase analysis 2026-11-03, HA stage 1).
  *   2026-11-04 — _rawMemory answers MemoryWriteProbe, the three columns setMemory decides with
@@ -54,6 +56,8 @@ import type { MemoryRecord, Storage } from '../../interface.js';
 import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import type { DB } from './db-types.js';
 import { runMigrationsLocked, takeBootLock } from './migrate.js';
+import { createPgBusWire } from './bus-wire.js';
+import type { BusWire } from '../../bus-wire.js';
 import { checkServerVersion } from './server-version.js';
 import { logger } from '../../../utils/logger.js';
 import { memoryMethods, type MemoryWriteProbe } from './methods/memory.js';
@@ -145,8 +149,11 @@ export class PostgresKyselyStorage {
   readonly chunkedUploads = new ChunkedUploadStore();
   /** The request-path statement limit (./pool-limits.ts); config-init points `ms` at the node's config. */
   readonly requestStatementLimit: RequestStatementLimit;
+  /** The database this storage opened, for the event bus's listening connection (busWire). */
+  private readonly connectionString: string;
 
   constructor(connectionString: string, limits: PoolLimits = POOL_LIMITS) {
+    this.connectionString = connectionString;
     // TIME LIMITS (QA audit E6-07). Without them a database that stops answering, or twenty
     // connections held by slow statements, made every request, the health probe and the operator's
     // fault report wait with no end and no log line. A refused connection already failed fast; a
@@ -198,6 +205,11 @@ export class PostgresKyselyStorage {
    */
   bootLock(): Promise<() => Promise<void>> {
     return takeBootLock(this.pool);
+  }
+
+  /** The event-bus line between this node's processes (./bus-wire.ts). See the contract on `Storage.busWire`. */
+  busWire(): BusWire {
+    return createPgBusWire(this.pool, this.connectionString);
   }
 
   /** The handle every method uses: the transaction bound to this async context, else the pool. */

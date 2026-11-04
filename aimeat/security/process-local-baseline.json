@@ -473,6 +473,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/bus-relay.ts :: set :: running": {
+      "count": 1,
+      "reason": "The relays this process started, so its stop closes their listening connections. Each process has its own connection by design; nothing is shared through it."
+    },
     "src/services/cache-cleanup.ts :: interval :: startCacheCleanupJob": {
       "count": 1,
       "reason": "DEBT"
@@ -905,6 +909,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/event-bus.ts :: set :: transports": {
+      "count": 1,
+      "reason": "The transports this process hands its events to (services/bus-relay.ts). Each process adds its own at boot; this is what carries events to the other processes."
+    },
     "src/services/exchange-projection.ts :: map :: lastReconcile": {
       "count": 1,
       "reason": "DEBT"
@@ -1007,11 +1015,11 @@
     },
     "src/services/internet-opening/opening-registry.ts :: let :: openApps": {
       "count": 1,
-      "reason": "DEBT"
+      "reason": "A copy of the stored openings in each process, read again when another process changes one (its `internet-openings` event over services/bus-relay.ts, PostgreSQL)."
     },
     "src/services/internet-opening/opening-registry.ts :: let :: openForms": {
       "count": 1,
-      "reason": "DEBT"
+      "reason": "A copy of the stored openings in each process, read again when another process changes one (its `internet-openings` event over services/bus-relay.ts, PostgreSQL)."
     },
     "src/services/marketplace-fee.ts :: map :: operatorCache": {
       "count": 1,

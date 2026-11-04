@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-04 — busWire(): the line the event bus of a node's processes talk over (PostgreSQL only;
+ *     codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — MemoryShapeRepository: memory reads by the shape of the key or the value, filtered in
  *     SQL (codebase analysis 2026-11-03, item C7).
  *   v1.11.0 — 2026-11-04 — bootLock(): the lock two booting processes of one node take in turn
@@ -74,6 +76,7 @@ export * from './types/sso.js';
 export * from './types/held-names.js';
 
 // ── Domain Repository Interfaces ────────────────────────────────────
+import type { BusWire } from './bus-wire.js';
 import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
 import type { EcosystemAppRepository } from './repositories/ecosystem-app.repository.js';
@@ -248,4 +251,12 @@ export interface Storage extends
    * one process per database (SQLite, memory) has none, and the caller goes on without it.
    */
   bootLock?(): Promise<() => Promise<void>>;
+
+  /**
+   * The line the event bus of this node's processes talk over (./bus-wire.ts), a new one per call.
+   * PostgreSQL only: NOTIFY to send, a LISTEN connection of its own to receive. A provider with one
+   * process per database (SQLite, memory) has none, and the bus stays in its process
+   * (services/bus-relay.ts).
+   */
+  busWire?(): BusWire;
 }

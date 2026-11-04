@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The stop closes the event bus between the node's processes last (services/bus-relay.ts
+ *     stopBusRelays; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — The stop drains first (server-bootstrap/drain.ts): readiness 503, no new connection,
  *     live streams ended, requests in flight finished within 5 s, then the background work and the
  *     buffers, and exit 0; a 25 s last resort and a second signal exit 1 (codebase analysis
@@ -596,6 +598,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     if (tunnelManager) await tunnelManager.shutdown();
     if (connectTunnelManager) await connectTunnelManager.shutdown();
     if (realtimeManager) await realtimeManager.shutdown();
+    // The events of the stop went to the other processes; then the listening connection closes.
+    const { stopBusRelays } = await import('./services/bus-relay.js');
+    await stopBusRelays();
     logger.info('Server closed');
     process.exit(0);
   };

@@ -31,9 +31,11 @@
  * @usage installDataproductChangeRuns({ storage, config }, (ownerGhii, name) => runDataproductOnChange(storage, config, ownerGhii, name));
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial (WP9c, plan doc-mvwxcas3dom3 D9.5).
+ *   v1.1.0 — 2026-11-04 — A change another process made runs nothing here (event-bus.ts origin rule;
+ *     codebase analysis 2026-11-03, HA stage 2, e2-bus).
  */
 import type { SourceDeps } from './source-common.js';
-import { onMemoryWrittenEvent, onChangeEvent, WORKSPACE_DOMAIN_PREFIX, type ChangeEvent, type MemoryWriteEvent } from '../event-bus.js';
+import { onMemoryWrittenEvent, onChangeEvent, isRemoteEvent, WORKSPACE_DOMAIN_PREFIX, type ChangeEvent, type MemoryWriteEvent } from '../event-bus.js';
 import { addStorageFileListener } from '../storage-file-hooks.js';
 import { latestKey } from '../datapackage/contract.js';
 import { ownerGhiiOf, runAsNode } from '../../utils/gaii.js';
@@ -148,15 +150,16 @@ function markWhere(state: NodeState, hit: (t: ChangeTrigger) => boolean): void {
     for (const [id, w] of state.watches) if (w.triggers.some(hit)) markDirty(state, id);
 }
 
+// A change another process made runs its products in that process, once (event-bus.ts, the origin rule).
 function onMemoryWritten(state: NodeState, evt: MemoryWriteEvent): void {
-    if (!state.watches.size || evt.key.startsWith(DATAPRODUCT_KEY_PREFIX)) return;
+    if (isRemoteEvent(evt) || !state.watches.size || evt.key.startsWith(DATAPRODUCT_KEY_PREFIX)) return;
     const owner = ownerGhiiOf(evt.ownerGaii);
     markWhere(state, t => (t.on === 'key' && t.ownerGhii === owner && t.key === evt.key)
         || (t.on === 'prefix' && t.ownerGhii === owner && evt.key.startsWith(t.prefix)));
 }
 
 function onChange(state: NodeState, evt: ChangeEvent): void {
-    if (!state.watches.size || !evt.domain.startsWith(WORKSPACE_DOMAIN_PREFIX)) return;
+    if (isRemoteEvent(evt) || !state.watches.size || !evt.domain.startsWith(WORKSPACE_DOMAIN_PREFIX)) return;
     const [organismId, ws] = evt.domain.slice(WORKSPACE_DOMAIN_PREFIX.length).split('/');
     markWhere(state, t => t.on === 'workspace' && t.organismId === organismId && t.ws === ws);
 }

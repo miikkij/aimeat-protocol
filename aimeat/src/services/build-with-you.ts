@@ -33,6 +33,9 @@
  *   startBuildWithYou · stopBuildWithYou
  * @usage res.json(success(nodeId, await submitOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.2.2 — 2026-11-04 — A setting changed on another process of the node is told to the card's
+ *     domain by that process only, so a stream hears it once (event-bus.ts origin rule; codebase
+ *     analysis 2026-11-03, HA stage 2, e2-bus).
  *   v1.2.1 — 2026-11-02 — The queue's `inviteAccount` is kept and shown beside `inviteEmail`, so the
  *     card can say the invitation waits in the aimeat.io account rather than in an inbox
  *     (commercial's crew56 chain test).
@@ -54,7 +57,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { CallerContext } from './caller-context.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
-import { emitChange, onChangeEvent, offChangeEvent } from './event-bus.js';
+import { emitChange, onChangeEvent, offChangeEvent, isRemoteEvent, type ChangeEvent } from './event-bus.js';
 import { onUsageRecorded } from './usage/usage-buffer.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readJson } from '../utils/read-capped.js';
@@ -467,7 +470,8 @@ export function startBuildWithYou(storage: Storage, config: AimeatConfig): void 
   });
   // A changed setting may be the build code or the queue, which the card reads: tell it in its own
   // domain, so a page listens to one.
-  const onConfig = (evt: { domain: string }) => { if (evt.domain === 'config') emitChange(BUILD_DOMAIN); };
+  // A setting another process changed is told by that process, whose own event reaches every stream.
+  const onConfig = (evt: ChangeEvent) => { if (evt.domain === 'config' && !isRemoteEvent(evt)) emitChange(BUILD_DOMAIN); };
   onChangeEvent(onConfig);
   stopConfig = () => offChangeEvent(onConfig);
   sweepTimer = setInterval(() => {
