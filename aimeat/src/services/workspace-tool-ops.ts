@@ -30,6 +30,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-11-04 — readWorkspaceOp's batch-open reads the workspace's rows without values and the values
+ *     of the records it opens only, and their provenance only; both modes answer `truncated: true` when
+ *     the workspace holds more rows than one read loads (codebase analysis 2026-11-03, item C7).
  *   2026-10-31 — readWorkspaceOp reads each record's role from the end of its key (recordAt), skips a
  *     key of a longer namespace and makes no empty slot, so one record id with a dot no longer makes
  *     the index answer 500 to every member (secaudit2026oct31w2 round 10, f-2026-10-23-dotted-id-breaks-index).
@@ -226,9 +229,12 @@ export async function readWorkspaceOp(
     // The one loader (services/workspace-content.ts): it loads, decides the read with
     // decideWorkspaceRead, and passes the classification reader. The manifest decision is made with
     // the owner GHII, as this operation always has, so a grant naming the owner works for their agent.
+    // A batch-open loads the rows without their values and reads the values of the records it opens
+    // (got.hydrate); the index shows a title and a size per record, which come from every value.
+    const opening = !!(ids && ids.length);
     const got = await loadWorkspaceContent(deps, args.reader,
         { sub: caller.principal, ownerName: caller.ownerName, accessorGaii: caller.ownerGhii },
-        { organismId, ws, archived: args.includeArchived ? 'include' : undefined });
+        { organismId, ws, archived: args.includeArchived ? 'include' : undefined, valuesOnDemand: opening });
     if (!got.ok) return refuse(got.status, got.code, got.message);
     const { items } = got;
     // The meta records are the copies that count (services/workspace-meta.ts), for the gate and the answer.
@@ -263,36 +269,43 @@ export async function readWorkspaceOp(
     }
     const byteLen = (v: unknown): number => (typeof v === 'string' ? v.length : JSON.stringify(v ?? null).length);
 
-    if (ids && ids.length) {
+    if (opening) {
         const scoped = space ? [...spaces.values()].filter(s => s.ot.name === space || s.ot.namespace === space) : [...spaces.values()];
-        const found: unknown[] = [];
-        const missing: string[] = [];
-        const provFor = await readProvenanceMany(storage, config, items.map(r => r.aiProvenanceId));
-        for (const asked of new Set(ids.map(String))) {
+        // Which slot each asked id names, in the order asked; then the values of those slots only.
+        const asks: Array<{ asked: string; hit?: { name: string; id: string; slot: Slot } }> = [];
+        for (const asked of new Set(ids!.map(String))) {
             // aimeat_discover names a workspace record by its FULL memory key, and an agent hands
             // that on as it got it. Inside THIS workspace the key says which space and which
             // instance; a key from anywhere else matches no prefix here and stays missing.
             const named = instanceFromKey(root, scoped.map(s => s.ot.namespace as string), asked);
             const id = named?.instance ?? asked;
-            let hit = false;
-            for (const s of named ? scoped.filter(x => x.ot.namespace === named.namespace) : scoped) {
-                const slot = s.inst.get(id);
-                const cur = slot?.latest ?? slot?.draft;
-                if (!slot || !cur) continue;
-                found.push({
-                    space: s.ot.name, id, value: cur.value,
-                    published: !!slot.latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,
-                    // The draft's own version is what a compare-and-swap write needs to name.
-                    ...(slot.draft ? { draft: slot.draft.value, _draftVersion: slot.draft.version } : {}),
-                    ...provFor(cur.aiProvenanceId),
-                    // TARGET-082: an AI shown a warning-classified record is told so, per item.
-                    ...warningFieldSnake(cur),
-                });
-                hit = true; break;
-            }
-            if (!hit) missing.push(asked);
+            const s = (named ? scoped.filter(x => x.ot.namespace === named.namespace) : scoped)
+                .find(x => { const slot = x.inst.get(id); return !!(slot && (slot.latest ?? slot.draft)); });
+            asks.push({ asked, ...(s ? { hit: { name: s.ot.name, id, slot: s.inst.get(id)! } } : {}) });
+        }
+        const opened = await got.hydrate(asks.flatMap(a => (a.hit ? [a.hit.slot.latest, a.hit.slot.draft].filter((r): r is MemoryRecord => !!r) : [])));
+        const whole = new Map(opened.map(r => [`${r.ownerGaii}\u0000${r.key}`, r]));
+        const wholeOf = (r: MemoryRecord | undefined) => (r ? whole.get(`${r.ownerGaii}\u0000${r.key}`) : undefined);
+        const provFor = await readProvenanceMany(storage, config, opened.map(r => r.aiProvenanceId));
+        const found: unknown[] = [];
+        const missing: string[] = [];
+        for (const { asked, hit } of asks) {
+            const latest = wholeOf(hit?.slot.latest);
+            const draft = wholeOf(hit?.slot.draft);
+            const cur = latest ?? draft;
+            if (!hit || !cur) { missing.push(asked); continue; }
+            found.push({
+                space: hit.name, id: hit.id, value: cur.value,
+                published: !!latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,
+                // The draft's own version is what a compare-and-swap write needs to name.
+                ...(draft ? { draft: draft.value, _draftVersion: draft.version } : {}),
+                ...provFor(cur.aiProvenanceId),
+                // TARGET-082: an AI shown a warning-classified record is told so, per item.
+                ...warningFieldSnake(cur),
+            });
         }
         return { ok: true, data: { organism_id: organismId, ws, mode: 'content', items: found, ...(missing.length ? { missing } : {}),
+            ...(got.truncated ? { truncated: true } : {}),
             ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}) } };
     }
 
@@ -327,6 +340,8 @@ export async function readWorkspaceOp(
     const schemas = await readWorkspaceSchemas(storage, organismId, ws);
 
     return { ok: true, data: { organism_id: organismId, ws, mode: 'index', manifest, apps, rules, counts, index,
+        // More rows than one read loads: the index is not the whole workspace (services/workspace-content.ts).
+        ...(got.truncated ? { truncated: true } : {}),
         // Every warning-classified record this read showed, the manifest and meta records included.
         ...(args.reader.warnings.length ? { classification_warnings: args.reader.warnings } : {}),
         ...(Object.keys(sections).length ? { sections } : {}),
