@@ -10,7 +10,7 @@
  *   spend and nothing else. The address never crosses into the app, and the app never learns who
  *   else is in there.
  *
- *   Shape and lifetime follow routes/extensions/internal-pass.ts, which is this project's existing
+ *   Shape and lifetime follow services/extension-access/internal-pass.ts, which is this project's existing
  *   answer to the same question: a random token held in this process's memory, minted only by the
  *   node, never derived from caller input, expiring on its own. Two deliberate differences. It
  *   lasts MINUTES rather than seconds, because a person is choosing rather than a loopback call

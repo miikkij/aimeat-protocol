@@ -220,7 +220,7 @@ export async function buyForExtension(args: {
   // registry, and the only thing that supplied it is the seller's own public memory record — so a
   // seller could write down somebody else's capability and have this call invoke it, on the buyer's
   // account, with the seller collecting. A capability reference resolves inside its owner's
-  // namespace, here as everywhere else (see routes/extensions/priced-binding.ts), so the one thing
+  // namespace, here as everywhere else (see services/extension-access/priced-binding.ts), so the one thing
   // that makes a binding real is that the seller owns what they are selling.
   //
   // Resolved BEFORE the settle, deliberately. Money that has to be given back is a worse answer
@@ -284,7 +284,7 @@ export async function buyForExtension(args: {
 
   try {
     const { invokeCapability } = await import('./capability-invoke.js');
-    const { mintInternalPass } = await import('../routes/extensions/internal-pass.js');
+    const { mintInternalPass } = await import('./extension-access/internal-pass.js');
     const lockedInput = applyLockedInput(toolDef, input);
     // Already settled on the product's own coordinate: the seller's paywall must not charge it again.
     const pass = mintInternalPass(coordExt, tool);

@@ -324,7 +324,7 @@ export function appToolSellableResolver(): SellableResolver {
           // H-17; this path checked nothing until secaudit 2026-10).
           const misbound = appToolBindingRefusal(cap, sellerOwner, appRef, toolName);
           if (misbound) throw new CommerceError(misbound.code, misbound.statusCode, misbound.message);
-          const { mintInternalPass } = await import('../routes/extensions/internal-pass.js');
+          const { mintInternalPass } = await import('../services/extension-access/internal-pass.js');
           // The checkout is the payment: this session collected the tool's declared price before
           // fulfillment ran. The capability then runs over the node's own HTTP surface and meets the
           // raw paywall, which sees only the backing action — so without this it charges the buyer a

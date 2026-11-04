@@ -1,5 +1,5 @@
 /**
- * @file src/routes/extensions/paywall.ts
+ * @file src/services/extension-access/paywall.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Per-call paywall for raw extension invokes (design: dev-organism notes doc-r6tyr3o,
@@ -15,6 +15,8 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   2026-11-04 — Moved unchanged from routes/extensions/ with the five modules it reads, so the MCP
+ *     tool and the services take the paywall from a service (codebase analysis 2026-11-03, item D-f).
  *   2026-10-31 — Step 3.5 runs before the uncontracted pacing at 3.1: a bad product name
  *     (INVALID_APP_TOOL, APP_TOOL_MISMATCH) and the 402 for an action a money-priced app-tool sells are
  *     answered with nothing charged, and a call settled on the caller's app-tool contract is paced once,
@@ -81,24 +83,24 @@ import type { Storage } from '../../storage/interface.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
-import { checkExtPayToken, consumeExtPayToken, accrueTokenShare } from '../../services/ext-pay-token.js';
+import { checkExtPayToken, consumeExtPayToken, accrueTokenShare } from '../ext-pay-token.js';
 import type { DynamicDesignation } from '../../commerce/beneficiary-split.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
-import { getCarryPlan } from '../../services/app-members.js';
+import { getCarryPlan } from '../app-members.js';
 import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
-import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
-import type { BeneficiaryAccrual } from '../../services/metered-settlement.js';
+import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../metered-entitlements.js';
+import type { BeneficiaryAccrual } from '../metered-settlement.js';
 import { consumeInternalPass, type InternalPass } from './internal-pass.js';
 import { AppToolsDocSchema, appToolsKey } from '../../models/app-tool-schemas.js';
-import { listInterfaceVersions } from '../../services/app-tool-interfaces.js';
-import { appSpendRefusal } from '../../services/metered-access.js';
+import { listInterfaceVersions } from '../app-tool-interfaces.js';
+import { appSpendRefusal } from '../metered-access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, refusePacingShortfall, resolvePacingToll } from './pacing.js';
-import { resolveGatedApp } from './permissions.js';
-import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../../services/members-only.js';
+import { resolveGatedApp } from '../members-only.js';
+import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../members-only.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
-import { findBackingCapability } from '../../services/component-address.js';
+import { findBackingCapability } from '../component-address.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
 

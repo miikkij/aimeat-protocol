@@ -17,7 +17,7 @@ import type { MeteredOutcome } from '../../src/services/metered-access.js';
 import { registerExchangeRunTools } from '../../src/mcp/exchange-run.js';
 import { authoriseMeteredCall } from '../../src/services/metered-access.js';
 import { invokeCapability, appToolBindingRefusal } from '../../src/services/capability-invoke.js';
-import { consumeInternalPass } from '../../src/routes/extensions/internal-pass.js';
+import { consumeInternalPass } from '../../src/services/extension-access/internal-pass.js';
 import { membersOnlyRefusalForCapability } from '../../src/services/members-only.js';
 import { getInterfaceVersion } from '../../src/services/app-tool-interfaces.js';
 

@@ -205,7 +205,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/routes/extensions/internal-pass.ts :: map :: passes": {
+    "src/services/extension-access/internal-pass.ts :: map :: passes": {
       "count": 1,
       "reason": "DEBT"
     },

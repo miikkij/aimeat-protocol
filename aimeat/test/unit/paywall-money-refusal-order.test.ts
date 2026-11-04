@@ -2,7 +2,7 @@
  * @file test/unit/paywall-money-refusal-order.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The raw-invoke paywall (routes/extensions/paywall.ts) refuses a money-priced action's
+ * @description The raw-invoke paywall (services/extension-access/paywall.ts) refuses a money-priced action's
  *   call that brings no usable pay token, or comes from an app without the spend permission, before
  *   it charges the pacing. It charged the pacing first and credited the provider, then refused and
  *   reversed the charge, and a reversal gives back only what the provider still holds
@@ -18,9 +18,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { enforcePaywall } from '../../src/routes/extensions/paywall.js';
+import { enforcePaywall } from '../../src/services/extension-access/paywall.js';
 import { mintExtPayToken } from '../../src/services/ext-pay-token.js';
-import { createRefusalRecorder } from '../../src/routes/extensions/metered-response.js';
+import { createRefusalRecorder } from '../../src/services/extension-access/metered-response.js';
 
 const NODE = 'paywall-node';
 const CALLER = `bob@${NODE}`;

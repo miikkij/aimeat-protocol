@@ -1,5 +1,5 @@
 /**
- * @file src/routes/extensions/priced-binding.ts
+ * @file src/services/extension-access/priced-binding.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Is this raw extension action the thing a PRICED app-tool actually sells? If it is,
@@ -30,6 +30,8 @@
  * @structure pricedAppToolsFor(storage, ownerGhii, extName, actionId) → PricedBinding[]
  * @usage const sold = await pricedAppToolsFor(storage, `${owner}@${config.nodeId}`, ext.name, action.id);
  * @version-history
+ *   v1.1.1 — 2026-11-04 — Moved unchanged from routes/extensions/ with the paywall (codebase analysis
+ *     2026-11-03, item D-f).
  *   v1.1.0 — 2026-10-25 — A tool the owner bound to their own namespaced extension by its short name
  *     (`ext:weather:run` for `alice/weather`) sells that action too, so the raw route charges as the
  *     tool does (owner namespaces wish, secaudit2026oct22).
@@ -44,9 +46,9 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { AppToolsDocSchema, isToolOffered, isToolPriced, toolTollMorsels } from '../../models/app-tool-schemas.js';
-import { cached, TTL } from '../../services/cache.js';
+import { cached, TTL } from '../cache.js';
 import { logger } from '../../utils/logger.js';
-import { shortNameOf } from '../../services/component-address.js';
+import { shortNameOf } from '../component-address.js';
 
 /** The app-tool an extension action is sold as. */
 export interface PricedBinding {

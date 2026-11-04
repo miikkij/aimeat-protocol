@@ -361,7 +361,7 @@ export function toolPacing(config: AimeatConfig, tool: AppTool): number {
  * True when the extension action behind a capability (`ext:{name}:{action}`) has its own money price.
  * Once a free tool's pacing is charged, the raw paywall stands down on a `settled` pass so the action
  * is not paced a second time for the same use; an action that sells for money keeps the `unpriced`
- * pass, which still leaves its own price owed (routes/extensions/paywall.ts).
+ * pass, which still leaves its own price owed (services/extension-access/paywall.ts).
  */
 async function actionSellsForMoney(storage: Storage, capRef: string | undefined): Promise<boolean> {
   const m = /^ext:([^:]+):(.+)$/.exec(capRef ?? '');

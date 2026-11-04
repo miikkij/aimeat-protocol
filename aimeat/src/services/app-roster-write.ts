@@ -81,7 +81,7 @@ export async function setCarryPlan(
         + 'carrying an offering gives away free access to it. Add it from the owner\'s own session, or an agent of theirs holding commerce:sell.');
     }
     // Who pays and who manages are the owner's to change. `access: "free"` makes every call of the
-    // owner's paid service free before any settlement (extensions/paywall.ts), which is more than an
+    // owner's paid service free before any settlement (extension-access/paywall.ts), which is more than an
     // added offering gives away; manageRoles hands out the roster (secaudit 2026-10, APP-1).
     const changed = [
       b.access !== undefined && normalizeAccess(String(b.access)) !== (c.plan?.access ?? 'members-free') ? 'access' : null,

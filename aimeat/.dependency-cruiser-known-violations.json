@@ -57,76 +57,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/mcp/exchange-run.ts",
-    "to": "src/routes/extensions/internal-pass.ts",
-    "unresolvedTo": "../routes/extensions/internal-pass.js",
-    "dependencyTypes": [
-      "local",
-      "dynamic-import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/mcp/exchange-run.ts",
-    "to": "src/routes/extensions/metered-response.ts",
-    "unresolvedTo": "../routes/extensions/metered-response.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/mcp/extensions.ts",
-    "to": "src/routes/extensions/metered-response.ts",
-    "unresolvedTo": "../routes/extensions/metered-response.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/mcp/extensions.ts",
-    "to": "src/routes/extensions/paywall.ts",
-    "unresolvedTo": "../routes/extensions/paywall.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/mcp/extensions.ts",
-    "to": "src/routes/extensions/permissions.ts",
-    "unresolvedTo": "../routes/extensions/permissions.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/mcp/portfolio.ts",
     "to": "src/routes/portfolio.ts",
     "unresolvedTo": "../routes/portfolio.js",
@@ -664,20 +594,6 @@
   },
   {
     "type": "dependency",
-    "from": "src/services/capability-invoke.ts",
-    "to": "src/routes/extensions/internal-pass.ts",
-    "unresolvedTo": "../routes/extensions/internal-pass.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
     "from": "src/services/cortex-lifecycle.ts",
     "to": "src/routes/cortex/activation.ts",
     "unresolvedTo": "../routes/cortex/activation.js",
@@ -726,20 +642,6 @@
     "dependencyTypes": [
       "local",
       "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/extension-purchase.ts",
-    "to": "src/routes/extensions/internal-pass.ts",
-    "unresolvedTo": "../routes/extensions/internal-pass.js",
-    "dependencyTypes": [
-      "local",
-      "dynamic-import"
     ],
     "rule": {
       "severity": "error",
@@ -1623,38 +1525,6 @@
       },
       {
         "name": "src/data/library-packs/vendored-motion.ts",
-        "dependencyTypes": [
-          "local",
-          "import"
-        ]
-      }
-    ]
-  },
-  {
-    "type": "cycle",
-    "from": "src/routes/extensions/entitlement-gate.ts",
-    "to": "src/routes/extensions/paywall.ts",
-    "unresolvedTo": "./paywall.js",
-    "dependencyTypes": [
-      "local",
-      "type-only",
-      "import"
-    ],
-    "rule": {
-      "severity": "warn",
-      "name": "no-circular-type-only"
-    },
-    "cycle": [
-      {
-        "name": "src/routes/extensions/paywall.ts",
-        "dependencyTypes": [
-          "local",
-          "type-only",
-          "import"
-        ]
-      },
-      {
-        "name": "src/routes/extensions/entitlement-gate.ts",
         "dependencyTypes": [
           "local",
           "import"

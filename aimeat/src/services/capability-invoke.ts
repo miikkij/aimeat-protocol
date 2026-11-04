@@ -70,7 +70,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
-import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
+import { INTERNAL_PASS_HEADER } from './extension-access/internal-pass.js';
 import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../auth/loopback-pass.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../utils/gaii.js';
@@ -205,7 +205,7 @@ export async function invokeCapability(
   mode: 'normal' | 'raw' = 'normal',
   /**
    * One-shot proof that a route which knows the purchased product already settled this call.
-   * Minted in-process, single use, seconds long — see `routes/extensions/internal-pass.ts`.
+   * Minted in-process, single use, seconds long — see `services/extension-access/internal-pass.ts`.
    */
   internalPass?: string,
   /**

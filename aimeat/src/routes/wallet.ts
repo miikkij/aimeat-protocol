@@ -48,7 +48,7 @@ import { emitChange } from '../services/event-bus.js';
 import { cached, TTL } from '../services/cache.js';
 import { createWalletTabService } from '../services/db/wallet-tab-db-service.js';
 import { lifetimeOf } from '../services/wallet-stats.js';
-import { resolvePacingToll } from './extensions/pacing.js';
+import { resolvePacingToll } from '../services/extension-access/pacing.js';
 import { pacingPackOffer } from '../commerce/pacing-pack.js';
 
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
@@ -113,7 +113,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
         accumulation_cap: config.dailyAllowanceCap,
       },
       // The node-wide pacing floor, resolved the way a metered call resolves it when the capability
-      // declares no toll (routes/extensions/pacing.ts). 0 is off and is the shipped default; a
+      // declares no toll (services/extension-access/pacing.ts). 0 is off and is the shipped default; a
       // capability may still declare its own toll, which this does not describe.
       pacing: {
         enabled: defaultToll > 0,

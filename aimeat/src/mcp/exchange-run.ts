@@ -106,7 +106,7 @@ import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-a
 import type { MeteredEntitlement } from '../services/metered-entitlements.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../services/call-timing.js';
-import { meteredRefusalText } from '../routes/extensions/metered-response.js';
+import { meteredRefusalText } from '../services/extension-access/metered-response.js';
 import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput, isToolPriced } from '../models/app-tool-schemas.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
@@ -292,7 +292,7 @@ export function registerExchangeRunTools(
             // Settled → invoke; refund on throw (never leave a phantom charge).
             try {
                 const { invokeCapability } = await import('../services/capability-invoke.js');
-                const { mintInternalPass } = await import('../routes/extensions/internal-pass.js');
+                const { mintInternalPass } = await import('../services/extension-access/internal-pass.js');
                 // Settled above on this app-tool's coordinate. The capability then runs over the node's
                 // own HTTP surface and meets the raw paywall, which cannot know which product was bought —
                 // so it billed the same contract a second time. One call, one settlement, whichever twin

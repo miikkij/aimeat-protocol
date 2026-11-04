@@ -1,5 +1,5 @@
 /**
- * @file src/routes/extensions/internal-pass.ts
+ * @file src/services/extension-access/internal-pass.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description A one-shot, in-process pass saying "this call was already settled upstream, do not
@@ -36,6 +36,8 @@
  *   headers[INTERNAL_PASS_HEADER] = pass;                            // on the loopback invoke
  *   const upstream = consumeInternalPass(req.header(INTERNAL_PASS_HEADER));  // paywall
  * @version-history
+ *   v1.2.1 — 2026-11-04 — Moved unchanged from routes/extensions/ with the paywall (codebase analysis
+ *     2026-11-03, item D-f).
  *   v1.2.0 — 2026-08-11 — Document what the coordinate is for (August 2026 audit H-17). The two
  *     fields had been carried since v1.0.0 and read by nobody, so a pass minted for one product
  *     stood the paywall down on any other. The check itself lives in paywall.ts, which is the only

@@ -324,17 +324,17 @@
       "digest": "sha256:622dba3980dc13c20bec75c6"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
         "aimeat/src/services/extension-manifest.ts",
-        "aimeat/src/routes/extensions/paywall.ts",
+        "aimeat/src/services/extension-access/paywall.ts",
         "aimeat/src/routes/extensions/crud.ts",
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:1540298cdf0a2e41b5d51471"
+      "digest": "sha256:88416f9f5363f6029bcd8b64"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-11-04",
@@ -371,7 +371,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:67a5b1f617782b9a44b48eed"
+      "digest": "sha256:e3be35a1bda9236c5e170cae"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-04",
@@ -761,9 +761,9 @@
       "aimeat/src/services/build-extension-prompt.ts": "fdcfd38cd4fc64f5",
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/extension-manifest.ts": "fd3d70de8b81e457",
-      "aimeat/src/routes/extensions/paywall.ts": "e464e27b4cbca9aa",
+      "aimeat/src/services/extension-access/paywall.ts": "ae42068a8b036d98",
       "aimeat/src/routes/extensions/crud.ts": "723ee89afa7b5c7f",
-      "aimeat/src/routes/extensions/instances.ts": "d7ace6eb026fee79",
+      "aimeat/src/routes/extensions/instances.ts": "72b9b56f92022abe",
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
@@ -797,7 +797,7 @@
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "f3ec18941ecc650d",
-      "aimeat/src/commerce/app-tool-catalog.ts": "310924ae6dd5e120",
+      "aimeat/src/commerce/app-tool-catalog.ts": "c2ddc40235643464",
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",

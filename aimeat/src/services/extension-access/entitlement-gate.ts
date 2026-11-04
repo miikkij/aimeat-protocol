@@ -1,5 +1,5 @@
 /**
- * @file src/routes/extensions/entitlement-gate.ts
+ * @file src/services/extension-access/entitlement-gate.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The HTTP adapter over the metered chokepoint — thin on purpose.
@@ -15,6 +15,8 @@
  *   directly rather than fabricate a `Response` to reach it, which is what the previous shape forced.
  * @structure settleMeteredCoordinate (express adapter) · settleViaEntitlement (ext wrapper)
  * @version-history
+ *   v2.1.1 — 2026-11-04 — Moved unchanged from routes/extensions/ with the paywall (codebase analysis
+ *     2026-11-03, item D-f).
  *   v2.1.0 — 2026-08-10 — res widened to PaywallResponder (Express Response still satisfies it).
  *   v2.0.0 — 2026-07-28 — Reduced to an adapter: the sequence lives in services/metered-access.ts, so
  *     the owner-free rule now applies on every door instead of three of them.
@@ -29,7 +31,7 @@
 import type { PaywallResponder } from './metered-response.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ExtensionRecord } from '../../storage/interface.js';
-import { authoriseMeteredCall } from '../../services/metered-access.js';
+import { authoriseMeteredCall } from '../metered-access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import type { PaywallOutcome } from './paywall.js';
 
