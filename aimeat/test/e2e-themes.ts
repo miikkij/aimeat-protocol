@@ -6,12 +6,14 @@
  *   as a warning and still saved, CSS that does not parse refused with its line, contrast as a
  *   warning, the built-in theme read only, an ordinary owner refused, versions and restore, what the
  *   page shell carries before its first paint, the component catalogue naming the theme, and a
- *   person's own choice.
+ *   person's own choice, and the shipped optional theme Tiilitaivas.
  *
  *   The ones that matter most: the operator's CSS is refused ONLY when it does not parse (Jouni,
  *   Q2: "mahdollisimman muokattavaksi"), and nobody but the operator writes a theme.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=themes
  * @version-history
+ *   v1.3.0 — 2026-11-04 — Tiilitaivas: offered beside AIMEAT with the default unchanged, read only and
+ *     copyable, its sheet and faces served by the node, a person's choice kept, the operator's list wins.
  *   v1.2.0 — 2026-10-02 — An AI's JSON answer applied as the "Ask your AI" paste does, and its
  *     failure path (a colour that does not parse).
  *   v1.1.0 — 2026-09-24 — Who chooses (PUT /v1/themes/policy), and one name, one theme (NAME_TAKEN).
@@ -336,6 +338,79 @@ await test('People do not choose → FIXED; leave the node on its defaults', asy
     await json('/v1/admin/config', op(put({ changes: [{ path: 'themes.personal_choice', value: true }, { path: 'themes.offered', value: '' }] })));
     const r = await json(`/v1/themes/${themeId}`, op(put({ retired: true })));
     assert(r.body.data.theme.retired === true, 'retired');
+});
+
+console.log('\nThe shipped theme Tiilitaivas');
+
+await test('On a node with no list of its own, Tiilitaivas can be chosen and AIMEAT stays the default', async () => {
+    const { status, body } = await json('/v1/themes');
+    assert(status === 200, `status ${status}`);
+    assert(body.data.policy.default === 'aimeat', `default ${body.data.policy.default}`);
+    assert(body.data.policy.offered.join(',') === 'aimeat,tiilitaivas', `offered ${body.data.policy.offered}`);
+    const t = body.data.themes.find((x: any) => x.id === 'tiilitaivas');
+    assert(!!t && t.name === 'Tiilitaivas' && t.builtin === true, JSON.stringify(t));
+    assert(t.sheet?.startsWith('/v1/themes/tiilitaivas/theme.css?v='), `sheet ${t.sheet}`);
+    assert(t.styles.length === 1 && t.styles[0].onlyMode === null, 'one style, light and dark');
+    assert(t.styles[0].swatch.light.bg === '#eaf8f6' && t.styles[0].swatch.dark.bg === '#1b1726', JSON.stringify(t.styles[0].swatch));
+});
+
+await test('The page shell lets a first visitor keep AIMEAT and carries Tiilitaivas for the pill', async () => {
+    const shell = await fetch(`${BASE}/v1/home`).then((r) => r.text());
+    assert(shell.includes('"id":"tiilitaivas"'), 'the snapshot names the theme');
+    assert(shell.includes('"default":"aimeat"'), 'the default stays AIMEAT');
+});
+
+await test('Its stylesheet is served from the node: light and dark values, its shapes, no outside address', async () => {
+    const res = await fetch(`${BASE}/v1/themes/tiilitaivas/theme.css`);
+    assert(res.status === 200 && (res.headers.get('content-type') ?? '').includes('text/css'), `${res.status} ${res.headers.get('content-type')}`);
+    const css = await res.text();
+    for (const expected of ['--bg: #EAF8F6;', '--bg: #1B1726;', '--font-headline: \'Pixelify Sans\'', '--font-body: \'Baloo 2\'', '--shape-shadow-action: 4px 4px 0 0 var(--shadow);']) {
+        assert(css.includes(expected), `missing ${expected}`);
+    }
+    assert(!/url\(|@import|https?:/i.test(css), 'no outside address');
+});
+
+await test('Its fonts come from this node, licensed in the trail', async () => {
+    const sheet = await fetch(`${BASE}/lib/aimeat-fonts.css`).then((r) => r.text());
+    assert(sheet.includes("font-family: 'Pixelify Sans'"), 'the faces sheet declares Pixelify Sans');
+    const font = await fetch(`${BASE}/lib/fonts/pixelify-sans-var-latin.woff2`);
+    assert(font.status === 200, `font ${font.status}`);
+    const fonts = (await json('/v1/themes/all', op())).body.data.fonts.base.find((f: any) => f.family === 'Pixelify Sans');
+    assert(fonts?.licence === 'OFL-1.1' && fonts?.licenceStatus === 'stated', JSON.stringify(fonts));
+});
+
+await test('It is read only and its name is taken → 409; a copy holds its values under new ids', async () => {
+    const edit = await json('/v1/themes/tiilitaivas', op(put({ name: 'Mine' })));
+    assert(edit.status === 409 && edit.body.error?.code === 'READ_ONLY', `edit ${edit.status} ${edit.body.error?.code}`);
+    const taken = await json('/v1/themes', op(post({ name: 'tiilitaivas' })));
+    assert(taken.status === 409 && taken.body.error?.code === 'NAME_TAKEN', `name ${taken.status} ${taken.body.error?.code}`);
+    const copy = await json('/v1/themes', op(post({ name: 'Oma tiili', basedOn: 'tiilitaivas' })));
+    assert(copy.status === 201, `copy ${copy.status}: ${JSON.stringify(copy.body.error)}`);
+    const t = copy.body.data.theme;
+    assert(t.builtin === false && t.basedOn === 'tiilitaivas', 'the copy is the operator\'s own');
+    assert(t.styles.length === 1 && t.styles[0].id !== 'tiilitaivas' && t.styles[0].light['--bg'] === '#EAF8F6', JSON.stringify(t.styles[0].id));
+    assert(t.shapes['--shape-corner'] === '14px' && (t.css ?? '').includes('--primaryHover'), 'shapes and theme CSS copied');
+    const own = await json(`/v1/themes/${t.id}`, op(put({ retired: true })));
+    assert(own.status === 200, `retire the copy ${own.status}`);
+});
+
+await test('A person chooses it and the choice is kept on their account', async () => {
+    const ok = await json('/v1/themes/choice', member(put({ theme: 'tiilitaivas' })));
+    assert(ok.status === 200 && ok.body.data.style === 'tiilitaivas', `choice ${ok.status}: ${JSON.stringify(ok.body)}`);
+    const read = await json('/v1/themes/choice', member());
+    assert(read.body.data.theme === 'tiilitaivas' && read.body.data.style === 'tiilitaivas', JSON.stringify(read.body.data));
+});
+
+await test('The operator takes it off the list: only AIMEAT is saved as written, the choice → 422, and it comes back', async () => {
+    const only = await json('/v1/themes/policy', op(put({ offered: ['aimeat'], default: 'aimeat' })));
+    assert(only.status === 200, `policy ${only.status}: ${JSON.stringify(only.body.error)}`);
+    const after = await json('/v1/themes');
+    assert(after.body.data.policy.offered.join(',') === 'aimeat', `offered ${after.body.data.policy.offered}`);
+    assert(!after.body.data.themes.some((x: any) => x.id === 'tiilitaivas'), 'not offered any more');
+    const refused = await json('/v1/themes/choice', member(put({ theme: 'tiilitaivas' })));
+    assert(refused.status === 422 && refused.body.error?.code === 'NOT_OFFERED', `choice ${refused.status} ${refused.body.error?.code}`);
+    const back = await json('/v1/themes/policy', op(put({ offered: ['aimeat', 'tiilitaivas'], default: 'aimeat' })));
+    assert(back.status === 200 && back.body.data.policy.offered.join(',') === 'aimeat,tiilitaivas', JSON.stringify(back.body.data?.policy));
 });
 
 // ─── Summary ───

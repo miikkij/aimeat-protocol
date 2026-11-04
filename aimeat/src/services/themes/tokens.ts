@@ -19,6 +19,7 @@
  * @structure ThemeTokenKind · THEME_TOKENS · CORE_TOKENS · THEME_FACES · FACE_SLOTS · faceStack
  * @usage import { THEME_TOKENS, THEME_FACES } from './tokens.js';
  * @version-history
+ *   v1.7.0 — 2026-11-04 — Pixelify Sans, Baloo 2 and Nunito, for the Tiilitaivas theme (aimeat-fonts.css v1.7.0).
  *   v1.6.0 — 2026-10-22 — Michroma, vendored for the TDR look (aimeat-fonts.css v1.6.0).
  *   v1.5.0 — 2026-10-17 — Newsreader, vendored for the kirjapaino look (aimeat-fonts.css v1.5.0).
  *   v1.4.0 — 2026-10-09 — IBM Plex Sans and IBM Plex Mono, vendored for the SOC console (aimeat-fonts.css v1.4.0).
@@ -124,6 +125,10 @@ export const THEME_FACES: Readonly<Record<string, string>> = {
     'Newsreader': "'Newsreader', Georgia, 'Times New Roman', serif",
     // Vendored on 2026-10-22 for the TDR look (the machine-room family of apps).
     'Michroma': "'Michroma', 'IBM Plex Mono', 'JetBrains Mono', monospace",
+    // Vendored on 2026-11-04 for the Tiilitaivas theme. Pixelify Sans is for headings of 20 px and larger.
+    'Pixelify Sans': "'Pixelify Sans', 'Baloo 2', system-ui, sans-serif",
+    'Baloo 2': "'Baloo 2', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    'Nunito': "'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
 };
 
 /** The three faces a theme may choose, and the token each one sets. */

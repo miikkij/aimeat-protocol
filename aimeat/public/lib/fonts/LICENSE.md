@@ -34,6 +34,8 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | IBM Plex Mono | v20 on Google Fonts (static 400, 500 and 600) | `ibm-plex-mono-400-latin.woff2`, `ibm-plex-mono-400-latin-ext.woff2`, `ibm-plex-mono-500-latin.woff2`, `ibm-plex-mono-500-latin-ext.woff2`, `ibm-plex-mono-600-latin.woff2`, `ibm-plex-mono-600-latin-ext.woff2` | © 2017 IBM Corp. (https://github.com/IBM/plex), Reserved Font Name "Plex" | https://fonts.google.com/specimen/IBM+Plex+Mono |
 | Selawik | 1.01 (static 300, 350, 400, 600, 700; one file per cut, each whole) | `selawik-300.woff2`, `selawik-350.woff2`, `selawik-400.woff2`, `selawik-600.woff2`, `selawik-700.woff2` | © 2015 Microsoft Corporation (www.microsoft.com), Reserved Font Name Selawik; Selawik is a trademark of Microsoft Corporation | https://github.com/microsoft/Selawik/releases/tag/1.01 |
 | Michroma | v21 on Google Fonts (static 400, the only cut) | `michroma-400-latin.woff2`, `michroma-400-latin-ext.woff2` | © 2011 The Michroma Project Authors (https://github.com/googlefonts/Michroma-font) | https://fonts.google.com/specimen/Michroma |
+| Pixelify Sans | v3 on Google Fonts (variable wght 400–700) | `pixelify-sans-var-latin.woff2`, `pixelify-sans-var-latin-ext.woff2` | © 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans) | https://fonts.google.com/specimen/Pixelify+Sans |
+| Nunito | v32 on Google Fonts (variable wght 200–1000, declared 400–800) | `nunito-var-latin.woff2`, `nunito-var-latin-ext.woff2` | © 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito) | https://fonts.google.com/specimen/Nunito |
 
 Baloo 2 + Bangers vendored 2026-07-19 for the self-hosted `fonts` capability pack
 (game/display faces, loaded via `/lib/fonts.css`). Inter, Space Grotesk, Fraunces and
@@ -81,3 +83,10 @@ here (those are byte-identical to Google's v20). Michroma's licence was read fro
 repository (https://github.com/google/fonts/blob/main/ofl/michroma/OFL.txt, upstream
 https://github.com/googlefonts/Michroma-font): SIL OFL 1.1, copyright 2011 The Michroma Project
 Authors, designed by Vernon Adams, no Reserved Font Name.
+
+Pixelify Sans and Nunito vendored 2026-11-04 for the Tiilitaivas theme, which also declares the Baloo
+2 files already here in `aimeat-fonts.css`. Both are Google Fonts' latin and latin-ext subsets,
+unchanged. Their licences were read from the Google Fonts repository
+(https://github.com/google/fonts/blob/main/ofl/pixelifysans/OFL.txt and
+https://github.com/google/fonts/blob/main/ofl/nunito/OFL.txt): SIL OFL 1.1, copyright as in the rows
+above, no Reserved Font Name.

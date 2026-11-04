@@ -15069,7 +15069,7 @@
     "cfgDesc_federation_package_peer_cap": "On a package repository: the most servers it registers as packages-only peers, through access grants, sales and named sellers. Past it, a new server is refused and you are told once",
     "cfgDesc_federation_package_repository": "This server acts as a package repository: it serves a private package, over signed requests, to the peer servers entitled to it. Off: a private package reaches only its author",
     "cfgDesc_themes_personal_choice": "People choose a theme and a style in the look picker. Off: every page uses the default theme in its default style, and the picker offers no choice",
-    "cfgDesc_themes_offered": "The themes people can choose from, as theme ids separated by commas. Empty offers the built-in AIMEAT theme only",
+    "cfgDesc_themes_offered": "The themes people can choose from, as theme ids separated by commas. Empty offers the two built-in themes, AIMEAT and Tiilitaivas; aimeat offers AIMEAT alone",
     "cfgDesc_themes_default": "The theme a person sees before choosing, and the one everybody sees when choosing is off. A theme id from the offered themes",
     "cfgDesc_quota_memory_delete_grace_days": "Days a deleted memory entry can still be restored before it is removed for good",
     "cfgDesc_mcp_stdio_enabled": "Allow MCP servers that run as local processes on this server's machine. Off by default, because it runs code that somebody else wrote",

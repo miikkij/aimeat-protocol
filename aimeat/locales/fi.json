@@ -15806,7 +15806,7 @@
     "cfgDesc_federation_package_peer_cap": "Pakettirepositoryn yläraja palvelimille, jotka se rekisteröi pelkiksi pakettivertaisiksi käyttöoikeuden, myynnin tai nimetyn myyjän kautta. Rajan ylittyessä uusi palvelin hylätään, ja sinulle ilmoitetaan kerran.",
     "cfgDesc_federation_package_repository": "Palvelin toimii pakettirepositoryna: se jakaa yksityisen paketin allekirjoitettujen pyyntöjen kautta niille vertaispalvelimille, joilla on siihen oikeus. Pois päältä: yksityinen paketti on vain tekijänsä käytössä.",
     "cfgDesc_themes_personal_choice": "Ihmiset valitsevat teeman ja tyylin ulkoasun valitsimesta. Pois päältä: jokainen sivu käyttää oletusteemaa sen oletustyylissä, eikä valitsin tarjoa vaihtoehtoja.",
-    "cfgDesc_themes_offered": "Teemat, joista ihmiset voivat valita, teemojen tunnisteina pilkulla eroteltuina. Tyhjä tarjoaa vain valmiin AIMEAT-teeman.",
+    "cfgDesc_themes_offered": "Teemat, joista ihmiset voivat valita, teemojen tunnisteina pilkulla eroteltuina. Tyhjä tarjoaa kaksi valmista teemaa, AIMEATin ja Tiilitaivaan. Tunniste aimeat tarjoaa vain AIMEATin.",
     "cfgDesc_themes_default": "Teema, jonka ihminen näkee ennen kuin valitsee, ja jonka kaikki näkevät, kun valinta ei ole käytössä. Tunnisteen on oltava tarjolla olevien teemojen joukossa.",
     "cfgDesc_quota_memory_delete_grace_days": "Montako päivää poistettu muistin merkintä on vielä palautettavissa ennen lopullista poistoa.",
     "cfgDesc_mcp_stdio_enabled": "Sallii MCP-palvelimet, jotka ajetaan paikallisina prosesseina tämän palvelimen koneella. Oletuksena pois päältä, koska se ajaa jonkun muun kirjoittamaa koodia.",

@@ -29,6 +29,9 @@
  * @structure ThemeError · Theme · ThemeInput · ThemeService · themeSnapshot · INNER_PATHS
  * @usage const svc = new ThemeService(config, storage); await svc.offered();
  * @version-history
+ *   v2.6.0 — 2026-11-04 — The shipped theme Tiilitaivas (tiilitaivas.ts) beside the AIMEAT theme: read
+ *     only, offered with it on a node with an empty themes.offered, AIMEAT stays the default. Only
+ *     the AIMEAT theme has no sheet; only the two together are written as an empty list.
  *   v2.5.0 — 2026-10-03 — The font manager (fonts.ts): the service holds a FontService, the catalogue
  *     carries `fonts` (the inventory; the owners' fonts for the operator), the vocabulary's faces are
  *     the base faces and the ones the operator added, and a theme never takes the id of a
@@ -59,6 +62,7 @@ import { lintCss, type CssWarning } from './css-lint.js';
 import { builtinStyles, prepareStyle, swatchOf, STYLE_ID_RE, type Style, type StyleInput } from './styles.js';
 import { themeSheet, componentCssState, catalogueHooks, servedFaces, type ComponentCssState } from './sheet.js';
 import { SHAPE_TOKENS, builtinShapes, checkShape } from './shapes.js';
+import { tiilitaivasTheme, TIILITAIVAS_ID } from './tiilitaivas.js';
 import type { ContrastResult } from './contrast.js';
 import type { ConfigProvenance } from '../config-provenance.js';
 import { applyConfigChanges } from '../config-apply.js';
@@ -69,6 +73,8 @@ import { THEME_WRITE_SCOPE } from '../../utils/scope-coverage.js';
 export const THEME_KEY_PREFIX = 'ui.theme.';
 export const THEME_CHOICE_KEY = 'settings.theme';
 export const BUILTIN_THEME = 'aimeat';
+/** What people may choose from on a node whose themes.offered is empty; the first is the default. */
+const DEFAULT_OFFERED: readonly string[] = [BUILTIN_THEME, TIILITAIVAS_ID];
 /**
  * AIMEAT's own interface: the pages a theme reaches. Everything else the shell serves (the front
  * page, help, members, the change log, the showroom pages) keeps behaving as it did before themes
@@ -123,7 +129,7 @@ export const themeSnapshot = (): ThemeSnapshot | null => snapshotCache;
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,39}$/;
 /** Words a /v1/themes/<word> route answers itself, so no theme takes one as its id. */
-const RESERVED_IDS = new Set([BUILTIN_THEME, 'all', 'choice', 'policy', 'preview', 'fonts']);
+const RESERVED_IDS = new Set([BUILTIN_THEME, TIILITAIVAS_ID, 'all', 'choice', 'policy', 'preview', 'fonts']);
 const hash = (s: string, n = 12) => createHash('sha1').update(s).digest('hex').slice(0, n);
 
 function builtinTheme(): Theme {
@@ -190,7 +196,10 @@ export class ThemeService {
 
     // ── Reading ──
 
-    /** Every theme: the built-in first, then the node's own by name. */
+    /**
+     * Every theme: the built-in ones first, then the node's own by name. A record a node saved under
+     * the id `tiilitaivas` before this theme shipped stays as it is and takes the shipped one's place.
+     */
     async listAll(): Promise<Theme[]> {
         const { items } = await this.storage.listAllMemoryMeta({ ownerPrefix: this.systemGhii, prefix: THEME_KEY_PREFIX, limit: 500, excludeVersionRows: true });
         const custom: Theme[] = [];
@@ -200,7 +209,8 @@ export class ThemeService {
             if (v && typeof v === 'object' && Array.isArray(v.styles)) custom.push(v);
         }
         custom.sort((a, b) => a.name.localeCompare(b.name));
-        return [builtinTheme(), ...custom];
+        const shipped = custom.some((t) => t.id === TIILITAIVAS_ID) ? [] : [tiilitaivasTheme()];
+        return [builtinTheme(), ...shipped, ...custom];
     }
 
     async get(id: string): Promise<Theme | null> {
@@ -208,7 +218,8 @@ export class ThemeService {
         if (!ID_RE.test(id)) return null;
         const rec = await this.storage.getMemory(this.systemGhii, THEME_KEY_PREFIX + id);
         const v = rec?.value as Theme | undefined;
-        return v && typeof v === 'object' && Array.isArray(v.styles) ? v : null;
+        if (v && typeof v === 'object' && Array.isArray(v.styles)) return v;
+        return id === TIILITAIVAS_ID ? tiilitaivasTheme() : null;
     }
 
     private async must(id: string): Promise<Theme> {
@@ -221,7 +232,7 @@ export class ThemeService {
     policyFrom(themes: Theme[]): ThemePolicy {
         const live = themes.filter((t) => !t.retired).map((t) => t.id);
         const listed = String(this.config.themesOffered || '').split(',').map((s) => s.trim()).filter((id) => live.includes(id));
-        const offered = listed.length ? listed : [BUILTIN_THEME];
+        const offered = listed.length ? listed : DEFAULT_OFFERED.filter((id) => live.includes(id));
         const def = offered.includes(String(this.config.themesDefault)) ? String(this.config.themesDefault) : offered[0];
         return { personalChoice: this.config.themesPersonalChoice !== false, offered, default: def };
     }
@@ -244,7 +255,7 @@ export class ThemeService {
             builtin: builtinStyles().map((s) => s.id),
             themes: shown.map((id) => themes.find((t) => t.id === id)!).filter(Boolean).map((t) => ({
                 id: t.id, name: t.name, builtin: t.builtin, defaultStyle: t.defaultStyle,
-                sheet: t.builtin ? null : `/v1/themes/${t.id}/theme.css?v=${hash(themeSheet(t))}`,
+                sheet: t.id === BUILTIN_THEME ? null : `/v1/themes/${t.id}/theme.css?v=${hash(themeSheet(t))}`,
                 styles: (policy.personalChoice ? this.offeredStylesOf(t) : t.styles.filter((s) => s.id === t.defaultStyle))
                     .map((s) => ({ id: s.id, name: s.name, onlyMode: s.onlyMode, swatch: swatchOf(s) })),
             })),
@@ -255,7 +266,7 @@ export class ThemeService {
     /** One theme's stylesheet and its ETag. */
     async stylesheet(id: string): Promise<{ css: string; etag: string }> {
         const t = await this.must(id);
-        const css = t.builtin || t.retired ? `/* Theme "${t.name}": nothing of its own to serve. */\n` : themeSheet(t);
+        const css = t.id === BUILTIN_THEME || t.retired ? `/* Theme "${t.name}": nothing of its own to serve. */\n` : themeSheet(t);
         return { css, etag: `"${hash(css, 16)}"` };
     }
 
@@ -516,10 +527,12 @@ export class ThemeService {
         const def = input.default === undefined ? (offered.includes(current.default) ? current.default : offered[0]) : input.default;
         if (!offered.includes(def)) throw new ThemeError('INVALID_POLICY', `default: one of the available themes (${offered.join(', ')})`, 422);
         if (input.personalChoice !== undefined && typeof input.personalChoice !== 'boolean') throw new ThemeError('INVALID_POLICY', 'personalChoice: true or false', 422);
+        const list = [...new Set(offered)].join(',');
         const changes = [
             ...(input.personalChoice !== undefined ? [{ path: 'themes.personal_choice', value: input.personalChoice }] : []),
-            // Only the AIMEAT theme available is written as empty, the node's own default.
-            { path: 'themes.offered', value: offered.length === 1 && offered[0] === BUILTIN_THEME ? '' : [...new Set(offered)].join(',') },
+            // The node's own default list is written as empty; anything else is written out, so
+            // "AIMEAT only" stays that way when a later version ships another theme.
+            { path: 'themes.offered', value: list === DEFAULT_OFFERED.join(',') ? '' : list },
             { path: 'themes.default', value: def },
         ];
         const sealed = changes.map((c) => c.path).filter((p) => isSealed(this.config, p));

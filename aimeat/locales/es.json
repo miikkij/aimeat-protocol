@@ -13955,7 +13955,7 @@
     "cfgDesc_federation_package_peer_cap": "En un repositorio de paquetes: el máximo de servidores que registra como pares solo de paquetes, por permisos de acceso, ventas o vendedores nombrados. Pasado ese límite, se rechaza un servidor nuevo y se te avisa una vez.",
     "cfgDesc_federation_package_repository": "Este servidor actúa como repositorio de paquetes: entrega un paquete privado, mediante solicitudes firmadas, a los servidores pares que tienen derecho a él. Apagado: un paquete privado solo llega a su autor.",
     "cfgDesc_themes_personal_choice": "Las personas eligen un tema y un estilo en el selector de aspecto. Apagado: todas las páginas usan el tema por defecto en su estilo por defecto, y el selector no ofrece opciones.",
-    "cfgDesc_themes_offered": "Los temas entre los que pueden elegir las personas, como identificadores separados por comas. Vacío ofrece solo el tema AIMEAT incorporado.",
+    "cfgDesc_themes_offered": "Los temas entre los que pueden elegir las personas, como identificadores separados por comas. Vacío ofrece los dos temas incorporados, AIMEAT y Tiilitaivas; aimeat ofrece solo AIMEAT.",
     "cfgDesc_themes_default": "El tema que ve una persona antes de elegir, y el que ven todos cuando la elección está apagada. Un identificador de entre los temas ofrecidos.",
     "cfgDesc_quota_memory_delete_grace_days": "Días durante los que una entrada de memoria borrada todavía se puede recuperar antes de eliminarse para siempre.",
     "cfgDesc_mcp_stdio_enabled": "Permite servidores MCP que corren como procesos locales en la máquina de este servidor. Apagado por defecto, porque ejecuta código que escribió otra persona.",

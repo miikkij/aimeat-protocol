@@ -58,13 +58,22 @@ link. Nothing on the node links a font CDN, and the CSP refuses one; a new face 
 there, with its row in `lib/fonts/LICENSE.md`, before a token names it. The list a theme may
 choose from is `THEME_FACES` in `src/services/themes/tokens.ts`, and the Design Book's copy is
 `SERVED_FONT_FAMILIES` in `src/services/app-ui/signature-tokens.ts`; a new face goes into both.
-Since 2026-10-22 the node serves twenty-seven families: the ten house and palette faces above, and
-seventeen for themes and apps that want a face of their own (Instrument Serif and Sans, Schibsted
+Since 2026-11-04 the node serves thirty families: the ten house and palette faces above, and
+twenty for themes and apps that want a face of their own (Instrument Serif and Sans, Schibsted
 Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Mona Sans, Hubot Sans, Geist Mono, Martian
 Mono, Press Start 2P, Selawik, IBM Plex Sans and IBM Plex Mono, vendored for the SOC console's
 accepted design on 2026-10-09, Newsreader, the text face of the kirjapaino look, vendored on
-2026-10-17 with the Fraunces italic, and Michroma, the display face of the tdr look, vendored on
-2026-10-22 with the IBM Plex Mono 600).
+2026-10-17 with the Fraunces italic, Michroma, the display face of the tdr look, vendored on
+2026-10-22 with the IBM Plex Mono 600, and Pixelify Sans, Baloo 2 and Nunito for the Tiilitaivas
+theme on 2026-11-04).
+
+**A second theme ships with the node: Tiilitaivas** (`src/services/themes/tiilitaivas.ts`), optional
+and read only like AIMEAT, which stays the default. Its rules differ from the poster's on purpose:
+rounded corners, hard offset shadows in its own shadow colour, and a pixel headline face that stops
+at 20 px. It sets `--font-poster`, `--font-showroom` and `--font-display` to the body face and names
+`--font-headline` only on the large headings, so a new component that reads a headline alias at a
+small size stays readable in it. A component that reads `--font-headline` directly at a small size
+goes on the list in that file.
 
 **A face can also be added to the running node, with no commit and no deploy** (the font manager,
 since 2026-10-03): the operator adds it on Admin → Themes & Styles → Fonts, or an AI does with

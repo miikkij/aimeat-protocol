@@ -310,7 +310,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // An id that names no theme is dropped where the values are read, so a stale setting never offers
   // a theme that does not exist; the Themes & Styles view offers only real ids.
   { key: 'themesPersonalChoice', dotPath: 'themes.personal_choice', envVar: 'AIMEAT_THEMES_PERSONAL_CHOICE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'People choose a theme and a style in the pill. Off: every page wears the default theme in its default style, and the pill shows no choice' },
-  { key: 'themesOffered', dotPath: 'themes.offered', envVar: 'AIMEAT_THEMES_OFFERED', type: 'string', validate: v => typeof v === 'string' && /^([a-z0-9-]{2,40}(\s*,\s*[a-z0-9-]{2,40})*)?$/.test(v.trim()), immutable: false, description: 'The themes available to people, comma separated theme ids; empty means the built-in AIMEAT theme only' },
+  { key: 'themesOffered', dotPath: 'themes.offered', envVar: 'AIMEAT_THEMES_OFFERED', type: 'string', validate: v => typeof v === 'string' && /^([a-z0-9-]{2,40}(\s*,\s*[a-z0-9-]{2,40})*)?$/.test(v.trim()), immutable: false, description: 'The themes available to people, comma separated theme ids; empty means the two built-in themes, AIMEAT and Tiilitaivas, and aimeat offers AIMEAT alone' },
   { key: 'themesDefault', dotPath: 'themes.default', envVar: 'AIMEAT_THEMES_DEFAULT', type: 'string', validate: v => typeof v === 'string' && /^[a-z0-9-]{2,40}$/.test(v), immutable: false, description: 'The default theme: what a person sees before choosing, and what everybody sees when people do not choose (a theme id among the available)' },
 
   // ── Extensions (Phase 2.7, mutable) ──
