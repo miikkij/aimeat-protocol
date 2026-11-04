@@ -1442,3 +1442,638 @@
 }
 [data-ak-look='tdr'] .ak-input:focus { border-color: var(--ak-accent-text); }
 [data-ak-look='tdr'] ::selection { background: var(--ak-accent); color: var(--ak-accent-ink); }
+
+/* @preset-block mappi — a binder on the desk: a petrol board, coloured index tabs as the navigation, a white sheet with two punched holes, Bricolage Grotesque headings and sections ruled on the sheet.
+   One of the two office worlds Jouni chose on 2026-11-04. The board is painted by the binder structure rather than the page ground, so a page without the side column stays a plain sheet under a board-coloured bar. The tab colours say which part of the binder a page is in, and the words on them stay dark in both modes. */
+[data-ak-look='mappi'] {
+  --ak-page-image:        none;
+  --ak-surface-image:     none;
+  --ak-hero-image:        none;
+  --ak-grain:             none;
+  --ak-blur:              0px;
+  --ak-display-shadow:    none;
+  --ak-display-stroke:    0;
+  --ak-tilt:              0deg;
+  --ak-kinetic:           none;
+  --ak-ambient:           none;
+  --ak-font-display:      'Bricolage Grotesque', 'Archivo', system-ui, sans-serif;
+  --ak-font:              'Instrument Sans', 'Inter', system-ui, sans-serif;
+  --ak-weight-display:    800;
+  --ak-text-hero:         clamp(2.5rem, 5vw, 3.5rem);
+  --ak-radius:            8px;
+  --ak-radius-sm:         6px;
+  --ak-elev-1:            none;
+  --ak-elev-2:            0 8px 24px color-mix(in oklab, var(--ak-ink) 16%, transparent);
+  --ak-glass:             var(--ak-surface);
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)));
+  --ak-gap:               16px;
+  --ak-enter-distance:    6px;
+  --ak-enter-stagger:     24ms;
+  --ak-motion:            160ms;
+  --ak-spring-stiffness:  280;
+  --ak-spring-damping:    28;
+  --ak-spring-mass:       1;
+  --ak-bg:                #f0f2ec;
+  --ak-surface:           #ffffff;
+  --ak-surface-2:         #e8ebe3;
+  --ak-ink:               #14242a;
+  --ak-ink-dim:           #4c5f66;
+  --ak-line:              #c3ccca;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+}
+/* @preset-block mappi@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='mappi'], [data-ak-look='mappi'][data-theme='dark'] {
+  --ak-bg:         #14262b;
+  --ak-surface:    #1c333a;
+  --ak-surface-2:  #243e46;
+  --ak-ink:        #e6eeee;
+  --ak-ink-dim:    #a6b8bd;
+  --ak-line:       #46626b;
+}
+/* structure: binder — The BINDER: the page sits on a coloured board, the side navigation is a row of coloured index tabs, the chosen tab joins the sheet, and the sheet has two punched holes. Sections are ruled on the sheet instead of floating as cards. */
+[data-ak-look='mappi'] {
+  --ak-binder-board: #0f3b45;
+  --ak-binder-on-board: #ffffff;
+  --ak-binder-tab-ink: #14242a;
+  --ak-binder-tab-1: #8ab4f8;
+  --ak-binder-tab-2: #f4b740;
+  --ak-binder-tab-3: #c9a7eb;
+  --ak-binder-tab-4: #7bc8a4;
+  --ak-binder-tab-5: #f28b82;
+}
+[data-theme='dark'] [data-ak-look='mappi'], [data-ak-look='mappi'][data-theme='dark'] {
+  --ak-binder-board: #08181c;
+  --ak-binder-on-board: #e6eeee;
+}
+[data-ak-look='mappi'] .ak-app__bar {
+  background: var(--ak-binder-board);
+  color: var(--ak-binder-on-board);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 0;
+  box-shadow: none;
+}
+[data-ak-look='mappi'] .ak-app__title { color: var(--ak-binder-on-board); letter-spacing: -0.02em; }
+[data-ak-look='mappi'] .ak-app__pill .aimeat-auth-wrap { display: inline-flex; padding: 4px 6px; background: var(--ak-surface); border-radius: var(--ak-radius-sm); }
+[data-ak-look='mappi'] .ak-app__bar .ak-app__tagline { color: var(--ak-binder-on-board); }
+[data-ak-look='mappi'] .ak-app__frame { background: var(--ak-binder-board); gap: 0; padding: 0 var(--ak-pad) var(--ak-pad) calc(var(--ak-pad) * 1.5); }
+[data-ak-look='mappi'] .ak-app__side { padding-top: calc(var(--ak-pad) * 2); }
+[data-ak-look='mappi'] .ak-sidenav { gap: 12px; }
+[data-ak-look='mappi'] .ak-sidenav__group { gap: 5px; padding-left: 14px; }
+[data-ak-look='mappi'] .ak-sidenav__heading { color: var(--ak-binder-on-board); padding-left: 2px; }
+[data-ak-look='mappi'] .ak-sidenav__item {
+  background: var(--ak-binder-tab-1);
+  color: var(--ak-binder-tab-ink);
+  font-weight: 600;
+  border-radius: var(--ak-radius) 0 0 var(--ak-radius);
+  transition: margin-left var(--ak-motion) var(--ak-ease), background var(--ak-motion) var(--ak-ease);
+}
+[data-ak-look='mappi'] .ak-sidenav__item:nth-of-type(5n+2) { background: var(--ak-binder-tab-2); }
+[data-ak-look='mappi'] .ak-sidenav__item:nth-of-type(5n+3) { background: var(--ak-binder-tab-3); }
+[data-ak-look='mappi'] .ak-sidenav__item:nth-of-type(5n+4) { background: var(--ak-binder-tab-4); }
+[data-ak-look='mappi'] .ak-sidenav__item:nth-of-type(5n) { background: var(--ak-binder-tab-5); }
+[data-ak-look='mappi'] .ak-sidenav__item:hover { background: var(--ak-binder-tab-2); margin-left: -6px; width: calc(100% + 6px); }
+[data-ak-look='mappi'] .ak-sidenav__item .ak-sidenav__count { color: var(--ak-binder-tab-ink); }
+[data-ak-look='mappi'] .ak-sidenav__item--active,
+[data-ak-look='mappi'] .ak-sidenav__item--active:hover,
+[data-ak-look='mappi'] .ak-sidenav__item--active:nth-of-type(n) {
+  background: var(--ak-bg);
+  color: var(--ak-ink);
+  font-weight: 700;
+  margin-left: -14px;
+  width: calc(100% + 14px);
+  box-shadow: none;
+}
+[data-ak-look='mappi'] .ak-sidenav__item--active .ak-sidenav__count { color: var(--ak-ink-dim); }
+[data-ak-look='mappi'] .ak-sidenav__item:focus-visible { outline-color: var(--ak-binder-on-board); }
+[data-ak-look='mappi'] .ak-app__side .ak-sidenav__foot { color: var(--ak-ink); }
+[data-ak-look='mappi'].ak-app--sidenav .ak-app__main,
+[data-ak-look='mappi'] .ak-app--sidenav .ak-app__main {
+  padding: calc(var(--ak-pad) * 2.25) calc(var(--ak-pad) * 2.75) calc(var(--ak-chrome-bottom) + var(--ak-pad) * 2.75) calc(var(--ak-pad) * 4.5);
+  background:
+    radial-gradient(circle 10px at 32px 120px, var(--ak-binder-board) 96%, transparent) no-repeat,
+    radial-gradient(circle 10px at 32px 360px, var(--ak-binder-board) 96%, transparent) no-repeat,
+    var(--ak-bg);
+  border-radius: 0 var(--ak-radius) var(--ak-radius) var(--ak-radius);
+  max-width: none;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+[data-ak-look='mappi'] .ak-section {
+  background: transparent;
+  border: 0;
+  border-top: 2px solid var(--ak-ink);
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-ak-look='mappi'] .ak-section:not(.ak-section--flush) { --ak-section-pad: 16px 0 0; }
+[data-ak-look='mappi'] .ak-section__title { font-size: 1.625rem; letter-spacing: -0.015em; }
+[data-ak-look='mappi'] .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-ak-look='mappi'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='mappi'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='mappi'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: 0 0 var(--ak-pad); }
+[data-ak-look='mappi'] .ak-hero__title { line-height: 1; letter-spacing: -0.03em; }
+[data-ak-look='mappi'] .ak-input:not(.ak-input--range) { border: 2px solid var(--ak-ink); background: var(--ak-surface); }
+[data-ak-look='mappi'] .ak-btn--primary { background: var(--ak-ink); color: var(--ak-bg); border-color: var(--ak-ink); box-shadow: none; }
+[data-ak-look='mappi'] .ak-btn--primary:hover, [data-ak-look='mappi'] .ak-btn--primary:active { filter: none; background: color-mix(in oklab, var(--ak-ink) 86%, var(--ak-bg)); }
+[data-ak-look='mappi'] .ak-btn:not(.ak-btn--primary):not(.ak-btn--danger) { border: 2px solid var(--ak-ink); background: transparent; color: var(--ak-ink); }
+[data-ak-look='mappi'] .ak-list { gap: 0; }
+[data-ak-look='mappi'] .ak-list__row {
+  background: transparent;
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  padding-inline: 0;
+}
+[data-ak-look='mappi'] .ak-table { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+[data-ak-look='mappi'] .ak-table th { background: transparent; color: var(--ak-ink); border-bottom: 2px solid var(--ak-ink); }
+[data-ak-look='mappi'] .ak-statrow__tile { background: transparent; border: 0; border-top: 2px solid var(--ak-ink); border-radius: 0; box-shadow: none; transform: none; }
+@media (max-width: 760px) {
+  [data-ak-look='mappi'] .ak-app__frame { padding: 0; background: var(--ak-bg); }
+  [data-ak-look='mappi'].ak-app--sidenav .ak-app__main,
+  [data-ak-look='mappi'] .ak-app--sidenav .ak-app__main {
+    padding: var(--ak-pad) var(--ak-pad) calc(var(--ak-chrome-bottom) + var(--ak-touch) + var(--ak-pad) * 2);
+    background: var(--ak-bg);
+    border-radius: 0;
+  }
+}
+
+/* @preset-block korostus — a highlighter on a printout: black ink on white, no cards, a giant heading over heavy rules, and one marker colour that always means the same thing, this came from a machine and nobody has accepted it yet.
+   The second office world Jouni chose on 2026-11-04. Colour carries one meaning here, so the marker is reserved for <mark> around what an AI proposed. The same yellow and the same black words stand in both modes, because a highlighter does not change with the room. */
+[data-ak-look='korostus'] {
+  --ak-page-image:        none;
+  --ak-surface-image:     none;
+  --ak-hero-image:        none;
+  --ak-grain:             none;
+  --ak-blur:              0px;
+  --ak-display-shadow:    none;
+  --ak-display-stroke:    0;
+  --ak-tilt:              0deg;
+  --ak-kinetic:           none;
+  --ak-ambient:           none;
+  --ak-font-display:      'Schibsted Grotesk', 'Inter', system-ui, sans-serif;
+  --ak-font:              'Schibsted Grotesk', 'Inter', system-ui, sans-serif;
+  --ak-weight-display:    900;
+  --ak-text-hero:         clamp(3.5rem, 10.5vw, 9.25rem);
+  --ak-text-body:         1.0625rem;
+  --ak-radius:            0px;
+  --ak-radius-sm:         0px;
+  --ak-radius-pill:       0px;
+  --ak-line-w:            1px;
+  --ak-elev-1:            none;
+  --ak-elev-2:            none;
+  --ak-glass:             var(--ak-bg);
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)));
+  --ak-accent-text:       color-mix(in oklab, var(--ak-accent) 60%, var(--ak-ink));
+  --ak-mark:              #ffe94a;
+  --ak-mark-ink:          #0b0b0a;
+  --ak-focus:             var(--ak-ink);
+  --ak-gap:               20px;
+  --ak-enter-distance:    0px;
+  --ak-enter-stagger:     0ms;
+  --ak-motion:            100ms;
+  --ak-spring-stiffness:  420;
+  --ak-spring-damping:    40;
+  --ak-spring-mass:       1;
+  --ak-bg:                #ffffff;
+  --ak-surface:           #ecece6;
+  --ak-surface-2:         #f6f6f2;
+  --ak-ink:               #0b0b0a;
+  --ak-ink-dim:           #55554f;
+  --ak-line:              #0b0b0a;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+}
+/* @preset-block korostus@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='korostus'], [data-ak-look='korostus'][data-theme='dark'] {
+  --ak-bg:           #10100e;
+  --ak-surface:      #22221e;
+  --ak-surface-2:    #191916;
+  --ak-ink:          #f4f3ee;
+  --ak-ink-dim:      #b5b4ab;
+  --ak-line:         #f4f3ee;
+  --ak-accent-text:  color-mix(in oklab, var(--ak-accent) 60%, var(--ak-ink));
+}
+/* structure: highlighter — The HIGHLIGHTER: no cards at all. Black words on the page under heavy rules, a giant heading, and one marker colour on a <mark> that always means the same thing: this came from a machine and nobody has accepted it yet. */
+[data-ak-look='korostus'] .ak-app__bar {
+  background: var(--ak-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 3px solid var(--ak-ink);
+  box-shadow: none;
+}
+[data-ak-look='korostus'] .ak-app__title { font-weight: 900; letter-spacing: -0.02em; }
+[data-ak-look='korostus'] .ak-section,
+[data-ak-look='korostus'] .ak-statrow__tile {
+  background: transparent;
+  border: 0;
+  border-top: 3px solid var(--ak-ink);
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+[data-ak-look='korostus'] .ak-section:not(.ak-section--flush) { --ak-section-pad: 16px 0 0; }
+[data-ak-look='korostus'] .ak-section__title { font-size: 1.875rem; font-weight: 900; letter-spacing: -0.03em; }
+[data-ak-look='korostus'] .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-ak-look='korostus'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='korostus'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='korostus'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: 0 0 var(--ak-pad); }
+[data-ak-look='korostus'] .ak-hero__title { line-height: 0.92; letter-spacing: -0.05em; }
+[data-ak-look='korostus'] .ak-hero__sub { font-size: clamp(1.25rem, 2vw, 1.625rem); line-height: 1.3; font-weight: 500; color: var(--ak-ink); }
+[data-ak-look='korostus'] .ak-sidenav__item { background: transparent; border-radius: 0; padding-inline: 0; font-weight: 500; }
+[data-ak-look='korostus'] .ak-sidenav__item:hover { background: transparent; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+[data-ak-look='korostus'] .ak-sidenav__heading { padding-inline: 0; }
+[data-ak-look='korostus'] .ak-sidenav__item--active,
+[data-ak-look='korostus'] .ak-sidenav__item--active:hover {
+  background: transparent;
+  box-shadow: none;
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 5px;
+}
+[data-ak-look='korostus'] .ak-input:not(.ak-input--range) { background: transparent; border: 2px solid var(--ak-ink); }
+[data-ak-look='korostus'] .ak-btn--primary { background: var(--ak-ink); color: var(--ak-bg); border-color: var(--ak-ink); box-shadow: none; font-weight: 800; }
+[data-ak-look='korostus'] .ak-btn--primary:hover, [data-ak-look='korostus'] .ak-btn--primary:active { filter: none; background: var(--ak-mark); color: var(--ak-mark-ink); }
+[data-ak-look='korostus'] .ak-btn:not(.ak-btn--primary):not(.ak-btn--danger) { border: 2px solid var(--ak-ink); background: transparent; color: var(--ak-ink); font-weight: 800; }
+[data-ak-look='korostus'] .ak-dialog { background: var(--ak-bg); border: 3px solid var(--ak-ink); }
+[data-ak-look='korostus'] .ak-list { gap: 0; }
+[data-ak-look='korostus'] .ak-list__row {
+  background: transparent;
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  padding-inline: 0;
+}
+[data-ak-look='korostus'] .ak-table { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+[data-ak-look='korostus'] .ak-table th { background: transparent; color: var(--ak-ink); font-weight: 800; border-bottom: 2px solid var(--ak-ink); }
+[data-ak-look='korostus'] .ak-table td { border-color: color-mix(in oklab, var(--ak-ink) 22%, var(--ak-bg)); font-variant-numeric: tabular-nums; }
+[data-ak-look='korostus'] .ak-statrow__value { font-weight: 900; letter-spacing: -0.04em; }
+[data-ak-look='korostus'] mark { padding: 0 0.3em; font-weight: inherit; }
+[data-ak-look='korostus'] ::selection { background: var(--ak-mark); color: var(--ak-mark-ink); }
+
+/* @preset-block komento — a command room for people who work through hundreds of rows: IBM Plex, tight spacing, flat panels on hairlines, small-capital table heads, tabular figures and one accent that marks what is chosen.
+   The dense corporate world Jouni chose on 2026-11-04. Body text stays above the kit's 13 px floor, and the lower controls apply only on a wide screen, so a phone keeps its full touch height. Like every look it takes its accent from the viewer's palette; the komento style kit makes it cobalt. */
+[data-ak-look='komento'] {
+  --ak-page-image:        none;
+  --ak-surface-image:     none;
+  --ak-hero-image:        none;
+  --ak-grain:             none;
+  --ak-blur:              0px;
+  --ak-display-shadow:    none;
+  --ak-display-stroke:    0;
+  --ak-tilt:              0deg;
+  --ak-kinetic:           none;
+  --ak-ambient:           none;
+  --ak-font-display:      'IBM Plex Sans', 'Inter', system-ui, sans-serif;
+  --ak-font:              'IBM Plex Sans', 'Inter', system-ui, sans-serif;
+  --ak-font-mono:         'IBM Plex Mono', 'JetBrains Mono', 'SF Mono', monospace;
+  --ak-weight-display:    600;
+  --ak-text-hero:         1.5rem;
+  --ak-text-body:         0.875rem;
+  --ak-radius:            4px;
+  --ak-radius-sm:         3px;
+  --ak-radius-pill:       3px;
+  --ak-elev-1:            none;
+  --ak-elev-2:            0 6px 18px color-mix(in oklab, var(--ak-ink) 18%, transparent);
+  --ak-glass:             var(--ak-surface);
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)));
+  --ak-gap:               10px;
+  --ak-pad:               12px;
+  --ak-enter-distance:    0px;
+  --ak-enter-stagger:     0ms;
+  --ak-motion:            90ms;
+  --ak-spring-stiffness:  520;
+  --ak-spring-damping:    46;
+  --ak-spring-mass:       1;
+  --ak-bg:                #eef0f3;
+  --ak-surface:           #ffffff;
+  --ak-surface-2:         #f6f7f9;
+  --ak-ink:               #14171c;
+  --ak-ink-dim:           #56606e;
+  --ak-line:              #c4cad3;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+}
+/* @preset-block komento@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='komento'], [data-ak-look='komento'][data-theme='dark'] {
+  --ak-bg:         #0f1217;
+  --ak-surface:    #1a1f27;
+  --ak-surface-2:  #232932;
+  --ak-ink:        #e4e8ee;
+  --ak-ink-dim:    #a2adba;
+  --ak-line:       #3d4653;
+}
+/* structure: command-room — The COMMAND ROOM: a working screen for many rows. A slim bar on a hairline, a tight side column, flat panels joined by hairlines, table heads in small capitals, figures in tabular numerals. On a wide screen the controls sit lower; on a phone they keep their full touch height. */
+[data-ak-look='komento'] .ak-app__bar {
+  background: var(--ak-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: none;
+}
+[data-ak-look='komento'] .ak-app__title { font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.02em; }
+[data-ak-look='komento'] .ak-section {
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: none;
+}
+[data-ak-look='komento'] .ak-section:not(.ak-section--flush) { --ak-section-pad: 12px 14px; --ak-section-gap: 8px; }
+[data-ak-look='komento'] .ak-section__title,
+[data-ak-look='komento'] .ak-app--sidenav .ak-section__title { font-size: 0.875rem; font-weight: 600; letter-spacing: 0; }
+[data-ak-look='komento'] .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+[data-ak-look='komento'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='komento'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='komento'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: 0 0 var(--ak-pad); }
+[data-ak-look='komento'] .ak-hero__title { font-size: 1.25rem; font-weight: 600; line-height: 1.3; letter-spacing: 0; }
+[data-ak-look='komento'] .ak-hero__sub { font-size: var(--ak-text-body); }
+[data-ak-look='komento'] .ak-table th,
+[data-ak-look='komento'] .ak-sidenav__heading {
+  font-size: var(--ak-text-fine);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+}
+[data-ak-look='komento'] .ak-table td { font-variant-numeric: tabular-nums; }
+[data-ak-look='komento'] .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
+[data-ak-look='komento'] .ak-sidenav { gap: 10px; }
+[data-ak-look='komento'] .ak-sidenav__group { gap: 1px; }
+[data-ak-look='komento'] .ak-sidenav__item { color: var(--ak-ink); border-radius: var(--ak-radius-sm); }
+[data-ak-look='komento'] .ak-sidenav__item:hover { background: var(--ak-surface-2); }
+[data-ak-look='komento'] .ak-sidenav__item--active,
+[data-ak-look='komento'] .ak-sidenav__item--active:hover {
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  color: var(--ak-ink);
+  box-shadow: inset 0 0 0 var(--ak-line-w) var(--ak-accent-text);
+}
+[data-ak-look='komento'] .ak-sidenav__count { font-family: var(--ak-font-mono); font-size: var(--ak-text-fine); }
+[data-ak-look='komento'] .ak-list { gap: 0; background: var(--ak-surface); border: var(--ak-line-w) solid var(--ak-line); }
+[data-ak-look='komento'] .ak-list__row {
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-ak-look='komento'] .ak-list__row:last-child { border-bottom: 0; }
+[data-ak-look='komento'] .ak-btn { box-shadow: none; font-weight: 600; }
+[data-ak-look='komento'] .ak-btn--primary { background: var(--ak-accent); color: var(--ak-accent-ink); border-color: var(--ak-accent); }
+[data-ak-look='komento'] .ak-statrow__tile { box-shadow: none; transform: none; border: var(--ak-line-w) solid var(--ak-line); }
+[data-ak-look='komento'] .ak-statrow__value { font-family: var(--ak-font-mono); font-weight: 500; }
+@media (min-width: 761px) {
+  [data-ak-look='komento'] { --ak-touch: 34px; --ak-touch-min: 30px; }
+  [data-ak-look='komento'] .ak-sidenav__item { padding: 5px 10px; }
+  [data-ak-look='komento'] .ak-table th, [data-ak-look='komento'] .ak-table td { padding-block: 6px; }
+  [data-ak-look='komento'] .ak-list__row { padding-block: 7px; }
+}
+
+/* @preset-block vuosikertomus — an annual report: one band of the company colour, a numbered table of contents, Source Serif headings over rules, no cards, and figures set large.
+   The formal corporate world Jouni chose on 2026-11-04. The side navigation numbers itself with a CSS counter, and an app that wants the large chapter figure puts it in the hero's kicker. A brand colour through a style kit fills the top band. */
+[data-ak-look='vuosikertomus'] {
+  --ak-page-image:        none;
+  --ak-surface-image:     none;
+  --ak-hero-image:        none;
+  --ak-grain:             none;
+  --ak-blur:              0px;
+  --ak-display-shadow:    none;
+  --ak-display-stroke:    0;
+  --ak-tilt:              0deg;
+  --ak-kinetic:           none;
+  --ak-ambient:           none;
+  --ak-font-display:      'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --ak-font:              'Source Sans 3', 'Inter', system-ui, sans-serif;
+  --ak-weight-display:    600;
+  --ak-text-hero:         clamp(2.25rem, 4.4vw, 3.75rem);
+  --ak-text-body:         1.0625rem;
+  --ak-radius:            0px;
+  --ak-radius-sm:         0px;
+  --ak-radius-pill:       0px;
+  --ak-line-w:            1px;
+  --ak-elev-1:            none;
+  --ak-elev-2:            none;
+  --ak-glass:             var(--ak-bg);
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)));
+  --ak-accent-text:       color-mix(in oklab, var(--ak-accent) 60%, var(--ak-ink));
+  --ak-focus:             var(--ak-ink);
+  --ak-enter-distance:    0px;
+  --ak-enter-stagger:     40ms;
+  --ak-motion:            var(--motion-slow, 320ms);
+  --ak-spring-stiffness:  140;
+  --ak-spring-damping:    28;
+  --ak-spring-mass:       1;
+  --ak-bg:                #ffffff;
+  --ak-surface:           #eef0f4;
+  --ak-surface-2:         #f7f8fa;
+  --ak-ink:               #101a2b;
+  --ak-ink-dim:           #515c6e;
+  --ak-line:              #101a2b;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+}
+/* @preset-block vuosikertomus@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='vuosikertomus'], [data-ak-look='vuosikertomus'][data-theme='dark'] {
+  --ak-bg:           #0d1420;
+  --ak-surface:      #1a2536;
+  --ak-surface-2:    #141d2c;
+  --ak-ink:          #eaeef5;
+  --ak-ink-dim:      #a9b4c4;
+  --ak-line:         #eaeef5;
+  --ak-accent-text:  color-mix(in oklab, var(--ak-accent) 60%, var(--ak-ink));
+}
+/* structure: annual-report — The ANNUAL REPORT: one band of the company colour across the top, a numbered table of contents as the side navigation, a serif heading over rules, no cards, and a very large figure in the hero's kicker for a chapter number. */
+[data-ak-look='vuosikertomus'] .ak-app__bar {
+  background: var(--ak-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-top: 12px solid var(--ak-accent);
+  border-bottom: var(--ak-line-w) solid var(--ak-ink);
+  box-shadow: none;
+}
+[data-ak-look='vuosikertomus'] .ak-app__title { font-family: var(--ak-font); font-size: 0.875rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+[data-ak-look='vuosikertomus'] .ak-sidenav { gap: 0; counter-reset: ak-report-toc; }
+[data-ak-look='vuosikertomus'] .ak-sidenav__group { gap: 0; }
+[data-ak-look='vuosikertomus'] .ak-sidenav__heading { padding: 14px 0 6px; color: var(--ak-ink); font-weight: 700; letter-spacing: 0.1em; }
+[data-ak-look='vuosikertomus'] .ak-sidenav__item {
+  counter-increment: ak-report-toc;
+  background: transparent;
+  border-top: var(--ak-line-w) solid color-mix(in oklab, var(--ak-ink) 22%, var(--ak-bg));
+  border-radius: 0;
+  padding-inline: 0;
+  color: var(--ak-ink);
+}
+[data-ak-look='vuosikertomus'] .ak-sidenav__item::before {
+  content: counter(ak-report-toc, decimal-leading-zero);
+  flex: none;
+  width: 26px;
+  font-size: var(--ak-text-fine);
+  font-variant-numeric: tabular-nums;
+  color: var(--ak-ink-dim);
+}
+[data-ak-look='vuosikertomus'] .ak-sidenav__item:hover { background: transparent; text-decoration: underline; text-underline-offset: 3px; }
+[data-ak-look='vuosikertomus'] .ak-sidenav__item--active,
+[data-ak-look='vuosikertomus'] .ak-sidenav__item--active:hover {
+  background: transparent;
+  box-shadow: none;
+  font-weight: 700;
+  border-top: 2px solid var(--ak-ink);
+}
+[data-ak-look='vuosikertomus'] .ak-sidenav__item--active::before { color: var(--ak-ink); }
+[data-ak-look='vuosikertomus'] .ak-section,
+[data-ak-look='vuosikertomus'] .ak-statrow__tile {
+  background: transparent;
+  border: 0;
+  border-top: 2px solid var(--ak-ink);
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+[data-ak-look='vuosikertomus'] .ak-section:not(.ak-section--flush) { --ak-section-pad: 16px 0 0; }
+[data-ak-look='vuosikertomus'] .ak-section__title,
+[data-ak-look='vuosikertomus'] .ak-app--sidenav .ak-section__title { font-size: 1.625rem; font-weight: 600; letter-spacing: -0.005em; }
+[data-ak-look='vuosikertomus'] .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-ak-look='vuosikertomus'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='vuosikertomus'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='vuosikertomus'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: 0 0 var(--ak-pad); }
+[data-ak-look='vuosikertomus'] .ak-hero__before {
+  font-family: var(--ak-font-display);
+  font-size: clamp(5.5rem, 13vw, 11.5rem);
+  font-weight: 400;
+  line-height: 0.8;
+  letter-spacing: 0;
+  color: var(--ak-accent-text);
+}
+[data-ak-look='vuosikertomus'] .ak-hero__title { line-height: 1.02; letter-spacing: -0.015em; }
+[data-ak-look='vuosikertomus'] .ak-hero__sub { font-family: var(--ak-font-display); font-size: 1.3125rem; line-height: 1.3; color: var(--ak-ink); }
+[data-ak-look='vuosikertomus'] .ak-table { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+[data-ak-look='vuosikertomus'] .ak-table th { background: transparent; color: var(--ak-ink); font-weight: 700; border-bottom: 2px solid var(--ak-ink); }
+[data-ak-look='vuosikertomus'] .ak-table td { font-variant-numeric: tabular-nums; border-color: color-mix(in oklab, var(--ak-ink) 22%, var(--ak-bg)); }
+[data-ak-look='vuosikertomus'] .ak-statrow__value { font-weight: 600; font-variant-numeric: lining-nums tabular-nums; }
+[data-ak-look='vuosikertomus'] .ak-input:not(.ak-input--range) { background: var(--ak-surface); border: 0; border-bottom: 2px solid var(--ak-ink); }
+[data-ak-look='vuosikertomus'] .ak-btn { box-shadow: none; }
+[data-ak-look='vuosikertomus'] .ak-btn--primary { background: var(--ak-accent); color: var(--ak-accent-ink); border-color: var(--ak-accent); }
+[data-ak-look='vuosikertomus'] .ak-btn:not(.ak-btn--primary):not(.ak-btn--danger) { background: transparent; border: var(--ak-line-w) solid var(--ak-ink); color: var(--ak-ink); }
+[data-ak-look='vuosikertomus'] .ak-list { gap: 0; }
+[data-ak-look='vuosikertomus'] .ak-list__row {
+  background: transparent;
+  border: 0;
+  border-bottom: var(--ak-line-w) solid color-mix(in oklab, var(--ak-ink) 22%, var(--ak-bg));
+  border-radius: 0;
+  box-shadow: none;
+  padding-inline: 0;
+}
+
+/* @preset-block konserni — one company's own tool: a bar in the company's colour with words worked out to stay readable on it, neutral greys under it, headings in the colour, and Hanken Grotesk throughout.
+   The white-label corporate world Jouni chose on 2026-11-04. It has no colour of its own to defend: a style kit with one brand colour (kit.ts, `brand`) gives it the accent, the words on the accent and the accent as text, each proven on these grounds. */
+[data-ak-look='konserni'] {
+  --ak-page-image:        none;
+  --ak-surface-image:     none;
+  --ak-hero-image:        none;
+  --ak-grain:             none;
+  --ak-blur:              0px;
+  --ak-display-shadow:    none;
+  --ak-display-stroke:    0;
+  --ak-tilt:              0deg;
+  --ak-kinetic:           none;
+  --ak-ambient:           none;
+  --ak-font-display:      'Hanken Grotesk', 'Inter', system-ui, sans-serif;
+  --ak-font:              'Hanken Grotesk', 'Inter', system-ui, sans-serif;
+  --ak-weight-display:    800;
+  --ak-text-hero:         clamp(2rem, 4vw, 2.75rem);
+  --ak-radius:            10px;
+  --ak-radius-sm:         6px;
+  --ak-elev-1:            none;
+  --ak-elev-2:            0 8px 24px color-mix(in oklab, var(--ak-ink) 12%, transparent);
+  --ak-glass:             var(--ak-surface);
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)));
+  --ak-enter-distance:    6px;
+  --ak-enter-stagger:     24ms;
+  --ak-motion:            160ms;
+  --ak-spring-stiffness:  260;
+  --ak-spring-damping:    30;
+  --ak-spring-mass:       1;
+  --ak-bg:                #f1f2f4;
+  --ak-surface:           #ffffff;
+  --ak-surface-2:         #f7f8f9;
+  --ak-ink:               #16181d;
+  --ak-ink-dim:           #5a606b;
+  --ak-line:              #cbd0d8;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+}
+/* @preset-block konserni@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='konserni'], [data-ak-look='konserni'][data-theme='dark'] {
+  --ak-bg:         #0e1013;
+  --ak-surface:    #1b1e24;
+  --ak-surface-2:  #24282f;
+  --ak-ink:        #e9ebef;
+  --ak-ink-dim:    #a7adb8;
+  --ak-line:       #40454e;
+}
+/* structure: company-bar — The COMPANY BAR: the bar is filled with the company's own colour, with words worked out to stay readable on it. Neutral greys everywhere else, headings in the colour, and the chosen page tinted with it. Made for a style kit with one brand colour. */
+[data-ak-look='konserni'] .ak-app__bar {
+  background: var(--ak-accent);
+  color: var(--ak-accent-ink);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 0;
+  box-shadow: none;
+}
+[data-ak-look='konserni'] .ak-app__title,
+[data-ak-look='konserni'] .ak-app__bar .ak-app__tagline { color: var(--ak-accent-ink); }
+[data-ak-look='konserni'] .ak-app__pill .aimeat-auth-wrap { display: inline-flex; padding: 4px 6px; background: var(--ak-surface); border-radius: var(--ak-radius-sm); }
+[data-ak-look='konserni'] .ak-sidenav__item { color: var(--ak-ink); }
+[data-ak-look='konserni'] .ak-sidenav__item--active,
+[data-ak-look='konserni'] .ak-sidenav__item--active:hover {
+  background: color-mix(in oklab, var(--ak-accent) 12%, var(--ak-surface));
+  color: var(--ak-accent-text);
+  font-weight: 700;
+  box-shadow: none;
+}
+[data-ak-look='konserni'] .ak-section { box-shadow: none; }
+[data-ak-look='konserni'] .ak-section__title,
+[data-ak-look='konserni'] .ak-hero__title { color: var(--ak-accent-text); }
+[data-ak-look='konserni'] .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+[data-ak-look='konserni'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='konserni'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='konserni'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: 0 0 var(--ak-pad); }
+[data-ak-look='konserni'] .ak-hero__title { letter-spacing: -0.02em; }
+[data-ak-look='konserni'] .ak-btn--primary { background: var(--ak-accent); color: var(--ak-accent-ink); border-color: var(--ak-accent); box-shadow: none; }
+[data-ak-look='konserni'] .ak-btn--primary:hover, [data-ak-look='konserni'] .ak-btn--primary:active { filter: brightness(0.94); }
+[data-ak-look='konserni'] .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
+[data-ak-look='konserni'] .ak-input:focus { border-color: var(--ak-accent-text); }

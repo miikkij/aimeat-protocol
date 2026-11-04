@@ -19,6 +19,7 @@
  * @structure ThemeTokenKind · THEME_TOKENS · CORE_TOKENS · THEME_FACES · FACE_SLOTS · faceStack
  * @usage import { THEME_TOKENS, THEME_FACES } from './tokens.js';
  * @version-history
+ *   v1.8.0 — 2026-11-04 — Source Serif 4, Source Sans 3 and Hanken Grotesk, for the vuosikertomus and konserni looks.
  *   v1.7.0 — 2026-11-04 — Pixelify Sans, Baloo 2 and Nunito, for the Tiilitaivas theme (aimeat-fonts.css v1.7.0).
  *   v1.6.0 — 2026-10-22 — Michroma, vendored for the TDR look (aimeat-fonts.css v1.6.0).
  *   v1.5.0 — 2026-10-17 — Newsreader, vendored for the kirjapaino look (aimeat-fonts.css v1.5.0).
@@ -129,6 +130,10 @@ export const THEME_FACES: Readonly<Record<string, string>> = {
     'Pixelify Sans': "'Pixelify Sans', 'Baloo 2', system-ui, sans-serif",
     'Baloo 2': "'Baloo 2', 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
     'Nunito': "'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    // Vendored on 2026-11-04 for the vuosikertomus and konserni looks.
+    'Source Serif 4': "'Source Serif 4', Georgia, 'Times New Roman', serif",
+    'Source Sans 3': "'Source Sans 3', 'Inter', system-ui, sans-serif",
+    'Hanken Grotesk': "'Hanken Grotesk', 'Inter', system-ui, sans-serif",
 };
 
 /** The three faces a theme may choose, and the token each one sets. */

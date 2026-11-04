@@ -12,6 +12,7 @@
  * @structure ak-list · ak-listdetail · ak-grid + ak-card · ak-mediacard · ak-timeline
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v1.1.0 — 2026-11-04 — The marker: <mark> wears --ak-mark and --ak-mark-ink, proven on every look.
  *   v0.39.0 — 2026-09-05 — The list, the card grid and the timeline read their own tokens instead
  *     of the literals they carried: --ak-list-gap / -row-gap / -row-pad-y / -row-pad-x /
  *     -line-gap, --ak-card-min / -gap / -aspect / -pad, --ak-timeline-dot / -gap / -rail /
@@ -782,4 +783,14 @@ button.ak-card:hover { box-shadow: var(--ak-elev-2); transform: translateY(-2px)
   [data-ak-choreo='cinema'] .ak-mosaic__unit,
   [data-ak-choreo='cinema'] .ak-mosaic__units--grid > *,
   [data-ak-choreo='cinema'] .ak-hero { animation: none; }
+}
+
+/* The marker: words a machine proposed and nobody has accepted yet. The pair is a contract token,
+   proven on every look (AK-MARK), and clone keeps the padding on each line of a wrapped mark. */
+mark {
+  background: var(--ak-mark);
+  color: var(--ak-mark-ink);
+  padding: 0 0.2em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }

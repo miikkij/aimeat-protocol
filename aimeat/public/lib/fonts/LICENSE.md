@@ -34,6 +34,9 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | IBM Plex Mono | v20 on Google Fonts (static 400, 500 and 600) | `ibm-plex-mono-400-latin.woff2`, `ibm-plex-mono-400-latin-ext.woff2`, `ibm-plex-mono-500-latin.woff2`, `ibm-plex-mono-500-latin-ext.woff2`, `ibm-plex-mono-600-latin.woff2`, `ibm-plex-mono-600-latin-ext.woff2` | © 2017 IBM Corp. (https://github.com/IBM/plex), Reserved Font Name "Plex" | https://fonts.google.com/specimen/IBM+Plex+Mono |
 | Selawik | 1.01 (static 300, 350, 400, 600, 700; one file per cut, each whole) | `selawik-300.woff2`, `selawik-350.woff2`, `selawik-400.woff2`, `selawik-600.woff2`, `selawik-700.woff2` | © 2015 Microsoft Corporation (www.microsoft.com), Reserved Font Name Selawik; Selawik is a trademark of Microsoft Corporation | https://github.com/microsoft/Selawik/releases/tag/1.01 |
 | Michroma | v21 on Google Fonts (static 400, the only cut) | `michroma-400-latin.woff2`, `michroma-400-latin-ext.woff2` | © 2011 The Michroma Project Authors (https://github.com/googlefonts/Michroma-font) | https://fonts.google.com/specimen/Michroma |
+| Source Serif 4 | v15 on Google Fonts (variable opsz 8–60, wght 200–900) | `source-serif-4-var-latin.woff2`, `source-serif-4-var-latin-ext.woff2` | © 2014 The Source Serif 4 Project Authors (https://github.com/adobe-fonts/source-serif) | https://fonts.google.com/specimen/Source+Serif+4 |
+| Source Sans 3 | v20 on Google Fonts (variable wght 200–900) | `source-sans-3-var-latin.woff2`, `source-sans-3-var-latin-ext.woff2` | © 2010-2020 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source' | https://fonts.google.com/specimen/Source+Sans+3 |
+| Hanken Grotesk | v12 on Google Fonts (variable wght 100–900) | `hanken-grotesk-var-latin.woff2`, `hanken-grotesk-var-latin-ext.woff2` | © 2021 The Hanken Grotesk Project Authors (https://github.com/marcologous/hanken-grotesk) | https://fonts.google.com/specimen/Hanken+Grotesk |
 | Pixelify Sans | v3 on Google Fonts (variable wght 400–700) | `pixelify-sans-var-latin.woff2`, `pixelify-sans-var-latin-ext.woff2` | © 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans) | https://fonts.google.com/specimen/Pixelify+Sans |
 | Nunito | v32 on Google Fonts (variable wght 200–1000, declared 400–800) | `nunito-var-latin.woff2`, `nunito-var-latin-ext.woff2` | © 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito) | https://fonts.google.com/specimen/Nunito |
 
@@ -90,3 +93,9 @@ unchanged. Their licences were read from the Google Fonts repository
 (https://github.com/google/fonts/blob/main/ofl/pixelifysans/OFL.txt and
 https://github.com/google/fonts/blob/main/ofl/nunito/OFL.txt): SIL OFL 1.1, copyright as in the rows
 above, no Reserved Font Name.
+
+Source Serif 4, Source Sans 3 and Hanken Grotesk vendored 2026-11-04 for the vuosikertomus and konserni
+looks (office and corporate apps). All three are Google Fonts' latin and latin-ext subsets, unchanged.
+Their licences were read from the Google Fonts repository (https://github.com/google/fonts/tree/main/ofl,
+folders sourceserif4, sourcesans3 and hankengrotesk): SIL OFL 1.1. Source Sans 3 keeps Adobe's Reserved
+Font Name "Source"; the files here are not modified.
