@@ -81,7 +81,7 @@
       "digest": "sha256:6fa688b45c8a057d593bd92e"
     },
     "07-security.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/config-posture.ts",
         "aimeat/src/middleware/cors.ts",
@@ -90,7 +90,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/mcp-client/capability-use-setting.ts"
       ],
-      "digest": "sha256:836debd8511668438b3fa11b"
+      "digest": "sha256:c256bee9fb20a48a927ec813"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -182,7 +182,7 @@
       "digest": "sha256:4a124591b51f02e11c124e14"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-03",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -198,7 +198,7 @@
         "docs/operations/federation.md",
         "docs/coding-guidelines/environment-configs.md"
       ],
-      "digest": "sha256:89200184b2d088c3fbe8038b"
+      "digest": "sha256:aa2b8dae13f007084bae9a7c"
     },
     "README.md": {
       "reviewedOn": "2026-11-02",
@@ -305,7 +305,7 @@
     },
     "07-security.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
-      "aimeat/src/middleware/cors.ts": "0f742801d6902ab5",
+      "aimeat/src/middleware/cors.ts": "d9d975cd1e5657d6",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "1cc9b1c65b8ad105",
@@ -385,9 +385,9 @@
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
       "aimeat/src/services/once-only-step.ts": "08156126e71309f0",
-      "aimeat/src/services/event-bus.ts": "0ccba87737ae9f24",
+      "aimeat/src/services/event-bus.ts": "f73b40db41597ad5",
       "aimeat/src/mcp/oauth.ts": "66a8f23e8c8562ae",
-      "aimeat/src/mcp/legacy-sessions.ts": "9307c49d8f8d3ff6",
+      "aimeat/src/mcp/legacy-sessions.ts": "4784fea1f0026443",
       "aimeat/src/services/passkeys.ts": "57fd388e3fb070ef",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
       "aimeat/src/services/ai-jobs/service.ts": "2f42b114f3d2e845",
