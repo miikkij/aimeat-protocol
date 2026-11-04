@@ -36,6 +36,12 @@ export const CREDENTIAL_KINDS = {
             + 'POST /v1/parties/token (services/parties/verify.ts). No credential is 401, a stopped party 403.',
         admitsNoCredential: false,
     },
+    'app-party': {
+        credential: 'A person registered to one app without an account: the app party token from the app\'s sign-in link, '
+            + 'checked for this app, its epoch, the party\'s status, the node setting and the Origin '
+            + '(services/app-parties/service.ts appPartyFromRequest). No credential is 401.',
+        admitsNoCredential: false,
+    },
 } as const satisfies Record<string, CredentialKindInfo>;
 
 export type CredentialKind = keyof typeof CREDENTIAL_KINDS;
