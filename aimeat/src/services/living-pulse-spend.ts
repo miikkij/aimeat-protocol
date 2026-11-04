@@ -77,7 +77,7 @@ function ownPrincipal(principal: string, owner: string, nodeId: string): boolean
  * The principal whose permission a config's AI spend runs under, or null for the owner's own. An
  * agent- or app-held config: its holder. A config in the owner's namespace: its latest writer in the
  * write tally when that is not the owner: an agent or app of the owner, or a member of another
- * account who published over the config in a shared workspace (routes/organisms/shared.ts records
+ * account who published over the config in a shared workspace (services/organism-gate.ts records
  * the publisher; secaudit2026nov02d round 13).
  */
 export async function pulseSpender(deps: Deps, holder: string, key: string): Promise<string | null> {

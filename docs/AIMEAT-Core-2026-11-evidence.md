@@ -183,7 +183,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | COL-03 | met | `aimeat/src/services/organism-agent-access.ts:13-52`; `aimeat/src/routes/organisms.ts:127-145` | |
 | COL-04 | met | `aimeat/src/services/organism-namespace-access.ts` (content owned by the writer's identity) | |
 | COL-05 | met | `aimeat/src/services/organism-export.ts` (header); `aimeat/src/routes/organisms/workspace-transfer.ts:108,135` | |
-| COL-06 | met | `aimeat/src/routes/organisms/shared.ts` (publish, about 255-265); `aimeat/src/config.ts:326` (20 versions) | |
+| COL-06 | met | `aimeat/src/services/organism-gate.ts` (publish, about 285-300); `aimeat/src/config.ts:326` (20 versions) | |
 | COL-07 | met | `aimeat/src/services/write-guards.ts:166-186` | |
 | COL-08 | met | `aimeat/src/services/write-guards.ts:160-164`; `aimeat/src/routes/organisms/gates.ts:248-252`; `aimeat/src/services/memory-bin.ts:145-154` | |
 | COL-09 | partial | `aimeat/src/routes/organisms/workspace-access.ts:389-410` (`organism:invite`); `aimeat/src/services/workspace-roles.ts:46,86` | Not verified that an owner who is a plain member is refused. |

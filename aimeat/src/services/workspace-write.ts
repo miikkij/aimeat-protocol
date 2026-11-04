@@ -53,7 +53,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { fresherRec, collapseKeyTo } from '../routes/organisms/record-helpers.js';
+import { fresherRec, collapseKeyTo } from './organism-record-helpers.js';
 import { afterMemoryWrite } from './memory-write.js';
 import { emitChange } from './event-bus.js';
 import { isSameOwner } from '../utils/gaii.js';

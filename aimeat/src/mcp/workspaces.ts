@@ -188,7 +188,8 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { canWriteNamespaceRule, createOrganismHelpers } from '../routes/organisms/shared.js';
+import { canWriteNamespaceRule } from '../services/organism-record-helpers.js';
+import { createOrganismGate } from '../services/organism-gate.js';
 import { registerWorkspaceCreateTool } from './workspace-create.js';
 import { registerWorkspaceRowTools } from './workspace-rows.js';
 import { registerWorkspaceDocumentTools } from './workspace-documents.js';
@@ -242,7 +243,7 @@ export function registerWorkspaceTools(
     // plain functions that take identities and return a result rather than an HTTP response — so
     // this door calls them and renders the answer as text, instead of carrying a second copy that
     // drifted apart on the audit trail, the draft owner and the cross-owner draft lookup.
-    const H = createOrganismHelpers(config, storage);
+    const H = createOrganismGate(config, storage);
     const agentGaii = getAgentGaii();
     const parsed = parseGAII(agentGaii);
     const ownerName = localAccountName(agentGaii);

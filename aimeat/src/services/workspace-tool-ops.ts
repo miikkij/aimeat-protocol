@@ -128,8 +128,8 @@
  *     opened record, which is what a script needs to swap against.
  */
 import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
-import { canWriteNamespaceRule, readOrganismConfig, createOrganismHelpers, fresherRec } from '../routes/organisms/shared.js';
-import type { BatchPublishItemResult } from '../routes/organisms/shared.js';
+import { canWriteNamespaceRule, readOrganismConfig, fresherRec } from './organism-record-helpers.js';
+import { createOrganismGate, type BatchPublishItemResult } from './organism-gate.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { workspaceRowIndex } from './workspace-rows/row-service.js';
 import type { RowObjectType } from './workspace-rows/row-space.js';
@@ -549,7 +549,7 @@ export async function publishWorkspaceOp(
     const { organismId, ws, id } = args;
     // A space's name is taken as well as its namespace, before the role check and the fence read it.
     const namespace = await resolveSpaceNamespace(storage, organismId, ws, args.namespace);
-    const H = createOrganismHelpers(config, storage);
+    const H = createOrganismGate(config, storage);
     const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
     const role = await memberRoleOf(storage, caller, organismId);
     if (!role || !canWriteNamespaceRule(role, namespace)) {
@@ -703,7 +703,7 @@ export async function publishRecordsBatchOp(
             + 'so a reviewer publishes them, or ask an organism admin to turn the publish gate off for the import.');
     }
 
-    const H = createOrganismHelpers(config, storage);
+    const H = createOrganismGate(config, storage);
     const publisher = caller.principal;
     const early: BatchPublishItemResult[] = [];
     let ids: string[];

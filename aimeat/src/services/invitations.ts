@@ -393,8 +393,8 @@ export async function createEmailInvitation(
  * active immediately, grants applied, and they are notified (they can always leave). */
 
 /** Find a workspace's registry entry across every member's registry copy (one key per creator).
- *  Standalone twin of routes/organisms/shared.ts findWsEntry so the service layer needs no route
- *  helper bag. */
+ *  Standalone twin of services/organism-gate.ts findWsEntry, kept as it was written when that
+ *  helper lived in a route file. */
 export async function findWorkspaceEntry(
   storage: Storage, orgId: string, ws: string,
 ): Promise<{ id: string; name?: string; createdBy?: string; ownerGaii: string } | null> {
@@ -442,7 +442,7 @@ export async function applyInvitationWorkspaceGrants(
  * things outlive that row and both of them ARE access:
  *
  *   1. `organism.agentGaiis`. Every membership gate in the organism code treats a GAII listed there as
- *      a member in its own right (routes/organisms/shared.ts memberRole, the nine workspace read
+ *      a member in its own right (services/organism-gate.ts memberRole, the nine workspace read
  *      gates, the MCP workspace tools), so an ejected person kept the whole organism through their own
  *      agent's token while the roster showed them gone.
  *   2. The workspace-role consents granted to them. Those are owned by each workspace's CREATOR and

@@ -22,7 +22,7 @@
  *
  *   A WORKSPACE SHARE RECORD (`organism.<id>.w.<ws>.meta.share`) is an ordinary record that carries
  *   one secret field: the scrypt hash of the share password. The share routes read it from storage
- *   and never show it (routes/organisms/shared.ts), but the generic doors returned it to the creator's
+ *   and never show it (services/organism-gate.ts), but the generic doors returned it to the creator's
  *   agents and to any app holding memory:read. They now show `has_password` in its place, and
  *   `has_ics_key` in place of the SHA-256 of the calendar feed key, the second secret on that record,
  *   which the share routes likewise never show. The record stays writable through the generic doors:

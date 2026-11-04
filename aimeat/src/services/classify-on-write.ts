@@ -35,7 +35,7 @@
  *
  *   The callers: services/memory-write.ts writeMemoryRecord, services/workspace-write.ts
  *   writeWorkspaceRecord, services/memory-batch-write.ts writeMemoryBatch, PUT and PATCH
- *   /v1/memory/:key, POST /v1/memory/copy, and the organism publish paths in routes/organisms/shared.ts.
+ *   /v1/memory/:key, POST /v1/memory/copy, and the organism publish paths in services/organism-gate.ts.
  *
  *   A CONTAINER (an organism, a workspace, a board, an app) is judged on its name and description
  *   when it is created or renamed (classifyContainerAfterWrite, plan doc-mvdipuyqraas, L1.6), by the

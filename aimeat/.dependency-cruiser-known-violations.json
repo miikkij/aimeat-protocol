@@ -84,20 +84,6 @@
     }
   },
   {
-    "type": "dependency",
-    "from": "src/mcp/workspaces.ts",
-    "to": "src/routes/organisms/shared.ts",
-    "unresolvedTo": "../routes/organisms/shared.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "mcp-does-not-import-routes"
-    }
-  },
-  {
     "type": "cycle",
     "from": "src/cli/connect/agent-key.ts",
     "to": "src/cli/connect/config.ts",
@@ -695,48 +681,6 @@
     "from": "src/services/subdomain-sites.ts",
     "to": "src/routes/subdomains.ts",
     "unresolvedTo": "../routes/subdomains.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/workspace-suggestions.ts",
-    "to": "src/routes/organisms/shared.ts",
-    "unresolvedTo": "../routes/organisms/shared.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/workspace-tool-ops.ts",
-    "to": "src/routes/organisms/shared.ts",
-    "unresolvedTo": "../routes/organisms/shared.js",
-    "dependencyTypes": [
-      "local",
-      "import"
-    ],
-    "rule": {
-      "severity": "error",
-      "name": "services-do-not-import-routes"
-    }
-  },
-  {
-    "type": "dependency",
-    "from": "src/services/workspace-write.ts",
-    "to": "src/routes/organisms/record-helpers.ts",
-    "unresolvedTo": "../routes/organisms/record-helpers.js",
     "dependencyTypes": [
       "local",
       "import"
