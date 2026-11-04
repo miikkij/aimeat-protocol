@@ -34,6 +34,7 @@
  * @usage
  *   const rule = await ruleForCaller(storage, caller.gaii, 'send-reply', callerKind(caller));
  * @version-history
+ *   2026-11-04 — The rule count reads at most MAX_RULES rows (codebase analysis 2026-11-03, item C1).
  *   v1.1.0 — 2026-09-23 — A rule that names a decision provider is refused at write time when the
  *     provider does not exist or cannot carry its questions.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
@@ -112,7 +113,8 @@ export async function putRule(
   }
 
   const existing = await getRule(storage, ownerGhii, id);
-  if (!existing && (await storage.listMemoryMeta(ownerGhii, { prefix: RULE_PREFIX })).length >= MAX_RULES) {
+  // `limit` stops the read at the ceiling: the comparison needs to know only whether there are that many.
+  if (!existing && (await storage.listMemoryMeta(ownerGhii, { prefix: RULE_PREFIX, limit: MAX_RULES })).length >= MAX_RULES) {
     throw new DecideError('TOO_MANY_RULES', 409, `An account holds at most ${MAX_RULES} decision rules. Delete one you no longer use.`);
   }
   const now = new Date().toISOString();

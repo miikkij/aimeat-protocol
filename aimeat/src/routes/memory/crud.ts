@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — GET /v1/memory?limit=N with values reads the values of its page only; the listing,
+ *     `total` and the quota come from the meta rows, with the same answer (services/memory-list-page.ts;
+ *     codebase analysis 2026-11-03, item C1).
  *   2026-10-20 — SECURITY: GET /v1/memory with owner_scope or ?agent= asks the organism read rule
  *     (organismReadableRecords) on the meta and value paths and the count, as GET /v1/memory/:key does,
  *     and so does GET /v1/memory/search with ?agent=.
@@ -97,6 +100,7 @@ import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js
 import { organismReadableRecords } from '../../services/organism-namespace-access.js';
 import { callerOf } from '../../middleware/caller.js';
 import { listMemoryMetaFor, searchMemoryRecords } from '../../services/memory-query.js';
+import { memoryPageWithValues, shownMemoryBytes } from '../../services/memory-list-page.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -355,8 +359,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // listing was refused for being too large therefore had NO way to ask for less, which is what
     // turned a size wall into a blocker rather than a tuning problem. Measured by crewaimeat-dev on
     // 2026-09-04, four values on each of two doors. The slice is on the way OUT rather than in the
-    // query, because that is where the wall is — the tunnel refuses on RESPONSE size — and neither
-    // storage provider's listMemory takes a limit. → pitfalls §44
+    // query, because that is where the wall is — the tunnel refuses on RESPONSE size — and the
+    // total, the count and the quota describe every match, which the classification reader, the
+    // organism rule and the owner-scope view decide row by row after the query. The values path
+    // reads the values of the page only (below, 2026-11-04). → pitfalls §44
     const limitParam = req.query.limit as string | undefined;
     const limit = limitParam !== undefined
       ? Math.min(MEMORY_LIST_MAX_LIMIT, Math.max(1, parseInt(limitParam, 10) || MEMORY_LIST_MAX_LIMIT))
@@ -466,38 +472,60 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    let loaded: MemoryRecord[];
-    if (ownerScope && !agentParam) {
-      // Owner-scope: GHII + all the owner's agents + eco apps (deduped, GHII first) via the service.
-      // (services/owner-memory.ts remains the shared impl the service composes, so the workflow signal
-      // evaluator reads the exact same set — same-owner-access invariant.)
-      loaded = await memoryDb.listOwnerScope(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
-    } else {
-      loaded = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
-    }
-    // The one presentation of memory values: the classification reader plus the credential mask.
-    const allRecords = await presentMemories(reader, await organismView(ownerScopeView(loaded, self, !restricted)));
-
-    // ?count=true with tag/maxFlags filters — count from the materialized list (rare path). Before
-    // the limit, like the meta path: a count answers "how many are there", not "how many did I ask for".
-    if (req.query.count === 'true') {
-      res.json(success(config.nodeId, { count: allRecords.length }));
-      return;
-    }
-
     // THE ONE THAT CARRIES VALUES, so it is the one the limit rescues. This path hands back every
     // matching record's full value, and a caller who wanted eighty key names was moved 25 MB of
     // article bodies to get them — until the tunnel refused the lot and left no smaller thing to ask
     // for. The values themselves stay, because this route is also how the Memory tab reads a working
     // set; what changed is that the caller can now bound it. `?include=meta` remains the right call
     // for anyone who only wants to know what exists, and is what `aimeat_memory_list` sends.
-    const records = limit !== undefined ? allRecords.slice(0, limit) : allRecords;
-
-    // Calculate total size for quota reporting. Summed over EVERYTHING that matched, not over the
+    //
+    // `total`, `quota.used_keys` and `quota.used_bytes` describe EVERYTHING that matched, not the
     // slice: the quota describes the keyspace and must not shrink because a caller passed a limit.
+    let records: MemoryRecord[];
+    let total: number;
     let totalBytes = 0;
-    for (const r of allRecords) {
-      totalBytes += Buffer.byteLength(JSON.stringify(r.value), 'utf8');
+    if (limit !== undefined) {
+      // A bounded listing decides what matches from the meta rows, through the same filters in the
+      // same order as the unbounded path below, and reads the values of its page only; used_bytes
+      // is the same sum of the shown values (services/memory-list-page.ts). Before 2026-11-04 every
+      // matching value was read and serialised twice to return N of them (codebase analysis
+      // 2026-11-03, item C1).
+      const meta = await listMemoryMetaFor({ storage, config }, {
+        ownerScopeOf: (ownerScope && !agentParam) ? req.auth!.owner : null, gaii,
+        prefix, visibility, tags, maxFlags, archived,
+      });
+      const matched = await reader.show(await organismView(ownerScopeView(meta, self, !restricted)), r => memoryTarget(r.ownerGaii, r.key));
+      // ?count=true with tag/maxFlags filters: before the limit, like the meta path.
+      if (req.query.count === 'true') {
+        res.json(success(config.nodeId, { count: matched.length }));
+        return;
+      }
+      records = await memoryPageWithValues(storage, matched.slice(0, limit));
+      total = matched.length;
+      totalBytes = await shownMemoryBytes(storage, matched);
+    } else {
+      let loaded: MemoryRecord[];
+      if (ownerScope && !agentParam) {
+        // Owner-scope: GHII + all the owner's agents + eco apps (deduped, GHII first) via the service.
+        // (services/owner-memory.ts remains the shared impl the service composes, so the workflow signal
+        // evaluator reads the exact same set — same-owner-access invariant.)
+        loaded = await memoryDb.listOwnerScope(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived });
+      } else {
+        loaded = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
+      }
+      // The one presentation of memory values: the classification reader plus the credential mask.
+      records = await presentMemories(reader, await organismView(ownerScopeView(loaded, self, !restricted)));
+
+      // ?count=true with tag/maxFlags filters — count from the materialized list (rare path). Before
+      // the limit, like the meta path: a count answers "how many are there", not "how many did I ask for".
+      if (req.query.count === 'true') {
+        res.json(success(config.nodeId, { count: records.length }));
+        return;
+      }
+      total = records.length;
+      for (const r of records) {
+        totalBytes += Buffer.byteLength(JSON.stringify(r.value), 'utf8');
+      }
     }
 
     res.json(success(config.nodeId, {
@@ -519,14 +547,14 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         // TARGET-082: an AI shown a warning-classified record is told so, per item.
         ...warningField(r),
       })),
-      total: allRecords.length,
-      ...(records.length < allRecords.length
+      total,
+      ...(records.length < total
         ? { shown: records.length, truncated: true,
-            hint: `Showing the first ${records.length} of ${allRecords.length}. Narrow with prefix/tags, add include=meta to drop the values, or raise limit (max ${MEMORY_LIST_MAX_LIMIT}).` }
+            hint: `Showing the first ${records.length} of ${total}. Narrow with prefix/tags, add include=meta to drop the values, or raise limit (max ${MEMORY_LIST_MAX_LIMIT}).` }
         : {}),
       quota: {
         max_keys: config.memoryMaxKeysPerAgent,
-        used_keys: allRecords.length,
+        used_keys: total,
         max_bytes: config.memoryQuotaMb * 1024 * 1024,
         used_bytes: totalBytes,
       },

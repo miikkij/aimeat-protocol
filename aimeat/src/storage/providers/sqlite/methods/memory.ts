@@ -8,6 +8,12 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-11-04 — getMemoryTotals and compactMemoryTotals over memory_totals; sumMemoryBytes reads it
+ *     (repos/memory.ts); setMemory's first read takes version, trackable and groupId, and the whole
+ *     row only for a trackable key (codebase analysis 2026-11-03, item C3).
+ *   2026-11-04 — listMemory, listMemoryMeta and their many-owner twins take `limit` and a key cursor in
+ *     SQL (allPaged, repos/memory.ts memoryPageSql); without them the statement is unchanged
+ *     (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity, over repos/memory.ts (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
  *     (secaudit 2026-10-31 inv-24).
@@ -26,7 +32,7 @@
  */
 import type { MemoryRecord, ArchiveFilter } from '../../../interface.js';
 import type {
-  MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord, MemoryMetaRow,
+  MemoryListOpts, MemoryTextHit, MemoryTextSearchOpts, MemoryTotals, MemoryVersionRecord, MemoryMetaRow,
 } from '../../../repositories/memory.repository.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { searchValueText } from '../../../search-text.js';
@@ -37,7 +43,7 @@ import {
   archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo,
   unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo,
   NOT_DELETED_SQL, LIVE_SQL, deleteExpiredMemory as deleteExpiredMemoryRepo,
-  listKeyActivity as listKeyActivityRepo,
+  listKeyActivity as listKeyActivityRepo, memoryPageSql,
 } from '../repos/memory.js';
 import type { KeyActivityRow } from '../../../repositories/memory.repository.js';
 import { globPrefix } from '../../../key-prefix.js';
@@ -67,6 +73,13 @@ function rowToMeta(row: Record<string, unknown>): MemoryMetaRow {
   };
 }
 
+/** A keyspace listing's statement run unpaged, as it always was, or with the page memoryPageSql builds. */
+function allPaged(db: SqliteStorage['db'], sql: string, params: unknown[], opts: MemoryListOpts | undefined): Record<string, unknown>[] {
+  const page = memoryPageSql(opts, new Date().toISOString());
+  if (!page) return db.prepare(sql).all(...params) as Record<string, unknown>[];
+  return db.prepare(sql + page.where + page.tail).all(...params, ...page.whereParams, ...page.tailParams) as Record<string, unknown>[];
+}
+
 export const memoryMethods = {
 
   // ══════════════════════════════════════════════════════════
@@ -81,9 +94,17 @@ export const memoryMethods = {
     //
     // The old value is not recoverable after this, and that is the right rule: the bin protects
     // against a DELETE, not against an overwrite, exactly as it never protected against one before.
-    const rawRow = this.db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ?')
-      .get(record.ownerGaii, record.key) as Record<string, unknown> | undefined;
-    const existing = rawRow ? this.deserializeMemory(rawRow) : null;
+    //
+    // The probe reads what this decides with (version, trackable, groupId); the value is read only for
+    // a trackable key, whose history keeps it (codebase analysis 2026-11-03, item C3: every column,
+    // value included, was read on every write).
+    const probe = this.db.prepare('SELECT version, trackable, groupId FROM memory WHERE ownerGaii = ? AND key = ?')
+      .get(record.ownerGaii, record.key) as { version: number; trackable: number; groupId: string | null } | undefined;
+    const existing: MemoryRecord | Pick<MemoryRecord, 'version' | 'trackable' | 'groupId'> | null = !probe ? null
+      : probe.trackable
+        ? this.deserializeMemory(this.db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ?').get(record.ownerGaii, record.key) as Record<string, unknown>)
+        // The same mapping deserializeMemory gives these three columns.
+        : { version: probe.version, ...(probe.groupId ? { groupId: probe.groupId } : {}) };
     // Trackable is a property of the key: inherit the existing setting if the writer didn't specify, so
     // a generic rewrite never silently turns tracking off. Archiving keeps the PREVIOUS version.
     const trackable = record.trackable ?? existing?.trackable ?? false;
@@ -97,15 +118,17 @@ export const memoryMethods = {
     const searchValues = searchValueText(record.value, record.key);
     if (existing) {
       if (existing.trackable) {
+        // A trackable key's row was read whole above.
+        const full = existing as MemoryRecord;
         // Archive the about-to-be-overwritten version into the separate history table (append-only).
         this.db.prepare(
           `INSERT OR IGNORE INTO memory_history (ownerGaii, key, version, value, actor, event, recordedAt)
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         ).run(
-          existing.ownerGaii, existing.key, existing.version,
-          JSON.stringify(existing.value),
-          this.memoryAnnotation(existing.value, '_actor'), this.memoryAnnotation(existing.value, '_event'),
-          existing.updatedAt,
+          full.ownerGaii, full.key, full.version,
+          JSON.stringify(full.value),
+          this.memoryAnnotation(full.value, '_actor'), this.memoryAnnotation(full.value, '_event'),
+          full.updatedAt,
         );
       }
       record.version = existing.version + 1;
@@ -227,7 +250,7 @@ export const memoryMethods = {
     return record;
   },
 
-  async listMemory(this: SqliteStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]> {
+  async listMemory(this: SqliteStorage, ownerGaii: string, opts?: MemoryListOpts): Promise<MemoryRecord[]> {
     let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
     const params: unknown[] = [ownerGaii];
 
@@ -241,7 +264,7 @@ export const memoryMethods = {
     }
     sql += archivedSql(opts?.archived);
 
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const rows = allPaged(this.db, sql, params, opts);
     const results: MemoryRecord[] = [];
     for (const row of rows) {
       const record = this.deserializeMemory(row);
@@ -269,6 +292,17 @@ export const memoryMethods = {
 
   async sumMemoryBytes(this: SqliteStorage, ownerGaii: string): Promise<number> {
     return sumMemoryBytesRepo(this.db, ownerGaii);
+  },
+
+  /** The kept totals (schema-memory-totals.ts): one row per owner, none when both are zero. */
+  async getMemoryTotals(this: SqliteStorage, ownerGaii: string): Promise<MemoryTotals> {
+    const row = this.db.prepare('SELECT keys, bytes FROM memory_totals WHERE ownerGaii = ?').get(ownerGaii) as { keys: number; bytes: number } | undefined;
+    return { keys: row?.keys ?? 0, bytes: row?.bytes ?? 0 };
+  },
+
+  /** Nothing to fold: the triggers keep one row per owner and remove a row at zero. */
+  async compactMemoryTotals(this: SqliteStorage): Promise<number> {
+    return 0;
   },
 
   async sumMemoryBytesForOwners(this: SqliteStorage, ownerGaiis: string[]): Promise<number> {
@@ -652,7 +686,7 @@ export const memoryMethods = {
   async listMemoryKeysByPrefix(this: SqliteStorage, keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]> {
     return this.db.prepare('SELECT ownerGaii, key FROM memory WHERE key GLOB ? AND archived = 0 AND deletedAt IS NULL').all(globPrefix(keyPrefix)) as { ownerGaii: string; key: string }[];
   },
-  async listMemoryMeta(this: SqliteStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]> {
+  async listMemoryMeta(this: SqliteStorage, ownerGaii: string, opts?: MemoryListOpts): Promise<MemoryMetaRow[]> {
     // META projection: select metadata + byteSize, NEVER the `value` column (the whole point — a
     // keyspace of thousands of keys lists without loading/serialising any value). ttlHours + createdAt
     // are read only to prune lazily-expired rows, then dropped from the result.
@@ -662,7 +696,7 @@ export const memoryMethods = {
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
 
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const rows = allPaged(this.db, sql, params, opts);
     const out: MemoryMetaRow[] = [];
     for (const row of rows) {
       const ttlHours = row.ttlHours as number | null;
@@ -681,7 +715,7 @@ export const memoryMethods = {
     return out;
   },
 
-  async listMemoryForOwners(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryRecord[]> {
+  async listMemoryForOwners(this: SqliteStorage, ownerGaiis: string[], opts?: MemoryListOpts): Promise<MemoryRecord[]> {
     if (ownerGaiis.length === 0) return [];
     const ph = ownerGaiis.map(() => '?').join(',');
     let sql = `SELECT * FROM memory WHERE ownerGaii IN (${ph})`;
@@ -689,7 +723,7 @@ export const memoryMethods = {
     if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const rows = allPaged(this.db, sql, params, opts);
     const results: MemoryRecord[] = [];
     for (const row of rows) {
       const record = this.deserializeMemory(row);
@@ -701,7 +735,7 @@ export const memoryMethods = {
     return results;
   },
 
-  async listMemoryMetaForOwners(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]> {
+  async listMemoryMetaForOwners(this: SqliteStorage, ownerGaiis: string[], opts?: MemoryListOpts): Promise<MemoryMetaRow[]> {
     if (ownerGaiis.length === 0) return [];
     const ph = ownerGaiis.map(() => '?').join(',');
     let sql = `SELECT ${META_COLS} FROM memory WHERE ownerGaii IN (${ph})`;
@@ -709,7 +743,7 @@ export const memoryMethods = {
     if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const rows = allPaged(this.db, sql, params, opts);
     const out: MemoryMetaRow[] = [];
     for (const row of rows) {
       const ttlHours = row.ttlHours as number | null;

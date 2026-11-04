@@ -1,7 +1,8 @@
 {
-  "note": "Storage list methods with nothing to bound what they return, and the calls outside src/storage that read a whole table through one (scripts/check-unbounded-lists.ts). Seeded 2026-10-20 from the QA audit of 2026-10-16 (P7-10). An entry under methods is DEBT, a known unbounded read nobody has judged yet, or the reason the list cannot grow. Answering one means giving the method a limit and a cursor, or replacing DEBT with that reason. wholeTableCalls counts calls with no arguments per file; a count may only fall, and the gate fails until a fallen count is lowered here. The counts of services/account-event-task-keep.ts, services/app-tool-invoke-keep.ts, services/knowledge-link-owner-keep.ts, services/datapackage/audience-record.ts and services/portfolio-read-hold-keep.ts are once-only start steps (server-bootstrap/once-only-keep-steps.ts): each reads those tables whole once per node, before the node serves, and never in a request. Re-seeding forgives every entry, so it is a decision to ask about, never maintenance.",
+  "note": "Storage list methods with nothing to bound what they return, and the calls outside src/storage that read a whole table through one (scripts/check-unbounded-lists.ts). Seeded 2026-10-20 from the QA audit of 2026-10-16 (P7-10). An entry under methods is DEBT, a known unbounded read nobody has judged yet, or the reason the list cannot grow. Answering one means giving the method a limit and a cursor, or replacing DEBT with that reason. wholeTableCalls counts calls with no arguments per file; a count may only fall, and the gate fails until a fallen count is lowered here. The counts of services/account-event-task-keep.ts, services/app-tool-invoke-keep.ts, services/knowledge-link-owner-keep.ts, services/datapackage/audience-record.ts and services/portfolio-read-hold-keep.ts are once-only start steps (server-bootstrap/once-only-keep-steps.ts): each reads those tables whole once per node, before the node serves, and never in a request. Re-seeding forgives every entry, so it is a decision to ask about, never maintenance. On 2026-11-04 the gate began to decide a bound from the parameter's TYPE (an options type with a limit, cursor or page field, or a scalar named limit, since, after and the like) instead of from its name, which had counted any parameter called opts, query or filter as a bound (codebase analysis 2026-11-03, item C1). The 27 entries added that day are not new debt: they are lists the old name test could not see, entered as DEBT. The count went from 69 to 96.",
   "methods": {
     "getAllConfigValues": "DEBT: ConfigRepository.getAllConfigValues() reads the whole table, with no limit or cursor",
+    "listActions": "DEBT: ActionRepository.listActions(opts) returns every match for its scope, with no limit or cursor",
     "listActionsByProvider": "DEBT: ActionRepository.listActionsByProvider(gaii) returns every match for its scope, with no limit or cursor",
     "listActiveSessions": "DEBT: SessionRepository.listActiveSessions(owner) returns every match for its scope, with no limit or cursor",
     "listAgents": "DEBT: AgentRepository.listAgents() reads the whole table, with no limit or cursor",
@@ -16,26 +17,46 @@
     "listAppVersionSizes": "DEBT: AppRepository.listAppVersionSizes(ownerGaii, filename) returns every match for its scope, with no limit or cursor",
     "listAppVersionSummaries": "DEBT: AppRepository.listAppVersionSummaries(ownerGaii, filename) returns every version of one app, with no limit or cursor. Five named columns and no content (about 100 bytes a row), in place of listAppVersions on GET .../versions (codebase analysis 2026-11-03, item A1); no version pruning exists, so it grows with every publish",
     "listAutomationRecipesByOwner": "DEBT: EcosystemAppRepository.listAutomationRecipesByOwner(owner) returns every match for its scope, with no limit or cursor",
+    "listBoards": "DEBT: BoardRepository.listBoards(opts) returns every match for its scope, with no limit or cursor",
     "listBoardSubscriptions": "DEBT: BoardRepository.listBoardSubscriptions(boardId) returns every match for its scope, with no limit or cursor",
     "listCapabilitiesByOwner": "DEBT: CapabilityRepository.listCapabilitiesByOwner(ownerGhii) returns every match for its scope, with no limit or cursor",
     "listCapabilitiesBySourceType": "DEBT: CapabilityRepository.listCapabilitiesBySourceType(sourceType) returns every match for its scope, with no limit or cursor",
+    "listChatInstances": "DEBT: IdentityRepository.listChatInstances(opts) returns every match for its scope, with no limit or cursor",
     "listComponentVersions": "DEBT: ComponentVersionRepository.listComponentVersions(kind, name) returns every match for its scope, with no limit or cursor",
+    "listConnections": "DEBT: ConnectionRepository.listConnections(query) returns every match for its scope, with no limit or cursor",
+    "listConsentAudit": "DEBT: ConsentRepository.listConsentAudit(ownerGaii, opts) returns every match for its scope, with no limit or cursor",
+    "listConsents": "DEBT: ConsentRepository.listConsents(ownerGaii, opts) returns every match for its scope, with no limit or cursor",
+    "listConsentsForAgents": "DEBT: ConsentRepository.listConsentsForAgents(ownerGaiis, opts) returns every match for its scope, with no limit or cursor",
+    "listContacts": "DEBT: DirectMessageRepository.listContacts(ownerGhii, opts) returns every match for its scope, with no limit or cursor",
     "listConversations": "DEBT: DirectMessageRepository.listConversations(ownerGhii) returns every match for its scope, with no limit or cursor",
     "listConversationsForOwners": "DEBT: DirectMessageRepository.listConversationsForOwners(ownerGhiis) returns every match for its scope, with no limit or cursor",
-    "listMcpUserCredentials": "Cannot grow with the data: one person's own sign-ins on shared MCP servers, at most one per node or group server whose auth is per-user-oauth and that admits them. The servers are attached one by one by an operator or a group's governors. Written 2026-11-02 (cc-jouni-yritysliitin).",
-    "listDirectMessageCopies":"Cannot grow with the data: the copies of ONE message on this node, one per mailbox it was delivered to. A 1:1 message has two at most; a group thread at most one per participant, and a group holds at most 64 (MAX_GROUP_PARTICIPANTS, services/conversation-group.ts). Written 2026-10-26 (cc-jouni-inbox-speed).",
     "listConversationsForParticipant": "DEBT: DirectMessageRepository.listConversationsForParticipant(identity) returns every match for its scope, with no limit or cursor",
+    "listCortexExtensions": "DEBT: NodeRepository.listCortexExtensions(opts) returns every match for its scope, with no limit or cursor",
+    "listCsms": "DEBT: CatalogueRepository.listCsms(opts) returns every match for its scope, with no limit or cursor",
     "listDelegations": "DEBT: ConnectionRepository.listDelegations(connectionId) returns every match for its scope, with no limit or cursor",
     "listDeletedMemory": "DEBT: MemoryRepository.listDeletedMemory(ownerGaii) returns every match for its scope, with no limit or cursor",
+    "listDependencyEdges": "DEBT: DependencyRepository.listDependencyEdges(filter) returns every match for its scope, with no limit or cursor",
+    "listDirectMessageCopies": "Cannot grow with the data: the copies of ONE message on this node, one per mailbox it was delivered to. A 1:1 message has two at most; a group thread at most one per participant, and a group holds at most 64 (MAX_GROUP_PARTICIPANTS, services/conversation-group.ts). Written 2026-10-26 (cc-jouni-inbox-speed).",
     "listDisputesByProvider": "DEBT: DisputeRepository.listDisputesByProvider(gaii) returns every match for its scope, with no limit or cursor",
     "listDmsByBroadcast": "DEBT: DirectMessageRepository.listDmsByBroadcast(broadcastId, ownerGhii) returns every match for its scope, with no limit or cursor",
     "listExtensionInstances": "DEBT: ExtensionInstanceRepository.listExtensionInstances(extensionName) returns every match for its scope, with no limit or cursor",
+    "listExtensions": "DEBT: NodeRepository.listExtensions(opts) returns every match for its scope, with no limit or cursor",
     "listFederationPeers": "DEBT: FederationRepository.listFederationPeers() reads the whole table, with no limit or cursor",
     "listFiscalYears": "DEBT: FinanceRepository.listFiscalYears(ownerGhii) returns every match for its scope, with no limit or cursor",
+    "listGenesisPeers": "DEBT: FederationRepository.listGenesisPeers(opts) returns every match for its scope, with no limit or cursor",
+    "listGHIIs": "DEBT: IdentityRepository.listGHIIs(opts) returns every match for its scope, with no limit or cursor",
     "listGroupSharesByGroups": "DEBT: SharingGroupRepository.listGroupSharesByGroups(groupIds) returns every match for its scope, with no limit or cursor",
     "listGroupSharesByOwner": "DEBT: SharingGroupRepository.listGroupSharesByOwner(ownerGaii) returns every match for its scope, with no limit or cursor",
+    "listInvitationsByEmailHash": "DEBT: InvitationRepository.listInvitationsByEmailHash(emailHash, opts) returns every match for its scope, with no limit or cursor",
+    "listInvitationsByOrganism": "DEBT: InvitationRepository.listInvitationsByOrganism(organismId, opts) returns every match for its scope, with no limit or cursor",
+    "listJoinRequests": "DEBT: OrganismRepository.listJoinRequests(organismId, opts) returns every match for its scope, with no limit or cursor",
+    "listLinks": "DEBT: KnowledgeRepository.listLinks(key, opts) returns every match for its scope, with no limit or cursor",
+    "listMcpServers": "DEBT: McpServerRepository.listMcpServers(query) returns every match for its scope, with no limit or cursor",
+    "listMcpUserCredentials": "Cannot grow with the data: one person's own sign-ins on shared MCP servers, at most one per node or group server whose auth is per-user-oauth and that admits them. The servers are attached one by one by an operator or a group's governors. Written 2026-11-02 (cc-jouni-yritysliitin).",
+    "listMembers": "DEBT: OrganismRepository.listMembers(organismId, opts) returns every match for its scope, with no limit or cursor",
     "listMembershipsByGhii": "DEBT: OrganismRepository.listMembershipsByGhii(ghii) returns every match for its scope, with no limit or cursor",
     "listMemoryKeysByPrefix": "DEBT: MemoryRepository.listMemoryKeysByPrefix(keyPrefix) returns every match for its scope, with no limit or cursor",
+    "listMsms": "DEBT: CatalogueRepository.listMsms(opts) returns every match for its scope, with no limit or cursor",
     "listNotificationTemplates": "DEBT: NotificationTemplateRepository.listNotificationTemplates() reads the whole table, with no limit or cursor",
     "listOnboardingByStatus": "DEBT: AgentOnboardingRepository.listOnboardingByStatus(status) returns every match for its scope, with no limit or cursor",
     "listOverduePendingApprovals": "DEBT: OrganismRepository.listOverduePendingApprovals(nowIso) returns every match for its scope, with no limit or cursor",
@@ -43,9 +64,12 @@
     "listPasskeysByOwner": "DEBT: PasskeyRepository.listPasskeysByOwner(owner) returns every match for its scope, with no limit or cursor",
     "listPats": "DEBT: PatRepository.listPats(owner) returns every match for its scope, with no limit or cursor",
     "listPeeringRequests": "DEBT: FederationRepository.listPeeringRequests(status) returns every match for its scope, with no limit or cursor",
+    "listPendingApprovals": "DEBT: OrganismRepository.listPendingApprovals(organismId, opts) returns every match for its scope, with no limit or cursor",
+    "listPendingApprovalsForOrgs": "DEBT: OrganismRepository.listPendingApprovalsForOrgs(organismIds, opts) returns every match for its scope, with no limit or cursor",
     "listPendingDeviceAuthByOwner": "DEBT: DeviceAuthRepository.listPendingDeviceAuthByOwner(ownerName) returns every match for its scope, with no limit or cursor",
     "listPendingEcoAuthByOwner": "DEBT: EcosystemAppRepository.listPendingEcoAuthByOwner(ownerName) returns every match for its scope, with no limit or cursor",
     "listPendingMessages": "DEBT: AgentMessageRepository.listPendingMessages(agentGaii) returns every match for its scope, with no limit or cursor",
+    "listPersonalNodes": "DEBT: FederationRepository.listPersonalNodes(opts) returns every match for its scope, with no limit or cursor",
     "listPersonalPushSubscriptions": "DEBT: NotificationRepository.listPersonalPushSubscriptions(personalNodeId) returns every match for its scope, with no limit or cursor",
     "listPrincipalProviderClients": "DEBT: ConnectionRepository.listPrincipalProviderClients(principal) returns every match for its scope, with no limit or cursor",
     "listPublishMetrics": "DEBT: ConnectionRepository.listPublishMetrics(attemptId) returns every match for its scope, with no limit or cursor",
@@ -53,6 +77,7 @@
     "listPushSubscriptionsByOwner": "DEBT: NodeRepository.listPushSubscriptionsByOwner(ownerName) returns every match for its scope, with no limit or cursor",
     "listReplies": "DEBT: BoardRepository.listReplies(boardId, postId) returns every match for its scope, with no limit or cursor",
     "listReviews": "DEBT: KnowledgeRepository.listReviews(packageId) returns every match for its scope, with no limit or cursor",
+    "listScheduledJobs": "DEBT: SchedulerRepository.listScheduledJobs(filter) returns every match for its scope, with no limit or cursor",
     "listSchemas": "DEBT: SchemaRepository.listSchemas(prefix) returns every match for its scope, with no limit or cursor",
     "listSecrets": "DEBT: SecretRepository.listSecrets(ownerGaii) returns every match for its scope, with no limit or cursor",
     "listSharingGroups": "DEBT: SharingGroupRepository.listSharingGroups(ownerGaii) returns every match for its scope, with no limit or cursor",
@@ -62,7 +87,9 @@
     "listStorageFilesForOwners": "DEBT: FileRepository.listStorageFilesForOwners(ownerGaiis) returns every match for its scope, with no limit or cursor",
     "listSubdomainSites": "DEBT: SubdomainSiteRepository.listSubdomainSites() reads the whole table, with no limit or cursor",
     "listSubscriptionsByAgent": "DEBT: BoardRepository.listSubscriptionsByAgent(gaii) returns every match for its scope, with no limit or cursor",
+    "listSystemPrompts": "DEBT: SystemPromptRepository.listSystemPrompts(opts) returns every match for its scope, with no limit or cursor",
     "listThreads": "DEBT: AgentMessageRepository.listThreads(agentGaii) returns every match for its scope, with no limit or cursor",
+    "listTrustedIssuers": "DEBT: NodeRepository.listTrustedIssuers(opts) returns every match for its scope, with no limit or cursor",
     "listUnplacedLinks": "Read only by the once-only start step services/knowledge-link-owner-keep.ts. Every link writer passes the owner of the source record since 2026-10-22, so the set of unplaced rows only shrinks.",
     "listVatCodes": "DEBT: FinanceRepository.listVatCodes() reads the whole table, with no limit or cursor",
     "listWorkByProvider": "DEBT: WorkRepository.listWorkByProvider(gaii) returns every match for its scope, with no limit or cursor",
@@ -171,6 +198,9 @@
     "src/server-bootstrap/service-init.ts": {
       "listFederationPeers": 1
     },
+    "src/services/account-event-task-keep.ts": {
+      "listAppGrants": 1
+    },
     "src/services/agent-port-redirect.ts": {
       "listFederationPeers": 1
     },
@@ -179,9 +209,6 @@
     },
     "src/services/ai/catalog/refresh.ts": {
       "listOwners": 1
-    },
-    "src/services/account-event-task-keep.ts": {
-      "listAppGrants": 1
     },
     "src/services/app-agent-deploy.ts": {
       "listAgents": 1
@@ -236,6 +263,10 @@
     "src/services/daily-allowance.ts": {
       "listOwners": 1
     },
+    "src/services/datapackage/audience-record.ts": {
+      "listOwners": 1,
+      "listAgents": 1
+    },
     "src/services/email-recipients.ts": {
       "listOwners": 1
     },
@@ -284,13 +315,6 @@
     "src/services/knowledge-overview.ts": {
       "listAgents": 1
     },
-    "src/services/portfolio-read-hold-keep.ts": {
-      "listOwners": 1
-    },
-    "src/services/datapackage/audience-record.ts": {
-      "listOwners": 1,
-      "listAgents": 1
-    },
     "src/services/mail-read-consent.ts": {
       "listAppGrants": 1
     },
@@ -316,6 +340,9 @@
       "listAgents": 1
     },
     "src/services/operators.ts": {
+      "listOwners": 1
+    },
+    "src/services/portfolio-read-hold-keep.ts": {
       "listOwners": 1
     },
     "src/services/rest-scope-gates-migration.ts": {

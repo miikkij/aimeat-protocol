@@ -17,6 +17,8 @@
  * @version-history
  *   2026-11-04 — The migrations run under the boot lock, and bootLock() takes it for the boot seeding
  *     (migrate.ts takeBootLock; codebase analysis 2026-11-03, HA stage 1).
+ *   2026-11-04 — _rawMemory answers MemoryWriteProbe, the three columns setMemory decides with
+ *     (codebase analysis 2026-11-03, item C3).
  *   2026-10-25 — Zoneless timestamps are UTC on any host: Date parameters are sent in UTC, a zoneless
  *     value is read as UTC, and the session zone is UTC (./utc-timestamps.ts). A time written inside
  *     the autumn fold hour had read back one hour early on a host east of UTC (secaudit2026oct22).
@@ -51,7 +53,7 @@ import type { DB } from './db-types.js';
 import { runMigrationsLocked, takeBootLock } from './migrate.js';
 import { checkServerVersion } from './server-version.js';
 import { logger } from '../../../utils/logger.js';
-import { memoryMethods } from './methods/memory.js';
+import { memoryMethods, type MemoryWriteProbe } from './methods/memory.js';
 import { systemMethods } from './methods/system.js';
 import { identityMethods } from './methods/identity.js';
 import { walletMethods } from './methods/wallet.js';
@@ -116,8 +118,8 @@ import { heldNameMethods } from './methods/held-names.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
-  _rawMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
-  _writeMemoryRow(record: MemoryRecord, existing: MemoryRecord | null): Promise<MemoryRecord>;
+  _rawMemory(ownerGaii: string, key: string): Promise<MemoryWriteProbe | null>;
+  _writeMemoryRow(record: MemoryRecord, existing: MemoryRecord | MemoryWriteProbe | null): Promise<MemoryRecord>;
 }
 
 /**

@@ -17,6 +17,7 @@
  *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   2026-11-04 — MemoryTotals joins the per-identity cascade, after Memory (codebase analysis 2026-11-03, item C3).
  *   v1.6.0 — 2026-10-29 — deleteInstalledCortexesDb writes each bare cortex name it deletes down as freed
  *     (`freed:<pseudonym>`): free for the next install, and the apps that loaded it ask their owner first
  *     (secaudit2026oct26 round 8c, services/cortex-holder-change.ts).
@@ -52,6 +53,10 @@ type Db = Kysely<DB>;
 export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<void> {
   // Memory and micro-memory
   await db.deleteFrom('Memory').where('ownerGaii', '=', gaii).execute();
+  // The kept totals of this identity (migration 0125). AFTER the memory delete, whose trigger appends
+  // the rows that take them to zero: deleted first, those rows would stay behind as a negative total
+  // for whoever registers the released name next.
+  await db.deleteFrom('MemoryTotals').where('ownerGaii', '=', gaii).execute();
 
   // The write tally for THIS namespace. A deleted username is released for reuse, so a surviving row
   // would hand the next registrant somebody else's history. Rows where this identity was the WRITER

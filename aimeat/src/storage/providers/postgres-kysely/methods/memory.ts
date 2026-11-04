@@ -9,6 +9,11 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-11-04 — getMemoryTotals and compactMemoryTotals over the kept totals of migration 0125;
+ *     sumMemoryBytes reads them; setMemory's first read of the row takes version, trackable and
+ *     groupId only (codebase analysis 2026-11-03, item C3).
+ *   2026-11-04 — listMemory, listMemoryMeta and their many-owner twins take `limit` and a key cursor in
+ *     SQL (applyPage); without them the query is unchanged (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
  *     first, never the value (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
@@ -50,14 +55,14 @@
  */
 import { sql } from 'kysely';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
-import type { KeyActivityRow, MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+import type { KeyActivityRow, MemoryListOpts, MemoryMetaRow, MemoryTotals, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 import { clampKeyActivityLimit } from '../../../repositories/memory.repository.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { buildSearchBlob, byteSize, isLive, jsonb, rowToMeta, rowToRecord } from '../helpers.js';
 import { likePrefix } from '../../../key-prefix.js';
 
-type ListOpts = { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter };
+type ListOpts = MemoryListOpts;
 type CountOpts = { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] };
 
 /** Annotation reader — the archived history keeps who/what changed a value (value._actor / _event). */
@@ -91,7 +96,31 @@ function applyList(q: any, opts?: ListOpts) {
   if (typeof opts?.maxFlags === 'number') q = q.where('flagCount', '<=', opts.maxFlags);
   q = applyArchive(q, opts?.archived);
   if (opts?.tags?.length) q = q.where(sql<boolean>`"tags" @> ${sql.val(opts.tags)}`);   // array-contains-all
-  return q;
+  return applyPage(q, opts);
+}
+
+/**
+ * The page of a keyspace listing (MemoryListOpts `limit`, `after`), in SQL: live rows only, the key
+ * cursor, byte order of key and then owner (COLLATE "C", the order SQLite's BINARY gives), and the
+ * LIMIT. Without either option the query is the one it always was, in the order the database returns.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyPage(q: any, opts?: ListOpts) {
+  if (opts?.limit === undefined && opts?.after === undefined) return q;
+  q = liveSql(q, new Date());
+  const after = opts.after;
+  if (after !== undefined) {
+    const afterOwner = opts.afterOwner;
+    q = afterOwner === undefined
+      ? q.where(sql`"key" COLLATE "C"`, '>', after)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : q.where((eb: any) => eb.or([
+        eb(sql`"key" COLLATE "C"`, '>', after),
+        eb.and([eb('key', '=', after), eb(sql`"ownerGaii" COLLATE "C"`, '>', afterOwner)]),
+      ]));
+  }
+  q = q.orderBy(sql`"key" COLLATE "C"`).orderBy(sql`"ownerGaii" COLLATE "C"`);
+  return opts.limit === undefined ? q : q.limit(Math.max(0, Math.floor(opts.limit)));
 }
 
 type AllOpts = { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean };
@@ -132,14 +161,24 @@ function windowAll(q: any, opts: AllOpts | undefined) {
   return opts?.limit ? q.limit(opts.limit).offset(opts.offset ?? 0) : q;
 }
 
+/** What setMemory reads of the current row before it writes: no value (codebase analysis 2026-11-03, item C3). */
+export type MemoryWriteProbe = Pick<MemoryRecord, 'version' | 'trackable' | 'groupId'>;
+
 const META_COLS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'allowedOrigins',
   'aiProvenanceId', 'archived', 'tags', 'version', 'flagCount', 'byteSize', 'ttlHours', 'createdAt', 'updatedAt'] as const;
 
 export const memoryMethods = {
-  /** Raw current row (any TTL/archive state) — for existence/version continuity on write. */
-  async _rawMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<MemoryRecord | null> {
-    const r = await this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
-    return r ? rowToRecord(r) : null;
+  /**
+   * The current row (any TTL, archive or bin state), as much of it as setMemory decides with: its
+   * version, whether the key keeps a history, and its group. The value and the search text stay in the
+   * database; a trackable key's full row is read again FOR UPDATE below (codebase analysis 2026-11-03,
+   * item C3: this read took every column, value included, on every write).
+   */
+  async _rawMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<MemoryWriteProbe | null> {
+    const r = await this.db.selectFrom('Memory').select(['version', 'trackable', 'groupId'])
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
+    // The same mapping rowToRecord gives these three columns.
+    return r ? { version: r.version, trackable: r.trackable, ...(r.groupId ? { groupId: r.groupId } : {}) } : null;
   },
 
   async setMemory(this: PostgresKyselyStorage, record: MemoryRecord): Promise<MemoryRecord> {
@@ -161,17 +200,19 @@ export const memoryMethods = {
   },
 
   /** The body of setMemory once the current row is known (read FOR UPDATE for a trackable key). */
-  async _writeMemoryRow(this: PostgresKyselyStorage, record: MemoryRecord, existing: MemoryRecord | null): Promise<MemoryRecord> {
+  async _writeMemoryRow(this: PostgresKyselyStorage, record: MemoryRecord, existing: MemoryRecord | MemoryWriteProbe | null): Promise<MemoryRecord> {
     // trackable is a property of the KEY: inherit the existing setting if the writer didn't specify.
     const trackable = record.trackable ?? existing?.trackable ?? false;
     record.trackable = trackable || undefined;
     if (existing) {
       if (existing.trackable) {
+        // A trackable key's row arrives whole: setMemory read it FOR UPDATE, every column.
+        const full = existing as MemoryRecord;
         // keep the previous version before overwrite (INSERT … ON CONFLICT DO NOTHING = INSERT OR IGNORE)
         await this.db.insertInto('MemoryVersion').values({
-          ownerGaii: existing.ownerGaii, key: existing.key, version: existing.version,
-          value: jsonb(existing.value), actor: annotation(existing.value, '_actor'), event: annotation(existing.value, '_event'),
-          recordedAt: new Date(existing.updatedAt),
+          ownerGaii: full.ownerGaii, key: full.key, version: full.version,
+          value: jsonb(full.value), actor: annotation(full.value, '_actor'), event: annotation(full.value, '_event'),
+          recordedAt: new Date(full.updatedAt),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any).onConflict(oc => oc.columns(['ownerGaii', 'key', 'version']).doNothing()).execute();
       }
@@ -520,8 +561,41 @@ export const memoryMethods = {
   },
 
   async sumMemoryBytes(this: PostgresKyselyStorage, ownerGaii: string): Promise<number> {
-    const r = await this.db.selectFrom('Memory').select(sql<number>`coalesce(sum("byteSize"),0)`.as('b')).where('ownerGaii', '=', ownerGaii).where('archived', '=', false).executeTakeFirst();
-    return Number(r?.b ?? 0);
+    // SUM("byteSize") of the owner's rows not archived, as the triggers of migration 0125 keep it on
+    // every change; this summed every row of the owner on every memory write (item C3).
+    // getMemoryTotals is optional on the Storage interface and always present on this provider.
+    return (await this.getMemoryTotals!(ownerGaii)).bytes;
+  },
+
+  /** The kept totals: the sum of the owner's delta rows in "MemoryTotals" (migration 0125). */
+  async getMemoryTotals(this: PostgresKyselyStorage, ownerGaii: string): Promise<MemoryTotals> {
+    const r = await this.db.selectFrom('MemoryTotals')
+      .select([sql<string>`coalesce(sum("keys"), 0)`.as('k'), sql<string>`coalesce(sum("bytes"), 0)`.as('b')])
+      .where('ownerGaii', '=', ownerGaii).executeTakeFirst();
+    return { keys: Number(r?.k ?? 0), bytes: Number(r?.b ?? 0) };
+  },
+
+  /**
+   * Fold each owner's delta rows into one, and drop an owner whose rows sum to zero. One statement:
+   * the DELETE takes the rows its snapshot sees and the INSERT puts back their sum, so a row another
+   * writer appends meanwhile is neither deleted nor counted twice, and no total changes.
+   */
+  async compactMemoryTotals(this: PostgresKyselyStorage): Promise<number> {
+    const r = await sql`
+      WITH folded AS (
+        DELETE FROM "MemoryTotals" WHERE "ownerGaii" IN (
+          SELECT "ownerGaii" FROM "MemoryTotals" GROUP BY "ownerGaii"
+          HAVING count(*) > 1 OR (sum("keys") = 0 AND sum("bytes") = 0)
+        ) RETURNING "ownerGaii", "keys", "bytes"
+      ), kept AS (
+        INSERT INTO "MemoryTotals" ("ownerGaii", "keys", "bytes")
+        SELECT "ownerGaii", sum("keys"), sum("bytes") FROM folded GROUP BY "ownerGaii"
+        HAVING sum("keys") <> 0 OR sum("bytes") <> 0
+        RETURNING 1
+      )
+      SELECT (SELECT count(*) FROM folded) - (SELECT count(*) FROM kept) AS removed
+    `.execute(this.db);
+    return Number((r.rows[0] as { removed?: string | number } | undefined)?.removed ?? 0);
   },
 
   async sumMemoryBytesForOwners(this: PostgresKyselyStorage, ownerGaiis: string[]): Promise<number> {

@@ -13,11 +13,15 @@
  *
  *   WHAT IT READS (scripts/inventory/storage-methods.ts gives the methods):
  *   - UNBOUNDED METHODS: every `list*` or `getAll*` method of the `Storage` composite none of whose
- *     parameters bounds the result. A parameter bounds it when its name says so (limit, cursor,
- *     options, query, filter, page, max, since, before, after, range, window, params, args,
- *     criteria, select); an owner or an id scopes a list to one account and does not bound it,
- *     because one account's data grows too. A new one fails the gate; a listed one that has gained a
- *     bound, or is gone, fails until its entry is deleted, so the list only shrinks.
+ *     parameters bounds the result. The parameter's TYPE decides (typedStorageRepositories, one
+ *     TypeScript program over the repository files): an options object bounds the list when its type
+ *     has a limit, cursor, after, before, since or page field (BOUND_PROPERTY); a number, string or
+ *     date parameter bounds it when its name says so (BOUND_SCALAR: `limit`, `sinceIso`). An owner or
+ *     an id scopes a list to one account and does not bound it, because one account's data grows
+ *     too. Until 2026-11-04 the NAME decided, and a parameter called opts, query or filter counted as
+ *     a bound whatever its type held (codebase analysis 2026-11-03, item C1). A new one fails the
+ *     gate; a listed one that has gained a bound, or is gone, fails until its entry is deleted, so the
+ *     list only shrinks.
  *   - WHOLE-TABLE CALLS: every call outside src/storage/ of a list method with no parameters at all
  *     (`storage.listOwners()`), counted per file. A file whose count rises fails, and a file whose
  *     count falls fails until the baseline is lowered to match.
@@ -38,7 +42,7 @@
  *   The baseline is security/unbounded-lists-baseline.json. Its entries are seeded `DEBT`: a known
  *   unbounded read nobody has judged yet. Answering one means bounding it, or replacing DEBT with the
  *   reason it cannot grow (a node-wide table of fixed size, for instance).
- * @structure unboundedMethods(repos) · wholeTableCalls(file, source, names) · takeFirstWithoutLimit(file, source) · contentListReads(file, source) · compare(...) · compareContentLists(...) · main()
+ * @structure parameterBounds(checker, param) · typedStorageRepositories(root) · unboundedMethods(repos) · wholeTableCalls(file, source, names) · takeFirstWithoutLimit(file, source) · contentListReads(file, source) · compare(...) · compareContentLists(...) · main()
  * @usage
  *   cd aimeat && pnpm check:unbounded-lists          # the gate
  *   cd aimeat && pnpm check:unbounded-lists --seed   # rewrite the baseline from today's code (ask first)
@@ -49,6 +53,9 @@
  *     (the aimeat.io outage of 2026-10-23: ten such reads, four of them on the App table).
  *   v1.2.0 — 2026-11-04 — App lists that read the content, in both providers, allowed only for the
  *     methods named in contentLists (codebase analysis 2026-11-03, item A1).
+ *   v1.3.0 — 2026-11-04 — A parameter bounds a list by its type, not its name (parameterBounds,
+ *     typedStorageRepositories); the baseline rose from 69 to 96 methods, each new one DEBT
+ *     (codebase analysis 2026-11-03, item C1).
  */
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -58,10 +65,68 @@ import { storageRepositories, type StorageRepository } from './inventory/storage
 
 const BASELINE = 'security/unbounded-lists-baseline.json';
 
-/** A parameter name that bounds what a list returns. */
+/** A parameter name that bounds what a list returns, for a method whose parameter types were not read. */
 export const BOUND = /limit|cursor|opts|options|query|filter|page|max|since|before|after|range|window|params|args|criteria|select/i;
 
+/** A property of an options type that bounds what a list returns. `maxFlags` is a filter, so `max` is matched whole. */
+export const BOUND_PROPERTY = /^(limit|cursor|after|before|since|page|pageSize|perPage|first|take|top|max|maxResults|maxRows|maxItems)$/i;
+
+/** The name of a scalar parameter (a number, a string or a date) that bounds what a list returns. */
+export const BOUND_SCALAR = /^(limit|max\w*|cursor|after\w*|before\w*|since\w*|page\w*|first|take|top|window|range)$/i;
+
 export interface UnboundedMethod { name: string; repository: string; params: string[]; wholeTable: boolean }
+
+/** A storage method whose parameters were read with their types: `bounds[i]` says whether parameter i bounds the list. */
+export interface TypedStorageMethod { name: string; params: string[]; bounds?: boolean[] }
+export interface TypedStorageRepository { name: string; file: string; methods: TypedStorageMethod[] }
+
+/**
+ * Whether one parameter bounds a list, decided from its TYPE (codebase analysis 2026-11-03, item C1).
+ * An options object bounds the list when its type has a bound property (`limit`, `cursor`, `after`, …);
+ * a scalar bounds it when its name says so (`limit: number`, `sinceIso: string`). Until 2026-11-04 the
+ * NAME decided, so `opts?: { prefix?: string }` counted as a bound and the four memory listings, with
+ * 24 more, were invisible to this gate.
+ */
+export function parameterBounds(checker: ts.TypeChecker, param: ts.ParameterDeclaration): boolean {
+    const name = ts.isIdentifier(param.name) ? param.name.text : '';
+    const type = checker.getNonNullableType(checker.getTypeAtLocation(param));
+    const parts = type.isUnion() ? type.types : [type];
+    const scalarFlags = ts.TypeFlags.NumberLike | ts.TypeFlags.StringLike | ts.TypeFlags.BigIntLike;
+    let scalar = true;
+    for (const t of parts) {
+        if (t.flags & scalarFlags) continue;
+        if (t.getSymbol()?.getName() === 'Date') continue;
+        scalar = false;
+        const objectLike = (t.flags & ts.TypeFlags.Object) !== 0 || t.isIntersection();
+        if (objectLike && !checker.isArrayType(t) && checker.getPropertiesOfType(t).some(p => BOUND_PROPERTY.test(p.getName()))) return true;
+    }
+    return scalar && BOUND_SCALAR.test(name);
+}
+
+/**
+ * The Storage composite's repositories (scripts/inventory/storage-methods.ts) with each parameter's
+ * bound read from its type through one TypeScript program over the repository files.
+ */
+export function typedStorageRepositories(root: string): TypedStorageRepository[] {
+    const repos = storageRepositories(root);
+    const cfg = ts.readConfigFile(path.join(root, 'tsconfig.json'), ts.sys.readFile);
+    const parsed = ts.parseJsonConfigFileContent(cfg.config, ts.sys, root);
+    const files = repos.map(r => path.join(root, r.file));
+    const program = ts.createProgram({ rootNames: files, options: { ...parsed.options, noEmit: true } });
+    const checker = program.getTypeChecker();
+    return repos.map(r => {
+        const sf = program.getSourceFile(path.join(root, r.file));
+        const decl = sf?.statements.find((s): s is ts.InterfaceDeclaration => ts.isInterfaceDeclaration(s) && s.name.text === r.name);
+        const byName = new Map<string, boolean[]>();
+        for (const m of decl?.members ?? []) {
+            const nameOf = m.name && (ts.isIdentifier(m.name) || ts.isStringLiteral(m.name)) ? m.name.text : '';
+            const params = ts.isMethodSignature(m) ? m.parameters
+                : ts.isPropertySignature(m) && m.type && ts.isFunctionTypeNode(m.type) ? m.type.parameters : null;
+            if (nameOf && params) byName.set(nameOf, params.map(p => parameterBounds(checker, p)));
+        }
+        return { ...r, methods: r.methods.map(m => (byName.has(m.name) ? { ...m, bounds: byName.get(m.name) } : m)) };
+    });
+}
 
 export interface Baseline {
     note: string;
@@ -73,10 +138,10 @@ export interface Baseline {
     contentLists?: Record<string, string>;
 }
 
-/** Every list method of the composite that nothing bounds. */
-export function unboundedMethods(repos: StorageRepository[]): UnboundedMethod[] {
-    return repos.flatMap(r => r.methods
-        .filter(m => /^(list|getAll)/.test(m.name) && !m.params.some(p => BOUND.test(p)))
+/** Every list method of the composite that nothing bounds: by the parameters' types where they were read, else by their names. */
+export function unboundedMethods(repos: Array<StorageRepository | TypedStorageRepository>): UnboundedMethod[] {
+    return repos.flatMap(r => (r.methods as TypedStorageMethod[])
+        .filter(m => /^(list|getAll)/.test(m.name) && !(m.bounds ? m.bounds.some(Boolean) : m.params.some(p => BOUND.test(p))))
         .map(m => ({ name: m.name, repository: r.name, params: m.params, wholeTable: m.params.length === 0 })))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -266,7 +331,7 @@ export function compareContentLists(reads: Array<{ at: string; method: string }>
 
 function main(): void {
     const root = process.cwd();
-    const methods = unboundedMethods(storageRepositories(root));
+    const methods = unboundedMethods(typedStorageRepositories(root));
     const whole = new Set(methods.filter(m => m.wholeTable).map(m => m.name));
     const calls: Record<string, Record<string, number>> = {};
     for (const f of sourceFiles(root)) {

@@ -459,6 +459,14 @@ export interface MemoryFamilyTally {
   lastAt: string;
 }
 
+/** A principal's kept memory key count and byte total, as delta rows the triggers append (migration 0125). BIGINT arrives as a string. */
+export interface MemoryTotals {
+  id: Generated<string>;
+  ownerGaii: string;
+  keys: string;
+  bytes: string;
+}
+
 export interface AccountEvent {
   id: string;
   ownerGhii: string;
@@ -2424,6 +2432,7 @@ export interface DB {
   AccountEvent: AccountEvent;
   MemoryWriteTally: MemoryWriteTally;
   MemoryFamilyTally: MemoryFamilyTally;
+  MemoryTotals: MemoryTotals;
   AccountEventArchive: AccountEventArchive;
   WorkspaceRow: WorkspaceRow;
   WorkspaceRowRevision: WorkspaceRowRevision;

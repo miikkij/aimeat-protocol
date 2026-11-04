@@ -12,6 +12,7 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   2026-11-04 — memory_totals joins the cascade, after memory (codebase analysis 2026-11-03, item C3).
  *   v1.7.0 — 2026-10-22 — knowledge_links joins the cascade: the links of the identity's packages and
  *     the ones it contributed (secaudit 2026-10, v79).
  *   v1.6.0 — 2026-09-29 — classification_audit joins the cascade (TARGET-082 V4).
@@ -42,6 +43,9 @@ export const cascadeMethods = {
   cascadeDeleteAgentData(this: SqliteStorage, gaii: string): void {
     // Memory
     this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(gaii);
+    // The kept totals of this identity. The delete above already took them to zero, and the trigger
+    // removes a row at zero; this names the table for the parity gate and clears anything left.
+    this.db.prepare('DELETE FROM memory_totals WHERE ownerGaii = ?').run(gaii);
     // The write tally for THIS namespace. A deleted username is released for reuse, so a surviving
     // row would hand the next registrant somebody else's history. Rows where this identity was the
     // WRITER into somebody ELSE'S namespace are deliberately NOT deleted here — they are that

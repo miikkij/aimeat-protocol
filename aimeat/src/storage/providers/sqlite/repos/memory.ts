@@ -18,6 +18,8 @@
  *   listKeyActivity
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   2026-11-04 — sumMemoryBytes reads the kept total (memory_totals) (codebase analysis 2026-11-03, item C3).
+ *   2026-11-04 — memoryPageSql: the page of a keyspace listing in SQL (codebase analysis 2026-11-03, item C1).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
  *     first, never the value (the overview's activity counts).
  *   2026-10-25 — countMemory takes excludePrefixes (secaudit2026oct22).
@@ -33,7 +35,7 @@
  */
 import type Database from 'better-sqlite3';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
-import type { KeyActivityRow, MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
+import type { KeyActivityRow, MemoryListOpts, MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
 import { clampKeyActivityLimit } from '../../../repositories/memory.repository.js';
 import { globPrefix } from '../../../key-prefix.js';
 
@@ -74,6 +76,32 @@ export function deleteExpiredMemory(db: Database.Database, nowIso: string): numb
   return db.prepare(
     'DELETE FROM memory WHERE ttlHours IS NOT NULL AND ttlHours <> 0 AND julianday(createdAt) + ttlHours / 24.0 < julianday(?)'
   ).run(nowIso).changes;
+}
+
+/**
+ * The page of a keyspace listing (MemoryListOpts `limit`, `after`) as SQL, or null when the caller
+ * asked for every row (the query is then the one it always was). On the paged path the tag and flag
+ * filters, which the unpaged path applies in JavaScript, and the TTL test move into SQL, so the LIMIT
+ * counts only rows the caller keeps; the order is key and then owner, BINARY, as PostgreSQL's
+ * COLLATE "C". `where` has a leading ` AND` and goes before `tail`, which holds ORDER BY and LIMIT.
+ */
+export function memoryPageSql(opts: MemoryListOpts | undefined, nowIso: string): { where: string; whereParams: unknown[]; tail: string; tailParams: unknown[] } | null {
+  if (opts?.limit === undefined && opts?.after === undefined) return null;
+  let where = '';
+  const whereParams: unknown[] = [];
+  for (const tag of opts.tags ?? []) { where += ' AND EXISTS (SELECT 1 FROM json_each(memory.tags) WHERE json_each.value = ?)'; whereParams.push(tag); }
+  if (opts.maxFlags !== undefined) { where += ' AND COALESCE(flagCount, 0) <= ?'; whereParams.push(opts.maxFlags); }
+  where += LIVE_SQL; whereParams.push(nowIso);
+  if (opts.after !== undefined) {
+    if (opts.afterOwner === undefined) { where += ' AND key > ?'; whereParams.push(opts.after); }
+    else { where += ' AND (key > ? OR (key = ? AND ownerGaii > ?))'; whereParams.push(opts.after, opts.after, opts.afterOwner); }
+  }
+  const limited = opts.limit !== undefined;
+  return {
+    where, whereParams,
+    tail: ' ORDER BY key, ownerGaii' + (limited ? ' LIMIT ?' : ''),
+    tailParams: limited ? [Math.max(0, Math.floor(opts.limit!))] : [],
+  };
 }
 
 export function archivedSql(archived?: ArchiveFilter): string {
@@ -130,8 +158,11 @@ function isMemoryExpired(record: MemoryRecord): boolean {
 /** Sum the byte size of one owner's memory values, computed entirely in SQLite (no rows/values
  *  transferred to JS). Backs the memory total-size quota — replaces a load-all + re-serialise. */
 export function sumMemoryBytes(db: Database.Database, ownerGaii: string): number {
-  const row = db.prepare('SELECT COALESCE(SUM(byteSize), 0) AS s FROM memory WHERE ownerGaii = ?').get(ownerGaii) as { s: number };
-  return row.s;
+  // SUM(byteSize) over every row of the owner, as the triggers of schema-memory-totals.ts keep it on
+  // every change; this summed every row of the owner on every memory write (codebase analysis
+  // 2026-11-03, item C3).
+  const row = db.prepare('SELECT bytes FROM memory_totals WHERE ownerGaii = ?').get(ownerGaii) as { bytes: number } | undefined;
+  return row?.bytes ?? 0;
 }
 
 /** Sum value bytes across MANY owner identities in one SQL SUM — the owner-scope total-usage figure

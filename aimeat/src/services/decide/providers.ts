@@ -40,6 +40,7 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   2026-11-04 — The provider count reads at most MAX_OWNER_PROVIDERS + 1 rows (codebase analysis 2026-11-03, item C1).
  *   2026-10-18 — putOwnerProvider claims a new id with createMemoryIfAbsent and counts the account's
  *     providers after the claim, so MAX_OWNER_PROVIDERS is held on what is stored.
  *   v1.5.0 — 2026-10-09 — An operator's `env` auth names only a provider key variable
@@ -556,7 +557,8 @@ export async function putOwnerProvider(
   const key = `${PROVIDER_PREFIX}${id}`;
   const existing = await storage.getMemory(ownerGhii, key);
   const tooMany = () => new DecideError('TOO_MANY_PROVIDERS', 409, `An account holds at most ${MAX_OWNER_PROVIDERS} decision providers of its own.`);
-  const held = async () => (await storage.listMemoryMeta(ownerGhii, { prefix: PROVIDER_PREFIX })).length;
+  // Read at most one past the ceiling: both comparisons below (>= and >) need nothing beyond it.
+  const held = async () => (await storage.listMemoryMeta(ownerGhii, { prefix: PROVIDER_PREFIX, limit: MAX_OWNER_PROVIDERS + 1 })).length;
   if (!existing && await held() >= MAX_OWNER_PROVIDERS) {
     throw tooMany();
   }
