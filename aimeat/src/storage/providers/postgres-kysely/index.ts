@@ -15,6 +15,9 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-11-04 — A query-builder read outside a transaction that met a lost connection (class 08,
+ *     57P01-57P03) or 40001 is tried once more, and a lost connection leaves the pool (./read-retry.ts;
+ *     codebase analysis 2026-11-03, item HA stage 3).
  *   2026-11-04 — busWire(): NOTIFY and a LISTEN connection of its own for the event bus between this
  *     node's processes (./bus-wire.ts; codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 — ephemeralClaimMethods bound (EphemeralClaim, migration 0126; codebase analysis
@@ -59,6 +62,7 @@ import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import type { DB } from './db-types.js';
 import { runMigrationsLocked, takeBootLock } from './migrate.js';
 import { createPgBusWire } from './bus-wire.js';
+import { dropLostConnections, withReadRetry } from './read-retry.js';
 import type { BusWire } from '../../bus-wire.js';
 import { checkServerVersion } from './server-version.js';
 import { logger } from '../../../utils/logger.js';
@@ -197,7 +201,16 @@ export class PostgresKyselyStorage {
         logger.warn('postgres: a connection ended while in use; its query has been rejected', { error: String(err) });
       });
     });
-    this.rootDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: this.pool }) });
+    // A READ THAT MET A LOST CONNECTION IS TRIED ONCE MORE (./read-retry.ts): a failover or a
+    // restart of the database fails the statements in flight, and a read can be asked again. A
+    // write, a raw statement and anything inside a transaction fail to the caller as before; the
+    // lost connection leaves the pool instead of going back to it.
+    dropLostConnections(this.pool);
+    this.rootDb = new Kysely<DB>({
+      dialect: withReadRetry(new PostgresDialect({ pool: this.pool }), (info) => {
+        logger.warn('postgres: a read met a lost connection and was asked once more', { reason: info.reason, code: info.code, error: info.error });
+      }),
+    });
     // Under the boot lock: a second process booting at the same time waits, then finds the files applied.
     this.ready = checkServerVersion(this.pool).then(() => runMigrationsLocked(this.pool));
   }
