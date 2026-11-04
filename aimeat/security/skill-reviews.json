@@ -361,7 +361,7 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -371,7 +371,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:110b77df9abf93ec33aacbf7"
+      "digest": "sha256:67a5b1f617782b9a44b48eed"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-04",
@@ -797,7 +797,7 @@
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "f3ec18941ecc650d",
-      "aimeat/src/commerce/app-tool-catalog.ts": "9f754fa8073a0adf",
+      "aimeat/src/commerce/app-tool-catalog.ts": "310924ae6dd5e120",
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",

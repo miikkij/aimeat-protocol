@@ -15,10 +15,11 @@
     },
     "src/commerce/app-tool-catalog.ts": {
       "reads": {
-        "listAllMemory": 1,
+        "listAllMemoryMeta": 1,
+        "listAllMemoryByKeyShape": 1,
         "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public app tool manifests (app configuration) for the commerce and directory catalogue, published by design. The listMemory (2026-10-07, listOwnCallableAppTools) reads the caller's own owner's PUBLIC apps.*.tools manifests for GET /v1/commerce/tools?include=own: the same published records, in the caller's own namespace only."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public app tool manifests (app configuration) for the commerce and directory catalogue, published by design. 2026-11-04 (codebase analysis C7): the scan reads the public apps.*.tools rows only (listAllMemoryByKeyShape) and their addresses and versions without values first (listAllMemoryMeta) to reuse an unchanged read; the same published records. The listMemory (2026-10-07, listOwnCallableAppTools) reads the caller's own owner's PUBLIC apps.*.tools manifests for GET /v1/commerce/tools?include=own: the same published records, in the caller's own namespace only."
     },
     "src/commerce/beneficiary-book.ts": {
       "reads": {
@@ -572,9 +573,10 @@
     },
     "src/routes/notifications.ts": {
       "reads": {
-        "listMemory": 1
+        "listMemory": 1,
+        "listInboxRows": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner. 2026-10-16 (QA audit F13-01): the list and mark-read go through listOwnerNotificationRecords (services/notification-sweeps.ts), on the owner's own identity."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner. 2026-10-16 (QA audit F13-01): the list and mark-read go through listOwnerNotificationRecords (services/notification-sweeps.ts), on the owner's own identity. 2026-11-04 (codebase analysis C7): mark-all-read reads the owner's unread notification rows with listInboxRows, the same node-written records on the owner's own identity."
     },
     "src/routes/openrouter.ts": {
       "reads": {
@@ -2375,9 +2377,10 @@
     "src/services/notification-sweeps.ts": {
       "reads": {
         "listAllMemory": 1,
-        "listMemory": 1
+        "listMemory": 1,
+        "listInboxRows": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Settings and node-generated notification records for the morning push. 2026-10-16 (QA audit F13-01): one owner's notifications are read with listMemory on that owner's identity (listOwnerNotificationRecords), for the bell, mark-read and both sweeps."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Settings and node-generated notification records for the morning push. 2026-10-16 (QA audit F13-01): one owner's notifications are read with listMemory on that owner's identity (listOwnerNotificationRecords), for the bell, mark-read and both sweeps. 2026-11-04 (codebase analysis C7): the bell's page (readNotificationInbox) and the by-id lookup (findOwnerNotificationsByIds) read the same node-written records on the owner's own identity with listInboxRows."
     },
     "src/services/notify.ts": {
       "reads": {
@@ -3102,9 +3105,12 @@
     },
     "src/services/workspace-content.ts": {
       "reads": {
-        "listAllMemory": 2
+        "listAllMemory": 1,
+        "listAllMemoryMeta": 1,
+        "getMemoryByKeys": 1,
+        "getMemory": 1
       },
-      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
+      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. 2026-11-04 (codebase analysis C7): with valuesOnDemand it loads the rows without values (listAllMemoryMeta), passes those rows through the reader, and reads the values (getMemoryByKeys, getMemory where a provider has no bulk read) only of rows the reader showed."
     },
     "src/services/workspace-engagements.ts": {
       "reads": {

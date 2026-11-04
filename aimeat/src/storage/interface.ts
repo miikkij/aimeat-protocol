@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-04 — MemoryShapeRepository: memory reads by the shape of the key or the value, filtered in
+ *     SQL (codebase analysis 2026-11-03, item C7).
  *   v1.11.0 — 2026-11-04 — bootLock(): the lock two booting processes of one node take in turn
  *     (PostgreSQL only; codebase analysis 2026-11-03, HA stage 1).
  *   v1.10.0 — 2026-10-16 — savepoint(): a tolerant step inside a transaction that undoes only its
@@ -77,6 +79,7 @@ import type { AgentRepository } from './repositories/agent.repository.js';
 import type { EcosystemAppRepository } from './repositories/ecosystem-app.repository.js';
 import type { MemoryRepository } from './repositories/memory.repository.js';
 import type { MemoryTallyRepository } from './repositories/memory-tally.repository.js';
+import type { MemoryShapeRepository } from './repositories/memory-shape.repository.js';
 import type { ActionRepository } from './repositories/action.repository.js';
 import type { WorkRepository } from './repositories/work.repository.js';
 import type { WalletRepository } from './repositories/wallet.repository.js';
@@ -149,7 +152,7 @@ import type { McpServerRepository } from './repositories/mcp-server.repository.j
 import type { HeldAccountNameRepository } from './repositories/held-names.repository.js';
 
 export interface Storage extends
-  OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository,
+  OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository,
   ActionRepository, WorkRepository, WalletRepository,
   BoardRepository, OtkRepository, DisputeRepository,
   FileRepository, IdentityRepository,

@@ -28,6 +28,8 @@
  *   cd aimeat && pnpm check:classification-reach --shrink   # lower counts that fell; nothing else
  *   cd aimeat && pnpm check:classification-reach --seed     # rewrite from the tree, keeping reasons
  * @version-history
+ *   v1.3.0 — 2026-11-04 — listInboxRows and listAllMemoryByKeyShape count as content reads: they load
+ *     memory values as listMemory and listAllMemory do (codebase analysis 2026-11-03, item C7).
  *   v1.2.0 — 2026-10-16 — listAllMemoryPages (storage/memory-pages.ts) counts as a content read: it is
  *     listAllMemory read to the end page by page, and a read through it must stay on the list (QA audit
  *     S8-10, F06c-01).
@@ -58,6 +60,8 @@ export const CONTENT_READS = new Set([
   'listWorkspaceRows', 'getWorkspaceRow',
   'listMemoryHistory', 'listDeletedMemory', 'listAllDeletedMemory', 'listMemoryKeysByPrefix',
   'readStorageFileRange', 'listStorageFilesForOwners',
+  // 2026-11-04: the memory reads by key or value shape (repositories/memory-shape.repository.ts).
+  'listInboxRows', 'listAllMemoryByKeyShape',
 ]);
 
 /**

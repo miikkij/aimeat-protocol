@@ -21,10 +21,12 @@
  * @usage
  *   await answerNotifications(storage, ownerGhii, { ref: 'publish-request:<id>' }, { outcome: 'allowed', by, at });
  * @version-history
+ *   2026-11-04 — A match by id alone reads that notification by the key's end, not every row of the
+ *     owner (codebase analysis 2026-11-03, item C7).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, the approval standard; the developer's review).
  */
 import type { Storage } from '../storage/interface.js';
-import { listOwnerNotificationRecords } from './notification-sweeps.js';
+import { listOwnerNotificationRecords, findOwnerNotificationsByIds } from './notification-sweeps.js';
 import { emitChange } from './event-bus.js';
 import { updateMemoryRecord, UNCHANGED } from './record-cas.js';
 import { logger } from '../utils/logger.js';
@@ -62,7 +64,10 @@ export async function answerNotifications(
 ): Promise<number> {
   if (!match.ref && !match.refPrefix && !match.id) return 0;
   try {
-    const rows = await listOwnerNotificationRecords(storage, recipientGhii);
+    // One named notification is read by the key's end; a question (`ref`) is in the value, so every row.
+    const rows = match.id && !match.ref && !match.refPrefix
+      ? await findOwnerNotificationsByIds(storage, recipientGhii, [match.id])
+      : await listOwnerNotificationRecords(storage, recipientGhii);
     let marked = 0;
     type Stored = { id?: string; ref?: string; answered?: unknown; actions?: unknown[] } | null;
     const matches = (v: Stored) => !!v && ((!!match.ref && v.ref === match.ref) || (!!match.id && v.id === match.id)

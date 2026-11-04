@@ -50,6 +50,8 @@
  *     the owner shows the screenshot of an access-limited app to everyone (secaudit2026oct31w2 round 10, W2-12).
  *   2026-11-04 — Add listAppVersionSummaries(): the version list without the content (codebase
  *     analysis 2026-11-03, item A1).
+ *   2026-11-04 — Add findOperatorHiddenApps(): which of the named apps the operator hid, for the public
+ *     app-tool scan (codebase analysis 2026-11-03, item C7).
  */
 import type { AppRecord, AppSummaryRecord, AppVersionSize, AppVersionSummary, AppDraftRecord, AppListOptions, AppForkRecord, AppListing } from '../interface.js';
 
@@ -104,6 +106,13 @@ export interface AppRepository {
      * export, which needs them.
      */
     listAppVersionSummaries(ownerGaii: string, filename: string): Promise<AppVersionSummary[]>;
+    /**
+     * Which of `apps` the operator has hidden: those for which
+     * `getAppByOwnerName(ownerName, filename)?.operatorHidden === true` (its newest version row), in
+     * one read and without the payload. The public app-tool scan asks it once per scan, for the apps
+     * whose manifests it read, instead of reading each manifest's app record whole.
+     */
+    findOperatorHiddenApps(apps: Array<{ ownerName: string; filename: string }>): Promise<Array<{ ownerName: string; filename: string }>>;
     getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number>;
     deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean>;
     updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean>;

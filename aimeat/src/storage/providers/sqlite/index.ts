@@ -101,6 +101,7 @@ import { knowledgeMethods } from './methods/knowledge.js';
 import { mcpServerMethods } from './methods/mcp-servers.js';
 import { memoryMethods } from './methods/memory.js';
 import { memoryTallyMethods } from './methods/memory-tally.js';
+import { memoryShapeMethods } from './methods/memory-shape.js';
 import { moderationMethods } from './methods/moderation.js';
 import { nodeExtEscrowMethods } from './methods/node-ext-escrow.js';
 import { nodeInfraMethods } from './methods/node-infra.js';
@@ -314,6 +315,7 @@ Object.assign(
   mcpServerMethods,
   memoryMethods,
   memoryTallyMethods,
+  memoryShapeMethods,
   moderationMethods,
   nodeExtEscrowMethods,
   nodeInfraMethods,

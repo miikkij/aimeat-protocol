@@ -6,6 +6,9 @@
  *   OKF overviews, structure graphs, dangling-refs scan, structure timeline, content search, and the
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — GET /v1/organisms/:id/workspace answers `truncated: true` when the workspace holds
+ *     more rows than one read loads (5 000); those rows were left out with nothing to say so (codebase
+ *     analysis 2026-11-03, item C7).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  *   v1.1.0 — 2026-07-15 — Org managers (creator/admin) pass the workspace read gate automatically —
  *     an org admin reads every workspace under the organism without a per-workspace grant.
@@ -279,6 +282,8 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       ...(rules ? { rules, sections } : {}),
       ...(Object.keys(schemas).length ? { schemas } : {}),
       ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
+      // More rows than one read loads: `objects` is not the whole workspace (services/workspace-content.ts).
+      ...(got.truncated ? { truncated: true } : {}),
     }, [
       { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },
       { description: 'Write a draft record', method: 'POST', url: '/v1/memory' },

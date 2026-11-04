@@ -17,6 +17,10 @@
  *   const mine = await listOwnCallableAppTools(storage, config, req.auth.owner, 500);
  *   const byApp = await listOwnerAppToolNames(storage, ownerGhii);
  * @version-history
+ *   2026-11-04 — listPublicAppTools reads the public `apps.*.tools` rows only (key shape and visibility
+ *     in SQL), reads their values again only when a manifest changed (publicToolManifestRecords), and
+ *     names the operator-hidden apps in one read (findOperatorHiddenApps) instead of reading each
+ *     manifest's app record with its payload (codebase analysis 2026-11-03, item C7).
  *   2026-10-31 — ownPublicManifests is exported, for the overview's offerings lane (services/overview/overview-sources.ts).
  *   2026-10-25 — listPublicAppTools leaves out the tools of an app the operator hid (operatorHidden),
  *     so discover, the commerce feed and catalog, the .well-known card and the merchant files stop
@@ -50,8 +54,10 @@
  *   v1.0.0 — 2026-07-14 — Extracted from the commerce-acp feed scan + enriched entry shape
  *     (TARGET-034 phase D)
  */
+import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
+import { cached, TTL } from '../services/cache.js';
 import { AppToolsDocSchema, appIdFromToolsKey, isToolOffered, presentToolPacing, toolMoneyPrices, toolTollMorsels, type AppTool } from '../models/app-tool-schemas.js';
 import { localAccountName } from '../utils/gaii.js';
 import { chargePacing, resolvePacingToll, type PacingCharge } from '../services/metered-settlement.js';
@@ -131,6 +137,39 @@ function webmcpUrls(config: AimeatConfig, ownerName: string, appId: string, tool
   };
 }
 
+/** The window of the manifest scan, in rows. */
+const MANIFEST_SCAN_ROWS = 2000;
+/** A manifest's key is `apps.{appId}.tools` (models/app-tool-schemas.ts appToolsKey). */
+const TOOLS_KEY_PREFIX = 'apps.';
+const TOOLS_KEY_SUFFIX = '.tools';
+
+/**
+ * Every owner's PUBLIC `apps.*.tools` records, in key order, at most MANIFEST_SCAN_ROWS, with values.
+ *
+ * FILTERED IN SQL. The scan read the first 2 000 `apps.*` rows of every kind and visibility, values
+ * included, and kept the public tool manifests; the other `apps.*` records (config, workspaces, agent
+ * face) took room in the window, so past about 500 apps a tool left discovery with no error. The
+ * key shape and the visibility are now the query, so the window holds only the rows the scan uses.
+ * At the node's size today the rows are the same (codebase analysis 2026-11-03, item C7).
+ *
+ * CACHED BY WHAT IS STORED. Every call reads the rows' addresses, versions and update times without
+ * the values; the values are read again only when those changed. Any write to a manifest raises its
+ * version, so a change is seen on the next call, by whatever door it was written; nothing has to
+ * remember to clear this cache.
+ */
+async function publicToolManifestRecords(storage: Storage): Promise<MemoryRecord[]> {
+  const opts = { visibility: 'public', limit: MANIFEST_SCAN_ROWS };
+  // The same rows as the query below, without values: the public `apps.*` rows, kept to the key shape
+  // `apps.<something>.tools` in the same order (key, then owner), the first MANIFEST_SCAN_ROWS of them.
+  const meta = (await storage.listAllMemoryMeta({ prefix: TOOLS_KEY_PREFIX, visibility: 'public' })).items
+    .filter(r => r.key.endsWith(TOOLS_KEY_SUFFIX) && r.key.length >= TOOLS_KEY_PREFIX.length + TOOLS_KEY_SUFFIX.length)
+    .slice(0, MANIFEST_SCAN_ROWS);
+  const stamp = createHash('sha256');
+  for (const r of meta) stamp.update(`${r.ownerGaii}\u0000${r.key}\u0000${r.version}\u0000${r.updatedAt}\n`);
+  return cached(`app-tools:manifests:${stamp.digest('hex')}`, TTL.catalogue,
+    () => storage.listAllMemoryByKeyShape(TOOLS_KEY_PREFIX, TOOLS_KEY_SUFFIX, opts));
+}
+
 /**
  * Every tool from every PUBLIC apps.{appId}.tools manifest, capped at `cap` entries.
  * appIds are published filenames and nearly always carry dots ("aimeat-pages.html") — the key is
@@ -144,7 +183,12 @@ export async function listPublicAppTools(
   const cap = opts.cap ?? 500;
   const pricedOnly = opts.pricedOnly ?? true;
   const out: PricedAppTool[] = [];
-  const { items } = await storage.listAllMemory({ prefix: 'apps.', limit: 2000 });
+  const items = await publicToolManifestRecords(storage);
+  const named = items.flatMap(rec => {
+    const appId = appIdFromToolsKey(rec.key);
+    return appId ? [{ ownerName: localAccountName(rec.ownerGaii), filename: appId }] : [];
+  });
+  const hidden = new Set((await storage.findOperatorHiddenApps(named)).map(a => `${a.ownerName}\u0000${a.filename}`));
   for (const rec of items) {
     if (out.length >= cap) break;
     const appId = appIdFromToolsKey(rec.key);
@@ -156,8 +200,9 @@ export async function listPublicAppTools(
     // An app the operator hid is removed from every public surface, and these lists are public
     // surfaces: discover, the commerce feed and catalog, the .well-known card and the merchant files
     // (secaudit2026oct22, app-tool-catalog-ignores-app-hidden-state). A manifest for a file the node
-    // does not host has no app record and keeps its listing.
-    if ((await storage.getAppByOwnerName(ownerName, appId))?.operatorHidden === true) continue;
+    // does not host has no app record and keeps its listing. One read names every hidden app, by the
+    // row getAppByOwnerName reads (the newest version), instead of one whole app record per manifest.
+    if (hidden.has(`${ownerName}\u0000${appId}`)) continue;
     for (const tool of tools) {
       if (out.length >= cap) break;
       // Offered = a money price (isToolPriced, the invoke route's own 402 test, which reads

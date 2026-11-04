@@ -36,6 +36,8 @@
  *     content: 503 versions and 1 041 MB for one app, which stalled aimeat.io at 06:56 that day.
  *   2026-11-04 — listAppVersionSummaries: the version list without the content; GET .../versions
  *     read every version's payload through listAppVersions (codebase analysis 2026-11-03, item A1).
+ *   2026-11-04 — findOperatorHiddenApps: which of the named apps the operator hid, without the payload
+ *     (codebase analysis 2026-11-03, item C7).
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
@@ -314,6 +316,23 @@ export const appMethods = {
       size: Number(r.size),
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
     }));
+  },
+
+  async findOperatorHiddenApps(this: PostgresKyselyStorage, apps: Array<{ ownerName: string; filename: string }>): Promise<Array<{ ownerName: string; filename: string }>> {
+    // getAppByOwnerName's row is the highest versionNumber of (ownerName, filename); the app is hidden
+    // when that row says so. Names and flags only, never the payload (codebase analysis 2026-11-03, C7).
+    const out: Array<{ ownerName: string; filename: string }> = [];
+    for (let i = 0; i < apps.length; i += 200) {
+      const chunk = apps.slice(i, i + 200);
+      const rows = await this.db.selectFrom('App as a')
+        .select(['a.ownerName', 'a.filename']).distinct()
+        .where('a.operatorHidden', '=', true)
+        .where(eb => eb.or(chunk.map(p => eb.and([eb('a.ownerName', '=', p.ownerName), eb('a.filename', '=', p.filename)]))))
+        .where(sql<boolean>`a."versionNumber" = (SELECT MAX(b."versionNumber") FROM "App" b WHERE b."ownerName" = a."ownerName" AND b."filename" = a."filename")`)
+        .execute();
+      out.push(...rows.map(r => ({ ownerName: r.ownerName, filename: r.filename })));
+    }
+    return out;
   },
 
   async listAppVersionSummaries(this: PostgresKyselyStorage, ownerGaii: string, filename: string): Promise<AppVersionSummary[]> {

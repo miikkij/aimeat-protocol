@@ -17,6 +17,9 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   2026-11-04 — GET reads the page it answers with and the unread and total counts in SQL
+ *     (readNotificationInbox); /:id/answered and POST /read with ids read the named rows by the key's
+ *     end, and POST /read with all reads the unread rows. Same answers (codebase analysis 2026-11-03, item C7).
  *   2026-10-25 — POST /v1/notifications/:id/answered: a notice whose button ran shows the answer and
  *     loses its buttons, for every kind (services/notification-answers.ts; secaudit2026oct22).
  *   2026-10-16 — DELETE /v1/notifications from an agent or an app grant puts the notifications in the
@@ -61,7 +64,7 @@ import {
   readNotificationSettingsStrict, updateNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor, readMailLog,
   NOTIF_GROUPS, type NotifSource, type NotificationSettings,
 } from '../services/notification-settings.js';
-import { listOwnerNotifications, listOwnerNotificationRecords } from '../services/notification-sweeps.js';
+import { listOwnerNotifications, readNotificationInbox, findOwnerNotificationsByIds } from '../services/notification-sweeps.js';
 import { logger } from '../utils/logger.js';
 import { answerNotifications, outcomeOfAction, type NotifAnswer } from '../services/notification-answers.js';
 import { isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
@@ -79,11 +82,16 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
    * node held >500 notifications total, the window was entirely OLD rows and every recent
    * notification for every owner fell outside it — the bell silently froze. The read is now
    * on THIS owner's identity with no window at all (bounded by the 90-day TTL); a window of
-   * 1000 in key order still cut an owner's newest rows past 1000 (QA audit F13-01). The sort
-   * newest first + slice below yields the newest page with an accurate unread count. */
+   * 1000 in key order still cut an owner's newest rows past 1000 (QA audit F13-01). The newest
+   * page and the unread and total counts come from SQL over this owner's rows (readNotificationInbox). */
   router.get('/v1/notifications', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const ghii = ownerGhii(req);
-    const mine = (await listOwnerNotificationRecords(storage, ghii))
+    const onlyUnread = req.query.unread === '1' || req.query.unread === 'true';
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+    // The page, newest first, and the two counts, read in SQL: the rows a sort and a slice of every
+    // notification of 90 days gave, without loading the rest (codebase analysis 2026-11-03, item C7).
+    const inbox = await readNotificationInbox(storage, ghii, { limit, unreadOnly: onlyUnread });
+    const list = inbox.rows
       .map(r => r.value as NotifValue)
       // Who sent it and which group it belongs to travel with every row, derived for the rows
       // written before the source did, so the page and the bell never have to guess. The buttons
@@ -93,11 +101,7 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       .map(v => ({ ...v, actions: servableNotifActions(v.actions, { recipient: ghii, notif: v.id }), source: sourceOf(v), group: groupOfType(v.type) }))
       // An answered notice says whether the reader gave the answer, so the page can say "You allowed this".
       .map(v => (v.answered ? { ...v, answered: { ...v.answered, by_you: v.answered.by === ghii || v.answered.by === req.auth!.owner } } : v));
-    const unread = mine.filter(n => !n.read).length;
-    const onlyUnread = req.query.unread === '1' || req.query.unread === 'true';
-    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
-    const list = (onlyUnread ? mine.filter(n => !n.read) : mine).slice(0, limit);
-    res.json(success(config.nodeId, { notifications: list, unread, total: mine.length }));
+    res.json(success(config.nodeId, { notifications: list, unread: inbox.unread, total: inbox.total }));
   });
 
   /**
@@ -236,7 +240,7 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
     const ghii = ownerGhii(req);
     const id = req.params.id as string;
     const action = typeof req.body?.action === 'string' ? req.body.action : '';
-    const row = (await listOwnerNotificationRecords(storage, ghii)).map(r => r.value as NotifValue).find(v => v.id === id);
+    const row = (await findOwnerNotificationsByIds(storage, ghii, [id])).map(r => r.value as NotifValue).find(v => v.id === id);
     if (!row) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such notification on this account.')); return; }
     if (row.answered) { res.json(success(config.nodeId, { answered: row.answered })); return; }
     if (!(row.actions ?? []).some(a => a.id === action && a.kind === 'api')) {
@@ -259,9 +263,13 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
     const idSet = Array.isArray(ids) ? new Set(ids) : null;
-    // The caller's own rows, all of them (QA audit F13-01): this read was the node's oldest 500
-    // notification rows of every owner, so past 500 it found none of the caller's newer ones.
-    const items = await listOwnerNotificationRecords(storage, ghii);
+    // The caller's own rows (QA audit F13-01): this read was the node's oldest 500 notification rows
+    // of every owner, so past 500 it found none of the caller's newer ones. `all` reads the unread
+    // rows, the ids read their own rows by the key's end; the loop below skips a read row either way
+    // (codebase analysis 2026-11-03, item C7).
+    const items = all
+      ? await storage.listInboxRows(ghii, NOTIF_PREFIX, { unreadOnly: true })
+      : await findOwnerNotificationsByIds(storage, ghii, idSet ?? []);
     let marked = 0;
     const now = new Date().toISOString();
     for (const r of items) {
