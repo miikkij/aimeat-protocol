@@ -10,6 +10,7 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-11-04 — The challenge Map and its sweep timer are removed: GET /v1/auth/challenge wrote to it and no code read it, so its answer is unchanged. The signatures POST /v1/auth/token spends are kept in the node's storage (auth/signed-request.ts; codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-02 — An agent's token and refresh on a store place carry the place's default words (services/place-agent-scopes.ts).
  *   2026-10-27 — DELETE /v1/auth/sessions tells the person which of their Full and operator access tokens still act as them (services/owner-tokens-kept-notice.ts; secaudit2026oct26).
  *   2026-10-25 — The refresh, revoke and session routes read the refresh cookie by the node's config, so an
@@ -120,9 +121,6 @@ import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 import { getStats } from '../services/stats.js';
 import { widenAndAnnounce } from './agents/announce-scopes.js';
 
-// In-memory challenge store
-const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
-
 export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -191,8 +189,10 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     const challenge = `ch-${randomBytes(16).toString('hex')}`;
+    // Nothing reads the challenge back: POST /v1/auth/token signs the GAII and a timestamp, and the
+    // signature is spent there (auth/signed-request.ts). It was written to a Map no code read until
+    // 2026-11-04; the answer is unchanged.
     const expiresAt = Date.now() + 60_000; // 60 seconds
-    challenges.set(challenge, { challenge, expiresAt, owner });
 
     res.json(success(config.nodeId, {
       challenge,
@@ -254,7 +254,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // Spent on first use, as on the MCP OAuth signature path and the ecosystem refresh: within the
       // window above, a captured request body minted a fresh token every time it was sent again
       // (Core 2026-11 AUTH-11). After the freshness check, so a stale signature is not remembered.
-      if (!spendSignature(signature)) {
+      if (!await spendSignature(signature)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'That signature has already been used. Sign a new timestamp.'));
         return;
       }
@@ -375,7 +375,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       }
       // Spent on first use, as the agent branch above does (AUTH-11): within the window, a captured
       // owner request body otherwise minted an owner session every time it was sent again.
-      if (!spendSignature(signature)) {
+      if (!await spendSignature(signature)) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'That signature has already been used. Sign a new timestamp.'));
         return;
       }
@@ -786,14 +786,6 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   // The OTK routes are gone: the Tier 0.5 pair on 2026-08-23 (RFC v4.0) and the connectivity-key
   // mint on 2026-10-14 (feature-list audit row 202). Device authorization connects an agent.
 
-
-  // Cleanup expired challenges periodically
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, val] of challenges) {
-      if (now > val.expiresAt) challenges.delete(key);
-    }
-  }, 30_000);
 
   return router;
 }

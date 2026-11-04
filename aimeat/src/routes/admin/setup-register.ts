@@ -19,6 +19,8 @@
  * @structure registerSetupRegisterRoute(router, deps) — the route, with the admin check passed in
  * @usage registerSetupRegisterRoute(router, { config, storage, rateLimiter: adminAuthLimit, admitAdmin });
  * @version-history
+ *   v1.2.1 -- 2026-11-04 -- admitAdmin is async: the wrong-password count is kept in the node's storage
+ *     (codebase analysis 2026-11-03, HA stage 2).
  *   v1.2.0 -- 2026-11-04 -- The admin check is admitAdmin, which answers its own refusal: a wrong
  *     password counts in the one count of services/admin-password.ts, and an address over it gets 429
  *     (codebase analysis 2026-11-03, item A12).
@@ -49,7 +51,7 @@ export interface SetupRegisterDeps {
     rateLimiter: RequestHandler;
     /** The admin session (cookie or header) or the admin password in its header, as routes/admin.ts
      *  checks it (services/admin-password.ts). False when it answered the refusal itself. */
-    admitAdmin: (req: Request, res: Response) => boolean;
+    admitAdmin: (req: Request, res: Response) => Promise<boolean>;
 }
 
 export function registerSetupRegisterRoute(router: Router, deps: SetupRegisterDeps): void {
@@ -58,7 +60,7 @@ export function registerSetupRegisterRoute(router: Router, deps: SetupRegisterDe
     // POST /v1/admin/setup/register — register owner (password-protected, no auth)
     router.post('/v1/admin/setup/register', rateLimiter, async (req, res) => {
         // Check admin session (cookie or header) or password via header (NOT query param)
-        if (!admitAdmin(req, res)) return;
+        if (!await admitAdmin(req, res)) return;
 
         // The admin password creates the FIRST operator and nothing after it. Until 2026-10-09 this
         // route created an operator for anyone holding the password for the life of the process,

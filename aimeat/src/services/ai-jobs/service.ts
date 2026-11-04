@@ -22,6 +22,7 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (takeAiCallOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.18.0 -- 2026-11-04 -- A stopping node marks its running jobs (markStoppingJobs) and the next start queues a marked
  *     job again once (restart.ts); writeResult moved to write-result.ts unchanged (codebase analysis 2026-11-03, item HA 1.4).
  *   v1.17.2 -- 2026-10-27 -- The per-owner queue brake and the slot pool's lane count the account (ownerGhiiOf), not the
@@ -115,7 +116,7 @@ import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach, type JobOpOutcome } from './run-op.js';
 import { fileJobPictureRequest } from './picture-request.js';
-import { takeAiCall } from '../account-limits.js';
+import { takeAiCallOnNode } from '../account-limits.js';
 import { emitAiJobFinished } from './finished-listeners.js';
 import { findExtension, namespacedName } from '../component-address.js';
 import { restartDecision, markStopped } from './restart.js';
@@ -230,7 +231,7 @@ export class AiJobService implements AiJobStarter {
         // ctx.ai.start in an extension. Only a chain's continuation is 'exempt' (its first start was
         // counted); the run itself is not counted again (run-op.ts).
         if (ctx.limit !== 'exempt') {
-            const turn = takeAiCall(this.config, ownerGhii);
+            const turn = await takeAiCallOnNode(this.config, ownerGhii);
             if (!turn.ok) throw new AiJobError(turn.code, 429, turn.message, turn.retryAfterSec);
         }
 

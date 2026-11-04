@@ -13,6 +13,7 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (requireAiCallTurnOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v2.8.0 -- 2026-10-08 -- The record states text with method `transcribed`, so its label says a model transcribed it.
  *   v2.7.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (services/ai/errors.ts):
  *     a permanent 4xx is 422 PROVIDER_REJECTED with the provider's reason (aiprov plan, A1). The
@@ -59,7 +60,7 @@ import { logger } from '../utils/logger.js';
 import { resolveSttLanguage } from './ai-model-defaults.js';
 import type { CallerClass } from './ai/policy.js';
 import type { RequestLanguage } from './ai/ai-fix-words.js';
-import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from './account-limits.js';
 
 /** Shown when the owner has no `sttModel`. Lives in services/ai/unset-model.ts since the gate refuses
  *  it; re-exported so the route, the message route and the UI copy point at the same instruction. */
@@ -145,7 +146,7 @@ export async function transcribeForOwner(
   }
   // POST /v1/ai/transcribe, the message attachment transcribe route and aimeat_ai_transcribe all
   // arrive here: one count per account, before any spend.
-  requireAiCallTurn(config, gaii, opts.limit);
+  await requireAiCallTurnOnNode(config, gaii, opts.limit);
 
   // Owner setting, then the node's default, then a refusal by name (the gate words it). The
   // refusal stays: handing audio to a chat model turns a clear local error into an opaque provider one.

@@ -17,9 +17,13 @@
       "count": 1,
       "reason": "openapi.yaml read once per process; every process reads the same file."
     },
-    "src/services/admin-password.ts :: map :: misses": {
+    "src/services/ephemeral-claims.ts :: map :: local": {
       "count": 1,
-      "reason": "Each process counts wrong admin passwords on its own, so N active processes allow N times the limit; one active process plus a standby keeps the limit as set."
+      "reason": "The one-time values and counters of a process with no storage registered (a unit test, a CLI command), and the synchronous `here` forms kept for callers that cannot wait; a running node keeps them in the EphemeralClaim table, which every process sees."
+    },
+    "src/middleware/login-tarpit.ts :: map :: writing": {
+      "count": 1,
+      "reason": "This process's own count writes in flight, so its next request from one address reads its own last outcome; the count itself is in the EphemeralClaim table, which every process sees."
     },
     "src/services/classification/audit.ts :: let :: soonTimer": {
       "count": 1,
@@ -74,10 +78,6 @@
       "reason": "DEBT"
     },
     "src/auth/middleware.ts :: map :: _lastSeenCache": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/auth/signed-request.ts :: map :: spent": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -153,15 +153,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/middleware/login-tarpit.ts :: interval :: <module>": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/middleware/login-tarpit.ts :: let :: sleeping": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/middleware/login-tarpit.ts :: map :: buckets": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -178,14 +170,6 @@
       "reason": "DEBT"
     },
     "src/routes/apps-backup.ts :: map :: backupCache": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/routes/auth.ts :: interval :: authRouter": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/routes/auth.ts :: map :: challenges": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -270,10 +254,6 @@
       "reason": "DEBT"
     },
     "src/services/account-events.ts :: set :: firstUseSeen": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/account-limits.ts :: map :: aiCallLimiters": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -1149,10 +1129,6 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/passkeys.ts :: map :: pending": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/services/person-zone.ts :: map :: zones": {
       "count": 1,
       "reason": "DEBT"
@@ -1208,10 +1184,6 @@
     "src/services/request-injector.ts :: map :: targets": {
       "count": 1,
       "reason": "This process's own Express app and listening server per port: a request the node makes to itself goes to the process that makes it, which a second process changes nothing in."
-    },
-    "src/services/request-nonce.ts :: map :: seen": {
-      "count": 1,
-      "reason": "DEBT"
     },
     "src/services/saml-sp.ts :: map :: instanceCache": {
       "count": 1,
@@ -1302,18 +1274,6 @@
       "reason": "DEBT"
     },
     "src/services/signals/signal-service.ts :: map :: keyLocks": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/single-use-tickets.ts :: interval :: ensureSweeper": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/single-use-tickets.ts :: let :: sweeper": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/single-use-tickets.ts :: set :: stores": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -1469,23 +1429,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/upload-token.ts :: interval :: initUploadTokenKeys": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/upload-token.ts :: let :: _cleanupInterval": {
-      "count": 1,
-      "reason": "DEBT"
-    },
     "src/services/upload-token.ts :: let :: _privateKey": {
       "count": 1,
       "reason": "DEBT"
     },
     "src/services/upload-token.ts :: let :: _publicKey": {
-      "count": 1,
-      "reason": "DEBT"
-    },
-    "src/services/upload-token.ts :: map :: handles": {
       "count": 1,
       "reason": "DEBT"
     },

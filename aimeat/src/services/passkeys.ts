@@ -12,15 +12,11 @@
  *   a verification that is wrong in the permissive direction accepts a forged assertion silently.
  *   What lives here is everything around it: which challenge, whose credential, what the answer is.
  *
- *   THE CHALLENGE STORE IS IN MEMORY, on purpose and with a limit. A challenge is a random value
- *   that must be used once, within a minute, by the browser it was handed to. Putting it in the
- *   database would make every sign-in two extra writes for a value whose whole life is 60 seconds.
- *
- *   AND IT STAYS IN MEMORY, because a node is one process. This platform does not grow by putting
- *   replicas behind one address; it grows by there being more nodes, each its own, federated. A
- *   ceremony therefore begins and ends in the same process by construction, and there is no shared
- *   store to add later. Same reasoning as the rate limiter (middleware/rate-limit.ts), whose note
- *   about a shared store is about a deployment shape this platform does not have.
+ *   THE CHALLENGE STORE HAS A LIMIT. A challenge is a random value that must be used once, within a
+ *   minute, by the browser it was handed to, and at most MAX_PENDING are in flight. It is a one-time
+ *   value in the node's storage (services/ephemeral-claims.ts), so a ceremony begun on one process of
+ *   the node ends on another (one active process plus a standby, or more after stage 2); it was a Map
+ *   in this process until 2026-11-04, on the ground that a node is one process.
  *
  *   THE RELYING PARTY ID IS THE HOST, and a passkey is bound to it forever. Changing this node's
  *   domain makes every registered key unusable, which is why config derives it from baseUrl rather
@@ -40,6 +36,9 @@
  *   - PasskeyCeremony: what a caller gets back, and the refusal shape both doors render
  * @usage const r = await beginLogin(config, storage, 'alice');
  * @version-history
+ *   v1.5.0 — 2026-11-04 — The ceremonies in flight are kept in the node's storage (oneTimeStore
+ *     'passkey-ceremony'): the same minute, the same limit, the same answers, on every process
+ *     (codebase analysis 2026-11-03, HA stage 2).
  *   v1.4.0 — 2026-10-09 — beginSigning / finishSigning: a device signs a document statement (the
  *     challenge is its hash), user verification required, from the node or one of its app origins
  *     (passkeyOriginAllowed). Used by services/docsign/.
@@ -63,6 +62,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import type { PasskeyRecord } from '../storage/types/passkeys.js';
 import { logger } from '../utils/logger.js';
+import { oneTimeStore } from './ephemeral-claims.js';
 
 /** A ceremony lives one minute. Long enough for a fingerprint, short enough not to be a store. */
 const CHALLENGE_TTL_MS = 60_000;
@@ -76,33 +76,26 @@ interface PendingCeremony {
   owner?: string;
 }
 
-const pending = new Map<string, PendingCeremony>();
+/** The ceremonies in flight, in the node's storage, so a ceremony begun on one process ends on another. */
+const pending = oneTimeStore<PendingCeremony>('passkey-ceremony');
 
-/** Drop what has expired. Called on every write, so the map cannot outgrow its own traffic. */
-function sweep(): void {
-  const now = Date.now();
-  for (const [id, c] of pending) if (c.expiresAt <= now) pending.delete(id);
-}
-
-function remember(challenge: string, owner?: string): string {
-  sweep();
-  if (pending.size >= MAX_PENDING) {
+async function remember(challenge: string, owner?: string): Promise<string> {
+  if (await pending.count() >= MAX_PENDING) {
     // Full means somebody is hammering the door. Refuse the NEW one rather than evicting a
     // ceremony a real person is halfway through.
     throw new Error('PASSKEY_BUSY');
   }
   const id = crypto.randomUUID();
-  pending.set(id, { challenge, expiresAt: Date.now() + CHALLENGE_TTL_MS, owner });
+  const expiresAt = Date.now() + CHALLENGE_TTL_MS;
+  await pending.put(id, { challenge, expiresAt, owner }, expiresAt);
   return id;
 }
 
 /** Take the ceremony, whether it succeeds or not: a challenge is used once either way. */
-function take(id: string): PendingCeremony | null {
-  sweep();
-  const c = pending.get(id);
-  if (!c) return null;
-  pending.delete(id);
-  return c.expiresAt > Date.now() ? c : null;
+async function take(id: string): Promise<PendingCeremony | null> {
+  if (typeof id !== 'string' || !id) return null;
+  const c = (await pending.take(id))?.data;
+  return c && c.expiresAt > Date.now() ? c : null;
 }
 
 export type PasskeyResult<T> =
@@ -184,7 +177,7 @@ export async function beginRegistration(
   }
 
   try {
-    return { ok: true, data: { ceremony_id: remember(options.challenge, owner), options } };
+    return { ok: true, data: { ceremony_id: await remember(options.challenge, owner), options } };
   } catch {
     return { ok: false, status: 503, code: 'PASSKEY_BUSY', message: 'Too many sign-ins in flight right now. Try again in a moment.' };
   }
@@ -197,7 +190,7 @@ export async function finishRegistration(
 ): Promise<PasskeyResult<{ passkey: PasskeyRecord }>> {
   const off = disabled(config); if (off) return off;
 
-  const ceremony = take(args.ceremonyId);
+  const ceremony = await take(args.ceremonyId);
   if (!ceremony || ceremony.owner !== args.owner) {
     return { ok: false, status: 400, code: 'PASSKEY_CHALLENGE_EXPIRED', message: 'That took too long. Start again.' };
   }
@@ -298,7 +291,7 @@ export async function beginLogin(
   });
 
   try {
-    return { ok: true, data: { ceremony_id: remember(options.challenge, named || undefined), options } };
+    return { ok: true, data: { ceremony_id: await remember(options.challenge, named || undefined), options } };
   } catch {
     return { ok: false, status: 503, code: 'PASSKEY_BUSY', message: 'Too many sign-ins in flight right now. Try again in a moment.' };
   }
@@ -323,7 +316,7 @@ export async function finishLogin(
 ): Promise<PasskeyResult<FinishLoginData>> {
   const off = disabled(config); if (off) return off;
 
-  const ceremony = take(args.ceremonyId);
+  const ceremony = await take(args.ceremonyId);
   if (!ceremony) {
     return { ok: false, status: 400, code: 'PASSKEY_CHALLENGE_EXPIRED', message: 'That took too long. Start again.' };
   }
@@ -450,7 +443,7 @@ export async function beginSigning(
     challenge,
   });
   try {
-    return { ok: true, data: { ceremony_id: remember(options.challenge, owner), options } };
+    return { ok: true, data: { ceremony_id: await remember(options.challenge, owner), options } };
   } catch {
     return { ok: false, status: 503, code: 'PASSKEY_BUSY', message: 'Too many ceremonies in flight right now. Try again in a moment.' };
   }
@@ -472,7 +465,7 @@ export async function finishSigning(
   args: { ceremonyId: string; owner: string; response: { id?: string; response?: { clientDataJSON?: string } } & Record<string, unknown> },
 ): Promise<PasskeyResult<FinishSigningData>> {
   const off = disabled(config); if (off) return off;
-  const ceremony = take(args.ceremonyId);
+  const ceremony = await take(args.ceremonyId);
   if (!ceremony || ceremony.owner !== args.owner) {
     return { ok: false, status: 400, code: 'PASSKEY_CHALLENGE_EXPIRED', message: 'That took too long, or it was started for another account. Start again.' };
   }
@@ -526,5 +519,5 @@ export async function finishSigning(
 
 /** TEST SEAM: forget every pending ceremony. Never called by the server. */
 export function _resetPasskeyCeremonies(): void {
-  pending.clear();
+  pending.here.clear();
 }

@@ -12,6 +12,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-11-04 -- The wrong-password count is kept in the node's storage (checkAdminPasswordOnNode), so
+ *     every process shares it; admitAdmin is async (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 -- The admin password is checked by checkAdminPassword (services/admin-password.ts) on
  *     the setup pages and on POST /v1/admin/seed-examples, with one count of wrong passwords per address
  *     shared with the build-with-you operator routes: seed-examples had only the node's global limit
@@ -73,7 +75,7 @@ import { morselsInCirculation } from '../services/morsel.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes } from 'node:crypto';
-import { checkAdminPassword, adminPasswordLimitedMessage } from '../services/admin-password.js';
+import { checkAdminPasswordOnNode, adminPasswordLimitedMessage } from '../services/admin-password.js';
 import { sign } from '../auth/keypair.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT, generateSessionId } from '../auth/jwt.js';
@@ -176,9 +178,9 @@ export function adminRouter(
 
     // POST /v1/admin/setup/auth — authenticate with admin password, get session cookie
     const adminAuthLimit = rateLimit(() => ({ max: config.adminAuthRateLimitMax, windowMs: config.adminAuthRateLimitWindowMs }));
-    router.post('/v1/admin/setup/auth', adminAuthLimit, (req, res) => {
+    router.post('/v1/admin/setup/auth', adminAuthLimit, async (req, res) => {
         const pw = (req.headers['x-admin-password'] as string) ?? req.body?.admin_password ?? '';
-        const check = checkAdminPassword(config, req.ip ?? '', pw);
+        const check = await checkAdminPasswordOnNode(config, req.ip ?? '', pw);
         if (check.kind === 'limited') { refuseAdminLimited(res, check); return; }
         if (check.kind !== 'ok') {
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
@@ -210,10 +212,10 @@ export function adminRouter(
      * parameter), the password through the one check. False when it answered the refusal: 429 for an
      * address over the wrong-password count, else `unauthorized`.
      */
-    function admitAdmin(req: import('express').Request, res: import('express').Response, unauthorized: () => void): boolean {
+    async function admitAdmin(req: import('express').Request, res: import('express').Response, unauthorized: () => void): Promise<boolean> {
         const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
         if (sessionId && validateAdminSession(sessionId)) return true;
-        const check = checkAdminPassword(config, req.ip ?? '', req.headers['x-admin-password']);
+        const check = await checkAdminPasswordOnNode(config, req.ip ?? '', req.headers['x-admin-password']);
         if (check.kind === 'ok') return true;
         if (check.kind === 'limited') refuseAdminLimited(res, check);
         else unauthorized();
@@ -230,7 +232,7 @@ export function adminRouter(
 
     // POST /v1/admin/setup/token — sign + get JWT for an owner (password-protected)
     router.post('/v1/admin/setup/token', adminAuthLimit, async (req, res) => {
-        if (!admitAdmin(req, res, invalidAdminPassword(res))) return;
+        if (!await admitAdmin(req, res, invalidAdminPassword(res))) return;
 
         // The account-key sign-in, under the same version gate as POST /v1/auth/token's owner branch:
         // removed in OWNER_KEY_LOGIN_REMOVED_IN (4.0.0) whatever the setting says. This route had kept
@@ -654,7 +656,7 @@ export function adminRouter(
         // Auth: JWT operator OR admin password
         if (await isOperatorCaller(storage, req.auth)) {
             // OK — operator JWT
-        } else if (!admitAdmin(req, res, () => {
+        } else if (!await admitAdmin(req, res, () => {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Requires operator JWT or admin password'));
         })) {
             // The admin session or the admin password, through the one check and its one count.

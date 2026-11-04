@@ -21,6 +21,7 @@
  * @structure NodeRequestCheck · signNodeRequest(storage, config, audience, fields) ·
  *   checkNodeRequest(headers, opts) · audienceProof(privateKey, signed, audience) ·
  *   audienceRefusal(opts) · signedMessageRefusal(sourceNode, timestamp, signature) ·
+ *   signedMessageRefusalOnNode(sourceNode, timestamp, signature) ·
  *   deliveryProof(privateKey, signed, audience, sentAt?) · deliveryRefusal(opts) · ProofPin ·
  *   carriesProof(body) · pinnedRefusal(pin, body, check) · federationPeerProofPin(storage, peer) ·
  *   genesisPeerProofPin(storage, peer) · nodeRequestSignedBy(headers, opts) ·
@@ -29,8 +30,12 @@
  * @usage
  *   const headers = await signNodeRequest(storage, config, peerId, { purpose: 'package', group_id });
  *   const who = await checkNodeRequest(req.headers, { thisNodeId, fields, keyOf: (node) => ... });
- *   const refusal = signedMessageRefusal(source_node, timestamp, signature);   // an older format, after verify
+ *   const refusal = await signedMessageRefusalOnNode(source_node, timestamp, signature);   // an older format, after verify
  * @version-history
+ *   2026-11-04 — The nonce and the single use of an older-format message are spent in the node's
+ *     storage (request-nonce.ts nonceAccepted), so a request accepted by one process is refused by
+ *     another; signedMessageRefusalOnNode is what the routes call, and signedMessageRefusal keeps the
+ *     answer of this process alone (codebase analysis 2026-11-03, HA stage 2).
  *   2026-10-16 — audienceHeaders and signedGetRefusal: a signed GET in the older format (the template
  *     listing, the service summary) names its audience in headers and passes inside five minutes and
  *     once (QA audit S6-09).
@@ -61,7 +66,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GenesisPeerRecord, FederationPeerRecord } from '../storage/interface.js';
 import { sign, verify } from '../auth/keypair.js';
 import { createHash } from 'node:crypto';
-import { newNonce, nonceAccepted, NONCE_WINDOW_MS } from './request-nonce.js';
+import { newNonce, nonceAccepted, nonceAcceptedHere, NONCE_WINDOW_MS } from './request-nonce.js';
 import { AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, unprovenFormatLive } from '../config-federation.js';
 import { noteDeprecatedUse } from './deprecation.js';
 import { logger } from '../utils/logger.js';
@@ -151,7 +156,7 @@ export async function checkNodeRequest(
     return { ok: false, status: 401, code: 'UNAUTHORIZED', message: opts.badSignatureMessage };
   }
   // After the signature, so a forged request cannot use up a real node's nonce.
-  if (!nonceAccepted(sourceNode, nonce, now)) {
+  if (!await nonceAccepted(sourceNode, nonce, now)) {
     return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed request was already received. A node signs every request anew.' };
   }
   return { ok: true, nodeId: sourceNode };
@@ -250,7 +255,7 @@ export async function signedGetRefusal(opts: {
   return await pinnedRefusal(opts.pin, body, provenSince => audienceRefusal({
     signed: opts.signed, audience: body.audience, audienceSignature: body.audience_signature,
     publicKey: opts.publicKey, thisNodeId: opts.thisNodeId, required: opts.required, provenSince,
-  })) ?? signedMessageRefusal(opts.sourceNode, opts.timestamp, opts.signature);
+  })) ?? await signedMessageRefusalOnNode(opts.sourceNode, opts.timestamp, opts.signature);
 }
 
 /**
@@ -265,6 +270,28 @@ export async function signedGetRefusal(opts: {
  * signature verified, so a forged message cannot use up a real one. Null when the message may pass.
  */
 export function signedMessageRefusal(sourceNode: string, timestamp: unknown, signature: string, now = Date.now()): Refusal | null {
+  const once = signedMessageOnce(sourceNode, timestamp, signature, now);
+  if ('ok' in once) return once;
+  return nonceAcceptedHere(once.source, once.nonce, now, once.until) ? null : replayedMessage();
+}
+
+/**
+ * signedMessageRefusal across every process of the node: the same window, and the single use spent in
+ * the node's storage, so a message received by one process is refused by another. What the routes call.
+ */
+export async function signedMessageRefusalOnNode(sourceNode: string, timestamp: unknown, signature: string, now = Date.now()): Promise<Refusal | null> {
+  const once = signedMessageOnce(sourceNode, timestamp, signature, now);
+  if ('ok' in once) return once;
+  return await nonceAccepted(once.source, once.nonce, now, once.until) ? null : replayedMessage();
+}
+
+/** A new object each time, as before: a caller may add to the refusal it is given. */
+function replayedMessage(): Refusal {
+  return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed message was already received. A node signs every message anew.' };
+}
+
+/** The window check of a signed message, and the one-time value it is spent under. */
+function signedMessageOnce(sourceNode: string, timestamp: unknown, signature: string, now: number): Refusal | { source: string; nonce: string; until: number } {
   const ts = Date.parse(String(timestamp ?? ''));
   if (!Number.isFinite(ts) || Math.abs(now - ts) > NONCE_WINDOW_MS) {
     return { ok: false, status: 400, code: 'STALE_TIMESTAMP', message: 'The timestamp is missing, invalid, or outside the 5-minute window.' };
@@ -274,10 +301,7 @@ export function signedMessageRefusal(sourceNode: string, timestamp: unknown, sig
   // same message through once per spelling. Remembered until the message's own window closes, so one
   // signed ahead of this node's clock cannot come back after five minutes from its arrival.
   const once = createHash('sha256').update(Buffer.from(signature, 'base64')).digest('hex').slice(0, 32);
-  if (!nonceAccepted(`signed:${sourceNode}`, once, now, Math.max(now, ts) + NONCE_WINDOW_MS)) {
-    return { ok: false, status: 401, code: 'REPLAYED', message: 'This signed message was already received. A node signs every message anew.' };
-  }
-  return null;
+  return { source: `signed:${sourceNode}`, nonce: once, until: Math.max(now, ts) + NONCE_WINDOW_MS };
 }
 
 /**
@@ -331,7 +355,7 @@ export async function deliveryRefusal(opts: {
   if (!proof || !sentAt || !await verify(opts.publicKey, deliveryMessage(opts.signed, audience, sentAt), proof)) {
     return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The audience and send time of this message are not signed by the sending node.' };
   }
-  return signedMessageRefusal(opts.sourceNode, sentAt, proof, opts.now);
+  return signedMessageRefusalOnNode(opts.sourceNode, sentAt, proof, opts.now);
 }
 
 /**

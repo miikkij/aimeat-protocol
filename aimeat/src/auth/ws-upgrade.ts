@@ -24,13 +24,15 @@
  *   header and the AIMEAT error envelope as the body (refuseUpgrade). A browser does not expose either,
  *   but a server-side client and a test can read why.
  * @structure SOCKET_KINDS · isSocketKind · SOCKET_TICKET_TTL_SECONDS · mintSocketTicket ·
- *   authenticateUpgrade · upgradeDeprecationHeaderLines · refuseUpgrade
+ *   issueSocketTicket · authenticateUpgrade · upgradeDeprecationHeaderLines · refuseUpgrade
  * @usage
  *   const auth = await authenticateUpgrade(request, url, 'personal-tunnel', config.wsQueryToken);
  *   if (auth.outcome === 'refused') { refuseUpgrade(socket, auth.status, auth.code, auth.message); return; }
  *   if (auth.outcome === 'none') { refuseUpgrade(socket, 401, 'AUTH_REQUIRED'); return; }
  *   const { payload, token } = auth;
  * @version-history
+ *   v1.2.0 — 2026-11-04 — issueSocketTicket: the ticket is kept in the node's storage, so a ticket
+ *     issued on one process opens the socket on another (codebase analysis 2026-11-03, HA stage 2).
  *   v1.1.0 — 2026-10-12 — `?token=` is a version gate: refused from WS_QUERY_TOKEN_REMOVED_IN whatever
  *     the setting says, and the 101 answer of an upgrade let in on it carries the Deprecation headers
  *     (Core 2026-11 AUTH-24, HTTP-07, HTTP-08).
@@ -61,20 +63,29 @@ export const SOCKET_TICKET_TTL_SECONDS = 60;
 interface SocketTicket {
   socket: SocketKind;
   /**
-   * The bearer the ticket was minted with. Kept in this process's memory only, for the life of the
-   * ticket, because the upgrade re-verifies it (an expired or revoked token opens nothing) and the
-   * connect tunnel reuses it as the bearer of every forwarded call.
+   * The bearer the ticket was minted with, kept for the life of the ticket, because the upgrade
+   * re-verifies it (an expired or revoked token opens nothing) and the connect tunnel reuses it as the
+   * bearer of every forwarded call. In the node's storage it is sealed under a key only the ticket
+   * opens (services/ephemeral-claims.ts).
    */
   token: string;
   /** The principal that minted the ticket; the re-verified token must name the same one. */
   sub: string;
 }
 
-const socketTickets = createSingleUseTicketStore<SocketTicket>();
+const socketTickets = createSingleUseTicketStore<SocketTicket>('ws-ticket');
 
-/** Mint a ticket for one socket kind. `token` is the caller's verified JWT, `sub` its principal. */
+/**
+ * Mint a ticket for one socket kind in this process only. `token` is the caller's verified JWT, `sub`
+ * its principal. The route issues with issueSocketTicket, which every process of the node accepts.
+ */
 export function mintSocketTicket(socket: SocketKind, token: string, sub: string): string {
   return socketTickets.mint({ socket, token, sub }, SOCKET_TICKET_TTL_SECONDS * 1000);
+}
+
+/** Issue a ticket for one socket kind that every process of the node accepts (POST /v1/ws/ticket). */
+export function issueSocketTicket(socket: SocketKind, token: string, sub: string): Promise<string> {
+  return socketTickets.issue({ socket, token, sub }, SOCKET_TICKET_TTL_SECONDS * 1000);
 }
 
 export type UpgradeAuth =
@@ -124,7 +135,7 @@ export async function authenticateUpgrade(
     token = header.slice(7);
     via = 'header';
   } else if (ticketParam !== null) {
-    const t = socketTickets.take(ticketParam);
+    const t = await socketTickets.take(ticketParam);
     if (!t) return refused('INVALID_TICKET', 'The ticket is unknown, expired or already used. POST /v1/ws/ticket for a new one.');
     if (t.socket !== socket) return refused('TICKET_WRONG_SOCKET', `This ticket was minted for the ${t.socket} socket, not ${socket}.`);
     token = t.token;

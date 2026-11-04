@@ -11,7 +11,7 @@
       "digest": "sha256:97ed01226a4e87fe789e0f94"
     },
     "node:aimeat-decide": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -19,7 +19,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:288ca6dd1137033b6418db26"
+      "digest": "sha256:bb2a11f09737d69b9f1de703"
     },
     "node:aimeat-refinery": {
       "reviewedOn": "2026-10-29",
@@ -321,7 +321,7 @@
         "aimeat/src/routes/ai-gen-rules.ts",
         "aimeat/src/services/ai-image.ts"
       ],
-      "digest": "sha256:032f727529a1834fdd4c0b3c"
+      "digest": "sha256:60feb58191e723e8b37ece29"
     },
     "node:aimeat-extension-builder": {
       "reviewedOn": "2026-11-04",
@@ -421,7 +421,7 @@
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/ai/capabilities.ts",
         "aimeat/src/services/ai-embed.ts",
@@ -429,7 +429,7 @@
         "aimeat/src/static/sdk-libs/ai/index.js",
         "aimeat/src/services/ai-jobs/ext-capability.ts"
       ],
-      "digest": "sha256:aa300e947fd7cef743a0330f"
+      "digest": "sha256:3693d016de72bc6f4ea65588"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-11-04",
@@ -716,7 +716,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
-      "aimeat/src/services/decide/service.ts": "3290c26e746e72eb",
+      "aimeat/src/services/decide/service.ts": "360b60f15e63d977",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "bb5b771bd7739ac0",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"
@@ -728,7 +728,7 @@
     },
     "node:aimeat-ai-capabilities": {
       "aimeat/src/services/ai/capabilities.ts": "c2bd2ada0b90307e",
-      "aimeat/src/services/ai-embed.ts": "1f5aa10952622806",
+      "aimeat/src/services/ai-embed.ts": "95acba296a286424",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
       "aimeat/src/static/sdk-libs/ai/index.js": "230e6a57c0cd20e3",
       "aimeat/src/services/ai-jobs/ext-capability.ts": "bebc48a0defe8ffa"
@@ -829,7 +829,7 @@
       "aimeat/src/services/ai/gen-rules.ts": "8cf30c2a05b14cbc",
       "aimeat/src/services/ai/gen-rules-store.ts": "34377e884aa25b71",
       "aimeat/src/routes/ai-gen-rules.ts": "b3339d944f0ee1fc",
-      "aimeat/src/services/ai-image.ts": "53c0267de7433bf0"
+      "aimeat/src/services/ai-image.ts": "a7fccd8935aa5181"
     }
   }
 }

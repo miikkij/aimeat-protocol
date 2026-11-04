@@ -176,10 +176,9 @@ These calls go to addresses that a signed-in person, an agent or an outside clie
 
 The repository documents no minimum CPU, memory or disk size.
 
-**A node grows up first, and out by more nodes.** One process serves a node in the shape the guides describe, and the code's design notes say the platform grows by more nodes, each its own, federated (`aimeat/src/services/passkeys.ts`). The supported shape is one active process and a standby on one PostgreSQL database; more than one active process is not supported yet. Processes of one node that share a database already claim some work in it: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`), a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`), and the processes take one node key. What stays in each process is listed with its consequence on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); in short:
+**A node grows up first, and out by more nodes.** One process serves a node in the shape the guides describe, and the code's design notes say a node runs one process where state stays in it (`aimeat/src/services/ai/node-key-hold.ts`). The supported shape is one active process and a standby on one PostgreSQL database; more than one active process is not supported yet. Processes of one node that share a database already claim some work in it: a scheduled job fires once (`aimeat/src/services/scheduler-fire-claim.ts`), a once-per-node start step runs once (`aimeat/src/services/once-only-step.ts`), the processes take one node key, and the short sign-in steps, the replay caches of signed requests and the per-account limits are kept in the database (`aimeat/src/services/ephemeral-claims.ts`). What stays in each process is listed with its consequence on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md#several-node-processes-on-one-database); in short:
 
-- rate limiters and the node-key spending hold are per process (`aimeat/src/services/ai/node-key-hold.ts`);
-- the replay cache for signed requests and the OAuth authorization codes are in process memory, and the code says both must move to storage before more than one process can serve without sticky routing (`aimeat/src/auth/signed-request.ts`);
+- the request rate limiters and the node-key spending hold are per process (`aimeat/src/middleware/rate-limit.ts`, `aimeat/src/services/ai/node-key-hold.ts`);
 - live updates and the cache are per process (`aimeat/src/services/event-bus.ts`, `aimeat/src/services/cache.ts`).
 
 For availability, use a process manager restart, one active process with a standby, separate nodes to keep one outage small, a tested restore and, on PostgreSQL, the database's own high-availability features ([18](18-scope-and-deployment-patterns.md#availability)).
@@ -196,7 +195,7 @@ For availability, use a process manager restart, one active process with a stand
 
 ## Limits
 
-- More than one active node process is not supported yet: live updates, rate limits, short sign-in steps and Config page changes stay per process. One active process with a standby is supported, and the project records no test of a standby taking over behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
+- More than one active node process is not supported yet: live updates, request rate limits and Config page changes stay per process. One active process with a standby is supported, and the project records no test of a standby taking over behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
 - The repository documents no minimum CPU, memory or disk size; the only figures are the heap ceilings and memory limits in `aimeat/deploy/aimeat.service` and `aimeat/Dockerfile` and one measured trace.
 - With `AIMEAT_STORAGE` unset, the node runs on an in-memory database and loses all data at restart; `aimeat validate` warns but the node starts (`aimeat/src/utils/env-validator.ts`, `aimeat/src/storage/storage-factory.ts`).
 - With `AIMEAT_BIND_HOST` empty the node listens on every address; the firewall must keep the port closed to everything but the proxy.

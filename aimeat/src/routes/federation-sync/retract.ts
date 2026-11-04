@@ -17,6 +17,7 @@
  *   federation endpoint verifies unconditionally (security DNA invariant 5).
  * @structure registerRetractRoute(router, config, storage, peers)
  * @version-history
+ *   2026-11-04 — The single use of a signed retraction is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-10-20 — Initial (secaudit 2026-10, replica retention).
  */
 
@@ -29,7 +30,7 @@ import type { PeerInfo } from '../../services/federation.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { verify } from '../../auth/keypair.js';
 import {
-    signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin,
+    signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin,
 } from '../../services/signed-node-request.js';
 import { emitChange } from '../../services/event-bus.js';
 
@@ -70,7 +71,7 @@ export function registerRetractRoute(router: Router, config: AimeatConfig, stora
         const refusal = await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
             signed: retractPayload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
             publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-        })) ?? signedMessageRefusal(String(source_node), timestamp, String(signature));
+        })) ?? await signedMessageRefusalOnNode(String(source_node), timestamp, String(signature));
         if (refusal) {
             res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
             return;

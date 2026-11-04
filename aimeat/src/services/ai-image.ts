@@ -21,6 +21,7 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (requireAiCallTurnOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v2.13.0 -- 2026-11-02 -- `storeIn`: an ecosystem app's picture stays in its own namespace while its
  *     owner pays for it (secaudit2026nov02d round 13).
  *   v2.12.0 -- 2026-10-31 -- The generation rules (services/ai/gen-rules.ts): the directives of the
@@ -88,7 +89,7 @@ import { contentHashOf } from './ai-provenance.js';
 import type { CallerClass } from './ai/policy.js';
 import type { RequestLanguage } from './ai/ai-fix-words.js';
 import { logger } from '../utils/logger.js';
-import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from './account-limits.js';
 import {
   fileRaiseAsk, fileFilePublishRequest, type StoragePublishGate, type FilePublishFiled,
 } from './storage-file-publish.js';
@@ -263,7 +264,7 @@ export async function generateForOwner(
   // one the owner is asked about is stored private below and the request filed once it exists.
   const requester = await publicPictureRequester(storage, config, gaii, opts);
   // POST /v1/ai/image and aimeat_image_generate both arrive here: one count per account, before any spend.
-  requireAiCallTurn(config, gaii, opts.limit);
+  await requireAiCallTurnOnNode(config, gaii, opts.limit);
   // The generation rules, decided after the call is counted and before anything is spent: a bypass
   // that is not the caller's to ask is refused here. The directives of the rules in force go after
   // the caller's prompt, so the prompt limit above stays the caller's own. An owner's exception for

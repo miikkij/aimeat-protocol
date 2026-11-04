@@ -101,7 +101,7 @@ What this means for you: there is no long-term support line. Plan to follow rele
 - Only the newest node release receives security fixes; there is no long-term support line (`.github/SECURITY.md`).
 - No support contract or service level comes with the open-source project.
 - The project has one named maintainer (`.github/SECURITY.md`). The MIT licence and the rules, checks and tests in the repository let an organisation continue the software itself ([17 Exit plan, continue it yourselves](17-exit-plan.md#continue-it-yourselves)).
-- One active process with a standby is supported; more than one active process is not supported yet, because live updates, rate limits, short sign-in steps and Config page changes stay per process. The project records no test of a standby taking over behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
+- One active process with a standby is supported; more than one active process is not supported yet, because live updates, request rate limits and Config page changes stay per process. The project records no test of a standby taking over behind a load balancer ([18](18-scope-and-deployment-patterns.md#limits)).
 - `relay` and `mirror` node types are accepted, but the guide states that the names alone do not give working replication or a tested resource budget (`docs/coding-guidelines/environment-configs.md`).
 - The change log is in two places: `CHANGELOG.md` up to node 3.15.0, `aimeat/public/changelog.json` after it.
 - The repository holds no third-party certification or audit attestation.

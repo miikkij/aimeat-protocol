@@ -56,6 +56,7 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (requireAiCallTurnOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   2026-10-27 -- The owner is told once when a bare allowlist entry lets another author's app in
  *     (ai/app-name-notice.ts; secaudit2026oct26).
  *   2026-10-25 — DecideCaller.readerAs: the agent a decision run reads as (runs.ts; secaudit2026oct22).
@@ -118,7 +119,7 @@ import { agentNameOf, readAgentKey, agentCapRefusal } from '../agent-ai-keys.js'
 import { ruleForCaller, type RuleCallerKind } from './rules.js';
 import { evaluateRule, fieldsOutside, type DecisionRule } from './rule-validate.js';
 import { gateSettingOf, gateApplies, openGateItem } from './gate.js';
-import { requireAiCallTurn, type AiCallLimitMark } from '../account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from '../account-limits.js';
 import { noticeBareNameMatch } from '../ai/app-name-notice.js';
 
 export interface DecideCaller {
@@ -417,7 +418,7 @@ export async function decideForOwner(
   }
   // POST /v1/ai/decide, the rule try route and aimeat_decide all arrive here: one count per account,
   // before anything is read, sent or recorded.
-  requireAiCallTurn(config, caller.gaii, caller.limit);
+  await requireAiCallTurnOnNode(config, caller.gaii, caller.limit);
   const limits = {
     ...DEFAULT_DECIDE_LIMITS,
     maxRequestTokens: config.decideMaxRequestTokens,

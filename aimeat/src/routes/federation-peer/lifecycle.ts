@@ -5,6 +5,7 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The single use of a signed lifecycle message is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.10.2 — 2026-10-27 — key-exchange refuses this node's own id (400 SELF_NODE_ID) and reads the
  *     approved peering requests by status instead of every request an introduction left
  *     (secaudit2026oct26).
@@ -51,7 +52,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { LIVENESS_RECOVERABLE, OPERATOR_PARKED, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
+import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -122,7 +123,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             const stale = await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
                 signed: pingPayload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
                 publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-            })) ?? signedMessageRefusal(fromId, timestamp, signature as string);
+            })) ?? await signedMessageRefusalOnNode(fromId, timestamp, signature as string);
             if (stale) { res.status(stale.status).json(error(config.nodeId, stale.code, stale.message)); return; }
             peer.lastSeen = new Date().toISOString();
             // A liveness signal proves the peer is up. It does not undo a decision about whether we

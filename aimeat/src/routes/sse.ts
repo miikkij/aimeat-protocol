@@ -14,6 +14,9 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   2026-11-04 -- The stream and socket tickets are issued into the node's storage, so a ticket from one
+ *     process opens the stream on another; the same 30 s, the same answers (codebase analysis
+ *     2026-11-03, HA stage 2).
  *   2026-11-04 -- A stop ends the stream at once (services/node-lifecycle.ts endOnDrain), so the
  *     server closes and the process exits 0 (codebase analysis 2026-11-03, HA stage 1).
  *   2026-10-25 -- secaudit2026oct22: the ticket keeps the bearer it was minted with
@@ -70,7 +73,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { verifyJWT } from '../auth/jwt.js';
-import { isSocketKind, mintSocketTicket, SOCKET_KINDS, SOCKET_TICKET_TTL_SECONDS } from '../auth/ws-upgrade.js';
+import { isSocketKind, issueSocketTicket, SOCKET_KINDS, SOCKET_TICKET_TTL_SECONDS } from '../auth/ws-upgrade.js';
 import { createSingleUseTicketStore } from '../services/single-use-tickets.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
@@ -127,7 +130,14 @@ const RECHECK_BEFORE_FRAME_MS = 5_000;
 /** An idle stream asks the same question this often, so a revoked stream also ends with no change to send. */
 const RECHECK_IDLE_MS = 60_000;
 
-const tickets = createSingleUseTicketStore<Ticket>();
+/** The ticket as stored: `allow` is a Set in memory and a list in the node's storage. */
+const tickets = createSingleUseTicketStore<Ticket>('sse-ticket', {
+  encode: t => ({ ...t, allow: t.allow ? [...t.allow] : null }),
+  decode: raw => {
+    const t = raw as Omit<Ticket, 'allow'> & { allow: string[] | null };
+    return { ...t, allow: t.allow ? new Set(t.allow) : null };
+  },
+});
 
 /**
  * Streams opened without an account, across the node and from one address. A visitor's stream is
@@ -165,7 +175,7 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const header = req.headers.authorization;
     const credential = await streamCredentialOf(typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null);
-    const ticket = tickets.mint({
+    const ticket = await tickets.issue({
       ...(credential ? { credential } : {}),
       sub: req.auth!.sub,
       presenceGhii: resolveIdentity(req.auth!, config.nodeId),
@@ -191,7 +201,7 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       }
       app = topic;
     }
-    const ticket = tickets.mint({
+    const ticket = await tickets.issue({
       sub: '',
       presenceGhii: '',
       allow: new Set<string>(),
@@ -222,13 +232,13 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(401).json(error(config.nodeId, 'JWT_REQUIRED', 'Ask for this ticket while signed in, with your sign-in token in the Authorization header. An access token cannot open a live connection.'));
       return;
     }
-    const ticket = mintSocketTicket(socket, token, verified.sub);
+    const ticket = await issueSocketTicket(socket, token, verified.sub);
     res.set('Cache-Control', 'no-store');
     res.json(success(config.nodeId, { ticket, socket, expires: SOCKET_TICKET_TTL_SECONDS }));
   });
 
   // SSE stream — validates ticket, streams change events
-  router.get('/v1/events', (req, res) => {
+  router.get('/v1/events', async (req, res) => {
     const ticketId = req.query.ticket as string;
     if (!ticketId) {
       res.status(400).json(error(config.nodeId, 'MISSING_TICKET', 'ticket query parameter required'));
@@ -236,7 +246,7 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // Consumed on this read (single-use), whether or not it is still valid.
-    const t = tickets.take(ticketId);
+    const t = await tickets.take(ticketId);
     if (!t) {
       res.status(401).json(error(config.nodeId, 'INVALID_TICKET', 'Ticket is invalid or expired'));
       return;

@@ -11,6 +11,7 @@
  * @structure registerMessageReactionFederationRoute(router, config, storage, peers)
  * @usage registerMessageReactionFederationRoute(router, config, storage, peers); (routes/federation-sync.ts)
  * @version-history
+ *   v1.0.1 — 2026-11-04 — The single use of a signed reaction is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-10-26 — Initial (wish-kuittausreaktiot-yksitt-isiin-viesteihin-viestit-ketjuissa).
  */
 import type { Router } from 'express';
@@ -20,7 +21,7 @@ import type { PeerInfo } from '../../services/federation.js';
 import { success, error } from '../../middleware/envelope.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
+import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { applyRemoteReaction, reactionPayload } from '../../services/message-reactions.js';
 
 export function registerMessageReactionFederationRoute(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
@@ -52,7 +53,7 @@ export function registerMessageReactionFederationRoute(router: Router, config: A
         const refusal = await pinnedRefusal(await federationPeerProofPin(storage, peer), body, provenSince => audienceRefusal({
             signed, audience: body.audience, audienceSignature: body.audience_signature,
             publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-        })) ?? signedMessageRefusal(source_node, timestamp, signature);
+        })) ?? await signedMessageRefusalOnNode(source_node, timestamp, signature);
         if (refusal) {
             res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
             return;

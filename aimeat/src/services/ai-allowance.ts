@@ -25,6 +25,9 @@
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.7.0 — 2026-11-04 — The allowance record is written on the version that was read
+ *     (record-cas.ts updateRecord), so two processes settling one account's calls lose no debit; in one
+ *     process oneAtATime still runs them in turn (codebase analysis 2026-11-03, HA stage 2).
  *   v1.6.0 — 2026-11-04 — resolveAiKey, AiKeyChoice and isOpenRouterHost are removed: nothing has
  *     called them since ae6f30957 (2026-09-28), when the planner took the decision, and a tested,
  *     exported "which key pays" that production does not use misled readers (codebase analysis
@@ -60,6 +63,7 @@ import { AiCompletionError } from './ai/completion.js';
 import { readSystem, updateSystem } from './classification/system-record.js';
 import { nodeKeySpent, markNodeKeyUsed } from './ai/node-key-balance.js';
 import { logger } from '../utils/logger.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 /**
  * One person's standing on the node's key. Lives under the reserved `ai-usage.` prefix, so an
@@ -141,38 +145,34 @@ export async function readAllowance(
 async function readAllowanceInTurn(
   storage: Storage, config: AimeatConfig, gaii: string,
 ): Promise<AllowanceRecord> {
-  const rec = (await storage.getMemory(gaii, allowanceKey(gaii)))?.value as AllowanceRecord | undefined;
-  const current = rec ?? empty();
-
   const free = Number(config.chatFreeAllowanceUsd) || 0;
-  if (free > 0 && !current.free_granted) {
-    const seeded: AllowanceRecord = {
-      ...current,
-      granted_usd: current.granted_usd + free,
-      free_granted: true,
-      updated_at: new Date().toISOString(),
-    };
-    await writeAllowance(storage, gaii, seeded);
-    logger.info(`[allowance] gaii=${gaii} free starter grant $${free.toFixed(2)}`);
-    return seeded;
-  }
-  return current;
+  if (!(free > 0)) return ((await storage.getMemory(gaii, allowanceKey(gaii)))?.value as AllowanceRecord | undefined) ?? empty();
+  let seededNow = false;
+  const out = await changeAllowance(storage, gaii, current => {
+    seededNow = false;
+    if (current.free_granted) return UNCHANGED;
+    seededNow = true;
+    return { ...current, granted_usd: current.granted_usd + free, free_granted: true, updated_at: new Date().toISOString() };
+  });
+  if (seededNow) logger.info(`[allowance] gaii=${gaii} free starter grant $${free.toFixed(2)}`);
+  return out;
 }
 
-async function writeAllowance(storage: Storage, gaii: string, rec: AllowanceRecord): Promise<void> {
-  const now = new Date().toISOString();
-  const existing = await storage.getMemory(gaii, allowanceKey(gaii));
-  await storage.setMemory({
-    key: allowanceKey(gaii),
-    ownerGaii: gaii,
-    value: rec as unknown as Record<string, unknown>,
-    visibility: 'private',
-    tags: ['ai', 'allowance'],
-    ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
+/**
+ * Change one account's allowance record on the version that was read (services/record-cas.ts): a
+ * write another process made in between is read again and the change applied to it, so no debit or
+ * grant is lost when two processes settle calls of one account at the same moment. Within a process
+ * oneAtATime already runs them in turn, so there the record is written as it always was: the same
+ * value, tags, visibility and version step. Until 2026-11-04 the write was a plain set of the copy
+ * read before it (codebase analysis 2026-11-03, HA stage 2).
+ */
+function changeAllowance(
+  storage: Storage, gaii: string, change: (current: AllowanceRecord) => AllowanceRecord | typeof UNCHANGED,
+): Promise<AllowanceRecord> {
+  return updateRecord<AllowanceRecord>(storage, gaii, allowanceKey(gaii),
+    v => (v as AllowanceRecord | undefined) ?? empty(),
+    change,
+    { tag: 'ai', tags: ['ai', 'allowance'], ttlHours: null, visibility: 'private' });
 }
 
 /** What is left to spend on the node's key. Never negative: a call may overshoot by its own cost. */
@@ -251,16 +251,14 @@ export async function debitAllowance(
   try {
     const today = utcDay();
     const next = await oneAtATime(storage, gaii, async () => {
-      const rec = await readAllowanceInTurn(storage, config, gaii);
-      const out: AllowanceRecord = {
+      await readAllowanceInTurn(storage, config, gaii);
+      return changeAllowance(storage, gaii, rec => ({
         ...rec,
         spent_usd: rec.spent_usd + costUsd,
         day: today,
         day_spent_usd: (rec.day === today ? rec.day_spent_usd ?? 0 : 0) + costUsd,
         updated_at: new Date().toISOString(),
-      };
-      await writeAllowance(storage, gaii, out);
-      return out;
+      }));
     });
     // All accounts together, for the node-wide daily limit. Compare-and-swap, because every account
     // writes this one record.
@@ -284,14 +282,12 @@ export async function grantAllowance(
 ): Promise<AllowanceRecord> {
   if (!(usd > 0)) throw new AiCompletionError('INVALID_BODY', 400, 'A grant must be a positive amount.');
   const next = await oneAtATime(storage, gaii, async () => {
-    const rec = await readAllowanceInTurn(storage, config, gaii);
-    const out: AllowanceRecord = {
+    await readAllowanceInTurn(storage, config, gaii);
+    return changeAllowance(storage, gaii, rec => ({
       ...rec,
       granted_usd: rec.granted_usd + usd,
       updated_at: new Date().toISOString(),
-    };
-    await writeAllowance(storage, gaii, out);
-    return out;
+    }));
   });
   logger.info(`[allowance] gaii=${gaii} granted $${usd.toFixed(2)} (${source}); balance $${remainingOf(next).toFixed(2)}`);
   return next;

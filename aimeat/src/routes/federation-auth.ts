@@ -14,6 +14,7 @@
  *   through services/password-check.ts, with the same per-account lock as the sign-in route, and an
  *   account with two-step sign-in needs its code here too.
  * @version-history
+ *   2026-11-04 -- The single use of a signed verify request is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.6.0 -- 2026-11-02 -- The sign-in policy (services/sign-in-policy.ts): with password sign-in off
  *     the verify answers 403 PASSWORD_SIGN_IN_OFF before the consent or the password is read; under
  *     `operators` a non-operator gets the same answer after the password. A covered account with no
@@ -55,7 +56,7 @@ import { hasNodeAuthConsent, linkCarriesSignIn } from '../services/federation-au
 import { federationAuthPayload } from '../services/federation-auth-payload.js';
 import { checkPassword, checkSecondFactor } from '../services/password-check.js';
 import { sign, verify } from '../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../services/signed-node-request.js';
+import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../services/signed-node-request.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import { passwordSignInRefusal, passwordWayInRefusal, twoStepCovers, TWO_STEP_SETUP_REQUIRED } from '../services/sign-in-policy.js';
@@ -132,7 +133,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             const replayed = await pinnedRefusal(await federationPeerProofPin(storage, gate.peer), req.body ?? {}, provenSince => audienceRefusal({
                 signed: payload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
                 publicKey: gate.peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
-            })) ?? signedMessageRefusal(requesting_node, timestamp, signature);
+            })) ?? await signedMessageRefusalOnNode(requesting_node, timestamp, signature);
             if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 
             // Password sign-in policy (services/sign-in-policy.ts): with it off, this node vouches for

@@ -14,6 +14,7 @@
  * @usage
  *   const r = await embedForOwner(storage, config, payer, { input: ['a', 'b'], appId: 'notes' });
  * @version-history
+ *   2026-11-04 — The AI call limit is counted in the node's storage (requireAiCallTurnOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   v1.6.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (services/ai/errors.ts):
  *     a permanent 4xx is 422 PROVIDER_REJECTED with the provider's reason (aiprov plan, A1).
  *   v1.5.0 -- 2026-10-07 -- A provider's key refusal is 424 INVALID_API_KEY, not 401 (PROVIDER_KEY_REFUSED_STATUS).
@@ -35,7 +36,7 @@ import { callCost } from './ai/catalog/price.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import type { CallerClass } from './ai/policy.js';
 import type { RequestLanguage } from './ai/ai-fix-words.js';
-import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
+import { requireAiCallTurnOnNode, type AiCallLimitMark } from './account-limits.js';
 
 /** One call's ceiling: enough for a page of notes, small enough to answer inside a request. */
 export const EMBED_LIMITS = { maxInputs: 256, maxTotalChars: 500_000 } as const;
@@ -84,7 +85,7 @@ export async function embedForOwner(
       `One call takes at most ${EMBED_LIMITS.maxInputs} texts and ${EMBED_LIMITS.maxTotalChars} characters; this had ${input.length} and ${total}. Split it into several calls.`);
   }
   // POST /v1/ai/embed and aimeat_ai_embed both arrive here: one count per account, before any spend.
-  requireAiCallTurn(config, gaii, opts.limit);
+  await requireAiCallTurnOnNode(config, gaii, opts.limit);
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'embed', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),

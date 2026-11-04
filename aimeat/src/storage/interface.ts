@@ -13,6 +13,8 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-04 — EphemeralClaimRepository: short-lived values and window counters every process of a
+ *     node sees (codebase analysis 2026-11-03, high-availability stage 2).
  *   2026-11-04 — MemoryShapeRepository: memory reads by the shape of the key or the value, filtered in
  *     SQL (codebase analysis 2026-11-03, item C7).
  *   v1.11.0 — 2026-11-04 — bootLock(): the lock two booting processes of one node take in turn
@@ -150,6 +152,7 @@ import type { CompanyRepository } from './repositories/company.repository.js';
 import type { SsoConnectionRepository } from './repositories/sso-connection.repository.js';
 import type { McpServerRepository } from './repositories/mcp-server.repository.js';
 import type { HeldAccountNameRepository } from './repositories/held-names.repository.js';
+import type { EphemeralClaimRepository } from './repositories/ephemeral-claim.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository,
@@ -195,6 +198,7 @@ export interface Storage extends
   SsoConnectionRepository,
   McpServerRepository,
   HeldAccountNameRepository,
+  EphemeralClaimRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

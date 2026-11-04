@@ -10,12 +10,14 @@
  *
  *   PER PROCESS. The buckets live in this process's memory, as the middleware's always have, so a node
  *   run as several replicas needs a shared store before these limits hold across them.
- * @structure RateTake · rateBuckets(windowMs) → take(key, max)
+ * @structure RateTake · rateBuckets(windowMs) → take(key, max) · rateTakeOf(count, resetAt, max, now)
  * @usage
  *   const take = rateBuckets(60_000);
  *   const counted = take(key, 30);
  *   if (!counted.ok) refuse(counted.retryAfterSec);
  * @version-history
+ *   v1.1.0 — 2026-11-04 — rateTakeOf: the answer for a count, shared with the node-wide account limits
+ *     (services/account-limits.ts; codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-09-24 — Extracted from middleware/rate-limit.ts, so the per-account message limit
  *     (services/message-send-limit.ts) counts the way every other limiter here does.
  */
@@ -68,17 +70,26 @@ export function rateBuckets(windowMs: number): (key: string, max: number) => Rat
 
         bucket.count++;
 
-        const ok = bucket.count <= max;
-        if (!ok) {
-            getStats()?.increment('rate_limit_hits_total');
-            getPromMetrics()?.rateLimitHitsTotal.inc();
-        }
-        return {
-            ok,
-            limit: max,
-            remaining: Math.max(0, max - bucket.count),
-            resetAt: bucket.resetAt,
-            retryAfterSec: Math.ceil((bucket.resetAt - now) / 1000),
-        };
+        return rateTakeOf(bucket.count, bucket.resetAt, max, now);
+    };
+}
+
+/**
+ * The answer for a key that has made `count` calls in a window ending at `resetAt`, with the refusal
+ * counted in the metrics. Shared by the buckets above and the node-wide counters
+ * (services/ephemeral-claims.ts windowCounter), so both answer alike.
+ */
+export function rateTakeOf(count: number, resetAt: number, max: number, now: number): RateTake {
+    const ok = count <= max;
+    if (!ok) {
+        getStats()?.increment('rate_limit_hits_total');
+        getPromMetrics()?.rateLimitHitsTotal.inc();
+    }
+    return {
+        ok,
+        limit: max,
+        remaining: Math.max(0, max - count),
+        resetAt,
+        retryAfterSec: Math.ceil((resetAt - now) / 1000),
     };
 }

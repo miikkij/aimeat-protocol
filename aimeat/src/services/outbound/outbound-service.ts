@@ -24,6 +24,7 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-11-04 — The send allowance is counted in the node's storage (takeMailSendOnNode; codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 — The node transport sends through mail-gate.ts sendMail with the account turn (codebase analysis 2026-11-03, item B3).
  *   2026-10-16 — A campaign email carries the sender footer from the owner's (or the company's)
  *     outbound.sender record, a lead image, the send's locale, and on marketing the List-Unsubscribe
@@ -99,7 +100,7 @@ import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
 import { disclosureHeaders, isDeclared, type AiDisclosure } from './ai-disclosure.js';
 import { provenanceForWrite, storeHeldProvenance } from '../ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
-import { takeMailSend } from '../account-limits.js';
+import { takeMailSendOnNode } from '../account-limits.js';
 import { sendMail } from '../mail-gate.js';
 
 /**
@@ -508,7 +509,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // The account's send allowance, here rather than on a route, so POST /v1/outbound/send, the MCP
   // tool aimeat_mail_send and a contact message draw on one count for the owner and all their agents
   // (services/account-limits.ts; secaudit 2026-10, C5). Asked before anything is written.
-  const turn = takeMailSend(input.principal ?? ownerGhii);
+  const turn = await takeMailSendOnNode(input.principal ?? ownerGhii);
   if (!turn.ok) throw new OutboundError(turn.code, 429, turn.message);
 
   // WHICH COMPANY IS SPEAKING, resolved before anything else, because it decides WHOSE BOOK this
