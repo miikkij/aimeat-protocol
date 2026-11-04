@@ -24,6 +24,7 @@
  *   rememberTool(id)
  * @usage html`<${SetupGuide} poster facts stepRows />` · html`<${InstructionsDialog} open=${o} onClose=${close} />`
  * @version-history
+ *   v1.4.0 — 2026-11-04 — A tool's `mcp.troubleshooting` lines show under "If it does not work".
  *   v1.3.0 — 2026-11-01 — On a node the store sold the tool tabs are the chat AIs, with "Other AI
  *     tools (N)" for the rest; `lead={false}` drops the question the MCP page already asks above it
  *     (commercial's crew52 check: the page read as developer text and said the same thing twice).
@@ -184,6 +185,10 @@ export function SetupGuide({ poster = false, asideInstall = false, facts = false
       ${/* The free Claude plan has no Opus, so a road for it says which model it does have. */''}
       ${(claudeNote && tool.id === 'claude-web') ? html`<p class="setup-guide-note">${claudeNote}</p>`
         : tool.mcp.note ? html`<p class="setup-guide-note">${tool.mcp.note}</p>` : null}
+
+      ${tool.mcp.troubleshooting?.length ? html`
+        <div class="setup-guide-params-head">${tr('setup.ifItFails', 'If it does not work')}</div>
+        ${tool.mcp.troubleshooting.map((line, i) => html`<p class="setup-guide-note" key=${i}>${line}</p>`)}` : null}
 
       <a class="poster-action poster-action--more" href=${tool.mcp.docs} target="_blank" rel="noopener">
         ${tr('setup.officialDocs', 'Official instructions from')} ${tool.label} →

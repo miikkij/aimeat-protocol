@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-11-04 -- ROUTE_CEILING 449: GET /v1/themes/choice is refused to a stranger on a signed-in-only
+ *     node by e2e-content-access-gate.
  *   2026-11-01 -- ROUTE_CEILING 450: GET /v1/admin/compliance/report is refused to a non-operator by
  *     test/e2e-data-intermediation.ts (plan doc-mvwxcas3dom3, D7).
  *   2026-10-31 -- ROUTE_CEILING 451: GET /v1/knowledge/organism/{id} and POST /v1/knowledge/{id}/contribute
@@ -126,7 +128,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 450;
+export const ROUTE_CEILING = 449;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

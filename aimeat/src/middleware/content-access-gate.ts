@@ -28,6 +28,8 @@
  *     decides what a peer gets).
  *   - The node's own description for machines: health, build, llms.txt, the API contract, the
  *     served libraries' code. None of it names a person, an organism or an app.
+ *   - The look of the node's pages: a theme's stylesheet and the font files the operator added,
+ *     which the shell links with <link> and so loads without a session.
  *
  *   THE OTHER ORIGINS. An app origin serves the app page itself, and the app gate asks for a
  *   sign-in grant from the apex before it does (routes/subdomains.ts, appIsRestricted); a welcome
@@ -43,7 +45,10 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
- *   v1.4.5 — 2026-11-04 — GET /v1/health/live and /v1/health/ready are open, as /v1/health is (codebase analysis 2026-11-03, HA stage 1).
+ *   v1.4.6 — 2026-11-04 — GET /v1/health/live and /v1/health/ready are open, as /v1/health is (codebase analysis 2026-11-03, HA stage 1).
+ *   v1.4.5 — 2026-11-04 — A theme's stylesheet, the added faces' stylesheet and the font files are open:
+ *     the shell loads them with <link>, which carries no session, so a custom theme never reached a
+ *     signed-in person on a signed-in-only node (seen on orgnode.example).
  *   v1.4.4 — 2026-11-01 — The public dataset page /v1/dataset/{owner}/{name} and the share link page
  *     /v1/shared-data open as SPA page addresses (WP9b).
  *   v1.4.3 — 2026-10-31 — isOpenRoute tests the open patterns case-insensitively, as Express routes
@@ -159,6 +164,11 @@ export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; w
   { method: 'GET', path: /^\/(llms|llms-full)\.txt$/, why: 'the node\'s own agent guide' },
   { method: 'GET', path: /^\/(auth\.md|skill\.md|agents\.txt|openapi\.json|AGENTS\.md)$/, why: 'the node\'s own agent documents' },
   { method: 'GET', path: /^\/v1\/libs(\/.*)?$/, why: 'served library code' },
+  // The look of the node's own pages: a theme's stylesheet and the faces the operator added. The shell
+  // links them with <link>, which carries no session, so a 401 here left every signed-in person on
+  // the built-in look (seen on orgnode.example). Each is the operator's CSS or a font file; neither
+  // names a person, an organism or an app. The theme list and the account's choice stay closed.
+  { method: 'GET', path: /^\/v1\/themes\/(fonts\.css|fonts\/[^/]+\/[^/]+|[^/]+\/theme\.css)$/, why: 'theme stylesheets and added font files (loaded by <link>, no session)' },
   // The node's own documents the showroom pages link to (a signed-in person's new tab carries no
   // session, so these answered a raw 401): the site map, the markdown mirrors of the authored pages
   // (data/public-pages.ts), the glossary, the AI transparency statement and the provenance schema.

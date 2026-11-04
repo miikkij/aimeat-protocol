@@ -238,13 +238,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:1dfd53086f4b9286972b62f3"
+      "digest": "sha256:e5bb7af9f5f88e3f4098b88f"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-31",
@@ -277,7 +277,7 @@
       "digest": "sha256:d78eaf80767d1827ba9352b7"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-03",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/tool-catalog/scopes.ts",
@@ -285,7 +285,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:5d05c6a04572965c2a7b61b8"
+      "digest": "sha256:44200f52e9f0fe14dec8313b"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-27",
@@ -472,13 +472,13 @@
       "digest": "sha256:ef9048a899a684528b70c5cf"
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:ecd2ea95b087c651f50c4117"
+      "digest": "sha256:8783e01620e901ec86e94ed5"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-10-29",
@@ -629,7 +629,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "16679d2a0f875ca0",
+      "aimeat/src/routes/agents/device-auth.ts": "59195162d900eb5f",
       "aimeat/src/routes/ghii/register-login.ts": "1e875fad86029fb2",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
@@ -648,7 +648,7 @@
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "16679d2a0f875ca0",
+      "aimeat/src/routes/agents/device-auth.ts": "59195162d900eb5f",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "168debe4df9511ba",
@@ -686,7 +686,7 @@
     "project:aimeat-design-language": {
       "aimeat/public/css/theme.css": "ffbbc71080bb57ca",
       "aimeat/public/css/poster.css": "3a32b3760fd32b41",
-      "aimeat/public/lib/aimeat-fonts.css": "cff1b3fc1029b6c2"
+      "aimeat/public/lib/aimeat-fonts.css": "d0c524d2a1bb30d2"
     },
     "project:aimeat-frontend-verify": {
       "aimeat/scripts/sandbox.ts": "e0908125aa35620b"

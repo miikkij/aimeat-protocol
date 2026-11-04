@@ -11,6 +11,8 @@
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.9.0 — 2026-11-04 — SERVED_FONT_FAMILIES takes Pixelify Sans, Baloo 2 and Nunito
+ *     (aimeat-fonts.css v1.7.0), the faces of the Tiilitaivas theme.
  *   v1.8.0 — 2026-10-22 — SERVED_FONT_FAMILIES takes Michroma (aimeat-fonts.css v1.6.0), the TDR
  *     look's display face, so a look and a layout may name it in --ak-font-display.
  *   v1.7.0 — 2026-10-17 — SERVED_FONT_FAMILIES takes Newsreader (aimeat-fonts.css v1.5.0), the
@@ -44,6 +46,7 @@ export const SERVED_FONT_FAMILIES: readonly string[] = [
   'IBM Plex Sans', 'IBM Plex Mono',
   'Newsreader',
   'Michroma',
+  'Pixelify Sans', 'Baloo 2', 'Nunito',
 ];
 
 /** Faces a browser has without a download, and the generic keywords. Lower case. */

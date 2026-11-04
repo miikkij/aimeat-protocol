@@ -15,6 +15,7 @@
  * @structure ThemesConfig · themesDefaults()
  * @usage import { themesDefaults } from './config-themes.js';  const config = { ...themesDefaults(), … };
  * @version-history
+ *   v2.1.0 — 2026-11-04 — An empty list means both built-in themes, now that Tiilitaivas ships.
  *   v2.0.0 — 2026-09-24 — Theme ids, not style ids; themesFixed folded into themesDefault (07 "Data").
  *   v1.0.0 — 2026-09-24 — Initial (UI consolidation phase 4).
  */
@@ -22,7 +23,7 @@
 export interface ThemesConfig {
   /** People choose in the pill. Off: every page wears the default theme in its default style. */
   themesPersonalChoice: boolean;
-  /** Comma-separated theme ids available to people; empty means the built-in AIMEAT theme only. */
+  /** Comma-separated theme ids available to people; empty means the two built-in themes, AIMEAT and Tiilitaivas. */
   themesOffered: string;
   /** The theme a person sees before choosing, and the one everybody sees when people do not choose. */
   themesDefault: string;

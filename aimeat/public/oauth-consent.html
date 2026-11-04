@@ -1,13 +1,20 @@
 <!DOCTYPE html>
 <!--
   @file oauth-consent.html
-  @description The OAuth consent page for MCP connectors (claude.ai, ChatGPT, …): the owner signs
-    in, picks or creates the agent the connector will act as, chooses how much that agent may do,
-    approves, and is either redirected back or shown an auth code to paste. Standalone — it is NOT
+  @description The OAuth consent page for MCP connectors (claude.ai, ChatGPT, …): the signed-in owner
+    picks or creates the agent the connector will act as, chooses how much that agent may do,
+    approves, and is either redirected back or shown an auth code to paste. An owner with no session
+    goes to the front page first and returns here (js/sign-in-return.js). Standalone — it is NOT
     part of the SPA, so it carries its own styles — but it reads the shared i18n runtime, the
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.12.0 — 2026-11-04 — The page signs nobody in. An owner with no session goes to the front page,
+      which signs in or registers the way the node is configured and returns here with the request
+      in its address. The form here could not register anyone, and a person with no account waited
+      for a mail that never came (Jouni, 2026-11-04). The boundary sentences moved to the view for a
+      person with no agents yet, who used to read them on the sign-in form. The page says which account
+      is signed in and offers another.
     v1.11.0 — 2026-11-04 — An app whose redirect is a loopback address is described in words ("runs on
       your own computer", approve only if you started it), not as 127.0.0.1:58627 and "check the
       address above", which a person cannot do. A request refused with 401 renews the access token
@@ -226,7 +233,6 @@
     .auth-code-value { flex:1; }
     .auth-code-label { margin-bottom:.5rem; font-size:.9rem; }
     .auth-code-hint { color:var(--muted); font-size:.82rem; }
-    .login-prompt { margin:1rem 0; font-size:.9rem; }
     .hidden { display:none; }
     #loading { text-align:center; padding:2rem; color:var(--muted); }
     /* The ☀|☾ switch: same segmented shape the login pill uses, so the control reads as the
@@ -236,6 +242,8 @@
     .theme-switch button { border:none; background:transparent; color:var(--muted);
       padding:.3rem .6rem; font-size:.9rem; line-height:1; cursor:pointer; }
     .theme-switch button[aria-pressed="true"] { color:var(--accent); background:var(--surface); }
+    .account-line { margin:.75rem 0 0; font-size:.85rem; color:var(--muted); }
+    .account-switch { background:none; border:0; padding:0; font:inherit; color:var(--accent); text-decoration:underline; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -246,6 +254,7 @@
 
   <script type="module">
     import { copyToClipboard } from '/js/utils.js';
+    import { signInAddress, refreshedSession, useAnotherAccount } from '/js/sign-in-return.js';
     import { loadTranslations, t as translate, getLocale } from '/js/i18n.js';
     import { getTheme, setTheme } from '/js/theme.js';
     import { scopeSentence, areaLine, presetSummary, boundaryLines } from '/js/consent-vocab.js';
@@ -332,7 +341,7 @@
     /**
      * Where the code goes and how the app is identified, from what the server checked: the redirect's
      * host, the client_id host of a metadata-document client, and a name the app gave itself marked
-     * as not checked. Shown before the sign-in and the approval alike.
+     * as not checked. Shown with the approval.
      */
     function identityHtml() {
       if (!verified) return '';
@@ -340,6 +349,9 @@
       const local = verified.redirect_ok && verified.redirect_local === true;
       if (local) {
         lines.push(escHtml(t('localApp')));
+        // The program that receives the result stops with its command, and the person cannot see that
+        // from here: after Approve the browser only says it cannot connect (Codex 0.166.0, measured).
+        lines.push(escHtml(t('localAppKeepRunning')));
       } else if (verified.redirect_ok && verified.redirect_host) {
         lines.push(`${escHtml(t('codeGoesTo'))} <strong>${escHtml(verified.redirect_host)}</strong>`);
       } else {
@@ -355,7 +367,7 @@
       return `<div class="identity-box">${lines.map((l) => `<p>${l}</p>`).join('')}</div>`;
     }
 
-    /** The lead and the expandable "What is an agent?", shared by the sign-in and approval views. */
+    /** The lead and the expandable "What is an agent?", shared by the two approval views. */
     const introHtml = () => `
       <h1>${escHtml(titleText())}</h1>
       <p class="lead">${escHtml(t('lead', { client: aiLabel }))}</p>
@@ -477,27 +489,6 @@
       ? translate('profile.agents.pendingRequests.keepCurrent')
       : translate(`profile.agents.scopeUi.${{ readonly: 'readOnly', standard: 'standard', full: 'fullAccess', custom: 'custom' }[p]}`);
 
-    // Restore an existing browser session from the httpOnly refresh cookie.
-    // POST /v1/auth/refresh is the session-restore endpoint (GET /v1/auth/session is the
-    // unrelated legacy challenge flow and always 400s here, which forced a re-login).
-    async function checkSession() {
-      try {
-        const r = await fetch('/v1/auth/refresh', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'X-AIMEAT-Refresh': '1' },
-        });
-        const d = await r.json();
-        const jwt = d.ok && d.data?.token;
-        if (!jwt) return null;
-        // Owner name lives in the JWT payload; decode it client-side.
-        const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        if (!payload.owner) return null;
-        return { jwt, owner: payload.owner };
-      } catch {}
-      return null;
-    }
-
     /** An Error that keeps the HTTP status, so withFreshToken can tell an expired token from a refusal. */
     const httpError = (status, message) => Object.assign(new Error(message), { status });
 
@@ -505,7 +496,8 @@
      * Runs a signed-in request with the session's access token. The token was read when the page
      * loaded and lasts fifteen minutes on a shipped node, so a page left open sends an expired one. On
      * a 401 this renews it from the refresh cookie and runs the request once more. When the cookie
-     * no longer works, or now belongs to another account, the sign-in view takes over.
+     * no longer works, or now belongs to another account, the person goes through the front page and
+     * back, and this page opens again for the account that is signed in.
      */
     async function withFreshToken(action) {
       try {
@@ -513,28 +505,15 @@
       } catch (err) {
         if (err.status !== 401) throw err;
         const owner = getOwnerName();
-        const renewed = await checkSession();
+        const renewed = await refreshedSession();
         if (!renewed || renewed.owner !== owner) {
           session = null;
-          renderLogin();
+          location.replace(signInAddress(location.pathname + location.search, params.get('lang') || ''));
           throw err;
         }
         session = renewed;
         return action(renewed.jwt);
       }
-    }
-
-    async function doLogin(username, password, totp) {
-      const body = { username, password };
-      if (totp) body.totp_code = totp;
-      const r = await fetch('/v1/ghii/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const d = await r.json();
-      if (!d.ok) throw new Error(d.error?.message || 'Login failed');
-      return d.data;
     }
 
     async function fetchHomeAgentName(jwt) {
@@ -616,85 +595,14 @@
       }
     }
 
-    function renderLogin() {
-      app.innerHTML = `
-        ${introHtml()}
-        ${boundaryHtml()}
-        <p class="login-prompt">${escHtml(t('loginRequired'))}</p>
-        <form id="linkForm">
-          <label>${escHtml(t('modal.emailLabel'))}</label>
-          <input type="email" id="linkEmail" required autocomplete="email" maxlength="254" placeholder="${escHtml(t('modal.emailPlaceholder'))}" /><!-- js/input-limits.js email -->
-          <p class="name-identity-hint">${escHtml(t('modal.loginLinkNoteFirst'))}</p>
-          <div id="linkMsg" class="error-msg" role="status"></div>
-          <div class="btn-row">
-            <button type="submit" class="btn btn-approve" id="linkBtn">${escHtml(t('modal.loginLinkSend'))}</button>
-          </div>
-        </form>
-        <p class="login-prompt">${escHtml(t('modal.loginLinkUsePassword'))}</p>
-        <form id="loginForm">
-          <label>${escHtml(t('usernameLabel'))}</label>
-          <input type="text" id="username" required autocomplete="username" maxlength="256" /><!-- js/input-limits.js id -->
-          <label>${escHtml(t('passwordLabel'))}</label>
-          <input type="password" id="password" required autocomplete="current-password" />
-          <label>${escHtml(t('totpLabel'))}</label>
-          <input type="text" id="totp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" />
-          <div id="loginError" class="error-msg"></div>
-          <div class="btn-row">
-            <button type="button" class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
-            <button type="submit" class="btn btn-approve">${escHtml(t('loginBtn'))}</button>
-          </div>
-        </form>
-      `;
-      document.getElementById('denyBtn').addEventListener('click', deny);
-      // An account made by an emailed link has no password. The link returns to this same page, with
-      // the request in its address, and the session it opens shows the agent choice (checkSession).
-      document.getElementById('linkForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const msg = document.getElementById('linkMsg');
-        const btn = document.getElementById('linkBtn');
-        msg.textContent = '';
-        btn.disabled = true;
-        try {
-          const r = await fetch('/v1/ghii/magic-link', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: document.getElementById('linkEmail').value.trim(),
-              redirect: location.pathname + location.search,
-              lang: getLocale(),
-            }),
-          });
-          const d = await r.json();
-          if (!d.ok) throw new Error(d.error?.message || t('modal.loginLinkSend'));
-          msg.classList.remove('error-msg');
-          msg.classList.add('name-identity-hint');
-          msg.textContent = t('modal.loginLinkSent');
-        } catch (err) {
-          msg.textContent = err.message;
-          btn.disabled = false;
-        }
-      });
-      document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const errEl = document.getElementById('loginError');
-        errEl.textContent = '';
-        try {
-          const data = await doLogin(
-            document.getElementById('username').value.trim(),
-            document.getElementById('password').value,
-            document.getElementById('totp').value.trim() || undefined,
-          );
-          session = data;
-          const loginOwner = typeof data.owner === 'string' ? data.owner : data.owner?.name || data.username;
-          loadPacing(data.jwt || data.token);
-          [agents, homeAgentName] = await Promise.all([
-            fetchAgents(loginOwner, data.jwt || data.token),
-            fetchHomeAgentName(data.jwt || data.token),
-          ]);
-          renderApproval();
-        } catch (err) {
-          errEl.textContent = err.message;
-        }
+    /** Which account this approval lands on, and the way to another one. */
+    const accountLineHtml = () => `
+      <p class="account-line">${escHtml(t('signedInAs', { name: getOwnerName() }))}
+        <button type="button" class="account-switch" id="accountSwitch">${escHtml(t('useAnotherAccount'))}</button></p>`;
+
+    function wireAccountLine() {
+      document.getElementById('accountSwitch').addEventListener('click', () => {
+        void useAnotherAccount(session?.jwt || session?.token || '', location.pathname + location.search, params.get('lang') || '');
       });
     }
 
@@ -845,10 +753,13 @@
           ${introHtml()}
           <p class="select-agent-title">${escHtml(t('noAgentsCreate', { client: aiInline }))}</p>
           <div id="createContainer"></div>
+          ${boundaryHtml()}
+          ${accountLineHtml()}
           <div class="btn-row">
             <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
           </div>
         `;
+        wireAccountLine();
         document.getElementById('denyBtn').addEventListener('click', deny);
         renderCreateForm(document.getElementById('createContainer'), selectCreatedAgent);
         return;
@@ -893,6 +804,7 @@
         <div id="inlineCreateContainer" class="hidden"></div>
         <div id="scopeArea">${selectedAgent ? scopeSectionHtml() : ''}</div>
         ${boundaryHtml()}
+        ${accountLineHtml()}
         <div id="pacingSlot">${pacingHtml()}</div>
         <div id="approveError" class="error-msg"></div>
         <div class="btn-row">
@@ -900,6 +812,8 @@
           <button class="btn btn-approve" id="approveBtn" ${selectedAgent ? '' : 'disabled'}>${escHtml(t('approveBtn'))}</button>
         </div>
       `;
+
+      wireAccountLine();
 
       // Agent selection — the permission section describes the SELECTED agent, so switching
       // re-seeds it (back to "keep", custom list from the new agent's real scopes).
@@ -1027,7 +941,7 @@
     // Boot. The operator statement is public and small, so it is read beside the session restore and
     // is in place before the first view renders.
     let clientInfo;
-    [session, operator, clientInfo] = await Promise.all([checkSession(), fetchOperator(), fetchClientInfo()]);
+    [session, operator, clientInfo] = await Promise.all([refreshedSession(), fetchOperator(), fetchClientInfo()]);
     applyVerified(clientInfo);
     if (session) {
       const jwt = session.jwt || session.token;
@@ -1037,8 +951,10 @@
         fetchHomeAgentName(jwt),
       ]);
       renderApproval();
-    } else {
-      renderLogin();
+    } else if (clientId) {
+      // Signing in or registering is the front page's job, by this node's settings. The request
+      // stays in the address the front page returns to.
+      location.replace(signInAddress(location.pathname + location.search, params.get('lang') || ''));
     }
   </script>
 </body>

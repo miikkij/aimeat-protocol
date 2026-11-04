@@ -548,6 +548,7 @@
       "/js/swallowed.js": "/js/swallowed.js",
       "/js/desktop-download.js": "/js/desktop-download.js",
       "/js/site.js": "/js/site.js",
+      "/js/sign-in-return.js": "/js/sign-in-return.js",
       "/js/ai-credit.js": "/js/ai-credit.js",
       "/js/visual-viewport.js": "/js/visual-viewport.js",
       "/js/closed-node-fetch.js": "/js/closed-node-fetch.js",
@@ -1078,7 +1079,7 @@
     import { h, render, Component } from 'preact';
     import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
     import htm from 'htm';
-    import { loadTranslations, t, getLocale, switchLocale, onLocaleChange, applyAccountLocale } from '/js/i18n.js';
+    import { loadTranslations, t, tPrefix, getLocale, switchLocale, onLocaleChange, applyAccountLocale } from '/js/i18n.js';
     // Side-effect import, and EARLY on purpose: the browser fires `beforeinstallprompt` once,
     // shortly after load, and the module must be listening before views lazy-load.
     import '/js/install-prompt.js';
@@ -1093,7 +1094,8 @@
     import { loadDisplayPrefs, onPrefsChange } from '/js/display-prefs.js';
     import { initThemeSystem, setTheme } from '/js/theme.js';
     import { siteLink, signInFirst, signedInOnly, customerNode, devLinksShown } from '/js/site.js';
-    import { getSession } from '/js/services/auth.js';
+    import { getSession, onAuthChange, showLoginModal } from '/js/services/auth.js';
+    import { startSignInReturn } from '/js/sign-in-return.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
     import { applyHelpHover, helpHoverOf } from '/js/help-hover.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
@@ -2026,6 +2028,19 @@
       if (window.AIMEAT?.auth?.login) {
         try { await window.AIMEAT.auth.login(); } catch (_) {}
       }
+
+      // An agent connect page sent a person here to sign in or register (js/sign-in-return.js). Signed
+      // in, they go straight back, and the page does not draw at all. A node the store sold offers no
+      // registration, as its header button does not (mountAuth below).
+      const leavingForApproval = startSignInReturn({
+        getSession, onAuthChange, showLoginModal,
+        modalOptions: () => ({
+          i18n: tPrefix('modal.'),
+          line: t('oauthConsent.signInFirst'),
+          ...(customerNode() ? { signInOnly: true } : {}),
+        }),
+      });
+      if (leavingForApproval) return;
 
       // The margin pattern is the person's own choice: read once the session is known, again
       // whenever the sign-in changes (a sign-out takes it away). The help on a word comes from the

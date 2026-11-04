@@ -23,6 +23,9 @@
  *   2026-11-04 — GET /v1/health/live and /v1/health/ready are open (HA stage 1). The route list is read
  *     asynchronously: the synchronous read held the event loop past the node's keep-alive timeout, and
  *     the first request after it failed with ECONNRESET on the closed pooled socket.
+ *   2026-11-04 — GET /v1/themes/{}/theme.css, /v1/themes/fonts.css and /v1/themes/fonts/{}/{} are open:
+ *     the shell links them with <link>, which carries no session, so a custom theme never showed on
+ *     orgnode.example. The theme list, a theme's record and the account's choice stay closed.
  *   2026-11-03 — POST /v1/ghii/login/two-step/start and /finish are open: the two-step setup a covered
  *     account finishes mid sign-in, on the setup token the password step gave (4fc091e8d).
  *   2026-11-01 — GET /v1/dataset/{}/{} is open: the public dataset page's shell, which in this mode carries
@@ -125,6 +128,8 @@ const OPEN_CODE_ROUTES = new Set<string>([
     // The node describing itself to machines.
     'GET /v1/health', 'GET /v1/health/live', 'GET /v1/health/ready', 'GET /v1/build', 'GET /v1/spec', 'GET /llms.txt', 'GET /llms-full.txt', 'GET /AGENTS.md', 'GET /agents.txt', 'GET /auth.md', 'GET /skill.md', 'GET /openapi.json',
     'GET /v1/libs', 'GET /v1/libs/aimeat-auth.js', 'GET /v1/libs/aimeat-{}.js', 'GET /v1/libs/portfolio-standalone.js', 'GET /v1/libs/test-harness',
+    // The look of the node's pages, which the shell links with <link> and so loads with no session.
+    'GET /v1/themes/{}/theme.css', 'GET /v1/themes/fonts.css', 'GET /v1/themes/fonts/{}/{}',
     // The node's own documents a signed-in person's new tab opens, and what a browser sends with no
     // session by necessity: the live stream (its ticket) and a provider's redirect (state + cookie).
     // test/e2e-content-access-browser.ts holds the cases.
@@ -231,6 +236,23 @@ async function main() {
             assert(challenge.status === 200, `GET /v1/auth/challenge ${challenge.status} ${JSON.stringify(challenge.body?.error)}`);
             const page = await fetch(`${BASE}/v1/portfolio/${owner}`, { headers: { Accept: 'text/html' } });
             assert(page.status === 200, `GET /v1/portfolio/${owner} ${page.status}`);
+        });
+
+        await test('a theme\'s stylesheet and the added faces load without a session; the theme list and the choice stay closed', async () => {
+            // USAGE: the shell links the theme sheet and the faces sheet with <link>, which sends no
+            // Authorization header even for a signed-in person, so these must answer a bare request.
+            const sheet = await fetch(`${BASE}/v1/themes/aimeat/theme.css`);
+            assert(sheet.status === 200 && (sheet.headers.get('content-type') ?? '').startsWith('text/css'), `GET /v1/themes/aimeat/theme.css ${sheet.status} ${sheet.headers.get('content-type')}`);
+            const faces = await fetch(`${BASE}/v1/themes/fonts.css`);
+            assert(faces.status === 200 && (faces.headers.get('content-type') ?? '').startsWith('text/css'), `GET /v1/themes/fonts.css ${faces.status} ${faces.headers.get('content-type')}`);
+            // A font the node does not have is the route's own 404, not the gate's 401.
+            const font = await json('/v1/themes/fonts/nosuchface/400-latin.woff2');
+            assert(font.status === 404, `GET /v1/themes/fonts/nosuchface/400-latin.woff2 ${font.status} ${JSON.stringify(font.body?.error)}`);
+            // FAILURE: the reads beside them that name the node's themes or a person's choice stay closed.
+            for (const path of ['/v1/themes', '/v1/themes/all', '/v1/themes/aimeat', '/v1/themes/choice', '/v1/themes/fonts', '/v1/themes/aimeat/versions']) {
+                const r = await json(path);
+                assert(r.status === 401 && r.body.error?.code === 'SIGN_IN_REQUIRED', `GET ${path} ${r.status} ${JSON.stringify(r.body?.error)}`);
+            }
         });
 
         await test('the shell a stranger gets carries no app and says the node is signed-in only', async () => {

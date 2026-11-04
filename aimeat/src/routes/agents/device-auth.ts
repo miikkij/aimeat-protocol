@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-11-04 — user_instructions names the approval address and says the person signs in only in their browser.
  *   2026-11-01 — An approval on POST /v1/agents/verify writes the trail line with event agent.approved
  *     (services/place-trail.ts), which the store's fleet service keys its first-build gift on.
  *   2026-11-01 -- keep_your_key adds that a client keeps node_id and this node's address with the key
@@ -417,7 +418,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       ...(returnProof !== undefined ? { return_proof: returnProof ? 'verified' : 'not_verified' } : {}),
       user_instructions: autoApproved
         ? `Auto-approved (same-owner registration). Fetch your credentials now: POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } — the first poll returns your token.`
-        : `Tell your owner to approve this request. They can find it in their AIMEAT profile under Agents (${baseUrl}/v1/profile -> Agents tab). The verification code is: ${userCode}. Once approved, poll POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } every 5 seconds until you receive your token.${autoApproveNote ? ` NOTE: ${autoApproveNote}` : ''}`,
+        : `Give your owner this address to approve the request: ${verificationUriComplete}. If they are not signed in, it takes them through the front page and back. They sign in only in their own browser, so never ask them for a password, a sign-in link or a code in chat. They can also find the request in their AIMEAT profile under Agents (${baseUrl}/v1/profile -> Agents tab). The verification code is: ${userCode}. Once approved, poll POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } every 5 seconds until you receive your token.${autoApproveNote ? ` NOTE: ${autoApproveNote}` : ''}`,
     }, [
       ...(autoApproved ? [] : [{ description: 'Owner approves in AIMEAT profile -> Agents tab', method: 'GET' as const, url: `${baseUrl}/v1/profile` }]),
       { description: 'Poll for authorization result', method: 'POST', url: '/v1/agents/device-token' },
