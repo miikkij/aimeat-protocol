@@ -18,6 +18,13 @@
 #      or AIMEAT_RED_CI_REASON, and a person's push gets the same message as a warning. Offline,
 #      the state is unknown and nothing is refused.
 #
+#   4. Push a rewritten history back. Main's history was rewritten on 2026-11-04, and a merge of an
+#      old branch is a fast-forward that GitHub accepts. scripts/check-rewritten-history.mjs refuses
+#      a pushed commit that descends from a root in security/rewritten-history.txt.
+#   5. Push an organisation node's names. scripts/check-private-terms.mjs reads the commits being
+#      pushed, messages and added lines, against the list in git's common directory (the commit-msg
+#      hook checks each commit as it is made; this catches commits made without the hook).
+#
 # It also lists, for a Claude Code session, the commits about to go that carry no Session: trailer.
 #
 # WHAT IS NOT HERE, AND WHY (2026-09-05). For a few hours this hook also ran the whole unit suite
@@ -31,7 +38,12 @@
 set -e
 ROOT="$(git rev-parse --show-toplevel)"
 REMOTE="$1"
+# git hands the refs being pushed on stdin, once; both checks below read them.
+REFS="$(cat)"
 . "$(dirname "$0")/lib-pnpm.sh"
+
+printf '%s\n' "$REFS" | node "$ROOT/aimeat/scripts/check-rewritten-history.mjs"
+printf '%s\n' "$REFS" | node "$ROOT/aimeat/scripts/check-private-terms.mjs" --push "$REMOTE"
 
 git fetch -q "$REMOTE" main 2>/dev/null || true
 BEHIND="$(git rev-list --count HEAD..refs/remotes/$REMOTE/main 2>/dev/null || echo 0)"

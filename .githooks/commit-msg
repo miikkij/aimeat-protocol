@@ -26,3 +26,6 @@ esac
 . "$(dirname "$0")/lib-pnpm.sh"
 cd "$ROOT/aimeat"
 pnpm -s check:commit-msg "$MSG"
+# An organisation node's names stay out of this public repository, in the message and in what the
+# commit adds (scripts/check-private-terms.mjs; the list is in git's common directory, not here).
+node scripts/check-private-terms.mjs --commit "$MSG"

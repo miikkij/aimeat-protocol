@@ -32,6 +32,7 @@
  *   v1.1.2 — 2026-10-04 — Ceiling 40,500 → 40,800 for the rule that a mentioned place comes with its URL.
  *   v1.1.3 — 2026-10-18 — Ceiling 40,800 → 41,000 for the rule that live data is an event, never a poll.
  *   v1.1.4 -- 2026-11-01 -- Ceiling 41,200 -> 41,700 for the rule that the IT adoption package stays true to the code.
+ *   v1.1.5 -- 2026-11-04 -- Ceiling 41,700 -> 43,000 for the rule that this public repository names no organisation node.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -63,7 +64,7 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * stays true to the code ("tämä on tärkeä"), which holds in every session: any change to a setting,
  * a default or a security control can make one of its pages false.
  */
-const CEILING_BYTES = 41_700;
+const CEILING_BYTES = 43_000;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })

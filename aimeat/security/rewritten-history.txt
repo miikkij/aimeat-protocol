@@ -1,0 +1,11 @@
+# Histories of main that were rewritten and must never be pushed again (scripts/check-rewritten-history.mjs).
+#
+# One line per rewritten history: the FIRST commit that history has and the current main does not,
+# then the date and why. A push whose commits descend from any of these carries the old history back
+# to GitHub. That happened once already: 4dfad71bd merged the old history in an hour after the first
+# rewrite and put 26 old commit messages back on GitHub.
+#
+# A line is added in the same change as the rewrite, before anybody pushes on top of it.
+ece20d3e41ff67cf5ac11bef1d1d863a747f8bca 2026-11-04 organisation data in files and commit messages (original history)
+2323f04aac9a5a482ad318cba3c8c2131c14ea37 2026-11-04 the same, first rewrite (people and app names left in)
+60470cd8afcd721661271d38de2ad00aaff2fd17 2026-11-04 the same, second rewrite (an old branch merged back in)
