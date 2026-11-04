@@ -14,6 +14,8 @@
  *   const { token } = await mintExtPayToken(storage, { buyerOwner, ext, action, currency, amount });
  *   const r = await consumeExtPayToken(storage, token, { buyerOwner, ext, action });
  * @version-history
+ *   2026-11-04 — accrueTokenShare books through settlePurchase, in one transaction (commerce/settle-purchase.ts;
+ *     codebase analysis 2026-11-03, item B2).
  *   v1.3.0 — 2026-10-31 — checkExtPayToken: consume's checks without the spend, so the paywall refuses an
  *     unusable token before it charges the pacing (secaudit 2026-10-31 inv-08). consume is check + delete.
  *   v1.2.0 — 2026-10-18 — A token may carry the seller's net of its sale (`share`), and a spent token
@@ -24,8 +26,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
-import { readSplit, computeSplit, type DynamicDesignation, type SplitResult } from '../commerce/beneficiary-split.js';
-import { bookBeneficiaryShares } from '../commerce/beneficiary-book.js';
+import type { DynamicDesignation, SplitResult } from '../commerce/beneficiary-split.js';
+import { settlePurchase } from '../commerce/settle-purchase.js';
 import { logger } from '../utils/logger.js';
 
 /** Token namespace (system-owned memory; server-side only, never client-readable). */
@@ -57,22 +59,28 @@ export async function accrueTokenShare(
 ): Promise<SplitResult | null> {
   const share = grant.share;
   if (!share || share.net <= 0) return null;
+  // The token was spent when the call ran, so the purchase is delivered: this books it
+  // (commerce/settle-purchase.ts).
   try {
-    const split = await readSplit(storage, share.sellerGhii, grant.ext, grant.action);
-    const result = computeSplit(share.net, split, designations);
-    if (!result.lines.length) return result;
-    await bookBeneficiaryShares(storage, {
-      lines: result.lines, trackingCode: `chk_tok_${token}`, fromGhii: share.sellerGhii,
-      currency: grant.currency, buyerGhii: share.buyerGhii, reference: share.reference,
+    const settled = await settlePurchase(storage, null, {
+      from: 'delivered',
+      steps: [{
+        books: [{
+          kind: 'shares', sellerGhii: share.sellerGhii, ext: grant.ext, action: grant.action, net: share.net,
+          currency: grant.currency, designations, trackingCode: `chk_tok_${token}`, buyerRef: share.buyerGhii, reference: share.reference,
+        }],
+        tolerant: { message: SPLIT_NOT_BOOKED, context: { ext: grant.ext, action: grant.action } },
+      }],
     });
-    return result;
+    const step = settled.steps[0];
+    return step?.ok ? step.splits[0] ?? null : null;
   } catch (err) {
-    logger.error('[ext-pay-token] the paid call\'s revenue split was not booked; the seller keeps the whole cut', {
-      ext: grant.ext, action: grant.action, error: String(err),
-    });
+    logger.error(SPLIT_NOT_BOOKED, { ext: grant.ext, action: grant.action, error: String(err) });
     return null;
   }
 }
+
+const SPLIT_NOT_BOOKED = '[ext-pay-token] the paid call\'s revenue split was not booked; the seller keeps the whole cut';
 
 /** Mint a single-use token for a settled money payment. Returns the token + its expiry. */
 export async function mintExtPayToken(storage: Storage, grant: ExtPayGrant): Promise<{ token: string; expiresAt: string }> {

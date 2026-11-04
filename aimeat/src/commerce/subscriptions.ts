@@ -31,6 +31,8 @@
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   2026-11-04 — A renewal's write and its beneficiary booking commit in one transaction
+ *     (commerce/settle-purchase.ts; codebase analysis 2026-11-03, item B2).
  *   v1.2.1 — 2026-10-27 — A plan whose period got shorter at an amount that does not fall with it is a
  *     higher price per day and waits for the buyer the same way; allowRaisedPrice checks and records
  *     the period the buyer was asked about (secaudit2026oct26).
@@ -52,8 +54,8 @@ import type { SellableResolver } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { getPaymentHandler, listPaymentHandlers } from './payment-handlers.js';
 import { integerMicros, percentFee } from './money.js';
-import { readSplit, computeSplit, type DynamicDesignation } from './beneficiary-split.js';
-import { bookBeneficiaryShares } from './beneficiary-book.js';
+import type { DynamicDesignation } from './beneficiary-split.js';
+import { settlePurchase } from './settle-purchase.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { notify } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
@@ -336,26 +338,25 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
     }
     return { result: 'failed', detail: reason };
   }
-  const renewed = await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
-    ...(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
-    active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
-    last_order: reference, updated_at: new Date().toISOString(),
-  }), { tag: SUBSCRIPTION_ACTION });
-  const nextUntil = renewed!.active_until;
   // The seller's net of the renewal, shared with the plan's payees by the seller's split, as at checkout.
+  // Booked in one transaction with the renewal write (commerce/settle-purchase.ts).
   const net = plan.amount - percentFee(plan.amount, commerceFeePercent(config));
-  try {
-    const split = await readSplit(storage, sellerGhii, sub.ext, SUBSCRIPTION_ACTION);
-    const result = computeSplit(net, split, designationsOf(plan));
-    if (result.lines.length) {
-      await bookBeneficiaryShares(storage, {
-        lines: result.lines, trackingCode: `sub_${trackingCode}`, fromGhii: sellerGhii, currency: plan.currency,
-        buyerGhii: sub.buyer_ghii, reference,
-      });
-    }
-  } catch (err) {
-    logger.error('subscriptions: the renewal\'s revenue split was not booked; the seller keeps the whole cut', { reference, error: String(err) });
-  }
+  const { delivered: renewed } = await settlePurchase(storage, config, {
+    from: 'paid',
+    deliver: () => updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
+      ...(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
+      active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
+      last_order: reference, updated_at: new Date().toISOString(),
+    }), { tag: SUBSCRIPTION_ACTION }),
+    steps: [{
+      books: [{
+        kind: 'shares', sellerGhii, ext: sub.ext, action: SUBSCRIPTION_ACTION, net, currency: plan.currency,
+        designations: designationsOf(plan), trackingCode: `sub_${trackingCode}`, buyerRef: sub.buyer_ghii, reference,
+      }],
+      tolerant: { message: 'subscriptions: the renewal\'s revenue split was not booked; the seller keeps the whole cut', context: { reference } },
+    }],
+  });
+  const nextUntil = renewed!.active_until;
   emitChange('commerce', sub.buyer_ghii);
   return { result: 'renewed', detail: nextUntil };
 }

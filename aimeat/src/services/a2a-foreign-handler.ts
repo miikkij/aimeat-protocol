@@ -34,6 +34,8 @@
  * @structure ForeignA2AHandler
  * @usage new ForeignA2AHandler(storage, config, agent, peer, card, payment)
  * @version-history
+ *   2026-11-04 -- The paid work record and the sale's booking commit in one transaction
+ *     (settleSessionlessSale, commerce/settle-purchase.ts; codebase analysis 2026-11-03, item B2).
  *   v1.3.0 -- 2026-10-27 -- The provider's paid-work notice says where the caller's key is published
  *     unless that is the host its name gives (secaudit2026oct26, jwks-origin-unbound-to-claimed-node).
  *   v1.2.0 -- 2026-10-25 -- A settlement whose outcome is unknown is kept as a possible payment for the
@@ -66,7 +68,7 @@ import { getPaymentHandler } from '../commerce/payment-handlers.js';
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
 import { PossiblePaymentError, recordPossiblePayment } from '../commerce/possible-payment.js';
 import { decodeXPayment } from '../commerce/x402-facilitator.js';
-import { bookSessionlessSale } from '../commerce/session-service.js';
+import { settleSessionlessSale } from '../commerce/session-service.js';
 import { commerceFeePercent } from './marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import { notify } from './notify.js';
@@ -346,21 +348,21 @@ export class ForeignA2AHandler implements A2ARequestHandler {
       // operator's fee as a receivable under the operator's own GHII, and then whoever the seller
       // owes a share of what is left. Booked against the SELLER because that is where a fee on a
       // transaction belongs; nothing here creates an account for the buyer, and nothing here is a
-      // second fee mechanism — it is `bookSessionlessSale`, which lives beside the checkout leg.
-      const booked = await bookSessionlessSale(this.storage, this.config, {
-        gross: priced.price.amount, currency: priced.price.currency,
-        sellerGhii: work.providerGhii, buyerRef: this.peer.gaii,
-        ext: work.ext, action: work.action,
-        trackingCode, handler: X402_HANDLER_ID,
-        reference: `a2a:${work.workId}:${work.ext}:${work.action}`,
-      });
-
+      // second fee mechanism — it is `bookSessionlessSale`, which lives beside the checkout leg. Booked
+      // in one transaction with the paid work record (settleSessionlessSale), so a work record that
+      // cannot be written leaves no sale booked.
       const paid: AgentWork = {
         ...work,
         chargedUnits: priced.price.amount,
         note: `${work.note} · paid ${trackingCode}`,
       };
-      await putWork(this.storage, paid);
+      const booked = await settleSessionlessSale(this.storage, this.config, {
+        gross: priced.price.amount, currency: priced.price.currency,
+        sellerGhii: work.providerGhii, buyerRef: this.peer.gaii,
+        ext: work.ext, action: work.action,
+        trackingCode, handler: X402_HANDLER_ID,
+        reference: `a2a:${work.workId}:${work.ext}:${work.action}`,
+      }, () => putWork(this.storage, paid));
 
       // NOW the provider hears about it. Telling them before the money arrived would be asking them
       // to start work a stranger had not paid for.

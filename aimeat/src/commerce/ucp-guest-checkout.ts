@@ -33,6 +33,9 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   2026-11-04 — The sale is booked after the order and the completed checkout are written, not
+ *     before; the receipt's fee is computed by the same rate and function (codebase analysis
+ *     2026-11-03, item B2).
  *   2026-10-27 — The PUT and the cancel change the stored checkout only while it may change
  *     (changeStoredCheckout), so one read before a completion's claim cannot reopen it
  *     (secaudit2026oct26, commerce/session-service:stale-session-write-reopens-consumed-payment).
@@ -57,6 +60,8 @@ import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { getPaymentHandler } from './payment-handlers.js';
 import { STRIPE_HANDLER_ID } from './stripe-handler.js';
 import { bookSessionlessSale } from './session-service.js';
+import { percentFee } from './money.js';
+import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { createFulfillmentTask } from './fulfillment.js';
 import { CommerceError } from './errors.js';
 import { PaymentError } from './payment-handlers.js';
@@ -490,11 +495,9 @@ export async function completeGuestCheckout(
     }
   }
   order.fulfillment = { taskIds };
-  const { fee, net } = await bookSessionlessSale(storage, config, {
-    gross: total, currency: 'USD', sellerGhii: session.sellerGhii, buyerRef: `ucp:${session.platformProfile}`,
-    ext: 'ucp', action: 'checkout', trackingCode, handler: STRIPE_HANDLER_ID, reference: orderId,
-  });
-  order.receipt = { handler: STRIPE_HANDLER_ID, charged: total, earned: net, fee, trackingCode };
+  // The receipt's fee and net, by the rate and the function bookSessionlessSale books with.
+  const fee = percentFee(total, commerceFeePercent(config));
+  order.receipt = { handler: STRIPE_HANDLER_ID, charged: total, earned: total - fee, fee, trackingCode };
   await putRecord(storage, session.sellerGhii, orderKey(orderId), order, null);
 
   session.status = 'completed';
@@ -503,6 +506,12 @@ export async function completeGuestCheckout(
   session.lastError = null;
   session.updatedAt = now;
   await putRecord(storage, session.sellerGhii, sessionKey(id), session, KEEP_HOURS);
+  // The sale is booked after the last write of the order (commerce/settle-purchase.ts), so an order
+  // that cannot be written leaves no fee and no share booked. It never throws.
+  await bookSessionlessSale(storage, config, {
+    gross: total, currency: 'USD', sellerGhii: session.sellerGhii, buyerRef: `ucp:${session.platformProfile}`,
+    ext: 'ucp', action: 'checkout', trackingCode, handler: STRIPE_HANDLER_ID, reference: orderId,
+  });
 
   recordCheckoutStage(storage, config, { sellerGhii: session.sellerGhii, family: session.platformFamily, stage: 'completed' });
   recordPurchase(storage, config, { sellerGhii: session.sellerGhii, channel: 'ai', family: session.platformFamily, via: 'agent', amount: total, currency: 'USD' });

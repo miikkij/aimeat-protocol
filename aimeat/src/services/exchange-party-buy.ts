@@ -12,7 +12,7 @@
  *   (commerce/ucp-guest-checkout.ts). A party is neither, so this is a small checkout over the same
  *   money handlers: Stripe's hosted card page on the provider's own Stripe account
  *   (`com.stripe.checkout`), or the test double (`test.money`) on a node that runs it. The seller's
- *   side is booked with bookSessionlessSale, as every sale without an account is.
+ *   side is booked with settleSessionlessSale, as every sale without an account is.
  *
  *   TWO STEPS. openPartyPurchase prices the purchase from the listing (never from the request) and
  *   keeps it, open, for an hour; with the card page it answers the page's address. completePartyPurchase
@@ -57,6 +57,8 @@
  *   const done = await completePartyPurchase(deps, purchaseId, { handler: 'test.money', instrument: 'x' });
  *   const r = await completePartyPurchaseFromStripe(deps, sellerGhii, purchaseId, stripeSessionId);
  * @version-history
+ *   2026-11-04 — The completion write and the sale's booking commit in one transaction
+ *     (settleSessionlessSale, commerce/settle-purchase.ts; codebase analysis 2026-11-03, item B2).
  *   v1.2.0 — 2026-11-03 — secaudit2026nov02d round 13b: a card page purchase paid inside its hour and
  *     completed after it is delivered (or refunded when the offering cannot be sold any more), an
  *     unpaid expired one still answers 410; the seller's Stripe webhook completes a party purchase
@@ -88,7 +90,7 @@ import { getPaymentHandler, PaymentError } from '../commerce/payment-handlers.js
 import { sellerKey } from '../commerce/stripe-handler.js';
 import { percentFee } from '../commerce/money.js';
 import { commerceFeePercent } from './marketplace-fee.js';
-import { bookSessionlessSale } from '../commerce/session-service.js';
+import { settleSessionlessSale } from '../commerce/session-service.js';
 import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../commerce/stripe-checkout.js';
 import { TEST_MONEY_HANDLER_ID } from '../commerce/test-money-handler.js';
 import { readPsp } from '../commerce/psp-record.js';
@@ -493,18 +495,18 @@ export async function completePartyPurchase(
         share = written ?? share;
         const data = await deliveryAnswer(deps, stored, o.title, party, share, { entitlementId: ent.entitlementId, pricing }, key);
 
-        // The last write that can fail. The sale is booked only after it (bookSessionlessSale never
-        // throws), so a failure here leaves no sale on the seller's books for a payment that goes back.
+        // The last write that can fail. The sale is booked in one transaction with it
+        // (settleSessionlessSale), so a failure here leaves no sale on the seller's books for a payment
+        // that goes back.
         const paidWith = opts.unattended && typeof input.instrument === 'string' ? input.instrument.slice(0, 200) : undefined;
-        await changePurchase(storage, config.nodeId, id, p => ({
+        await settleSessionlessSale(storage, config, {
+            gross: stored.amount, currency: stored.currency, sellerGhii: stored.providerGhii, buyerRef: ref,
+            ext: o.ext, action: o.action, trackingCode, handler: handler.id, reference: id,
+        }, () => changePurchase(storage, config.nodeId, id, p => ({
             ...p, status: 'completed', completedAt: new Date().toISOString(), trackingCode,
             partyUid: party!.uid, entitlementId: ent.entitlementId, shareId: share!.id,
             ...(opts.unattended ? { handover: { keyPending: !!made.partyName }, ...(paidWith ? { paidWith } : {}) } : {}),
-        }));
-        await bookSessionlessSale(storage, config, {
-            gross: stored.amount, currency: stored.currency, sellerGhii: stored.providerGhii, buyerRef: ref,
-            ext: o.ext, action: o.action, trackingCode, handler: handler.id, reference: id,
-        });
+        })));
         emitChange('consent', stored.providerGhii);
         return { ok: true, data };
     } catch (err) {
@@ -550,8 +552,8 @@ interface DeliveryWrites {
 /**
  * Undo what a failed completion wrote, newest first: a share it granted ends, the contract goes back
  * to what it was before (a contract this attempt made is revoked), a party it made is removed (its key
- * was never handed out). Each step is logged when it fails and never stops the buyer's answer. No sale
- * is booked before the last write, so there is none to undo here.
+ * was never handed out). Each step is logged when it fails and never stops the buyer's answer. The sale
+ * is booked in one transaction with the last write, so there is none to undo here.
  */
 async function undoDelivery(storage: Storage, providerGhii: string, ref: string, made: DeliveryWrites, id: string): Promise<void> {
     const step = async (what: string, run: () => Promise<unknown>): Promise<void> => {

@@ -29,6 +29,8 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.6.0 — 2026-11-04 — Rule sale-booking: a sale's fee and shares are booked only by settlePurchase
+ *     (commerce/settle-purchase.ts), with the purchase's last write (codebase analysis 2026-11-03, B2).
  *   v1.5.0 — 2026-11-04 — Rule verification-level-gate: an owner's address is proven by
  *     provenOwnerAddress, not by the account's verification level (codebase analysis 2026-11-03, A9).
  *   v1.4.0 — 2026-11-04 — Rule admin-password: the admin password is read only by its one check, its
@@ -165,6 +167,13 @@ const RULES: Rule[] = [
     label: 'A route\'s caller is callerOf(req) (middleware/caller.ts), built once per request with its answers on it, not an object copied field by field from req.auth (C9)',
     pattern: /roles:req\.auth!?\.roles/,
     skipDirs: ['src/middleware/caller.ts', 'src/auth/'],
+  },
+  {
+    id: 'sale-booking',
+    label: 'A sale\'s platform fee and beneficiary shares are booked only by settlePurchase (commerce/settle-purchase.ts), in one transaction with the purchase\'s last write, so a write that fails leaves no fee and no share booked (codebase analysis 2026-11-03, B2)',
+    pattern: /\b(bookBeneficiaryShares|recordMoneyPlatformFee)\(/,
+    // The two writers themselves: their own definitions.
+    skipDirs: ['src/commerce/beneficiary-book.ts', 'src/commerce/platform-fee.ts'],
   },
 ];
 

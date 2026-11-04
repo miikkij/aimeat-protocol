@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-11-04 -- completeSession writes the completed session and the seller's order copy in one transaction with the sale's fee and beneficiary bookings (commerce/settle-purchase.ts; the line step moved to checkout-shares.ts); bookSessionlessSale books through settlePurchase, and settleSessionlessSale books with the caller's last write (codebase analysis 2026-11-03, item B2).
  *   2026-10-27 -- updateSessionItems and cancelSession write the stored session only while it is open (session-claim.ts changeOpenSession; secaudit2026oct26).
  *   2026-10-27 -- A subscription line whose plan period changed since the quote is refused PRICE_CHANGED (secaudit2026oct26).
  *   2026-10-25 -- A collect whose x402 settlement outcome is unknown (PossiblePaymentError) is kept as a possible payment for the seller and the operator before the session opens again (commerce/possible-payment.ts; secaudit2026oct22, lead 4432).
@@ -74,13 +75,13 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, PaymentHandler, CheckoutAttribution, RefundOutcome } from './types.js';
-import { meteredCoordinateOf } from './metered-coordinate.js';
+import { checkoutBeneficiaryStep } from './checkout-shares.js';
 import { refundCollected, refundSentence, recordUndeliveredPayment } from './undelivered-payment.js';
 import { PossiblePaymentError, recordPossiblePaymentOf } from './possible-payment.js';
 import { getPaymentHandler, listPaymentHandlers, LEGACY_MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { chargePacing, pacingReceipt } from '../services/metered-settlement.js';
 import { insufficientMorselsMessage } from './pacing-pack.js';
-import { putRecord, recordMoneyPlatformFee } from './platform-fee.js';
+import { putRecord } from './platform-fee.js';
 import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { createFulfillmentTask } from './fulfillment.js';
@@ -89,8 +90,8 @@ import { appSpendRefusal } from '../services/metered-access.js';
 import { isMoneyCurrency, percentFee, MONEY_CURRENCIES } from './money.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { logger } from '../utils/logger.js';
-import { readSplit, computeSplit, type DynamicDesignation } from './beneficiary-split.js';
-import { bookBeneficiaryShares } from './beneficiary-book.js';
+import type { DynamicDesignation } from './beneficiary-split.js';
+import { settlePurchase, type BookingStep } from './settle-purchase.js';
 import { takeDesignations } from './beneficiary-designation.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -304,49 +305,67 @@ export async function listOrders(storage: Storage, sellerGhii: string, limit = 5
 export async function bookSessionlessSale(
   storage: Storage,
   config: AimeatConfig,
-  args: {
-    gross: number; currency: string;
-    sellerGhii: string; buyerRef: string;
-    /** The metered coordinate the sale happened at — what the seller's split is keyed to. */
-    ext: string; action: string;
-    trackingCode: string; handler: string; reference: string;
-  },
+  args: SessionlessSale,
 ): Promise<{ fee: number; net: number }> {
-  const fee = percentFee(args.gross, commerceFeePercent(config));
-  const net = args.gross - fee;
+  const { fee, net, steps } = sessionlessSale(config, args);
   try {
-    // MONEY ONLY, like the checkout leg beside it: morsels pace usage, they are not revenue, and a
-    // fraction of them is not a share. A morsel-priced sale cannot reach this road anyway — the A2A
-    // door refuses one outright — so this is the guard staying true rather than a live branch.
-    if (!isMoneyCurrency(args.currency)) return { fee: 0, net: args.gross };
-    if (fee > 0) {
-      await recordMoneyPlatformFee(storage, config, {
-        fee, currency: args.currency, sellerGhii: args.sellerGhii,
-        buyerGhii: args.buyerRef, trackingCode: args.trackingCode, handler: args.handler,
-      });
-    }
-    // Then whoever the seller owes a share of their cut. Out of the seller's NET, never added to
-    // what the buyer paid — identical to both the checkout and the contracted paths.
-    if (net > 0) {
-      const split = await readSplit(storage, args.sellerGhii, args.ext, args.action);
-      const result = computeSplit(net, split, []);
-      if (result.lines.length) {
-        await bookBeneficiaryShares(storage, {
-          lines: result.lines,
-          trackingCode: `a2a_${args.trackingCode}_${args.action}`,
-          fromGhii: args.sellerGhii,
-          currency: args.currency,
-          buyerGhii: args.buyerRef,
-          reference: args.reference,
-        });
-      }
-    }
+    await settlePurchase(storage, config, { from: 'delivered', steps });
   } catch (err) {
-    logger.error('[commerce] sessionless sale bookkeeping failed; the seller keeps the whole cut', {
-      seller: args.sellerGhii, trackingCode: args.trackingCode, error: String(err),
-    });
+    logger.error(SESSIONLESS_BOOKING_FAILED, { seller: args.sellerGhii, trackingCode: args.trackingCode, error: String(err) });
   }
   return { fee, net };
+}
+
+/**
+ * The same sale, booked in one transaction with the purchase's last write (`deliver`, storage calls
+ * only): a failure of that write leaves no fee and no share booked, and is thrown to the caller, which
+ * refunds as before. A booking failure is still only logged (commerce/settle-purchase.ts).
+ */
+export async function settleSessionlessSale<T>(
+  storage: Storage,
+  config: AimeatConfig,
+  args: SessionlessSale,
+  deliver: () => Promise<T>,
+): Promise<{ fee: number; net: number; delivered: T }> {
+  const { fee, net, steps } = sessionlessSale(config, args);
+  const settled = await settlePurchase(storage, config, { from: 'paid', deliver, steps });
+  return { fee, net, delivered: settled.delivered as T };
+}
+
+/** A money sale with no checkout session behind it, as bookSessionlessSale takes it. */
+export interface SessionlessSale {
+  gross: number; currency: string;
+  sellerGhii: string; buyerRef: string;
+  /** The metered coordinate the sale happened at — what the seller's split is keyed to. */
+  ext: string; action: string;
+  trackingCode: string; handler: string; reference: string;
+}
+
+const SESSIONLESS_BOOKING_FAILED = '[commerce] sessionless sale bookkeeping failed; the seller keeps the whole cut';
+
+/** The fee, the seller's net and the bookings of one sessionless sale. */
+function sessionlessSale(config: AimeatConfig, args: SessionlessSale): { fee: number; net: number; steps: BookingStep[] } {
+  const fee = percentFee(args.gross, commerceFeePercent(config));
+  const net = args.gross - fee;
+  // MONEY ONLY, like the checkout leg beside it: morsels pace usage, they are not revenue, and a
+  // fraction of them is not a share. A morsel-priced sale cannot reach this road anyway — the A2A
+  // door refuses one outright — so this is the guard staying true rather than a live branch.
+  if (!isMoneyCurrency(args.currency)) return { fee: 0, net: args.gross, steps: [] };
+  return {
+    fee, net,
+    steps: [{
+      books: [
+        { kind: 'fee', fee, currency: args.currency, sellerGhii: args.sellerGhii, buyerRef: args.buyerRef, trackingCode: args.trackingCode, handler: args.handler },
+        // Then whoever the seller owes a share of their cut. Out of the seller's NET, never added to
+        // what the buyer paid — identical to both the checkout and the contracted paths.
+        {
+          kind: 'shares', sellerGhii: args.sellerGhii, ext: args.ext, action: args.action, net, currency: args.currency,
+          trackingCode: `a2a_${args.trackingCode}_${args.action}`, buyerRef: args.buyerRef, reference: args.reference,
+        },
+      ],
+      tolerant: { message: SESSIONLESS_BOOKING_FAILED, context: { seller: args.sellerGhii, trackingCode: args.trackingCode } },
+    }],
+  };
 }
 
 /** The money handler that completes a session with a money total: the one named, settling its currency. */
@@ -427,54 +446,6 @@ export async function cancelSession(
  * rethrows, leaving the session open for retry. Payout/fee legs run after fulfillment and are
  * best-effort ordered — the buyer's money moves exactly once.
  */
-/**
- * Book the seller's beneficiary shares for one settled checkout line.
- *
- * THE SAME SPLIT AS A CONTRACTED CALL. A buyer can reach a priced capability two ways: by holding an
- * EXCHANGE contract, or by paying for it once through a checkout. Both are sales, both hand the
- * seller their cut, and a split declared on the coordinate has to apply to both — otherwise a
- * provider who promised a company a share of every lookup quietly stops paying it the moment
- * somebody buys the same lookup through the other route.
- *
- * `net` is what the seller actually received, after the platform fee, so the share is a percentage
- * of their real revenue rather than of the buyer's gross. Money only: morsels are the pacing meter
- * and are never shared.
- *
- * Never throws: the money has already moved and the buyer already has their answer. A bookkeeping
- * failure is logged, not turned into a failed purchase.
- */
-async function bookCheckoutBeneficiaries(
-  ctx: PaymentContext,
-  args: {
-    sellable: Sellable; session: CheckoutSessionRecord; net: number;
-    trackingCode: string; designations: DynamicDesignation[];
-  },
-): Promise<void> {
-  if (args.net <= 0) return;
-  // MONEY ONLY. Morsels pace usage; they are not revenue and a fraction of them is not a share, so
-  // a morsel-priced checkout line books nothing here, exactly as a morsel-priced contract does not.
-  if (!isMoneyCurrency(args.session.currency)) return;
-  const coord = meteredCoordinateOf(args.sellable);
-  if (!coord || args.sellable.sharesAtUse) return;   // split when the paid call names its payees
-  try {
-    const split = await readSplit(ctx.storage, args.sellable.sellerGhii, coord.ext, coord.action);
-    const result = computeSplit(args.net, split, args.designations);
-    if (!result.lines.length) return;
-    await bookBeneficiaryShares(ctx.storage, {
-      lines: result.lines,
-      trackingCode: `chk_${args.trackingCode}_${coord.action}`,
-      fromGhii: args.sellable.sellerGhii,
-      currency: args.session.currency,
-      buyerGhii: args.session.buyerGhii,
-      reference: `checkout:${args.session.id}:${coord.ext}:${coord.action}`,
-    });
-  } catch (err) {
-    logger.error('[commerce] checkout beneficiary accrual failed; the seller keeps the whole cut for this line', {
-      session: args.session.id, seller: args.sellable.sellerGhii, error: String(err),
-    });
-  }
-}
-
 type CompletingCaller = { sub?: string; roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
 
 /**
@@ -694,7 +665,8 @@ async function completeSessionInner(
   }
 
   // 3) Payouts: the sellable's custom distribution (EE commission splits) or the default
-  //    seller payout. 4) Then the fee leg (operator | burn).
+  //    seller payout. 4) Then the bookings, in one transaction with the completion write below.
+  const bookings: BookingStep[] = [];
   if (handler && session.total > 0) {
     for (let i = 0; i < lines.length; i++) {
       const { item, gross, fee, net } = lines[i]!;
@@ -707,20 +679,21 @@ async function completeSessionInner(
       }
       // The seller has their cut; now whoever they owe a share of it. Out of the seller's net,
       // never added to what the buyer paid — identical to the contracted path.
-      await bookCheckoutBeneficiaries(ctx, {
+      const shares = checkoutBeneficiaryStep({
         sellable, session, net, trackingCode: collected.trackingCode,
         designations: lineDesignations[i] ?? [],
       });
+      if (shares) bookings.push(shares);
     }
     // Fee leg. No ledger movement — record the operator's platform-fee entry as a receivable, so the
     // cut is ACCOUNTED and shows in the dashboard as OWED. No rail collects it here: the seller charges
     // on their own account and the fee is invoiced out of band. (The pacing's operator share moved on
-    // the morsel ledger above, in chargePacing.)
+    // the morsel ledger above, in chargePacing.) Strict, as it always was: a failure fails the completion.
     if (totalFee > 0) {
-      await recordMoneyPlatformFee(storage, config, {
-        fee: totalFee, currency: session.currency, sellerGhii: session.sellerGhii,
-        buyerGhii: session.buyerGhii, trackingCode: collected.trackingCode, handler: handler.id,
-      });
+      bookings.push({ books: [{
+        kind: 'fee', fee: totalFee, currency: session.currency, sellerGhii: session.sellerGhii,
+        buyerRef: session.buyerGhii, trackingCode: collected.trackingCode, handler: handler.id,
+      }] });
     }
   }
 
@@ -734,12 +707,20 @@ async function completeSessionInner(
     fulfillment: { taskIds, ...(results.length ? { results } : {}) },
     updatedAt: new Date().toISOString(),
   };
-  await putRecord(storage, session.buyerGhii, key, completed);
-  // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data). It
-  // carries the seller's view of each result, never a buyer's one-time token (secrets audit
-  // 2026-10-09, S-3).
-  await putRecord(storage, session.sellerGhii, orderKey(session.id), {
-    ...completed, fulfillment: { taskIds, ...(sellerResults.length ? { results: sellerResults } : {}) },
+  // The completion write and the sale's bookings commit together (commerce/settle-purchase.ts): a
+  // completion that cannot be written leaves no fee and no share booked.
+  await settlePurchase(storage, config, {
+    from: 'paid',
+    deliver: async () => {
+      await putRecord(storage, session.buyerGhii, key, completed);
+      // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data). It
+      // carries the seller's view of each result, never a buyer's one-time token (secrets audit
+      // 2026-10-09, S-3).
+      await putRecord(storage, session.sellerGhii, orderKey(session.id), {
+        ...completed, fulfillment: { taskIds, ...(sellerResults.length ? { results: sellerResults } : {}) },
+      });
+    },
+    steps: bookings,
   });
   // Counted for the seller under the channel it came from. Without an attribution (the buyer opted
   // out, or the door gave nothing to go on) it counts as `none`: in the totals, under no channel.

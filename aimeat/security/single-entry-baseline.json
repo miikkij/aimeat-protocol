@@ -663,6 +663,12 @@
         "count": 1,
         "why": "The configuration display shows the password masked, or says it is generated at start; nothing is compared."
       }
+    },
+    "sale-booking": {
+      "src/commerce/settle-purchase.ts": {
+        "count": 2,
+        "why": "The one booking step: the fee record and the beneficiary shares, inside the purchase's transaction."
+      }
     }
   }
 }
