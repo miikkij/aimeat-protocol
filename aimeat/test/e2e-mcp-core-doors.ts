@@ -33,6 +33,8 @@
  *   - Phase 6: MCP resources — the memory mapper in resources/list, the storage blob in resources/read
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-core-doors
  * @version-history
+ *   2026-11-04 — 26b: aimeat_storage_upload refuses visibility 'group' with no group_id, inline and
+ *     presigned. Red before the change: it asserted the hole the change closes.
  *   2026-10-17 — 3: the work and write tools miss only one-press words, so a memory:read agent is
  *     listed them (permission ask, mcp/permission-ask-gate.ts) and each call is refused SCOPE_DENIED
  *     with the allow address.
@@ -564,6 +566,20 @@ await test('26. A file uploaded with aimeat_storage_upload comes back as a blob 
     assert(typeof contents.blob === 'string', 'a storage resource answers with a blob, never text');
     assert(Buffer.from(contents.blob, 'base64').toString('utf8') === payload,
         `the bytes did not survive the round trip: ${contents.blob.slice(0, 40)}`);
+});
+
+await test('26b. aimeat_storage_upload refuses visibility group with no group_id, inline and presigned, and says what to send', async () => {
+    const key = `cd-nogroup-${STAMP}.html`;
+    const inline = await callTool(reqSession, 'aimeat_storage_upload', {
+        key, data_base64: Buffer.from('<p>x</p>', 'utf8').toString('base64'), mime_type: 'text/html', visibility: 'group',
+    });
+    assert(inline.isError, `an inline group file with no group was stored: ${inline.text}`);
+    assert(inline.text.includes('group_id'), `the refusal must say what to send: ${inline.text}`);
+    const presigned = await callTool(reqSession, 'aimeat_storage_upload', { key, mime_type: 'text/html', visibility: 'group' });
+    assert(presigned.isError, `a URL was minted for a group file with no group: ${presigned.text}`);
+    assert(presigned.text.includes('group_id'), `the refusal must say what to send: ${presigned.text}`);
+    const read = await mcpRpc(reqSession, 'resources/read', { uri: `aimeat://storage/${encodeURIComponent(key)}` });
+    assert(read?.result?.contents?.[0]?.text === 'Not found', 'the refused file exists');
 });
 
 await test('27. A storage key the caller does not hold answers "Not found" rather than another namespace', async () => {

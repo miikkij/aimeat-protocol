@@ -11,6 +11,8 @@
  *   v1.14.0 -- 2026-11-01 -- The presigned mint and DELETE of a company's page key ask what the company
  *     page route asks, as the inline write does through the shared write (services/storage-page-keys.ts;
  *     secaudit2026oct31w2 round 11).
+ *   v1.14.0 -- 2026-11-04 -- POST refuses visibility 'group' with no group_id, inline and presigned, and
+ *     PATCH .../visibility refuses 'group' on a file that has no group (storage-file-write.ts).
  *   v1.13.0 -- 2026-10-30 -- POST takes `store`, the store the writer names for the bytes (inline and
  *     presigned), and the upload answer and the list say each file's `store`
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -72,7 +74,7 @@ import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import {
-  removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
+  removeStorageFile, appOwnedKeyRefusal, groupBindingRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
 } from '../../services/storage-file-write.js';
 import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta } from '../../services/storage-page-keys.js';
 import { mintPublishCarry, closedFileLevel, fileCapRefusal } from '../../services/storage-file-publish.js';
@@ -134,6 +136,12 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const wsRefStr = normalizeWorkspaceRefs(workspace_refs, workspaceRef);
     if (visibility === 'workspace' && !wsRefStr) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspaceRef) as one or more "<organismId>/<workspaceId>"'));
+      return;
+    }
+    // Asked here because the presigned branch below mints its own token. The inline branch asks again at the shared write.
+    const unbound = groupBindingRefusal(visibility, group_id);
+    if (unbound) {
+      res.status(unbound.status).json(error(config.nodeId, unbound.code, unbound.message));
       return;
     }
     // How the bytes were made: the same statement POST /v1/storage takes, decided by the shared write.

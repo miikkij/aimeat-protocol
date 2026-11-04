@@ -20,6 +20,11 @@
  *     beside the ones it has; 'members', 'group', 'organism:*' and 'public' stay as they are, because
  *     rebinding them would take readers away. A document's embedded images follow the same two rules
  *     through bindFileToWorkspace (Jouni, 2026-10-30: "korjaa samalla tavalla kuin liitteet").
+ *     One 'group' file does become 'workspace': a stored one with no group id, which no group reads
+ *     (consent.ts answers missing_group_id). Its readers are the ones a private file has, at most, and
+ *     a key-space share still admits its reader after the binding, so nobody is taken away. No upload
+ *     path creates such a file any more (storage-file-write.ts groupBindingRefusal); this opens the
+ *     ones already stored when their writer links them.
  *   - After the write. The callers call this once every refusal has passed and the value has landed,
  *     the same order doc-images.ts scopeDocImagesToWorkspace keeps (refuse before you write).
  * @structure
@@ -30,6 +35,8 @@
  *   import { scopeRecordFilesToWorkspace } from '../services/record-files.js';
  *   await scopeRecordFilesToWorkspace(storage, value, { principal, ownerName, ownerGhii }, `${orgId}/${ws}`);
  * @version-history
+ *   v1.2.0 — 2026-11-04 — bindFileToWorkspace opens a stored group file with no group id, under the
+ *     ruling of 2026-10-30 quoted above.
  *   v1.1.0 — 2026-10-30 — bindFileToWorkspace: the one-file rule, which doc-images.ts now uses too.
  *   v1.0.0 — 2026-10-30 — Initial (wish-ty-tilan-tietueeseen-liitetty-yksityinen-tiedosto-aukeaa-ty-).
  */
@@ -109,7 +116,7 @@ export async function bindFileToWorkspace(
       const current = (file.workspaceRef ?? '').split(/\s+/).filter(Boolean);
       if (current.includes(workspaceRef)) return;
       merged = normalizeWorkspaceRefs([...current, workspaceRef], undefined);
-    } else if (WIDENABLE.has(file.visibility)) {
+    } else if (WIDENABLE.has(file.visibility) || (file.visibility === 'group' && !file.groupId)) {
       merged = workspaceRef;
     } else {
       return;

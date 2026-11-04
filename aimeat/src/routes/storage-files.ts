@@ -413,7 +413,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
 
         // Every visibility the upload takes (2026-10-17), as PATCH /v1/memory/files/{key}/visibility
         // does: 'workspace' (re)binds to one or more "<org>/<ws>", 'organism:<id>' names an organism
-        // the file owner's account is an active member of. 'group' keeps the group the file has.
+        // the file owner's account is an active member of. 'group' keeps the group the file has, and
+        // the shared change refuses it on a file that has none.
         if (!isStoredVisibility(visibility)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
                 `visibility must be one of: ${STORED_VISIBILITY_WORDS.join(', ')}, or "organism:<organism id>"`));

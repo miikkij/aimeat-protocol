@@ -6,6 +6,9 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   2026-11-04 — Tests 40e-40k: a group file with no group id is refused on every upload route and on
+ *     both visibility routes, and a file that has a group goes private and back with it. 40e-40j are
+ *     red before the change: they asserted the hole it closes (the file landed and opened to nobody).
  *   2026-10-31 — Test 67 asserts the refusal of a download URL with no version (401 TOKEN_INVALID,
  *     asking for a new URL): the transition it held open ended, a behaviour change Jouni approved
  *     (secaudit 2026-10-31 inv-18). A URL made now still stops at a re-upload.
@@ -958,6 +961,100 @@ await test('40. Non-member (agent-D) downloads the group file → 403, denial is
     assert(aStatus === 200, `audit status ${aStatus}: ${JSON.stringify(aBody)}`);
     const found = (aBody.data?.entries as any[]).some(e => e.memory_key === `storage:${groupFileKey}` && e.allowed === false);
     assert(found, `no denial audit entry for storage:${groupFileKey}`);
+});
+
+// ── A group file needs a group ──
+//
+// A file stored at visibility 'group' with no group id opens to nobody (consent.ts answers
+// missing_group_id), and the uploader was told nothing. Every upload route and the visibility change
+// refuse it now, and nothing lands.
+const noGroupKey = `no-group-${Date.now()}`;
+const agentAAuth = () => ({ Authorization: `Bearer ${agentAToken}` });
+const assertNoGroupRefusal = (status: number, body: any) => {
+    assert(status === 400, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'INVALID_INPUT', `code: ${JSON.stringify(body.error)}`);
+    assert(String(body.error?.message).includes('group_id'), `the refusal must say what to send: ${body.error?.message}`);
+};
+const assertNotStored = async (key: string) => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(key)}`, { method: 'HEAD', headers: agentAAuth() });
+    assert(res.status === 404, `the refused file exists: ${res.status}`);
+};
+
+await test('40e. POST /v1/storage inline, group with no group_id → 400, nothing stored', async () => {
+    const { status, body } = await json('/v1/storage', {
+        method: 'POST', headers: agentAAuth(),
+        body: JSON.stringify({ key: noGroupKey, data: testContentB64, mime_type: 'text/plain', visibility: 'group' }),
+    });
+    assertNoGroupRefusal(status, body);
+    await assertNotStored(noGroupKey);
+});
+
+await test('40f. POST /v1/storage presigned, group with no group_id → 400, no URL', async () => {
+    const { status, body } = await json('/v1/storage', {
+        method: 'POST', headers: agentAAuth(),
+        body: JSON.stringify({ key: noGroupKey, mode: 'presigned', mime_type: 'text/plain', visibility: 'group' }),
+    });
+    assertNoGroupRefusal(status, body);
+    assert(!body.data?.upload_url, 'a URL was minted');
+});
+
+await test('40g. POST /v1/storage raw body, ?visibility=group → 400, nothing stored', async () => {
+    const res = await rawFetch(`/v1/storage?key=${encodeURIComponent(noGroupKey)}&visibility=group`, {
+        method: 'POST', headers: { ...agentAAuth(), 'Content-Type': 'text/plain' }, body: 'raw bytes',
+    });
+    assertNoGroupRefusal(res.status, await res.json());
+    await assertNotStored(noGroupKey);
+});
+
+await test('40h. POST /v1/storage/upload/init, group with no group_id → 400, no session', async () => {
+    const { status, body } = await json('/v1/storage/upload/init', {
+        method: 'POST', headers: agentAAuth(),
+        body: JSON.stringify({ key: noGroupKey, mime_type: 'text/plain', visibility: 'group', chunk_size: 1024, total_chunks: 1 }),
+    });
+    assertNoGroupRefusal(status, body);
+    assert(!body.data?.upload_id, 'an upload session was opened');
+});
+
+await test('40i. POST /v1/memory/files inline and presigned, group with no group_id → 400', async () => {
+    const inline = await json('/v1/memory/files', {
+        method: 'POST', headers: agentAAuth(),
+        body: JSON.stringify({ key: noGroupKey, content: testContentB64, mime_type: 'text/plain', visibility: 'group' }),
+    });
+    assertNoGroupRefusal(inline.status, inline.body);
+    await assertNotStored(noGroupKey);
+    const presigned = await json('/v1/memory/files', {
+        method: 'POST', headers: agentAAuth(),
+        body: JSON.stringify({ key: noGroupKey, mode: 'presigned', mime_type: 'text/plain', visibility: 'group' }),
+    });
+    assertNoGroupRefusal(presigned.status, presigned.body);
+    assert(!presigned.body.data?.upload_url, 'a URL was minted');
+});
+
+await test('40j. Both visibility routes refuse group on a file that has no group, and the file stays as it was', async () => {
+    const key = `no-group-patch-${Date.now()}`;
+    const up = await json('/v1/storage', {
+        method: 'POST', headers: agentAAuth(),
+        body: JSON.stringify({ key, data: testContentB64, mime_type: 'text/plain', visibility: 'private' }),
+    });
+    assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body)}`);
+    for (const path of [`/v1/storage/${encodeURIComponent(key)}/visibility`, `/v1/memory/files/${encodeURIComponent(key)}/visibility`]) {
+        const { status, body } = await json(path, { method: 'PATCH', headers: agentAAuth(), body: JSON.stringify({ visibility: 'group' }) });
+        assertNoGroupRefusal(status, body);
+    }
+    const head = await rawFetch(`/v1/storage/${encodeURIComponent(key)}`, { method: 'HEAD', headers: agentAAuth() });
+    assert(head.headers.get('x-aimeat-visibility') === 'private', `visibility: ${head.headers.get('x-aimeat-visibility')}`);
+});
+
+await test('40k. A file with a group goes private and back with its group, and the member reads it again', async () => {
+    const path = `/v1/storage/${encodeURIComponent(groupFileKey)}/visibility`;
+    const off = await json(path, { method: 'PATCH', headers: agentAAuth(), body: JSON.stringify({ visibility: 'private' }) });
+    assert(off.status === 200, `to private ${off.status}: ${JSON.stringify(off.body)}`);
+    const back = await json(path, { method: 'PATCH', headers: agentAAuth(), body: JSON.stringify({ visibility: 'group' }) });
+    assert(back.status === 200, `back to group ${back.status}: ${JSON.stringify(back.body)}`);
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(groupFileKey)}`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(res.status === 200, `member read ${res.status}`);
 });
 
 // ── The fourth tier, which nothing in the corpus had ever uploaded ──
