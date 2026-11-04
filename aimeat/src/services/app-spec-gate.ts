@@ -28,6 +28,7 @@
  *   import { evaluateSpecCheck } from './app-spec-gate.js';
  *   const specCheck = evaluateSpecCheck(config, { specToken, specAck });
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.2.0 — 2026-08-27 — Two tracks, two tokens (TARGET-074): the Atelier spec's digest
  *     (`atelier-…`, /v1/prompts/build-app-atelier) satisfies the gate exactly as the Classic one
  *     does, with an answer that names the track it proves. Non-ok answers stay Classic-oriented —
@@ -43,10 +44,7 @@ import type { AimeatConfig } from '../config.js';
 import { buildAppSpecToken } from './build-app-prompt.js';
 import { buildAtelierSpecToken } from './build-atelier-prompt.js';
 
-/** The skill that teaches the whole paved path, named in every non-ok answer. */
-export const APP_BUILDER_SKILL_REF = 'node:aimeat-app-builder';
-
-/** The Atelier track's counterpart (TARGET-074). */
+/** The skill that teaches the whole paved path for a new app, named in every non-ok answer. */
 export const ATELIER_BUILDER_SKILL_REF = 'node:aimeat-app-builder-atelier';
 
 /** The one value the owner may send to publish without the token on purpose. */
@@ -80,7 +78,7 @@ export interface SpecCheckInput {
 export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): AppSpecCheck {
   const expected = buildAppSpecToken(config);
   const given = typeof input.specToken === 'string' ? input.specToken.trim() : '';
-  const specUrl = `${config.baseUrl.replace(/\/+$/, '')}/v1/prompts/build-app`;
+  const specUrl = `${config.baseUrl.replace(/\/+$/, '')}/v1/prompts/build-app-atelier`;
 
   if (given && given === buildAtelierSpecToken(config)) {
     return {
@@ -114,7 +112,7 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
     return {
       status: 'skipped',
       message: 'The owner chose to publish without the build spec. Recorded on the app\'s change log.',
-      skill: APP_BUILDER_SKILL_REF,
+      skill: ATELIER_BUILDER_SKILL_REF,
       spec_url: specUrl,
     };
   }
@@ -122,21 +120,21 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
   if (given) {
     return {
       status: 'stale',
-      message: 'The build spec has changed since the token you carried. Fetch GET /v1/prompts/build-app '
-        + '(or /v1/prompts/build-app-atelier on the Atelier track) and pass spec_token. Read what '
+      message: 'The build spec has changed since the token you carried. Fetch GET /v1/prompts/build-app-atelier '
+        + '(or /v1/prompts/build-app for an app already on the Classic track) and pass spec_token. Read what '
         + 'changed before the next publish — the parts you did not read are the parts that bite.',
-      skill: APP_BUILDER_SKILL_REF,
+      skill: ATELIER_BUILDER_SKILL_REF,
       spec_url: specUrl,
     };
   }
 
   return {
     status: 'missing',
-    message: 'Fetch GET /v1/prompts/build-app and pass spec_token — or, on the Atelier track, '
-      + 'GET /v1/prompts/build-app-atelier. The spec names the library URLs that exist, the theme '
+    message: 'Fetch GET /v1/prompts/build-app-atelier and pass spec_token — or, for an app already on the Classic track, '
+      + 'GET /v1/prompts/build-app. The spec names the library URLs that exist, the theme '
       + 'tokens, and how to read data your agents wrote — three things a published app gets wrong '
       + 'when it is modelled on an older template instead.',
-    skill: APP_BUILDER_SKILL_REF,
+    skill: ATELIER_BUILDER_SKILL_REF,
     spec_url: specUrl,
   };
 }

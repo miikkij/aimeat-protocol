@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-25 — intake-form-undeclared: the forms a page submits to are named in <meta name="aimeat-intake"> (services/app-intake-forms.ts).
  *   2026-10-19 — no-max-tokens: a text job runs uncapped and its record says truncated (wish
  *     ai-jobs-run-uncapped-and-report-a-cut-answer). schedule-next-run-needs-the-year: a failed
@@ -105,7 +106,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'invented-lib-urls',
     title: 'Invented script/style URLs 404 and break the app',
     symptom: 'The app references a plausible-looking node URL (e.g. /i18n/translations.js, /components/x.js) that does not exist. Publishing REFUSES a node path that answers 404 (APP_ARTIFACT_BROKEN); a relative path or an outside host only gets a warning, and then the page half-loads in the browser.',
-    fix: 'Only load URLs the build spec lists. Fetch GET /v1/prompts/build-app first and use exactly the library and script URLs it names, and GET /v1/library-packs for everything the node vendors. Never guess one.',
+    fix: 'Only load URLs the build spec lists. Fetch the build spec first (GET /v1/prompts/build-app-atelier, or /v1/prompts/build-app for an app already on the Classic track) and use exactly the library and script URLs it names, and GET /v1/library-packs for everything the node vendors. Never guess one.',
     appliesTo: ['app', 'publish'],
     severity: 'critical',
     source: 'curated',

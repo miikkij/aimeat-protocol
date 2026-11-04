@@ -13,8 +13,9 @@ verification skill before editing platform UI.
 
 ## A hosted application
 
-Read the target node's `GET /v1/prompts/build-app` first. It is the current build
-specification. Use `GET /v1/app-templates` or the node's app-building tools to
+Read the target node's `GET /v1/prompts/build-app-atelier` first. It is the build
+specification for a new app. `GET /v1/prompts/build-app` is the Classic track, for an
+app already on it or when the owner asks for it. Use `GET /v1/app-templates` or the node's app-building tools to
 select a supported starter.
 
 Hosted apps have their own origins and owner-approved grants. Use the served

@@ -18,6 +18,7 @@
  *   - GET /AGENTS.md, /agents.md — orientation for a coding agent meeting this node
  * @usage app.use(agentDocsRouter(config));
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.2.0 — 2026-09-18 — AGENTS.md: Installation is the shared first steps (services/first-steps.ts),
  *     MCP first. It led with device authorization and gave MCP one closing paragraph. The response
  *     envelope is described as the node sends it (`ok`, `hints.next_actions`); it said `success`
@@ -72,7 +73,8 @@ ${pages}
 - [OpenAPI contract](${b}/v1/spec): the canonical API contract this node is held to
 - [API documentation](${b}/v1/docs): browsable endpoint reference
 - [Agent registration](${b}/auth.md): RFC 8628 device flow, owner-approved
-- [App building prompt](${b}/v1/prompts/build-app): the canonical spec for single-file AIMEAT apps
+- [App building spec](${b}/v1/prompts/build-app-atelier): the canonical spec for a new app, the Atelier track
+- [Classic app spec](${b}/v1/prompts/build-app): for an app already on the Classic track, or when the owner asks for it
 - [App templates](${b}/v1/app-templates): starter skeletons
 - [App-build pitfalls](${b}/v1/appdev/pitfalls): the curated registry of what breaks app builds
 - [Glossary](${b}/v1/glossary.md): the vocabulary, in markdown

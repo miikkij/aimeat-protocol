@@ -6,6 +6,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.1.0 — 2026-09-18 — platform-app-builder and platform-api are short pointers now. Both taught
  *     a contract that does not exist: they asked the person for their private key, read a field
  *     `owner_key` that POST /v1/owners never returned, and registered an agent with a header no
@@ -26,22 +27,22 @@ export const PLATFORM_SEEDS: PromptSeedEntry[] = [
     id: 'platform-app-builder',
     group: 'platform',
     name: 'Application Builder Full',
-    description: 'Starts an app build: sends the AI to the one maintained build specification at /v1/prompts/build-app and says how the finished app comes back',
+    description: 'Starts an app build: sends the AI to the build specification for a new app at /v1/prompts/build-app-atelier and says how the finished app comes back',
     content: `# Build an app on AIMEAT
 
 You are helping a person build a web application that runs on their AIMEAT at {{node_url}} (node id {{node_id}}).
 
-The complete, current build specification is one document. Fetch it and follow it:
+The complete, current build specification for a new app is the Atelier track's. Fetch it and follow it:
 
-  GET {{node_url}}/v1/prompts/build-app
+  GET {{node_url}}/v1/prompts/build-app-atelier
 
 It carries the interview, the data and sign-in rules, the client libraries, the design rules and the check an app passes before it is published. Read it before you ask the person anything, because it tells you what to ask.
 
-The document covers both ways to deliver the app:
-- You are connected to this AIMEAT over MCP: publish with aimeat_app_publish and hand the person the app's address.
-- You are not connected: produce one self-contained HTML file. The document's last section tells the person how to bring it back.
+How the app is delivered:
+- You are connected to this AIMEAT over MCP: read the specification in parts with aimeat_handbook_get { tier: "build-app-atelier" }, publish with aimeat_app_publish and hand the person the app's address.
+- You cannot connect: fetch GET {{node_url}}/v1/prompts/build-app instead, the Classic specification, and produce one self-contained HTML file. Its last section tells the person how to bring it back.
 
-Sign-in is the person's own, in the browser, through the aimeat-auth library the document describes. An app needs no key and no password from the person, so ask for neither.
+Sign-in is the person's own, in the browser, as the document describes. An app needs no key and no password from the person, so ask for neither.
 
 Start by fetching the document. Then ask the person what they want to build.`,
     variables: ['node_url', 'node_id'],

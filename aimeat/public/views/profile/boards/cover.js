@@ -11,6 +11,7 @@
  * @structure renderBoardsView · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.15.2 -- 2026-10-18 -- The "{n} public boards" tag counts every public board, the person's own included; it counted only the public boards of others.
  *   v1.15.1 -- 2026-10-11 -- The app guide link opens the node's app build specification (/v1/prompts/build-app); it opened /docs/app-developer-ai-guide.md, which no route serves.
  *   v1.15.0 -- 2026-10-02 -- The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
@@ -204,7 +205,7 @@ if (AIMEAT.social.signedIn()) await AIMEAT.social.subscribe(b.id, { filters: { c
 
 function secApp(ctx) {
   const copyExample = () => ctx.copy(SDK_EXAMPLE, c('copied'));
-  const openGuide = () => window.open('/v1/prompts/build-app?format=txt', '_blank', 'noopener');
+  const openGuide = () => window.open('/v1/prompts/build-app-atelier?format=txt', '_blank', 'noopener');
   const copyAgent = () => ctx.copy(ctx.agentPrompt(), c('copied'));
   const side = html`
     <${Stack} gap="medium">

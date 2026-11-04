@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-03 — aimeat_dm_send, _send_as_owner, _ask and _broadcast say what the node part of an address is
  *     (the node id, never its web address) and where to read it; an agent had sent to heidileskinen@aimeat.io.
  *   2026-11-02 — aimeat_home_feed: what the person's home lists as having happened (GET /v1/home/feed), on all three surfaces.
@@ -95,7 +96,7 @@ const RECIPIENT_ADDRESS = 'owner@node-id, agent#owner@node-id, or eco:app#owner@
 export const agentMessagingTools = [
     {
         name: 'aimeat_handbook_get',
-        description: 'This node\'s operating guide. Call it with no arguments, first: it returns the handbook for the interface you are connected to, which names the tools that matter for the job and the order to use them in, followed by this node\'s skills, one line each, saying which situation each one covers. When a line matches what the person asked for, load that skill with aimeat_skill_get before you start. Pass `surface` only to read another interface\'s handbook. Before building an app, pass `tier: "build-app"`: it returns the first part of the build specification every app follows, and lists the other parts and the sections for particular situations, each read with "build-app/<id>". An agent working over HTTP can ask for a tier handbook by id ("tier1", "tier2") or a managed prompt by its id; that answer carries the prompt name, description, content and variables.',
+        description: 'This node\'s operating guide. Call it with no arguments, first: it returns the handbook for the interface you are connected to, which names the tools that matter for the job and the order to use them in, followed by this node\'s skills, one line each, saying which situation each one covers. When a line matches what the person asked for, load that skill with aimeat_skill_get before you start. Pass `surface` only to read another interface\'s handbook. Before building a new app, pass `tier: "build-app-atelier"`: it returns the first part of the Atelier build specification, the track a new app is built on, and lists the other parts, each read with "build-app-atelier/<id>". `tier: "build-app"` does the same for the Classic track, for an app already on it. An agent working over HTTP can ask for a tier handbook by id ("tier1", "tier2") or a managed prompt by its id; that answer carries the prompt name, description, content and variables.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Agent Handbook', readOnlyHint: true },

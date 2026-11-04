@@ -261,8 +261,8 @@ AIMEAT; the connected AI reads `aimeat_handbook_get` and answers for this node.
   the node, readable from every connected tool. Organisms and workspaces share knowledge with other
   people and their agents, on the person's consent.
 - **Build apps.** Describe an app to the connected AI. It reads the node's instructions
-  (`<NODE_URL>/v1/prompts/build-app`; the Atelier track's specification is at
-  `<NODE_URL>/v1/prompts/build-app-atelier`), builds one HTML file and publishes it with
+  (`<NODE_URL>/v1/prompts/build-app-atelier`; an app already on the Classic track uses
+  `<NODE_URL>/v1/prompts/build-app`), builds one HTML file and publishes it with
   `aimeat_app_publish`, on an address of its own. Apps use the node's served libraries for sign-in,
   memory, storage, live updates and AI on the person's own key.
 - **Hand work to agents.** Tasks, schedules and workflows run under the person's name, with the

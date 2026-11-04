@@ -5,6 +5,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-01 — AIMEAT.iam for every member, aimeat-parties for the signup and sign-in only; party_stop and party_resume (WP9d).
  *   2026-11-01 — Users with no AIMEAT account: aimeat-parties.js and the party actions of aimeat_app_manage (plan D4).
  *   2026-10-17 — A package install renames its apps: link a sibling from your own name and the app
@@ -236,11 +237,11 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
    name. A track is not changed in the middle of a build. Unless you are Claude Opus or Claude
    Fable, say once, before you build, that apps built with Claude Opus or Claude Fable turn out
    noticeably better, and that the person can switch now or go on with you.
-1. RESEARCH: load the \`node:aimeat-app-builder\` skill (\`aimeat_skill_get\`), call
-   \`aimeat_appdev_overview\`, and on the Classic track fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law). Over MCP the same spec
+1. RESEARCH: load the \`node:aimeat-app-builder-atelier\` skill (\`aimeat_skill_get\`), call
+   \`aimeat_appdev_overview\`, and on the Classic track load \`node:aimeat-app-builder\` and fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law). Over MCP the same spec
    comes in parts: \`aimeat_handbook_get { tier: "build-app" }\` is the first and lists the rest.
-2. FRAME: tier (T1 pure client / T2 +cortex / T3 +extension), packs, start point (fork a prior
-   app / template proposal / shell), own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel),
+2. FRAME: a new app forks a genre; a Classic app keeps its tier (T1 pure client / T2 +cortex /
+   T3 +extension). Packs, start point (fork a prior app / template proposal / genre), own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel),
    decided NOW. A role belongs to the PERSON: a member's agents inherit it.
 3. PROPOSE the frame to the user in 3-5 lines; adjust.
 4. BUILD flexibly within the frame; verify locally; publish (presigned upload > ~1 KB).

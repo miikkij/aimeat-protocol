@@ -16,6 +16,7 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v2.0.4 — 2026-11-01 — Stage 3 stays open for the node's own chat and the basic agents until an AI
  *     of the person's from outside connects (journey-state.ts isOutsideMcpAgent).
  *   v2.0.3 — 2026-10-31 — Stage 6 is done when an agent the person made has finished a task other
@@ -209,7 +210,7 @@ data it handles, whether it brings an agent, and what it needs from them: \`aime
 returns all of that as its \`sheet\`, with the settings the install asks. The agents a package brings
 wait as proposals among their open items after the install; nothing runs before they approve one.
 Read an app's bound skills (\`aimeat_skill_list\` with \`binding\`) before you drive it. A small app of
-their own is the skill \`aimeat-app-builder\`. Buying happens on the page. The stage is done when
+their own is the skill \`aimeat-app-builder-atelier\`. Buying happens on the page. The stage is done when
 they have used one app once. Experience Center: layer L4, Apps in depth.
 
 ### 6. Agents that work while they are away

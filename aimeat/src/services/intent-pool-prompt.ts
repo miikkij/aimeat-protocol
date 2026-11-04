@@ -16,6 +16,7 @@
  * @structure buildIntentPoolPrompt(config)
  * @usage GET /v1/prompts/intent-pool
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-08-09 — Initial (intent pool, phase 4).
  */
 import type { AimeatConfig } from '../config.js';
@@ -44,7 +45,7 @@ record yourself — you do not have permission to, and the refusal you would get
 
 A pooled item often names a node-served prompt rather than carrying its text:
 
-    prompt_ref: "build-app"   →   GET ${url}/v1/prompts/build-app
+    prompt_ref: "build-app-atelier"   →   GET ${url}/v1/prompts/build-app-atelier
 
 Fetch it at the moment you do the work. The text is deliberately not stored in the record, so the
 version you get is the current one. If \`prompt_args\` is present, it holds the parameters for that

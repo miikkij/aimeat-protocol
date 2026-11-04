@@ -33,6 +33,7 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-02 -- aimeat-paying-for-the-ai: an ecosystem app's AI is paid from its owner's account (secaudit2026nov02d round 13).
  *   2026-11-01 -- aimeat-paying-for-the-ai: no free model on a node set up for the EU only (ai.region_mode eu-only).
  *   2026-10-27 -- aimeat-paying-for-the-ai: a node-key call is priced by everything it sends, a model
@@ -242,7 +243,7 @@ build step, no template catalogue, no draft, no research phase.
 |---|---|---|
 | Their own page, portfolio, "my site", welcome page | this skill | \`aimeat_portfolio_publish\` |
 | Their company's page | this skill | \`aimeat_company_portfolio_publish\` |
-| Something with state, users, data, or a game | the app builder | load \`aimeat-app-builder\` |
+| Something with state, users, data, or a game | the app builder | load \`aimeat-app-builder-atelier\` |
 
 **The failure this table prevents, seen in production.** Somebody asked for "a fancy portfolio page,
 just happy, with some interactivity". The agent loaded \`aimeat-app-builder\`, which correctly told it

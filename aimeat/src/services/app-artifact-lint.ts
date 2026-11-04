@@ -41,6 +41,7 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-31 — Refuses a page that calls AIMEAT.atelier without loading the kit (app-lint-kit-loaded.ts; v28 #13).
  *   2026-10-27 — collectAssetRefs reads the tags with one linear scan (utils/html-tag-scan.ts), not a
  *     `[^>]*` pattern per opener (secaudit2026oct26, collectAssetRefs:unclosed-tag-quadratic-scan).
@@ -592,7 +593,7 @@ async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<A
     `This node answers 404 for ${dead.length === 1 ? 'an asset this app loads' : 'assets this app loads'}: `
     + `${dead.join(', ')}. The app would throw before it drew anything. The SDK libraries live under `
     + '/v1/libs/ (aimeat-auth.js, aimeat-data.js, …) and the vendored packs under /lib/ — take the exact '
-    + 'URLs from GET /v1/prompts/build-app rather than guessing one that looks right.'
+    + 'URLs from the build spec (GET /v1/prompts/build-app-atelier, or /v1/prompts/build-app for an app on the Classic track) rather than guessing one that looks right.'
     + (dead.some(p => p.startsWith('/v1/cortex/'))
       ? ' A cortex installed under its owner\'s name (`full_name` in the install answer) loads from '
         + '/v1/cortex/<owner>/<name>/libs/<file>; the install answer lists its exact addresses.'

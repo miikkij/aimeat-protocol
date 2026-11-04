@@ -13,7 +13,7 @@
  *
  *   Two rules these prompts hold, both learned the expensive way:
  *   1. The app prompt does NOT restate how to build an AIMEAT app. It tells the chat to fetch
- *      GET /v1/prompts/build-app first, because that spec is node-served and canonical; a copy
+ *      GET /v1/prompts/build-app-atelier first, because that spec is node-served and canonical; a copy
  *      here would drift the moment the real one improves.
  *   2. The details prompt forbids inventing values. A business id or IBAN that "looks right"
  *      ends up on a real invoice and in a real e-invoice, so an unknown field stays empty.
@@ -24,6 +24,7 @@
  * @structure buildSettingsPrompt · buildPortfolioPrompt · buildAppPrompt
  * @usage import { buildSettingsPrompt } from './companies-prompts.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.1.0 — 2026-08-31 — buildCompaniesPrompt: the cover's registry-level prompt (list, register,
  *     fill in), for the person who has not opened one company yet.
  *   v1.0.0 — 2026-08-08 — Initial: settings, portfolio and app prompts for an MCP-capable chat.
@@ -177,7 +178,7 @@ WHAT I KNOW ABOUT THE COMPANY
 ${filled.length ? filled.join('\n') : '  (the details are not filled in yet)'}
 
 HOW TO DO IT
-1. Fetch ${nodeOrigin()}/v1/prompts/build-app and follow it. That is the canonical, node-served
+1. Fetch ${nodeOrigin()}/v1/prompts/build-app-atelier and follow it. That is the canonical, node-served
    spec for building an AIMEAT app — theme variables, the aimeat-scopes meta tag, which libraries
    load from where, and what "done" means. Read it before you write any code; do not work from
    your own recollection of how AIMEAT apps are built.
@@ -193,7 +194,8 @@ HOW TO DO IT
 
 IF YOU DO NOT HAVE THE AIMEAT TOOLS
 You will not see aimeat_app_publish or aimeat_company_front_page in your tool list if this chat
-has no AIMEAT connector. In that case still fetch and follow the build-app spec above, then give
+has no AIMEAT connector. In that case fetch and follow ${nodeOrigin()}/v1/prompts/build-app instead,
+which covers an AI that cannot connect, then give
 me the finished HTML file and I will publish it myself from the Apps tab.`;
 }
 

@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-01 — aimeat_seo_announce says the whole-site notice carries the public data packages' pages (plan doc-mvwxcas3dom3, D1.4).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version`, the display version the
@@ -47,7 +48,7 @@ const imageInputShape = z.object({
 const SPEC_GATE_INPUT = {
     spec_token: {
         type: 'string',
-        description: 'The `spec_token` from GET /v1/prompts/build-app — the digest of the build spec you built against. '
+        description: 'The `spec_token` from GET /v1/prompts/build-app-atelier, or from GET /v1/prompts/build-app for an app on the Classic track — the digest of the build spec you built against. '
             + 'It changes when the spec changes. Omitting it publishes anyway and returns spec_check.status "missing"; '
             + 'an out-of-date one returns "stale". Fetch the spec and pass the token rather than guessing a value: '
             + 'the point is that you read what it currently says.',

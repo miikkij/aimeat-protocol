@@ -11,6 +11,7 @@
  * @structure registerBuildAppAgentPrompt(router, config, storage)
  * @usage registered in routes/prompts.ts, before /v1/prompts/:tier
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.1 — 2026-10-13 — Both `?format=txt` answers go through sendPlainText, which adds
  *     `X-Content-Type-Options: nosniff` to the same content type (code scanning alerts 1731, 1732).
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
@@ -41,7 +42,7 @@ export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig
     // ?part=context: the agent section alone, for a caller that reads the specification in parts
     // (aimeat_handbook_get { tier: "build-app/agent/<name>" } on the connector's two surfaces).
     if (req.query.part === 'context') {
-      const next = 'Next: read the build specification, aimeat_handbook_get { tier: "build-app" }.';
+      const next = 'Next: read the build specification, aimeat_handbook_get { tier: "build-app-atelier" }.';
       if (req.query.format === 'txt') {
         sendPlainText(res, `${ctx.text}\n${next}\n`);
         return;
@@ -49,7 +50,7 @@ export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig
       res.json(success(config.nodeId, {
         id: `build-app/agent/${ctx.agent.name}`, agent: ctx.agent, has_result: ctx.has_result,
         content: `${ctx.text}\n${next}\n`,
-      }, [{ description: 'The build specification, first part', method: 'GET', url: '/v1/prompts/build-app/sections/start' }]));
+      }, [{ description: 'The build specification, first part', method: 'GET', url: '/v1/prompts/build-app-atelier/sections/start' }]));
       return;
     }
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';

@@ -24,6 +24,7 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.12.0 — 2026-10-30 — The structure page's first write carries two or three layouts drawn for the app (proposals).
  *   v1.11.0 — 2026-10-29 — A new app's first message carries its structure page (services/app-structure.ts):
  *     a cold Opus run that read this skill and not the Atelier one never opened it (1 of 3 runs).
@@ -72,7 +73,7 @@ export const APP_BUILDER_SKILL_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-app-builder
-description: Build and publish apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. The paved path for any "build/make/publish an app, game or tool on AIMEAT" request. It says first which build track the app goes on (Atelier for a new app, from a genre), then the Classic road — fetch the canonical build spec first, research what already exists, build a single-file app from a template, verify, publish, and report the live URL. Use whenever an owner asks for an app on the node.
+description: The Classic track's guide to apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. Use it to improve an app that is already Classic, or when the owner asks for Classic by name. For a NEW app, game or tool, load aimeat-app-builder-atelier instead. On Classic it fetches the canonical build spec first, researches what already exists, builds a single-file app from a template, verifies, publishes, and reports the live URL.
 license: MIT
 metadata:
   audience: agent
