@@ -203,6 +203,7 @@ FULL = {
     "toll_morsels": 5,
     "visibility": "public",
     "callable": {"action_id": "research-brief"},
+    "delivers_data": True,
 }
 
 
