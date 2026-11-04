@@ -30,6 +30,8 @@
  * @structure AppPartyCtx · signUp · signIn · verifyLink · partyMe · signOut · appPartyFromRequest · signInWith
  * @usage const out = await signUp(deps, { owner, filename }, body);
  * @version-history
+ *   v1.2.1 — 2026-11-04 — The link mail goes through mail-gate.ts sendMail as sign-in mail (codebase
+ *     analysis 2026-11-03, item B3).
  *   v1.2.0 — 2026-11-02 — secaudit2026nov02d round 13: a pending signup past
  *     consent.app_party_pending_hours no longer counts toward MAX_APP_PARTIES, and the next new signup
  *     drops it (with any roster row the owner gave it).
@@ -44,6 +46,7 @@ import { UNCHANGED } from '../record-cas.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 import { getActiveEmailService } from '../email.js';
+import { sendMail } from '../mail-gate.js';
 import { resolveAppUrls } from '../app-urls.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { logger } from '../../utils/logger.js';
@@ -117,7 +120,10 @@ async function sendLink(deps: Deps, ref: AppRef, ownerGhii: string, appId: strin
         ?? `${deps.config.baseUrl.replace(/\/+$/, '')}/v1/apps/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.filename)}`;
     const url = `${appUrl}${appUrl.includes('?') ? '&' : '?'}aimeat_party_link=${encodeURIComponent(token)}`;
     const m = linkMail(lang, ref.filename.replace(/\.html?$/i, ''), url, purpose === 'signin');
-    try { return await mail.sendRaw(email, m.subject, m.html, m.text); }
+    try {
+        return await sendMail(mail, { kind: 'sign-in', to: email, why: 'The app party\'s own sign-up or sign-in link, to the address the party gave; one mail a minute per party.' },
+            { form: 'html', subject: m.subject, html: m.html, text: m.text }) === 'sent';
+    }
     catch (err) {
         logger.warn('app-parties: the sign-in link mail was not sent', { app: appId, error: String(err) });
         return false;

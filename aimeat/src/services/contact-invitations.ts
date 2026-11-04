@@ -12,6 +12,8 @@
  * @structure ContactInvitationError · createContactInvitation · pendingContactInvitation
  * @usage const { invitation, acceptUrl, emailSent } = await createContactInvitation(storage, config, { inviterName, email, message });
  * @version-history
+ *   v1.1.1 — 2026-11-04 — The invitation mail goes through mail-gate.ts sendMail as a third-party mail
+ *     bounded by the address-lookup count (codebase analysis 2026-11-03, item B3).
  *   v1.1.0 — 2026-09-26 — An invitation counts as an address lookup against the inviter's account
  *     (takeEmailLookup), before the address is read, on every door; a refusal is 429 RATE_LIMITED
  *     with retry_after_sec (secaudit 2026-09, A5-2).
@@ -23,6 +25,7 @@ import type { Storage } from '../storage/interface.js';
 import type { InvitationRecord } from '../storage/repositories/invitation.repository.js';
 import { hashInviteToken, inviteEmailHash, INVITE_DEFAULT_EXPIRY_DAYS } from './invitations.js';
 import { getActiveEmailService } from './email.js';
+import { sendMail } from './mail-gate.js';
 import { contactInviteEmail } from './email-templates.js';
 import { takeEmailLookup } from './email-lookup-limit.js';
 import { isValidEmail } from '../utils/email-validator.js';
@@ -147,7 +150,10 @@ export async function createContactInvitation(
       // the one form that is unambiguous to a reader we know nothing about.
       expiresLabel: invitation.expiresAt.slice(0, 10),
     }, input.locale);
-    emailSent = await emailSvc.sendRaw(cleanEmail, subject, html, text);
+    emailSent = await sendMail(emailSvc, {
+      kind: 'third-party', to: cleanEmail,
+      count: { uncounted: 'Counted as an address lookup (takeEmailLookup) before the address is read, and at most CONTACT_INVITE_MAX_PENDING_PER_INVITER open at once.' },
+    }, { form: 'html', subject, html, text }) === 'sent';
   }
   return { invitation, rawToken, acceptUrl, emailSent };
 }

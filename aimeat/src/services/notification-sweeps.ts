@@ -13,7 +13,8 @@
  *   listOwnerNotificationRecords and listOwnerNotifications (the shared owner-exact reads)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
- *   v1.4.1 -- 2026-11-04 -- The digest's address comes from provenOwnerAddress (owner-mail-address.ts), the one
+ *   v1.4.2 -- 2026-11-04 -- The digest goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
+ *   v1.4.1 --2026-11-04 -- The digest's address comes from provenOwnerAddress (owner-mail-address.ts), the one
  *     answer to "is this owner's address proven", which also checks the stored address hash (codebase
  *     analysis 2026-11-03, item A9).
  *   v1.4.0 -- 2026-11-04 -- Both passes claim before they send: the held marks are cleared on their version and
@@ -42,6 +43,7 @@ import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
 import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail } from './mail-gate.js';
 import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email-templates-digest.js';
 import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
 import { createT, toLocale } from '../i18n.js';
@@ -209,7 +211,7 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
         return claimed ? { ...current, lastDigestAt } : current;
       });
       if (!claimed) continue;
-      const ok = await email.sendRaw(to, subject, html, text);
+      const ok = await sendMail(email, { kind: 'owner', account: g }, { form: 'html', subject, html, text }) === 'sent';
       if (ok) {
         sent++;
         await appendMailLog(storage, ghii, { kind: 'digest', subject });

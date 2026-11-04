@@ -12,6 +12,7 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.5.1 — 2026-11-04 — The test and group mail go through mail-gate.ts sendMail as operator mail (codebase analysis 2026-11-03, item B3).
  *   v1.5.0 — 2026-10-25 — secaudit2026oct22: PUT /v1/admin/ghii/:ghii, DELETE …/email and DELETE
  *     /v1/admin/ghii/:ghii write the operator trail (recordOperatorAction, area 'identity') when the
  *     record is another person's; the level is stored with verificationMethod 'operator'.
@@ -37,6 +38,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { setCorsList } from '../services/cors-overview.js';
 import type { EmailService } from '../services/email.js';
+import { sendMail } from '../services/mail-gate.js';
 import { verificationEmailHtml, magicLinkEmailHtml, notificationEmailHtml } from '../services/email-templates.js';
 import { emailReach } from '../services/email-recipients.js';
 import { getStats } from '../services/stats.js';
@@ -277,7 +279,7 @@ export function adminFeaturesRouter(
                 subject = 'AIMEAT Test Email'; html = r.html; text = r.text; break;
             }
         }
-        const sent = await services.emailService.sendRaw(to, subject, html, text);
+        const sent = await sendMail(services.emailService, { kind: 'operator', to, why: 'The operator\'s test mail, to the address the operator typed.' }, { form: 'html', subject, html, text }) === 'sent';
         res.json(success(config.nodeId, { sent, template: template || 'notification' }));
         emitChange('features');
     }));
@@ -305,7 +307,8 @@ export function adminFeaturesRouter(
         const { html: mailHtml, text: mailText } = notificationEmailHtml(subject as string, body as string);
         let sent = 0;
         for (const addr of recipients) {
-            const ok = await services.emailService.sendRaw(addr, subject as string, mailHtml, mailText);
+            const ok = await sendMail(services.emailService, { kind: 'operator', to: addr, why: 'The operator\'s group mail, to the addresses emailReach lists.' },
+                { form: 'html', subject: subject as string, html: mailHtml, text: mailText }) === 'sent';
             if (ok) sent++;
         }
         res.json(success(config.nodeId, { sent, total: recipients.length, group }));

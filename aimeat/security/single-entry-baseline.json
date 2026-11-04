@@ -663,6 +663,7 @@
         "count": 1,
         "why": "The configuration display shows the password masked, or says it is generated at start; nothing is compared."
       }
-    }
+    },
+    "mail-send": {}
   }
 }

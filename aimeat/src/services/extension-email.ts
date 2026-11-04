@@ -9,6 +9,9 @@
  * @structure buildExtensionEmail() · MULTI_RECIPIENT_REFUSAL · isSingleRecipient() · unavailableEmail()
  * @usage email: buildExtensionEmail({ storage, config, extName, extConfig, ownerName, emailService })
  * @version-history
+ *   v1.1.3 — 2026-11-04 — A send goes through mail-gate.ts sendMail: the owner's own address as an owner
+ *     mail, any other as a third-party mail bounded by the hourly allowance (codebase analysis
+ *     2026-11-03, item B3).
  *   v1.1.2 — 2026-11-04 — The owner's own address is asked of owner-mail-address.ts provenOwnerAddress,
  *     which also compares it with the proven hash (codebase analysis 2026-11-03, item A9).
  *   v1.1.1 — 2026-10-27 — isSingleRecipient also asks the transport's own parser (nodemailer
@@ -32,6 +35,7 @@ import addressparser from 'nodemailer/lib/addressparser';
 import { logger } from '../utils/logger.js';
 import { extensionConsentHolds } from './extension-consent.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail, type MailIntent } from './mail-gate.js';
 import { rateBuckets } from './rate-buckets.js';
 import { EXT_EMAIL_PER_HOUR_DEFAULT } from '../config-extension-load.js';
 
@@ -56,11 +60,12 @@ export function buildExtensionEmail(deps: {
 }): NonNullable<ExtensionCtx['email']> {
     const { storage, config, extName, extConfig, ownerName, emailService } = deps;
     const ownerGhii = ownerName.includes('@') ? ownerName : `${ownerName}@${config.nodeId}`;
-    // A send the tier rule allowed: the account's allowance first, then the mail service.
-    const send = (to: string, subject: string, body: string): Promise<boolean> => {
+    // A send the tier rule allowed: the account's allowance first, then the mail gate (mail-gate.ts).
+    const send = async (intent: MailIntent, subject: string, body: string): Promise<boolean> => {
         takeExtensionEmail(config, ownerGhii);
-        return emailService!.sendNotification(to, subject, body);
+        return await sendMail(emailService, intent, { form: 'notification', subject, body }) === 'sent';
     };
+    const stranger = (to: string): MailIntent => ({ kind: 'third-party', to, count: { uncounted: STRANGER_BOUND } });
     return async (to, subject, body) => {
         // One message names one recipient, so each recipient passes its own tier check below
         // (secaudit2026oct22, lead 325). Refused before anything else, with what to do instead.
@@ -70,21 +75,26 @@ export function buildExtensionEmail(deps: {
             return false;
         }
         if (extConfig?.emailPolicy === 'unrestricted') {
-            return send(to, subject, body);
+            return send(stranger(to), subject, body);
         }
-        const own = provenOwnerAddress(await storage.getGHII(ownerGhii));
+        const account = await storage.getGHII(ownerGhii);
+        const own = provenOwnerAddress(account);
         if (own && own === to) {
-            return send(to, subject, body);
+            return send({ kind: 'owner', account }, subject, body);
         }
         // A consent to the extension installed under this name now, unexpired: an earlier install's
         // consent does not pass to the next one (services/extension-consent.ts; secaudit2026oct22).
         if (await extensionConsentHolds(storage, ownerGhii, 'extension_email', extName)) {
-            return send(to, subject, body);
+            return send(stranger(to), subject, body);
         }
         logger.warn(`[ext:${extName}] Email blocked: no authorization for recipient`);
         return false;
     };
 }
+
+/** What bounds an extension's mail to an address other than the owner's (mail-gate.ts third-party). */
+const STRANGER_BOUND = 'The operator set emailPolicy unrestricted, or the owner granted this extension an extension_email '
+    + 'consent; every send draws on the account\'s hourly extension mail allowance (extensions.email_per_hour, takeExtensionEmail).';
 
 /** What a script is told when its `to` names more than one recipient. */
 export const MULTI_RECIPIENT_REFUSAL = 'INVALID_INPUT: ctx.email sends one message to one recipient, and "to" names several. '

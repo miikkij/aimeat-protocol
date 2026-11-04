@@ -6,6 +6,7 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — The key mail goes through mail-gate.ts sendMail as a third-party mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-02 — A code key answers 403 PASSWORD_SIGN_IN_OFF when the password sign-in policy refuses
  *     a new password (services/sign-in-policy.ts; IT review): its code is the account's password.
  *   2026-10-27 — A code-key account reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
@@ -107,6 +108,10 @@ import { eraseOwner } from '../../services/owner-erasure.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { newPasswordRefusal } from '../../services/sign-in-policy.js';
+import { sendMail } from '../../services/mail-gate.js';
+
+/** Why the key mail draws on no account count (mail-gate.ts third-party). */
+const KEY_MAIL_BOUND = 'Only an owner of the organism mints a key, under the route\'s rate limit (30 in ten minutes); the mail carries the key it made.';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -664,13 +669,13 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const emailSvc = getActiveEmailService();
     let emailSent = false;
     if (emailSvc?.enabled) {
-      emailSent = await emailSvc.sendKeyInvite(cleanEmail, {
+      emailSent = await sendMail(emailSvc, { kind: 'third-party', to: cleanEmail, count: { uncounted: KEY_MAIL_BOUND } }, { form: 'key-invite', args: {
         code,
         landingUrl: (typeof landing_url === 'string' && landing_url) ? landing_url : config.baseUrl,
         orgName: organism.name,
         inviterName: inviter,
         message: invitation.message,
-      }, typeof locale === 'string' ? locale : undefined);
+      }, locale: typeof locale === 'string' ? locale : undefined }) === 'sent';
     }
 
     emitChange('organisms');

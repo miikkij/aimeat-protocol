@@ -32,6 +32,8 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.6.2 — 2026-11-04 — The link and the welcome go through mail-gate.ts sendMail as sign-in mail
+ *     (codebase analysis 2026-11-03, item B3).
  *   v1.6.1 — 2026-10-31 — redeemLoginLink() takes the account's verified address as "still theirs" as
  *     well as its notification address: an account proven by hash alone has no notification address,
  *     and every link the store's buyers were mailed was refused INVALID_TOKEN (v27 P1).
@@ -59,10 +61,14 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import type { Locale } from '../i18n.js';
 import { getActiveEmailService, type EmailService } from './email.js';
+import { sendMail } from './mail-gate.js';
 import { appendMailLog } from './notification-settings.js';
 import { welcomeEmail } from './email-template-welcome.js';
 import { resolveAppOriginTarget } from './app-origin-target.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
+
+/** Why a link goes to the address the caller names (mail-gate.ts sign-in). */
+const LINK_ADDRESS = 'The address the account was found by (its email hash), or the address an install set created the account with.';
 
 /** A link a person asks for: fifteen minutes, as it always was. */
 export const LOGIN_LINK_TTL_MS = 15 * 60 * 1000;
@@ -184,7 +190,7 @@ export async function sendLoginLink(
     const url = await issueLoginLink(storage, config, ghii, email, ttlMs, back);
     // The language of the page the link was asked from, when it named one: a person who asked in
     // English on a store page reads the mail in English, whatever the account says (v27 P1).
-    const sent = await mail.sendMagicLink(email, url, locale ?? ghii.locale);
+    const sent = await sendMail(mail, { kind: 'sign-in', to: email, why: LINK_ADDRESS }, { form: 'magic-link', url, locale: locale ?? ghii.locale }) === 'sent';
     if (sent) await appendMailLog(storage, ghii.ghii, { kind: 'magic_link', subject: 'login link' });
     return sent;
 }
@@ -206,7 +212,7 @@ export async function sendWelcomeLink(
     const loginUrl = await issueLoginLink(storage, config, ghii, email, WELCOME_LINK_TTL_MS, back);
     const site = config.baseUrl.replace(/^https?:\/\//, '');
     const m = welcomeEmail({ site, username: ghii.ownerName, loginUrl }, ghii.locale);
-    const sent = await mail.sendRaw(email, m.subject, m.html, m.text);
+    const sent = await sendMail(mail, { kind: 'sign-in', to: email, why: LINK_ADDRESS }, { form: 'html', subject: m.subject, html: m.html, text: m.text }) === 'sent';
     if (sent) await appendMailLog(storage, ghii.ghii, { kind: 'magic_link', subject: 'welcome sign-in link' });
     return sent;
 }

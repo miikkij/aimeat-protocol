@@ -30,6 +30,8 @@
  *   // Registered as core handler 'inactivity-nudge' in services/core-jobs.ts.
  *   await runInactivityNudgeJob(config, storage);
  * @version-history
+ *   v1.0.4 — 2026-11-04 — The nudge goes through mail-gate.ts sendMail as an owner mail (codebase
+ *     analysis 2026-11-03, item B3).
  *   v1.0.3 — 2026-11-04 — Mails only an address owner-mail-address.ts provenOwnerAddress proves, not
  *     any address of an account at level 1 or above: a change of address leaves the level (codebase
  *     analysis 2026-11-03, item A9).
@@ -45,6 +47,7 @@ import { getActiveEmailService } from './email.js';
 import { outboundEmailHtml } from './email-templates.js';
 import { readNotificationSettings, appendMailLog } from './notification-settings.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail } from './mail-gate.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { buildWelcomeMatPrompt } from './welcome-mat-prompt.js';
 import { logger } from '../utils/logger.js';
@@ -253,7 +256,7 @@ export async function runInactivityNudgeJob(
             : (storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(claim, marker.version) : (await storage.setMemory(claim), true));
         if (!landed) continue;
 
-        const ok = await email.sendRaw(to, c.subject, html, text).catch(err => {
+        const ok = await sendMail(email, { kind: 'owner', account: g }, { form: 'html', subject: c.subject, html, text }).then(r => r === 'sent', err => {
             logger.warn('inactivity-nudge: send failed', { owner: g.ownerName, error: String(err) });
             return false;
         });

@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.6.0 — 2026-11-04 — Rule mail-send: a mail goes out through sendMail (services/mail-gate.ts); the
+ *     24 files that called the mail service directly moved onto it, so the baseline is empty. RULES is
+ *     exported for its unit test (codebase analysis 2026-11-03, item B3).
  *   v1.5.0 — 2026-11-04 — Rule verification-level-gate: an owner's address is proven by
  *     provenOwnerAddress, not by the account's verification level (codebase analysis 2026-11-03, A9).
  *   v1.4.0 — 2026-11-04 — Rule admin-password: the admin password is read only by its one check, its
@@ -59,7 +62,7 @@ interface Rule {
   skipDirs?: string[];
 }
 
-const RULES: Rule[] = [
+export const RULES: Rule[] = [
   {
     id: 'password-verify',
     label: 'An account password is checked only by checkPassword (services/password-check.ts), which applies the account lock (C1)',
@@ -159,6 +162,15 @@ const RULES: Rule[] = [
     id: 'admin-password',
     label: 'The node\'s admin password is checked only by checkAdminPassword (services/admin-password.ts), with one count of wrong passwords per address for every route that takes it (codebase analysis 2026-11-03, A12)',
     pattern: /\bconfig\.adminPassword\b/,
+  },
+  {
+    id: 'mail-send',
+    label: 'A mail goes out through sendMail (services/mail-gate.ts), whose intent says whose mail it is: an owner mail asks provenOwnerAddress and the sender\'s daily limit, a third-party mail shows the account\'s turn or the reason it has none (codebase analysis 2026-11-03, B3)',
+    // A call of an EmailService send method. sendNotification is also the web-push method, so it
+    // counts only on an object whose name does not say push (pushService, push, webpush).
+    pattern: /\.(sendVerificationCode|sendMagicLink|sendInvite|sendKeyInvite|sendKeyCredentials|sendRaw|sendWithAttachments)\(|(^|[^\w$])(?![\w$]*push)[\w$]+[!?]?\.sendNotification\(|\)[!?]?\.sendNotification\(/i,
+    // email.ts defines the methods; push.ts is the web-push service, whose own method is sendNotification.
+    skipDirs: ['src/services/mail-gate.ts', 'src/services/email.ts', 'src/services/push.ts'],
   },
   {
     id: 'request-caller-built',

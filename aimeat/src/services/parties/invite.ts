@@ -33,6 +33,8 @@
  * @structure INVITE_TTL_DAYS · inviteLinkOf · sendShareLink · shareAndSend · previewInvite · redeemInvite
  * @usage const out = await sendShareLink(ctx, 'matti', { share, email, locale });
  * @version-history
+ *   v1.2.1 — 2026-11-04 — The link mail goes through mail-gate.ts sendMail as a third-party mail with the
+ *     account turn taken before the write (codebase analysis 2026-11-03, item B3).
  *   v1.2.0 — 2026-11-04 — sendShareLink (and so shareAndSend) counts a mailed link with takeMailSend
  *     before anything is written (codebase analysis 2026-11-03, item A11).
  *   v1.1.0 — 2026-11-01 — The page's package carries the licence's deed (`licence_url`), the
@@ -47,6 +49,7 @@ import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { getActiveEmailService } from '../email.js';
 import { takeMailSend, MAIL_SEND_LIMIT } from '../account-limits.js';
+import { sendMail, type AccountTurnTaken } from '../mail-gate.js';
 import { logger } from '../../utils/logger.js';
 import { EMAIL_RE } from '../datapackage/share-notices.js';
 import { packageFreshness } from '../datapackage/freshness-read.js';
@@ -149,9 +152,11 @@ export async function sendShareLink(
     // one POST /v1/outbound/send and aimeat_mail_send draw on (account-limits.ts takeMailSend;
     // codebase analysis 2026-11-03, item A11). Asked before the write, and only when a mail will go.
     const mail = getActiveEmailService();
+    let counted: AccountTurnTaken | null = null;
     if (mail?.enabled) {
         const turn = takeMailSend(c.ownerGhii);
-        if (!turn.ok) {
+        if (turn.ok) counted = turn;
+        else {
             return {
                 ok: false, status: 429, code: turn.code,
                 message: `${turn.message} No new link was made and nothing was sent; a link sent earlier for this share keeps working.`,
@@ -187,9 +192,10 @@ export async function sendShareLink(
         until: day(share.expires), purpose: share.purpose, link, linkUntil: day(expiresAt),
     };
     let sent = false;
-    if (mail?.enabled) {
+    if (mail?.enabled && counted) {
         try {
-            sent = await mail.sendNotification(email, MAIL[locale].subject(facts), MAIL[locale].body(facts));
+            sent = await sendMail(mail, { kind: 'third-party', to: email, count: { turn: counted } },
+                { form: 'notification', subject: MAIL[locale].subject(facts), body: MAIL[locale].body(facts) }) === 'sent';
         } catch (err) {
             logger.warn('party invite: the link could not be mailed', { owner: c.ownerGhii, party: name, error: String(err) });
         }

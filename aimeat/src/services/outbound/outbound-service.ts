@@ -24,6 +24,7 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-11-04 — The node transport sends through mail-gate.ts sendMail with the account turn (codebase analysis 2026-11-03, item B3).
  *   2026-10-16 — A campaign email carries the sender footer from the owner's (or the company's)
  *     outbound.sender record, a lead image, the send's locale, and on marketing the List-Unsubscribe
  *     and List-Unsubscribe-Post headers; an unusable lead image is refused as INVALID_IMAGE.
@@ -99,6 +100,7 @@ import { disclosureHeaders, isDeclared, type AiDisclosure } from './ai-disclosur
 import { provenanceForWrite, storeHeldProvenance } from '../ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import { takeMailSend } from '../account-limits.js';
+import { sendMail } from '../mail-gate.js';
 
 /**
  * Where a refused or failed attempt was recorded, so a caller can find it again.
@@ -733,10 +735,10 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
         status = res.ok ? 'sent' : 'failed';
         if (!res.ok) error = res.error;
       } else if (emailSvc?.enabled) {
-        const ok = await emailSvc.sendWithAttachments(contact.email, subject, html, text, attachments, {
+        const ok = await sendMail(emailSvc, { kind: 'third-party', to: contact.email, count: { turn } }, { form: 'attachments', subject, html, text, attachments, opts: {
           replyTo: input.replyTo, fromName: input.fromName,
           ...(Object.keys(extraHeaders).length ? { headers: extraHeaders } : {}),
-        });
+        } }) === 'sent';
         status = ok ? 'sent' : 'failed';
         if (!ok) error = 'SMTP_SEND_FAILED';
       } else {

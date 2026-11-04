@@ -21,6 +21,7 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-11-04 — The invitation mail goes through mail-gate.ts sendMail with the account turn, or the install set's reason (codebase analysis 2026-11-03, item B3).
  *   2026-10-31 — The in-app notice of an email invitation links by the invitation's id, not the raw
  *     token (secaudit2026oct31w2 round 10, R-f-2026sec-07-d7).
  *   2026-10-27 — findWorkspaceEntry and the departure revoke read the registry copy that counts
@@ -83,6 +84,7 @@ import { isValidEmail } from '../utils/email-validator.js';
 import { LOCALES } from '../i18n.js';
 import { emailTemplateLang } from './email-templates.js';
 import { takeInviteEmail } from './account-limits.js';
+import { sendMail, type ThirdPartyCount } from './mail-gate.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
@@ -279,9 +281,11 @@ export async function createEmailInvitation(
 
   // The account's invitation allowance, counted here so the REST route and the MCP tool share one
   // count for the owner and all their agents (services/account-limits.ts; secaudit 2026-10, C5).
+  let count: ThirdPartyCount = { uncounted: 'The node\'s own work (sendLimit exempt): an install set inviting the people it names.' };
   if (input.sendLimit !== 'exempt') {
     const turn = takeInviteEmail(input.inviterGhii.includes('@') ? input.inviterGhii : `${input.inviterGhii}@${config.nodeId}`);
     if (!turn.ok) throw new InvitationError(429, turn.code, turn.message);
+    count = { turn };
   }
 
   // Read before anything is written: the language is validated here, so a refused locale leaves no
@@ -350,7 +354,7 @@ export async function createEmailInvitation(
   const emailSvc = getActiveEmailService();
   let emailSent = false;
   if (emailSvc?.enabled) {
-    emailSent = await emailSvc.sendInvite(cleanEmail, {
+    emailSent = await sendMail(emailSvc, { kind: 'third-party', to: cleanEmail, count }, { form: 'invite', args: {
       orgName: input.organism.name,
       inviterName,
       acceptUrl,
@@ -369,7 +373,7 @@ export async function createEmailInvitation(
           invitation.expiresAt, { dateStyle: 'long' },
         )
         : invitation.expiresAt.slice(0, 10),
-    }, locale);
+    }, locale }) === 'sent';
   }
 
   emitChange('organisms');

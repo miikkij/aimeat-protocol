@@ -44,11 +44,14 @@
  *     notifyAutomationTaskComplete:mails-unverified-notification-address).
  *   v1.3.1 — 2026-11-04 — The address is asked of provenOwnerAddress, which also compares it with the
  *     proven hash (codebase analysis 2026-11-03, item A9).
+ *   v1.3.2 — 2026-11-04 — The report mail goes through mail-gate.ts sendMail as an owner mail
+ *     (codebase analysis 2026-11-03, item B3).
  */
-import type { Storage, AgentTaskRecord, MemoryRecord } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord, MemoryRecord, GHIIRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { getActiveEmailService } from './email.js';
 import { provenOwnerAddress, notificationEmailUnverified } from './owner-mail-address.js';
+import { sendMail } from './mail-gate.js';
 import { outboxPrefix } from './ecosystem-automation-advisories.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -280,10 +283,11 @@ export async function notifyAutomationTaskComplete(
     }
     let ownerEmail: string | null = null;
     let unverified = false;
+    let ghii: GHIIRecord | null = null;
     try {
       // Only an address the owner proved (owner-mail-address.ts): any principal of the owner holding
       // memory:write-reserved may set notification_email, and a new one arrives unverified.
-      const ghii = await storage.getGHII(ownerGhii);
+      ghii = await storage.getGHII(ownerGhii);
       ownerEmail = provenOwnerAddress(ghii);
       unverified = notificationEmailUnverified(ghii);
     } catch (err) {
@@ -299,7 +303,7 @@ export async function notifyAutomationTaskComplete(
       }
       return;
     }
-    const sent = await emailSvc.sendNotification(ownerEmail, subject, bodyText);
+    const sent = await sendMail(emailSvc, { kind: 'owner', account: ghii }, { form: 'notification', subject, body: bodyText }) === 'sent';
     if (sent) {
       logger.info('automation report email sent', { owner: ownerName, recipe: auto.recipeId });
       // Reflect that the email went out on the in-app record (best-effort).

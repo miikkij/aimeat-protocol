@@ -25,6 +25,7 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-11-04 — The retirement notice goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-04 — The retirement notice's address is asked of provenOwnerAddress, which also compares
  *     it with the proven hash (codebase analysis 2026-11-03, item A9).
  *   2026-11-02 — SECURITY: the retirement notice is mailed only to an address the owner confirmed
@@ -87,6 +88,7 @@ import { memoryTarget } from './classification/labels.js';
 import { inheritSourceLabels, type SourceCopy } from './living-source-labels.js';
 import type { PushService } from './push.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
+import { sendMail } from './mail-gate.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
@@ -176,8 +178,8 @@ async function notifyStop(services: LivingNotify | undefined, storage: Storage, 
   try {
     if (services.email?.enabled) {
       // Only an address the owner proved (owner-mail-address.ts); the reason can quote the charter's text.
-      const to = provenOwnerAddress(await storage.getGHII(ownerGaii));
-      if (to) await services.email.sendNotification(to, 'Living document retired', body);
+      const account = await storage.getGHII(ownerGaii);
+      if (provenOwnerAddress(account)) await sendMail(services.email, { kind: 'owner', account }, { form: 'notification', subject: 'Living document retired', body });
     }
   } catch (err) { logger.warn('to: email best-effort', { error: String(err) }); }
 }
