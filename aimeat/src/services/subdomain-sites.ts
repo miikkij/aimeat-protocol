@@ -37,9 +37,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
-import {
-  RESERVED_SUBDOMAINS, SUBDOMAIN_RE, resolveAppTarget, draftBaseLabel, DRAFT_LABEL_SUFFIX,
-} from '../routes/subdomains.js';
+import { resolveAppTarget } from '../routes/subdomains.js';
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE, draftBaseLabel, DRAFT_LABEL_SUFFIX } from './subdomain-names.js';
 import { appNeedsCodeOrPayment } from './app-access.js';
 import { isNodeApexLabel } from './subdomain-node-labels.js';
 

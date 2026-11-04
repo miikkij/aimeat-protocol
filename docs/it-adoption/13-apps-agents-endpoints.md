@@ -12,7 +12,7 @@ An app is a single-file web app that a person publishes on the node.
 
 | Question | Answer | Source |
 |---|---|---|
-| Who may publish | Any account. An agent needs `app:write`. An app gets it only when it declares the word and the owner approves it on the app's consent screen. There is no operator approval before publishing. | `aimeat/src/routes/apps/publish.ts`, `aimeat/src/routes/app-grant-vocabulary.ts` |
+| Who may publish | Any account. An agent needs `app:write`. An app gets it only when it declares the word and the owner approves it on the app's consent screen. There is no operator approval before publishing. | `aimeat/src/routes/apps/publish.ts`, `aimeat/src/services/app-grant-vocabulary.ts` |
 | Who sees it in lists | `listed`, `community` (signed-in accounts) or `unlisted`; new apps start at `AIMEAT_APP_DEFAULT_LISTING` (default `listed`) | `aimeat/.env.example` |
 | Who may open it | `anyone` or `signed-in`, or one organism's members (`open_to`), optionally with an access code; new apps start at `AIMEAT_APP_DEFAULT_ACCESS` (default `anyone`) and `AIMEAT_APP_DEFAULT_ACCESS_CODE` | [Organisation node sign-in](../organisation-node-sign-in.md), section 6a |
 | On a closed node | With `AIMEAT_CONTENT_ACCESS=signed-in`, no app opens to a visitor without an account of this node | [Organisation node sign-in](../organisation-node-sign-in.md), section 6a |
@@ -27,7 +27,7 @@ For an organisation node, set `AIMEAT_APP_DEFAULT_ACCESS=signed-in`, `AIMEAT_APP
 - Each app runs on its own origin, `<app>.apps.<host>`, so its code cannot read the session of the person who opens it. It is on by default when `AIMEAT_SECURITY_PROFILE=public`, and needs a wildcard DNS name and certificate ([Production deployment](../operations/production-deployment.md)).
 - `AIMEAT_APP_HOST` names the app host; `AIMEAT_APP_ORIGIN_ENABLED` turns isolation on or off (`aimeat/.env.example`).
 - An app reaches the person's data only through an app grant: the owner approves named scopes on a consent screen, and the app gets a short access token with role `app` and a rotating refresh token. The scopes are enforced on every request, and the owner can narrow or revoke the grant (`aimeat/src/routes/app-grants.ts`).
-- An app can never hold `account:security` (`aimeat/src/auth/account-security.ts`). It holds `app:write` only when the owner approved that word on the app's consent screen (`aimeat/src/routes/app-grant-vocabulary.ts`, `APP_GRANTABLE_SCOPES`).
+- An app can never hold `account:security` (`aimeat/src/auth/account-security.ts`). It holds `app:write` only when the owner approved that word on the app's consent screen (`aimeat/src/services/app-grant-vocabulary.ts`, `APP_GRANTABLE_SCOPES`).
 - When an app goes away, its address stays held for its owner for `AIMEAT_APP_HELD_LABEL_DAYS` (90), because its visitors' browser data lives on that origin (`aimeat/.env.example`).
 
 ### Opening one app to the internet on a closed node

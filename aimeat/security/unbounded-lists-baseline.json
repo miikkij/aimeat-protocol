@@ -162,9 +162,6 @@
       "listSubdomainSites": 1,
       "listOwners": 1
     },
-    "src/routes/subdomains.ts": {
-      "listSubdomainSites": 2
-    },
     "src/server-bootstrap/config-init.ts": {
       "getAllConfigValues": 1
     },
@@ -354,6 +351,9 @@
     "src/services/stats-page.ts": {
       "listOwners": 1,
       "listAgents": 1
+    },
+    "src/services/subdomain-names.ts": {
+      "listSubdomainSites": 2
     },
     "src/services/subdomain-sites.ts": {
       "listSubdomainSites": 1
