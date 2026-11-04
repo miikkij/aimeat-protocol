@@ -25,6 +25,8 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The retirement notice goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-04 — The retirement notice's address is asked of provenOwnerAddress, which also compares
  *     it with the proven hash (codebase analysis 2026-11-03, item A9).
@@ -138,8 +140,8 @@ async function swapTaskState(
     key, ownerGaii, value, visibility: 'private', tags: [], ttlHours: null,
     version: (prev?.version ?? 0) + 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
   };
-  if (!prev) return storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(record) : (await storage.setMemory(record), true);
-  return storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(record, prev.version) : (await storage.setMemory(record), true);
+  if (!prev) return !!await storage.createMemoryIfAbsent(record);
+  return !!await storage.setMemoryIfVersion(record, prev.version);
 }
 const srcKey = (l: Loc, id: string) => `${wsRoot(l)}.living-src.${l.docId}__${id}.latest`;
 const ledgerKey = (l: Loc) => `${wsRoot(l)}.living-ledger.${l.docId}__${Date.now()}-${Math.random().toString(36).slice(2, 6)}.latest`;

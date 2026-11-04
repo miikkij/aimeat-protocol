@@ -32,6 +32,8 @@
  *   // ... the run changes claimed.record ...
  *   await finishRun(storage, key, parse, claimed.record, claimed.claim);
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-31 — claimRun says whether its claim created the record (`created`), and
  *     releaseRun ends a claim whose run was refused before its first write, so applyInstallSet can
  *     claim before the repository link, the pulls and the owner account (secaudit 2026-10-31 inv-22).
@@ -76,8 +78,8 @@ async function writeOn(storage: Storage, key: string, rec: MemoryRecord | null, 
         key, ownerGaii: NS_INSTALL_SETS, value: value as unknown as MemoryRecord['value'], visibility: 'private', tags: ['install-set'],
         ttlHours: null, version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? createdAt, updatedAt: now,
     };
-    if (rec) return storage.setMemoryIfVersion ? !!(await storage.setMemoryIfVersion(record, rec.version)) : !!(await storage.setMemory(record));
-    return storage.createMemoryIfAbsent ? !!(await storage.createMemoryIfAbsent(record)) : !!(await storage.setMemory(record));
+    if (rec) return !!(await storage.setMemoryIfVersion(record, rec.version));
+    return !!(await storage.createMemoryIfAbsent(record));
 }
 
 /**

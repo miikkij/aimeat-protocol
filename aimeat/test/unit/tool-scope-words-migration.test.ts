@@ -14,6 +14,7 @@ import {
     migrateToolScopeWordsOnce, carriedForwardWords, TOOL_SCOPE_WORDS_SHIPPED_AT, TOOL_SCOPE_WORDS_KEY,
 } from '../../src/services/tool-scope-words-migration.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { sameScopeList } from '../../src/storage/scope-list.js';
 
 const BEFORE = '2026-10-01T00:00:00.000Z';
 const AFTER = '2026-10-07T00:00:00.000Z';
@@ -30,6 +31,23 @@ function stubStorage(agents: Array<{ gaii: string; createdAt?: string; defaultSc
         },
         getMemory: async (owner: string, key: string) => memory.get(`${owner}/${key}`) ?? null,
         setMemory: async (record: { ownerGaii: string; key: string; value: unknown }) => {
+            memory.set(`${record.ownerGaii}/${record.key}`, record);
+            return record;
+        },
+        // The conditional writes every Storage has (required since 2026-11-04).
+        setAgentScopesIf: async (gaii: string, expected: readonly string[], next: string[]) => {
+            const held = written.get(gaii) ?? agents.find(a => a.gaii === gaii)?.defaultScopes;
+            if (!sameScopeList(held, expected)) return false;
+            written.set(gaii, next);
+            return true;
+        },
+        createMemoryIfAbsent: async (record: { ownerGaii: string; key: string; value: unknown }) => {
+            if (memory.has(`${record.ownerGaii}/${record.key}`)) return null;
+            memory.set(`${record.ownerGaii}/${record.key}`, record);
+            return record;
+        },
+        setMemoryIfVersion: async (record: { ownerGaii: string; key: string; value: unknown }, v: number) => {
+            if ((memory.get(`${record.ownerGaii}/${record.key}`) as { version?: number } | undefined)?.version !== v) return null;
             memory.set(`${record.ownerGaii}/${record.key}`, record);
             return record;
         },

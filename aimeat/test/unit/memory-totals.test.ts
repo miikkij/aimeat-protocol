@@ -15,6 +15,8 @@
  *     ceiling and the byte budget.
  * @usage cd aimeat && DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/memory-totals.test.ts
  * @version-history
+ *   2026-11-04 — The full-count storage answers getMemoryTotals by a full count instead of lacking
+ *     it, since the method is required (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — Initial (codebase analysis 2026-11-03, item C3).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -218,11 +220,16 @@ describe('one memory write reads the record once and scans none of the writer’
 });
 
 describe('memoryCeilings answers what the full count answered', () => {
-  /** The storage as it was before the kept totals: no getMemoryTotals, a full SUM and COUNT. */
+  /** The storage as it was before the kept totals: a full SUM and COUNT. getMemoryTotals is required
+   *  on Storage since 2026-11-04 (item D-e), so it answers here what memoryCeilings computed without
+   *  it: countMemory with the excluded prefixes, and the full byte sum. */
   function fullCount(p: Provider): Storage {
     return new Proxy(p.storage, {
       get(target, prop, recv) {
-        if (prop === 'getMemoryTotals') return undefined;
+        if (prop === 'getMemoryTotals') return async (o: string) => ({
+          keys: await target.countMemory([o], { excludePrefixes: [...MEMORY_COUNT_EXCLUDED_PREFIXES] }),
+          bytes: await p.fullBytes(o),
+        });
         if (prop === 'sumMemoryBytes') return (o: string) => p.fullBytes(o);
         const v = Reflect.get(target, prop, recv) as unknown;
         return typeof v === 'function' ? (v as (...x: unknown[]) => unknown).bind(target) : v;

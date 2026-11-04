@@ -25,6 +25,8 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without createMemoryIfAbsent: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.5.4 — 2026-11-04 — The rescue goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
  *   v1.5.3 — 2026-11-04 — The rescue mails only an address provenOwnerAddress proves, not any address
  *     of an account at level 1 or above (codebase analysis 2026-11-03, item A9).
@@ -170,9 +172,7 @@ export async function writeMarkerOnce(
     };
     // Created only if still absent (createMemoryIfAbsent): of two callers at once, one writes the
     // marker and is answered true, and the other is answered false.
-    if (storage.createMemoryIfAbsent) return !!await storage.createMemoryIfAbsent(marker);
-    await storage.setMemory(marker);
-    return true;
+    return !!await storage.createMemoryIfAbsent(marker);
 }
 
 // In-process de-dupe so a busy owner costs one storage read per boot, not one per session.

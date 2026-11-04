@@ -91,7 +91,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/mcp-client/capability-use-setting.ts"
       ],
-      "digest": "sha256:a57bb3339fc64dc6023efac6"
+      "digest": "sha256:4d5b200916f8f832a0f4b234"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -204,7 +204,7 @@
         "aimeat/src/server-bootstrap/drain.ts",
         "aimeat/src/services/notification-sweeps.ts"
       ],
-      "digest": "sha256:a8c7ce59adf76e3451e3f389"
+      "digest": "sha256:c4d460b41acf4cec59ef78c1"
     },
     "README.md": {
       "reviewedOn": "2026-11-03",
@@ -312,7 +312,7 @@
     },
     "07-security.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
-      "aimeat/src/middleware/cors.ts": "d9d975cd1e5657d6",
+      "aimeat/src/middleware/cors.ts": "98494722f522e801",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
@@ -391,7 +391,7 @@
     },
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
-      "aimeat/src/services/once-only-step.ts": "08156126e71309f0",
+      "aimeat/src/services/once-only-step.ts": "12c59204aa41d7f2",
       "aimeat/src/services/event-bus.ts": "f73b40db41597ad5",
       "aimeat/src/mcp/oauth.ts": "66a8f23e8c8562ae",
       "aimeat/src/mcp/legacy-sessions.ts": "4784fea1f0026443",
@@ -407,7 +407,7 @@
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "41f44d4c72ded9c2",
       "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
-      "aimeat/src/services/notification-sweeps.ts": "c8b9e1d2e50daf56"
+      "aimeat/src/services/notification-sweeps.ts": "41dc0401bea00176"
     }
   }
 }

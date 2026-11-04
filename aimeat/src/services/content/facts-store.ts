@@ -33,6 +33,8 @@
  *   await putFacts(deps, writer, facts);
  *   const page = await listFacts(storage, ownerGhii, { kind: 'pdf', limit: 50 });
  * @version-history
+ *   2026-11-04 — No per-shard getMemory for a storage without getMemoryByKeys: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-20 — Initial.
  *   v1.1.0 — 2026-11-02 — The profile's sections as a private file (putProfileDetail and its kin).
  *   v1.2.0 — 2026-11-03 — listFacts filters by `keyPrefix` and `hasProfile`; `isStale` is exported.
@@ -113,11 +115,9 @@ export async function deleteFacts(deps: ContentDeps, writer: ContentWriter, sour
 /** Every shard key, in order. */
 const SHARD_KEYS: readonly string[] = Array.from({ length: FACT_SHARDS }, (_, i) => `${SHARD_PREFIX}${String(i).padStart(2, '0')}`);
 
-/** Every stored facts entry of the owner, read from the shards in one query when the backend can. */
+/** Every stored facts entry of the owner, read from the shards in one query. */
 async function allFacts(storage: Storage, ownerGhii: string): Promise<ContentFacts[]> {
-  const rows: Array<MemoryRecord | null> = storage.getMemoryByKeys
-    ? await storage.getMemoryByKeys(ownerGhii, [...SHARD_KEYS])
-    : await Promise.all(SHARD_KEYS.map((k) => storage.getMemory(ownerGhii, k)));
+  const rows: Array<MemoryRecord | null> = await storage.getMemoryByKeys(ownerGhii, [...SHARD_KEYS]);
   const out: ContentFacts[] = [];
   for (const r of rows) {
     if (!r || !r.key.startsWith(SHARD_PREFIX)) continue;

@@ -22,6 +22,8 @@
  *   const records = await memoryPageWithValues(storage, matched.slice(0, limit));
  *   const usedBytes = await shownMemoryBytes(storage, matched);
  * @version-history
+ *   2026-11-04 — No per-key getMemory for a storage without getMemoryByKeys: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — Initial (codebase analysis 2026-11-03, item C1).
  */
 import type { MemoryRecord, Storage } from '../storage/interface.js';
@@ -47,9 +49,7 @@ async function recordsAt(storage: Storage, rows: ReadonlyArray<{ ownerGaii: stri
     }
     const out = new Map<string, MemoryRecord>();
     for (const [owner, keys] of keysByOwner) {
-        const found = storage.getMemoryByKeys
-            ? await storage.getMemoryByKeys(owner, keys)
-            : (await Promise.all(keys.map(k => storage.getMemory(owner, k)))).filter((r): r is MemoryRecord => !!r);
+        const found = await storage.getMemoryByKeys(owner, keys);
         for (const r of found) out.set(addressOf(r.ownerGaii, r.key), r);
     }
     return out;

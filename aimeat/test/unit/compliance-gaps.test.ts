@@ -67,6 +67,8 @@ function storageWith(opts: {
     listAllMemoryMeta: async (q: { prefix: string }) => ({ items: Object.keys(memory).filter(k => k.startsWith(q.prefix)).map(key => ({ key })) }),
     // The records of processing the report's `processing` half lists (services/compliance-docs.ts): none here.
     listAllMemory: async () => ({ items: [], total: 0 }),
+    // The parties records the data intermediation section reads by key (services/data-intermediation/findings.ts): none here.
+    getMemoryByKeysAnyOwner: async () => [],
     queryUsageDailyAllOwners: async () => usageRows,
     queryUsageDaily: async () => usageRows,
     consentFacets: async () => [],

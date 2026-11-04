@@ -30,6 +30,15 @@ function store(initial?: Partial<NotificationSettings>) {
             return owner === OWNER && key === NOTIF_SETTINGS_KEY && value !== undefined ? { key, value, version, createdAt: 'c', updatedAt: 'u' } : null;
         },
         setMemory: async (r: { value: unknown; version: number }) => { writes++; value = r.value; version = r.version; return r; },
+        // The conditional writes every Storage has (required since 2026-11-04).
+        createMemoryIfAbsent: async (r: { value: unknown; version: number }) => {
+            if (value !== undefined) return null;
+            writes++; value = r.value; version = r.version; return r;
+        },
+        setMemoryIfVersion: async (r: { value: unknown; version: number }, expected: number) => {
+            if (value === undefined || version !== expected) return null;
+            writes++; value = r.value; version = r.version; return r;
+        },
     } as unknown as Storage;
     return {
         storage,

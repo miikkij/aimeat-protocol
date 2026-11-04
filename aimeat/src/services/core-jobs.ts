@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-04 — compactMemoryTotals called without a presence check: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — memory-ttl-cleanup also folds the kept memory totals (storage.compactMemoryTotals;
  *     codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — outbox-sweep: webhook and mail retries kept in the stored outbox are resumed (services/outbox.ts;
@@ -385,7 +387,7 @@ async function runMemoryTtlCleanupJob(storage: Storage): Promise<void> {
   if (removed > 0) logger.info(`Memory TTL sweep removed ${removed} expired record(s)`);
   // The kept memory totals fold each owner's delta rows into one, so reading a total stays a read of
   // one row per owner (PostgreSQL; SQLite keeps one row already). No total changes (item C3).
-  if (storage.compactMemoryTotals) await storage.compactMemoryTotals();
+  await storage.compactMemoryTotals();
 }
 
 async function runBoardPostTtlCleanupJob(storage: Storage): Promise<void> {

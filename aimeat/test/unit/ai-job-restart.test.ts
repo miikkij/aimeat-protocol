@@ -63,6 +63,7 @@ function memoryStorage(): { storage: Storage; rows: Map<string, MemoryRecord> } 
         findApplicableSchema: async () => null,
         countMemory: async () => rows.size,
         sumMemoryBytes: async () => 0,
+        getMemoryTotals: async () => ({ keys: rows.size, bytes: 0 }),
         getGHIIByOwner: async () => null,
         transaction: async <T>(fn: () => Promise<T>) => fn(),
         getAgentsByOwner: async () => [],

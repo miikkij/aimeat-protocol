@@ -71,6 +71,9 @@ describe('the sealed statement of a wallet signature', () => {
     const storage = {
       getMemory: async (ns: string, key: string) => (ns === NS ? mem.get(key) ?? null : null),
       setMemory: async (r: Record<string, unknown>) => { mem.set(String(r.key), r); },
+      // The conditional writes every Storage has (required since 2026-11-04).
+      createMemoryIfAbsent: async (r: Record<string, unknown>) => (mem.has(String(r.key)) ? null : (mem.set(String(r.key), r), r)),
+      setMemoryIfVersion: async (r: Record<string, unknown>, v: number) => (mem.get(String(r.key))?.version === v ? (mem.set(String(r.key), r), r) : null),
       getGHII: async () => ({ verificationLevel: 1, displayName: 'Alice Example' }),
       getNodeKey: async () => nodeKey,
     } as unknown as Storage;

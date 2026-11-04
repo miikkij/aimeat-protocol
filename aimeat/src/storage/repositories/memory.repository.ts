@@ -14,6 +14,9 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-11-04 — The 14 memory methods that were optional are required: both providers implement
+ *     them, and a missing CAS method no longer turns a conditional write into a blind one (codebase
+ *     analysis 2026-11-03, item D-e).
  *   2026-11-04 — getMemoryTotals and compactMemoryTotals: the kept per-principal key count and byte
  *     total (codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — MemoryListOpts: the four keyspace listings take `limit` and a key cursor, applied in
@@ -145,7 +148,7 @@ export interface MemoryTextSearchOpts {
 export interface MemoryRepository {
   setMemory(record: MemoryRecord): Promise<MemoryRecord>;
   /** Atomically update memory only if the current version matches expectedVersion. Returns null on conflict. */
-  setMemoryIfVersion?(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null>;
+  setMemoryIfVersion(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null>;
   /**
    * Atomically INSERT a record only if the key does not exist yet. Returns null when another writer
    * created it first, so the caller can re-read and merge instead of clobbering.
@@ -155,24 +158,22 @@ export interface MemoryRepository {
    * first, where there is no version to compare against. Without it the create is last-write-wins and
    * two agents starting the same shared record at the same moment lose one of their subtrees.
    */
-  createMemoryIfAbsent?(record: MemoryRecord): Promise<MemoryRecord | null>;
+  createMemoryIfAbsent(record: MemoryRecord): Promise<MemoryRecord | null>;
   getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
   /**
    * getMemory without the value: the same row (live, not in the bin, archived or not) as a
    * MemoryMetaRow, or null where getMemory answers null. For a reader that needs a record's
    * metadata only, such as its allowedOrigins for a CORS answer (middleware/cors.ts), so a large
-   * value is never loaded for it (codebase analysis 2026-11-03, item C2). Both providers have it;
-   * optional so a reader keeps working with a store that does not (it then reads getMemory).
+   * value is never loaded for it (codebase analysis 2026-11-03, item C2).
    */
-  getMemoryMeta?(ownerGaii: string, key: string): Promise<MemoryMetaRow | null>;
+  getMemoryMeta(ownerGaii: string, key: string): Promise<MemoryMetaRow | null>;
   /**
    * BULK PRIMITIVE — read MANY keys under ONE owner in a single `key IN (…)` query (data-access
    * redesign, Phase 1). Backs the batched existing-row lookup a bulk write does, replacing one
    * getMemory per entry (an N-entry import was N serial round-trips just to check existence). Returns
    * only the keys that exist (live, non-expired); order is not guaranteed — the caller indexes by key.
-   * Optional so a backend without it falls back to the adapter's per-key loop.
    */
-  getMemoryByKeys?(ownerGaii: string, keys: string[]): Promise<MemoryRecord[]>;
+  getMemoryByKeys(ownerGaii: string, keys: string[]): Promise<MemoryRecord[]>;
   /**
    * BULK PRIMITIVE — read MANY keys ACROSS ALL owners in one `key IN (…)` query (Phase 2). Unlike
    * {@link getMemoryByKeys} (single owner), this fetches every live row whose key is in the set no matter
@@ -181,60 +182,59 @@ export interface MemoryRepository {
    * member may own each). Collapses a per-key `listAllMemory` probe loop (the discovery list's
    * per-workspace canReadWs manifest scan) into ONE query. Returns only existing (live, non-expired) rows;
    * order is not guaranteed and a key forked across owners may return more than one row (the caller
-   * dedupes, e.g. by freshest). Optional — a backend without it falls back to a per-key any-owner loop.
+   * dedupes, e.g. by freshest).
    */
-  getMemoryByKeysAnyOwner?(keys: string[]): Promise<MemoryRecord[]>;
+  getMemoryByKeysAnyOwner(keys: string[]): Promise<MemoryRecord[]>;
   /**
    * BULK PRIMITIVE — read ONE key under MANY owners in a single `ownerGaii IN (…)` query. Backs a
    * per-principal record a listing shows on every row (an agent's `agent.avatar`), so a list of N
    * agents is one read instead of N point reads. Live rows only; order is not guaranteed — the caller
-   * indexes by ownerGaii. Optional: a backend without it falls back to one getMemory per owner.
+   * indexes by ownerGaii.
    */
-  getMemoryForOwners?(ownerGaiis: string[], key: string): Promise<MemoryRecord[]>;
+  getMemoryForOwners(ownerGaiis: string[], key: string): Promise<MemoryRecord[]>;
   /**
    * BULK PRIMITIVE — upsert MANY rows as ONE unit (Phase 1). Same per-row semantics as
    * {@link setMemory} (version bump, trackable-history archive, byteSize), but committed together
-   * (SQLite: one transaction) so a bulk import pays one commit instead of N. Optional; the adapter
-   * falls back to a sequential loop when absent.
+   * (SQLite: one transaction) so a bulk import pays one commit instead of N.
    */
-  bulkSetMemory?(records: MemoryRecord[]): Promise<MemoryRecord[]>;
+  bulkSetMemory(records: MemoryRecord[]): Promise<MemoryRecord[]>;
   /**
    * BULK PRIMITIVE — delete a record's whole family (`baseKey` itself plus its `baseKey.*` children:
    * `.draft` / `.latest` / `.version.N`) under one owner in ONE statement (Phase 1), WITHOUT matching a
    * sibling `baseKeyX`. Replaces the per-key gated deletes a record teardown does today (a 550-record
-   * CADENCE delete was thousands of round-trips). Returns the number of rows removed. Optional.
+   * CADENCE delete was thousands of round-trips). Returns the number of rows removed.
    */
-  deleteMemorySubtree?(ownerGaii: string, baseKey: string): Promise<number>;
+  deleteMemorySubtree(ownerGaii: string, baseKey: string): Promise<number>;
   /**
    * BULK PRIMITIVE — delete EVERY memory row whose key begins with `keyPrefix`, across ALL owners, in
    * ONE statement (Phase 2). Backs the whole-workspace / whole-organism wipe (organism.{id}.[w.{ws}.]*),
    * replacing its per-key deleteMemory loop over thousands of rows. Deletes active AND archived rows —
    * a wipe removes the container entirely. Pass a prefix ending at a key boundary (e.g. `organism.{id}.`)
-   * so a sibling id can't be caught. Returns the number of rows removed. Optional.
+   * so a sibling id can't be caught. Returns the number of rows removed.
    */
-  deleteMemoryByPrefix?(keyPrefix: string): Promise<number>;
+  deleteMemoryByPrefix(keyPrefix: string): Promise<number>;
   /**
    * BULK PRIMITIVE — delete MANY rows addressed by explicit (ownerGaii, key) pairs in ONE unit (Phase 2:
    * SQLite = one transaction; Prisma = chunked deleteMany). Backs the batched record-family delete
    * (a caller-authorized set of rows collected across records that may span owner identities). Returns
-   * the number of rows removed. Optional.
+   * the number of rows removed.
    */
-  bulkDeleteMemory?(refs: { ownerGaii: string; key: string }[]): Promise<number>;
+  bulkDeleteMemory(refs: { ownerGaii: string; key: string }[]): Promise<number>;
   /**
    * BULK PRIMITIVE — put MANY rows addressed by (ownerGaii, key) into the deleted-memory bin in ONE unit:
    * the per-row semantics of {@link deleteMemory} (deletedAt and deletedBy set, a row already in the bin
    * left alone), so each key is restorable with restoreMemory until the sweeper's grace period ends.
    * Backs the batched workspace record delete (POST /v1/organisms/:id/workspace/records/delete).
-   * Returns the number of rows binned. Optional; a backend without it falls back to deleteMemory per key.
+   * Returns the number of rows binned.
    */
-  bulkBinMemory?(refs: { ownerGaii: string; key: string }[], deletedBy?: string): Promise<number>;
+  bulkBinMemory(refs: { ownerGaii: string; key: string }[], deletedBy?: string): Promise<number>;
   /**
    * BULK PRIMITIVE — enumerate the (ownerGaii, key) ADDRESSES of every row under a key prefix, across ALL
    * owners, WITHOUT loading any value (Phase 2). Backs the batched record delete: it needs only the
    * addresses to filter (same-owner + role) and delete, so a value-loading `listAllMemory` scan per
    * record was pure waste (the value bytes dominated the delete cost). Cheap even over a whole namespace.
    */
-  listMemoryKeysByPrefix?(keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]>;
+  listMemoryKeysByPrefix(keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]>;
   listMemory(ownerGaii: string, opts?: MemoryListOpts): Promise<MemoryRecord[]>;
   /**
    * List one owner's memory as lightweight META rows — key + metadata + stored `byteSize`, with the
@@ -273,16 +273,15 @@ export interface MemoryRepository {
   /**
    * One principal's memory as the write ceilings count it ({@link MemoryTotals}), kept by the database
    * in the statement that changes a row (codebase analysis 2026-11-03, item C3), so a write reads one
-   * small row set instead of counting and summing every row of the writer. Optional so a storage stub
-   * without it falls back to countMemory and sumMemoryBytes; both providers implement it.
+   * small row set instead of counting and summing every row of the writer.
    */
-  getMemoryTotals?(ownerGaii: string): Promise<MemoryTotals>;
+  getMemoryTotals(ownerGaii: string): Promise<MemoryTotals>;
   /**
    * Fold each principal's kept-total rows into one, and drop the principals whose rows sum to zero
    * (PostgreSQL keeps a row per changing statement; SQLite keeps one per principal and answers 0). The
    * memory TTL job runs it. Returns the rows removed.
    */
-  compactMemoryTotals?(): Promise<number>;
+  compactMemoryTotals(): Promise<number>;
   /**
    * Sum the byte size of memory VALUES across MANY owner identities (GHII + agents + GEAIs) in ONE
    * DB-side aggregate — the owner-scope total-usage figure (profile Home). Replaces calling

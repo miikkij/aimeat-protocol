@@ -8,6 +8,8 @@
  * @structure EcosystemAppRepository — EcosystemApp CRUD + EcoAuth handshake methods
  * @usage Part of the composed `Storage` interface (storage/interface.ts).
  * @version-history
+ *   2026-11-04 — setEcosystemAppScopesIf and swapEcosystemAppCapabilityApprovals are required: both
+ *     providers implement them (codebase analysis 2026-11-03, item D-e).
  *   v1.3.0 — 2026-10-22 — swapEcosystemAppCapabilityApprovals: the owner's answers to another account's
  *     capability over their outside app, written on the list that was read (secaudit 2026-10).
  *   v1.2.0 — 2026-10-18 — setEcosystemAppScopesIf: the scope list written on the list that was read (check:atomic-writes, boot migrations).
@@ -25,12 +27,12 @@ export interface EcosystemAppRepository {
   getEcosystemAppsByOwner(owner: string): Promise<EcosystemAppRecord[]>;
   updateEcosystemApp(geai: string, updates: Partial<EcosystemAppRecord>): Promise<EcosystemAppRecord | null>;
   /** The scope list written only if the stored one still equals `expected` (agent.repository.ts setAgentScopesIf). */
-  setEcosystemAppScopesIf?(geai: string, expected: readonly string[], next: string[]): Promise<boolean>;
+  setEcosystemAppScopesIf(geai: string, expected: readonly string[], next: string[]): Promise<boolean>;
   /**
    * The capability approvals written only if the stored list still equals `expected`
    * (services/eco-capability-approvals.ts). False when the list changed or the app is gone.
    */
-  swapEcosystemAppCapabilityApprovals?(geai: string, expected: EcoCapabilityApproval[], next: EcoCapabilityApproval[]): Promise<boolean>;
+  swapEcosystemAppCapabilityApprovals(geai: string, expected: EcoCapabilityApproval[], next: EcoCapabilityApproval[]): Promise<boolean>;
   deleteEcosystemApp(geai: string): Promise<boolean>;
 
   // ── "Hello integration" handshake (mirror of the device-auth repository) ──

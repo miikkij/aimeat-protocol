@@ -15,6 +15,8 @@
  * @structure PART_NOTIF_KEY · partTitle · announcePart(ctx, ownerGhii, parent, part)
  * @usage await announcePart(ctx, ownerGhii, parent, part); // after both are stored
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-21 — Initial: the picture of a gated public image job is a part of its record's request.
  */
 import type { Storage } from '../../storage/interface.js';
@@ -61,8 +63,7 @@ export async function announcePart(
         updatedAt: new Date().toISOString(),
       };
       // On the version listed: a read mark written in between wins, and the parent keeps its own words.
-      if (ctx.storage.setMemoryIfVersion) await ctx.storage.setMemoryIfVersion(next, row.version);
-      else await ctx.storage.setMemory(next);
+      await ctx.storage.setMemoryIfVersion(next, row.version);
     }
     emitChange('notifications', ownerGhii);
     emitChange('open-items', ownerGhii);

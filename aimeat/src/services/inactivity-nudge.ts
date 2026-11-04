@@ -30,6 +30,8 @@
  *   // Registered as core handler 'inactivity-nudge' in services/core-jobs.ts.
  *   await runInactivityNudgeJob(config, storage);
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.4 — 2026-11-04 — The nudge goes through mail-gate.ts sendMail as an owner mail (codebase
  *     analysis 2026-11-03, item B3).
  *   v1.0.3 — 2026-11-04 — Mails only an address owner-mail-address.ts provenOwnerAddress proves, not
@@ -252,15 +254,15 @@ export async function runInactivityNudgeJob(
             updatedAt: at,
         };
         const landed = !marker
-            ? (storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(claim) : (await storage.setMemory(claim), true))
-            : (storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(claim, marker.version) : (await storage.setMemory(claim), true));
+            ? !!await storage.createMemoryIfAbsent(claim)
+            : !!await storage.setMemoryIfVersion(claim, marker.version);
         if (!landed) continue;
 
         const ok = await sendMail(email, { kind: 'owner', account: g }, { form: 'html', subject: c.subject, html, text }).then(r => r === 'sent', err => {
             logger.warn('inactivity-nudge: send failed', { owner: g.ownerName, error: String(err) });
             return false;
         });
-        if (ok && storage.setMemoryIfVersion) {
+        if (ok) {
             await storage.setMemoryIfVersion({ ...claim, value: { ...value, delivered: true }, version: claim.version + 1, updatedAt: new Date().toISOString() }, claim.version);
         }
         if (ok) {

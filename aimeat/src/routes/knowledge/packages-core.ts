@@ -6,6 +6,8 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-04 — No prefix scan for a storage without getMemoryByKeysAnyOwner: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-24 — POST /v1/knowledge/import refuses the shared anonymous principal with
  *     refuseAnonymousPrincipal (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   2026-10-22 — broken-links asks whether a public record is at the target with one read by that key,
@@ -574,9 +576,7 @@ export function registerPackagesCoreRoutes(
    * and every agent of the node on each call before (check:unbounded-lists).
    */
   async function publicRecordAt(target: string): Promise<boolean> {
-    const rows = storage.getMemoryByKeysAnyOwner
-      ? await storage.getMemoryByKeysAnyOwner([target])
-      : (await storage.listAllMemory({ prefix: target, visibility: 'public', limit: 100 })).items;
+    const rows = await storage.getMemoryByKeysAnyOwner([target]);
     const ofThisNode = (gaii: string) => !gaii.startsWith('eco:') && !gaii.startsWith('ext:') && gaii.endsWith(`@${config.nodeId}`);
     return rows.some(r => r.key === target && r.visibility === 'public' && !r.archived && ofThisNode(r.ownerGaii));
   }

@@ -23,6 +23,8 @@
  * @structure ECOSYSTEM_SUBSCRIPTIONS_MOVED_KEY · moveEcosystemSubscriptionsByOwnerOnce(storage, config)
  * @usage await moveEcosystemSubscriptionsByOwnerOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   2026-11-04 — setMemoryIfVersion called without a presence check: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 12).
  */
 import type { Storage } from '../storage/interface.js';
@@ -77,10 +79,9 @@ export async function moveEcosystemSubscriptionsByOwnerOnce(
       if (!left.length) {
         await storage.deleteMemory(system, LEGACY_SUBSCRIPTIONS_KEY, system);
       } else {
-        // Only on the version read; a storage without the conditional write keeps the record whole,
-        // which costs nothing, since no write reads it any more.
+        // Only on the version read.
         const rest = { ...legacy, key: LEGACY_SUBSCRIPTIONS_KEY, value: left, version: legacy.version + 1, updatedAt: at };
-        const written = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(rest, legacy.version) : false;
+        const written = !!await storage.setMemoryIfVersion(rest, legacy.version);
         if (!written) logger.warn('Ecosystem subscriptions: the node-wide record was not rewritten on the version read; it stays as it is');
       }
     }

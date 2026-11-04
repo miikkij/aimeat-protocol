@@ -13,6 +13,8 @@
  * @usage await updateRecord(storage, 'package-entitlements', key, parse, cur => ({ ...cur, n: 1 }), { tag: 'x' });
  *   await updateMemoryRecord(storage, owner, key, rec => rec ? { tags: [...rec.tags, 't'] } : UNCHANGED);
  * @version-history
+ *   2026-11-04 — No plain setMemory when the storage lacks setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on the Storage interface now (codebase analysis 2026-11-03, item D-e).
  *   v1.3.0 — 2026-10-19 — `opts.visibility` also takes a function of the stored record, for a caller
  *     whose blind write kept the stored record's visibility (wish
  *     wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j, G6).
@@ -59,10 +61,8 @@ export async function updateRecord<T>(
       version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
     };
     if (!rec) {
-      if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return next; }
       if (await storage.createMemoryIfAbsent(record)) return next;
     } else {
-      if (!storage.setMemoryIfVersion) { await storage.setMemory(record); return next; }
       if (await storage.setMemoryIfVersion(record, rec.version)) return next;
     }
   }
@@ -96,10 +96,8 @@ export async function updateMemoryRecord(
       ...base, ...patch, key, ownerGaii: owner, version: base.version + 1, createdAt: base.createdAt, updatedAt: now,
     };
     if (!rec) {
-      if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return record; }
       if (await storage.createMemoryIfAbsent(record)) return record;
     } else {
-      if (!storage.setMemoryIfVersion) { await storage.setMemory(record); return record; }
       if (await storage.setMemoryIfVersion(record, rec.version)) return record;
     }
   }

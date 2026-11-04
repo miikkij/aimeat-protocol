@@ -19,6 +19,8 @@
  * @structure DataWalletService.overview(ownerGaii, auditDays?, entryLimit?) → { consents, audit, permSummary, names }
  * @usage const ov = await createDataWalletService(storage).overview(resolve(req), 30);
  * @version-history
+ *   2026-11-04 — No per-organism scan for a storage without getMemoryByKeysAnyOwner: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-09-04 — Audit grouped (consent-audit-groups.ts), newest rows only (entry_limit),
  *     organism + workspace names, the consent quota in the summary.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Data Wallet tab's 3 reads into one composite (memory = meta-only).
@@ -132,9 +134,7 @@ export class DataWalletService {
     const records = await Promise.all(orgIds.map(id => this.storage.getOrganism(id)));
     records.forEach((o, i) => { if (o?.name) organisms[orgIds[i]] = o.name; });
     const keyToOrg = new Map(orgIds.map(id => [wsRegistryKey(id), id]));
-    const regs: MemoryRecord[] = this.storage.getMemoryByKeysAnyOwner
-      ? await this.storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()])
-      : (await Promise.all(orgIds.map(id => this.storage.listAllMemory({ prefix: wsRegistryKey(id), limit: 1000 }).then(r => r.items)))).flat();
+    const regs: MemoryRecord[] = await this.storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()]);
     for (const rec of regs) {
       const orgId = keyToOrg.get(rec.key);
       if (!orgId) continue;

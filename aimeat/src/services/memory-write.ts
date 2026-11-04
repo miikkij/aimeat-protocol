@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The ceilings take the record this write already read, and the kept totals instead of
  *     a SUM and a COUNT over the writer's rows (codebase analysis 2026-11-03, item C3). The contract's
  *     types moved unchanged to memory-write-types.ts and are exported from here as before.
@@ -491,10 +493,8 @@ export async function writeMemoryRecord(
         if (input.expectedVersion === undefined) {
             landed = await storage.setMemory(prepared);
         } else if (input.expectedVersion === 0) {
-            if (!storage.createMemoryIfAbsent) throw new Error('Storage must support atomic memory creation');
             landed = await storage.createMemoryIfAbsent(prepared);
         } else {
-            if (!storage.setMemoryIfVersion) throw new Error('Storage must support atomic memory updates');
             landed = await storage.setMemoryIfVersion(prepared, input.expectedVersion);
         }
         if (landed) await storeHeldProvenance(storage, held);

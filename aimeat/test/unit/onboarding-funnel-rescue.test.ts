@@ -74,6 +74,15 @@ function makeStorage(ghiis: any[], memory: Record<string, Record<string, unknown
             this.writes.push(rec);
             return rec;
         },
+        // The conditional writes every Storage has (required since 2026-11-04).
+        async createMemoryIfAbsent(rec: any) {
+            if (mem[rec.ownerGaii]?.[rec.key]) return null;
+            return this.setMemory(rec);
+        },
+        async setMemoryIfVersion(rec: any, v: number) {
+            if (mem[rec.ownerGaii]?.[rec.key]?.version !== v) return null;
+            return this.setMemory(rec);
+        },
     } as any;
 }
 

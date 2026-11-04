@@ -30,6 +30,8 @@
  * @usage
  *   const facts = (await allDatasetFacts(storage)).filter(f => f.audience === 'public');
  * @version-history
+ *   2026-11-04 — No per-record getMemory for a storage without getMemoryByKeysAnyOwner: it is required
+ *     on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The cached facts carry MEMORY_ANY_LEVEL_TAG, so a change to a record only its owner
  *     reads still drops them (codebase analysis 2026-11-03, item C4).
  *   v1.4.0 — 2026-11-02 — A manifest counts only in the namespace and at the key the service writes it,
@@ -237,14 +239,7 @@ export async function allDatasetFacts(storage: Storage): Promise<DatasetFacts[]>
     const records: MemoryRecord[] = [];
     const keys = [...new Set(found.map(f => f.key))];
     for (let i = 0; i < keys.length; i += READ_CHUNK) {
-      const chunk = keys.slice(i, i + READ_CHUNK);
-      if (storage.getMemoryByKeysAnyOwner) records.push(...await storage.getMemoryByKeysAnyOwner(chunk));
-      else {
-        for (const f of found.filter(x => chunk.includes(x.key))) {
-          const rec = await storage.getMemory(f.ownerGaii, f.key);
-          if (rec) records.push(rec);
-        }
-      }
+      records.push(...await storage.getMemoryByKeysAnyOwner(keys.slice(i, i + READ_CHUNK)));
     }
     const wanted = new Set(found.map(f => `${f.ownerGaii}|${f.key}`));
     const listed: DatasetFacts[] = [];

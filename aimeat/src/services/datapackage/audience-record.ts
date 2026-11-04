@@ -52,6 +52,8 @@
  *   const trusted = await trustedAudienceOf(storage, nodeId, ownerGhii, name, pointer);
  *   if (!(await datapackageReadable(storage, ownerGhii, trusted.visibility, reader))) return null;
  * @version-history
+ *   2026-11-04 — No per-package getMemory for a storage without getMemoryByKeysAnyOwner: it is required
+ *     on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.3.0 -- 2026-11-02 -- recordedAudiencesOf: the recorded audience and withdrawal of many packages in
  *     one bulk read, for the node-wide catalogue listing (secaudit2026nov02d round 13).
  *   v1.2.0 -- 2026-11-01 -- The record carries the owner's confirmation of a public package from personal
@@ -315,16 +317,9 @@ export async function recordedAudiencesOf(
 ): Promise<Map<string, RecordedAudience> | null> {
     if (!(await audienceRuleInForce(storage, nodeId))) return null;
     const found = new Map<string, unknown>();
-    if (storage.getMemoryByKeysAnyOwner) {
-        const keys = [...new Set(pkgs.map(p => audienceRecordKey(p.name)))];
-        for (let i = 0; i < keys.length; i += RECORD_READ_CHUNK) {
-            for (const r of await storage.getMemoryByKeysAnyOwner(keys.slice(i, i + RECORD_READ_CHUNK))) found.set(`${r.ownerGaii}|${r.key}`, r.value);
-        }
-    } else {
-        for (const p of pkgs) {
-            const r = await storage.getMemory(p.ownerGhii, audienceRecordKey(p.name));
-            if (r) found.set(`${r.ownerGaii}|${r.key}`, r.value);
-        }
+    const keys = [...new Set(pkgs.map(p => audienceRecordKey(p.name)))];
+    for (let i = 0; i < keys.length; i += RECORD_READ_CHUNK) {
+        for (const r of await storage.getMemoryByKeysAnyOwner(keys.slice(i, i + RECORD_READ_CHUNK))) found.set(`${r.ownerGaii}|${r.key}`, r.value);
     }
     const out = new Map<string, RecordedAudience>();
     for (const p of pkgs) {

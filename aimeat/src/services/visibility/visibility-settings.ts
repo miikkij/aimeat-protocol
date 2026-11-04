@@ -16,6 +16,8 @@
  *   resetVisibilitySettingsCache (tests)
  * @usage const s = await cachedVisibilitySettings(storage, ownerGhii); if (s.enabled) …
  * @version-history
+ *   2026-11-04 — listMemoryKeysByPrefix called without optional chaining: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.1.1 — 2026-10-19 — setVisibilitySettings changes the record on its version (updateRecord)
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.1.0 — 2026-10-11 — tagsInUseOnNode: which analytics services any account holder uses, so the
@@ -120,7 +122,7 @@ export async function refreshTagsInUse(storage: Storage): Promise<TagsInUse> {
   tagsInUseStorage = storage;
   try {
     const found: TagsInUse = { clarity: false, ga4: false };
-    for (const { ownerGaii, key } of (await storage.listMemoryKeysByPrefix?.(VISIBILITY_SETTINGS_KEY)) ?? []) {
+    for (const { ownerGaii, key } of await storage.listMemoryKeysByPrefix(VISIBILITY_SETTINGS_KEY)) {
       if (key !== VISIBILITY_SETTINGS_KEY) continue;
       const s = await getVisibilitySettings(storage, ownerGaii);
       if (s.clarityProjectId) found.clarity = true;

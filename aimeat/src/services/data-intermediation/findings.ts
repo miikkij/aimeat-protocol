@@ -27,6 +27,8 @@
  * @structure IntermediationFacts · gatherFacts · buildFindings · ITEM_CAP
  * @usage const facts = await gatherFacts(deps, { owner }); const findings = buildFindings(facts);
  * @version-history
+ *   2026-11-04 — getMemoryByKeysAnyOwner called without a presence check: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-11-01 — Finding (d) counts the apps whose party signup is open and that sell (plan D4.5).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D7.3, D7.5, D7.6, D2.10).
  */
@@ -123,7 +125,7 @@ export async function gatherFacts(deps: { storage: Storage; config: AimeatConfig
     const pricedShares: IntermediationFacts['pricedShares'] = [];
     const personParties: IntermediationFacts['personParties'] = [];
     let liveShares = 0, parties = 0, consents = 0;
-    const partyRecords = storage.getMemoryByKeysAnyOwner ? await storage.getMemoryByKeysAnyOwner([PARTIES_KEY]) : [];
+    const partyRecords = await storage.getMemoryByKeysAnyOwner([PARTIES_KEY]);
     for (const rec of partyRecords) {
         const account = localAccountName(rec.ownerGaii);
         if (!mine(account) || !rec.ownerGaii.endsWith(`@${config.nodeId}`)) continue;

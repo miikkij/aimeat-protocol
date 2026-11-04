@@ -19,6 +19,8 @@
  *   - CleanupResult / FEDERATION_PREFIXES: result shape and the scanned key prefixes
  *
  * @version-history
+ *   2026-11-04 — setMemoryIfVersion called without a presence check: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — A row dated more than five minutes ahead of this node's clock is rewritten with the
  *     cycle's time and kept, so it ages out from then; such a row was kept on every cycle for as long
  *     as the time a peer chose (secaudit2026oct26, replica peer-chosen-updatedAt). Counted in
@@ -153,7 +155,7 @@ export async function runCleanupCycle(
           try {
             // Written on the version read: a replicate landing in between keeps its own write.
             const full = await storage.getMemory(row.ownerGaii, row.key);
-            if (full && storage.setMemoryIfVersion && await storage.setMemoryIfVersion({ ...full, version: full.version + 1, updatedAt: now.toISOString() }, full.version)) result.futureClamped++;
+            if (full && await storage.setMemoryIfVersion({ ...full, version: full.version + 1, updatedAt: now.toISOString() }, full.version)) result.futureClamped++;
           } catch (err) {
             logger.warn('runCleanupCycle: a row dated ahead of the clock could not be brought to the present, continuing', {
               prefix, key: row.key, owner: row.ownerGaii, error: String(err),

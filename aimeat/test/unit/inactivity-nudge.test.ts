@@ -8,6 +8,8 @@
  *   this month, and the whole feature switched off.
  * @usage cd aimeat && pnpm exec vitest run test/unit/inactivity-nudge.test.ts
  * @version-history
+ *   v1.1.1 — 2026-11-04 — The fake storage answers createMemoryIfAbsent and setMemoryIfVersion through its
+ *     setMemory: both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-11-04 — The verified fixture carries the flag and the hash the code-confirm paths
  *     write with level 1; an address that changed, an unproven address at level 3 and an address the
  *     hash does not name get no mail (codebase analysis 2026-11-03, item A9).
@@ -58,7 +60,7 @@ function ghii(over: Record<string, unknown> = {}) {
  * make every "it sends" test pass for the wrong reason.
  */
 function fakeStorage(over: Record<string, unknown> = {}) {
-    return {
+    const s: Record<string, unknown> = {
         listGHIIs: async () => [ghii()],
         listActiveSessions: async () => [],
         listChatInstances: async () => [],
@@ -66,7 +68,13 @@ function fakeStorage(over: Record<string, unknown> = {}) {
             key === 'settings.email_notifications' ? { value: { enabled: true } } : null,
         setMemory: vi.fn(async () => undefined),
         ...over,
-    } as never;
+    };
+    // The conditional writes every Storage has (required since 2026-11-04). Nothing else writes in
+    // this fake, so each one lands, and it lands through the fake's setMemory, which the cases read.
+    const land = async (r: unknown) => { await (s.setMemory as (r: unknown) => Promise<unknown>)(r); return r; };
+    s.createMemoryIfAbsent ??= land;
+    s.setMemoryIfVersion ??= land;
+    return s as never;
 }
 
 const run = (storage: unknown, cfg = config) =>

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — getMemoryByKeys called without a non-null assertion: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The bulk write and the import announce with emitRecordChangePriorUnknown: the same
  *     streams hear them, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   2026-10-31 — The write tally names an app grant as the app (data-map/tally-writer.ts; secaudit2026oct31w2 round 10).
@@ -434,7 +436,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // entry becomes a NEW key (created). One batched existing-lookup covers the first probe; deeper
     // collisions fall back to per-candidate reads (rare).
     if (mode === 'rename' && survivors.length) {
-      const existingKeys = new Set((await storage.getMemoryByKeys!(gaii, survivors.map(s => s.key))).map(r => r.key));
+      const existingKeys = new Set((await storage.getMemoryByKeys(gaii, survivors.map(s => s.key))).map(r => r.key));
       for (const s of survivors) {
         if (!existingKeys.has(s.key)) continue;
         let n = 1;

@@ -32,6 +32,8 @@
  *   if (!claim) return { ran: false };
  *   try { ...work...; await claim.finish({ at, ... }); } catch (err) { await claim.release(); throw err; }
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — secaudit2026oct26: a claim carries ruleSince, the time the node first tried the
  *     step, kept in `<key>.first-seen` across a release; keptBefore and madeBefore for the steps.
  *   v1.0.0 — 2026-10-18 — Initial (check:atomic-writes, the boot migration sites).
@@ -85,8 +87,7 @@ async function ruleSince(storage: Storage, owner: string, key: string, at: strin
     key: k, ownerGaii: owner, value: { at }, visibility: 'private', tags: ['migration'],
     ttlHours: null, version: 1, createdAt: at, updatedAt: at,
   };
-  if (storage.createMemoryIfAbsent) await storage.createMemoryIfAbsent(rec);
-  else await storage.setMemory(rec);
+  await storage.createMemoryIfAbsent(rec);
   return (await read()) ?? at;
 }
 
@@ -122,10 +123,9 @@ export async function claimOnceOnlyStep(storage: Storage, owner: string, key: st
     // Never swept: a record that expired would run the step again at the next start.
     ttlHours: null, version: (prior?.version ?? 0) + 1, createdAt: prior?.createdAt ?? at, updatedAt: at,
   };
-  // A storage without the conditional writes writes plainly, as these steps did before.
   const won = prior
-    ? (storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(claim, prior.version) : (await storage.setMemory(claim), true))
-    : (storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(claim) : (await storage.setMemory(claim), true));
+    ? !!await storage.setMemoryIfVersion(claim, prior.version)
+    : !!await storage.createMemoryIfAbsent(claim);
   if (!won) return null;
   if (prior) logger.warn(`Boot step ${key}: a claim from ${runningClaim(prior.value)?.claimedAt} never finished; running the step now`);
 
@@ -133,7 +133,7 @@ export async function claimOnceOnlyStep(storage: Storage, owner: string, key: st
     ruleSince: since,
     async finish(value: Record<string, unknown>): Promise<void> {
       const done: MemoryRecord = { ...claim, value, version: claim.version + 1, updatedAt: new Date().toISOString() };
-      const written = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(done, claim.version) : (await storage.setMemory(done), true);
+      const written = !!await storage.setMemoryIfVersion(done, claim.version);
       // Only a takeover after the lease changes the claim, and that process writes its own record.
       if (!written) logger.warn(`Boot step ${key}: another process took the step over after its claim lapsed; its record stands`);
       // The step is done, so the first-seen time has nothing left to bound; a step whose done record

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — PUT /:key with owner_scope: a caller that reads a sibling's record as absent does not
  *     change its visibility, 403 SCOPE_DENIED naming memory:read-as-owner; the value and tags it still
  *     edits (secaudit2026oct26, put-owner-scope-sibling-relabel-bypasses-read-as-owner).
@@ -625,9 +627,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     for (let attempt = 0; attempt < CORS_ATTEMPTS && current && !landed; attempt++) {
       current.allowedOrigins = origins;
       current.updatedAt = new Date().toISOString();
-      landed = storage.setMemoryIfVersion
-        ? !!(await storage.setMemoryIfVersion({ ...current, key: current.key }, current.version))
-        : !!(await storage.setMemory(current));
+      landed = !!(await storage.setMemoryIfVersion({ ...current, key: current.key }, current.version));
       if (!landed) current = await readRecord();
     }
     if (!current) {

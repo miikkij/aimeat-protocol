@@ -19,6 +19,8 @@
  * @structure recordBehaviour · flushBehaviour · mergeBehaviourDay · BehaviourBeacon
  * @usage recordBehaviour(storage, { ownerGhii, app, optedOut, vc, scroll, heat, dead, rage });
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.1 — 2026-10-11 — A new record's `spec` is the served contract address (VISIBILITY_MONTH_SPEC).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
@@ -198,8 +200,8 @@ async function mergeApp(storage: Storage, ownerGhii: string, app: string, days: 
         version: version + 1, createdAt: row?.createdAt ?? now, updatedAt: now,
       } as MemoryRecord;
       const won = version === 0
-        ? (storage.createMemoryIfAbsent ? !!(await storage.createMemoryIfAbsent(record)) : (await storage.setMemory(record), true))
-        : (storage.setMemoryIfVersion ? !!(await storage.setMemoryIfVersion(record, version)) : (await storage.setMemory(record), true));
+        ? !!(await storage.createMemoryIfAbsent(record))
+        : !!(await storage.setMemoryIfVersion(record, version));
       if (won) return;
     }
     logger.warn('behaviour: gave up merging counts after repeated write conflicts', { ownerGhii, app });

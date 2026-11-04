@@ -33,6 +33,8 @@
  *   const refusal = await ecosystemCallRefusal({ storage, config }, { capability, app, action, callerGhii, input });
  *   if (refusal) throw Object.assign(new Error(refusal.message), refusal);
  * @version-history
+ *   2026-11-04 — No guard for a storage without swapEcosystemAppCapabilityApprovals: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.3.0 — 2026-10-25 — The account holder's notice carries its question's ref, and Allow and Don't
  *     allow close it: the answer shows and the buttons go (closeQuestion).
  *   v1.2.0 — 2026-10-25 — Allow and Don't allow tell the one whose call asked (approval-standard.ts
@@ -96,7 +98,6 @@ async function updateApprovals(
   storage: Storage, ownerName: string, app: string,
   change: (list: EcoCapabilityApproval[]) => EcoCapabilityApproval[] | null,
 ): Promise<{ list: EcoCapabilityApproval[]; changed: boolean; record: EcosystemAppRecord } | null> {
-  if (!storage.swapEcosystemAppCapabilityApprovals) throw new Error('this storage cannot keep capability approvals');
   for (let i = 0; i < SWAP_TRIES; i++) {
     const record = await storage.getEcosystemAppByOwnerAndApp(ownerName, app);
     if (!record) return null;

@@ -12,6 +12,8 @@
  * @structure MessagesInboxService.overview(ownerGhii, ownerName, { inPerson }) → { requests, conversations, important, tracked, agents, groups, peerNames, peerAvatars }
  * @usage const inbox = await createMessagesInboxService(storage).overview(ghii, owner);
  * @version-history
+ *   2026-11-04 — No per-id read for a storage without getDirectMessagesByIds: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.5.0 — 2026-10-19 — peerAvatars: the picture of every on-screen agent (services/agent-avatar.ts).
  *   v1.4.0 — 2026-10-09 — The agents go out without their webhook signing secret (agentRecordView),
  *     found by e2e-secret-canary-sweep (secrets audit 2026-10-09).
@@ -151,9 +153,7 @@ export class MessagesInboxService {
     const firstIds = pending.map(c => c.firstMessageId).filter((x): x is string => !!x);
     const firstById = new Map<string, DirectMessageRecord>();
     if (firstIds.length) {
-      const msgs = this.storage.getDirectMessagesByIds
-        ? await this.storage.getDirectMessagesByIds(firstIds, ownerGhii)
-        : (await Promise.all(firstIds.map(id => this.storage.getDirectMessage(id, ownerGhii)))).filter((m): m is DirectMessageRecord => !!m);
+      const msgs = await this.storage.getDirectMessagesByIds(firstIds, ownerGhii);
       for (const m of msgs) firstById.set(m.id, m);
     }
     return pending.map(c => {

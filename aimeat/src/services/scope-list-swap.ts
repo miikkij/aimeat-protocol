@@ -15,6 +15,8 @@
  *   const next = await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes,
  *     held => { const missing = wordsFor(held); return missing.length ? [...held, ...missing] : null; });
  * @version-history
+ *   2026-11-04 — No unconditional update for a storage without the conditional scope writes: all
+ *     three are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-18 — Initial (check:atomic-writes, the boot migration sites).
  */
 import type { Storage } from '../storage/interface.js';
@@ -33,19 +35,9 @@ async function readList(storage: Storage, t: ScopeListTarget): Promise<readonly 
 
 /** Write `next` if the stored list is still `held`; true when written. */
 async function swap(storage: Storage, t: ScopeListTarget, held: readonly string[], next: string[]): Promise<boolean> {
-  if (t.kind === 'agent') {
-    if (storage.setAgentScopesIf) return storage.setAgentScopesIf(t.id, held, next);
-    await storage.updateAgent(t.id, { defaultScopes: next });
-    return true;
-  }
-  if (t.kind === 'ecosystem-app') {
-    if (storage.setEcosystemAppScopesIf) return storage.setEcosystemAppScopesIf(t.id, held, next);
-    await storage.updateEcosystemApp(t.id, { scopes: next });
-    return true;
-  }
-  if (storage.setAppGrantScopesIf) return storage.setAppGrantScopesIf(t.id, held, next);
-  await storage.updateAppGrant(t.id, { scopes: next });
-  return true;
+  if (t.kind === 'agent') return storage.setAgentScopesIf(t.id, held, next);
+  if (t.kind === 'ecosystem-app') return storage.setEcosystemAppScopesIf(t.id, held, next);
+  return storage.setAppGrantScopesIf(t.id, held, next);
 }
 
 /**

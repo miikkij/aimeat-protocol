@@ -30,6 +30,8 @@
  *   const standing = await workspaceStanding(deps, caller, orgId, ws);
  *   if (isRefusal(standing)) return standing;
  * @version-history
+ *   2026-11-04 — No value scan for a storage without listMemoryKeysByPrefix: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — existingDocIds reads a page's id from the end of its key (recordRowAt), so a page
  *     whose id holds a dot counts as present; it read as gone, and unfiling it passed as housekeeping
  *     (secaudit2026oct31w2 round 10b, dotted record ids).
@@ -306,9 +308,7 @@ export async function existingDocIds(
     deps: ChangeDeps, orgId: string, ws: string, namespace: string, ids: string[],
 ): Promise<Set<string>> {
     const prefix = `${wsRoot(orgId, ws)}.${namespace}.`;
-    const keys = deps.storage.listMemoryKeysByPrefix
-        ? (await deps.storage.listMemoryKeysByPrefix(prefix)).map(r => r.key)
-        : (await deps.storage.listAllMemory({ prefix, limit: 10000, archived: 'include' })).items.map(r => r.key);
+    const keys = (await deps.storage.listMemoryKeysByPrefix(prefix)).map(r => r.key);
     // The id is read from the end of the key (recordRowAt), so a page whose id holds a dot is found
     // under its whole id; split on the first dot it read as gone (secaudit2026oct31w2 round 10b). A
     // bare rest with a dot in it is taken whole, as such a page's id.

@@ -2,6 +2,7 @@
  * @file app-record-keys.ts
  * @description Collision-free app record identities and verified legacy migration.
  * @version-history
+ *   2026-11-04 - No guard for a storage without createMemoryIfAbsent: it is required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 - readAuthorAppRecord and appRecordsOfAuthor: an author's records (the design spec, the roadmap) do not pass to the next holder of an erased name (secaudit2026oct26).
  *   2026-10-05 - tokenOfThisApp moved here from auth/app-own-gate.ts (which re-exports it), so the roster services ask it; aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
  *   v1.0.0 - 2026-09-08 - Keep owner boundaries and filename case.
@@ -38,7 +39,6 @@ export async function readAppRecord(storage: Storage, ns: string, key: string, a
     if (existing) return existing;
     const live = await storage.getMemory(ns, legacyKey);
     if (!live || !equalAppId((live.value as { appId: string })?.appId, appId)) return null;
-    if (!storage.createMemoryIfAbsent) throw new Error('App record migration requires atomic storage creation.');
     const migrated = await storage.createMemoryIfAbsent({ ...live, key, visibility: 'private' });
     await storage.deleteMemory(ns, legacyKey);
     return migrated ?? await storage.getMemory(ns, key);

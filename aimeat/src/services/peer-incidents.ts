@@ -26,6 +26,8 @@
  *   void reportPeerIncident(storage, config.nodeId, { kind: 'id-held', nodeId, presented: { key, url },
  *       held: { key: peer.publicKey, url: peer.url }, via: 'introduce', actor: node_id });
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-18 — The marker is claimed with createMemoryIfAbsent before the incident is recorded, the
  *     bounds are counted after the claim, and the incident id is written on the claim's version.
  *   v1.0.0 — 2026-10-01 — Initial (follow-up to the peer-registration incident, items 5 and 6).
@@ -71,11 +73,7 @@ export async function reportPeerIncident(storage: Storage, thisNodeId: string, e
             key: marker, ownerGaii: NS_PEER_ORIGIN, value: { nodeId: e.nodeId, kind: e.kind, incident: null as string | null, at: now },
             visibility: 'private' as const, tags: ['peer-incident'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
         };
-        if (storage.createMemoryIfAbsent) {
-            if (!await storage.createMemoryIfAbsent(claimed)) return;
-        } else {
-            await storage.setMemory(claimed);
-        }
+        if (!await storage.createMemoryIfAbsent(claimed)) return;
         const unclaim = () => storage.deleteMemory(NS_PEER_ORIGIN, marker);
         const all = await storage.listMemory(NS_PEER_ORIGIN, { prefix: 'incident.' });
         // By the recorded node id, not the key prefix: a node id may contain dots, so one id's prefix can begin another's.
@@ -100,8 +98,7 @@ export async function reportPeerIncident(storage: Storage, thisNodeId: string, e
         if (!out.recorded) { await unclaim(); return; }
         // On the claim's own version: a marker removed meanwhile (forgetPeer) is not written back.
         const recorded = { ...claimed, value: { ...claimed.value, incident: out.id }, updatedAt: new Date().toISOString() };
-        if (storage.setMemoryIfVersion) await storage.setMemoryIfVersion(recorded, claimed.version);
-        else await storage.setMemory(recorded);
+        await storage.setMemoryIfVersion(recorded, claimed.version);
     } catch (err) {
         logger.warn('reportPeerIncident: the Security page entry is best-effort', { error: String(err), nodeId: e.nodeId, kind: e.kind });
     }

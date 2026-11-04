@@ -5,6 +5,8 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.5.2 — 2026-10-23 — A ban that removes the peer also revokes its approved peering requests, so a key
  *     exchange cannot re-admit it (Core FED-15; secaudit2026oct22).
  *   v1.5.1 — 2026-10-18 — A peer's trust notice is stored on the version read (setMemoryIfVersion), and
@@ -220,11 +222,9 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
                 ttlHours: null, version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
             };
             if (existing) {
-                if (!storage.setMemoryIfVersion) { await storage.setMemory(next); record = value; }
-                else if (await storage.setMemoryIfVersion(next, existing.version)) record = value;
+                if (await storage.setMemoryIfVersion(next, existing.version)) record = value;
                 continue;
             }
-            if (!storage.createMemoryIfAbsent) { await storage.setMemory(next); record = value; continue; }
             if (!await storage.createMemoryIfAbsent(next)) continue;
             const held = await storage.listMemory(systemGaii, { prefix: `trust_advisory:recv:${source_node}:` });
             if (held.length > MAX_RECEIVED_PER_PEER) {

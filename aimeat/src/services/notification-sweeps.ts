@@ -14,6 +14,8 @@
  *   readNotificationInbox and findOwnerNotificationsByIds (the bell's page and the by-id lookup)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.5.0 -- 2026-11-04 -- readNotificationInbox: the bell's page and its unread and total counts, read in
  *     SQL; findOwnerNotificationsByIds: the notifications of named ids, narrowed by the key's end (codebase
  *     analysis 2026-11-03, item C7).
@@ -177,7 +179,7 @@ export async function sweepHeldPushes(storage: Storage, _config: AimeatConfig, p
           key: n.key, ownerGaii: ghii, value: { ...n.value, held: false }, visibility: 'private' as const, tags: ['notif'],
           ttlHours: 24 * 90, version: n.version + 1, createdAt: n.createdAt, updatedAt: now,
         };
-        const won = storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(record, n.version) : await storage.setMemory(record);
+        const won = await storage.setMemoryIfVersion(record, n.version);
         if (won) held.push(n);
       }
       if (!held.length) continue;

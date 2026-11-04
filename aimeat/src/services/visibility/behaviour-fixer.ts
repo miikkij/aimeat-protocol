@@ -19,6 +19,8 @@
  *   BehaviourFixError
  * @usage const run = await runBehaviourFix(storage, config, ownerGhii, 'shop.html', 'owner');
  * @version-history
+ *   2026-11-04 — No skip for a storage without listMemoryKeysByPrefix: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-15 — A run on request reads the fixer switch too: 409 FIXER_OFF while it is off (feature-list audit 91).
  *   v1.0.1 — 2026-10-11 — The runs record's `spec` is the served contract address (VISIBILITY_MONTH_SPEC).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
@@ -193,7 +195,7 @@ export async function runBehaviourFix(
  */
 export async function runWeeklyBehaviourFixer(storage: Storage, config: AimeatConfig): Promise<{ owners: number; runs: number; drafts: number }> {
   const result = { owners: 0, runs: 0, drafts: 0 };
-  if (!nodeWatchesBehaviour(config) || !storage.listMemoryKeysByPrefix) return result;
+  if (!nodeWatchesBehaviour(config)) return result;
   for (const { ownerGaii, key } of await storage.listMemoryKeysByPrefix(BEHAVIOUR_SETTINGS_KEY)) {
     if (key !== BEHAVIOUR_SETTINGS_KEY || !localAccountOf(ownerGaii)) continue;
     const settings = await getBehaviourSettings(storage, ownerGaii);

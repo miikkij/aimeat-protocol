@@ -17,15 +17,15 @@
  * @structure holdsOldestPackageCopy(storage, manifestKey, identities)
  * @usage if (!(await holdsOldestPackageCopy(storage, manifestKey, identities))) return notFound();
  * @version-history
+ *   2026-11-04 — No prefix scan for a storage without getMemoryByKeysAnyOwner: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 
 /** Every live copy of `key` on this node, whoever holds it. */
 async function copiesOf(storage: Storage, key: string): Promise<MemoryRecord[]> {
-  const rows = storage.getMemoryByKeysAnyOwner
-    ? await storage.getMemoryByKeysAnyOwner([key])
-    : (await storage.listAllMemory({ prefix: key, limit: 1000 })).items;
+  const rows = await storage.getMemoryByKeysAnyOwner([key]);
   return rows.filter(r => r.key === key);
 }
 

@@ -23,7 +23,12 @@ function stubStorage(keysHeld: number): { storage: Storage; writes: string[] } {
         getMemory: async () => null,
         countMemory: async () => keysHeld,
         sumMemoryBytes: async () => 0,
+        // The kept totals every Storage has (required since 2026-11-04): the same count and sum.
+        getMemoryTotals: async () => ({ keys: keysHeld, bytes: 0 }),
         setMemory: async (rec: { key: string }) => { writes.push(rec.key); return rec; },
+        // The conditional insert every Storage has (required since 2026-11-04). getMemory answers
+        // null for every key here, so each insert lands.
+        createMemoryIfAbsent: async (rec: { key: string }) => { writes.push(rec.key); return rec; },
     } as unknown as Storage;
     return { storage, writes };
 }

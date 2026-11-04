@@ -32,6 +32,8 @@
  *   if (existing && await proofVerifies(existing.publicKey, owner, name, body.proof, Date.now(), nodeId)
  *     && await spendReturnProof(storage, ownerGhii, body.proof)) await markReturnProven(storage, ownerGhii, userCode, gaii);
  * @version-history
+ *   2026-11-04 — No pass for a storage without createMemoryIfAbsent: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-10-27 — ecoHelloProofMessage and ecoHelloProofVerifies: an ecosystem app proves a
  *     same-key reconnect with its pinned key (secaudit2026oct26, token-pickup-without-pinned-key-proof).
  *   2026-10-27 — The v2 text names the node (`aimeat-device-return:v2\n<node id>\n<owner>\n<agent>\n<signed_at>`),
@@ -126,9 +128,7 @@ export async function spendReturnProof(storage: Storage, ownerGhii: string, proo
     key: `${RETURN_PROOF_PREFIX}spent-${id}`, ownerGaii: ownerGhii, value: { spent_at: at }, visibility: 'private' as const,
     tags: ['agent', 'device-return'], ttlHours: 1, version: 1, createdAt: at, updatedAt: at,
   };
-  // One conditional insert: of two processes taking the same proof, one wins. Both providers have it;
-  // a store without it is held by this process's own record above.
-  if (!storage.createMemoryIfAbsent) return true;
+  // One conditional insert: of two processes taking the same proof, one wins.
   return (await storage.createMemoryIfAbsent(record)) !== null;
 }
 

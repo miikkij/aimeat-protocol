@@ -26,6 +26,8 @@
  * @structure ACS_STRIPE_VERSION · intakeAgentOrder · IntakeResult
  * @usage const r = await intakeAgentOrder(storage, config, ownerGhii, sessionObject, event.id);
  * @version-history
+ *   2026-11-04 — No guard for a storage without createMemoryIfAbsent: it is required on Storage
+ *     (codebase analysis 2026-11-03, item D-e).
  *   v1.2.0 — 2026-10-25 — A session Stripe reads back as not paid answers not_yet_paid and takes no
  *     order; checkout.session.async_payment_succeeded takes it once paid (secaudit2026oct22).
  *   v1.1.0 — 2026-10-10 — The order key is claimed with createMemoryIfAbsent before the fulfilment
@@ -165,7 +167,6 @@ export async function intakeAgentOrder(
   // the same event, or a Stripe retry after a slow first attempt, both pass the getMemory check at the
   // top; only one of them wins this insert, and the other answers already_taken without creating
   // tasks, counting the purchase or writing payment_received a second time.
-  if (!storage.createMemoryIfAbsent) throw new Error('Agent order intake requires atomic storage creation.');
   order.fulfillment = { taskIds: [] };
   const claimed = await storage.createMemoryIfAbsent({
     key: orderKey(stripeSessionId), ownerGaii: sellerGhii, value: { ...order } as unknown as Record<string, unknown>,

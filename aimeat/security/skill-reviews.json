@@ -2,13 +2,13 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:agent-avatar": {
-      "reviewedOn": "2026-10-19",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/agent-avatar.ts",
         "aimeat/src/routes/agents/avatar.ts",
         "aimeat/src/data/agent-avatar-templates.ts"
       ],
-      "digest": "sha256:3191bf463992cd653fff6945"
+      "digest": "sha256:1154c40201046749e1eded5e"
     },
     "node:aimeat-decide": {
       "reviewedOn": "2026-10-27",
@@ -45,11 +45,11 @@
       "digest": "sha256:839abfd09d483e7ae5575500"
     },
     "node:aimeat-open-items": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:4730794dc7914fef305e5e55"
+      "digest": "sha256:713b17bc7e4b121014ceda7b"
     },
     "node:aimeat-recurring-work": {
       "reviewedOn": "2026-11-02",
@@ -346,7 +346,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:c946429c670cd375a568adb2"
+      "digest": "sha256:72676dacf022014cb574bf60"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-11-01",
@@ -385,7 +385,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:b5b746e2d100f33926ba08a4",
+      "digest": "sha256:0385c7a145fa3ad23d0f2180",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -400,14 +400,14 @@
       "digest": "sha256:5ccd6685d6c0d8af335879a2"
     },
     "node:aimeat-workflow-decisions": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/engine-human.ts",
         "aimeat/src/services/workflow/lifecycle.ts",
         "aimeat/src/mcp/workflows.ts"
       ],
-      "digest": "sha256:f7465674aff12a3ecb43197a"
+      "digest": "sha256:dd87be8aab072cf195f86746"
     },
     "node:aimeat-bookkeeping": {
       "reviewedOn": "2026-11-01",
@@ -511,11 +511,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-11-04",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:edfb584b4aa3baab233c7a6b"
+      "digest": "sha256:188d5f673ace31d526cefe75"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -540,7 +540,7 @@
   },
   "fileDigests": {
     "node:aimeat-open-items": {
-      "aimeat/src/services/open-items.ts": "cef5aded3c599ed5"
+      "aimeat/src/services/open-items.ts": "43236657d5a52e6f"
     },
     "node:aimeat-first-conversation": {
       "aimeat/src/services/model-recommendation.ts": "35430253a9486362"
@@ -701,7 +701,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "dca722aac4be161b"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "21226c4f9dabb2df"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -752,7 +752,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/cli/connect/mcp/local-server.ts": "0383709a9de3de50",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "dca722aac4be161b",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "21226c4f9dabb2df",
       "aimeat/src/routes/organisms/workspace-access.ts": "5f6047e5621c3e26",
       "aimeat/src/services/agent-profile-write.ts": "8cd2abe3dc838b0f",
       "aimeat/src/services/agent-task-rules.ts": "207afa09788c8a11"
@@ -767,8 +767,8 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "936a5d01b39626fe",
-      "aimeat/src/routes/memory/key.ts": "c91da37221733eba",
+      "aimeat/src/routes/memory/bulk.ts": "bb42109735a58663",
+      "aimeat/src/routes/memory/key.ts": "1b7da6f1cdeaa1f0",
       "aimeat/src/services/memory-bin.ts": "9fa3d0c47be934d5",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
@@ -785,7 +785,7 @@
     },
     "node:aimeat-workflow-decisions": {
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
-      "aimeat/src/services/workflow/engine-human.ts": "e526ff78525b0d61",
+      "aimeat/src/services/workflow/engine-human.ts": "63bfdbf288e0782d",
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29",
       "aimeat/src/mcp/workflows.ts": "cfe244d336c1b03c"
     },
@@ -812,7 +812,7 @@
       "aimeat/src/routes/page-host.ts": "11cf872797b054ef"
     },
     "node:agent-avatar": {
-      "aimeat/src/services/agent-avatar.ts": "e723ba76d91fa56a",
+      "aimeat/src/services/agent-avatar.ts": "49799d63c4108b71",
       "aimeat/src/routes/agents/avatar.ts": "412e3df74736e1bf",
       "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
     },

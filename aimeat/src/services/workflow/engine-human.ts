@@ -8,6 +8,8 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.5.0 — 2026-10-22 — An answer_to_key that names an `organism.*` key is written through the shared
  *     memory write, as the owner when the owner answered in person and otherwise as the run's
  *     principal, so the organism namespace rule applies (step-write.ts; secaudit 2026-10, r66). A
@@ -162,9 +164,8 @@ export async function applyHumanAnswer(
       });
       // Attached only on the version that was read: the record is about the bytes the person saw, so
       // a write that changed them meanwhile is kept and is not stamped as reviewed.
-      const stamped = provenanceId && (storage.setMemoryIfVersion
-        ? await storage.setMemoryIfVersion({ ...reviewed, key: reviewedKey, aiProvenanceId: provenanceId, updatedAt: now }, reviewed.version)
-        : await storage.setMemory({ ...reviewed, key: reviewedKey, aiProvenanceId: provenanceId, updatedAt: now }));
+      const stamped = provenanceId
+        && await storage.setMemoryIfVersion({ ...reviewed, key: reviewedKey, aiProvenanceId: provenanceId, updatedAt: now }, reviewed.version);
       if (stamped) {
         rs.writes = [...new Set([...rs.writes, reviewedKey])];
       } else if (provenanceId) {

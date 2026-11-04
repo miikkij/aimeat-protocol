@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
+ *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 — normalizeInboundAttachments moved to ./inbound-attachments.ts unchanged (max-file-lines).
  *   2026-10-27 — Replicate stores a record time more than five minutes ahead of this node's clock as
  *     the time the replica arrived, so the retention sweep ages it on this node's clock; a person
@@ -276,9 +278,9 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 updatedAt: incomingUpdatedAt,
             };
             if (!existing) {
-                stored = storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(replica) : (await storage.setMemory(replica), true);
+                stored = !!await storage.createMemoryIfAbsent(replica);
             } else {
-                stored = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(replica, existing.version) : (await storage.setMemory(replica), true);
+                stored = !!await storage.setMemoryIfVersion(replica, existing.version);
             }
         }
         if (!stored) {

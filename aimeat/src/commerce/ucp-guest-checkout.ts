@@ -33,6 +33,8 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   2026-11-04 — runUcpUpkeep no longer skips a storage without listMemoryKeysByPrefix: it is
+ *     required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The sale is booked after the order and the completed checkout are written, not
  *     before; the receipt's fee is computed by the same rate and function (codebase analysis
  *     2026-11-03, item B2).
@@ -780,7 +782,6 @@ export async function deliverOrderWebhook(storage: Storage, config: AimeatConfig
 
 /** The scheduled upkeep: deliver every webhook whose next try is due. */
 export async function runUcpUpkeep(storage: Storage, config: AimeatConfig): Promise<{ tried: number; delivered: number }> {
-  if (!storage.listMemoryKeysByPrefix) return { tried: 0, delivered: 0 };
   let tried = 0;
   let delivered = 0;
   for (const { ownerGaii, key } of await storage.listMemoryKeysByPrefix('commerce.ucp.pending.')) {

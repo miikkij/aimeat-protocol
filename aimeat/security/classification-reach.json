@@ -76,17 +76,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A node-written payables ledger: read-to-update and owner listing."
     },
-    "src/commerce/platform-fee.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-11, the node's own read: the existing platform-fee or checkout record, read only to carry its version and creation time into the upsert (moved unchanged from session-service.ts)."
-    },
     "src/commerce/platform-fee-writers.ts": {
       "reads": {
         "listAllMemoryPages": 1
       },
       "why": "Written 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: the money platform-fee records (commerce.platform-fee.*) read once at start to mark the ones another writer wrote and to name the undecided ones to the operator. Fee figures only, no content, shown to no one but the operator."
+    },
+    "src/commerce/platform-fee.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: the existing platform-fee or checkout record, read only to carry its version and creation time into the upsert (moved unchanged from session-service.ts)."
     },
     "src/commerce/psp-record.ts": {
       "reads": {
@@ -195,12 +195,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, read to find a workspace entry."
     },
-    "src/middleware/cors.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A memory record read only for its allowedOrigins CORS setting."
-    },
     "src/routes/admin-features.ts": {
       "reads": {
         "getMemory": 2
@@ -281,8 +275,7 @@
     },
     "src/routes/agents/profile-metadata.ts": {
       "reads": {
-        "getMemoryByKeysAnyOwner": 1,
-        "listAllMemory": 1
+        "getMemoryByKeysAnyOwner": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, read to resolve workspace names."
     },
@@ -454,7 +447,7 @@
     "src/routes/ghii/profile.ts": {
       "reads": {
         "getMemoryByKeysAnyOwner": 1,
-        "getMemory": 2
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The directory_listed opt-in flags."
     },
@@ -489,8 +482,7 @@
       "reads": {
         "getMemory": 3,
         "listMemoryForOwners": 1,
-        "getMemoryByKeysAnyOwner": 1,
-        "listAllMemory": 1
+        "getMemoryByKeysAnyOwner": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: the reads here are read-to-update and an ownership check. Since 2026-10-15 the manifest of GET /:id comes from helpers.ts findReadableManifest, which passes presentMemory. Reviewed 2026-10-22 (secaudit 2026-10, v79), the node's own read: GET /:id/broken-links reads the link's source and target only to learn whether a record is there (in the package's account, or public on this node), and answers the link rows, never a record's value."
     },
@@ -519,9 +511,10 @@
         "getMemory": 6,
         "memoryDb.listOwnerScope": 2,
         "listMemory": 2,
+        "getMemoryByKeys": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-04 (codebase analysis item D-e): getMemoryByKeys is the rename-mode lookup of which of the caller's own keys already exist; only the keys are used. The read was there before; the check counts it since the call lost its non-null assertion."
     },
     "src/routes/memory/copy.ts": {
       "reads": {
@@ -573,8 +566,8 @@
     },
     "src/routes/notifications.ts": {
       "reads": {
-        "listMemory": 1,
-        "listInboxRows": 1
+        "listInboxRows": 1,
+        "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner. 2026-10-16 (QA audit F13-01): the list and mark-read go through listOwnerNotificationRecords (services/notification-sweeps.ts), on the owner's own identity. 2026-11-04 (codebase analysis C7): mark-all-read reads the owner's unread notification rows with listInboxRows, the same node-written records on the owner's own identity."
     },
@@ -610,8 +603,8 @@
     },
     "src/routes/organisms/shared.ts": {
       "reads": {
-        "listAllMemory": 5,
         "listMemoryKeysByPrefix": 1,
+        "listAllMemory": 3,
         "getMemoryByKeysAnyOwner": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The manifest for gate policy, decision-log pruning, the publish state machine, and registry and manifest indexes."
@@ -624,7 +617,7 @@
     },
     "src/routes/organisms/workspace-ops.ts": {
       "reads": {
-        "listAllMemory": 6
+        "listAllMemory": 5
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; the other reads serve a write or the node's own bookkeeping. The batch delete's key-only scan moved to services/workspace-tool-ops.ts on 2026-10-06."
     },
@@ -692,15 +685,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's own site template and portal keys, served by design."
     },
-    "src/routes/storage-files.ts": {
-      "reads": {
-        "getStorageFileMeta": 4,
-        "readStorageFileRange": 1,
-        "getStorageFile": 3,
-        "generateDownloadToken": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it). fileKeyFor (2026-10-26) reads metadata only to decide which key the request names; nothing it reads is answered, and the file under that key then passes the reader."
-    },
     "src/routes/storage-files-download.ts": {
       "reads": {
         "getStorageFileMeta": 1
@@ -712,6 +696,15 @@
         "listStorageFiles": 1
       },
       "why": "Moved 2026-10-30 from routes/storage-files.ts by pure extraction (Reviewed 2026-09-29, TARGET-082 review): GET /v1/storage lists the caller's own files and passes them through the classification reader before any is answered."
+    },
+    "src/routes/storage-files.ts": {
+      "reads": {
+        "getStorageFileMeta": 4,
+        "readStorageFileRange": 1,
+        "getStorageFile": 3,
+        "generateDownloadToken": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it). fileKeyFor (2026-10-26) reads metadata only to decide which key the request names; nothing it reads is answered, and the file under that key then passes the reader."
     },
     "src/routes/subdomain-origin-docs.ts": {
       "reads": {
@@ -775,7 +768,7 @@
     },
     "src/services/agent-avatar.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
       "why": "Reviewed 2026-10-19: an agent's own picture at agent.avatar, public by design like its description (the agent's face on every listing), so it is profile metadata rather than classified content. The value is read only as one emoji or one SVG and served as an image; no other key is read."
     },
@@ -824,12 +817,6 @@
       },
       "why": "Reviewed 2026-10-11, the node's own read: the owner's apps' data map documents (public by definition, apps.<id>.datamap), from which only the rows that name an agent are taken, and the owner's workplace records (agent-workplace.<name>, a reserved prefix only services/agent-workplace.ts writes). Shown to that owner on their home. No content anybody classified."
     },
-    "src/services/overview/overview-sources.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-10-31, the node's own read: the owner's apps' data map documents (public by definition, tag datamap), from which only the organism and workspace ids in a row's whereExactly are taken, and kept only when they name a place the reader is already a member of. The overview shows the owner a line between their app and that place. No content anybody classified; the workspace activity is read through storage.listKeyActivity, which returns keys and times and never a value."
-    },
     "src/services/agent-workplace.ts": {
       "reads": {
         "getMemory": 2,
@@ -875,18 +862,18 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-18: readResult hands a job's answer to the extension that started it, through presentMemory with the job's own reader (starter.ts jobReader). 2026-11-04: the version read before the answer's write moved to write-result.ts."
     },
-    "src/services/ai-jobs/write-result.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-04 (moved unchanged from ai-jobs/service.ts writeResult), serves a write: the version of the result record is read so the job's answer is written on it (expectedVersion); nothing read is handed to a caller."
-    },
     "src/services/ai-jobs/store.ts": {
       "reads": {
         "getMemory": 3,
         "listMemory": 4
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI job state records, day logs and the active index: the job state machine."
+    },
+    "src/services/ai-jobs/write-result.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-04 (moved unchanged from ai-jobs/service.ts writeResult), serves a write: the version of the result record is read so the job's answer is written on it (expectedVersion); nothing read is handed to a caller."
     },
     "src/services/ai-usage-history.ts": {
       "reads": {
@@ -924,17 +911,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key, settings and usage counter, read to plan an AI call."
     },
-    "src/services/ai/policy-store.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI policy record."
-    },
     "src/services/ai/gen-rules-store.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-31, the node's own read: the owner's generation rules record (ai.policy.gen-rules), read to decide what a generation call or a provenance mint is given; it is a setting, not content, and nothing of it goes to a model but the built-in directive text."
+    },
+    "src/services/ai/policy-store.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI policy record."
     },
     "src/services/ai/provider-store.ts": {
       "reads": {
@@ -1038,6 +1025,13 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: one bounded page of an app's member rows in the system namespace app-member, read for their role names only, to choose the role a request notification's one-click approval offers. Nothing it reads is shown to the caller."
     },
+    "src/services/app-members.ts": {
+      "reads": {
+        "listAllMemory": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership and seen-visit records in system namespaces."
+    },
     "src/services/app-parties/data.ts": {
       "reads": {
         "getMemory": 3,
@@ -1057,13 +1051,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4), the node's own read: an app's service-owned `app-parties.` record (its signup setting and the people who registered), which only the app party service writes."
-    },
-    "src/services/app-members.ts": {
-      "reads": {
-        "listAllMemory": 1,
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership and seen-visit records in system namespaces."
     },
     "src/services/app-record-keys.ts": {
       "reads": {
@@ -1171,10 +1158,16 @@
       },
       "why": "Reviewed 2026-11-01: the node's own record of the place's one build request, under system@<node> (build-with-you.request), which only this file writes. It holds the request's four fields as the owner sent them and the queue's answer; it is no person's content read for another reader, and no model reads it."
     },
+    "src/services/builtin-extension-seeder.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-27 (secaudit2026oct26), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUILTIN_EXTENSION_NAME_HELD incident twice. No content."
+    },
     "src/services/cache-cleanup.ts": {
       "reads": {
-        "getMemory": 1,
-        "listAllMemoryMeta": 1
+        "listAllMemoryMeta": 1,
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists federation cache entries only to delete expired ones. From 2026-10-20 the listing is listAllMemoryMeta, by key prefix across every owner principal instead of a walk of the local agents table, because a replica sits under the SENDING node's principal and the walk visited none of them (secaudit 2026-10, replica retention). It is the value-free META projection, read to compare an updatedAt against the TTL and delete; nothing is served to anyone. The getMemory (2026-10-27, secaudit2026oct26) reads a row dated ahead of this node's clock only to write it back unchanged but for updatedAt, on the version read; nothing is served to anyone."
     },
@@ -1276,6 +1269,12 @@
         "getMemory": 1
       },
       "why": "The node's own read (TARGET-082 V3, moved from classifier.ts on 2026-09-30): the classification service's own records under system@<node> (the classifier's usage counter, queues and index, and the exceptions list), and a record's version before it is rewritten; nothing is shown to a caller from here."
+    },
+    "src/services/company/company-page-key.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-01 (secaudit2026oct31w2 round 11), the node's own read: the service-owned record company-page-writers.<company id> that holds which writers the owner allowed to change a company's page through the file routes. Nothing of it is shown to anyone or sent to a model."
     },
     "src/services/company/company-portfolio.ts": {
       "reads": {
@@ -1391,7 +1390,7 @@
     },
     "src/services/content/facts-store.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 1,
         "getMemoryByKeys": 1,
         "getStorageFile": 2
       },
@@ -1426,18 +1425,18 @@
       },
       "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the owner's own contentclass.settings record."
     },
+    "src/services/content/shared-profile-settings.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-03 (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan), the node's own read: one boolean setting (autoProfile) of a workspace or an organism, held by the node's system@ identity. No content of an item."
+    },
     "src/services/content/shared-profile.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-11-03 (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan), the node's own read: the shared fingerprint records of a workspace (organism.<org>.w.<ws>.meta.fingerprint.*), held by the node's own system@ identity and kept only when that identity owns the row. They are read after the document they describe passed the reader: openWorkspaceDoc asks decideWorkspaceRead and then reader.show on the document's record, and listSharedProfiles keeps only the documents loadWorkspaceContent's reader showed, answering a fingerprint only beside its shown document."
-    },
-    "src/services/content/shared-profile-settings.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-03 (wish-sormenj-lki-jaetuksi-yksi-per-ty-tilan-asiakirja-ja-ty-tilan), the node's own read: one boolean setting (autoProfile) of a workspace or an organism, held by the node's system@ identity. No content of an item."
     },
     "src/services/contribution-proofs.ts": {
       "reads": {
@@ -1451,17 +1450,17 @@
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, v81 and v82), the node's own read: a group send reads an attachment's metadata only, to stamp the version that was sent; no bytes are read and nothing is shown."
     },
-    "src/services/cortex-lifecycle.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tags on seeded records, checked before uninstall deletes them."
-    },
     "src/services/cortex-holder-change.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Written 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: its own record under system@<node> (cortex.holder-change.<name>), which lists the apps that loaded a cortex name before its holder changed and whether each app's owner allowed the new holder; the library route reads it to decide. No content is read or shown."
+    },
+    "src/services/cortex-lifecycle.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tags on seeded records, checked before uninstall deletes them."
     },
     "src/services/cortex-seeder.ts": {
       "reads": {
@@ -1477,7 +1476,7 @@
     },
     "src/services/crew-def-store.ts": {
       "reads": {
-        "getMemory": 7,
+        "getMemory": 6,
         "getMemoryByKeys": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's own crew configuration envelopes. Reviewed 2026-10-16 (QA audit F07b-02): crewSitesWriteRefusal reads the stored live definition's browser site list to compare it with a write; nothing is returned to the caller."
@@ -1494,6 +1493,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Source records pass reader.show before titles and refs become findings; the archived rows and the registry give ids only."
     },
+    "src/services/data-intermediation/findings.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 1,
+        "listAllMemory": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D7.3, D4.5), the node's own read: the owners' `parties` records and the apps' `app-parties.` records (both service-owned), counted for the compliance report's data intermediation findings (how many person parties hold a contact, per account; which apps have an open signup), and an app's tool manifest read only for whether a tool has a money price. The operator's report gets counts, account and app names; an owner's slice only their own. No party contact or other content leaves."
+    },
     "src/services/data-map/data-map-access.ts": {
       "reads": {
         "getMemory": 1
@@ -1506,13 +1513,141 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An app's public data-map declaration."
     },
-    "src/services/data-intermediation/findings.ts": {
+    "src/services/datapackage/audience-record.ts": {
       "reads": {
+        "getMemory": 3,
+        "getStorageFile": 2,
         "getMemoryByKeysAnyOwner": 1,
-        "listAllMemory": 1,
+        "listStorageFilesForOwners": 1
+      },
+      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned audience record and the boot step's record, and in the once-only boot step every namespace's file list and data package pointers, to record each package's audience. 2026-11-01 (WP9e): the pointer-state boot step's record (pointerStateInForce), and trustedPackageOf reads a package's pointer to answer the record's facts beside it; the pointer's display fields go to a caller who already decided on the record, and no rows are read. 2026-11-02 (secaudit2026nov02d round 13): recordedAudiencesOf reads the service-owned audience records of the catalogue's packages in bulk (getMemoryByKeysAnyOwner, or getMemory per package on a backend without it) and answers only each package's audience and withdrawal to the catalogue listing, whose public readers then pass the classification reader. Nothing else read is returned to a caller."
+    },
+    "src/services/datapackage/catalogue-facts.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.1, D1.3), passes the reader at the point of use: the node-wide scan of the data package catalogue manifests (packages/*/manifest tagged data-package), cached and shared. publicDatasetFacts passes the anonymous classification reader before the DCAT feed, the dataset sitemap and the IndexNow plan; the discovery source passes the caller's reader (ctx.reader.show) and the package audience rule; the MCP resource list names packages the session's audience rule admits, as the descriptor read does."
+    },
+    "src/services/datapackage/file-read.ts": {
+      "reads": {
+        "getStorageFile": 2
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.4), the node's own read: a data package's latest.json pointer and a version's descriptor, read to decide who may read a file under datapkg/. Nothing read is answered; GET /v1/pub then passes the file it serves through the classification reader (hiddenFromCaller)."
+    },
+    "src/services/datapackage/freshness-read.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.1), the node's own read: the owner's data product definition (`dataproducts.<name>`, service-owned) for its schedule, and the current version's descriptor for the producer's schedule and kind. Only the freshness state, the cron and timestamps leave, to a caller the package's own read already admitted. No row of data."
+    },
+    "src/services/datapackage/images.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence check through file metadata; no bytes are read."
+    },
+    "src/services/datapackage/odps-read.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.1), the node's own read: the tags of a version's descriptor file, for the audience the ODPS sheet states. No bytes are read and nothing read is answered; the package itself is opened through openPackage, which asks the package's audience."
+    },
+    "src/services/datapackage/personal-guard.ts": {
+      "reads": {
         "getMemory": 1
       },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D7.3, D4.5), the node's own read: the owners' `parties` records and the apps' `app-parties.` records (both service-owned), counted for the compliance report's data intermediation findings (how many person parties hold a contact, per account; which apps have an open signup), and an app's tool manifest read only for whether a tool has a money price. The operator's report gets counts, account and app names; an owner's slice only their own. No party contact or other content leaves."
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.7), the node's own read: the publishing app's data map (apps.{appId}.datamap, public by design), read to decide whether a public publish asks the owner first. Nothing read is answered beyond the map rows' own what and holds, which the map publishes."
+    },
+    "src/services/datapackage/retention.ts": {
+      "reads": {
+        "listStorageFiles": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.4), the node's own read, moved from ./store.ts: the owner's own package file list (keys and creation times), read to apply the owner's retention policy after a publish. No content reaches anyone."
+    },
+    "src/services/datapackage/sale-terms-record.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listStorageFilesForOwners": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP9e), the node's own read: the service-owned sale terms record of a data package, and in the once-only boot step every namespace's file list and data package pointers, to copy their sale terms, withdrawal and public confirmation onto the service's records. The terms are returned only to the owner's own sale path and the EXCHANGE projection, which publishes them as the listing; no rows are read."
+    },
+    "src/services/datapackage/shared-data.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-02 (WP11), the node's own read: the names of the caller's own data product definitions (dataproducts.* keys under the caller's GHII), to mark which packages a product builds. No value is answered; the packages themselves come from visiblePackages (./visible.ts), which passes the caller's classification reader."
+    },
+    "src/services/datapackage/store.ts": {
+      "reads": {
+        "getStorageFileMeta": 1,
+        "getStorageFile": 8,
+        "listStorageFiles": 2
+      },
+      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10, W2-15): the rows of a resource reach a caller only through loadResourceRows, which passes the CSV through the classification reader (readerFor(...).show with fileTarget), as GET /v1/pub does for the same bytes. The other reads are the node's own: the latest.json pointer and the version descriptors a read decides the package's audience and version on (their content is the package's metadata, returned only after the audience decision), the version list, and the pointer read before a publish. 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry. 2026-11-01: a dry run (a data product preview) reads the descriptor file's metadata to say whether those bytes are already published; no content. 2026-11-01: the retention listing moved to ./retention.ts."
+    },
+    "src/services/datapackage/version-audience.ts": {
+      "reads": {
+        "getStorageFile": 3,
+        "getMemory": 2,
+        "listStorageFiles": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the owner's own data package files (latest.json, the version's files rewritten at a new tier with the same bytes) and the catalogue rows read-to-update, as ./store.ts read them before writeLatest and upsertCatalogueEntry moved here. Nothing read is returned to a caller."
+    },
+    "src/services/datapackage/version-returns.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP10e C2), the node's own read: the service-owned record datapkg-returns.<name> that only publishPackage writes, the content hashes and times of a package's returns to earlier bytes. listVersions reads it after openPackage decided the reader may read the package, and adds a row only for a version the reader's own list already holds; nothing of a person's content is in it."
+    },
+    "src/services/datapackage/versions-in-use.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.4), the node's own read: the current version's descriptor for its retention policy, for the owner's versions list. No row of data."
+    },
+    "src/services/datapackage/withdraw.ts": {
+      "reads": {
+        "listStorageFiles": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.3), the node's own read: the owner's own package files listed to delete them on a purge, and the package's catalogue manifest read for the entry keys to remove. Nothing read is answered; the caller is the owner or the owner's principal with storage:write."
+    },
+    "src/services/dataproduct/on-change.ts": {
+      "reads": {
+        "listMemoryKeysByPrefix": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: at start, the addresses of every data product definition (dataproducts.*, a reserved, service-owned prefix) and each definition, to know which products run when a source changes and which sources they read. Nothing is shown to anyone; the run itself reads the sources through the source readers, which pass the classification reader."
+    },
+    "src/services/dataproduct/schedule-input.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9.5), the node's own read: whether the data product definition a dataproduct schedule names exists. No content is shown."
+    },
+    "src/services/dataproduct/scheduled-job.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: the data product definition (dataproducts.<name>, service-owned) a run after a source change is for, to find its maker (runAs). Nothing is shown; the run reads the sources through the source readers."
+    },
+    "src/services/dataproduct/service.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9), the node's own read: the caller's own data product definitions (dataproducts.*), a reserved, service-owned prefix, read to answer the caller about its own definitions and to build them. The material a definition names is read by the source readers, through the classification reader."
+    },
+    "src/services/dataproduct/sources-memory.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listOwnerScopeMemory": 1,
+        "getOwnerScopeMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9.1): the app source and the memory source read the records a data product names, and pass the classification reader on them: show() (a record the caller may not see answers as absent) and, for an audience other than private, leave() as an export. getMemory reads the app's data map (configuration) and another account's record, which passes authorizeRead and then show()."
     },
     "src/services/dataspace/participant.ts": {
       "reads": {
@@ -1540,116 +1675,6 @@
         "listMemoryMeta": 2
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D8.3), the node's own read: the owner's DSP negotiation, transfer and archive records (`dsp.` prefix, service-owned), the protocol state this node keeps for each process, read to answer the participant and the owner and to fold finished ones into the monthly archive. No package content: the rows are read through the party read gate."
-    },
-    "src/services/datapackage/images.ts": {
-      "reads": {
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence check through file metadata; no bytes are read."
-    },
-    "src/services/datapackage/file-read.ts": {
-      "reads": {
-        "getStorageFile": 2
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.4), the node's own read: a data package's latest.json pointer and a version's descriptor, read to decide who may read a file under datapkg/. Nothing read is answered; GET /v1/pub then passes the file it serves through the classification reader (hiddenFromCaller)."
-    },
-    "src/services/datapackage/odps-read.ts": {
-      "reads": {
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.1), the node's own read: the tags of a version's descriptor file, for the audience the ODPS sheet states. No bytes are read and nothing read is answered; the package itself is opened through openPackage, which asks the package's audience."
-    },
-    "src/services/datapackage/catalogue-facts.ts": {
-      "reads": {
-        "listAllMemoryMeta": 1,
-        "getMemoryByKeysAnyOwner": 1,
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.1, D1.3), passes the reader at the point of use: the node-wide scan of the data package catalogue manifests (packages/*/manifest tagged data-package), cached and shared. publicDatasetFacts passes the anonymous classification reader before the DCAT feed, the dataset sitemap and the IndexNow plan; the discovery source passes the caller's reader (ctx.reader.show) and the package audience rule; the MCP resource list names packages the session's audience rule admits, as the descriptor read does."
-    },
-    "src/services/datapackage/shared-data.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-11-02 (WP11), the node's own read: the names of the caller's own data product definitions (dataproducts.* keys under the caller's GHII), to mark which packages a product builds. No value is answered; the packages themselves come from visiblePackages (./visible.ts), which passes the caller's classification reader."
-    },
-    "src/services/knowledge-shared.ts": {
-      "reads": {
-        "listAllMemoryMeta": 1,
-        "getMemoryByKeysAnyOwner": 1
-      },
-      "why": "Reviewed 2026-11-02 (WP11), passes the reader at the point of use: the cached node-wide scan of knowledge package manifests shared with members or an organism; sharedKnowledgeFor admits each by knowledgeAudienceAllows and then runs presentMemories with the caller's classification reader before the library answers, as GET /v1/knowledge/:id does."
-    },
-    "src/services/datapackage/personal-guard.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D1.7), the node's own read: the publishing app's data map (apps.{appId}.datamap, public by design), read to decide whether a public publish asks the owner first. Nothing read is answered beyond the map rows' own what and holds, which the map publishes."
-    },
-    "src/services/datapackage/version-returns.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (WP10e C2), the node's own read: the service-owned record datapkg-returns.<name> that only publishPackage writes, the content hashes and times of a package's returns to earlier bytes. listVersions reads it after openPackage decided the reader may read the package, and adds a row only for a version the reader's own list already holds; nothing of a person's content is in it."
-    },
-    "src/services/datapackage/withdraw.ts": {
-      "reads": {
-        "listStorageFiles": 1,
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.3), the node's own read: the owner's own package files listed to delete them on a purge, and the package's catalogue manifest read for the entry keys to remove. Nothing read is answered; the caller is the owner or the owner's principal with storage:write."
-    },
-    "src/services/datapackage/store.ts": {
-      "reads": {
-        "getStorageFile": 8,
-        "listStorageFiles": 2,
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10, W2-15): the rows of a resource reach a caller only through loadResourceRows, which passes the CSV through the classification reader (readerFor(...).show with fileTarget), as GET /v1/pub does for the same bytes. The other reads are the node's own: the latest.json pointer and the version descriptors a read decides the package's audience and version on (their content is the package's metadata, returned only after the audience decision), the version list, and the pointer read before a publish. 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry. 2026-11-01: a dry run (a data product preview) reads the descriptor file's metadata to say whether those bytes are already published; no content. 2026-11-01: the retention listing moved to ./retention.ts."
-    },
-    "src/services/datapackage/retention.ts": {
-      "reads": {
-        "listStorageFiles": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.4), the node's own read, moved from ./store.ts: the owner's own package file list (keys and creation times), read to apply the owner's retention policy after a publish. No content reaches anyone."
-    },
-    "src/services/datapackage/freshness-read.ts": {
-      "reads": {
-        "getMemory": 1,
-        "getStorageFile": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.1), the node's own read: the owner's data product definition (`dataproducts.<name>`, service-owned) for its schedule, and the current version's descriptor for the producer's schedule and kind. Only the freshness state, the cron and timestamps leave, to a caller the package's own read already admitted. No row of data."
-    },
-    "src/services/datapackage/versions-in-use.ts": {
-      "reads": {
-        "getStorageFile": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D6.4), the node's own read: the current version's descriptor for its retention policy, for the owner's versions list. No row of data."
-    },
-    "src/services/datapackage/audience-record.ts": {
-      "reads": {
-        "getMemory": 4,
-        "getMemoryByKeysAnyOwner": 1,
-        "listStorageFilesForOwners": 1,
-        "getStorageFile": 2
-      },
-      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned audience record and the boot step's record, and in the once-only boot step every namespace's file list and data package pointers, to record each package's audience. 2026-11-01 (WP9e): the pointer-state boot step's record (pointerStateInForce), and trustedPackageOf reads a package's pointer to answer the record's facts beside it; the pointer's display fields go to a caller who already decided on the record, and no rows are read. 2026-11-02 (secaudit2026nov02d round 13): recordedAudiencesOf reads the service-owned audience records of the catalogue's packages in bulk (getMemoryByKeysAnyOwner, or getMemory per package on a backend without it) and answers only each package's audience and withdrawal to the catalogue listing, whose public readers then pass the classification reader. Nothing else read is returned to a caller."
-    },
-    "src/services/datapackage/sale-terms-record.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listStorageFilesForOwners": 1,
-        "getStorageFile": 1
-      },
-      "why": "Reviewed 2026-11-01 (WP9e), the node's own read: the service-owned sale terms record of a data package, and in the once-only boot step every namespace's file list and data package pointers, to copy their sale terms, withdrawal and public confirmation onto the service's records. The terms are returned only to the owner's own sale path and the EXCHANGE projection, which publishes them as the listing; no rows are read."
-    },
-    "src/services/datapackage/version-audience.ts": {
-      "reads": {
-        "getStorageFile": 3,
-        "getMemory": 2,
-        "listStorageFiles": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the owner's own data package files (latest.json, the version's files rewritten at a new tier with the same bytes) and the catalogue rows read-to-update, as ./store.ts read them before writeLatest and upsertCatalogueEntry moved here. Nothing read is returned to a caller."
     },
     "src/services/db/agent-data-access-overview-db-service.ts": {
       "reads": {
@@ -1679,8 +1704,7 @@
       "reads": {
         "listMemoryMeta": 1,
         "listStorageFiles": 1,
-        "getMemoryByKeysAnyOwner": 1,
-        "listAllMemory": 1
+        "getMemoryByKeysAnyOwner": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Key and file metadata and the workspace registry index; no values."
     },
@@ -1895,13 +1919,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public market listings, needs and bids, published to the exchange by their writers."
     },
-    "src/services/exchange-projection.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App tool manifests and offer declarations, read to project listings."
-    },
     "src/services/exchange-party-buy.ts": {
       "reads": {
         "getMemory": 1
@@ -1913,6 +1930,13 @@
         "listStorageFiles": 1
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D5.1), the node's own read: the names of the owner's data package pointers, to project the packages on sale. Only file keys are read here; the pointer and descriptor are read in services/exchange-datapackage.ts."
+    },
+    "src/services/exchange-projection.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App tool manifests and offer declarations, read to project listings."
     },
     "src/services/exchange-proposals.ts": {
       "reads": {
@@ -1953,12 +1977,6 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
-    },
-    "src/services/builtin-extension-seeder.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Written 2026-10-27 (secaudit2026oct26), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUILTIN_EXTENSION_NAME_HELD incident twice. No content."
     },
     "src/services/extension-files.ts": {
       "reads": {
@@ -2017,6 +2035,25 @@
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. The second read (2026-10-26) is the same lookup under the account's own extension file key; the file it finds passes the same access decision and reader."
     },
+    "src/services/file-store/node-file-stores.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-10-30, the node's own read: the record of the node's named file stores (targets, folders, encrypted keys, the default) under system@<node>. Read to decide where a new file goes and to show the stores to the operators. No content of anyone's is shown from here."
+    },
+    "src/services/file-store/owner-file-store-actions.ts": {
+      "reads": {
+        "listStorageFilesForOwners": 1
+      },
+      "why": "Written 2026-10-29, the node's own read: the file metadata (no bytes) of one person and their agents, to count how many are in the person's own storage and to choose which to move. The person asking is the owner of every file read; only counts and the moved file names go back."
+    },
+    "src/services/file-store/owner-file-store.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-29, the node's own read: the record of a person's own file storage (target, folder, encrypted key) and the operators' approvals, both under system@<node> (the scan keeps only that owner's rows). Read to decide where a new file goes and to list the stores for the operators. No content of anyone's is shown from here."
+    },
     "src/services/finance/accountant-access.ts": {
       "reads": {
         "getMemory": 2,
@@ -2037,17 +2074,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Subscribed public memory passes leaveToPeer; the cache prune and the subscription record are the node's own."
     },
-    "src/services/goals/goals-model.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-25 (agent goals, the node's model as a worker), the node's own read: the answer a goal's own background AI job wrote to its temporary record (goal-runs.<goal>.<work>), read once to move it into the goal's results record for the same owner and then deleted. The job and the record are the goal's; nobody else's content is read."
-    },
     "src/services/goals/goals-model-reach.ts": {
       "reads": {
         "getOwnerScopeMemory": 1
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26, goal model work), the node's own read: a record an agent named in a goal is looked up only for its namespace and visibility, to learn whether that agent may read it before the model work starts; its value is not read on. What the model reads comes through services/ai-inputs.ts when the job runs."
+    },
+    "src/services/goals/goals-model.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-25 (agent goals, the node's model as a worker), the node's own read: the answer a goal's own background AI job wrote to its temporary record (goal-runs.<goal>.<work>), read once to move it into the goal's results record for the same owner and then deleted. The job and the record are the goal's; nobody else's content is read."
     },
     "src/services/goals/goals-ops.ts": {
       "reads": {
@@ -2138,25 +2175,6 @@
       },
       "why": "Reviewed 2026-10-15 (feature-list audit #64), the node's own read: the registry of conversation forms in the system namespace, each conversation form's config records found once on the first run, and the thread records of a form (keys, form_id and the last visitor turn's time) to find the conversations past the form's keeping time and delete them with every version. Nothing read here is returned to any caller; the scheduled job and the visitor's forget route only delete."
     },
-    "src/services/file-store/owner-file-store-actions.ts": {
-      "reads": {
-        "listStorageFilesForOwners": 1
-      },
-      "why": "Written 2026-10-29, the node's own read: the file metadata (no bytes) of one person and their agents, to count how many are in the person's own storage and to choose which to move. The person asking is the owner of every file read; only counts and the moved file names go back."
-    },
-    "src/services/file-store/node-file-stores.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Written 2026-10-30, the node's own read: the record of the node's named file stores (targets, folders, encrypted keys, the default) under system@<node>. Read to decide where a new file goes and to show the stores to the operators. No content of anyone's is shown from here."
-    },
-    "src/services/file-store/owner-file-store.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listAllMemory": 1
-      },
-      "why": "Written 2026-10-29, the node's own read: the record of a person's own file storage (target, folder, encrypted key) and the operators' approvals, both under system@<node> (the scan keeps only that owner's rows). Read to decide where a new file goes and to list the stores for the operators. No content of anyone's is shown from here."
-    },
     "src/services/internet-opening/opening-store.ts": {
       "reads": {
         "getMemory": 2,
@@ -2183,13 +2201,6 @@
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, v78 and v79), the node's own read: the once-only start step reads which namespaces hold a link row's source key, to give the row its owner; only the holders' identities are used, and nothing is shown to anyone."
     },
-    "src/services/knowledge-review-reach.ts": {
-      "reads": {
-        "getMemoryByKeysAnyOwner": 1,
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the copies of one package manifest key are read only for their holders and creation times, to decide whose package the operator's reviews are; no value is shown to anyone."
-    },
     "src/services/knowledge-overview.ts": {
       "reads": {
         "listMemoryForOwners": 1,
@@ -2208,6 +2219,19 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: after a knowledge write by the caller's own account, the manifest's and the named entries' versions are read to stamp the publish request. Only the version numbers leave this file."
+    },
+    "src/services/knowledge-review-reach.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the copies of one package manifest key are read only for their holders and creation times, to decide whose package the operator's reviews are; no value is shown to anyone."
+    },
+    "src/services/knowledge-shared.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemoryByKeysAnyOwner": 1
+      },
+      "why": "Reviewed 2026-11-02 (WP11), passes the reader at the point of use: the cached node-wide scan of knowledge package manifests shared with members or an organism; sharedKnowledgeFor admits each by knowledgeAudienceAllows and then runs presentMemories with the caller's classification reader before the library answers, as GET /v1/knowledge/:id does."
     },
     "src/services/ledger-billing.ts": {
       "reads": {
@@ -2234,6 +2258,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's link-invite records."
     },
+    "src/services/living-pulse-spend.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Written 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned record living-spend-hold.<config key> that holds the owner's answer, and whether the living config named by an approved request still exists. Nothing of either is shown to anyone or sent to a model."
+    },
     "src/services/living-pulse.ts": {
       "reads": {
         "getMemory": 5,
@@ -2244,30 +2274,18 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/services/company/company-page-key.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Written 2026-11-01 (secaudit2026oct31w2 round 11), the node's own read: the service-owned record company-page-writers.<company id> that holds which writers the owner allowed to change a company's page through the file routes. Nothing of it is shown to anyone or sent to a model."
-    },
-    "src/services/mcp-client/capability-consent.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Written 2026-11-02 (secaudit2026nov02d round 13), the node's own read: the service-owned record mcp-capability-consents.<capability id> in the caller's account that holds which capabilities of other accounts the account holder allowed to run a remote MCP tool with their own sign-in. Nothing of it is shown to anyone or sent to a model."
-    },
-    "src/services/living-pulse-spend.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Written 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned record living-spend-hold.<config key> that holds the owner's answer, and whether the living config named by an approved request still exists. Nothing of either is shown to anyone or sent to a model."
-    },
     "src/services/mail-read-consent.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A migration marker and a notification-type existence check."
+    },
+    "src/services/mcp-client/capability-consent.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-02 (secaudit2026nov02d round 13), the node's own read: the service-owned record mcp-capability-consents.<capability id> in the caller's account that holds which capabilities of other accounts the account holder allowed to run a remote MCP tool with their own sign-in. Nothing of it is shown to anyone or sent to a model."
     },
     "src/services/mcp-client/grants.ts": {
       "reads": {
@@ -2304,8 +2322,7 @@
     },
     "src/services/memory-list-page.ts": {
       "reads": {
-        "getMemoryByKeys": 1,
-        "getMemory": 1
+        "getMemoryByKeys": 1
       },
       "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, item C1): the values of one page of GET /v1/memory?limit=N, read by key for rows the route has already passed through the classification reader (reader.show on the meta rows, the same reader presentMemories applies), with the credential mask applied to each value; the byte sum reads the values of the masked keys only to measure them, and returns no content."
     },
@@ -2350,17 +2367,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's network policy record."
     },
-    "src/services/notebook-ai.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence and AI settings."
-    },
     "src/services/node-resident-agent.ts": {
       "reads": {
         "getOwnerScopeMemory": 1
       },
       "why": "Reviewed 2026-11-01, the node's own read: an existence check of the owner's onboarding.hello_mcp proof key for home-state and open-items (moved here from both). Only true or false leaves the function; no content is shown to anyone."
+    },
+    "src/services/notebook-ai.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence and AI settings."
     },
     "src/services/notebook-classify.ts": {
       "reads": {
@@ -2448,12 +2465,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/services/outbox.ts": {
-      "reads": {
-        "listMemory": 2
-      },
-      "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, HA 1.5), the node's own read: the stored outbox entries in system@<node> (webhook and mail retries the node itself wrote), listed to resume them at boot and to free this process's claims at shutdown; nothing is handed to a caller."
-    },
     "src/services/outbound/outbound-service.ts": {
       "reads": {
         "getMemory": 2
@@ -2465,6 +2476,18 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-16, the node's own read: the sender's own footer record (outbound.sender), or a company's (outbound.sender.<company id>) read from the company owner's memory only after resolveSendingCompany admitted the caller. Every field passes validateSender (single-line, capped, privacy_url https) and is escaped where rendered; the value is the business's own public identity, printed in its own marketing mail."
+    },
+    "src/services/outbox.ts": {
+      "reads": {
+        "listMemory": 2
+      },
+      "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, HA 1.5), the node's own read: the stored outbox entries in system@<node> (webhook and mail retries the node itself wrote), listed to resume them at boot and to free this process's claims at shutdown; nothing is handed to a caller."
+    },
+    "src/services/overview/overview-sources.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: the owner's apps' data map documents (public by definition, tag datamap), from which only the organism and workspace ids in a row's whereExactly are taken, and kept only when they name a place the reader is already a member of. The overview shows the owner a line between their app and that place. No content anybody classified; the workspace activity is read through storage.listKeyActivity, which returns keys and times and never a value."
     },
     "src/services/own-key-coverage.ts": {
       "reads": {
@@ -2531,13 +2554,6 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 5), the node's own read: the cap marker, and the grants and sellers in the package-entitlements system namespace, read only for which node ids they name."
     },
-    "src/services/packages/sale/package-entitlements.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
-    },
     "src/services/packages/sale/package-account-checkout.ts": {
       "reads": {
         "getMemory": 1
@@ -2555,6 +2571,13 @@
         "listMemory": 3
       },
       "why": "Reviewed 2026-10-31, the node's own read: the account sale records in the package-account-sales system namespace, listed for the packages on sale, a buyer's own purchases and a refund by charge id. Commercial records, not anybody's content."
+    },
+    "src/services/packages/sale/package-entitlements.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
     },
     "src/services/packages/sale/package-offer.ts": {
       "reads": {
@@ -2587,6 +2610,30 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller registry."
     },
+    "src/services/parties/admin.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 2
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D2.9), the node's own read: every owner's `parties` record and party read log (service-owned keys), counted for the operator's Security overview. Only numbers leave it; no content is shown."
+    },
+    "src/services/parties/read-stats.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3.5), the node's own read: the owner's own party read log (`party-reads.<yyyy-mm>`, service-owned), which the node wrote, shown to that owner or the owner's principal holding party:manage. No content of a record."
+    },
+    "src/services/parties/shares.ts": {
+      "reads": {
+        "getStorageFile": 2
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3), the node's own read: a data package's pointer and descriptor (metadata the package service wrote) to check a share names a package and version that exist, and to build the connection file's table list for the owner or the party the owner shared it with. The rows themselves are read through openPackage and readRows, which pass the classification reader."
+    },
+    "src/services/parties/store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D2), the node's own read: the owner's `parties` record (service-owned), read to verify a party's key or token and to answer the owner about its own parties. No content."
+    },
     "src/services/peer-incidents.ts": {
       "reads": {
         "getMemory": 1,
@@ -2607,13 +2654,6 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: how a federation peer arrived, the package registrations waiting for their node, and the markers of its Security page events, in the federation-peer-origin system namespace. No content of a person's."
     },
-    "src/services/settlement-ceiling.ts": {
-      "reads": {
-        "getMemory": 4,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-10-31, the node's own read: the operator's settlement ceiling for a federation peer and the day's record of that peer's refused settlements, in the federation-settlement system namespace. No content of a person's."
-    },
     "src/services/peer-replace-ask.ts": {
       "reads": {
         "getMemory": 1,
@@ -2628,13 +2668,6 @@
       },
       "why": "Reviewed 2026-10-18, moved from src/routes/portfolio.ts by pure extraction: the owner's own portfolio config record (portfolio.config), read to merge a settings write and to tell whether the page is switched on, and when the stored page was written (metadata only), for the publish gate. No content is shown to anyone."
     },
-    "src/services/portfolio-read-hold.ts": {
-      "reads": {
-        "getMemory": 4,
-        "getStorageFile": 1
-      },
-      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. 2026-11-01 (secaudit2026oct31w2 round 11): the same record read again by the generic write's note and the once-only step, and the finished record of that step under system@<node>. Nothing of the page or the records is shown to anyone or sent to a model."
-    },
     "src/services/portfolio-members.ts": {
       "reads": {
         "listMemoryForOwners": 1
@@ -2646,6 +2679,13 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the owner's portfolio.config records under each of the owner's identities, read to tell whether a memory write would make the served welcome page public; only the switch and who may open the page are compared, and nothing is shown to the writer."
+    },
+    "src/services/portfolio-read-hold.ts": {
+      "reads": {
+        "getStorageFile": 1,
+        "getMemory": 4
+      },
+      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. 2026-11-01 (secaudit2026oct31w2 round 11): the same record read again by the generic write's note and the once-only step, and the finished record of that step under system@<node>. Nothing of the page or the records is shown to anyone or sent to a model."
     },
     "src/services/presence.ts": {
       "reads": {
@@ -2776,17 +2816,17 @@
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, r49), the node's own read: the once-only step's own record under system@<node>, and a record a scheduled AI job names, read only to learn whether the saver may see it before the schedule is saved; the content the job's model reads comes through services/ai-inputs.ts when it runs."
     },
-    "src/services/schedule-instruction-hold.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-27 (secaudit2026oct26, sibling schedule edit), the node's own read: the hold record a held schedule instruction keeps under system@<node> (schedules.instruction-hold.<id>), written only by this file. No content anybody classified."
-    },
     "src/services/schedule-extension-keep.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-21 (secaudit 2026-10, restore round), the node's own read: the once-only list of kept app extension schedules under the node's system identity, read at a fire to decide whether the schedule still runs. Nothing read is returned to anyone."
+    },
+    "src/services/schedule-instruction-hold.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26, sibling schedule edit), the node's own read: the hold record a held schedule instruction keeps under system@<node> (schedules.instruction-hold.<id>), written only by this file. No content anybody classified."
     },
     "src/services/schedule-write.ts": {
       "reads": {
@@ -2823,6 +2863,13 @@
         "getStorageFileMeta": 2
       },
       "why": "Reviewed 2026-10-18, the node's own read: the metadata of a welcome page or a company front page (which provenance record it carries), to tell whether that record belongs to a page served to anyone now. No content is read or returned."
+    },
+    "src/services/settlement-ceiling.ts": {
+      "reads": {
+        "getMemory": 4,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: the operator's settlement ceiling for a federation peer and the day's record of that peer's refused settlements, in the federation-settlement system namespace. No content of a person's."
     },
     "src/services/share-search-reindex.ts": {
       "reads": {
@@ -2913,18 +2960,18 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the node's layout records and their earlier versions."
     },
-    "src/services/task-result-delivery.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-02, checked: a scheduled task's deliverable, read under its agent for the owner who commissioned it; it goes to that owner's own bell, and to their e-mail only after passing leave (external, e-mail), as ecosystem-automation-notify.ts does. A record that stays behind is logged by key and goes to the bell only."
-    },
     "src/services/task-outcome.ts": {
       "reads": {
         "getMemory": 1,
         "listMemory": 1
       },
       "why": "Reviewed 2026-10-11, the node's own read: a finished task's result record, of which only `visibility` and `workspaceRef` are used, to say which workspaces the result is shared with. The value is never returned from here; the deliverable itself is read through the memory routes."
+    },
+    "src/services/task-result-delivery.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-02, checked: a scheduled task's deliverable, read under its agent for the owner who commissioned it; it goes to that owner's own bell, and to their e-mail only after passing leave (external, e-mail), as ecosystem-automation-notify.ts does. A record that stays behind is logged by key and goes to the bell only."
     },
     "src/services/themes/fonts.ts": {
       "reads": {
@@ -3098,17 +3145,15 @@
     },
     "src/services/workspace-change-core.ts": {
       "reads": {
-        "listMemoryKeysByPrefix": 1,
-        "listAllMemory": 1
+        "listMemoryKeysByPrefix": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A key existence scan (keys only)."
     },
     "src/services/workspace-content.ts": {
       "reads": {
-        "listAllMemory": 1,
         "listAllMemoryMeta": 1,
-        "getMemoryByKeys": 1,
-        "getMemory": 1
+        "listAllMemory": 1,
+        "getMemoryByKeys": 1
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. 2026-11-04 (codebase analysis C7): with valuesOnDemand it loads the rows without values (listAllMemoryMeta), passes those rows through the reader, and reads the values (getMemoryByKeys, getMemory where a provider has no bulk read) only of rows the reader showed."
     },
@@ -3159,8 +3204,7 @@
     },
     "src/services/workspace-records-delete-op.ts": {
       "reads": {
-        "listMemoryKeysByPrefix": 1,
-        "listAllMemory": 1
+        "listMemoryKeysByPrefix": 1
       },
       "why": "The batch delete's key-only scan and its value-scan fallback, moved unchanged from services/workspace-tool-ops.ts on 2026-10-16 (max-file-lines): they find the addresses a delete removes, and no value reaches the caller."
     },
@@ -3192,7 +3236,7 @@
     "src/services/workspace-versions.ts": {
       "reads": {
         "listMemoryKeysByPrefix": 2,
-        "listAllMemory": 3
+        "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Version-row key refs and manifest retention config."
     },
@@ -3219,64 +3263,6 @@
         "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest namespace policy and the latest version for write guards."
-    },
-    "src/services/dataproduct/on-change.ts": {
-      "reads": {
-        "listMemoryKeysByPrefix": 1,
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: at start, the addresses of every data product definition (dataproducts.*, a reserved, service-owned prefix) and each definition, to know which products run when a source changes and which sources they read. Nothing is shown to anyone; the run itself reads the sources through the source readers, which pass the classification reader."
-    },
-    "src/services/dataproduct/schedule-input.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9.5), the node's own read: whether the data product definition a dataproduct schedule names exists. No content is shown."
-    },
-    "src/services/dataproduct/scheduled-job.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: the data product definition (dataproducts.<name>, service-owned) a run after a source change is for, to find its maker (runAs). Nothing is shown; the run reads the sources through the source readers."
-    },
-    "src/services/dataproduct/service.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9), the node's own read: the caller's own data product definitions (dataproducts.*), a reserved, service-owned prefix, read to answer the caller about its own definitions and to build them. The material a definition names is read by the source readers, through the classification reader."
-    },
-    "src/services/dataproduct/sources-memory.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listOwnerScopeMemory": 1,
-        "getOwnerScopeMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9.1): the app source and the memory source read the records a data product names, and pass the classification reader on them: show() (a record the caller may not see answers as absent) and, for an audience other than private, leave() as an export. getMemory reads the app's data map (configuration) and another account's record, which passes authorizeRead and then show()."
-    },
-    "src/services/parties/admin.ts": {
-      "reads": {
-        "getMemoryByKeysAnyOwner": 2
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D2.9), the node's own read: every owner's `parties` record and party read log (service-owned keys), counted for the operator's Security overview. Only numbers leave it; no content is shown."
-    },
-    "src/services/parties/read-stats.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3.5), the node's own read: the owner's own party read log (`party-reads.<yyyy-mm>`, service-owned), which the node wrote, shown to that owner or the owner's principal holding party:manage. No content of a record."
-    },
-    "src/services/parties/shares.ts": {
-      "reads": {
-        "getStorageFile": 2
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3), the node's own read: a data package's pointer and descriptor (metadata the package service wrote) to check a share names a package and version that exist, and to build the connection file's table list for the owner or the party the owner shared it with. The rows themselves are read through openPackage and readRows, which pass the classification reader."
-    },
-    "src/services/parties/store.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D2), the node's own read: the owner's `parties` record (service-owned), read to verify a party's key or token and to answer the owner about its own parties. No content."
     }
   }
 }

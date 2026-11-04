@@ -36,6 +36,8 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion: it is required on
+ *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-31 — POST /v1/provenance takes `rulesFollowed`, the generation rules the declarer followed.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — POST /v1/provenance/embed answers 503 BUSY with Retry-After when every archive slot is in use (secaudit2026oct22, provenance-embed archive bound).
@@ -410,7 +412,6 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
         const existing = await storage.getMemory(principal, attachTo);
         if (!existing) break;
         const attached = { ...existing, key: attachTo, aiProvenanceId: row.id, updatedAt: new Date().toISOString() };
-        if (!storage.setMemoryIfVersion) { await storage.setMemory(attached); break; }
         if (await storage.setMemoryIfVersion(attached, existing.version)) break;
       }
 
