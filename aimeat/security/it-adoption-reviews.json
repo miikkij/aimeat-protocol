@@ -153,7 +153,7 @@
         "aimeat/src/services/compliance-derived.ts",
         "aimeat/src/tool-catalog/definitions/compliance.ts"
       ],
-      "digest": "sha256:d9855251aef62cef602b205b"
+      "digest": "sha256:681876df8071fe5a96125740"
     },
     "15-operations-runbook.md": {
       "reviewedOn": "2026-11-03",
@@ -240,7 +240,7 @@
       "watches": [
         "aimeat/src/services/compliance-derived.ts"
       ],
-      "digest": "sha256:b0127f12e95925c78569a1bf"
+      "digest": "sha256:989ed95714d78ee5ef5c04c9"
     },
     "templates/regulated-sector-addendum.md": {
       "reviewedOn": "2026-11-01",
@@ -349,7 +349,7 @@
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "c79f3a0670fd31eb"
     },
     "14-compliance-mapping.md": {
-      "aimeat/src/services/compliance-derived.ts": "ebc02e5a5f4a5ded",
+      "aimeat/src/services/compliance-derived.ts": "d04b929ecc35d3dc",
       "aimeat/src/tool-catalog/definitions/compliance.ts": "317238de919bcb16"
     },
     "15-operations-runbook.md": {
@@ -381,7 +381,7 @@
       "aimeat/src/data/classification-packs.ts": "ffbb4b6a6349fce1"
     },
     "templates/processing-record.md": {
-      "aimeat/src/services/compliance-derived.ts": "ebc02e5a5f4a5ded"
+      "aimeat/src/services/compliance-derived.ts": "d04b929ecc35d3dc"
     },
     "templates/regulated-sector-addendum.md": {
       "aimeat/src/services/docsign/statement.ts": "65d24a2c3e04407e"

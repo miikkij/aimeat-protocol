@@ -1,6 +1,6 @@
 # Template: record of processing activities (GDPR Article 30)
 
-> Checked against AIMEAT node 4.2.0 (commit 4dfad71bd) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 269f425b1) on 2026-11-04. Maintained with the code: see the README for how.
 
 ## How to use
 
