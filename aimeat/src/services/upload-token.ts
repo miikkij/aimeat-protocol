@@ -12,6 +12,9 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.15.0 — 2026-11-04 — Signed with the upload purpose's own key (auth/node-signer.ts); a token
+ *     signed before, with the node key, verifies as before until it expires (codebase analysis
+ *     2026-11-03, item B9).
  *   v1.14.0 — 2026-11-04 — The short upload addresses are kept in the node's storage (oneTimeStore
  *     'upload-handle') until the token expires, so an address issued on one process is accepted on
  *     another; the five-minute sweep timer is gone (codebase analysis 2026-11-03, HA stage 2).
@@ -57,7 +60,8 @@
  *     with the agent erased, and the node had nothing left to infer provenance from.
  */
 
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { sessionStorage } from '../auth/node-auth.js';
@@ -262,7 +266,7 @@ async function signUploadToken(payload: UploadTokenPayload, ttlSeconds: number):
     if (!_privateKey) throw new Error('Upload token keys not initialized');
     const actor = payload.actor ?? payload.sub;
 
-    return new SignJWT({
+    return signFor('upload', new SignJWT({
         typ: 'upload',
         utype: payload.utype,
         ...(payload.actor && payload.actor !== payload.sub ? { actor: payload.actor } : {}),
@@ -274,15 +278,13 @@ async function signUploadToken(payload: UploadTokenPayload, ttlSeconds: number):
         iat_ms: Date.now(),
         ...(await actorIsAgentRecord(actor) ? { actor_agent: true } : {}),
     })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         // EdDSA signing is deterministic: without a nonce, two tokens minted in the same
         // second with identical payloads are the SAME JWT — the second upload then trips
         // the single-use guard (TOKEN_USED). jti makes every mint unique.
         .setJti(randomUUID())
         .setSubject(payload.sub)
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), _privateKey);
 }
 
 // ── Token verification ──
@@ -303,7 +305,8 @@ function spendHashOf(token: string, jti: unknown): string {
  * in `store`, and a token already spent there, by this process or any other, is refused TOKEN_USED.
  */
 export async function verifyUploadToken(tokenOrHandle: string, store: UploadSpendStore): Promise<VerifiedUploadToken> {
-    if (!_publicKey) throw new Error('Upload token keys not initialized');
+    if (!_publicKey || !_privateKey) throw new Error('Upload token keys not initialized');
+    const nodeKeys = { privateKey: _privateKey, publicKey: _publicKey };
 
     // An address resolves to the credential it stands for; anything else is treated as the
     // credential itself, so a JWT minted before handles existed still completes.
@@ -319,9 +322,11 @@ export async function verifyUploadToken(tokenOrHandle: string, store: UploadSpen
 
     let payload;
     try {
-        const result = await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] });
+        const result = await verifyFor('upload', token, nodeKeys, { algorithms: ['EdDSA'] });
         payload = result.payload;
     } catch (err) {
+        // A token this node signed for another purpose gets the answer a token of another type always got.
+        if (err instanceof TokenPurposeError) throw new UploadTokenError('TOKEN_INVALID', 'Token is not an upload token');
         const msg = (err as Error).message;
         if (msg.includes('expired') || msg.includes('exp')) {
             throw new UploadTokenError('TOKEN_EXPIRED', 'Upload token has expired (60 min TTL)');

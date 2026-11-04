@@ -38,6 +38,9 @@
  *   if (!(await appAccessGranted(req.query.access, app.ownerName, app.filename))) return notFound();
  *   if (!(await pageAccessGranted(req.query.access, { kind: 'company', id: company.id }))) → redirect or 404
  * @version-history
+ *   2026-11-04 — The app grant, the screenshot grant and the page grant are each signed with their
+ *     purpose's own key (auth/node-signer.ts); a grant signed before, with the node key, opens as
+ *     before until it expires (codebase analysis 2026-11-03, item B9).
  *   2026-10-31 — generateAppShotToken() and appShotGranted(): a listing hands a caller who may open an
  *     access-limited app a grant that shows its screenshot and opens nothing else (secaudit2026oct31w2 round 10, W2-12).
  *   v1.3.0 — 2026-10-19 — A grant minted for a signed-in person carries `sid`, the sign-in session it
@@ -54,7 +57,8 @@
  *     code-gated app stops being the exception to H-2 origin isolation.
  *   v1.0.1 — 2026-09-26 — bare() takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
-import { SignJWT, jwtVerify, decodeJwt } from 'jose';
+import { SignJWT, decodeJwt } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 import { randomUUID } from 'node:crypto';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
 import { sessionStorage } from '../auth/node-auth.js';
@@ -113,16 +117,14 @@ export async function generateAppAccessToken(
     ttlSeconds: number = APP_ACCESS_TTL_SECONDS,
 ): Promise<string> {
     const { privateKey } = getNodeCryptoKeys();
-    return new SignJWT({ typ: 'app-access', filename: payload.filename, ...(payload.viewer ? { viewer: payload.viewer } : {}), ...(payload.session ? { sid: payload.session } : {}) })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+    return signFor('app-access', new SignJWT({ typ: 'app-access', filename: payload.filename, ...(payload.viewer ? { viewer: payload.viewer } : {}), ...(payload.session ? { sid: payload.session } : {}) })
         // EdDSA signing is deterministic: without a nonce two grants minted in the same second for
         // the same app would be the same string, which makes one leaked address indistinguishable
         // from another in a log.
         .setJti(randomUUID())
         .setSubject(payload.sub)
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), privateKey);
 }
 
 /**
@@ -137,13 +139,14 @@ export async function appAccessGranted(token: unknown, ownerBare: string, filena
     try {
         // Inside the try on purpose: on a node whose key init failed, every gated app must answer
         // 404 like an unknown one rather than 500 and announce that it is there.
-        const { publicKey } = getNodeCryptoKeys();
-        const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
+        const { payload } = await verifyFor('app-access', token, getNodeCryptoKeys(), { algorithms: ['EdDSA'] });
         if (payload.typ !== 'app-access') return false;
         if (payload.filename !== filename) return false;
         if (bare(String(payload.sub ?? '')) !== bare(ownerBare)) return false;
         return !(await grantSessionEnded(payload.sid));
     } catch (err) {
+        // A token this node signed for another purpose opens nothing here, as a token of another type never did.
+        if (err instanceof TokenPurposeError) return false;
         // Fails closed, and says so once: a grant that stopped verifying is the difference between
         // "this app is gone" and "your link expired", and only the log can tell them apart.
         logger.warn('app-access grant rejected → the app answers as unknown', { error: String(err) });
@@ -163,22 +166,21 @@ const SHOT_WINDOW_SECONDS = 3600;
 export async function generateAppShotToken(ownerBare: string, filename: string, nowMs: number = Date.now()): Promise<string> {
     const { privateKey } = getNodeCryptoKeys();
     const iat = Math.floor(nowMs / 1000 / SHOT_WINDOW_SECONDS) * SHOT_WINDOW_SECONDS;
-    return new SignJWT({ typ: 'app-shot', filename })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+    return signFor('app-shot', new SignJWT({ typ: 'app-shot', filename })
         .setSubject(bare(ownerBare))
         .setIssuedAt(iat)
-        .setExpirationTime(iat + 2 * SHOT_WINDOW_SECONDS)
-        .sign(privateKey);
+        .setExpirationTime(iat + 2 * SHOT_WINDOW_SECONDS), privateKey);
 }
 
 /** Does this token show this app's screenshot? Only a screenshot grant this node signed, unexpired, for this app. */
 export async function appShotGranted(token: unknown, ownerBare: string, filename: string): Promise<boolean> {
     if (typeof token !== 'string' || token === '' || token.length > 4096) return false;
     try {
-        const { publicKey } = getNodeCryptoKeys();
-        const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
+        const { payload } = await verifyFor('app-shot', token, getNodeCryptoKeys(), { algorithms: ['EdDSA'] });
         return payload.typ === 'app-shot' && payload.filename === filename && bare(String(payload.sub ?? '')) === bare(ownerBare);
     } catch (err) {
+        // A token this node signed for another purpose shows nothing here, as a token of another type never did.
+        if (err instanceof TokenPurposeError) return false;
         logger.debug('app screenshot grant rejected', { error: String(err) });
         return false;
     }
@@ -201,12 +203,10 @@ export async function generatePageAccessToken(
     ref: PageRef, ttlSeconds: number = APP_ACCESS_TTL_SECONDS, viewer?: string, session?: string,
 ): Promise<string> {
     const { privateKey } = getNodeCryptoKeys();
-    return new SignJWT({ typ: 'page-access', page: pageRefId(ref), ...(viewer ? { viewer } : {}), ...(session ? { sid: session } : {}) })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+    return signFor('page-access', new SignJWT({ typ: 'page-access', page: pageRefId(ref), ...(viewer ? { viewer } : {}), ...(session ? { sid: session } : {}) })
         .setJti(randomUUID())
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), privateKey);
 }
 
 /**
@@ -217,11 +217,12 @@ export async function generatePageAccessToken(
 export async function pageAccessGranted(token: unknown, ref: PageRef): Promise<boolean> {
     if (typeof token !== 'string' || token === '') return false;
     try {
-        const { publicKey } = getNodeCryptoKeys();
-        const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
+        const { payload } = await verifyFor('page-access', token, getNodeCryptoKeys(), { algorithms: ['EdDSA'] });
         if (payload.typ !== 'page-access' || payload.page !== pageRefId(ref)) return false;
         return !(await grantSessionEnded(payload.sid));
     } catch (err) {
+        // A token this node signed for another purpose opens nothing here, as a token of another type never did.
+        if (err instanceof TokenPurposeError) return false;
         logger.warn('page-access grant rejected → the page answers as unknown', { error: String(err) });
         return false;
     }

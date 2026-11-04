@@ -19,12 +19,16 @@
  * @usage import { generateDraftToken, verifyDraftToken } from '../services/draft-token.js';
  * @version-history
  *   v1.0.0 — 2026-07-11 — Initial implementation (app draft/staging feature).
+ *   v1.1.0 — 2026-11-04 — The draft preview and the frame grant are each signed with their purpose's
+ *     own key (auth/node-signer.ts); a token signed before, with the node key, verifies as before
+ *     until it expires (codebase analysis 2026-11-03, item B9).
  *   v1.1.0 — 2026-07-25 — Frame grants: a signed token naming ONE origin allowed to frame
  *     one app. Replaces enumerating allowed origins in frame-ancestors, which grew with the
  *     owner's app count and blew past the reverse proxy's header buffer in production.
  */
 
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 import { randomUUID } from 'node:crypto';
 
 // ── Key management (initialized from jwt.ts node keys) ──
@@ -67,18 +71,16 @@ export class DraftTokenError extends Error {
 export async function generateDraftToken(payload: DraftTokenPayload, ttlSeconds: number = 600): Promise<string> {
     if (!_privateKey) throw new Error('Draft token keys not initialized');
 
-    return new SignJWT({
+    return signFor('draft-preview', new SignJWT({
         typ: 'draft-preview',
         filename: payload.filename,
     })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         // EdDSA signing is deterministic: a jti nonce makes every mint a distinct token even
         // when two are minted in the same second with an identical payload.
         .setJti(randomUUID())
         .setSubject(payload.sub)
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), _privateKey);
 }
 
 // ── Token verification ──
@@ -114,28 +116,28 @@ export interface VerifiedFrameToken {
 export async function generateFrameToken(payload: FrameTokenPayload, ttlSeconds: number = 43200): Promise<string> {
     if (!_privateKey) throw new Error('Draft token keys not initialized');
 
-    return new SignJWT({
+    return signFor('frame-grant', new SignJWT({
         typ: 'frame-grant',
         filename: payload.filename,
         origin: payload.origin,
     })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setJti(randomUUID())
         .setSubject(payload.sub)
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), _privateKey);
 }
 
 /** Verify a frame grant. Throws DraftTokenError; callers fall back to the strict CSP. */
 export async function verifyFrameToken(token: string): Promise<VerifiedFrameToken> {
-    if (!_publicKey) throw new Error('Draft token keys not initialized');
+    if (!_publicKey || !_privateKey) throw new Error('Draft token keys not initialized');
 
     let payload;
     try {
-        const result = await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] });
+        const result = await verifyFor('frame-grant', token, { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] });
         payload = result.payload;
     } catch (err) {
+        // A token this node signed for another purpose gets the answer a token of another type always got.
+        if (err instanceof TokenPurposeError) throw new DraftTokenError('TOKEN_INVALID', 'Token is not a frame grant');
         const msg = (err as Error).message;
         if (msg.includes('expired') || msg.includes('exp')) {
             throw new DraftTokenError('TOKEN_EXPIRED', 'Frame grant has expired');
@@ -161,13 +163,15 @@ export async function verifyFrameToken(token: string): Promise<VerifiedFrameToke
 }
 
 export async function verifyDraftToken(token: string): Promise<VerifiedDraftToken> {
-    if (!_publicKey) throw new Error('Draft token keys not initialized');
+    if (!_publicKey || !_privateKey) throw new Error('Draft token keys not initialized');
 
     let payload;
     try {
-        const result = await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] });
+        const result = await verifyFor('draft-preview', token, { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] });
         payload = result.payload;
     } catch (err) {
+        // A token this node signed for another purpose gets the answer a token of another type always got.
+        if (err instanceof TokenPurposeError) throw new DraftTokenError('TOKEN_INVALID', 'Token is not a draft-preview token');
         const msg = (err as Error).message;
         if (msg.includes('expired') || msg.includes('exp')) {
             throw new DraftTokenError('TOKEN_EXPIRED', 'Draft preview token has expired');

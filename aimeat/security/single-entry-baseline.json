@@ -784,6 +784,41 @@
         "count": 3,
         "why": "The owner's access token at sign-in and at the two refresh-cookie steps: the owner's current roles, no scopes."
       }
+    },
+    "aes-gcm": {},
+    "token-key": {
+      "src/cli/connect/agent-key.ts": {
+        "count": 1,
+        "why": "The connector signs its agent's own assertion with the agent's own key; the node verifies it with the public key on the agent's record."
+      },
+      "src/services/agent-card.ts": {
+        "count": 1,
+        "why": "The signed agent card: a JWS that callers outside the node verify with the published key, so it is signed with that key."
+      },
+      "src/services/dataspace/identity.ts": {
+        "count": 1,
+        "why": "The dataspace identity token: other participants verify it with the node's published JWK (routes/dsp/index.ts), so it keeps the node key."
+      },
+      "src/services/dataspace/presentation.ts": {
+        "count": 2,
+        "why": "Verifies a verifiable presentation and its credentials with the keys their outside issuers publish."
+      },
+      "src/services/dataspace/verifier.ts": {
+        "count": 1,
+        "why": "Verifies another dataspace participant's self-issued token with that participant's own key."
+      },
+      "src/services/docsign/eudi.ts": {
+        "count": 1,
+        "why": "The request object to an EUDI wallet, signed with the signing credential's own key and certificate chain."
+      },
+      "src/services/sd-jwt.ts": {
+        "count": 1,
+        "why": "Verifies an outside issuer's SD-JWT with that issuer's key."
+      },
+      "src/services/vc-issuer.ts": {
+        "count": 2,
+        "why": "A verifiable credential: holders and verifiers outside the node check it against the node's DID key, so it is signed and verified with the node key."
+      }
     }
   }
 }

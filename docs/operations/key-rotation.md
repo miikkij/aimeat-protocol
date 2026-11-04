@@ -10,7 +10,7 @@ every step below starts with a backup of the database, `.env` and the node key f
 |---|---|---|---|
 | Data key | `AIMEAT_ENCRYPTION_KEY`, and `AIMEAT_TOTP_ENCRYPTION_KEY` on a node set up by `aimeat init` | Every stored secret: AI provider keys, the secrets vault, extension and MCP server secrets, connected accounts, payment provider secrets, file store credentials, two-step sign-in secrets, secret Config settings, app watermarks | Only in one direction: adding `AIMEAT_ENCRYPTION_KEY` to a node that ran on the TOTP key (below). A second data key needs the release step described under "Replacing the data key" |
 | Key passphrase | `AIMEAT_KEY_PASSPHRASE` | The node key file, and the node key's copy in the database | No procedure. Keep it as it is |
-| Node key | `AIMEAT_NODE_KEY_PATH` (Ed25519) | The node's federation identity, and the signatures on every token the node issues | No. A new node key is a new identity for every peer |
+| Node key | `AIMEAT_NODE_KEY_PATH` (Ed25519) | The node's federation identity, and, through the token keys derived from it, every token the node issues | No. A new node key is a new identity for every peer and ends every issued token |
 
 ## The data key
 
@@ -35,7 +35,7 @@ secrets are in use ([11 Backup and recovery](../it-adoption/11-backup-recovery.m
 
 ### Replacing the data key
 
-The ring and the key id are in place; the setting that adds a second key to the ring is not. Until it
+The ring and the key id are in place, but no setting adds a second key to the ring yet. Until one
 ships, do not change `AIMEAT_ENCRYPTION_KEY` on a node that has stored secrets: every secret sealed
 under the old key stops opening.
 
@@ -53,6 +53,36 @@ When the setting ships, a rotation takes these steps:
 
 After step 3 the node writes values with a key id, which a release from before 2026-11-04 cannot read.
 Do not move such a node back to an older release.
+
+## The node key and the token keys
+
+### What is signed with what
+
+The node key (Ed25519) is the node's identity. It signs every federation message, and the tokens that
+parties outside the node verify with the node's published key: a verifiable credential
+(`aimeat/src/services/vc-issuer.ts`), the dataspace identity token (`aimeat/src/services/dataspace/identity.ts`)
+and the signed agent card (`aimeat/src/routes/agents-v2/card.ts`).
+
+Every token the node issues and checks itself is signed with a key of its own kind
+(`aimeat/src/auth/node-signer.ts`): a session, a download address, an upload address, a share link, a
+draft preview, a frame grant, an operator confirmation, an outside party's token, a page frame, a
+Design Book preview, an app grant, an app screenshot grant, a page grant and a pending sign-up. Each
+key is derived from the node key with HKDF-SHA256, with the kind's name as the label, and the token's
+header names it (`kid`, for example `session.Ab3dE9xY`). A token of one kind does not verify as
+another kind, whatever its claims say.
+
+Every process of a node derives the same keys from the same node key, so a token signed by one process
+verifies on another. A token issued before 2026-11-04 carries no `kid` and was signed with the node key
+itself; the node verifies it with the node key until it expires, as before.
+
+### Replacing the node key
+
+There is no procedure, and nothing above changes that. The token keys are derived from the node key,
+so a new node key ends every token issued before it, and every federation peer that pinned the old
+public key refuses the node. Keep the key file (`AIMEAT_NODE_KEY_PATH`) and `AIMEAT_KEY_PASSPHRASE`
+backed up ([Backup and restore](backup-and-restore.md)). Because each token kind has its own key and
+its own `kid`, a later release can rotate the token keys without touching the node's federation
+identity; that release needs a decision on where the next generation of each key comes from.
 
 ## Who to ask
 

@@ -18,11 +18,15 @@
  * @structure initPartyTokenKeys · mintPartyToken · verifyPartyToken · PartyTokenClaims
  * @usage const token = await mintPartyToken({ owner, uid, kid });  const claims = await verifyPartyToken(token);
  * @version-history
+ *   v1.2.0 — 2026-11-04 — Signed with the party purpose's own key (auth/node-signer.ts); a token
+ *     signed before, with the node key, verifies as before until it expires (codebase analysis
+ *     2026-11-03, item B9).
  *   v1.1.0 — 2026-11-01 — The token of a party registered to an app names the app (`app`) and its
  *     sign-in epoch (`ep`); ./verify.ts refuses it on every endpoint but that app's (plan D4.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.1; lead decision L2).
  */
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../../auth/node-signer.js';
 import { PARTY_TOKEN_PREFIX, PARTY_TOKEN_TTL_SECONDS } from './contract.js';
 import { logger } from '../../utils/logger.js';
 
@@ -52,24 +56,24 @@ export interface PartyTokenClaims {
 /** Sign a party token. The answer carries the prefix and is what the party sends as its Bearer value. */
 export async function mintPartyToken(claims: PartyTokenClaims, ttlSeconds: number = PARTY_TOKEN_TTL_SECONDS): Promise<string> {
     if (!_privateKey) throw new Error('Party token keys not initialized');
-    const jwt = await new SignJWT({
+    const jwt = await signFor('party', new SignJWT({
         typ: 'party', owner: claims.owner, uid: claims.uid, kid: claims.kid,
         ...(claims.app ? { app: claims.app, ep: claims.ep ?? 0 } : {}),
     })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), _privateKey);
     return `${PARTY_TOKEN_PREFIX}${jwt}`;
 }
 
 /** The claims of a party token, or null for anything else: a wrong prefix, signature, type or an expired token. */
 export async function verifyPartyToken(token: string): Promise<PartyTokenClaims | null> {
-    if (!_publicKey || typeof token !== 'string' || !token.startsWith(PARTY_TOKEN_PREFIX)) return null;
+    if (!_publicKey || !_privateKey || typeof token !== 'string' || !token.startsWith(PARTY_TOKEN_PREFIX)) return null;
     let payload: Record<string, unknown>;
     try {
-        payload = (await jwtVerify(token.slice(PARTY_TOKEN_PREFIX.length), _publicKey, { algorithms: ['EdDSA'] })).payload as Record<string, unknown>;
+        payload = (await verifyFor('party', token.slice(PARTY_TOKEN_PREFIX.length), { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] })).payload as Record<string, unknown>;
     } catch (err) {
+        // A token this node signed for another purpose is no party token, as one of another type never was.
+        if (err instanceof TokenPurposeError) return null;
         // Expired, not signed by this node, or not a JWT: the same answer, no credential. A refused
         // credential is the caller's mistake, not the node's failure, so it is logged at debug.
         logger.debug('party token refused', { reason: (err as Error).message });

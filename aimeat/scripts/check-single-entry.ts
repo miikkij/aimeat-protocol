@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   v1.12.0 — 2026-11-04 — Rules aes-gcm and token-key: AES-256-GCM goes through utils/aes-gcm.ts
+ *     (baseline empty), and a JWT is signed or verified by hand only where the baseline names the
+ *     outside party whose key it uses (codebase analysis 2026-11-03, item B9).
  *   v1.11.0 — 2026-11-04 — Rules scope-widen-at-mint and token-mint: the store place's default is added
  *     only at the doors the baseline names, and every issueJWT caller is listed with what it mints
  *     (codebase analysis 2026-11-03, item B7).
@@ -243,6 +246,18 @@ export const RULES: Rule[] = [
     pattern: /\b(bookBeneficiaryShares|recordMoneyPlatformFee)\(/,
     // The two writers themselves: their own definitions.
     skipDirs: ['src/commerce/beneficiary-book.ts', 'src/commerce/platform-fee.ts'],
+  },
+  {
+    id: 'aes-gcm',
+    label: 'A value is encrypted with AES-256-GCM only through gcmSeal and gcmOpen (utils/aes-gcm.ts), the node\'s one implementation, which the stored secrets, the TOTP secrets, the node key and the short-lived claim rows use (codebase analysis 2026-11-03, B9)',
+    pattern: /\bcreate(Cipheriv|Decipheriv)\(/,
+    skipDirs: ['src/utils/aes-gcm.ts'],
+  },
+  {
+    id: 'token-key',
+    label: 'A token the node signs or verifies for itself goes through signFor and verifyFor (auth/node-signer.ts), which sign each kind with its purpose\'s own key; a file that signs or verifies a JWT by hand is listed with the outside party whose key it uses (codebase analysis 2026-11-03, B9)',
+    pattern: /\bjwtVerify\(|\.setProtectedHeader\(/,
+    skipDirs: ['src/auth/node-signer.ts'],
   },
 ];
 

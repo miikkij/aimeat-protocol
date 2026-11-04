@@ -20,8 +20,12 @@
  *   const claims = await verifyPageFrameToken(token);   // throws PageFrameTokenError on a bad or expired token
  * @version-history
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
+ *   v1.1.0 — 2026-11-04 — Signed with the page frame purpose's own key (auth/node-signer.ts); a token
+ *     signed before, with the node key, verifies as before until it expires (codebase analysis
+ *     2026-11-03, item B9).
  */
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT } from 'jose';
+import { signFor, verifyFor, TokenPurposeError } from '../auth/node-signer.js';
 
 let _privateKey: CryptoKey | null = null;
 let _publicKey: CryptoKey | null = null;
@@ -55,11 +59,9 @@ const ID_RE = /^[A-Za-z0-9._:-]{1,200}$/;
 
 export async function generatePageFrameToken(claims: PageFrameClaims, ttlSeconds: number = PAGE_FRAME_TTL_SECONDS): Promise<string> {
     if (!_privateKey) throw new Error('Page frame token keys not initialized');
-    return new SignJWT({ typ: 'pageframe', ...claims })
-        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+    return signFor('pageframe', new SignJWT({ typ: 'pageframe', ...claims })
         .setIssuedAt()
-        .setExpirationTime(`${ttlSeconds}s`)
-        .sign(_privateKey);
+        .setExpirationTime(`${ttlSeconds}s`), _privateKey);
 }
 
 /** A token that opens nothing: expired, forged, malformed or of another kind. The page host answers it with 404. */
@@ -72,12 +74,14 @@ export class PageFrameTokenError extends Error {
 
 /** The claims of a valid token. Throws PageFrameTokenError for any token that opens nothing. */
 export async function verifyPageFrameToken(token: string): Promise<PageFrameClaims> {
-    if (!_publicKey) throw new Error('Page frame token keys not initialized');
+    if (!_publicKey || !_privateKey) throw new Error('Page frame token keys not initialized');
     if (typeof token !== 'string' || token.length > 4096) throw new PageFrameTokenError('Malformed page frame token');
     let p: Record<string, unknown>;
     try {
-        p = (await jwtVerify(token, _publicKey, { algorithms: ['EdDSA'] })).payload as Record<string, unknown>;
+        p = (await verifyFor('pageframe', token, { privateKey: _privateKey, publicKey: _publicKey }, { algorithms: ['EdDSA'] })).payload as Record<string, unknown>;
     } catch (err) {
+        // A token this node signed for another purpose gets the answer a token of another kind always got.
+        if (err instanceof TokenPurposeError) throw new PageFrameTokenError('Not a page frame token');
         throw new PageFrameTokenError(`Page frame token does not verify: ${(err as Error).message}`);
     }
     if (p.typ !== 'pageframe') throw new PageFrameTokenError('Not a page frame token');
