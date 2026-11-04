@@ -33,7 +33,8 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 - [OpenAPI contract]({{BASE_URL}}/v1/spec): the canonical API contract this node is held to
 - [API documentation]({{BASE_URL}}/v1/docs): browsable endpoint reference
 - [Agent registration]({{BASE_URL}}/auth.md): RFC 8628 device flow, owner-approved
-- [App building prompt]({{BASE_URL}}/v1/prompts/build-app): the canonical single-file app spec
+- [App building spec]({{BASE_URL}}/v1/prompts/build-app-atelier): the canonical spec for a new app, the Atelier track
+- [Classic app spec]({{BASE_URL}}/v1/prompts/build-app): for an app already on the Classic track, or when the owner asks for it
 - [App templates]({{BASE_URL}}/v1/app-templates): starter skeletons
 - [App-build pitfalls]({{BASE_URL}}/v1/appdev/pitfalls): what breaks app builds, curated
 
