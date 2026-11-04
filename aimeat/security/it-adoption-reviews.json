@@ -91,7 +91,7 @@
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/mcp-client/capability-use-setting.ts"
       ],
-      "digest": "sha256:a435d79e59cbf254d0e0a03f"
+      "digest": "sha256:a57bb3339fc64dc6023efac6"
     },
     "08-threat-model.md": {
       "reviewedOn": "2026-11-02",
@@ -204,7 +204,7 @@
         "aimeat/src/server-bootstrap/drain.ts",
         "aimeat/src/services/notification-sweeps.ts"
       ],
-      "digest": "sha256:23f18313567e28d8d0642945"
+      "digest": "sha256:2a7848b3909bce49b7b1d8ea"
     },
     "README.md": {
       "reviewedOn": "2026-11-03",
@@ -312,7 +312,7 @@
     },
     "07-security.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
-      "aimeat/src/middleware/cors.ts": "0f742801d6902ab5",
+      "aimeat/src/middleware/cors.ts": "d9d975cd1e5657d6",
       "aimeat/src/utils/env-validator.ts": "52cbaed88580c602",
       "docs/security/verification-matrix.md": "4f9f1e7494122478",
       "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
@@ -392,9 +392,9 @@
     "18-scope-and-deployment-patterns.md": {
       "aimeat/src/services/scheduler-fire-claim.ts": "84a98422199a3a46",
       "aimeat/src/services/once-only-step.ts": "08156126e71309f0",
-      "aimeat/src/services/event-bus.ts": "0ccba87737ae9f24",
+      "aimeat/src/services/event-bus.ts": "f73b40db41597ad5",
       "aimeat/src/mcp/oauth.ts": "66a8f23e8c8562ae",
-      "aimeat/src/mcp/legacy-sessions.ts": "9307c49d8f8d3ff6",
+      "aimeat/src/mcp/legacy-sessions.ts": "4784fea1f0026443",
       "aimeat/src/services/passkeys.ts": "57fd388e3fb070ef",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
       "aimeat/src/services/ai-jobs/service.ts": "2f42b114f3d2e845",
@@ -407,7 +407,7 @@
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "41f44d4c72ded9c2",
       "aimeat/src/services/maintenance-cache.ts": "7dfe5724564d9859",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
-      "aimeat/src/services/notification-sweeps.ts": "5082dafa253ebfb1"
+      "aimeat/src/services/notification-sweeps.ts": "c8b9e1d2e50daf56"
     }
   }
 }

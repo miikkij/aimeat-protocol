@@ -13964,6 +13964,9 @@
     "cfg_mcp_task_after_ms": "Hitaasta työkalukutsusta MCP-tehtävä (ms)",
     "cfg_mcp_capability_use_approval": "Kysy ennen kuin toisen tilin työkalu käyttää henkilön kirjautumista",
     "cfg_mcp_unused_client_days": "Käyttämättömät asiakasrekisteröinnit (päivää)",
+    "cfg_mcp_legacy_sessions_per_principal": "Vanhan MCP-protokollan sessiot tekoälyä tai ihmistä kohden",
+    "cfg_mcp_legacy_sessions_total": "Vanhan MCP-protokollan sessiot yhteensä",
+    "cfg_storage_request_statement_ms": "Tietokantakyselyn aikaraja vastattaessa (ms)",
     "cfg_registration_mode": "Kuka saa rekisteröityä",
     "cfg_registration_members_see_each_other": "Kaikki tämän palvelimen käyttäjät näkevät toisensa",
     "cfg_scopes_default_agent_scopes": "Agentin oletusoikeudet",
@@ -14310,6 +14313,9 @@
     "cfgDesc_mcp_task_after_ms": "Kun tekoälyasiakas tukee MCP-tehtäviä ja sen työkalukutsu on yhä kesken näin monen millisekunnin jälkeen, AIMEAT vastaa heti MCP-tehtävällä. Asiakas hakee tuloksen myöhemmin. Arvolla 0 jokaisesta tällaisesta kutsusta tulee tehtävä.",
     "cfgDesc_mcp_capability_use_approval": "Joillekin MCP-palvelimille jokainen kirjautuu omalla tilillään. Siellä toisen tilin julkaisema kyvykkyys toimii sen henkilön nimissä, joka käyttää sitä. Kysy aina: kun henkilö käyttää toisen tilin kyvykkyyttä ensimmäisen kerran, häneltä kysytään kerran yhdellä painalluksella. Jokainen uusi kyvykkyys vaatii painalluksen, myös ylläpitäjän omat. Kysy, paitsi ylläpitäjien työkaluista (oletus): ylläpitäjän kyvykkyys toimii kysymättä, ja muiden tilien kyvykkyydet kysyvät kerran. Ylläpitäjällä on jo kaikki oikeudet tällä palvelimella, joten suojaa ei menetetä. Pois: mitään ei kysytä, eikä henkilö voi enää päättää, mikä työkalu toimii hänen nimissään. Muutos tulee voimaan heti. Tekoäly voi tiukentaa asetusta mutta ei löysentää sitä.",
     "cfgDesc_mcp_unused_client_days": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. Rekisteröinti, jolla joku on kirjautunut, säilyy. 0 säilyttää kaikki rekisteröinnit.",
+    "cfgDesc_mcp_legacy_sessions_per_principal": "Montako vanhan MCP-protokollan sessiota yhdellä tekoälyllä tai ihmisellä voi olla auki. Kun raja ylittyy, uusi sessio sulkee heidän pisimpään käyttämättä olleen sessionsa, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
+    "cfgDesc_mcp_legacy_sessions_total": "Montako vanhan MCP-protokollan sessiota koko palvelimella voi olla auki. Jokainen sessio pitää muistissa oman kopion työkalulistasta. Kun raja ylittyy, uusi sessio sulkee pisimpään käyttämättä olleen session, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
+    "cfgDesc_storage_request_statement_ms": "PostgreSQL-tietokannassa: kuinka kauan yksi tietokantakysely saa kestää, kun palvelin vastaa sivulle, sovellukselle tai tekoälylle. Pidempi kysely pysäytetään, ja se pyyntö epäonnistuu. Ajastetuilla töillä on tietokannan oma 120 sekunnin raja. Oletus 120000 on sama raja. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
     "cfgDesc_registration_members_see_each_other": "Yrityksen palvelimelle. Jokainen täällä tilin omistava näkyy jokaisen muun osoitekirjassa kollegana, eikä kahden käyttäjän ensimmäinen viesti tarvitse hyväksyntää. Oletuksena pois päältä.",
     "cfgDesc_scopes_default_agent_scopes": "Oikeudet, jotka agentti saa, kun kukaan ei valitse niitä. Yksi oikeus rivillä. Valmiiksi agentti saa lukea ja kirjoittaa omistajansa muistia, lukea katalogia, lukea omistajansa organismien työtiloja ja nähdä omistajansa muut agentit.",
@@ -30345,6 +30351,35 @@
           "low": "Pienempi: hylätyt rekisteröinnit poistuvat nopeammin. Sovellus, jonka rekisteröinti poistettiin, rekisteröityy uudelleen ennen kirjautumista.",
           "high": "Suurempi: hylätyt rekisteröinnit pysyvät tietokannassa pidempään.",
           "tip": "Pidä oletus. Asiakasta, jolla joku on kirjautunut, ei poisteta koskaan, olipa luku mikä tahansa."
+        },
+        "legacy_sessions_per_principal": {
+          "title": "Vanhan MCP-protokollan sessiot tekoälyä tai ihmistä kohden",
+          "short": "Montako vanhan MCP-protokollan sessiota yhdellä tekoälyllä tai ihmisellä voi olla auki. 0 tarkoittaa, että rajaa ei ole. Oletus on 100.",
+          "what": "Tekoälysovellus, joka käyttää vanhaa MCP-protokollaa (2025), avaa tämän palvelimen kanssa session. Palvelin pitää jokaista avointa sessiota varten muistissa kopion työkalulistasta. Useimmat sovellukset eivät sulje sessiota koskaan, joten se pysyy auki, kunnes sitä ei ole käytetty session jouten-rajan aikana. Kun yksi tekoäly tai ihminen avaa session tämän rajan yli, palvelin sulkee hänen sessionsa, jota ei ole käytetty pisimpään aikaan. Sovellus saa vastauksen, että sessio on poissa, ja yhdistää itse uudelleen, kuten jouten-rajan jälkeenkin.",
+          "range": "Kokonaisluku, 0 tai suurempi. Oletus on 100. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "Pienempi: sovellus, joka pitää monta sessiota auki, menettää vanhimmat sessionsa aiemmin ja yhdistää uudelleen.",
+          "high": "Suurempi: yksi tekoäly tai ihminen voi pitää enemmän sessioita auki, ja ne vievät enemmän muistia.",
+          "tip": "Pidä oletus. Sovellus käyttää yhtä sessiota kerrallaan, joten oikea tekoäly ei yllä sataan."
+        },
+        "legacy_sessions_total": {
+          "title": "Vanhan MCP-protokollan sessiot yhteensä",
+          "short": "Montako vanhan MCP-protokollan sessiota koko palvelimella voi olla auki. 0 tarkoittaa, että rajaa ei ole. Oletus on 1000.",
+          "what": "Jokainen vanhan MCP-protokollan (2025) avoin sessio pitää tämän palvelimen muistissa kopion työkalulistasta, noin 3 Mt. Tämä raja estää, että sessiot yhdessä täyttävät muistin. Kun uusi sessio ylittää rajan, palvelin sulkee session, jota ei ole käytetty pisimpään aikaan, oli se kenen tahansa. Sovellus saa vastauksen, että sessio on poissa, ja yhdistää itse uudelleen.",
+          "range": "Kokonaisluku, 0 tai suurempi. Oletus on 1000. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "Pienempi: muistia kuluu vähemmän, mutta kiireisellä palvelimella sovellukset yhdistävät uudelleen useammin.",
+          "high": "Suurempi: useampi sessio pysyy auki, ja ne voivat viedä enemmän muistia.",
+          "tip": "Pidä oletus, ellei palvelimen muisti käy vähiin. Uudempaa protokollaa (2026) käyttävät sovellukset eivät pidä sessiota, joten niitä ei lasketa."
+        }
+      },
+      "storage": {
+        "request_statement_ms": {
+          "title": "Tietokantakyselyn aikaraja vastattaessa (ms)",
+          "short": "PostgreSQL-tietokannassa: kuinka kauan yksi tietokantakysely saa kestää, kun palvelin vastaa pyyntöön. 0 tarkoittaa, että rajaa ei ole. Oletus on 120000 (kaksi minuuttia).",
+          "what": "Kun sivu, sovellus tai tekoäly kysyy tältä palvelimelta jotain, palvelin lukee vastauksen tietokannasta. Hyvin pitkä kysely pitää tietokantayhteyden varattuna, ja palvelimella on niitä 20 kaikkien käyttöön. Tämä raja pysäyttää pidemmän kyselyn, ja se yksi pyyntö epäonnistuu virheeseen. Ajastetuilla töillä ja muulla taustatyöllä on aina tietokannan oma kahden minuutin raja. Oletus on sama kaksi minuuttia, joten mikään ei muutu, ennen kuin asetat toisen luvun. SQLite-tietokannassa asetus ei tee mitään.",
+          "range": "Millisekunteja 0–3600000 (tunti). Oletus on 120000. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "Pienempi: hidas kysely päättyy aiemmin ja vapauttaa yhteytensä muille. Pyyntö, joka tarvitsee pitkän kyselyn, kuten suuri vienti, epäonnistuu.",
+          "high": "Suurempi: pitkät kyselyt ehtivät valmiiksi, ja hidas kysely pitää yhteyden varattuna kauemmin.",
+          "tip": "Pidä oletus, ellet ole mitannut hitaimpia pyyntöjäsi. Laske rajaa pienin askelin ja seuraa lokista, alkaako jokin pyyntö epäonnistua."
         }
       },
       "personal_nodes": {

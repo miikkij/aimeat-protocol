@@ -23,6 +23,8 @@
  * @usage
  *   const aiUse = await appAiUse(storage, config, app);   // → applyServeMarks({ aiUse: … })
  * @version-history
+ *   2026-11-04 -- The cached counts carry the app owner's memory tag, so a change to the tool manifest
+ *     that only the owner reads still drops them (codebase analysis 2026-11-03, item C4).
  *   v1.0.1 -- 2026-10-11 -- The gated test reads the app's pacing amount (appIsPaced); a morsel is pacing, not a price.
  *   v1.0.0 -- 2026-10-09 -- Initial (wish-ai-skill-and-ai-app-tool-badges-on-a-published-app-with-a-pa).
  */
@@ -33,6 +35,7 @@ import { publicManifestTools } from '../commerce/app-tool-catalog.js';
 import { listSkillsByBinding } from './skills.js';
 import { cached, TTL } from './cache.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 import { appAiUseOn, type AppAiUse } from '../utils/app-ai-use-badge.js';
 import { appIsPaced } from './app-pacing.js';
 export type { AppAiUse } from '../utils/app-ai-use-badge.js';
@@ -71,7 +74,9 @@ export async function appAiUse(storage: Storage, config: AimeatConfig, app: AppF
     const { tools, skills } = await cached(`appaiuse:${app.ownerGaii}:${app.filename}`, TTL.dashboard, async () => ({
       tools: publicManifestTools(await storage.getMemory(app.ownerGaii, appToolsKey(app.filename)))?.length ?? 0,
       skills: (await listSkillsByBinding(storage, config, binding, { ownerName: null })).length,
-    }), ['domain:memory', 'domain:skills', 'domain:apps']);
+      // The tool manifest is the app owner's record at whatever level the owner keeps it: the owner's
+      // tag drops the counts when only the owner reads the changed record (process-buffers.ts).
+    }), ['domain:memory', `owner:${localAccountName(app.ownerGaii)}:memory`, 'domain:skills', 'domain:apps']);
     if (tools + skills === 0) return null;
     return { tools, skills, guideUrl: aiUseGuideUrl(config, app.ownerName, app.filename) };
   } catch (err) {

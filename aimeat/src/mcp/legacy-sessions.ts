@@ -16,6 +16,9 @@
  *   const legacy = legacySessions({ config, storage, authority, authenticate, createMcpServer });
  *   await legacy.servePost(req, res, verified, token, serverRole);
  * @version-history
+ *   2026-11-04 — Session caps: past mcp.legacy_sessions_per_principal (100) or mcp.legacy_sessions_total
+ *     (1000) a new session closes the least recently used one, as the idle sweep closes one; 0 is no
+ *     limit. The sweep's close moved into closeSession() unchanged (codebase analysis 2026-11-03, item C5).
  *   v1.1.0 — 2026-10-20 — The agent admission and the first-contact records come from
  *     services/mcp-agent-admission.ts, and the answer to a request without a token from
  *     mcp/unauthenticated-answer.ts, both shared with the 2026-07-28 path. Same answers, same writes.
@@ -86,6 +89,18 @@ export function legacySessions(deps: LegacySessionDeps) {
     // Every config.mcpSessionSweepMs (10 s shipped): the scan is a Map walk over a handful of
     // sessions, and a short interval is what lets the idle floor go sub-minute. The E2E runner pins
     // 1 s so e2e-mcp-session-expiry proves a 6-second idle in 8 s rather than 18.
+    /** Close one session and drop it from every map, as the idle sweep always did. */
+    function closeSession(id: string, t: NodeStreamableHTTPServerTransport, why: string): void {
+        // close() fires transport.onclose, which removes the session from every map.
+        void Promise.resolve(t.close()).catch(err =>
+            logger.warn(`MCP ${why}: transport close failed; maps are cleaned regardless`, { error: String(err) }));
+        transports.delete(id);
+        sessionChatInstances.delete(id);
+        sessionPrincipals.delete(id);
+        sessionLastSeen.delete(id);
+        sessionAgents.delete(id);
+        forgetMcpSession(id);
+    }
     const sweeper = setInterval(() => {
         const cutoff = Date.now() - config.mcpSessionIdleMinutes * 60_000;
         let reaped = 0;
@@ -93,20 +108,41 @@ export function legacySessions(deps: LegacySessionDeps) {
             const seen = sessionLastSeen.get(id) ?? 0;
             if (seen < cutoff) {
                 reaped++;
-                // close() fires transport.onclose, which removes the session from every map.
-                void Promise.resolve(t.close()).catch(err =>
-                    logger.warn('MCP idle sweep: transport close failed; maps are cleaned regardless', { error: String(err) }));
-                transports.delete(id);
-                sessionChatInstances.delete(id);
-                sessionPrincipals.delete(id);
-                sessionLastSeen.delete(id);
-                sessionAgents.delete(id);
-                forgetMcpSession(id);
+                closeSession(id, t, 'idle sweep');
             }
         }
         if (reaped > 0) logger.info(`MCP idle sweep: closed ${reaped} session(s) idle over ${config.mcpSessionIdleMinutes} min (${transports.size} remain)`);
     }, config.mcpSessionSweepMs);
     sweeper.unref();
+
+    /**
+     * THE SESSION CAPS (codebase analysis 2026-11-03, item C5). Each session holds a whole McpServer,
+     * about 2.7 MB, and the idle limit was the only bound: a client that opened a session per
+     * conversation and never closed one kept them all for an hour. After a new session is stored,
+     * the least recently used sessions of the same principal past mcp.legacy_sessions_per_principal,
+     * then of the whole node past mcp.legacy_sessions_total, are closed the way the idle sweep closes
+     * one; their client gets the spec's 404 and initializes again. 0 is no limit. The defaults (100
+     * and 1000) are far above what one client opens. The new session is never the one closed.
+     */
+    function enforceSessionCaps(newId: string, sub: string): void {
+        const leastRecent = (ids: string[]) => ids.sort((a, b) => (sessionLastSeen.get(a) ?? 0) - (sessionLastSeen.get(b) ?? 0));
+        const perPrincipal = config.mcpLegacySessionsPerPrincipal;
+        if (perPrincipal > 0) {
+            const mine = [...sessionPrincipals].filter(([id, p]) => p.sub === sub && id !== newId).map(([id]) => id);
+            for (const id of leastRecent(mine).slice(0, Math.max(0, mine.length + 1 - perPrincipal))) {
+                const t = transports.get(id);
+                if (t) closeSession(id, t, 'session cap (per principal)');
+            }
+        }
+        const total = config.mcpLegacySessionsTotal;
+        if (total > 0 && transports.size > total) {
+            const others = [...transports.keys()].filter(id => id !== newId);
+            for (const id of leastRecent(others).slice(0, transports.size - total)) {
+                const t = transports.get(id);
+                if (t) closeSession(id, t, 'session cap (node)');
+            }
+        }
+    }
 
     // The session half of the POST handler: everything after the loop brake, the origin check and
     // authenticate(), which mcp/index.ts runs for both eras.
@@ -226,6 +262,7 @@ export function legacySessions(deps: LegacySessionDeps) {
             // So DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey can take this socket down
             // with the agent's other credentials (mcp/session-registry.ts).
             noteMcpSession(transport.sessionId, authenticatedGaii, () => transport.close());
+            enforceSessionCaps(transport.sessionId, verified!.sub);
         }
     }
 

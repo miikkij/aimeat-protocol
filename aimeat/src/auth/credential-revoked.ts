@@ -10,6 +10,9 @@
  *   patGone · ecosystemAppGone (the last five module-private)
  * @usage import { credentialRevoked } from './credential-revoked.js';   // re-exported by ./middleware.ts
  * @version-history
+ *   2026-11-04 — The account question reads the owner record through the request memo
+ *     (services/request-memo.ts), so the other checks of the same request share the read. Still one
+ *     answer per request, as before (codebase analysis 2026-11-03, item C2).
  *   2026-10-27 — credentialRevoked asks a NINTH question, first among the in-memory ones: the shared
  *     anonymous principal counts only while anonymous mode is on (secaudit2026oct26,
  *     isAnonymousMode:not-bound-to-live-config).
@@ -36,6 +39,7 @@ import { visitorPeerRefuses } from './visitor-peer.js';
 import { sessionConfig, sessionStorage } from './node-auth.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
 import { grantGivenToEarlierAuthor } from '../services/app-grant-author.js';
+import { memoGetOwner } from '../services/request-memo.js';
 
 /**
  * Has this token's session been ended? True only for a token that names a session the store has and
@@ -93,7 +97,7 @@ async function standingAppGrant(verified: VerifiedToken): Promise<AppGrantRecord
 async function accountRefuses(verified: VerifiedToken, grant: AppGrantRecord | null): Promise<boolean> {
   const storage = sessionStorage();
   if (isForeignPrincipal(verified) || verified.anonymous || !verified.owner || !storage) return false;
-  const owner = await storage.getOwner(verified.owner);
+  const owner = await memoGetOwner(storage, verified.owner);
   return ownerRefuses(owner, grant ? recordIssuedAt(grant.createdAt) : tokenIssuedAt(verified));
 }
 

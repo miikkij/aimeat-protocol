@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Real-provider discovery pagination and value-free listing contracts.
  * @version-history
+ *   2026-11-04 — getMemoryMeta answers the row getMemory answers, without the value (codebase analysis
+ *     2026-11-03, item C2).
  *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   1.0.0 2026-09-27 Later eligible hits and metadata parity.
  */
@@ -74,5 +76,29 @@ describe.each(names)('%s memory reads', name => {
     expect(meta.map(r => r.key)).toEqual(full.map(r => r.key));
     expect(meta.every(r => !('value' in r))).toBe(true);
     expect((await storage.listMemoryMetaForOwners([owner], opts)).map(r => r.key)).toEqual(full.map(r => r.key));
+  });
+
+  it('getMemoryMeta answers the row getMemory answers, without the value (codebase analysis 2026-11-03, C2)', async () => {
+    const storage = providers.get(name)!;
+    const owner = `one-${randomUUID()}@node`;
+    await storage.bulkSetMemory!([
+      row(owner, 'live', { allowedOrigins: ['https://a.example'], visibility: 'private' }),
+      row(owner, 'expired', { ttlHours: 1, createdAt: '2020-01-01T00:00:00.000Z' }),
+      row(owner, 'binned'),
+    ]);
+    await storage.deleteMemory(owner, 'binned', owner);
+    const full = await storage.getMemory(owner, 'live');
+    const meta = await storage.getMemoryMeta!(owner, 'live');
+    expect(meta).not.toBeNull();
+    expect('value' in (meta as object)).toBe(false);
+    expect(meta).toMatchObject({
+      key: 'live', ownerGaii: owner, visibility: full!.visibility, allowedOrigins: ['https://a.example'],
+      version: full!.version, createdAt: full!.createdAt, updatedAt: full!.updatedAt,
+    });
+    // Where getMemory answers null, so does the metadata read: absent, expired, in the bin.
+    for (const key of ['missing', 'expired', 'binned']) {
+      expect(await storage.getMemoryMeta!(owner, key), key).toBeNull();
+      expect(await storage.getMemory(owner, key), key).toBeNull();
+    }
   });
 });

@@ -675,9 +675,9 @@
     },
     "src/routes/public-stats.ts": {
       "reads": {
-        "listAllMemory": 3
+        "listAllMemoryMeta": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Counts and key tails of public memory; no values are returned."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Counts and key tails of public memory; no values are returned. 2026-11-04 (codebase analysis 2026-11-03, item C4): the same three reads take the metadata only (listAllMemoryMeta), so no value is loaded either."
     },
     "src/routes/schedules.ts": {
       "reads": {

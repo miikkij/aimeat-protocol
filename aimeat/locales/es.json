@@ -12347,6 +12347,9 @@
     "cfg_mcp_task_after_ms": "Una llamada lenta pasa a ser tarea MCP tras (ms)",
     "cfg_mcp_capability_use_approval": "Preguntar antes de que la herramienta de otra cuenta use la sesión de una persona",
     "cfg_mcp_unused_client_days": "Registros de clientes sin uso (días)",
+    "cfg_mcp_legacy_sessions_per_principal": "Sesiones MCP del protocolo antiguo por IA o persona",
+    "cfg_mcp_legacy_sessions_total": "Sesiones MCP del protocolo antiguo en total",
+    "cfg_storage_request_statement_ms": "Límite de una consulta a la base de datos al responder (ms)",
     "cfg_registration_mode": "Quién puede registrarse",
     "cfg_registration_members_see_each_other": "Todos en este servidor se ven entre sí",
     "cfg_scopes_default_agent_scopes": "Ámbitos de agente predeterminados",
@@ -12693,6 +12696,9 @@
     "cfgDesc_mcp_task_after_ms": "Cuando un cliente de IA que admite tareas MCP llama a una herramienta que sigue en curso tras estos milisegundos, AIMEAT responde enseguida con una tarea MCP y el cliente pide el resultado más tarde. Con 0, cada llamada de este tipo se responde con una tarea.",
     "cfgDesc_mcp_capability_use_approval": "En algunos servidores MCP cada persona inicia sesión con su propia cuenta. Allí, una capacidad que publicó otra cuenta actúa como la persona que la usa. Preguntar siempre: el primer uso de cada capacidad de otra cuenta le pregunta una vez a esa persona, con una pulsación; cada capacidad nueva cuesta una pulsación, también las del operador. Preguntar, salvo las herramientas de los operadores (predeterminado): la capacidad de un operador se ejecuta sin preguntar, y la de cualquier otra cuenta pregunta una vez; el operador ya tiene todos los permisos aquí, así que no se pierde protección. Apagado: no se pregunta nada, y la persona ya no decide qué herramienta actúa en su nombre. El cambio se aplica enseguida. Una IA puede hacerlo más estricto, nunca menos.",
     "cfgDesc_mcp_unused_client_days": "Un registro de cliente MCP con el que nadie inició sesión se borra pasados estos días. Un cliente con el que alguien inició sesión se conserva. 0 conserva todos los registros.",
+    "cfgDesc_mcp_legacy_sessions_per_principal": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener una IA o una persona. Al pasar el límite, una sesión nueva cierra la que lleva más tiempo sin usarse, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
+    "cfgDesc_mcp_legacy_sessions_total": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener todo el servidor. Cada una guarda en memoria su propia copia de la lista de herramientas. Al pasar el límite, una sesión nueva cierra la que lleva más tiempo sin usarse, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
+    "cfgDesc_storage_request_statement_ms": "En PostgreSQL, cuánto puede durar una consulta a la base de datos mientras el servidor responde a una página, una aplicación o una IA. Una consulta más larga se detiene y esa petición falla. Las tareas programadas conservan el límite propio de la base de datos, de 120 segundos. El valor por defecto 120000 es ese mismo límite. 0 significa sin límite.",
     "cfgDesc_registration_mode": "Quién puede tener cuenta nueva: open (todos), oauth (primer inicio por un proveedor de identidad, o invitación — sin registro por contraseña), invite (solo invitaciones de miembros), closed (nadie). Las cuentas existentes siempre entran.",
     "cfgDesc_registration_members_see_each_other": "Para el servidor de una empresa. Cada persona con cuenta aquí aparece como colega en la libreta de direcciones de todas las demás, y el primer mensaje entre dos de ellas no necesita aprobación. Desactivado por defecto.",
     "cfgDesc_scopes_default_agent_scopes": "Los permisos que recibe un agente cuando nadie elige ninguno, uno por línea. De serie puede leer y escribir la memoria de su dueño, leer el catálogo, leer los espacios de trabajo de los organismos de su dueño y ver los demás agentes de su dueño.",
@@ -27985,6 +27991,35 @@
           "low": "Menor: los registros abandonados se van antes. Una aplicación cuyo registro se borró se registra de nuevo antes de iniciar sesión.",
           "high": "Mayor: los registros abandonados se quedan más tiempo en la base de datos.",
           "tip": "Deja el valor por defecto. Un cliente con el que alguien inició sesión no se borra nunca, sea cual sea el número."
+        },
+        "legacy_sessions_per_principal": {
+          "title": "Sesiones MCP del protocolo antiguo por IA o persona",
+          "short": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener una IA o una persona. 0 significa sin límite. El valor por defecto es 100.",
+          "what": "Una aplicación de IA que usa el protocolo MCP antiguo (2025) abre una sesión con este servidor, y el servidor guarda en memoria una copia de la lista de herramientas para cada sesión abierta. La mayoría de las aplicaciones nunca cierran la sesión, así que sigue abierta hasta que pasa el límite de inactividad sin usarse. Cuando una IA o una persona abre una sesión por encima de este número, el servidor cierra su sesión que lleva más tiempo sin usarse. Esa aplicación recibe la respuesta de que la sesión ya no existe y vuelve a conectarse sola, como después del límite de inactividad.",
+          "range": "Un número entero, 0 o más. El valor por defecto es 100. 0 significa sin límite.",
+          "low": "Menor: una aplicación que tiene muchas sesiones abiertas pierde antes las más antiguas y vuelve a conectarse.",
+          "high": "Mayor: una IA o una persona puede tener más sesiones abiertas, y usan más memoria.",
+          "tip": "Deja el valor por defecto. Una aplicación usa una sesión a la vez, así que una IA real no llega a 100."
+        },
+        "legacy_sessions_total": {
+          "title": "Sesiones MCP del protocolo antiguo en total",
+          "short": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener todo el servidor. 0 significa sin límite. El valor por defecto es 1000.",
+          "what": "Cada sesión abierta del protocolo MCP antiguo (2025) guarda una copia de la lista de herramientas en la memoria de este servidor, unos 3 MB. Este límite evita que todas juntas llenen la memoria. Cuando una sesión nueva pasa el límite, el servidor cierra la sesión que lleva más tiempo sin usarse, sea de quien sea. Esa aplicación recibe la respuesta de que la sesión ya no existe y vuelve a conectarse sola.",
+          "range": "Un número entero, 0 o más. El valor por defecto es 1000. 0 significa sin límite.",
+          "low": "Menor: se usa menos memoria; en un servidor con mucho uso, las aplicaciones vuelven a conectarse más a menudo.",
+          "high": "Mayor: más sesiones siguen abiertas y pueden usar más memoria.",
+          "tip": "Deja el valor por defecto salvo que al servidor le falte memoria. Las aplicaciones que usan el protocolo nuevo (2026) no guardan sesión y no cuentan."
+        }
+      },
+      "storage": {
+        "request_statement_ms": {
+          "title": "Límite de una consulta a la base de datos al responder (ms)",
+          "short": "En PostgreSQL, cuánto puede durar una consulta a la base de datos mientras el servidor responde a una petición. 0 significa sin límite. El valor por defecto es 120000 (dos minutos).",
+          "what": "Cuando una página, una aplicación o una IA pregunta algo a este servidor, el servidor lee su base de datos para responder. Una consulta muy larga mantiene ocupada una conexión a la base de datos, y el servidor tiene 20 para todos. Este límite detiene una consulta más larga, y esa petición falla con un error. Las tareas programadas y el resto del trabajo en segundo plano conservan siempre el límite propio de la base de datos, de dos minutos. El valor por defecto es esos mismos dos minutos, así que nada cambia hasta que pongas otro número. En SQLite este ajuste no hace nada.",
+          "range": "Milisegundos, de 0 a 3600000 (una hora). El valor por defecto es 120000. 0 significa sin límite.",
+          "low": "Menor: una consulta lenta termina antes y deja su conexión libre para otros; una petición que necesita una consulta larga, como una exportación grande, falla.",
+          "high": "Mayor: las consultas largas terminan, y una lenta mantiene ocupada una conexión más tiempo.",
+          "tip": "Deja el valor por defecto salvo que hayas medido tus peticiones más lentas. Bájalo en pasos pequeños y mira en el registro si alguna petición empieza a fallar."
         }
       },
       "personal_nodes": {

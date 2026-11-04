@@ -158,6 +158,14 @@ export interface MemoryRepository {
   createMemoryIfAbsent?(record: MemoryRecord): Promise<MemoryRecord | null>;
   getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
   /**
+   * getMemory without the value: the same row (live, not in the bin, archived or not) as a
+   * MemoryMetaRow, or null where getMemory answers null. For a reader that needs a record's
+   * metadata only, such as its allowedOrigins for a CORS answer (middleware/cors.ts), so a large
+   * value is never loaded for it (codebase analysis 2026-11-03, item C2). Both providers have it;
+   * optional so a reader keeps working with a store that does not (it then reads getMemory).
+   */
+  getMemoryMeta?(ownerGaii: string, key: string): Promise<MemoryMetaRow | null>;
+  /**
    * BULK PRIMITIVE — read MANY keys under ONE owner in a single `key IN (…)` query (data-access
    * redesign, Phase 1). Backs the batched existing-row lookup a bulk write does, replacing one
    * getMemory per entry (an N-entry import was N serial round-trips just to check existence). Returns

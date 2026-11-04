@@ -8,12 +8,15 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-11-04 — META_COLS, rowToMeta and allPaged moved unchanged to ../repos/memory-meta.ts (800-line limit).
  *   2026-11-04 — getMemoryTotals and compactMemoryTotals over memory_totals; sumMemoryBytes reads it
  *     (repos/memory.ts); setMemory's first read takes version, trackable and groupId, and the whole
  *     row only for a trackable key (codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — listMemory, listMemoryMeta and their many-owner twins take `limit` and a key cursor in
  *     SQL (allPaged, repos/memory.ts memoryPageSql); without them the statement is unchanged
  *     (codebase analysis 2026-11-03, item C1).
+ *   2026-11-04 — getMemoryMeta: one record's metadata without its value (codebase analysis 2026-11-03,
+ *     item C2).
  *   2026-10-31 — listKeyActivity, over repos/memory.ts (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
  *     (secaudit 2026-10-31 inv-24).
@@ -43,42 +46,11 @@ import {
   archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo,
   unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo,
   NOT_DELETED_SQL, LIVE_SQL, deleteExpiredMemory as deleteExpiredMemoryRepo,
-  listKeyActivity as listKeyActivityRepo, memoryPageSql,
+  listKeyActivity as listKeyActivityRepo,
 } from '../repos/memory.js';
 import type { KeyActivityRow } from '../../../repositories/memory.repository.js';
 import { globPrefix } from '../../../key-prefix.js';
-
-/** The projected columns, in one place so the three reads below cannot drift apart on what META means. */
-const META_COLS = 'key, ownerGaii, visibility, groupId, workspaceRef, allowedOrigins, aiProvenanceId, '
-  + 'archived, tags, version, flagCount, byteSize, ttlHours, createdAt, updatedAt';
-
-/** Shared row→meta mapping for the projections below (tags parsed, defaults applied). */
-function rowToMeta(row: Record<string, unknown>): MemoryMetaRow {
-  return {
-    key: row.key as string,
-    ownerGaii: row.ownerGaii as string,
-    visibility: row.visibility as MemoryMetaRow['visibility'],
-    tags: JSON.parse((row.tags as string) ?? '[]') as string[],
-    version: row.version as number,
-    flagCount: (row.flagCount as number | null) ?? 0,
-    byteSize: (row.byteSize as number | null) ?? 0,
-    ttlHours: (row.ttlHours as number | null) ?? null,
-    createdAt: row.createdAt as string,
-    updatedAt: row.updatedAt as string,
-    groupId: (row.groupId as string | null) ?? null,
-    workspaceRef: (row.workspaceRef as string | null) ?? null,
-    allowedOrigins: row.allowedOrigins ? JSON.parse(row.allowedOrigins as string) as string[] : null,
-    aiProvenanceId: (row.aiProvenanceId as string | null) ?? null,
-    archived: !!row.archived,
-  };
-}
-
-/** A keyspace listing's statement run unpaged, as it always was, or with the page memoryPageSql builds. */
-function allPaged(db: SqliteStorage['db'], sql: string, params: unknown[], opts: MemoryListOpts | undefined): Record<string, unknown>[] {
-  const page = memoryPageSql(opts, new Date().toISOString());
-  if (!page) return db.prepare(sql).all(...params) as Record<string, unknown>[];
-  return db.prepare(sql + page.where + page.tail).all(...params, ...page.whereParams, ...page.tailParams) as Record<string, unknown>[];
-}
+import { META_COLS, rowToMeta, allPaged } from '../repos/memory-meta.js';
 
 export const memoryMethods = {
 
@@ -248,6 +220,16 @@ export const memoryMethods = {
       return null;
     }
     return record;
+  },
+
+  // getMemory without the value (codebase analysis 2026-11-03, item C2): the same row test, META_COLS.
+  // An expired row answers null as getMemory does; the TTL sweep and getMemory delete it.
+  async getMemoryMeta(this: SqliteStorage, ownerGaii: string, key: string): Promise<MemoryMetaRow | null> {
+    const row = this.db.prepare(`SELECT ${META_COLS} FROM memory WHERE ownerGaii = ? AND key = ? AND deletedAt IS NULL`).get(ownerGaii, key) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    const ttlHours = row.ttlHours as number | null;
+    if (ttlHours && Date.now() > new Date(row.createdAt as string).getTime() + ttlHours * 3_600_000) return null;
+    return rowToMeta(row);
   },
 
   async listMemory(this: SqliteStorage, ownerGaii: string, opts?: MemoryListOpts): Promise<MemoryRecord[]> {

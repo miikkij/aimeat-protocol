@@ -38,6 +38,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-04 — A stored file is announced with emitRecordChangePriorUnknown: the same streams hear
+ *     it, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   v1.14.0 — 2026-11-01 — The file hooks moved by extraction to ./storage-file-hooks.ts (line limit) and
  *     are re-exported; it adds addStorageFileListener(), which the data products that run when a source
  *     changes use (services/dataproduct/on-change.ts, WP9c).
@@ -110,7 +112,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { checkStorageQuota, chargeOverage } from './quota.js';
 import { generateUploadToken, buildUploadMeta } from './upload-token.js';
-import { emitRecordChange } from './event-bus.js';
+import { emitRecordChange, emitRecordChangePriorUnknown } from './event-bus.js';
 import { isAnonymousGaii } from '../routes/memory/shared.js';
 import { storeHeldProvenance } from './ai-provenance.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -430,8 +432,9 @@ export async function writeStorageFile(
     // A file only its owner reads is told to that owner's streams (event-bus.ts emitRecordChange).
     // The write does not read what the key held before, so a file it replaced as private is not
     // announced to those who could read the earlier one.
-    emitRecordChange('files', ownerGaii, level.visibility);
-    emitRecordChange('memory', ownerGaii, level.visibility);
+    // For that reason the read cache drops as for any change (event-bus.ts emitRecordChangePriorUnknown).
+    emitRecordChangePriorUnknown('files', ownerGaii, level.visibility);
+    emitRecordChangePriorUnknown('memory', ownerGaii, level.visibility);
     // The content class pipeline on arrival (services/content/intake.ts): scheduled, never awaited.
     fileStored({ storage, config }, ownerGaii, input.key);
     // A welcome page notes its writer before the answer, so the next read meets the record (storage-page-keys.ts).

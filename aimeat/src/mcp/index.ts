@@ -11,6 +11,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-11-04 — authenticate() takes the sign-in check global optionalAuth made for the same token in
+ *     the same request (auth/verified-on-request.ts) instead of verifying it and asking the
+ *     revocation questions a second time; the audience, stale-grant and scope steps run as before
+ *     (codebase analysis 2026-11-03, item C2).
  *   2026-10-31 — The chat surface lists its start tools in short words (chat-tool-text.ts; v31 K63).
  *   2026-10-25 — Warn-only mode (AIMEAT_MCP_ENFORCE_SCOPES=false) still answers SCOPE_DENIED for a
  *     word no wildcard carries, so the owner tools that have no check of their own keep their guard
@@ -183,6 +187,7 @@ import { MCP_VIA_HEADER, parseVia, viaRefusal, runWithVia } from '../services/mc
 import { verifyJWT, type VerifiedToken } from '../auth/jwt.js';
 import { credentialRevoked } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
+import { verifiedJwtOf } from '../auth/verified-on-request.js';
 import { scopeIsCovered, isOutsideWildcard } from '../utils/scope-coverage.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { getSoftwareVersion } from '../utils/version.js';
@@ -222,8 +227,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const header = req.headers.authorization;
         const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
         if (!token) return null;
-        const verified = await verifyJWT(token);
-        if (!verified || await credentialRevoked(token, verified)) {
+        // Global optionalAuth verified this exact token and asked every revocation question a moment
+        // ago in this request; that check is taken as it is (auth/verified-on-request.ts). Any other
+        // token, and every request optionalAuth did not see, is checked here as before.
+        const earlier = verifiedJwtOf(req, token);
+        const verified = earlier ?? await verifyJWT(token);
+        if (!verified || (!earlier && await credentialRevoked(token, verified))) {
             res.status(401).json({ jsonrpc: '2.0', error: { code: -32001,
                 message: 'Token is invalid or has been revoked. Obtain a new access token via /v1/mcp/token.' },
                 id: req.body?.id ?? null });

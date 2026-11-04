@@ -14,6 +14,8 @@
  *   DELETE /v1/open-items/:id
  * @usage app.use(openItemsRouter(config, storage))
  * @version-history
+ *   2026-11-04 — announce() uses emitRecordChangePriorUnknown: the same streams hear it, and the read
+ *     cache drops as before (codebase analysis 2026-11-03, item C4).
  *   v1.1.1 — 2026-11-04 — A create, a change and a switch-off tell the owner's open pages as the
  *     `memory` domain. The three calls passed the owner as the domain, so no page heard them
  *     (codebase analysis 2026-11-03, item A4).
@@ -28,7 +30,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { emitRecordChange } from '../services/event-bus.js';
+import { emitRecordChangePriorUnknown } from '../services/event-bus.js';
 import {
     ITEM_KINDS, CLOSES_CHECKS, MAX_ITEMS, OpenItemsConflict,
     showItems, openCount, addItem, patchItem, closeItem, getItem, itemStats,
@@ -46,9 +48,11 @@ export function openItemsRouter(config: AimeatConfig, storage: Storage): Router 
 
     /**
      * Tell the owner's open pages that the list changed. The record is owner-visible
-     * (services/open-items.ts writes it so), so the event goes to that owner's streams only.
+     * (services/open-items.ts writes it so), so the event goes to that owner's streams only. The write
+     * sets the level over whatever the key held, so the read cache drops as for any change
+     * (services/event-bus.ts emitRecordChangePriorUnknown).
      */
-    const announce = (req: Express.Request) => emitRecordChange('memory', resolve(req), 'owner');
+    const announce = (req: Express.Request) => emitRecordChangePriorUnknown('memory', resolve(req), 'owner');
 
     /** A write conflict is a retry, not a server fault. Say so with the status that means that. */
     const onConflict = (res: Parameters<Parameters<Router['get']>[1]>[1], e: unknown) => {

@@ -29,6 +29,9 @@
  *   v1.4.1 — 2026-09-26 — An owner's name in the ticker comes from localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
+ *   v1.5.0 — 2026-11-04 — The three counters read memory metadata (listAllMemoryMeta), never a value,
+ *     and node-totals reads every app's download count in one query (getAppDownloadsForApps). Same
+ *     rows, same order, same numbers (codebase analysis 2026-11-03, item C4).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -62,7 +65,8 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
         // newest public writes, so the ticker showed ten rows of `system` seeding itself.
         // Excluding in SQL also fixes the opposite symptom on a busy node, where the whole
         // fetched window was activity rows and post-filtering emptied the ticker completely.
-        const result = await storage.listAllMemory({
+        // Metadata only: the ticker shows the owner, the key and the time, never a value.
+        const result = await storage.listAllMemoryMeta({
           visibility: 'public', excludeOwnerPrefix: SYSTEM_OWNER, newestFirst: true, limit: 100,
         });
         items = result.items
@@ -97,7 +101,8 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
         // Same reasoning as the ticker: exclude the whole system identity in SQL. Post-filtering
         // a key prefix both let the seeded skills inflate the count and let activity rows crowd
         // real writes out of the window entirely.
-        const mem = await storage.listAllMemory({
+        // Metadata only: the count reads the time of each write, never a value.
+        const mem = await storage.listAllMemoryMeta({
           visibility: 'public', excludeOwnerPrefix: SYSTEM_OWNER, newestFirst: true, limit: 500,
         });
         publicWrites = mem.items.filter(m => isToday(m.updatedAt)).length;
@@ -130,10 +135,11 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
         // No ownerGaii/viewerGhii → public, latest-version, non-parked apps only.
         const { apps: list, total } = await storage.listApps({ limit: 1000 });
         apps = total || list.length;
-        const counts = await Promise.all(
-          list.map(a => storage.getAppDownloads(a.ownerGaii, a.filename).catch(err => { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); return 0; })),
-        );
-        downloads = counts.reduce((s, n) => s + (Number(n) || 0), 0);
+        // One query for every app's count (getAppDownloadsForApps), where one query per app ran at
+        // once against a pool of 20. Summed per listed app, as before; a failed read counts 0.
+        const counts = await storage.getAppDownloadsForApps(list.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename })))
+          .catch((err: unknown): Record<string, number> => { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); return {}; });
+        downloads = list.reduce((s, a) => s + (Number(counts[`${a.ownerGaii} ${a.filename}`]) || 0), 0);
       } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
       try {
         const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000, archived: 'exclude' });
@@ -151,7 +157,7 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
         // memory gets swamped by the public activity feed (activity/…) on busy nodes, pushing
         // the manifests past the limit and undercounting to 0 (catalogue is unaffected: it
         // queries per-owner with the same prefix).
-        const mem = await storage.listAllMemory({ visibility: 'public', prefix: 'packages/', limit: 1000 });
+        const mem = await storage.listAllMemoryMeta({ visibility: 'public', prefix: 'packages/', limit: 1000 });
         knowledgePackages = mem.items.filter(m => /^packages\/[^/]+\/manifest$/.test(m.key)).length;
       } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
       return {

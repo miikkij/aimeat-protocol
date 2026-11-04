@@ -20,6 +20,8 @@
  *   - PUT  /v1/calibrator/:id/batches/:batchId — update batch
  *   - DELETE /v1/calibrator/:id/batches/:batchId — delete batch
  * @version-history
+ *   2026-11-04 — Its writes are announced with emitRecordChangePriorUnknown: the same streams hear
+ *     them, and the read cache drops as before (codebase analysis 2026-11-03, item C4).
  *   2026-10-19 — PUT /:id, POST /:id/versions, PUT /:id/batches/:batchId, the dimensions list and the
  *     template backfill of GET /:id and GET /:id/detail write on the version that was read
  *     (record-cas.ts updateMemoryRecord), and set their change on a fresh read after a conflict.
@@ -48,7 +50,9 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { emitRecordChange } from '../services/event-bus.js';
+// The calibrator writes its records as private over whatever the key held, so it does not know the
+// earlier visibility (services/event-bus.ts emitRecordChangePriorUnknown).
+import { emitRecordChangePriorUnknown } from '../services/event-bus.js';
 import { createCalibratorDetailService } from '../services/db/calibrator-detail-db-service.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
@@ -386,7 +390,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       };
       await setCalMemory(gaii, `calibrator.${projectId}.project`, project, ['calibrator', 'project']);
       res.status(201).json(success(config.nodeId, { project }));
-      emitRecordChange('memory', gaii, 'private');
+      emitRecordChangePriorUnknown('memory', gaii, 'private');
     }
   );
 
@@ -464,7 +468,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
       res.json(success(config.nodeId, { project }));
-      emitRecordChange('memory', gaii, 'private');
+      emitRecordChangePriorUnknown('memory', gaii, 'private');
     }
   );
 
@@ -479,7 +483,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         await storage.deleteMemory(gaii, m.key);
       }
       res.json(success(config.nodeId, { deleted: allKeys.length }));
-      emitRecordChange('memory', gaii, 'private');
+      emitRecordChangePriorUnknown('memory', gaii, 'private');
     }
   );
 
@@ -517,7 +521,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       };
       await setCalMemory(gaii, `calibrator.${id}.version.${newVersion}`, version, ['calibrator', 'version']);
       res.status(201).json(success(config.nodeId, { version }));
-      emitRecordChange('memory', gaii, 'private');
+      emitRecordChangePriorUnknown('memory', gaii, 'private');
     }
   );
 
@@ -600,7 +604,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
 
       await setCalMemory(gaii, `calibrator.${id}.batch.${batchId}`, batch, ['calibrator', 'batch']);
       res.status(201).json(success(config.nodeId, { batch }));
-      emitRecordChange('memory', gaii, 'private');
+      emitRecordChangePriorUnknown('memory', gaii, 'private');
     }
   );
 
@@ -710,7 +714,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       res.json(success(config.nodeId, { batch }));
-      emitRecordChange('memory', gaii, 'private');
+      emitRecordChangePriorUnknown('memory', gaii, 'private');
     }
   );
 
@@ -727,7 +731,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       }
       await storage.deleteMemory(gaii, `calibrator.${id}.batch.${batchId}`);
       res.json(success(config.nodeId, { deleted: 1 }));
-      emitRecordChange('memory', gaii, 'private');
+      emitRecordChangePriorUnknown('memory', gaii, 'private');
     }
   );
 

@@ -8,7 +8,7 @@
  *   payload, consumed by the ConnectTunnelManager to push a single agent's
  *   socket (realtime reverse delivery). SSE never subscribes to `delivery`, so
  *   per-agent payloads are not broadcast to UI clients.
- * @structure emitChange/onChangeEvent/offChangeEvent (change) +
+ * @structure emitChange/emitRecordChange/emitRecordChangePriorUnknown/onChangeEvent/offChangeEvent (change) +
  *   emitDelivery/onDeliveryEvent/offDeliveryEvent (delivery).
  * @usage import { emitDelivery } from '../services/event-bus.js';
  * @version-history
@@ -34,6 +34,11 @@
  *     `workspace:<organismId>/<ws>`, told only to the organism's members (ChangeEvent.organismId).
  *     A written key inside a workspace and an appended row emit it from here; the workspace
  *     operations that write no key (a draft, a delete, an archive) call it themselves.
+ *   v1.9.0 — 2026-11-04 — ChangeEvent.ownerOnly: emitRecordChange marks a change every record of
+ *     which only its owner reads, before and after, so the read cache keeps what it computed from
+ *     records others read. emitRecordChangePriorUnknown for a writer that does not know the earlier
+ *     visibility: routed to the streams the same way, never marked (codebase analysis 2026-11-03,
+ *     item C4).
  */
 import { EventEmitter } from 'node:events';
 
@@ -57,6 +62,14 @@ export interface ChangeEvent {
    * its timing are the members' business only.
    */
   organismId?: string;
+  /**
+   * True when every record this change touched was readable by its owner alone, before the change
+   * and after it: emitRecordChange sets it when the writer named every visibility involved. The read
+   * cache (server-bootstrap/process-buffers.ts) then drops only what it keeps for that owner, and
+   * keeps what it computed from records other people read. Absent means the change may concern
+   * others, and every cache of the domain is dropped as before.
+   */
+  ownerOnly?: boolean;
 }
 
 export function emitChange(domain: string, ownerGaii?: string): void {
@@ -116,6 +129,26 @@ export function isOwnerOnlyChange(ownerGaii: string | null | undefined, ...visib
  * was writing (measured in test/e2e-sse.ts).
  */
 export function emitRecordChange(
+  domain: 'memory' | 'files',
+  ownerGaii: string | null | undefined,
+  ...visibilities: Array<string | null | undefined>
+): void {
+  if (isOwnerOnlyChange(ownerGaii, ...visibilities)) {
+    // The writer named every visibility the change involved, so the read cache may keep what it
+    // computed from records other people read (ChangeEvent.ownerOnly).
+    bus.emit('change', { domain, timestamp: Date.now(), ownerGaii: ownerGaii as string, ownerOnly: true } satisfies ChangeEvent);
+    return;
+  }
+  emitChange(domain);
+}
+
+/**
+ * emitRecordChange for a writer that does not know what every record held before: a batch that does
+ * not read the keys it overwrites, or a write of a fixed visibility over whatever the key held. The
+ * streams hear it exactly as emitRecordChange would tell them; the read cache treats it as a change
+ * other people may read, because a record it moved from public to private was public a moment ago.
+ */
+export function emitRecordChangePriorUnknown(
   domain: 'memory' | 'files',
   ownerGaii: string | null | undefined,
   ...visibilities: Array<string | null | undefined>

@@ -14,6 +14,8 @@
  *     groupId only (codebase analysis 2026-11-03, item C3).
  *   2026-11-04 — listMemory, listMemoryMeta and their many-owner twins take `limit` and a key cursor in
  *     SQL (applyPage); without them the query is unchanged (codebase analysis 2026-11-03, item C1).
+ *   2026-11-04 — getMemoryMeta: one record's metadata without its value (codebase analysis 2026-11-03,
+ *     item C2).
  *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
  *     first, never the value (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
@@ -327,6 +329,13 @@ export const memoryMethods = {
     const r = await this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
     if (!r || !isVisible(r)) return null;
     return rowToRecord(r);
+  },
+
+  // getMemory without the value (codebase analysis 2026-11-03, item C2): the same row test, META_COLS.
+  async getMemoryMeta(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<MemoryMetaRow | null> {
+    const r = await this.db.selectFrom('Memory').select([...META_COLS, 'deletedAt']).where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
+    if (!r || !isVisible(r)) return null;
+    return rowToMeta(r);
   },
 
   async getMemoryByKeys(this: PostgresKyselyStorage, ownerGaii: string, keys: string[]): Promise<MemoryRecord[]> {

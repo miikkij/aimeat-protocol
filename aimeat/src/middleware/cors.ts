@@ -14,6 +14,9 @@
  *   - setCorsHeaders(): writes Allow-Origin/Methods/Headers/Expose headers
  *
  * @version-history
+ *   2026-11-04 — A memory key's origin list is read from the record's metadata (getMemoryMeta), not
+ *     the whole record with its value; the agent and the account through the request memo
+ *     (services/request-memo.ts). Same origins, same answers (codebase analysis 2026-11-03, item C2).
  *   v1.1.0 — 2026-10-20 — The MCP 2026-07-28 request headers (MCP-Protocol-Version, Mcp-Method,
  *     Mcp-Name) are allowed (MCP SDK v2 migration step 5).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -33,6 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { memoGetAgent, memoGetGHIIByOwner } from '../services/request-memo.js';
 
 /**
  * Routes that authenticate with the host-only `aimeat_rt` cookie and return a usable credential.
@@ -146,22 +150,27 @@ async function resolveAllowedOrigins(
         // Phase 4: Memory-level — check if this is a memory request with a key
         const memoryKey = extractMemoryKey(req);
         if (memoryKey) {
-            const record = await storage.getMemory(memoryIdentity, memoryKey);
+            // The record's metadata only: its value can be large and the route reads it itself. A
+            // store without the metadata read is asked for the record, as before.
+            const record = storage.getMemoryMeta
+                ? await storage.getMemoryMeta(memoryIdentity, memoryKey)
+                : await storage.getMemory(memoryIdentity, memoryKey);
             if (record?.allowedOrigins?.length) {
                 return record.allowedOrigins;
             }
         }
 
-        // Phase 3: Agent-level — check agent's allowedOrigins
+        // Phase 3: Agent-level — check agent's allowedOrigins. Through the request memo: the
+        // revocation check of this request read the same agent (services/request-memo.ts).
         if (sub !== owner) {
-            const agent = await storage.getAgent(sub);
+            const agent = await memoGetAgent(storage, sub);
             if (agent?.allowedOrigins?.length) {
                 return agent.allowedOrigins;
             }
         }
 
         // Phase 2: GHII-level — check owner's GHII allowedOrigins
-        const ghii = await storage.getGHIIByOwner(owner);
+        const ghii = await memoGetGHIIByOwner(storage, owner);
         if (ghii?.allowedOrigins?.length) {
             return ghii.allowedOrigins;
         }

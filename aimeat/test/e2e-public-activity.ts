@@ -19,6 +19,8 @@
  *     appear in the ticker. The old name blamed the activity feed, which was always filtered
  *     correctly; the real leak was the seeded built-in skills (public since 2026-07-14), so a
  *     dedicated regression case names them.
+ *   v1.2.0 — 2026-11-04 — Phase 5: a cached count shows the owner's private write at once, and the
+ *     cached ticker a public write at once (codebase analysis 2026-11-03, item C4).
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -184,6 +186,39 @@ await test('The seeded built-in skills specifically are not ticker items', async
 // node-stats-today's public_writes uses the SAME exclusion, but a count assertion is not
 // deterministic on a shared test database (other suites write public memory too), so it is
 // deliberately not asserted here rather than shipping a flaky test.
+
+console.log('\nPhase 5: A cached page shows a change at once (codebase analysis 2026-11-03, C4)');
+
+// A memory change that only its owner reads keeps the public caches and drops the owner's own
+// entries (server-bootstrap/process-buffers.ts). Both views must still show a change at once: the
+// owner's count after a private write, and the public ticker after a public write.
+const countOf = async (query: string, auth: (o?: RequestInit) => RequestInit) => {
+  const r = await json(`/v1/memory?count=true${query}`, auth());
+  assert(r.status === 200, `count status ${r.status}: ${JSON.stringify(r.body)}`);
+  return r.body.data.count as number;
+};
+
+await test('The owner\'s own count shows a private write at once (cache warmed first)', async () => {
+  const before = await countOf('', agentAuth);
+  const ownerScopeBefore = await countOf('&owner_scope=true', agentAuth);
+  assert(await countOf('', agentAuth) === before, 'the second read is the cached one');
+  const w = await json('/v1/memory', agentAuth({ method: 'POST', body: JSON.stringify({ key: `pac.fresh.private.${stamp}`, value: { n: 1 }, visibility: 'private' }) }));
+  assert(w.status === 200 || w.status === 201, `private write status ${w.status}: ${JSON.stringify(w.body)}`);
+  assert(await countOf('', agentAuth) === before + 1, 'the agent\'s count rose by one at once');
+  assert(await countOf('&owner_scope=true', agentAuth) === ownerScopeBefore + 1, 'the owner-scope count rose by one at once');
+});
+
+await test('The public ticker shows a public write at once (cache warmed first), and never a private one', async () => {
+  await json('/v1/public/activity-ticker');
+  const key = `pac.fresh.public.${stamp}`;
+  const w = await json('/v1/memory', ownerAuth({ method: 'POST', body: JSON.stringify({ key, value: { n: 2 }, visibility: 'public' }) }));
+  assert(w.status === 200 || w.status === 201, `public write status ${w.status}: ${JSON.stringify(w.body)}`);
+  const { body } = await json('/v1/public/activity-ticker');
+  const items = body?.data?.items ?? [];
+  // The ticker shows the key's last two dot segments.
+  assert(items.some((it: any) => it.key === `public.${stamp}`), `the public write is on the ticker at once: ${JSON.stringify(items.slice(0, 3))}`);
+  assert(!items.some((it: any) => it.key === `private.${stamp}`), 'the private write is not on the ticker');
+});
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

@@ -22,6 +22,9 @@
  *   const admitted = await admitMcpAgent(storage, verified.sub);
  *   if (!admitted.ok) return res.status(admitted.status).json({ jsonrpc: '2.0', error: { code: admitted.code, message: admitted.message }, id });
  * @version-history
+ *   2026-11-04 — admitMcpAgent reads the agent, the owner and the account through the request memo
+ *     (./request-memo.ts): same answers, same refusals, without a second read of what the auth chain
+ *     of the same request read (codebase analysis 2026-11-03, item C2).
  *   v1.1.0 — 2026-11-01 — The place's own chat agent and the basic agents no longer write the
  *     first-MCP-call marker, which had ticked "connect your AI" on a place where no outside AI was
  *     connected (aimeat-commercial-1c, test lane).
@@ -34,6 +37,7 @@ import { logger } from '../utils/logger.js';
 import { registerChatInstance } from './chat-instance-write.js';
 import { markAgentMcpUse } from './agent-mcp-touch.js';
 import { isNodeResidentAgent } from './node-resident-agent.js';
+import { memoGetAgent, memoGetGHIIByOwner, memoGetOwner } from './request-memo.js';
 
 export type McpAdmission =
     | { ok: true; owner: string }
@@ -41,16 +45,18 @@ export type McpAdmission =
 
 /** Whether the token's subject may use MCP here: a known agent, a real owner, a GHII account. */
 export async function admitMcpAgent(storage: Storage, gaii: string): Promise<McpAdmission> {
-    const agent = await storage.getAgent(gaii);
+    // Through the request memo (./request-memo.ts): the revocation and scope checks of this request
+    // read the same agent and owner a moment ago, and the answer is the one they read.
+    const agent = await memoGetAgent(storage, gaii);
     if (!agent) {
         return { ok: false, status: 401, code: -32001, message: 'Agent not found. Connect it first through device authorization (POST /v1/agents/device-authorize), which your owner approves.' };
     }
-    const owner = await storage.getOwner(agent.owner);
+    const owner = await memoGetOwner(storage, agent.owner);
     if (!owner) {
         return { ok: false, status: 403, code: -32003, message: 'Agent has no valid owner profile. Owner approval required.' };
     }
     // GHII account is required for MCP access
-    const ghiiRecord = await storage.getGHIIByOwner(agent.owner);
+    const ghiiRecord = await memoGetGHIIByOwner(storage, agent.owner);
     if (!ghiiRecord) {
         return { ok: false, status: 403, code: -32004, message: 'GHII account required for MCP access. Create one at /v1/ghii first.' };
     }
