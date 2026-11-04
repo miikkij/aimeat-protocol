@@ -1,6 +1,6 @@
 # 12 Updates and releases
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit bcfc193dd) on 2026-11-04. Maintained with the code: see the README for how.
 
 This page is for the people who approve and apply updates: the system owner, the sysadmin and the security officer. It says how the project makes a release, what a release consists of, what you can verify about its integrity and what you cannot, how an update and a rollback work, and how security fixes are announced. The step-by-step procedure stays in [Upgrading](../operations/upgrading.md).
 
@@ -96,7 +96,7 @@ The procedure is in [Upgrading](../operations/upgrading.md#the-update). In short
 | Data changes | One-time data steps (for example the permission words kept for existing agents and apps in 4.0.0) run once per node at start and record that they ran | `aimeat/src/services/rest-scope-keep-working-migration.ts`, `aimeat/src/services/once-only-step.ts` |
 | A failing change | Rolled back; the start stops with the file named; the database stays as before that change | `aimeat/src/storage/providers/postgres-kysely/migrate.ts` |
 | Are changes reversible | No. There are no down migrations, and an older version does not undo what a newer one changed | [Upgrading](../operations/upgrading.md#the-update) |
-| Rollback | Restore the backup taken before the update and start the old version. Without that backup, going back is not supported | [Upgrading](../operations/upgrading.md#the-update), [Backup and restore](../operations/backup-and-restore.md) |
+| Rollback | Restore the backup taken before the update and start the old version. Without that backup, going back is not supported. A version from before 2026-11-04 refuses the tokens a newer version issued, so after going back to it people sign in again and agents connect again ([Key rotation](../operations/key-rotation.md)) | [Upgrading](../operations/upgrading.md#the-update), [Backup and restore](../operations/backup-and-restore.md) |
 | What is tested | Each new build starts on a database that the previous release wrote, on SQLite and PostgreSQL, nightly | `aimeat/test/upgrade-from-release.ts` |
 
 The rollback point is the backup. Its recovery point is the moment you took it: anything people wrote on the new version after that is lost on rollback. Plan the window with that in mind ([11 Backup and recovery](11-backup-recovery.md)).

@@ -75,6 +75,11 @@ Every process of a node derives the same keys from the same node key, so a token
 verifies on another. A token issued before 2026-11-04 carries no `kid` and was signed with the node key
 itself; the node verifies it with the node key until it expires, as before.
 
+The other direction does not hold: a release from before 2026-11-04 verifies tokens with the node key
+only, so it refuses every token a newer release issued. Update every process of a node together, as
+[Upgrading](upgrading.md) describes. After going back to such a release, people sign in again and
+agents connect again; nothing stored is lost.
+
 ### Replacing the node key
 
 There is no procedure, and nothing above changes that. The token keys are derived from the node key,

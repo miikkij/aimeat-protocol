@@ -129,7 +129,7 @@
       "digest": "sha256:c29dc870cca20d457bb8c8cb"
     },
     "12-updates-releases.md": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-04",
       "watches": [
         ".github/SECURITY.md",
         "docs/operations/upgrading.md"
