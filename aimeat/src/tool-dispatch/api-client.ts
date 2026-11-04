@@ -272,7 +272,10 @@ export class AimeatClient {
       this.lastStatus = 401;
       return held as ApiResponse;
     }
-    const res = await (this.fetchImpl ?? fetch)(url, {
+    // The node's own dispatcher sets an in-process fetch (setFetch); every other client uses the
+    // platform's, and this stays the one outbound call of the client.
+    const fetch = this.fetchImpl ?? globalThis.fetch;
+    const res = await fetch(url, {
       method,
       headers: this.headers(token),
       body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
