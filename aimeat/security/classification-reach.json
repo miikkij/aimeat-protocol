@@ -1039,9 +1039,9 @@
     "src/services/app-parties/data.ts": {
       "reads": {
         "getMemory": 3,
-        "listMemory": 1
+        "listMemoryMeta": 1
       },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4.2), the node's own read: the service-owned `app-party-data.` records under the app owner, read back only to the party whose uid the node put in the key (or the app's shared collection), and counted for the per-party limit. The party wrote the content itself; no owner content is read."
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D4.2), the node's own read: the service-owned `app-party-data.` records under the app owner, read back only to the party whose uid the node put in the key (or the app's shared collection), and counted for the per-party limit. The party wrote the content itself; no owner content is read. Since 2026-11-04 the count reads meta rows, no values, at most up to the limit (codebase analysis 2026-11-03, item C1)."
     },
     "src/services/app-parties/owner.ts": {
       "reads": {
@@ -2299,6 +2299,13 @@
         "listAllMemoryMeta": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Value-free public metadata (keys, owners, tags)."
+    },
+    "src/services/memory-list-page.ts": {
+      "reads": {
+        "getMemoryByKeys": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-04 (codebase analysis 2026-11-03, item C1): the values of one page of GET /v1/memory?limit=N, read by key for rows the route has already passed through the classification reader (reader.show on the meta rows, the same reader presentMemories applies), with the credential mask applied to each value; the byte sum reads the values of the masked keys only to measure them, and returns no content."
     },
     "src/services/memory-query.ts": {
       "reads": {
