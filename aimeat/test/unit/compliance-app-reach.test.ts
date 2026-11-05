@@ -2,12 +2,14 @@
  * @file compliance-app-reach.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Who can see an app's personal data, read from its data map (services/compliance-app-
- *   reach.ts): the four groups Jouni ruled on 2026-10-29, the widest row deciding the app, the other
+ * @description Who can see an app's personal data, read from its data map
+ *   (services/compliance/app-reach.ts): the four groups Jouni ruled on 2026-10-29, the widest row deciding the app, the other
  *   spellings measured on aimeat.io's 152 maps, an unsaid row that matters only when others can read
  *   it, and a word the node does not know, which is never guessed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-app-reach.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-05 — The description names the file at its new path (codebase analysis
+ *            2026-11-03, item D-h).
  *   v1.0.0 — 2026-10-29 — Initial.
  */
 import { describe, it, expect } from 'vitest';
