@@ -40,6 +40,7 @@ type AnyFn = (...args: unknown[]) => unknown;
 const objects = new WeakMap<object, z.ZodType>();
 /** The zod objects whose JSON Schema answers from a memo. */
 const memoized = new WeakSet<object>();
+// process-local: a per-process cache switch; each process builds its own cache, nothing is shared or needs to be.
 let enabled = true;
 
 const isZodSchema = (v: unknown): boolean => typeof v === 'object' && v !== null && '_zod' in v;
