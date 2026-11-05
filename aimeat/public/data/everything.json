@@ -3958,6 +3958,15 @@
      "plain": "Which code the node runs The node says which commit it runs, where it read that (the build stamp of the installed package, or the checkout it was started from), whether the running build is older than the code on disk, and when the process started. To know whether a fix is live, check that its commit is an ancestor of this one. A process manager and a load balancer get two probes that cost the same on every node: liveness, and readiness, which answers 503 while the process boots, while it drains after a stop signal and when its database does not answer. Limits: an install with neither a build stamp nor a git checkout, such as a container image built without one, reports no commit. GET /v1/build (commit, commit_source, state, started_at), GET /v1/health (data.build), GET /v1/health/live, GET /v1/health/ready"
     },
     {
+     "slug": "g-19-one-process-or-several",
+     "cells": [
+      "<strong>One process or several</strong>",
+      "One process serves the node by default, and a process that starts takes all of the node's work at once: the tasks that run at every start, the AI jobs left waiting and the timed clean-ups, also when its container was recreated with a new host name. An operator who runs a standby process or several active processes on one PostgreSQL database switches several on, and each piece of work then runs once: a process takes another live process's work only after that process stops reporting that it runs (30 s), or at once when it was stopped normally. Limits: the setting is read at start; every process needs the same value, and two processes left on one process both run the same work.",
+      "setting <code>node.processes</code> (<code>AIMEAT_NODE_PROCESSES</code>: <code>single</code> or <code>multiple</code>), <code>PUT /v1/admin/config</code>, <code>aimeat_admin_config_set</code>"
+     ],
+     "plain": "One process or several One process serves the node by default, and a process that starts takes all of the node's work at once: the tasks that run at every start, the AI jobs left waiting and the timed clean-ups, also when its container was recreated with a new host name. An operator who runs a standby process or several active processes on one PostgreSQL database switches several on, and each piece of work then runs once: a process takes another live process's work only after that process stops reporting that it runs (30 s), or at once when it was stopped normally. Limits: the setting is read at start; every process needs the same value, and two processes left on one process both run the same work. setting node.processes (AIMEAT_NODE_PROCESSES: single or multiple), PUT /v1/admin/config, aimeat_admin_config_set"
+    },
+    {
      "slug": "g-19-people-and-roles",
      "cells": [
       "<strong>People and roles</strong>",
@@ -4874,6 +4883,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 498
+  "rows": 499
  }
 }

@@ -13350,6 +13350,7 @@
     "cfgDesc_node_id": "Unique identifier of this instance",
     "cfgDesc_node_port": "HTTP listen port",
     "cfgDesc_node_bind_host": "The address the server answers on: 127.0.0.1 for this machine only, 0.0.0.0 for the local network and every other network that reaches the machine. Empty answers on every address. A server open beyond this machine gets the public safety defaults unless the security profile says otherwise. Set in the environment; takes effect at the next start.",
+    "cfgDesc_node_processes": "One process (the default) or several on the same database. With one, a process that starts takes all the work at once, also when its container gets a new host name. With several, a process takes another running process's work only after that process has stopped reporting that it runs (30 s). Set the same value on every process. Takes effect at the next start.",
     "cfgDesc_node_type": "Instance type: full, relay, or personal",
     "cfgDesc_storage_type": "Storage backend type",
     "cfgDesc_node_sealed_config_keys": "Settings whoever runs this instance set and nobody here can change. Readable, not writable. Empty when you run it yourself",
@@ -14432,6 +14433,7 @@
     "cfg_node_id": "Node ID",
     "cfg_node_port": "Port",
     "cfg_node_bind_host": "Listen address",
+    "cfg_node_processes": "Server processes",
     "cfg_node_type": "Node Type",
     "cfg_storage_type": "Storage Type",
     "cfg_morsel_policy_welcome_bonus": "Welcome Bonus",
@@ -15291,6 +15293,8 @@
     "cfgOpt_node_log_level_verbose": "Detailed",
     "cfgOpt_node_log_level_debug": "For debugging",
     "cfgOpt_node_log_level_silly": "Everything",
+    "cfgOpt_node_processes_single": "One process",
+    "cfgOpt_node_processes_multiple": "Several processes",
     "cfg_node_perf_trace": "Storage call timing",
     "cfgDesc_node_perf_trace": "Time every storage call and log the slow ones. For finding why a server is slow; it costs a little on every call. Set in the environment.",
     "cfg_node_key_path": "Server key file",
@@ -29483,6 +29487,17 @@
       }
     },
     "config": {
+      "node": {
+        "processes": {
+          "title": "Server processes",
+          "short": "Whether one process serves this server or several on the same database. One is the default.",
+          "what": "A process is one running copy of the server program. With one process, a process that starts takes all the server's work at once: the tasks that run at every start, the AI jobs left waiting and the timed clean-ups. It does so also when it starts in a new container with a new host name, because no other process can be running. With several processes, an active process and a standby, or several active processes behind a load balancer, share one database. Each piece of work then runs once: a process takes another process's work only after that process has stopped reporting that it runs, 30 seconds after its last report. A process that was stopped normally hands its work over at once.",
+          "range": "One of two: One process (the default) or Several processes. The server reads it at start, so a change takes effect at the next start.",
+          "ex1": "One process: a server in one container that is created again at each update.",
+          "ex2": "Several processes: a second process waits on another host as a standby, or two processes share the traffic behind a load balancer.",
+          "tip": "Set the same value on every process. With One process, do not start a second process on the same database: both would run the same work."
+        }
+      },
       "consent": {
         "data_intermediation": {
           "title": "Data intermediation service",

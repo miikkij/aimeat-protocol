@@ -14087,6 +14087,7 @@
     "cfgDesc_node_id": "Tämän instanssin yksilöivä tunniste.",
     "cfgDesc_node_port": "HTTP-portti, jota kuunnellaan.",
     "cfgDesc_node_bind_host": "Osoite, jossa palvelin vastaa. 127.0.0.1 tarkoittaa vain tätä konetta. 0.0.0.0 avaa palvelimen lähiverkkoon ja muihin verkkoihin, joista kone näkyy. Tyhjä vastaa kaikissa osoitteissa. Kun palvelin on auki tämän koneen ulkopuolelle, se saa julkisen palvelimen turva-asetukset, ellei suojausprofiili sano muuta. Asetetaan ympäristössä, ja muutos tulee voimaan seuraavassa käynnistyksessä.",
+    "cfgDesc_node_processes": "Yksi prosessi (oletus) tai useita samassa tietokannassa. Kun prosessi on yksi, käynnistyvä prosessi ottaa heti kaiken työn, myös silloin kun sen kontti saa uuden konenimen. Kun prosesseja on useita, prosessi ottaa toisen käynnissä olevan prosessin työn vasta, kun se on lakannut ilmoittamasta olevansa käynnissä (30 s). Aseta sama arvo jokaiselle prosessille. Muutos tulee voimaan seuraavassa käynnistyksessä.",
     "cfgDesc_node_type": "Instanssin tyyppi: full, relay tai personal.",
     "cfgDesc_storage_type": "Tallennustaustan tyyppi.",
     "cfgDesc_node_sealed_config_keys": "Asetukset, jotka instanssin pyörittäjä on asettanut ja joita ei voi muuttaa täältä. Luettavissa, ei kirjoitettavissa. Tyhjä, kun pyörität itse omaasi.",
@@ -15169,6 +15170,7 @@
     "cfg_node_id": "Instanssin tunnus",
     "cfg_node_port": "Portti",
     "cfg_node_bind_host": "Kuunteluosoite",
+    "cfg_node_processes": "Palvelimen prosessit",
     "cfg_node_type": "Instanssin tyyppi",
     "cfg_storage_type": "Tallennustyyppi",
     "cfg_morsel_policy_welcome_bonus": "Tervetulobonus",
@@ -16028,6 +16030,8 @@
     "cfgOpt_node_log_level_verbose": "Yksityiskohtainen",
     "cfgOpt_node_log_level_debug": "Vianetsintään",
     "cfgOpt_node_log_level_silly": "Kaikki",
+    "cfgOpt_node_processes_single": "Yksi prosessi",
+    "cfgOpt_node_processes_multiple": "Useita prosesseja",
     "cfg_node_perf_trace": "Tallennuskutsujen ajanotto",
     "cfgDesc_node_perf_trace": "Mittaa jokaisen tallennuskutsun keston ja kirjaa hitaat lokiin. Tällä etsitään syytä hitaaseen palvelimeen; se maksaa hieman jokaisella kutsulla. Asetetaan ympäristössä.",
     "cfg_node_key_path": "Palvelimen avaintiedosto",
@@ -30205,6 +30209,17 @@
       }
     },
     "config": {
+      "node": {
+        "processes": {
+          "title": "Palvelimen prosessit",
+          "short": "Palveleeko tätä palvelinta yksi prosessi vai useita samassa tietokannassa. Oletus on yksi.",
+          "what": "Prosessi on yksi käynnissä oleva palvelinohjelman kopio. Kun prosessi on yksi, käynnistyvä prosessi ottaa heti kaiken palvelimen työn: jokaisessa käynnistyksessä ajettavat tehtävät, odottamaan jääneet tekoälytyöt ja ajastetut siivoukset. Se tekee niin myös silloin, kun se käynnistyy uudessa kontissa uudella konenimellä, koska muuta prosessia ei voi olla käynnissä. Kun prosesseja on useita, aktiivinen prosessi ja varaprosessi tai useampi aktiivinen prosessi kuormantasaajan takana käyttävät samaa tietokantaa. Silloin jokainen työ ajetaan kerran: prosessi ottaa toisen prosessin työn vasta, kun se on lakannut ilmoittamasta olevansa käynnissä, 30 sekuntia viimeisen ilmoituksen jälkeen. Normaalisti pysäytetty prosessi luovuttaa työnsä heti.",
+          "range": "Toinen kahdesta: Yksi prosessi (oletus) tai Useita prosesseja. Palvelin lukee arvon käynnistyksessä, joten muutos tulee voimaan seuraavassa käynnistyksessä.",
+          "ex1": "Yksi prosessi: palvelin yhdessä kontissa, joka luodaan uudelleen jokaisessa päivityksessä.",
+          "ex2": "Useita prosesseja: toinen prosessi odottaa toisella koneella varaprosessina, tai kaksi prosessia jakaa liikenteen kuormantasaajan takana.",
+          "tip": "Aseta sama arvo jokaiselle prosessille. Kun valinta on Yksi prosessi, älä käynnistä toista prosessia samaan tietokantaan: molemmat ajaisivat saman työn."
+        }
+      },
       "consent": {
         "data_intermediation": {
           "title": "Datan välityspalvelu",

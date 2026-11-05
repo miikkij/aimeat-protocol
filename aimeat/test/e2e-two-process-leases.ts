@@ -23,6 +23,8 @@
  *   process (codebase analysis 2026-11-03, high-availability report sections 2e and 6).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-two-process-leases
  * @version-history
+ *   v1.0.1 -- 2026-11-05 -- Both processes start with AIMEAT_NODE_PROCESSES=multiple, which several
+ *     processes on one database now need (Jouni 2026-11-05, decision 6a); no assertion changed.
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, item HA 2.5-2.7).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -107,6 +109,9 @@ async function startProcess(label: 'A' | 'B'): Promise<ChildProcess> {
             AIMEAT_RL_OPENROUTER: '1000', AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '1000',
             AIMEAT_AI_JOB_SLOTS: '1',
             AIMEAT_MESSAGE_RETRY_INTERVAL_MS: String(RETRY_MS),
+            // Several processes on one database are switched on (Jouni 2026-11-05, decision 6a: one
+            // process is the default; test/e2e-single-process-lease.ts runs the default).
+            AIMEAT_NODE_PROCESSES: 'multiple',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });

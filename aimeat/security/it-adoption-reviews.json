@@ -35,7 +35,7 @@
         "aimeat/src/services/connections/providers-files.ts",
         "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:4398939694f6ca1797a8ac44"
+      "digest": "sha256:d4f3a9cca9083afc02b09339"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-04",
@@ -159,12 +159,12 @@
       "digest": "sha256:477cef5b8601d583a01009b8"
     },
     "15-operations-runbook.md": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-05",
       "watches": [
         "docs/operations/production-deployment.md",
         "aimeat/deploy/aimeat.service"
       ],
-      "digest": "sha256:ab240d210d6185e6174de0dc"
+      "digest": "sha256:09c27bc97a4f54e2ef244aa5"
     },
     "16-known-limitations.md": {
       "reviewedOn": "2026-11-04",
@@ -213,7 +213,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:179af5852f2eba91e2bdda6a"
+      "digest": "sha256:241ececded5c028ba6fca732"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -287,7 +287,7 @@
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "a730e25abfdcb643",
       "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
-      "docs/operations/production-deployment.md": "9c0c46739bbcfbd3",
+      "docs/operations/production-deployment.md": "2385ad9aadd29152",
       "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1"
     },
@@ -365,7 +365,7 @@
       "aimeat/src/tool-catalog/definitions/compliance.ts": "cd22016e2f0dccb7"
     },
     "15-operations-runbook.md": {
-      "docs/operations/production-deployment.md": "9c0c46739bbcfbd3",
+      "docs/operations/production-deployment.md": "2385ad9aadd29152",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577"
     },
     "16-known-limitations.md": {
@@ -422,9 +422,9 @@
       "aimeat/src/services/notification-sweeps.ts": "79e7a75daebd3d89",
       "aimeat/src/services/bus-relay.ts": "11799af91121af30",
       "aimeat/src/server-bootstrap/bus-relay-start.ts": "4ea49009017ba3bc",
-      "aimeat/src/services/process-lease.ts": "36268e000a135f38",
-      "aimeat/src/services/ai-jobs/reclaim.ts": "75c2fbca64a0c49c",
-      "aimeat/src/services/workflow/engine-lock.ts": "7867146c310b2c7d",
+      "aimeat/src/services/process-lease.ts": "56b5c28544c3d11b",
+      "aimeat/src/services/ai-jobs/reclaim.ts": "46edaddf7925f44c",
+      "aimeat/src/services/workflow/engine-lock.ts": "51637ef3a2de157d",
       "aimeat/src/services/ephemeral-claims.ts": "d9811a476371afca"
     }
   }

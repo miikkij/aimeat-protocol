@@ -12470,6 +12470,7 @@
     "cfgDesc_node_id": "Identificador único de esta instancia.",
     "cfgDesc_node_port": "Puerto HTTP que se escucha.",
     "cfgDesc_node_bind_host": "La dirección en la que responde el servidor: 127.0.0.1 solo para esta máquina, 0.0.0.0 para la red local y cualquier otra red que llegue a la máquina. Vacío responde en todas las direcciones. Un servidor abierto más allá de esta máquina recibe los ajustes de seguridad de un servidor público, salvo que el perfil de seguridad diga otra cosa. Se fija en el entorno y se aplica en el siguiente arranque.",
+    "cfgDesc_node_processes": "Un proceso (por defecto) o varios sobre la misma base de datos. Con uno, el proceso que arranca toma todo el trabajo enseguida, también cuando su contenedor recibe un nombre de host nuevo. Con varios, un proceso toma el trabajo de otro proceso en marcha solo cuando este ha dejado de indicar que sigue en marcha (30 s). Todos los procesos deben tener el mismo valor. Se aplica en el siguiente arranque.",
     "cfgDesc_node_type": "Tipo de instancia: full, relay o personal.",
     "cfgDesc_storage_type": "Tipo de almacenamiento.",
     "cfgDesc_node_sealed_config_keys": "Ajustes que fijó quien aloja esta instancia y que aquí nadie puede cambiar. Legibles, no escribibles. Vacío cuando la administras tú.",
@@ -13552,6 +13553,7 @@
     "cfg_node_id": "ID del nodo",
     "cfg_node_port": "Puerto",
     "cfg_node_bind_host": "Dirección de escucha",
+    "cfg_node_processes": "Procesos del servidor",
     "cfg_node_type": "Tipo de nodo",
     "cfg_storage_type": "Tipo de almacenamiento",
     "cfg_morsel_policy_welcome_bonus": "Bono de bienvenida",
@@ -14177,6 +14179,8 @@
     "cfgOpt_node_log_level_verbose": "Detallado",
     "cfgOpt_node_log_level_debug": "Para depurar",
     "cfgOpt_node_log_level_silly": "Todo",
+    "cfgOpt_node_processes_single": "Un proceso",
+    "cfgOpt_node_processes_multiple": "Varios procesos",
     "cfg_node_perf_trace": "Tiempos de las llamadas de almacenamiento",
     "cfgDesc_node_perf_trace": "Mide cada llamada de almacenamiento y registra las lentas. Sirve para encontrar por qué un servidor va lento; cuesta un poco en cada llamada. Se define en el entorno.",
     "cfg_node_key_path": "Archivo de clave del servidor",
@@ -27845,6 +27849,17 @@
       }
     },
     "config": {
+      "node": {
+        "processes": {
+          "title": "Procesos del servidor",
+          "short": "Si atiende este servidor un solo proceso o varios sobre la misma base de datos. Por defecto, uno.",
+          "what": "Un proceso es una copia en marcha del programa del servidor. Con un proceso, el proceso que arranca toma enseguida todo el trabajo del servidor: las tareas que se ejecutan en cada arranque, los trabajos de IA que quedaron en espera y las limpiezas programadas. Lo hace también cuando arranca en un contenedor nuevo con un nombre de host nuevo, porque no puede haber otro proceso en marcha. Con varios procesos, un proceso activo y uno en espera, o varios procesos activos detrás de un balanceador de carga, comparten una base de datos. Cada trabajo se ejecuta entonces una vez: un proceso toma el trabajo de otro solo cuando este ha dejado de indicar que sigue en marcha, 30 segundos después de su último aviso. Un proceso detenido con normalidad entrega su trabajo enseguida.",
+          "range": "Una de dos: Un proceso (por defecto) o Varios procesos. El servidor la lee al arrancar, así que un cambio se aplica en el siguiente arranque.",
+          "ex1": "Un proceso: un servidor en un contenedor que se vuelve a crear en cada actualización.",
+          "ex2": "Varios procesos: un segundo proceso espera en otro host como proceso en espera, o dos procesos se reparten el tráfico detrás de un balanceador de carga.",
+          "tip": "Todos los procesos deben tener el mismo valor. Con Un proceso, no se arranca un segundo proceso sobre la misma base de datos: los dos ejecutarían el mismo trabajo."
+        }
+      },
       "consent": {
         "data_intermediation": {
           "title": "Servicio de intermediación de datos",

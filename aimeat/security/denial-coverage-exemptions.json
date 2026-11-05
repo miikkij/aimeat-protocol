@@ -10,8 +10,12 @@
       "sha": "926d14f35e924f13"
     },
     "test/e2e-two-process-leases.ts": {
-      "reason": "REVIEWED 2026-11-04 — the suite is about processes, not a principal. Two processes of one node on one database: a queued AI job runs once, a sweep runs once per round, and a killed process's job is finished by the other. One owner queues the job so there is a job to run; which process runs it changes nothing about who may read or cancel it, and another owner's job answering 404 on read and cancel is fenced in e2e-ai-jobs case 12.",
-      "sha": "1aa0e81a526f8a14"
+      "reason": "REVIEWED 2026-11-04 — the suite is about processes, not a principal. Two processes of one node on one database: a queued AI job runs once, a sweep runs once per round, and a killed process's job is finished by the other. One owner queues the job so there is a job to run; which process runs it changes nothing about who may read or cancel it, and another owner's job answering 404 on read and cancel is fenced in e2e-ai-jobs case 12. RE-STAMPED 2026-11-05 (codebase analysis 2026-11-03, decision 6a): the only change was AIMEAT_NODE_PROCESSES=multiple in the environment of both processes, which several processes on one database now need; no assertion changed, and the reason above was re-read and still holds.",
+      "sha": "5f0b25ad3a7358bd"
+    },
+    "test/e2e-single-process-lease.ts": {
+      "reason": "REVIEWED 2026-11-05 — the suite is about processes, not a principal. With one process per node (the default), a process of a new name takes the previous process's @activate run and queued AI job at once. One owner makes the schedule and queues the jobs so there is work to take over; which process runs it changes nothing about who may read it, and another owner's job answering 404 on read and cancel is fenced in e2e-ai-jobs case 12.",
+      "sha": "d25816f2b9780908"
     },
     "test/e2e-boot-lock.ts": {
       "reason": "REVIEWED 2026-11-04 — the suite has no principal. Two processes boot on one empty database and both must answer readiness; no request in it carries a credential.",
