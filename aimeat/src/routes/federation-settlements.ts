@@ -11,6 +11,9 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   2026-11-05 — POST /v1/federation/settle declares the 'federation-peer' credential strategy: the body's
+ *     checks, the peer (active or depeering, allowed to settle) and its signature, in the same order with
+ *     the same refusals and the same log line (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-10-31 — A settlement credits at most what is left of the daily ceiling (services/settlement-
  *     ceiling.ts): the node's ceiling on morsels added from nothing, or the ceiling or no limit the
  *     operator set for that peer. Past it the answer is 429 QUOTA_EXCEEDED with the reason, nothing is
@@ -46,8 +49,9 @@ import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
-import { gatePeer } from '../services/federation-peer-gate.js';
 import { sign, verify } from '../auth/keypair.js';
+import { acceptCredential } from '../auth/credential-strategies.js';
+import { badInput, bodyOf, signedJson } from '../auth/credential-strategies-node.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import type { RouteManifest } from '../types/route-manifest.js';
@@ -94,7 +98,34 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
     // Used for cross-node morsel transfers (e.g., work completed on a remote node
     // that needs to credit/debit morsels on this node). The request must be
     // cryptographically signed by the sending node's Ed25519 private key.
-    router.post('/v1/federation/settle', async (req, res) => {
+    //
+    // The sending node is an active peer entitled to move balances here, and it signed the settlement:
+    // the 'federation-peer' credential strategy (src/auth/credential-strategies-node.ts), after the
+    // body's checks. This is the only unauthenticated door on the node that credits money, so the word
+    // is checked BEFORE the replay lookup and long before the credit. `depeering` still passes: money
+    // already owed must land while a link is being taken down.
+    router.post('/v1/federation/settle', acceptCredential('federation-peer', {
+        config, peers, capability: 'allowSettlement', acceptStatuses: ['active', 'depeering'], node: (req) => bodyOf(req).from_node,
+        before: (req) => {
+            const { from_node, to_node, gaii, amount, tracking_code, signature } = bodyOf(req);
+            // Validate required fields
+            if (!from_node || !to_node || !gaii || amount === undefined || !tracking_code || !signature) {
+                return badInput('from_node, to_node, gaii, amount, tracking_code, and signature are required');
+            }
+            // Verify this settlement is addressed to us
+            if (to_node !== config.nodeId) return badInput(`Settlement addressed to ${to_node}, but this node is ${config.nodeId}`);
+            // Validate amount is a positive number
+            if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) return badInput('amount must be a positive finite number');
+            return null;
+        },
+        // The cryptographic signature
+        signed: signedJson('from_node', 'to_node', 'gaii', 'amount', 'tracking_code', 'reason', 'timestamp'),
+        forged: 'Invalid signature on settlement request',
+        onForged: (req) => {
+            const { from_node, tracking_code } = bodyOf(req);
+            logger.warn(`Invalid settlement signature from node ${from_node} for tracking code ${tracking_code}`);
+        },
+    }), async (req, res) => {
         const {
             from_node,
             to_node,
@@ -103,57 +134,8 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             tracking_code,
             reason,
             timestamp: settlementTimestamp,
-            signature,
         } = req.body ?? {};
-
-        // Validate required fields
-        if (!from_node || !to_node || !gaii || amount === undefined || !tracking_code || !signature) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                'from_node, to_node, gaii, amount, tracking_code, and signature are required'));
-            return;
-        }
-
-        // Verify this settlement is addressed to us
-        if (to_node !== config.nodeId) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                `Settlement addressed to ${to_node}, but this node is ${config.nodeId}`));
-            return;
-        }
-
-        // Validate amount is a positive number
-        if (typeof amount !== 'number' || amount <= 0 || !Number.isFinite(amount)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'amount must be a positive finite number'));
-            return;
-        }
-
-        // The sending node is an active peer entitled to move balances here. This is the only
-        // unauthenticated door on the node that credits money, so the word is checked BEFORE the
-        // replay lookup and long before the credit. `depeering` still passes: money already owed
-        // must land while a link is being taken down.
-        const gate = gatePeer(peers, from_node, 'allowSettlement', { acceptStatuses: ['active', 'depeering'] });
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-
-        // Verify the cryptographic signature
-        const settlementPayload = JSON.stringify({
-            from_node,
-            to_node,
-            gaii,
-            amount,
-            tracking_code,
-            reason,
-            timestamp: settlementTimestamp,
-        });
-        const signatureValid = await verify(peer.publicKey, settlementPayload, signature);
-        if (!signatureValid) {
-            logger.warn(`Invalid settlement signature from node ${from_node} for tracking code ${tracking_code}`);
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
-                'Invalid signature on settlement request'));
-            return;
-        }
+        // The peer and its signature verified (credentialOf(req, 'federation-peer')); nothing below reads them.
 
         // The signed send time inside five minutes (Core 2026-11 FED-08; QA audit S6-09). The sender
         // signs a fresh timestamp each time (outbound route below), so a settlement signed long ago

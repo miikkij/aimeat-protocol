@@ -1,0 +1,937 @@
+[
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: missing",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such listed offering."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: basic valid",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such listed offering."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: basic wrong key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_PARTY_CREDENTIAL",
+        "message": "The party key or token is not valid here. Ask the owner who shared the data for a new key."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: basic unknown party",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_PARTY_CREDENTIAL",
+        "message": "The party key or token is not valid here. Ask the owner who shared the data for a new key."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: basic malformed user",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_PARTY_CREDENTIAL",
+        "message": "The Basic user is <owner>/<party name>, for example alice/matti."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: basic stopped party",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "PARTY_STOPPED",
+        "message": "The owner has stopped this party. Contact the owner who shared the data."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: token valid",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such listed offering."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: token expired",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_PARTY_CREDENTIAL",
+        "message": "The party token has expired or is not valid. Ask for a new one at POST /v1/parties/token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: token of an app party",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_PARTY_CREDENTIAL",
+        "message": "This token signs you in to one app, and it reads nothing here. Ask the owner who shared the data for a key."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: token not signed here",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_PARTY_CREDENTIAL",
+        "message": "The party token has expired or is not valid. Ask for a new one at POST /v1/parties/token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy {} :: node bearer (another kind)",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such listed offering."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: missing",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: basic valid",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: basic wrong key",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: basic unknown party",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: basic malformed user",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: basic stopped party",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: token valid",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: token expired",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: token of an app party",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: token not signed here",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/exchange/offerings/off-unknown/buy months not a number :: node bearer (another kind)",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "months: Wrong kind of value: expected number.",
+        "details": [
+          {
+            "path": "months",
+            "code": "invalid_type",
+            "message": "Wrong kind of value: expected number."
+          }
+        ]
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Change what the details name for each field, then send it again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  }
+]

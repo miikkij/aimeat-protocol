@@ -18,6 +18,9 @@
  *   v1.1.0 — 2026-11-02 — secaudit2026nov02d round 13: an opening without a party key counts against
  *     the address's hourly limit (consent.party_purchases_per_hour, 0 = no limit); a party buying
  *     again with its key is not counted.
+ *   v1.2.0 — 2026-11-05 — The buy declares the 'party-optional' credential strategy
+ *     (src/auth/credential-strategies.ts), which verifies a presented party credential as this handler
+ *     did (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   v1.1.1 — 2026-11-03 — secaudit2026nov02d round 13b: the 429 TOO_MANY_OPENINGS says what the limit
  *     is, that this address reached it, when to try again, that a party key is not counted, and where
  *     the operator changes it on the Config tab; the setting's name, the limit and the wait are in
@@ -28,7 +31,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { partyCredentialOf, verifyParty } from '../services/parties/verify.js';
+import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
 import { openPartyPurchase, completePartyPurchase, readPartyPurchase, purchaseView } from '../services/exchange-party-buy.js';
 import { validateBody } from '../models/schemas.js';
 import { PartyBuySchema, PartyPurchaseCompleteSchema } from '../models/exchange-datapackage-schemas.js';
@@ -44,15 +47,11 @@ export function exchangePartyBuyRouter(config: AimeatConfig, storage: Storage): 
     // count keeps one address from filling a provider's month with openings it never pays for.
     const takeOpening = rateBuckets(OPEN_WINDOW_MS);
 
-    router.post('/v1/exchange/offerings/:id/buy', validateBody(PartyBuySchema, config.nodeId), async (req: Request, res: Response) => {
-        // A party buying again proves who it is; a credential that names no live party is refused.
-        const cred = partyCredentialOf(req);
-        let renewal = null;
-        if (cred) {
-            const verdict = await verifyParty(deps, cred);
-            if (!verdict.ok) { res.status(verdict.status).json(error(config.nodeId, verdict.code, verdict.message)); return; }
-            renewal = verdict.ctx;
-        } else if (req.auth && !req.auth.anonymous) {
+    // A party buying again proves who it is: the 'party-optional' credential strategy refuses a
+    // credential that names no live party, and lets a buyer with none through.
+    router.post('/v1/exchange/offerings/:id/buy', validateBody(PartyBuySchema, config.nodeId), acceptCredential('party-optional', deps), async (req: Request, res: Response) => {
+        const renewal = credentialOf(req, 'party-optional').party;
+        if (!renewal && req.auth && !req.auth.anonymous) {
             // Only whether a session is present decides this refusal; no identity is stored or compared.
             res.status(409).json(error(config.nodeId, 'USE_YOUR_ACCOUNT',
                 'You are signed in to an account here. Accept the offering with your account instead: buying here is for someone with no account.',

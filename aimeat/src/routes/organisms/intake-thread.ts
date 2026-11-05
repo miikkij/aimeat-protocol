@@ -26,6 +26,10 @@
  *   POST /v1/intake/:org/:ws/:formId/thread/read    (PUBLIC) the conversation the token opens
  *   POST /v1/intake/:org/:ws/:formId/thread/forget  (PUBLIC) delete it: all three records, every version
  * @version-history
+ *   2026-11-05 — thread/read and thread/forget declare the 'intake-visitor' credential strategy
+ *     (src/auth/credential-strategies.ts), which verifies the visitor's token with the same reads and
+ *     the same 404; the form and record readers moved to services/intake/visitor-thread.ts unchanged
+ *     (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-10-15 — The expiry sweep on a new conversation is gone: the scheduled job
  *     core:intake-thread-retention deletes by date, whatever state the form is in, and the
  *     forget route deletes through the same service (feature-list audit #64).
@@ -41,46 +45,28 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { readPublishSpace } from '../../services/workspace-write-items.js';
-import { readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
+import { readThreadForm as readThreadFormOf, latestThreadRecord, type ThreadForm } from '../../services/intake/visitor-thread.js';
+import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
 import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';
 import { takeDailySlot } from '../../services/intake-daily-count.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import {
   THREAD_DEFAULTS, MIN_TURN_INTERVAL_MS, newThreadToken, threadIdOf, cleanTurnText, turnsOfThread, replyState, composeTurns,
-  type IntakeThreadConfig,
 } from '../../services/intake-thread.js';
 import { forgetThreadRecords } from '../../services/intake-thread-retention.js';
 import type { OrganismHelpers } from './shared.js';
-
-/** The part of a form's stored config these routes read (routes/organisms/intake.ts writes it). */
-interface ThreadFormConfig {
-  formId: string; namespace: string; ownerGhii: string; enabled: boolean;
-  honeypotField: string | null; maxPerDay: number | null; thread?: IntakeThreadConfig | null;
-}
 
 export function registerOrganismIntakeThreadRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { publishDraftsBatch } = H;
   const refuse = (res: Response, status: number, code: string, message: string) => { res.status(status).json(error(config.nodeId, code, message, status)); };
 
-  /** A form that takes a conversation, or null: unknown, switched off, or an ordinary form. */
-  async function readThreadForm(org: string, ws: string, formId: string): Promise<(ThreadFormConfig & { thread: IntakeThreadConfig }) | null> {
-    const cfg = (await readWorkspaceMetaRecord(storage, org, ws, `meta.intake.${formId}`, config.nodeId))?.value as ThreadFormConfig | undefined;
-    return cfg && cfg.enabled && cfg.thread ? cfg as ThreadFormConfig & { thread: IntakeThreadConfig } : null;
-  }
-
-  const baseKey = (org: string, ws: string, namespace: string, id: string) => `organism.${org}.w.${ws}.${namespace}.${id}`;
-
-  /** The live value of one record, the freshest copy when more than one owner holds it. */
-  async function latestOf(org: string, ws: string, namespace: string, id: string): Promise<MemoryRecord | null> {
-    const key = `${baseKey(org, ws, namespace, id)}.latest`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 20 });
-    return items.filter((r) => r.key === key).reduce<MemoryRecord | null>((best, r) => (!best || r.updatedAt > best.updatedAt ? r : best), null);
-  }
+  const readThreadForm = (org: string, ws: string, formId: string): Promise<ThreadForm | null> => readThreadFormOf(storage, config.nodeId, org, ws, formId);
+  const latestOf = (org: string, ws: string, namespace: string, id: string): Promise<MemoryRecord | null> => latestThreadRecord(storage, org, ws, namespace, id);
 
   /** Delete a conversation: the thread, the reply and the signal, with every version of each
    *  (services/intake-thread-retention.ts, which the scheduled retention job uses too). */
-  function forgetThread(org: string, ws: string, cfg: ThreadFormConfig & { thread: IntakeThreadConfig }, id: string): Promise<number> {
+  function forgetThread(org: string, ws: string, cfg: ThreadForm, id: string): Promise<number> {
     return forgetThreadRecords(storage, { org, ws, namespace: cfg.namespace, replyNamespace: cfg.thread.replyNamespace, signalNamespace: cfg.thread.signalNamespace }, id);
   }
 
@@ -215,17 +201,13 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
     });
 
   /* ── POST …/thread/read — PUBLIC. The conversation the token opens: both sides' turns, and its state. ── */
+  // The visitor's token is verified by the 'intake-visitor' credential strategy: one 404 for an
+  // unknown form, an unknown token and another form's conversation.
   router.post('/v1/intake/:org/:ws/:formId/thread/read',
     rateLimit({ windowMs: 15 * 60_000, max: 1200, keyBy: 'ip' }),
+    acceptCredential('intake-visitor', { storage, config }),
     async (req, res) => {
-      const { org, ws, formId } = params(req);
-      const cfg = await readThreadForm(org, ws, formId);
-      const id = threadIdOf((req.body ?? {}).token);
-      const thread = cfg && id ? await latestOf(org, ws, cfg.namespace, id) : null;
-      // One answer for an unknown form, an unknown token and another form's conversation.
-      if (!cfg || !id || !thread || (thread.value as { form_id?: unknown } | null)?.form_id !== formId) {
-        refuse(res, 404, 'THREAD_NOT_FOUND', 'No conversation opens with this token.'); return;
-      }
+      const { org, ws, form: cfg, threadId: id, thread } = credentialOf(req, 'intake-visitor');
       const state = replyState((await latestOf(org, ws, cfg.thread.replyNamespace, id))?.value);
       const visitorTurns = turnsOfThread(thread.value);
       res.json(success(config.nodeId, {
@@ -239,14 +221,9 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
   /* ── POST …/thread/forget — PUBLIC. Delete the conversation the token opens, on both sides. ── */
   router.post('/v1/intake/:org/:ws/:formId/thread/forget',
     rateLimit({ windowMs: 15 * 60_000, max: 30, keyBy: 'ip' }),
+    acceptCredential('intake-visitor', { storage, config }),
     async (req, res) => {
-      const { org, ws, formId } = params(req);
-      const cfg = await readThreadForm(org, ws, formId);
-      const id = threadIdOf((req.body ?? {}).token);
-      const thread = cfg && id ? await latestOf(org, ws, cfg.namespace, id) : null;
-      if (!cfg || !id || !thread || (thread.value as { form_id?: unknown } | null)?.form_id !== formId) {
-        refuse(res, 404, 'THREAD_NOT_FOUND', 'No conversation opens with this token.'); return;
-      }
+      const { org, ws, formId, form: cfg, threadId: id } = credentialOf(req, 'intake-visitor');
       await inOrder(`${org}/${ws}/${formId}`, async () => { await forgetThread(org, ws, cfg, id); });
       emitChange('organisms');
       res.json(success(config.nodeId, { forgotten: true }));

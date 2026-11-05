@@ -15,6 +15,8 @@
  * @structure CREDENTIAL_KINDS · CredentialKind
  * @usage import { CREDENTIAL_KINDS, type CredentialKind } from './credential-kinds.js';
  * @version-history
+ *   v1.1.0 — 2026-11-05 — 'intake-visitor', 'docsign-wallet', 'party-optional', 'federation-peer',
+ *     'package-seller', 'package-claimant' (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B8).
  */
 
@@ -51,6 +53,41 @@ export const CREDENTIAL_KINDS = {
     'ucp-platform-signed': {
         credential: 'A UCP 2026-08-25 platform that must prove itself: UCP-Agent names its profile and the request is '
             + 'signed under RFC 9421 with a key of that profile. Unsigned is 401.',
+        admitsNoCredential: false,
+    },
+    'intake-visitor': {
+        credential: 'A visitor with no account in a conversation through a public intake form: the token the node gave '
+            + 'when the conversation started, in the body, opening that conversation of that form and no other '
+            + '(services/intake/visitor-thread.ts). No token, or one that opens nothing, is 404 THREAD_NOT_FOUND.',
+        admitsNoCredential: false,
+    },
+    'docsign-wallet': {
+        credential: 'An EU Digital Identity Wallet in a signing session: the 128-bit wallet session id only the person who '
+            + 'started it was given, with the document token or the session state the request object named '
+            + '(services/docsign/eudi.ts). An unknown session or a wrong token is 404, a wrong state 400.',
+        admitsNoCredential: false,
+    },
+    'party-optional': {
+        credential: 'An outside party buying again, when it presents its credential (the same as \'party\'): a credential '
+            + 'that names no live party is refused as there, and a request with none is taken, because buying with '
+            + 'no account is what the door is for.',
+        admitsNoCredential: true,
+    },
+    'federation-peer': {
+        credential: 'A peer node of this node: active, entitled to the door\'s capability, its key on file '
+            + '(services/federation-peer-gate.ts), and an Ed25519 signature by that key over the exact text the door '
+            + 'signs, always verified. A missing or unknown peer is 403, a missing or forged signature 401.',
+        admitsNoCredential: false,
+    },
+    'package-seller': {
+        credential: 'A seller node of a package on this repository: a request signed by an active peer over its method, '
+            + 'path and body (services/packages/sale/package-sale-auth.ts), from a node the package\'s author names a '
+            + 'seller. Unsigned is 401, a node that sells nothing here 403.',
+        admitsNoCredential: false,
+    },
+    'package-claimant': {
+        credential: 'A node redeeming a package claim code: a request signed with the key its own body names, by the node '
+            + 'its body names (services/packages/sale/package-sale-auth.ts verifyRequestWithKey). Unsigned is 401.',
         admitsNoCredential: false,
     },
 } as const satisfies Record<string, CredentialKindInfo>;
