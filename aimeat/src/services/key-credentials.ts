@@ -19,7 +19,8 @@
  *   is an owner mail like every other mail to the account's address (mail-gate.ts kind `owner`,
  *   owner-mail-address.ts provenOwnerAddress). When the address is not proven at the first sign-in,
  *   the issued password is kept sealed with the node's data key (encryption.ts encryptBound) in the
- *   pseudo-owner namespace NS_HELD, one record per account, and the login response says so
+ *   pseudo-owner namespace NS_HELD, one record per account under HELD_KEY_PREFIX, which the data key's
+ *   re-encrypt job lists (key-reencrypt/sources.ts), and the login response says so
  *   (`email_held`, `email_note`). When the account then proves its address (routes/ghii/web-verify.ts,
  *   routes/ghii/recovery.ts), sendHeldKeyCredentials mails it once and deletes the record. A record is
  *   deleted unsent when the account's password changed since it was issued (the mailed password would
@@ -30,6 +31,8 @@
  *   const cred = await issueFirstLoginKeyCredentials(storage, config, ghiiRecord); // null if N/A
  *   await sendHeldKeyCredentials(storage, config, ghii);                           // after the address is proven
  * @version-history
+ *   v1.1.1 — 2026-11-05 — A held record's key is HELD_KEY_PREFIX and the GHII, so the re-encrypt job of
+ *     decision 4a lists and reseals it (codebase analysis 2026-11-03, decisions 4a and 14a of 2026-11-05).
  *   v1.1.0 — 2026-11-05 — The credentials mail goes as an owner mail, to the proven address only; an
  *     unproven address holds the password until the address is verified (codebase analysis
  *     2026-11-03, decision 14a of 2026-11-05).
@@ -61,10 +64,18 @@ export interface IssuedKeyCredentials {
 }
 
 /**
- * Pseudo-owner namespace of the held credentials, one record per account (the key is its GHII). It
- * has no '@', so no memory route or tool addresses it (as services/agent-port-redirect.ts NS_AGENT_PORT).
+ * Pseudo-owner namespace of the held credentials, one record per account. It has no '@', so no memory
+ * route or tool addresses it (as services/agent-port-redirect.ts NS_AGENT_PORT).
  */
 export const NS_HELD = 'key-credentials-held';
+
+/**
+ * The key of an account's held record is this prefix and its GHII. The prefix is what lets the data
+ * key's re-encrypt job (key-reencrypt/sources.ts) list every held record, since it lists memory by key
+ * prefix.
+ */
+export const HELD_KEY_PREFIX = 'key-credentials-held.';
+export const heldKey = (ghii: string): string => `${HELD_KEY_PREFIX}${ghii}`;
 
 /** How long a held password waits for the address to be verified. */
 export const HELD_TTL_HOURS = 30 * 24;
@@ -77,7 +88,7 @@ const NOT_HELD_NOTE = 'The email with these sign-in details was not sent, becaus
 interface HeldRecord { sealed: string; invitationId: string; passwordHash: string }
 
 /** The context a held password is sealed under: it opens only for this account and this key invitation. */
-const heldContext = (ghii: string, invitationId: string): string => `key-credentials-held:${ghii}:${invitationId}`;
+export const heldContext = (ghii: string, invitationId: string): string => `key-credentials-held:${ghii}:${invitationId}`;
 
 /** The credentials mail, as the first sign-in and the held send both write it. */
 async function credentialsMessage(storage: Storage, config: AimeatConfig, inv: InvitationRecord, ghii: GHIIRecord, password: string): Promise<MailMessage> {
@@ -97,7 +108,7 @@ async function holdCredentials(storage: Storage, config: AimeatConfig, inv: Invi
   const now = new Date().toISOString();
   const value: HeldRecord = { sealed: encryptBound(password, key, heldContext(ghii.ghii, inv.id)), invitationId: inv.id, passwordHash };
   await storage.setMemory({
-    key: ghii.ghii, ownerGaii: NS_HELD, value, visibility: 'private', tags: ['system'],
+    key: heldKey(ghii.ghii), ownerGaii: NS_HELD, value, visibility: 'private', tags: ['system'],
     ttlHours: HELD_TTL_HOURS, version: 1, createdAt: now, updatedAt: now,
   });
   return true;
@@ -156,12 +167,12 @@ export async function issueFirstLoginKeyCredentials(
  */
 export async function sendHeldKeyCredentials(storage: Storage, config: AimeatConfig, ghii: string): Promise<boolean> {
   try {
-    const row = await storage.getMemory(NS_HELD, ghii);
+    const row = await storage.getMemory(NS_HELD, heldKey(ghii));
     if (!row) return false;
     const rec = await storage.getGHII(ghii);
     // Still unproven: the record keeps waiting (the callers call this after the address is proven).
     if (rec && !provenOwnerAddress(rec)) return false;
-    await storage.deleteMemory(NS_HELD, ghii);
+    await storage.deleteMemory(NS_HELD, heldKey(ghii));
     const held = row.value as HeldRecord | null;
     const lapsed = !!row.createdAt && Date.now() > Date.parse(row.createdAt) + HELD_TTL_HOURS * 3_600_000;
     if (!held?.sealed || lapsed) return false;

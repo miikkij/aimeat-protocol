@@ -13,7 +13,7 @@
  */
 import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { issueFirstLoginKeyCredentials, sendHeldKeyCredentials, NS_HELD } from '../../src/services/key-credentials.js';
+import { issueFirstLoginKeyCredentials, sendHeldKeyCredentials, NS_HELD, heldKey } from '../../src/services/key-credentials.js';
 import { provideNodeService } from '../../src/services/node-context.js';
 import type { EmailService } from '../../src/services/email.js';
 
@@ -76,7 +76,7 @@ describe('the first sign-in of a code-key account', () => {
     expect(cred?.email_sent).toBe(false);
     expect(cred?.email_held).toBe(true);
     expect(cred?.email_note).toMatch(/not verified yet.*sent when you verify the address/);
-    const held = s.memory.get(`${NS_HELD} ${GHII}`);
+    const held = s.memory.get(`${NS_HELD} ${heldKey(GHII)}`);
     expect(held, 'the password waits in the held namespace').toBeTruthy();
     expect(JSON.stringify(held!.value)).not.toContain(cred!.password);
   });

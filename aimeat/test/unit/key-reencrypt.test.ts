@@ -24,6 +24,8 @@
  *   cd aimeat && pnpm exec vitest run test/unit/key-reencrypt.test.ts
  *   cd aimeat && node --env-file=.env.test.postgres-kysely --import tsx node_modules/vitest/vitest.mjs run test/unit/key-reencrypt.test.ts
  * @version-history
+ *   v1.0.1 — 2026-11-05 — The two-key config runs with several processes per node, since the job case
+ *     starts two processes on one database and one process per node is now the default (decision 6a).
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  */
 import { afterAll, describe, expect, it, vi } from 'vitest';
@@ -88,7 +90,9 @@ describe.each(providers)('the data key ring and the re-encrypt job on %s', (prov
   const SYSTEM = `system@${NODE_ID}`;
   const base = { ...loadConfig().config, nodeId: NODE_ID, baseUrl: 'https://node.test' } as AimeatConfig;
   const oneKey = { ...base, encryptionKey: A, totpSecretEncryptionKey: T, encryptionKey1: null, encryptionKeyCurrent: 0 } as AimeatConfig;
-  const twoKeys = (port: number) => ({ ...base, port, encryptionKey: A, totpSecretEncryptionKey: T, encryptionKey1: B, encryptionKeyCurrent: 1 }) as AimeatConfig;
+  // Several processes on one node, because the case below runs two of them on one database; with the
+  // default of one process (decision 6a) a starting process takes every lease at once.
+  const twoKeys = (port: number) => ({ ...base, port, nodeProcesses: 'multiple', encryptionKey: A, totpSecretEncryptionKey: T, encryptionKey1: B, encryptionKeyCurrent: 1 }) as AimeatConfig;
   const EXT = `ext-${RUN}`;
 
   let db: Awaited<ReturnType<typeof database>>;

@@ -5,8 +5,9 @@
  * @description Every place the node stores a value sealed with its data key, and how the re-encrypt
  *   job (job.ts) seals each one again with the current key.
  *
- *   THE LIST. Memory records under seven key prefixes (the payment provider record, the AI and
- *   decision provider keys, the file store credentials, the stored mail), and eleven table columns
+ *   THE LIST. Memory records under eight key prefixes (the payment provider record, the AI and
+ *   decision provider keys, the file store credentials, the stored mail, a first sign-in's password
+ *   waiting for a verified address), and eleven table columns
  *   (connected accounts and their app secrets, MCP server credentials and transport values, a
  *   person's MCP sign-in, a company's SMTP password, the secrets vault, two-step sign-in secrets,
  *   sealed Config rows, extension and instance configs, and the node key's database copy), plus the
@@ -27,6 +28,8 @@
  * @structure SourceCtx · RowPlan · ReencryptSource · REENCRYPT_SOURCES · SEALED_BY
  * @usage for (const s of REENCRYPT_SOURCES) { const rows = await storage.listSealedColumn(s.column, { prefix: s.prefix, ... }); }
  * @version-history
+ *   v1.0.1 — 2026-11-05 — The held first sign-in password (key-credentials.ts, decision 14a) is a
+ *     source, so the old key's count reaches 0 only when it too is resealed (decisions 4a and 14a).
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -38,6 +41,7 @@ import { contextFor as transportContext } from '../mcp-client/transport-secrets.
 import { credentialContext as nodeStoreContext, NODE_STORES_KEY } from '../file-store/node-file-stores.js';
 import { credentialContext as ownerStoreContext, OWNER_STORE_PREFIX } from '../file-store/owner-file-store.js';
 import { contextOf as mailContext } from '../email-outbox.js';
+import { HELD_KEY_PREFIX, NS_HELD, heldContext } from '../key-credentials.js';
 import { contextOf as settingContext, SEALED_SETTING_PREFIX } from '../config-at-rest.js';
 import { extensionConfigSecrets, sharedBindingName, sharedBindingOwner } from '../owner-secrets.js';
 import { nodeKeyRowSealedWith, nodeKeySecretsNow, openNodePrivateKey } from '../../storage/node-key-at-rest.js';
@@ -128,6 +132,18 @@ export const REENCRYPT_SOURCES: readonly ReencryptSource[] = [
       const tally = emptyTally();
       // The second form keeps each store's credential in `stores[i]`, the first form at the top.
       const r = resealTree(rec.value, ctx.key, path => (path[path.length - 1] === 'credential' ? ownerStoreContext(account, ctx.config.nodeId) : null), tally);
+      return r.changed ? { next: r.value, tally } : { tally };
+    },
+  },
+  {
+    // A first sign-in's password, held until the account verifies its address (key-credentials.ts).
+    id: 'sign-in details waiting for a verified address', column: 'memory', prefix: HELD_KEY_PREFIX,
+    planRecord: (rec, ctx) => {
+      if (rec.ownerGaii !== NS_HELD) return null;
+      const ghii = rec.key.slice(HELD_KEY_PREFIX.length);
+      const invitationId = (rec.value as { invitationId?: unknown } | null)?.invitationId;
+      const tally = emptyTally();
+      const r = resealTree(rec.value, ctx.key, path => (path.length === 1 && path[0] === 'sealed' && typeof invitationId === 'string' ? heldContext(ghii, invitationId) : null), tally);
       return r.changed ? { next: r.value, tally } : { tally };
     },
   },
@@ -261,6 +277,7 @@ export const SEALED_BY: Readonly<Record<string, string>> = {
   'src/services/file-store/node-file-stores.ts': 'node file stores',
   'src/services/file-store/owner-file-store.ts': 'personal file stores',
   'src/services/email-outbox.ts': 'mail waiting to be sent',
+  'src/services/key-credentials.ts': 'sign-in details waiting for a verified address',
   'src/services/connections/credential.ts': 'connected accounts, connected account apps',
   'src/services/mcp-client/credential.ts': 'MCP server credentials, personal MCP sign-ins',
   'src/services/mcp-client/transport-secrets.ts': 'MCP server headers and environment',
