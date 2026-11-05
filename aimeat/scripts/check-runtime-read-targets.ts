@@ -22,6 +22,8 @@
  *   cd aimeat && pnpm check:runtime-read-targets            # report
  *   cd aimeat && pnpm check:runtime-read-targets --strict   # the CI gate
  * @version-history
+ *   v1.2.0 — 2026-11-05 — Two more members, the re-encrypt job's sealed column listing (SQLite and
+ *     Postgres), whose table comes from the fixed SEALED_COLUMNS map, never input.
  *   v1.1.0 — 2026-09-26 — Two more members, both the visit-retention fold (SQLite and Postgres), whose
  *     table is one of a typed pair, never input.
  *   v1.0.0 — 2026-09-04 — Initial, after the read-path audit found this class has exactly one member.
@@ -52,6 +54,16 @@ const ALLOWED: Record<string, string> = {
         'The Postgres twin of the visit-retention fold: the table is typed as exactly UsageCall | '
         + 'UsageCallArchive and passed through sql.table(), never input; the filter is NAMED_OPEN, the '
         + 'same clause as the SQLite fold. Written 2026-09-25.',
+    'src/storage/providers/sqlite/methods/sealed-columns.ts:rows':
+        'The data key re-encrypt job lists one sealed column a page at a time. The table, its id columns '
+        + 'and the column come only from the fixed SEALED_COLUMNS map in '
+        + 'storage/repositories/sealed-column.repository.ts, keyed by a closed type, never from input; '
+        + 'memory rows name `deletedAt IS NULL` themselves. The rows are resealed and never shown. '
+        + 'Written 2026-11-05 (codebase analysis 2026-11-03, decision 4a of 2026-11-05).',
+    'src/storage/providers/postgres-kysely/methods/sealed-columns.ts:r':
+        'The Postgres twin of the re-encrypt job listing: the table comes from the fixed SEALED_COLUMNS '
+        + 'map through sql.table(), never input, with the same deletedAt filter for memory rows. '
+        + 'Written 2026-11-05 (codebase analysis 2026-11-03, decision 4a of 2026-11-05).',
 };
 
 export function main(): boolean {
