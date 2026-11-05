@@ -11,6 +11,8 @@
  *   decided at the start exactly as before.
  * @usage cd aimeat && pnpm exec vitest run test/unit/process-lease.test.ts
  * @version-history
+ *   v1.1.0 -- 2026-11-05 -- The several-process cases run with nodeProcesses 'multiple' (Jouni 2026-11-05,
+ *     decision 6a); new cases for the one-process default (codebase analysis 2026-11-03, decision 6a).
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, item HA 2.5-2.7).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -37,8 +39,11 @@ const { AiJobService } = await import('../../src/services/ai-jobs/service.js');
 const NODE = 'aimeat-lease-unit';
 const SYSTEM = `system@${NODE}`;
 const OWNER = `alice@${NODE}`;
+// The cases below describe several processes on one database, so the node allows them: nodeProcesses
+// 'multiple' (Jouni 2026-11-05, decision 6a: one process is the default, and several are switched on
+// with this setting). The one-process default has its own cases at the end, on `single`.
 const config = {
-    nodeId: NODE, port: 40999, aiJobSlots: 2, aiJobMaxChain: 3, aiJobMaxQueued: 10, aiJobMaxQueuedPerOwner: 10,
+    nodeId: NODE, port: 40999, nodeProcesses: 'multiple', aiJobSlots: 2, aiJobMaxChain: 3, aiJobMaxQueued: 10, aiJobMaxQueuedPerOwner: 10,
     aiJobMaxPromptBytes: 1_000_000, aiJobLogRetentionDays: 7, sttMaxMb: 1, classificationMode: 'off',
     memoryQuotaMb: 100, memoryMaxKeysPerAgent: 1000, memoryMaxValueSizeKb: 1024, memoryOverageMorselsPerMbMonth: 0,
 } as unknown as AimeatConfig;
@@ -217,5 +222,80 @@ describe('AI jobs another process holds', () => {
         expect(index?.find(e => e.jobId === job_id)?.by).toEqual(lease.thisProcess(config));
         await settle();
         await service.markStoppingJobs();
+    });
+});
+
+// One process per node, the default (node.processes = single; decision 6a of 2026-11-05). A lease
+// record of another name is what a previous process left, for example a container recreated with a
+// new hostname: no other live process can exist, so this process takes its work at once.
+describe('one process per node (the default)', () => {
+    const single = { ...config, nodeProcesses: 'single' } as unknown as AimeatConfig;
+    const unset = { ...config, nodeProcesses: undefined } as unknown as AimeatConfig;
+
+    it('is the default: only the word multiple allows several processes', () => {
+        expect(lease.singleProcess(single)).toBe(true);
+        expect(lease.singleProcess(unset)).toBe(true);
+        expect(lease.singleProcess(config)).toBe(false);
+    });
+
+    it('counts no holder but this process in this start as alive, whatever lease another name keeps', async () => {
+        const { storage, rows } = memoryStorage();
+        otherProcess(rows, 10 * 60_000);
+        const me = lease.thisProcess(single);
+        expect(await lease.holderAlive(storage, single, me)).toBe(true);
+        expect(await lease.holderAlive(storage, single, { name: me.name, boot: 'an-earlier-start' })).toBe(false);
+        expect(await lease.holderAlive(storage, single, OTHER)).toBe(false);
+        expect(await lease.otherProcessAlive(storage, single)).toBe(false);
+        // The same records, with several processes allowed, keep the other process alive.
+        expect(await lease.holderAlive(storage, config, OTHER)).toBe(true);
+        expect(await lease.otherProcessAlive(storage, config)).toBe(true);
+    });
+
+    it('takes the start-up lease and a run lock at once while a previous name\'s lease stands', async () => {
+        const { storage, rows } = memoryStorage();
+        otherProcess(rows, 10 * 60_000);
+        put(rows, SYSTEM, 'lease.scheduler.activate', { ...OTHER, at: new Date().toISOString() });
+        put(rows, SYSTEM, 'lease.wf-run.r1', { ...OTHER, at: new Date().toISOString() });
+        expect(await lease.takeHeldLease(storage, single, 'scheduler.activate')).toBe(true);
+        expect((rows.get(`${SYSTEM}::lease.scheduler.activate`)?.value as { name: string }).name).toBe(lease.thisProcess(single).name);
+        const began = Date.now();
+        await lease.waitForHeldLease(storage, single, 'wf-run.r1', 60_000);
+        expect(Date.now() - began).toBeLessThan(1_000);
+        await lease.releaseHeldLease(storage, single, 'wf-run.r1');
+        expect(rows.has(`${SYSTEM}::lease.wf-run.r1`)).toBe(false);
+    });
+
+    it('runs every sweep round, whichever name ran it last', async () => {
+        const { storage, rows } = memoryStorage();
+        put(rows, SYSTEM, 'lease.sweep.memory-bin', { ...OTHER, at: new Date(Date.now() - 60_000).toISOString() });
+        expect(await lease.claimSweepTick(storage, single, 'memory-bin', 3_600_000)).toBe(true);
+        expect((rows.get(`${SYSTEM}::lease.sweep.memory-bin`)?.value as { name: string }).name).toBe(lease.thisProcess(single).name);
+        expect(await lease.claimSweepTick(storage, single, 'memory-bin', 3_600_000)).toBe(true);
+    });
+
+    it('takes a previous name\'s queued AI job at its start, while that name\'s lease stands', async () => {
+        const { storage, rows } = memoryStorage();
+        otherProcess(rows, 10 * 60_000);
+        put(rows, OWNER, 'ai.jobs.j-prev', { id: 'j-prev', state: 'queued', owner: OWNER, op: 'text', prompt: 'p', result_key: 'out.j-prev', result_visibility: 'private', chain_depth: 0, queued_at: new Date().toISOString(), created_by: OWNER });
+        put(rows, SYSTEM, 'ai.jobs.active', [{ jobId: 'j-prev', ownerGhii: OWNER, by: OTHER }]);
+        const service = new AiJobService(single, storage);
+        expect(await service.reconcileAfterRestart()).toEqual({ failed: 0, requeued: 1 });
+        await new Promise(r => setTimeout(r, 40));
+        expect(model.calls).toBe(1);
+        const entry = (rows.get(`${SYSTEM}::ai.jobs.active`)?.value as Array<{ jobId: string; by?: { name: string } }> | undefined)?.find(e => e.jobId === 'j-prev');
+        expect(entry === undefined || entry.by?.name === lease.thisProcess(single).name).toBe(true);
+        await service.markStoppingJobs();
+    });
+
+    it('runs no adoption pass: a job another name started after this start is left to it', async () => {
+        const { storage, rows } = memoryStorage();
+        otherProcess(rows, -1);
+        put(rows, OWNER, 'ai.jobs.j-later', { id: 'j-later', state: 'running', owner: OWNER, op: 'text', prompt: 'p', result_key: 'out.j-later', result_visibility: 'private', chain_depth: 0, queued_at: new Date().toISOString(), created_by: OWNER });
+        put(rows, SYSTEM, 'ai.jobs.active', [{ jobId: 'j-later', ownerGhii: OWNER, by: OTHER }]);
+        const deps = { storage, config: single, isLive: () => false, enqueue: async () => { model.calls++; } };
+        expect(await reclaimJobs(deps, 'adopt')).toEqual({ failed: 0, requeued: 0 });
+        expect((rows.get(`${OWNER}::ai.jobs.j-later`)?.value as { state: string }).state).toBe('running');
+        expect((rows.get(`${SYSTEM}::ai.jobs.active`)?.value as Array<{ by?: { name: string } }>)[0].by?.name).toBe(OTHER.name);
+        expect(model.calls).toBe(0);
     });
 });

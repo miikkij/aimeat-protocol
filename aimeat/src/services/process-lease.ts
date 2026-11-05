@@ -34,7 +34,15 @@
  *   FAILING OPEN. A claim that cannot be made because the database failed lets the work run, as the
  *   scheduler's cron claim does (scheduler-fire-claim.ts): a lost sweep is worse than a double one.
  *   A liveness read that fails counts the holder as alive, so nothing is taken over on an error.
- * @structure ProcessRef · thisProcess · sameProcess · startProcessLease · processLeaseReady ·
+ *
+ *   ONE PROCESS OR SEVERAL (node.processes, AIMEAT_NODE_PROCESSES; decision 6a of 2026-11-05). The
+ *   default is `single`: no other live process can exist, so no holder but this process in this start
+ *   is alive, and a starting process takes every lease at once. Without it, a container recreated with
+ *   a new hostname is a process of a new name: it waited up to PROCESS_LEASE_MS for the previous
+ *   holder, skipped its @activate run meanwhile and took the AI jobs over after about 45 s. With
+ *   `multiple` the rules above apply unchanged. The process lease is written in both modes, so a node
+ *   switched to `multiple` at its next start finds every process named.
+ * @structure ProcessRef · thisProcess · sameProcess · singleProcess · startProcessLease · processLeaseReady ·
  *   releaseProcessLease · holderAlive · otherProcessAlive · takeHeldLease · waitForHeldLease ·
  *   releaseHeldLease · claimSweepTick · claimedSweep · PROCESS_LEASE_MS · PROCESS_RENEW_MS
  * @usage
@@ -42,6 +50,10 @@
  *   if (await takeHeldLease(storage, config, 'scheduler.activate')) runActivateJobs();
  *   setInterval(claimedSweep(storage, config, 'memory-bin', HOUR, () => { void sweep(); }), HOUR);
  * @version-history
+ *   v1.1.0 -- 2026-11-05 -- One process per node by default (singleProcess): holderAlive answers alive
+ *     only for this process in this start, otherProcessAlive answers no, and a sweep's round is never
+ *     left to another name; the active-plus-standby rules hold with node.processes = multiple
+ *     (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, item HA 2.5-2.7, run-once work).
  */
 import { hostname } from 'node:os';
@@ -65,7 +77,7 @@ export interface ProcessRef { name: string; boot: string }
 interface ProcessLeaseValue { name: string; boot: string; until: string; startedAt: string }
 interface HeldLeaseValue { name: string; boot: string; at: string }
 
-type LeaseConfig = Pick<AimeatConfig, 'nodeId' | 'port'>;
+type LeaseConfig = Pick<AimeatConfig, 'nodeId' | 'port' | 'nodeProcesses'>;
 
 // process-local: the start this process is in; every process draws its own, which is the point.
 const BOOT = randomUUID();
@@ -77,6 +89,14 @@ const processKey = (name: string): string => `${PROCESS_PREFIX}${safeName(name)}
 /** This process, as a holder names it. */
 export function thisProcess(config: Pick<AimeatConfig, 'port'>): ProcessRef {
     return { name: `${hostname()}:${config.port}`, boot: BOOT };
+}
+
+/**
+ * Whether this node runs one process (node.processes is `single`, the default). Only the word
+ * `multiple` allows several, so a config that does not name the setting keeps one process.
+ */
+export function singleProcess(config: Pick<AimeatConfig, 'nodeProcesses'>): boolean {
+    return config.nodeProcesses !== 'multiple';
 }
 
 /** Whether two holders are the same process in the same start. */
@@ -152,12 +172,13 @@ export async function releaseProcessLease(): Promise<void> {
 /**
  * Whether the process `ref` names is alive. This process is; this process's previous life is not;
  * another process is while its lease names that start and has not run out. No holder at all (work
- * written before leases existed) is not alive. A read that fails answers alive.
+ * written before leases existed) is not alive. A read that fails answers alive. With one process
+ * per node (singleProcess), only this process in this start is alive.
  */
 export async function holderAlive(storage: Storage, config: LeaseConfig, ref: ProcessRef | null | undefined): Promise<boolean> {
     if (!ref) return false;
     const me = thisProcess(config);
-    if (ref.name === me.name) return ref.boot === me.boot;
+    if (ref.name === me.name || singleProcess(config)) return sameProcess(ref, me);
     try {
         const v = (await storage.getMemory(systemOwner(config.nodeId), processKey(ref.name)))?.value as Partial<ProcessLeaseValue> | undefined;
         return !!v && v.boot === ref.boot && typeof v.until === 'string' && Date.parse(v.until) > Date.now();
@@ -167,8 +188,12 @@ export async function holderAlive(storage: Storage, config: LeaseConfig, ref: Pr
     }
 }
 
-/** Whether a process other than this one (another name) is alive on this node's database. */
+/**
+ * Whether a process other than this one (another name) is alive on this node's database. Never, with
+ * one process per node (singleProcess).
+ */
 export async function otherProcessAlive(storage: Storage, config: LeaseConfig): Promise<boolean> {
+    if (singleProcess(config)) return false;
     const me = thisProcess(config);
     try {
         const rows = await storage.listMemory(systemOwner(config.nodeId), { prefix: PROCESS_PREFIX });
@@ -261,7 +286,8 @@ export const SWEEP_KEEP_ROUNDS = 1.5;
 /**
  * Claim this round of the sweep `name`, which runs every `intervalMs`. True: run it. False: another
  * process ran it less than SWEEP_KEEP_ROUNDS intervals ago (so it is alive and keeps the sweep), or
- * took it in the same moment.
+ * took it in the same moment. With one process per node (singleProcess) every round is this
+ * process's, whichever name ran it last.
  */
 export async function claimSweepTick(storage: Storage, config: LeaseConfig, name: string, intervalMs: number): Promise<boolean> {
     if (!storage.createMemoryIfAbsent || !storage.setMemoryIfVersion) return true;
@@ -272,7 +298,7 @@ export async function claimSweepTick(storage: Storage, config: LeaseConfig, name
         await processLeaseReady(config);
         const prior = await storage.getMemory(owner, key);
         const held = prior?.value as Partial<HeldLeaseValue> | undefined;
-        const mine = held?.name === me.name;
+        const mine = held?.name === me.name || singleProcess(config);
         if (prior && !mine && typeof held?.at === 'string' && Date.now() - Date.parse(held.at) < SWEEP_KEEP_ROUNDS * intervalMs) return false;
         const value: HeldLeaseValue = { name: me.name, boot: me.boot, at: new Date().toISOString() };
         const rec = leaseRecord(owner, key, value, prior);

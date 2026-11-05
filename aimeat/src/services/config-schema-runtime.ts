@@ -8,12 +8,14 @@
  *   material). Until 2026-10-25 every one of these was read from the environment with no row, so the
  *   operator could not see them on the Config tab (check:config-coverage, widened to all of src/).
  *
- *   WHICH ARE STORED IN THE DATABASE. The usage meter and the log level are. The deployment rows are
+ *   WHICH ARE STORED IN THE DATABASE. The usage meter, the log level and the process count are. The deployment rows are
  *   immutable, for the reason each says: a value that decides who may reach what, or that the node
  *   needs before its database is open, is set by whoever runs the node, in the environment, and the
  *   Config tab shows it. The secrets show only whether they are set.
  * @structure RUNTIME_CONFIG_FIELDS
  * @version-history
+ *   v1.3.0 -- 2026-11-05 -- node.processes (AIMEAT_NODE_PROCESSES), stored and read at start: one
+ *     process per node by default, or several (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   v1.2.0 -- 2026-11-05 -- encryptionKey1 (AIMEAT_ENCRYPTION_KEY_1) and encryptionKeyCurrent
  *     (AIMEAT_ENCRYPTION_KEY_CURRENT), immutable like the first data key (codebase analysis 2026-11-03,
  *     decision 4a of 2026-11-05).
@@ -38,7 +40,7 @@ type RuntimeKey = 'usageHotDays' | 'usageHourRollupDays' | 'usageArchiveBatch' |
   | 'encryptionKey1' | 'encryptionKeyCurrent'
   | 'federationPublicKey' | 'federationPrivateKey' | 'securityProfile' | 'allowPrivateEgress' | 'trustProxy' | 'appHost'
   | 'appOriginEnabled' | 'portfolioHost' | 'portfolioOriginEnabled' | 'coHost' | 'coOriginEnabled' | 'connectFakeBaseUrl'
-  | 'x402TestFacilitator' | 'bindHost';
+  | 'x402TestFacilitator' | 'bindHost' | 'nodeProcesses';
 
 export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<RuntimeKey>[] = [
   // ── Usage meter (mutable). The windows and batches are read on each run; the flush intervals at start. ──
@@ -54,6 +56,9 @@ export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<RuntimeKey>[] = [
   { key: 'logLevel', dotPath: 'node.log_level', envVar: 'AIMEAT_LOG_LEVEL', type: 'string', ...oneOf('error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'), immutable: false, description: 'How much the node writes to its log: error is the least, debug and silly the most' },
   // Read when storage is created, before the database layer is applied, so it cannot be stored there.
   { key: 'perfTrace', dotPath: 'node.perf_trace', envVar: 'AIMEAT_PERF_TRACE', type: 'boolean', validate: bool, immutable: true, description: 'Time every storage call and log the slow ones. For finding a slow node; costs a little on every call. Set in the environment' },
+
+  // ── Processes (stored, read at start: services/process-lease.ts decides with it from the first claim) ──
+  { key: 'nodeProcesses', dotPath: 'node.processes', envVar: 'AIMEAT_NODE_PROCESSES', type: 'string', ...oneOf('single', 'multiple'), immutable: false, applies: 'restart', description: 'How many processes serve this node on its database. single (the default): one process, which takes all the work at its start at once, also after a restart under a new host name. multiple: an active process and a standby, or several active ones; a process then waits until the lease of another live process runs out (30 s) before it takes that process\'s work. Set the same value on every process. Takes effect at the next start' },
 
   // ── Key material (immutable: the node needs it before its database is open) ──
   { key: 'nodeKeyPath', dotPath: 'node.key_path', envVar: 'AIMEAT_NODE_KEY_PATH', type: 'string', validate: text, immutable: true, description: 'Where the node key file is. Empty uses a file named after the node id under ~/.aimeat' },

@@ -13,7 +13,8 @@ TLS, so it always runs behind a reverse proxy (nginx, Caddy, a cloud load balanc
 certificates. Only the proxy should reach the node's port: block it in the firewall.
 
 This guide describes one node process. Several processes on one PostgreSQL database are supported,
-as a standby or as more active processes. What the processes share (live updates, short sign-in
+as a standby or as more active processes, with `AIMEAT_NODE_PROCESSES=multiple` on every process (the
+default, `single`, lets a starting process take all work at once). What the processes share (live updates, short sign-in
 steps, Config page changes, AI jobs and sweeps) and what stays in each process (rate limits, the AI
 key hold, idempotency keys, requests through a tunnel) is in
 [18 Scope and deployment patterns](../it-adoption/18-scope-and-deployment-patterns.md#several-node-processes-on-one-database).

@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-05 -- e2e-single-process-lease.ts joins the list (not the guard tier): with one process per node, the default, a process of a new name takes the previous process's @activate run and queued AI jobs at once (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   2026-11-05 -- e2e-key-reencrypt.ts joins the list (not the guard tier): replacing the data key with a second key and the re-encrypt job, over REST and MCP (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 -- e2e-two-process-leases.ts joins the list (not the guard tier): two processes of one node on one database run an AI job once, a sweep once per round, and take a killed process's jobs over (codebase analysis 2026-11-03, item HA 2.5-2.7).
  *   2026-11-04 -- e2e-two-process-bus.ts joins the list (not the guard tier): two processes of one node on one PostgreSQL database share the event bus (codebase analysis 2026-11-03, HA stage 2, e2-bus).
@@ -1041,6 +1042,10 @@ const ALL_SUITES = [
     // first key removed, over one database; the re-encrypt job over REST and MCP (codebase analysis
     // 2026-11-03, decision 4a of 2026-11-05). Own node on 29620.
     'test/e2e-key-reencrypt.ts',
+    // One process per node, the default: a process of a new name (a container with a new hostname)
+    // takes the previous process's @activate run and queued AI jobs at once (codebase analysis
+    // 2026-11-03, decision 6a of 2026-11-05). Own nodes on 28871 and 28872, the provider stub on 28873.
+    'test/e2e-single-process-lease.ts',
     // What a model may be handed of the owner's data, by whom (secaudit 2026-10, r49, v74, v75). Own node on 28963.
     'test/e2e-ai-input-reach.ts',
     // A scheduled AI job reads what its maker may read, and a schedule stored before that rule keeps
