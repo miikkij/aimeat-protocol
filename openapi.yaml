@@ -2336,7 +2336,7 @@ components:
           type: string
           description: >-
             Sharing group ID. Required when visibility is 'group', unless the record already has a group,
-            which it then keeps; refused with 400 INVALID_INPUT without one.
+            which it then keeps. Refused with 400 INVALID_INPUT without one, and when the id names no group.
         tags:
           type: array
           items:
@@ -19582,7 +19582,8 @@ paths:
                   type: string
                   description: >-
                     With visibility `group`, the group that reads the record. Left out, the record keeps
-                    the group it has; a record with none is refused with 400 INVALID_INPUT.
+                    the group it has. A record with none, or an id that names no group, is refused with
+                    400 INVALID_INPUT.
                 ai_provenance_id:
                   type: string
                   description: Attach an AI provenance record of your own account to the new value.
@@ -27769,7 +27770,7 @@ paths:
                         type: string
                 group_id:
                   type: string
-                  description: 'Required with `visibility: group`; refused with 400 INVALID_INPUT without it.'
+                  description: 'Required with `visibility: group`; refused with 400 INVALID_INPUT without it, and when it names no group.'
                 store:
                   type: string
                   maxLength: 100
@@ -29966,7 +29967,7 @@ paths:
                   $ref: '#/components/schemas/UploadVisibility'
                 group_id:
                   type: string
-                  description: Sharing group ID. Required when visibility is 'group'; refused with 400 INVALID_INPUT without it.
+                  description: Sharing group ID. Required when visibility is 'group'; refused with 400 INVALID_INPUT without it, and when it names no group.
                 workspace_refs:
                   type: array
                   items:
@@ -30020,7 +30021,7 @@ paths:
                   $ref: '#/components/schemas/UploadVisibility'
                 group_id:
                   type: string
-                  description: Sharing group ID. Required when visibility is 'group'; refused with 400 INVALID_INPUT without it.
+                  description: Sharing group ID. Required when visibility is 'group'; refused with 400 INVALID_INPUT without it, and when it names no group.
       responses:
         '200':
           description: >
@@ -55679,8 +55680,8 @@ paths:
         members (every account of this node) and organism:<id> (that organism's active members) sit
         between owner and public; the export hands such an entry to whom it admits. An organism the
         writer is not an active member of is 400 NOT_ORGANISM_MEMBER, and nothing is written.
-        `group` needs `group_id` unless the entry's record already has a group: without one, 400
-        INVALID_INPUT, and nothing is written.
+        `group` needs `group_id` unless the entry's record already has a group: without one, or with an
+        id that names no group, 400 INVALID_INPUT, and nothing is written.
       tags: [Knowledge]
       security:
         - BearerAuth: []

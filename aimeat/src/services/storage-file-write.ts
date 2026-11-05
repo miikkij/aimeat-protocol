@@ -40,6 +40,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.16.0 — 2026-11-05 — groupBindingRefusal() also refuses a group id naming no group, on the write,
+ *     the mint and the routes that ask before them (Jouni, 2026-11-05).
  *   v1.15.0 — 2026-11-04 — groupBindingRefusal(): the write and the presigned mint refuse visibility
  *     'group' with no group id with 400 INVALID_INPUT, and the visibility change refuses 'group' on a
  *     file that has no group. Such a file was stored and opened to nobody (Jouni, 2026-11-04).
@@ -132,6 +134,7 @@ export { storageProvenanceMintRefusal };
 export type { StorageProvenanceInput, ProvenanceRefusalCode };
 import { ownExtensionFileKey } from './component-address.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
+import { unknownGroupRefusal } from '../storage/memory-sharing.js';
 import { emitChange } from './event-bus.js';
 import type { CallerContext } from './caller-context.js';
 import {
@@ -330,10 +333,15 @@ function checkKey(ownerGaii: string, key: string): KeyRefusal | null {
  * (consent.ts answers missing_group_id), and the uploader learns nothing, so it is refused here with
  * what to send instead. Exported for the upload routes that check a request before the shared write:
  * POST /v1/memory/files and the chunked init. The value may come straight from a JSON body, so anything
- * but a non-blank string names no group.
+ * but a non-blank string names no group, and an id with no group behind it answers group_not_found on
+ * every read, so it is refused as well.
  */
-export function groupBindingRefusal(visibility: unknown, groupId: unknown): KeyRefusal | null {
-    if (visibility !== 'group' || (typeof groupId === 'string' && groupId.trim())) return null;
+export async function groupBindingRefusal(storage: Pick<Storage, 'getSharingGroup'>, visibility: unknown, groupId: unknown): Promise<KeyRefusal | null> {
+    if (visibility !== 'group') return null;
+    if (typeof groupId === 'string' && groupId.trim()) {
+        const unknown = await unknownGroupRefusal(storage, visibility, groupId);
+        return unknown ? { ok: false, ...unknown } : null;
+    }
     return {
         ok: false, status: 400, code: 'INVALID_INPUT',
         message: 'visibility "group" requires group_id, the id of a sharing group whose members will read the file '
@@ -371,7 +379,7 @@ export async function writeStorageFile(
         };
     }
     // The same for a group file that names no group, on the level the node settled on.
-    const unbound = groupBindingRefusal(visibility, input.groupId);
+    const unbound = await groupBindingRefusal(storage, visibility, input.groupId);
     if (unbound) return unbound;
     // 'organism:<id>' names an organism the account owning this namespace is an active member of.
     const audience = await organismVisibilityRefusal(storage, visibility, { identity: ownerGaii });
@@ -630,7 +638,7 @@ export async function mintStorageUploadUrl(
         ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, writer);
     if (fenced) return fenced;
     // Refused at the mint as at the write, so no URL is handed out for a file that cannot land.
-    const unbound = groupBindingRefusal(input.visibility, input.groupId);
+    const unbound = await groupBindingRefusal(deps.storage, input.visibility, input.groupId);
     if (unbound) return unbound;
     const audience = await organismVisibilityRefusal(deps.storage, input.visibility, { identity: ownerGaii });
     if (audience) return { ok: false, ...audience };

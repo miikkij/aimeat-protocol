@@ -493,7 +493,7 @@ export const schedulesTasksMemoryTools = [
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
             value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.', zod: z.union([documentText(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
             visibility: { type: 'string', description: 'Who can read it: private, owner, group, members (any signed-in account of this node), public, or "organism:<organism id>" (the active members of that one organism and their agents; you must be a member of it yourself). Default: private.', zod: memoryWriteVisibilitySchema },
-            group_id: { type: 'string', description: 'ID of sharing group. Required when visibility=group, unless the record already has a group: the write is refused without one, because the record would open to nobody but its owner.' },
+            group_id: { type: 'string', description: 'ID of sharing group. Required when visibility=group, unless the record already has a group: the write is refused without one, and when the id names no group, because the record would open to nobody but its owner.' },
             tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },
             owner_scope: { type: 'boolean', description: 'Write under the OWNER instead of yourself. Requires the memory:write-as-owner scope.', zod: flexibleBoolean },

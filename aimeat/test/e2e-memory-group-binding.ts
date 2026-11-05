@@ -14,6 +14,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-group-binding
  * @version-history
+ *   v1.1.0 — 2026-11-05 — 7a, 9a, 13a, 20a: a group id that names no group is refused. Red before the change.
  *   v1.0.0 — 2026-11-05 — Initial. Written before the fix, and failing.
  */
 import * as ed from '@noble/ed25519';
@@ -136,6 +137,11 @@ async function main() {
         assert((await own(key)).body.data.visibility === 'private', 'the refused write changed the record');
     });
 
+    await test('7a. A group id that names no group is refused, and nothing is stored', async () => {
+        const key = `mgb.post.unknown.${stamp}`;
+        refused(await post('/v1/memory', A.token, { key, value: 1, visibility: 'group', group_id: `no-such-group-${stamp}` }));
+        assert((await own(key)).status === 404, 'the refused record exists');
+    });
     await test('7b. The rule opens nothing: an owner outside the group is refused a bound record, and through a rewrite that names no group', async () => {
         const key = `mgb.post.outsider.${stamp}`;
         const outside = () => json(`/v1/memory/${encodeURIComponent(A.ghii)}/${encodeURIComponent(key)}`, { headers: as(C.token) });
@@ -166,6 +172,13 @@ async function main() {
         assert(edited.status === 200, `edit: ${shown(edited)}`);
         const r = await memberRead(key);
         assert(r.status === 200 && r.body.data.value === 2, `the member reads the edit: ${shown(r)}`);
+    });
+
+    await test('9a. PUT naming a group that does not exist is refused, and the record keeps its group', async () => {
+        const key = `mgb.put.unknown.${stamp}`;
+        const version = await bound(key);
+        refused(await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'PUT', headers: as(A.token), body: JSON.stringify({ visibility: 'group', group_id: `no-such-group-${stamp}`, version }) }));
+        assert(await memberReads(key), 'the refused write took the group away');
     });
 
     console.log('\nPATCH /v1/memory/{key}');
@@ -206,6 +219,17 @@ async function main() {
         assert((await own(bad)).status === 404, 'the refused entry exists');
         assert((await own(good)).status === 200, 'the plain entry did not land');
         assert(await memberReads(named), 'the named entry does not share');
+    });
+    await test('13a. The entry naming a group that does not exist fails by name, and the rest lands', async () => {
+        const bad = `mgb.bulk.unknown.${stamp}`, good = `mgb.bulk.unknown-good.${stamp}`;
+        const r = await post('/v1/memory/bulk', A.token, { entries: [
+            { key: bad, value: 1, visibility: 'group', group_id: `no-such-group-${stamp}` }, { key: good, value: 1 },
+        ] });
+        assert(r.status === 200, `bulk: ${shown(r)}`);
+        const answer = JSON.stringify(r.body.data);
+        assert(answer.includes(bad) && answer.includes('group_id'), `the answer names the refused key: ${answer.slice(0, 400)}`);
+        assert((await own(bad)).status === 404, 'the refused entry exists');
+        assert((await own(good)).status === 200, 'the plain entry did not land');
     });
     await test('14. A bulk rewrite of a bound record naming no group keeps the group', async () => {
         const key = `mgb.bulk.bound.${stamp}`;
@@ -284,6 +308,10 @@ async function main() {
     const entryVisibility = (body: object) => json(`/v1/knowledge/${packageId}/entries/notes/visibility`, { method: 'PATCH', headers: as(A.token), body: JSON.stringify(body) });
     await test('20. An entry is not turned to group with no group', async () => {
         refused(await entryVisibility({ visibility: 'group' }));
+        assert((await own(`packages/${packageId}/notes`)).body.data.visibility === 'private', 'the refused change moved the record');
+    });
+    await test('20a. An entry naming a group that does not exist is refused', async () => {
+        refused(await entryVisibility({ visibility: 'group', group_id: `no-such-group-${stamp}` }));
         assert((await own(`packages/${packageId}/notes`)).body.data.visibility === 'private', 'the refused change moved the record');
     });
     await test('21. An entry naming its group shares it, and the member reads it', async () => {

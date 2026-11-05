@@ -50,9 +50,11 @@ const addTransaction = vi.fn(async () => undefined);
 
 // The quota asks whether the owner keeps files in storage of their own (services/file-store/): none here.
 const getMemory = vi.fn(async () => null);
+// The one group this node has. Any other id names no group.
+const getSharingGroup = vi.fn(async (id: string) => (id === 'grp-1' ? { id } : null));
 
 const storage = {
-    createStorageFile, listStorageFiles, getGHIIByOwner, debitBalance, addTransaction, getMemory,
+    createStorageFile, listStorageFiles, getGHIIByOwner, debitBalance, addTransaction, getMemory, getSharingGroup,
 } as unknown as Storage;
 
 const deps = { storage, config };
@@ -125,6 +127,13 @@ describe('writeStorageFile', () => {
             expect(out, `groupId ${String(groupId)}`).toMatchObject({ ok: false, status: 400, code: 'INVALID_INPUT' });
             expect(!out.ok && out.message).toContain('group_id');
         }
+        expect(createStorageFile).not.toHaveBeenCalled();
+    });
+
+    it('refuses a group id that names no group, and stores nothing', async () => {
+        const out = await writeStorageFile(deps, OWNER, { key: 'a.png', data: bytes(8), visibility: 'group', groupId: 'no-such-group' });
+        expect(out).toMatchObject({ ok: false, status: 400, code: 'INVALID_INPUT' });
+        expect(!out.ok && out.message).toContain('group_id');
         expect(createStorageFile).not.toHaveBeenCalled();
     });
 

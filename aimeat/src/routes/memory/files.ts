@@ -5,6 +5,7 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.1 -- 2026-11-05 -- POST refuses a group_id naming no group, inline and presigned (storage-file-write.ts).
  *   v1.15.0 -- 2026-11-01 -- The presigned mint carries the welcome page's writer in the token
  *     (`page_writer`), and DELETE notes it through the shared delete (services/storage-page-keys.ts;
  *     secaudit2026oct31w2 round 11).
@@ -139,7 +140,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
     // Asked here because the presigned branch below mints its own token. The inline branch asks again at the shared write.
-    const unbound = groupBindingRefusal(visibility, group_id);
+    const unbound = await groupBindingRefusal(storage, visibility, group_id);
     if (unbound) {
       res.status(unbound.status).json(error(config.nodeId, unbound.code, unbound.message));
       return;

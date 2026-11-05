@@ -589,6 +589,19 @@ await test('26c. aimeat_memory_write refuses visibility group with no group_id, 
     assert(out.text.includes('group_id'), `the refusal must say what to send: ${out.text}`);
 });
 
+await test('26d. A group_id that names no group is refused by aimeat_memory_write and aimeat_storage_upload', async () => {
+    const group_id = `no-such-group-${STAMP}`;
+    const record = await callTool(reqSession, 'aimeat_memory_write', { key: `cd.unknowngroup.${STAMP}`, value: 1, visibility: 'group', group_id });
+    assert(record.isError && record.text.includes('group_id'), `a record bound to no group was stored: ${record.text}`);
+    const key = `cd-unknowngroup-${STAMP}.html`;
+    const inline = await callTool(reqSession, 'aimeat_storage_upload', {
+        key, data_base64: Buffer.from('<p>x</p>', 'utf8').toString('base64'), mime_type: 'text/html', visibility: 'group', group_id,
+    });
+    assert(inline.isError && inline.text.includes('group_id'), `a file bound to no group was stored: ${inline.text}`);
+    const presigned = await callTool(reqSession, 'aimeat_storage_upload', { key, mime_type: 'text/html', visibility: 'group', group_id });
+    assert(presigned.isError && presigned.text.includes('group_id'), `a URL was minted for a file bound to no group: ${presigned.text}`);
+});
+
 await test('27. A storage key the caller does not hold answers "Not found" rather than another namespace', async () => {
     const read = await mcpRpc(reqSession, 'resources/read', { uri: `aimeat://storage/${encodeURIComponent(`cd-missing-${STAMP}.txt`)}` });
     assert(read?.result?.contents?.[0]?.text === 'Not found',

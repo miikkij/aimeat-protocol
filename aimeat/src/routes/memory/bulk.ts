@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
- *   2026-11-05 — A bulk entry at 'group' that names no group and finds none on the record fails by name
- *     (storage/memory-sharing.ts). An import takes no group id, so its entry at 'group' keeps the group
+ *   2026-11-05 — A bulk entry at 'group' that names no group and finds none on the record fails by name,
+ *     and so does one naming a group id with no group (storage/memory-sharing.ts). An import takes no group id, so its entry at 'group' keeps the group
  *     its record has, or is stored private with its data kept. The import wrote it to nobody.
  *   2026-11-04 — getMemoryByKeys called without a non-null assertion: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
@@ -137,7 +137,7 @@ import { writeMemoryBatch } from '../../services/memory-batch-write.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
-import { isNamedGroup, memoryGroupRefusal } from '../../storage/memory-sharing.js';
+import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../../storage/memory-sharing.js';
 import { discoverMemory } from '../../services/memory-discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
@@ -173,6 +173,14 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
     const mode = body.mode === 'skip' ? 'skip' : 'overwrite';
+    // One read per group id, so a batch of 1000 entries naming one group reads it once.
+    const groupReads = new Map<string, Promise<unknown>>();
+    const batchGroups = {
+      getSharingGroup: (id: string) => {
+        if (!groupReads.has(id)) groupReads.set(id, storage.getSharingGroup(id));
+        return groupReads.get(id)!;
+      },
+    };
 
     // Resolve the target identity (owner sessions may target one of their agents via ?agent / body.agent).
     let gaii = resolve(req);
@@ -232,6 +240,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // The read runs only for an entry at 'group' that names none.
       const noGroup = e.visibility === 'group' && !isNamedGroup(e.group_id) ? memoryGroupRefusal('group', undefined, await storage.getMemoryMeta(gaii, key)) : null;
       if (noGroup) { preFailed.push({ key, status: 'failed', reason: `${noGroup.code}: ${noGroup.message}` }); continue; }
+      // A group id naming no group, read once per id however many entries of the batch name it.
+      const unknownGroup = await unknownGroupRefusal(batchGroups, e.visibility, e.group_id);
+      if (unknownGroup) { preFailed.push({ key, status: 'failed', reason: `${unknownGroup.code}: ${unknownGroup.message}` }); continue; }
       // Making a record public, by a caller with nobody on this node to ask: that entry is refused.
       // A closed node stores it at 'members' instead (services/memory-batch-write.ts), so it asks nothing.
       if (publishAsk.kind === 'refused' && e.visibility === 'public' && !signedInOnly(config) && (await storage.getMemory(gaii, key))?.visibility !== 'public') {

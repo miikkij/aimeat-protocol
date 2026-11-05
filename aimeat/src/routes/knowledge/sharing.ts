@@ -7,7 +7,7 @@
  *   satisfy max-file-lines.
  * @version-history
  *   2026-11-05 — The entry visibility PATCH refuses 'group' with no group_id on a record that has no
- *     group, with 400 INVALID_INPUT (storage/memory-sharing.ts).
+ *     group, and a group_id naming no group, with 400 INVALID_INPUT (storage/memory-sharing.ts).
  *   2026-10-31 — The sharing PATCH reads catalog_listed as the boolean setKnowledgeSharing stores, so a
  *     truthy non-boolean (1, "yes") asks the publish gate and is lowered on a closed node as true is
  *     (secaudit 2026-10-31 inv-09).
@@ -71,7 +71,7 @@ import {
   packageAudienceOf, entryRecordVisibility, knowledgeAudienceAllows,
 } from '../../services/knowledge-audience.js';
 import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry, knowledgeEntryKey } from '../../services/knowledge-sharing.js';
-import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
+import { memoryGroupRefusal, unknownGroupRefusal } from '../../storage/memory-sharing.js';
 import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
@@ -195,7 +195,8 @@ export function registerSharingRoutes(
 
     // An entry at 'group' names its group, or its record has one (storage/memory-sharing.ts).
     if (visibility === 'group') {
-      const noGroup = memoryGroupRefusal('group', groupId, await storage.getMemoryMeta(ownerGaii, knowledgeEntryKey(packageId, entry.key)));
+      const stored = await storage.getMemoryMeta(ownerGaii, knowledgeEntryKey(packageId, entry.key));
+      const noGroup = memoryGroupRefusal('group', groupId, stored) ?? await unknownGroupRefusal(storage, 'group', groupId, stored?.groupId);
       if (noGroup) { res.status(noGroup.status).json(error(config.nodeId, noGroup.code, noGroup.message)); return; }
     }
 

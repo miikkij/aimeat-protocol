@@ -31,7 +31,8 @@
  * @version-history
  *   2026-11-05 — A write at 'group' that names no group and finds none on the record is refused with 400
  *     INVALID_INPUT, nothing stored (storage/memory-sharing.ts). A row an older node stored that way
- *     stays writable and the write carries the warning GROUP_NOT_NAMED.
+ *     stays writable and the write carries the warning GROUP_NOT_NAMED. A group id naming no group is
+ *     refused the same way, unless the record already carries that id.
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
@@ -163,7 +164,7 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { canonicalAppToolsKey } from './app-tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
-import { isNamedGroup, memoryGroupRefusal } from '../storage/memory-sharing.js';
+import { isNamedGroup, memoryGroupRefusal, unknownGroupRefusal } from '../storage/memory-sharing.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js';
 import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from './memory-publish-gate.js';
@@ -349,6 +350,8 @@ export async function writeMemoryRecord(
     // Asked of the level the record will have, before anything is stored.
     const noGroup = memoryGroupRefusal(input.visibility, input.groupId, existing);
     if (noGroup) return { ok: false, ...noGroup };
+    const unknownGroup = await unknownGroupRefusal(storage, input.visibility, input.groupId, existing?.groupId);
+    if (unknownGroup) return { ok: false, ...unknownGroup };
     // The label's audience cap (plan doc-mvdipuyqraas, L3.2), before the publish gate: refused, nothing stored.
     const capped = input.gatePublic ? await memoryCapRefusal({ storage, config }, caller, [memoryTarget(caller.targetGaii, input.key)], input.visibility, existing?.visibility, input.pipeline) : null;
     if (capped) return capped;

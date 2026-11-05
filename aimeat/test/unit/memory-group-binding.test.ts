@@ -26,6 +26,10 @@ const ALICE = `alice@${NODE}`;
 let storage: Storage;
 let config: AimeatConfig;
 
+async function seedGroup(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await storage.createSharingGroup({ id, name: id, ownerGaii: ALICE, members: [], defaultPermissions: { read: true, write: false }, createdAt: now, updatedAt: now });
+}
 async function seed(key: string, visibility: MemoryRecord['visibility'], groupId?: string): Promise<void> {
     const now = new Date().toISOString();
     await storage.setMemory({
@@ -91,6 +95,7 @@ describe('writeMemoryRecord over a stored row with no group', () => {
     });
 
     it('is repaired by naming a group, and then warns no more', async () => {
+        await seedGroup('g1');
         await seed('stored/named', 'group');
         const out = await write({ key: 'stored/named', visibility: 'group', groupId: 'g1' });
         expect(out.ok && out.warnings.map(w => w.code)).not.toContain('GROUP_NOT_NAMED');
@@ -109,6 +114,20 @@ describe('writeMemoryRecord over a stored row with no group', () => {
         const out = await write({ key: 'stored/bound', visibility: 'group' });
         expect(out.ok && out.warnings.map(w => w.code)).not.toContain('GROUP_NOT_NAMED');
         expect((await storage.getMemory(ALICE, 'stored/bound'))?.groupId).toBe('g1');
+    });
+
+    it('is not repaired by a group id that names no group, and stays as it was', async () => {
+        await seed('stored/unknown', 'group');
+        const out = await write({ key: 'stored/unknown', visibility: 'group', groupId: 'no-such-group' });
+        expect(out).toMatchObject({ ok: false, status: 400, code: 'INVALID_INPUT' });
+        expect((await storage.getMemory(ALICE, 'stored/unknown'))?.version).toBe(1);
+    });
+
+    it('keeps a record editable whose group was deleted later, when the write repeats the id it has', async () => {
+        await seed('stored/deleted-group', 'group', 'deleted-group');
+        const out = await write({ key: 'stored/deleted-group', visibility: 'group', groupId: 'deleted-group', value: { v: 2 } });
+        expect(out.ok).toBe(true);
+        expect((await storage.getMemory(ALICE, 'stored/deleted-group'))?.value).toEqual({ v: 2 });
     });
 
     it('refuses a new record naming no group, and stores nothing', async () => {
