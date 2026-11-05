@@ -10,6 +10,9 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-05 — aimeat_handbook_get's input schema is one module constant, so every server registers
+ *     the same object and tools/list builds its JSON Schema once (codebase analysis 2026-11-03,
+ *     decision 11b of 2026-11-05). The schema itself is unchanged.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -82,6 +85,16 @@ import { featureMapPiece, featureMapPieceIds } from '../services/feature-map.js'
 import { settingsExplainPiece, settingsExplainPieceIds } from '../services/settings-explain.js';
 import { placesPiece, placesPieceIds } from '../services/places.js';
 
+/**
+ * The input of aimeat_handbook_get: one object for the process, not one per server, so tools/list
+ * builds its JSON Schema once (mcp/tool-schema-cache.ts; codebase analysis 2026-11-03, decision 11b
+ * of 2026-11-05).
+ */
+const HANDBOOK_GET_INPUT = z.object({
+    tier: z.string().max(INPUT_LIMITS.id).optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "places" says where each page of Settings & Controls is, with the sections inside it and a link to each, and "places/admin" does the same for the admin pages: read it when the person asks where to find something on the pages of this AIMEAT. "settings" lists, first, the words this system uses (organism, agent, morsel and others), each in plain language, then the settings the pages explain behind a question mark, by area. "settings/<term>" is one of them in English, Finnish and Spanish. "settings/concept.<id>" is a word, for example "settings/concept.organism": read it before you use the word with the person or when they ask what it is, and give the word that meaning, which every page and tool uses too. Any other term is a setting: read it when the person asks what it means or which value to pick.'),
+    surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
+});
+
 export function registerPromptsTools(
     mcp: McpServer,
     storage: Storage,
@@ -100,10 +113,7 @@ export function registerPromptsTools(
         'aimeat_handbook_get',
         {
             description: descriptionFor('aimeat_handbook_get'),
-            inputSchema: z.object({
-                            tier: z.string().max(INPUT_LIMITS.id).optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "places" says where each page of Settings & Controls is, with the sections inside it and a link to each, and "places/admin" does the same for the admin pages: read it when the person asks where to find something on the pages of this AIMEAT. "settings" lists, first, the words this system uses (organism, agent, morsel and others), each in plain language, then the settings the pages explain behind a question mark, by area. "settings/<term>" is one of them in English, Finnish and Spanish. "settings/concept.<id>" is a word, for example "settings/concept.organism": read it before you use the word with the person or when they ask what it is, and give the word that meaning, which every page and tool uses too. Any other term is a setting: read it when the person asks what it means or which value to pick.'),
-                            surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
-                        }),
+            inputSchema: HANDBOOK_GET_INPUT,
             annotations: annotationsFor('aimeat_handbook_get'),
         },
         async ({ tier, surface }) => {
