@@ -461,6 +461,7 @@ describe('credential table, part 2: every remaining credential kind on every rou
         // node as when all are compared; while one is recorded, a family with no fixture yet only runs.
         it(`${family}: answers each row exactly as the code before the credential strategies did`, async () => {
             const fixture = fixtureOf(family);
+            expect(probes().length, `${family} has rows`).toBeGreaterThan(0);
             if (RECORDING.size && !RECORDING.has(family) && !existsSync(fixture)) { for (const p of probes()) await sendProbe(base, p); return; }
             await compareFamily(base, fixture, probes(), RECORDING.has(family));
         }, 120_000);

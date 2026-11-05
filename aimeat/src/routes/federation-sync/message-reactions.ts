@@ -11,6 +11,7 @@
  * @structure registerMessageReactionFederationRoute(router, config, storage, peers)
  * @usage registerMessageReactionFederationRoute(router, config, storage, peers); (routes/federation-sync.ts)
  * @version-history
+ *   v1.0.2 — 2026-11-05 — The peer and its signature are verified by the 'federation-peer' credential strategy, in the same order with the same refusals (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   v1.0.1 — 2026-11-04 — The single use of a signed reaction is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.0.0 — 2026-10-26 — Initial (wish-kuittausreaktiot-yksitt-isiin-viesteihin-viestit-ketjuissa).
  */
@@ -19,36 +20,35 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { success, error } from '../../middleware/envelope.js';
-import { gatePeer } from '../../services/federation-peer-gate.js';
-import { verify } from '../../auth/keypair.js';
+import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
+import { badInput, bodyOf } from '../../auth/credential-strategies-node.js';
 import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
 import { applyRemoteReaction, reactionPayload } from '../../services/message-reactions.js';
 
 export function registerMessageReactionFederationRoute(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
-    router.post('/v1/federation/message/reaction', async (req, res) => {
+    // A mark is part of the message conversation, so it rides the same word as a message. The peer and
+    // its signature are verified by the 'federation-peer' credential strategy. The receiver rebuilds the
+    // signed text from the fields, so a field the signature does not cover cannot ride along. `op`
+    // other than add/remove is refused below, after the signature.
+    router.post('/v1/federation/message/reaction', acceptCredential('federation-peer', {
+        config, peers, capability: 'allowMessaging', node: (req) => bodyOf(req).source_node,
+        before: (req) => {
+            const { source_node, signature } = bodyOf(req);
+            return typeof source_node !== 'string' || !source_node || typeof signature !== 'string' || !signature ? badInput('source_node and signature are required') : null;
+        },
+        signed: (req) => {
+            const { source_node, message_id, reaction, reactor, by_agent, op, timestamp } = bodyOf(req);
+            return JSON.stringify(reactionPayload(String(source_node), String(message_id ?? ''), {
+                reaction: String(reaction ?? ''), reactorGhii: String(reactor ?? ''),
+                byAgent: typeof by_agent === 'string' && by_agent ? by_agent : undefined, removed: op === 'remove',
+            }, String(timestamp ?? '')));
+        },
+        forged: 'Invalid signature on reaction',
+    }), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
-        const { source_node, message_id, reaction, reactor, by_agent, op, timestamp, signature } = body;
-        if (typeof source_node !== 'string' || !source_node || typeof signature !== 'string' || !signature) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and signature are required'));
-            return;
-        }
-        // A mark is part of the message conversation, so it rides the same word as a message.
-        const gate = gatePeer(peers, source_node, 'allowMessaging');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-        const signed = JSON.stringify(reactionPayload(source_node, String(message_id ?? ''), {
-            reaction: String(reaction ?? ''), reactorGhii: String(reactor ?? ''),
-            byAgent: typeof by_agent === 'string' && by_agent ? by_agent : undefined, removed: op === 'remove',
-        }, String(timestamp ?? '')));
-        // The receiver rebuilds the signed text from the fields, so a field the signature does not cover
-        // cannot ride along. `op` other than add/remove is refused below, after the signature.
-        if (!await verify(peer.publicKey, signed, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on reaction'));
-            return;
-        }
+        const { message_id, reaction, reactor, by_agent, op, timestamp } = body;
+        const source_node = body.source_node as string;
+        const { peer, signed, signature } = credentialOf(req, 'federation-peer');
         // Names this node, inside five minutes of its signed time, and once (signed-node-request.ts).
         const refusal = await pinnedRefusal(await federationPeerProofPin(storage, peer), body, provenSince => audienceRefusal({
             signed, audience: body.audience, audienceSignature: body.audience_signature,

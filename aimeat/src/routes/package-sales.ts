@@ -18,6 +18,9 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   2026-11-05 — The seller doors declare the 'package-seller' credential strategy (sellerAct moved there
+ *     unchanged) and the claim redemption the 'package-claimant' one (codebase analysis 2026-11-03,
+ *     decision 2 of 2026-11-05).
  *   2026-10-27 — Claim redemption and the sale grant pass config.securityProfile to the node link
  *     (secaudit2026oct26, linkPackagePeer-no-peerUrlRefusal).
  *   v1.7.0 — 2026-10-06 — PUT .../auto-renew names the agent that turns automatic renewal on, so each
@@ -39,7 +42,7 @@
  *     tool could, and the questions are read before the first sale.
  *   v1.0.0 — 2026-09-29 — Initial (install packages, phase 5: seller nodes).
  */
-import type { Router, Request, Response } from 'express';
+import type { Router, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -48,8 +51,9 @@ import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
-import { verifySaleRequest, verifyRequestWithKey, CLAIM_PURPOSE } from '../services/packages/sale/package-sale-auth.js';
-import { listSellers, addSeller, removeSeller, isSellerFor } from '../services/packages/sale/package-sellers.js';
+import { CLAIM_PURPOSE } from '../services/packages/sale/package-sale-auth.js';
+import { listSellers, addSeller, removeSeller } from '../services/packages/sale/package-sellers.js';
+import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
 import { grantEntitlement, revokeEntitlement, type PackageEntitlement } from '../services/packages/sale/package-entitlements.js';
 import { packageConfigNeeds } from '../services/packages/compose/package-config-needs.js';
 import { saleConfigNeeds, saleGrant, saleRevoke, saleClaim, saleOffer, claimPackageHere } from '../services/packages/sale/package-sale-client.js';
@@ -106,31 +110,12 @@ export function registerPackageSaleRoutes(
     });
 
     // ── The repository: a seller node's signed requests ────────────────────────────────────────
-    /** The package's author, when the signed request comes from one of the author's seller nodes. */
-    async function sellerAct(req: Request, res: Response): Promise<{ author: string; seller: string; groupId: string } | null> {
-        if (!config.packageRepository) {
-            res.status(404).json(error(config.nodeId, 'NOT_A_REPOSITORY', 'This node does not serve packages as a repository.'));
-            return null;
-        }
-        const body = req.method === 'PUT' ? req.body : undefined;
-        const who = await verifySaleRequest(req.headers, peers, config.nodeId, req.method, req.originalUrl, body);
-        if (!who.ok) { res.status(who.status).json(error(config.nodeId, who.code, who.message)); return null; }
-        const groupId = decodeURIComponent(req.params.groupId as string);
-        const pkg = (await storage.listVersions(groupId, 1, 0)).versions[0];
-        if (!pkg || !(await isSellerFor(storage, pkg.author, who.nodeId))) {
-            // One answer for "no such package" and "not your seller", so a node that is nobody's seller
-            // learns nothing about which private packages exist here.
-            res.status(403).json(error(config.nodeId, 'NOT_A_SELLER',
-                'Your node does not sell this package here. The package\'s author names the nodes that sell it.',
-                403, { node_id: who.nodeId, group_id: groupId, tool: 'aimeat_package_sellers' }));
-            return null;
-        }
-        return { author: pkg.author, seller: who.nodeId, groupId };
-    }
+    // The package's author, when the signed request comes from one of the author's seller nodes: the
+    // 'package-seller' credential strategy (src/auth/credential-strategies-node.ts, was sellerAct here).
+    const sellerDeps = { storage, config, peers };
 
-    router.get('/v1/federation/package-sales/:groupId/config-needs', async (req, res) => {
-        const act = await sellerAct(req, res);
-        if (!act) return;
+    router.get('/v1/federation/package-sales/:groupId/config-needs', acceptCredential('package-seller', sellerDeps), async (req, res) => {
+        const act = credentialOf(req, 'package-seller');
         const out = await packageConfigNeeds(storage, config, { owner: act.author, isOperator: false }, act.groupId);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, {
@@ -141,9 +126,8 @@ export function registerPackageSaleRoutes(
 
     // The author's offer, read by a seller node: every terms entry, so a renewal can name the terms
     // its buyer accepted (services/packages/sale/package-offer.ts).
-    router.get('/v1/federation/package-sales/:groupId/offer', async (req, res) => {
-        const act = await sellerAct(req, res);
-        if (!act) return;
+    router.get('/v1/federation/package-sales/:groupId/offer', acceptCredential('package-seller', sellerDeps), async (req, res) => {
+        const act = credentialOf(req, 'package-seller');
         const offer = await readOffer(storage, act.groupId);
         if (!offer) { res.status(404).json(error(config.nodeId, 'NO_OFFER', 'The author of this package has not set the terms it is sold on. Ask them to set an offer first.')); return; }
         // `latest`: what the version on sale can do, which the seller reviews before it sells it.
@@ -151,9 +135,8 @@ export function registerPackageSaleRoutes(
     });
 
     // A one-time code for a sale whose customer node does not exist yet (services/packages/sale/package-claims.ts).
-    router.put('/v1/federation/package-sales/:groupId/claims', async (req, res) => {
-        const act = await sellerAct(req, res);
-        if (!act) return;
+    router.put('/v1/federation/package-sales/:groupId/claims', acceptCredential('package-seller', sellerDeps), async (req, res) => {
+        const act = credentialOf(req, 'package-seller');
         const body = (req.body ?? {}) as Record<string, unknown>;
         const terms = await termsSnapshot(act.groupId, body.terms_id);
         if (terms && 'code' in terms) { res.status(terms.status).json(error(config.nodeId, terms.code, terms.message)); return; }
@@ -163,17 +146,11 @@ export function registerPackageSaleRoutes(
     });
 
     // A node redeems a claim code, signed with the key its body names: proof that it holds the key it
-    // asks to be registered under. Not a seller's request, so it is not sellerAct's.
-    router.post('/v1/federation/package-claims/:groupId', async (req, res) => {
-        if (!config.packageRepository) {
-            res.status(404).json(error(config.nodeId, 'NOT_A_REPOSITORY', 'This node does not serve packages as a repository.'));
-            return;
-        }
+    // asks to be registered under. Not a seller's request: the 'package-claimant' credential strategy.
+    router.post('/v1/federation/package-claims/:groupId', acceptCredential('package-claimant', { config, purpose: CLAIM_PURPOSE }), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
-        const publicKey = str(body.public_key);
-        const who = await verifyRequestWithKey(req.headers, publicKey, CLAIM_PURPOSE, config.nodeId, req.method, req.originalUrl, req.body);
-        if (!who.ok) { res.status(who.status).json(error(config.nodeId, who.code, who.message)); return; }
-        if (who.nodeId !== str(body.node_id)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id is the node that signs the request.')); return; }
+        const { nodeId, publicKey } = credentialOf(req, 'package-claimant');
+        const who = { nodeId };
         const groupId = decodeURIComponent(req.params.groupId as string);
         const pkg = (await storage.listVersions(groupId, 1, 0)).versions[0];
         if (!pkg) { res.status(404).json(error(config.nodeId, 'CLAIM_NOT_FOUND', 'No claim with that code waits for this package.')); return; }
@@ -192,9 +169,8 @@ export function registerPackageSaleRoutes(
         return { offerTermsId: t.id, price: t.price, renewal: t.updates.renewal, acceptedAt: new Date().toISOString() };
     }
 
-    router.put('/v1/federation/package-sales/:groupId/entitlements/:nodeId', async (req, res) => {
-        const act = await sellerAct(req, res);
-        if (!act) return;
+    router.put('/v1/federation/package-sales/:groupId/entitlements/:nodeId', acceptCredential('package-seller', sellerDeps), async (req, res) => {
+        const act = credentialOf(req, 'package-seller');
         const body = (req.body ?? {}) as Record<string, unknown>;
         const terms = await termsSnapshot(act.groupId, body.terms_id);
         if (terms && 'code' in terms) { res.status(terms.status).json(error(config.nodeId, terms.code, terms.message)); return; }
@@ -207,9 +183,8 @@ export function registerPackageSaleRoutes(
         res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true }));
     });
 
-    router.delete('/v1/federation/package-sales/:groupId/entitlements/:nodeId', async (req, res) => {
-        const act = await sellerAct(req, res);
-        if (!act) return;
+    router.delete('/v1/federation/package-sales/:groupId/entitlements/:nodeId', acceptCredential('package-seller', sellerDeps), async (req, res) => {
+        const act = credentialOf(req, 'package-seller');
         const out = await revokeEntitlement(storage, { owner: act.author, isOperator: false }, act.groupId, req.params.nodeId as string, act.seller);
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { revoked: true }));
