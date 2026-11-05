@@ -1,0 +1,688 @@
+[
+  {
+    "id": "GET request :: session valid",
+    "status": 200,
+    "cacheControl": "no-store",
+    "wwwAuthenticate": null,
+    "body": "string"
+  },
+  {
+    "id": "GET request :: session unknown",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such wallet session. It may have expired: start the signature again."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET request :: session malformed",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such wallet session. It may have expired: start the signature again."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET request :: signing switched off",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FEATURE_DISABLED",
+        "message": "Document signing is switched off on this node."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Ask whoever runs this node whether it can be turned on.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET document :: wrong token",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such document."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET document :: unknown session",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such wallet session. It may have expired: start the signature again."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET document :: token of the session",
+    "status": 200,
+    "cacheControl": "no-store",
+    "wwwAuthenticate": null,
+    "body": "string"
+  },
+  {
+    "id": "GET document :: token of the session, again",
+    "status": 200,
+    "cacheControl": "no-store",
+    "wwwAuthenticate": null,
+    "body": "string"
+  },
+  {
+    "id": "POST response :: no state",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_STATE",
+        "message": "state does not match this session."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Check where this is now — what you can do next depends on it.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST response :: wrong state",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_STATE",
+        "message": "state does not match this session."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Check where this is now — what you can do next depends on it.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST response :: state of another session",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_STATE",
+        "message": "state does not match this session."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Check where this is now — what you can do next depends on it.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST response :: unknown session",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such wallet session. It may have expired: start the signature again."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST response :: malformed session",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No such wallet session. It may have expired: start the signature again."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST response :: valid, no document",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "redirect_uri": "string"
+    }
+  },
+  {
+    "id": "POST response :: valid, after the session closed",
+    "status": 409,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_OPEN",
+        "message": "This wallet session is failed."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET request :: session closed",
+    "status": 409,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_OPEN",
+        "message": "This wallet session is failed."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST by state :: no state",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No open wallet session has that state."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST by state :: wrong state",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No open wallet session has that state."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST by state :: state of a closed session",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No open wallet session has that state."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST by state :: valid",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "redirect_uri": "string"
+    }
+  },
+  {
+    "id": "POST by state :: valid, again",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_FOUND",
+        "message": "No open wallet session has that state."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST / :: wrong state",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /</pre>\n</body>\n</html>\n"
+  },
+  {
+    "id": "POST / :: valid",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "redirect_uri": "string"
+    }
+  },
+  {
+    "id": "POST / :: not a form",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Error</title>\n</head>\n<body>\n<pre>Cannot POST /</pre>\n</body>\n</html>\n"
+  }
+]
