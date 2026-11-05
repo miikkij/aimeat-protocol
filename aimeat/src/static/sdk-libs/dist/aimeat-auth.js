@@ -3847,6 +3847,88 @@
     return ns2;
   }
 
+  // src/static/sdk-libs/auth/display-prefs.js
+  var KEEP_KEY = "display-prefs";
+  function identityOf(s) {
+    return s ? String(s.ghii || s.owner || s.identity || "") : "";
+  }
+  function makeDisplayPrefs(getSession, store) {
+    var keep = store || { save, load, remove };
+    var who = null;
+    var region = null;
+    var timezone = null;
+    var asked = false;
+    function announce() {
+      try {
+        window.dispatchEvent(new CustomEvent("aimeat-prefs-change", { detail: { region, timezone } }));
+      } catch (e) {
+        console.warn("[aimeat-auth] The display settings changed but the page could not be told:", e && /** @type {Error} */
+        e.message);
+      }
+    }
+    function read(s, forWho) {
+      var answer;
+      try {
+        answer = Promise.resolve(s.fetch("/v1/ghii/me"));
+      } catch (e) {
+        answer = Promise.reject(e);
+      }
+      answer.then(function(body) {
+        if (who !== forWho) return;
+        if (!body || !body.ok || !body.data) return;
+        var r = body.data.region || null;
+        var z = body.data.timezone || null;
+        keep.save(KEEP_KEY, { who: forWho, region: r, timezone: z });
+        if (r === region && z === timezone) return;
+        region = r;
+        timezone = z;
+        announce();
+      }, function(e) {
+        console.warn("[aimeat-auth] Reading the display settings failed; dates follow the browser:", e && /** @type {Error} */
+        e.message);
+      });
+    }
+    function current() {
+      var s;
+      try {
+        s = getSession();
+      } catch (e) {
+        console.warn("[aimeat-auth] The session could not be read; dates follow the browser:", e && /** @type {Error} */
+        e.message);
+        s = null;
+      }
+      var id = identityOf(s);
+      if (!s || !id || s.federated) {
+        who = null;
+        region = null;
+        timezone = null;
+        asked = false;
+        return { region: null, timezone: null };
+      }
+      if (id !== who) {
+        who = id;
+        asked = false;
+        var kept = keep.load(KEEP_KEY);
+        var mine = kept && kept.who === id;
+        region = mine ? kept.region || null : null;
+        timezone = mine ? kept.timezone || null : null;
+      }
+      if (!asked) {
+        asked = true;
+        read(s, id);
+      }
+      return { region, timezone };
+    }
+    function forget() {
+      who = null;
+      region = null;
+      timezone = null;
+      asked = false;
+      keep.remove(KEEP_KEY);
+    }
+    return { current, forget };
+  }
+
   // src/static/sdk-libs/auth/index.js
   if (typeof document !== "undefined" && document.addEventListener) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", maybeShowGoogleSignup);
@@ -3900,6 +3982,11 @@
       return { id: p.id, label: p.label, swatch: p.swatch };
     });
   };
+  var displayPrefs = makeDisplayPrefs(function() {
+    return auth.getSession();
+  });
+  auth.displayPrefs = displayPrefs.current;
+  on("logout", displayPrefs.forget);
   if (typeof document !== "undefined") {
     aimeatRestorePalette();
     aimeatRestoreMode();
@@ -3911,5 +3998,5 @@
     });
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-11-02-001";
+  ns.version = "2026-11-05-001";
 })();

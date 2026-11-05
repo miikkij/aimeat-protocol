@@ -5091,12 +5091,35 @@
     const ns = typeof window !== "undefined" ? window.AIMEAT : null;
     return ns && ns.fmt ? ns.fmt : null;
   }
+  function person() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    const auth = ns && ns.auth;
+    const p = auth && typeof auth.displayPrefs === "function" ? auth.displayPrefs() : null;
+    return { region: p && p.region || null, timezone: p && p.timezone || null };
+  }
+  var refusedReported = "";
+  function asPerson(call, opts, clock) {
+    const p = person();
+    const zone = clock && p.timezone && !(opts && opts.timeZone) ? p.timezone : null;
+    if (!p.region && !zone) return call(void 0, opts);
+    try {
+      return call(p.region || void 0, zone ? Object.assign({}, opts, { timeZone: zone }) : opts);
+    } catch (e) {
+      const which = (p.region || "") + "|" + (zone || "");
+      if (refusedReported !== which) {
+        refusedReported = which;
+        console.warn('[aimeat] This browser cannot write dates with the region "' + (p.region || "") + '" and the time zone "' + (zone || "") + `" of the person's settings; the browser's own format is used:`, e && /** @type {Error} */
+        e.message);
+      }
+      return call(void 0, opts);
+    }
+  }
   function num(n, opts) {
     if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
     const f2 = fmt();
     if (f2 && typeof f2.num === "function") return f2.num(n, opts);
     try {
-      return n.toLocaleString(void 0, opts);
+      return asPerson((tag, o) => n.toLocaleString(tag, o), opts, false);
     } catch {
       return String(n);
     }
@@ -5112,7 +5135,7 @@
       opts
     );
     try {
-      return n.toLocaleString(void 0, o);
+      return asPerson((tag, oo) => n.toLocaleString(tag, oo), o, false);
     } catch {
       return num(n) + " " + code;
     }
@@ -5123,7 +5146,7 @@
     const d = new Date(v);
     if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
     try {
-      return d.toLocaleDateString(void 0, opts);
+      return asPerson((tag, o) => d.toLocaleDateString(tag, o), opts, true);
     } catch {
       return String(v);
     }
@@ -5134,7 +5157,7 @@
     const d = new Date(v);
     if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
     try {
-      return d.toLocaleTimeString(void 0, opts);
+      return asPerson((tag, o) => d.toLocaleTimeString(tag, o), opts, true);
     } catch {
       return String(v);
     }
@@ -5145,7 +5168,7 @@
     const d = new Date(v);
     if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
     try {
-      return d.toLocaleString(void 0, opts);
+      return asPerson((tag, o) => d.toLocaleString(tag, o), opts, true);
     } catch {
       return String(v);
     }
@@ -5206,7 +5229,7 @@
     const withUtc = Object.assign({}, opts, { timeZone: "UTC" });
     if (f2 && typeof f2.date === "function") return f2.date(at3, withUtc);
     try {
-      return at3.toLocaleDateString(void 0, withUtc);
+      return asPerson((tag, o) => at3.toLocaleDateString(tag, o), withUtc, true);
     } catch {
       return String(v);
     }
@@ -14587,7 +14610,7 @@ Known schemas:
     if (value) s.value = value;
     return s;
   }
-  function person(account, displayName, email) {
+  function person2(account, displayName, email) {
     const shown = displayName || account || "";
     const sub = email || (displayName && account && displayName !== account ? account : "");
     return el("span", { class: "ak-mem__person", "data-ak-part": "who", title: account || null }, [
@@ -14831,7 +14854,7 @@ Known schemas:
           body.appendChild(list3("asked", v.rows.map(function(q) {
             const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm("members.role")) : null;
             if (sel) sel.disabled = sample;
-            return row(person(q.owner, q.displayName, q.email), q.note || "", [
+            return row(person2(q.owner, q.displayName, q.email), q.note || "", [
               sel,
               button2(tm("members.approve"), "primary", assign(q.owner, function() {
                 return sel ? sel.value : oneClick;
@@ -14851,7 +14874,7 @@ Known schemas:
             const sel = roles.length > 1 ? roleSelect(roles, oneClick, tm("members.role")) : null;
             if (sel) sel.disabled = sample;
             const visits = s.visits ? tm(s.visits === 1 ? "members.visit1" : "members.visits", { n: s.visits, d: day2(s.lastSeen) }) : "";
-            return row(person(s.owner, s.displayName, s.email), visits, [
+            return row(person2(s.owner, s.displayName, s.email), visits, [
               sel,
               button2(tm("members.approve"), "primary", assign(s.owner, function() {
                 return sel ? sel.value : oneClick;
@@ -14882,7 +14905,7 @@ Known schemas:
               }, sample);
             });
             const since = m.since ? variant === "table" ? day2(m.since) : tm("members.since", { d: day2(m.since) }) : "";
-            return row(person(m.owner, m.displayName, m.email), since, own.concat([
+            return row(person2(m.owner, m.displayName, m.email), since, own.concat([
               sel,
               button2(tm("members.remove"), "ghost", sample ? noop : function() {
                 ask({
@@ -14905,7 +14928,7 @@ Known schemas:
             return (i.emailShown || "") + " " + i.role;
           });
           body.appendChild(list3("invites", v.rows.map(function(i) {
-            return row(person(i.emailShown || "", null), tm("members.invited", { role: i.role, d: day2(i.at), until: day2(i.expiresAt) }), [
+            return row(person2(i.emailShown || "", null), tm("members.invited", { role: i.role, d: day2(i.at), until: day2(i.expiresAt) }), [
               button2(tm("members.cancelInvite"), "ghost", sample ? noop : function() {
                 act(function() {
                   return iam.cancelInvite(i.id);
@@ -14943,7 +14966,7 @@ Known schemas:
           Promise.resolve(spec.payingCustomers ? spec.payingCustomers() : []).then(function(rows) {
             clear(body);
             body.appendChild(list3("paying", (rows || []).map(function(c) {
-              return row(person(c.label || c.id, null), c.spend || "", []);
+              return row(person2(c.label || c.id, null), c.spend || "", []);
             }), tm("members.payingNone"), 0));
           });
         } else if (tab === "settings") {
@@ -15034,7 +15057,7 @@ Known schemas:
                     suggest.hidden = true;
                     input.focus();
                   }
-                } }, [person(p.account || p.email || "", p.displayName), p.account ? null : el("span", { class: "ak-mem__meta" }, tm("members.noAccount"))].filter(Boolean))]));
+                } }, [person2(p.account || p.email || "", p.displayName), p.account ? null : el("span", { class: "ak-mem__meta" }, tm("members.noAccount"))].filter(Boolean))]));
               });
             }, function() {
               suggest.hidden = true;
@@ -15970,7 +15993,7 @@ Known schemas:
           const sel = roleSel("viewer");
           sel.disabled = sample;
           const meta = [q.message || "", q.at ? tw("team.asked", { d: day2(q.at) }) : ""].filter(Boolean).join(" · ");
-          return row(person(q.account, q.displayName), meta, [
+          return row(person2(q.account, q.displayName), meta, [
             sel,
             button2(tw("team.approve"), "primary", sample ? noop : function() {
               const role = sel.value;
@@ -16008,14 +16031,14 @@ Known schemas:
           });
           if (m.role === "creator") {
             const chip = el("span", { class: "ak-ws__chip", "data-ak-part": "chip", title: tw("team.creatorHint") }, tw("role.creator"));
-            return row(person(m.account, m.displayName), since, own.concat([chip]), columnsOf(m));
+            return row(person2(m.account, m.displayName), since, own.concat([chip]), columnsOf(m));
           }
           const sel = roleSel(m.role || "viewer");
           sel.disabled = sample;
           sel.addEventListener("change", function() {
             changeRole(m, sel);
           });
-          return row(person(m.account, m.displayName), since, own.concat([
+          return row(person2(m.account, m.displayName), since, own.concat([
             sel,
             button2(tw("team.remove"), "ghost", sample ? noop : function() {
               ask({
@@ -16189,7 +16212,7 @@ Known schemas:
             });
           }, sample);
           cancel.setAttribute("data-ak-part", "cancel");
-          return row(person(inv.email, null), meta, [cancel]);
+          return row(person2(inv.email, null), meta, [cancel]);
         }), tw("team.invitationsNone"));
       }
       const draw = { requests: requestsTab, invite: inviteTab, invitations: invitationsTab, people: peopleTab };
@@ -16458,7 +16481,7 @@ Known schemas:
         el("p", { class: "ak-mem__hint" }, tw("picker.wsWill", { name: multiple ? typedWs.trim() || wsName : wsName })),
         list3.length ? el("ul", { class: "ak-mem__rows" }, list3.map(function(o) {
           return el("li", { class: "ak-mem__row", "data-ak-part": "row" }, [
-            person(o.name, null),
+            person2(o.name, null),
             el("span", { class: "ak-mem__meta" }, [el("span", { class: "ak-ws__chip", "data-ak-part": "chip" }, tw("orgRole." + o.role))]),
             el("span", { class: "ak-mem__acts" }, [
               button2(tw("picker.use"), "primary", "use", sample ? noop : function() {

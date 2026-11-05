@@ -508,7 +508,9 @@ Three things follow:
 - **Absent means follow the browser.** A person who never opened the settings sees what they always
   saw. Nobody is moved into a preference they did not express.
 - **The same rule reaches apps and the server.** In an app: `AIMEAT.fmt` (cortex `aimeat-i18n`) and
-  `_core/format.js` inside a served SDK library. On the server: `displayPrefsFor()` for the person
+  `_core/format.js` inside a served SDK library, which without `AIMEAT.fmt` follows the signed-in
+  person's own settings, read from their profile by aimeat-auth (`AIMEAT.auth.displayPrefs()`,
+  `sdk-libs/auth/display-prefs.js`), and the browser otherwise. On the server: `displayPrefsFor()` for the person
   the message is for, then `formatForPerson()` (both in `src/services/display-prefs.ts`). The
   recipient is the key, because an email written by an hourly sweep has no request, no browser and
   no cookie to ask.
