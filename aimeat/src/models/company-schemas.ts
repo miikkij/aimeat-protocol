@@ -61,7 +61,7 @@ export interface CompanyRecord {
   name: string;
   description: string | null;
   /**
-   * The AI-provenance record of the current description (services/ai-provenance.ts), or null: none
+   * The AI-provenance record of the current description (services/ai/provenance.ts), or null: none
    * yet, a description written by the owner in person, or no description. The description is the
    * sentence the front page and the company tools show, so a reader can ask how it was made.
    */

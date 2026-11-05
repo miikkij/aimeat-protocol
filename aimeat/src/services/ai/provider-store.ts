@@ -62,12 +62,12 @@ import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { recordAccountEvent } from '../account-events.js';
 import { readAgentKey } from '../agent-ai-keys.js';
-import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
+import { resolveModelFor, type ModelRole } from './model-defaults.js';
 import { logger } from '../../utils/logger.js';
 import { freeLastResortOf, freeModelOf, regionView } from './openrouter-region.js';
 import { isValidAgentName, localAccountName } from '../../utils/gaii.js';
 import { findExtension } from '../component-address.js';
-import { isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM } from '../ai-provider-common.js';
+import { isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM } from './provider-common.js';
 import { AiCompletionError } from './errors.js';
 import { clearHealth } from './health.js';
 import {

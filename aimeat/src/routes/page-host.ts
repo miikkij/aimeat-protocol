@@ -50,7 +50,7 @@ import { verifyPageFrameToken, PageFrameTokenError, type PageFrameClaims } from 
 import { findWorkspaceRecord } from '../services/workspace-write.js';
 import { listVersionRefs } from '../services/workspace-versions.js';
 import { readShareMetaOf, isDocPublicAt, publicViewerPath, shareIsOpen } from '../services/workspace-share.js';
-import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
 import {
     isHtmlPageValue, pageFrameCsp, pageHolderCsp, pageOriginOf, pageFileNameOk, isServablePageFileType, PAGE_PERMISSIONS_POLICY,

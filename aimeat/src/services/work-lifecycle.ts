@@ -60,7 +60,7 @@ import { emitChange } from './event-bus.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
-import { provenanceForWrite } from './ai-provenance.js';
+import { provenanceForWrite } from './ai/provenance.js';
 import { refreshTrustScore } from './trust.js';
 
 export interface WorkDeps {

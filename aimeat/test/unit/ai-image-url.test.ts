@@ -9,7 +9,7 @@
  *   v1.0.0 — 2026-08-28 — initial.
  */
 import { describe, it, expect } from 'vitest';
-import { imageFetchUrl } from '../../src/services/ai-image.js';
+import { imageFetchUrl } from '../../src/services/ai/image.js';
 
 describe('imageFetchUrl — the URL that loads for the visibility\'s audience', () => {
   const gaii = 'happydude500001@aimeat-finland-001-genesis';

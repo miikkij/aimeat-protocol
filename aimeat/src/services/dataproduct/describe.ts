@@ -17,7 +17,7 @@
  *   (it reads the definition) and ai:use (it spends the owner's AI), the word POST /v1/ai/complete asks.
  *
  *   WHAT IT ANSWERS: the draft, nothing stored; the page fills it into the description field for the
- *   owner to change. The provenance record of the call (services/ai-provenance-marks.ts), decided
+ *   owner to change. The provenance record of the call (services/ai/provenance-marks.ts), decided
  *   against the audience the product would have, so the page shows the AI label when one is owed. No
  *   AI to ask (no key, no model, the budget spent): the refusal of the AI call, with `details.reason`
  *   (NO_KEY, NO_MODEL, BUDGET_EXHAUSTED ...) and `details.settings_url`, the AI settings page.
@@ -32,7 +32,7 @@ import { normaliseDefinition, sourceLabel, asDefinition, type DataProductDefinit
 import { completeForOwner, AiCompletionError } from '../ai/completion.js';
 import { aiCallerFromCredential } from '../ai/caller-context.js';
 import { reasonOf, aiSettingsUrl } from '../ai/ai-fix-words.js';
-import { servedProvenanceOf } from '../ai-provenance-marks.js';
+import { servedProvenanceOf } from '../ai/provenance-marks.js';
 
 /** The languages a draft is written in; anything else is English. */
 export const DESCRIBE_LANGS = ['en', 'fi', 'es'] as const;

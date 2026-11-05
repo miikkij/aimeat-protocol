@@ -179,7 +179,7 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
 
   /**
    * Render a list of public docs as a single markdown document (for ?format=md). `noteOf` gives a
-   * document's provenance note (services/ai-provenance-marks.ts provenanceMarkdownNote), written
+   * document's provenance note (services/ai/provenance-marks.ts provenanceMarkdownNote), written
    * under its heading so an AI handed the text is told how each page was made.
    */
   const docsToMarkdown = (wsName: string | undefined, docs: PublicDoc[], noteOf?: (d: PublicDoc) => string): string => {

@@ -46,7 +46,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { readerForCaller, type ContentReader } from '../classification/reader.js';
 import { aiCallerFromCredential, aiCallerOfPrincipal, type AiCallerContext } from '../ai/caller-context.js';
 import type { MemoryWriteCaller } from '../memory-write.js';
-import { aiReadViewerOf, type AiReadViewer } from '../ai-read-viewer.js';
+import { aiReadViewerOf, type AiReadViewer } from '../ai/read-viewer.js';
 import type { AiJobRecord, AiJobStartedBy } from './types.js';
 
 type ReaderDeps = { storage: Storage; config: AimeatConfig };
@@ -146,7 +146,7 @@ export function unattendedReader(deps: ReaderDeps, ownerGaii: string): ContentRe
 }
 
 /**
- * Which same-owner records and files the job may hand its model (services/ai-inputs.ts): the
+ * Which same-owner records and files the job may hand its model (services/ai/inputs.ts): the
  * principal an extension's code reads as when one is recorded (`read_as`), else the starter. No
  * starter and no `read_as` (ctx.ai.start on the owner's reach, a chain, a job stored before
  * starters) is no viewer, which reads the owner scope as before.

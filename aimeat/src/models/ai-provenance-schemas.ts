@@ -6,7 +6,7 @@
  *   of a piece of content a model wrote, and how much a person did. It is the stored form; every
  *   external vocabulary (IPTC digitalSourceType, the W3C `ai-disclosure` attribute, the IETF
  *   `AI-Disclosure` header, the EU icons, a C2PA assertion) is DERIVED from it by a pure adapter in
- *   services/ai-provenance-adapters.ts and never stored. The record is canonical because none of
+ *   services/ai/provenance-adapters.ts and never stored. The record is canonical because none of
  *   those vocabularies can express `humanInvolvement` separately from `level`, and that separation
  *   is exactly what decides whether a visible label is owed under Art. 50(4).
  *
@@ -234,7 +234,7 @@ const contentHash = z.string().max(INPUT_LIMITS.id).trim().regex(CONTENT_HASH_PA
  * "refusing to mint an invalid record" to somebody publishing an app.
  *
  * This closes the door for NEW records only. Records minted before it exist, which is why the
- * readable page allowlists the scheme AGAIN at render time (services/ai-provenance-page.ts
+ * readable page allowlists the scheme AGAIN at render time (services/ai/provenance-page.ts
  * safeHref): that is the half that reaches what is already stored.
  */
 export const AiSourceUrlSchema = z.string().trim().url().max(2_000).refine(

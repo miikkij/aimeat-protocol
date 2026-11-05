@@ -38,7 +38,7 @@ vi.mock('../../src/services/ai/completion.js', async (orig) => ({
   ...(await orig<object>()),
   completeForOwner: vi.fn(async () => ({ content: 'answer', model: 'm', finishReason: 'stop', truncated: false, route: {}, usage, budget })),
 }));
-vi.mock('../../src/services/ai-transcription.js', async (orig) => ({
+vi.mock('../../src/services/ai/transcription.js', async (orig) => ({
   ...(await orig<object>()),
   transcribeForOwner: vi.fn(async () => ({ text: 'heard', model: 'm', language: 'fi', seconds: 3, route: {}, usage, budget })),
 }));

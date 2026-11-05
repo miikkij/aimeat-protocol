@@ -2,7 +2,7 @@
 
 This module MIRRORS the node contract (``aimeat.provenance/v1``); it does not define it. **The node
 schema wins on any mismatch.** The source of truth is
-``aimeat/src/models/ai-provenance-schemas.ts`` and ``aimeat/src/services/ai-provenance-input.ts``; if you
+``aimeat/src/models/ai-provenance-schemas.ts`` and ``aimeat/src/services/ai/provenance-input.ts``; if you
 find a difference, fix it here rather than working around it there.
 
 Why a crew should care

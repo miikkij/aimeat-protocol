@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-10-25 — Moved unchanged from services/app-publish.ts.
  */
 import type { AppManifest, AppProtection } from '../storage/interface.js';
-import type { DeclaredProvenance } from './ai-provenance.js';
+import type { DeclaredProvenance } from './ai/provenance.js';
 import type { PublishAsk } from './publish-requests/ask.js';
 
 

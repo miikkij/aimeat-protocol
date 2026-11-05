@@ -81,7 +81,7 @@ import { mintPublishCarry, closedFileLevel, fileCapRefusal } from '../../service
 import { closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-provenance-input.js';
-import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
 import type { MemoryRouteCtx } from './shared.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';

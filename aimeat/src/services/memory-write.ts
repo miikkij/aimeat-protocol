@@ -135,7 +135,7 @@ import { validateMemoryWrite } from './schema-validator.js';
 import { memoryCeilings } from './memory-ceilings.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 import { isKeyArchived } from './archive.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance } from './ai/provenance.js';
 import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
 import { emitChange, emitRecordChange } from './event-bus.js';

@@ -5,7 +5,7 @@
  * @description What one call on the node's shared AI key may cost, decided before it runs.
  *
  *   The node's key (AIMEAT_OPENROUTER_INSTANCE_KEY) pays for people who have no key of their own, up
- *   to each person's allowance (services/ai-allowance.ts). The allowance was a yes or no on whether any
+ *   to each person's allowance (services/ai/allowance.ts). The allowance was a yes or no on whether any
  *   of it was left, and the cost was debited after the provider answered, while the caller named the
  *   model and the answer's length. So an account with a few cents left could start many calls side by
  *   side to an expensive model with a long answer, and the node's key paid all of them

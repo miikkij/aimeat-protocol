@@ -1,7 +1,7 @@
 /**
  * @file test/unit/ai-read-viewer.test.ts
- * @description Who a model reads the owner scope for (services/ai-read-viewer.ts), what the one AI
- *   input loader then hands it (services/ai-inputs.ts readAiRecords), and which caller of an
+ * @description Who a model reads the owner scope for (services/ai/read-viewer.ts), what the one AI
+ *   input loader then hands it (services/ai/inputs.ts readAiRecords), and which caller of an
  *   extension's action makes its ctx.ai.start read narrower than the installer (ai-jobs/
  *   ext-capability.ts attendedReadAs). The e2e suite e2e-ai-input-reach.ts proves the same on a node;
  *   this file covers the callers it cannot reach cheaply: another account's caller, a sibling agent
@@ -12,8 +12,8 @@
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
-import { aiReadViewerOf, AiInputHiddenError } from '../../src/services/ai-read-viewer.js';
-import { readAiRecords } from '../../src/services/ai-inputs.js';
+import { aiReadViewerOf, AiInputHiddenError } from '../../src/services/ai/read-viewer.js';
+import { readAiRecords } from '../../src/services/ai/inputs.js';
 import { attendedReadAs } from '../../src/services/ai-jobs/ext-capability.js';
 import { jobReadViewer } from '../../src/services/ai-jobs/starter.js';
 import type { ContentReader } from '../../src/services/classification/reader.js';

@@ -103,7 +103,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { resolveAppOwnerScope } from '../app-owner-scope.js';
 import { systemGhiiFor } from '../compliance/register.js';
 import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
-import { provenanceForWrite } from '../ai-provenance.js';
+import { provenanceForWrite } from '../ai/provenance.js';
 import { AppUiService, type WriteProvenance } from '../app-ui/service.js';
 import {
   DesignBookError, validatePartInput, PART_STATUSES,

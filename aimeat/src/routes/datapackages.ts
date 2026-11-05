@@ -88,7 +88,7 @@ import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
-import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { inferSchema, validateRows, type ValidationIssue } from '../services/datapackage/table.js';
 import type { PublishInput, TableSchema } from '../services/datapackage/contract.js';
 import { publishPackage, openPackage, readRows, readAllRows, listPackages, listVersions, parseRef } from '../services/datapackage/store.js';

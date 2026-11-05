@@ -30,7 +30,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord, AppSummaryRecord } from '../storage/interface.js';
 import { recordPublicActivity, readPublicActivity } from './public-activity.js';
-import { provenanceForWrite } from './ai-provenance.js';
+import { provenanceForWrite } from './ai/provenance.js';
 import { appIsPublic } from './app-publish-gate.js';
 import { logger } from '../utils/logger.js';
 

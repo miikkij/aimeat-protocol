@@ -99,7 +99,7 @@ describe('the gate passes on the tree as it stands', () => {
     // The exact false positive the phase warned about. The comment says "if you find yourself typing
     // `machine-generated` or `trainedAlgorithmicMedia` in this file..." — a naive grep fails on the
     // documentation of the rule it is enforcing.
-    const marks = readFileSync(join(ROOT, 'src/services/ai-provenance-marks.ts'), 'utf8');
+    const marks = readFileSync(join(ROOT, 'src/services/ai/provenance-marks.ts'), 'utf8');
     expect(marks).toContain('trainedAlgorithmicMedia');       // the comment really is there
     expect(stripComments(marks)).not.toContain('trainedAlgorithmicMedia');
     expect((await runGate()).code).toBe(0);
@@ -174,7 +174,7 @@ describe('drop a label on purpose and the build fails', () => {
   });
 
   it('[vocabulary] an external vocabulary value typed outside the adapter — in CODE, not a comment', async () => {
-    breakFile('src/services/ai-provenance-marks.ts', (src) =>
+    breakFile('src/services/ai/provenance-marks.ts', (src) =>
       src.replace("const VISIBLE_LABEL_ID = 'aimeat-ai-label';",
         "const VISIBLE_LABEL_ID = 'aimeat-ai-label';\nconst LEAK = 'trainedAlgorithmicMedia';"));
     const { code, out } = await runGate();

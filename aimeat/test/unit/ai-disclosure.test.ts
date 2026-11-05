@@ -16,7 +16,7 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import { describe, it, expect } from 'vitest';
-import { disclosureFor, type SurfaceContext } from '../../src/services/ai-disclosure.js';
+import { disclosureFor, type SurfaceContext } from '../../src/services/ai/disclosure.js';
 import {
   AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_LEVELS, AI_HUMAN_INVOLVEMENT,
   type AiProvenance, type AiProvenanceLevel, type AiHumanInvolvement,

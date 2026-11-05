@@ -82,7 +82,7 @@ export function resultErrorCode(text: string): string | undefined {
  * `SCOPE_DENIED: …` shape of mcp/tool-error.ts or as a JSON object whose `error` is SCOPE_DENIED
  * (aimeat_memory_write), and names the word in its sentence, quoted or not; a result that names none
  * is not noted, because a refusal the owner cannot act on helps nobody. A `Held: [...]` list is what
- * the caller has, not what it lacks, and is left out (services/ai-provenance.ts ProvenanceScopeError);
+ * the caller has, not what it lacks, and is left out (services/ai/provenance.ts ProvenanceScopeError);
  * services/agent-refusals.ts also drops any word the agent's record holds.
  */
 export function scopeDeniedWords(value: unknown): string[] {

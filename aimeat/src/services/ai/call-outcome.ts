@@ -12,8 +12,8 @@
  */
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import type { AiGenRuleMark, AiMediaKind, AiProvenanceMethod } from '../../models/ai-provenance-schemas.js';
-import type { SurfaceContext } from '../ai-disclosure.js';
-import type { UsageRecord } from '../ai-usage-record.js';
+import type { SurfaceContext } from './disclosure.js';
+import type { UsageRecord } from './usage-record.js';
 import type { CostSource } from './types.js';
 
 export interface AiCallOutcome {

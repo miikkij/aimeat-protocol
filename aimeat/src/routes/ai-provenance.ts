@@ -85,14 +85,14 @@ import {
   AiProvenanceSourceSchema, CONTENT_HASH_PATTERN, aiProvenanceJsonSchema, AI_PROVENANCE_SCHEMA_PATH,
   AI_MEDIA_KINDS, AI_RESEMBLES_REAL, MEDIA_TYPE_PATTERN,
 } from '../models/ai-provenance-schemas.js';
-import { mintProvenance, projectForDetail } from '../services/ai-provenance.js';
-import { servedDisclosure } from '../services/ai-provenance-marks.js';
+import { mintProvenance, projectForDetail } from '../services/ai/provenance.js';
+import { servedDisclosure } from '../services/ai/provenance-marks.js';
 import { publiclyResolvableWithShares, findShareOpenedProvenanceByHash } from '../services/share-provenance.js';
 import { prefersHtmlPage } from '../services/markdown-negotiation.js';
-import { provenancePage, provenanceNotFoundPage } from '../services/ai-provenance-page.js';
+import { provenancePage, provenanceNotFoundPage } from '../services/ai/provenance-page.js';
 import { detectLocale } from '../i18n.js';
 import { embedProvenance, EmbedError } from '../services/provenance-embed/index.js';
-import type { SurfaceContext } from '../services/ai-disclosure.js';
+import type { SurfaceContext } from '../services/ai/disclosure.js';
 
 /** How many times POST /v1/provenance reads the attached record again after another write of it. */
 const ATTACH_ATTEMPTS = 10;

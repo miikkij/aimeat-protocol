@@ -32,7 +32,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { EntitlementUnit } from './metered-entitlements.js';
-import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock } from './ai-provenance-marks.js';
+import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock } from './ai/provenance-marks.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
 
 const NS = 'exchange-work';

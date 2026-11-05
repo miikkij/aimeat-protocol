@@ -28,7 +28,7 @@
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import type { AiMarks } from './types.js';
-import { fromIptc } from '../ai-provenance-adapters.js';
+import { fromIptc } from '../ai/provenance-adapters.js';
 
 type Verdict = AiMarks['verdict'];
 

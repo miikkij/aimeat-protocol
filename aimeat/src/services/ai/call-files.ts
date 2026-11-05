@@ -22,7 +22,7 @@
 import type { Storage } from '../../storage/interface.js';
 import { AiCompletionError } from './errors.js';
 import type { TextFile } from './gateway.js';
-import { readAiFile } from '../ai-inputs.js';
+import { readAiFile } from './inputs.js';
 import type { ContentReader } from '../classification/reader.js';
 import { sniffImage } from '../openrouter.js';
 
@@ -48,7 +48,7 @@ const DATA_URL = /^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
 export async function readCallerAudio(
   storage: Storage, reader: ContentReader, callerGaii: string, storageKey: string, opts: { mime?: string; filename?: string } = {},
 ): Promise<{ data: Buffer; mime: string; filename: string } | null> {
-  // The one loader of content a model reads (services/ai-inputs.ts): classification first.
+  // The one loader of content a model reads (services/ai/inputs.ts): classification first.
   const file = await readAiFile(storage, reader, callerGaii, storageKey, { capability: 'transcription' });
   if (!file) return null;
   return {
@@ -144,7 +144,7 @@ async function readImageInput(
 
 /**
  * A picture an agent made earlier, which the image call stored in its owner's storage (the payer's,
- * services/ai-image.ts). It is the agent's to reuse only when the picture's provenance record names
+ * services/ai/image.ts). It is the agent's to reuse only when the picture's provenance record names
  * this agent as the principal it was made for; any other file of the owner stays out of reach,
  * because an agent reading its owner's private files goes through the ordinary checks.
  */

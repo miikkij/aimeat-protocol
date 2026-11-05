@@ -78,7 +78,7 @@ import { registerBuildAppLayerPrompts } from './prompts-build-app-layers.js';
 import { registerBuildAppAgentPrompt } from './prompts-build-app-agent.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
-import { buildAiToolSetup } from '../services/ai-tool-setup.js';
+import { buildAiToolSetup } from '../services/ai/tool-setup.js';
 import { MODEL_RECOMMENDATION } from '../services/model-recommendation.js';
 import { logger } from '../utils/logger.js';
 import { registerAgentHandbook } from './prompts-agent-handbook.js';

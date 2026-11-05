@@ -34,13 +34,13 @@ import { principalCaller } from '../services/caller-context.js';
 import { AiCompletionError } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';
 import { queryModels } from '../services/ai/catalog/query.js';
-import { transcribeForOwner } from '../services/ai-transcription.js';
-import { embedForOwner } from '../services/ai-embed.js';
+import { transcribeForOwner } from '../services/ai/transcription.js';
+import { embedForOwner } from '../services/ai/embed.js';
 import { readCallerAudio } from '../services/ai/call-files.js';
 import { readerForAgent, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { recordUrlFor } from '../services/ai-provenance-marks.js';
+import { recordUrlFor } from '../services/ai/provenance-marks.js';
 
 export function registerAiCapabilityTools(
   mcp: McpServer,

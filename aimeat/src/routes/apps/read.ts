@@ -165,7 +165,7 @@ import { hiddenFromReader } from '../../services/app-read-gate.js';
 import { accessCodeUnlockPage } from './access-code-page.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
-} from '../../services/ai-provenance-marks.js';
+} from '../../services/ai/provenance-marks.js';
 
 export function registerReadRoutes(
     router: Router,

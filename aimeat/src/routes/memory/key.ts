@@ -96,7 +96,7 @@ import { warningField } from '../../services/classification-exits.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { registerPublicReadRoute } from './public-read.js';
 import { ownerGhiiOf, isForeignPrincipal, isOwnerInPerson } from '../../utils/gaii.js';
-import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
+import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
 import { logger } from '../../utils/logger.js';
 import { rolesWithOperator } from '../../services/operator-override.js';

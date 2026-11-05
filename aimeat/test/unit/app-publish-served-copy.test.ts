@@ -20,7 +20,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { publishApp, type PublishAppInput, type PublishAppResult } from '../../src/services/app-publish.js';
 import { applyServeMarks } from '../../src/services/app-serve-marks.js';
-import { contentHashOf } from '../../src/services/ai-provenance.js';
+import { contentHashOf } from '../../src/services/ai/provenance.js';
 import { provFixture } from './serve-marks-fixtures.js';
 
 const stores: SqliteStorage[] = [];

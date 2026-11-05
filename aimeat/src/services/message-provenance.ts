@@ -43,8 +43,8 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { provenanceForWrite, storeHeldProvenance, type DeclaredProvenance } from './ai-provenance.js';
-import { servedProvenanceOf, provenanceItemBlock, type AiProvenanceItemBlock } from './ai-provenance-marks.js';
+import { provenanceForWrite, storeHeldProvenance, type DeclaredProvenance } from './ai/provenance.js';
+import { servedProvenanceOf, provenanceItemBlock, type AiProvenanceItemBlock } from './ai/provenance-marks.js';
 
 /**
  * What a reader is told about how a message was written.

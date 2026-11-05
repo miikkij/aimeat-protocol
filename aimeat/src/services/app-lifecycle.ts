@@ -103,7 +103,7 @@ import { appQuotaRefusal } from './install-quotas.js';
 import { lintAppAiDisclosure } from './app-ai-posture.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { publishApp, type PublishAppRefusal, type PublishAppResult } from './app-publish.js';
-import { mintProvenance, type DeclaredProvenance } from './ai-provenance.js';
+import { mintProvenance, type DeclaredProvenance } from './ai/provenance.js';
 import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from './dependency-map.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { appDisplayVersionRefusal } from './app-display-version.js';

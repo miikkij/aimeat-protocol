@@ -149,9 +149,9 @@ import { draftNoticeFrom, appViewerStanding, readAppNews } from '../services/app
 import { publicAppManifest } from '../services/app-public-manifest.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
-import { writeProvenanceEcho } from '../services/ai-provenance-result.js';
-import { loadServedProvenance } from '../services/ai-provenance-marks.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
+import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
+import { loadServedProvenance } from '../services/ai/provenance-marks.js';
 import { registerAppForkTool } from './apps-fork.js';
 import { presentAppManifest } from '../services/app-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

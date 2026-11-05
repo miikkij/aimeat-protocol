@@ -71,7 +71,7 @@ import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
-import { canonicalAiAppId } from '../ai-app-id.js';
+import { canonicalAiAppId } from '../ai/app-id.js';
 import type { JevQuestion } from './limits.js';
 import { decideForOwner, ruleCallerKind, type DecideCaller } from './service.js';
 import { ruleForCaller } from './rules.js';
@@ -79,7 +79,7 @@ import { getProvider } from './providers.js';
 import { DecideError } from './errors.js';
 import { Semaphore } from './pacer.js';
 import { isReservedServerKey } from '../../utils/reserved-keys.js';
-import { readAiRecords } from '../ai-inputs.js';
+import { readAiRecords } from '../ai/inputs.js';
 import { systemReader, readerForCaller, warningsNote, type ContentReader } from '../classification/reader.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { ClassificationError } from '../classification/labels.js';
@@ -226,7 +226,7 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
   const gate = new Semaphore(config.decideConcurrency);
   let sinceSave = 0;
   const pending = run.items.filter(i => !run.results[i.subject]?.decision_id);
-  // The one loader of what a model reads (services/ai-inputs.ts) asks with a reader for the agent
+  // The one loader of what a model reads (services/ai/inputs.ts) asks with a reader for the agent
   // that started or resumed the run, so its clearance and the labels' audience apply as on an AI
   // job's input_keys (secaudit2026oct22); the owner in person and an app grant read with the node's
   // own reader, as before. One reader for the run, so the warning-classified records it sent are
@@ -258,7 +258,7 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
           return;
         }
       }
-      // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
+      // The one loader of what a model reads (services/ai/inputs.ts): the credential mask and the
       // classification check, with the run's reader.
       let rec: { value: unknown } | undefined;
       try {

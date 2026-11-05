@@ -12,7 +12,7 @@
  *   confidence. Approved in the instruction review of 2026-09-18 (item 11).
  *
  *   `reviewedOn` is the day a person or a session opened the vendors' pages and confirmed the
- *   names and the menu paths in services/ai-tool-setup.ts, never the day this file was edited.
+ *   names and the menu paths in services/ai/tool-setup.ts, never the day this file was edited.
  *   `pnpm check:prompt-refs` fails once it is older than MODEL_REVIEW_MAX_AGE_DAYS: the same rule,
  *   and the same 90 days, as the protocol version ledger.
  *

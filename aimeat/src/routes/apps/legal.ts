@@ -71,7 +71,7 @@ import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../../services/app
 import { sendAppOp } from '../app-op-answer.js';
 import { auditAppWithPlaytest } from '../../services/app-playtest.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
-import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
 import { appReviewedBy } from '../../services/app-marks.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';

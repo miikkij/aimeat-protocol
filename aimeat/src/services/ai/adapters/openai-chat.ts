@@ -7,7 +7,7 @@
  *   `chat.completion` JSON body, or a `chat.completion.chunk` SSE stream that ends in `data: [DONE]`.
  *
  *   WHY. The OpenAI-compatible proxy (routes/llm-proxy.ts) and the voice reply stream
- *   (services/ai-voice.ts) forward a chat-completions request and pass the provider's answer to
+ *   (services/ai/voice.ts) forward a chat-completions request and pass the provider's answer to
  *   their client byte for byte, reading usage out of it on the way. That holds for every provider
  *   that speaks the OpenAI dialect. A provider that does not (Anthropic's Messages API) is reached
  *   through its AI SDK package instead, and this module is the conversion on both sides, so those

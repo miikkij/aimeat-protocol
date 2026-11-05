@@ -113,8 +113,8 @@ import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } 
 import { completeForOwner, AiCompletionError, assertProviderAllowed } from '../services/ai/completion.js';
 import { nodeFailureOf, providerFailureOf } from '../services/ai/errors.js';
 import { DEFAULT_EMPTY_RETRIES } from '../services/ai/gateway.js';
-import { holdsImplicitFreeModel } from '../services/ai-model-defaults.js';
-import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { holdsImplicitFreeModel } from '../services/ai/model-defaults.js';
+import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
 import { aiCallerOf } from './ai-policy.js';
 import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN, aiLegacySettingsRoutesAllowed } from '../config-ai-models.js';
 import { noteDeprecatedUse } from '../services/deprecation.js';

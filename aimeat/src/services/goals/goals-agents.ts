@@ -13,7 +13,7 @@
  */
 import type { AgentRecord } from '../../storage/interface.js';
 import { buildGAII, parseGAII } from '../../utils/gaii.js';
-import { getTodayUsage } from '../ai-usage-record.js';
+import { getTodayUsage } from '../ai/usage-record.js';
 import { loadOwnerAgents } from '../db/owner-identity.js';
 import { LIVE_TASK_STATUSES } from '../../storage/types/agents-messaging.js';
 import { logger } from '../../utils/logger.js';

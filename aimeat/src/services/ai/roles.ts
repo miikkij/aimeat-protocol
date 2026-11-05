@@ -34,7 +34,7 @@ import type { Storage } from '../../storage/interface.js';
 import { upsertPrivateRecord } from '../private-record.js';
 import { emitChange } from '../event-bus.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator-confirm.js';
-import { isObj } from '../ai-provider-common.js';
+import { isObj } from './provider-common.js';
 import { logger } from '../../utils/logger.js';
 import { AiCompletionError } from './errors.js';
 import type { AiCapability } from './types.js';

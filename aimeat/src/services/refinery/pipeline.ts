@@ -63,7 +63,7 @@ import { writeMemoryRecord } from '../memory-write.js';
 import { CAS_ATTEMPTS } from '../record-cas.js';
 import { systemReader, readerForCaller } from '../classification/reader.js';
 import { ClassificationError } from '../classification/labels.js';
-import { readAiFile } from '../ai-inputs.js';
+import { readAiFile } from '../ai/inputs.js';
 import { aiCallerFromCredential } from '../ai/caller-context.js';
 import {
   parseMessage, listPage, isGraph, redact, senderDomain, ruleFor, extractionPrompt, parseJsonAnswer, queueFor,

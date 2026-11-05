@@ -13,7 +13,7 @@
  *   its lettering), a sentence, and each record's id and address; in a PDF also the document
  *   information. That is the vocabulary C2PA itself carries. A SIGNED C2PA manifest is not written:
  *   it needs a signing certificate from a trust list, which this node does not hold
- *   (services/ai-provenance-adapters.ts toC2paAssertion is ready for the day it does).
+ *   (services/ai/provenance-adapters.ts toC2paAssertion is ready for the day it does).
  *
  *   WHICH RECORDS: the caller's own account's, or one any visitor can resolve (a public picture), so a
  *   page that borrows another creator's published character can name its record. Any other id is
@@ -30,8 +30,8 @@ import { buildXmp, type EmbedFacts } from './xmp.js';
 import { markPng, markJpeg } from './raster.js';
 import { markPdf } from './pdf.js';
 import { markArchive, ArchiveBusyError } from './archive.js';
-import { toIptc, iptcComposite } from '../ai-provenance-adapters.js';
-import { recordUrlFor } from '../ai-provenance-marks.js';
+import { toIptc, iptcComposite } from '../ai/provenance-adapters.js';
+import { recordUrlFor } from '../ai/provenance-marks.js';
 import { publiclyResolvableWithShares } from '../share-provenance.js';
 import { writeStorageFile } from '../storage-file-write.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';

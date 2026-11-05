@@ -103,7 +103,7 @@ import { ownerGhiiOf } from '../utils/gaii.js';
 import { findBackingCapability } from '../services/component-address.js';
 import { buildAppAgentSurface } from '../services/app-agent-surface.js';
 import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
-import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';

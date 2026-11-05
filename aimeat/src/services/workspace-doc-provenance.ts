@@ -26,7 +26,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
-import { mintProvenance, provenanceForWrite } from './ai-provenance.js';
+import { mintProvenance, provenanceForWrite } from './ai/provenance.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 
 /** A person (a GHII), as opposed to an agent (GAII) or an ecosystem app (GEAI). */

@@ -443,7 +443,7 @@ const QUESTIONS = {
     assert(r.status === 200, `got ${r.status} ${JSON.stringify(r.body.error)}`);
   });
 
-  // One app, one name (services/ai-app-id.ts). The app token names the app by its file
+  // One app, one name (services/ai/app-id.ts). The app token names the app by its file
   // (`decide-probe.html`), an owner session by what the app says (`decide-probe`); Päätöspaja was
   // recorded under both on aimeat.io on 2026-09-19, with the daily cap split between them.
   const APP_NAME = FILENAME.replace(/\.html$/, '');

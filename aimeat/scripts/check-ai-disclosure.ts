@@ -171,7 +171,7 @@ const LLM_CHOKEPOINT = 'src/services/ai/completion.ts';
  * one is deliberately awkward: it means editing this file, in front of this comment.
  */
 const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {
-  'src/services/ai-voice.ts':
+  'src/services/ai/voice.ts':
     'Reviewed 2026-09-19. Voice must emit text and PCM frames before generation finishes, so the '
     + 'buffered completeForOwner result cannot carry this transport. Both streamReply and '
     + 'streamSpeech use prepareAiCall before the provider and settleAiCall in finally, including '
@@ -571,7 +571,7 @@ function checkOnePublishPath(): void {
 // The IETF draft expires and the W3C vocabulary is months old: when either moves, one function and
 // one test change — but only while these strings exist in exactly one place.
 
-const ADAPTERS = 'src/services/ai-provenance-adapters.ts';
+const ADAPTERS = 'src/services/ai/provenance-adapters.ts';
 
 /**
  * Value tokens from the external vocabularies. Deliberately the unambiguous ones: `ai-generated` is

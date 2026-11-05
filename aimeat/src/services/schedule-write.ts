@@ -101,7 +101,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentRecord } from '../storage/interface.js';
 import { buildGAII, isGEAI, isSameOwner } from '../utils/gaii.js';
 import { memoryWriteVisibilitySchema } from '../utils/visibility-words.js';
-import { aiJobKeyRefusal } from './ai-job-keys.js';
+import { aiJobKeyRefusal } from './ai/job-keys.js';
 import { readerForCaller } from './classification/reader.js';
 import { emitChange } from './event-bus.js';
 import type { FileRefAccessor } from './file-refs.js';

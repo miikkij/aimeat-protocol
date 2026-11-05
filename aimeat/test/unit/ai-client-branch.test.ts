@@ -32,8 +32,8 @@ import {
     aiClientQuestionOptions,
     aiClientVariantOptions,
     type AiToolId,
-} from '../../src/services/ai-tool-branch.js';
-import { buildAiToolSetup } from '../../src/services/ai-tool-setup.js';
+} from '../../src/services/ai/tool-branch.js';
+import { buildAiToolSetup } from '../../src/services/ai/tool-setup.js';
 
 const config = { nodeId: 'aimeat-test-node', baseUrl: 'https://test.example' } as any;
 

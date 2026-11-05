@@ -64,7 +64,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { toDeclaredProvenance, type AiProvenanceToolInput } from '../services/ai-provenance-input.js';
+import { toDeclaredProvenance, type AiProvenanceToolInput } from '../services/ai/provenance-input.js';
 import { checkAppManageInput } from '../tool-catalog/definitions/app-manage.js';
 import { requiredScopeForAction } from '../tool-catalog/action-scopes.js';
 import { answer, refusalText, plainRefusal, type ToolAnswer } from './app-manage-answers.js';

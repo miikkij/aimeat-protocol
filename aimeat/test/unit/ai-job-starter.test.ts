@@ -6,7 +6,7 @@
  *   V4, decided 2026-09-29). A job with no starter recorded reads as an AI, the strictest reader, and
  *   a scheduled job always does.
  *
- *   The one loader of what a model reads (services/ai-inputs.ts) is mocked and records the reader it
+ *   The one loader of what a model reads (services/ai/inputs.ts) is mocked and records the reader it
  *   was handed: that reader's kind is the evidence. The model call is mocked too.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-starter.test.ts
  * @version-history
@@ -22,7 +22,7 @@ import type { Storage, MemoryRecord, ScheduledJobRecord } from '../../src/storag
 /** Every reader the loader was handed, in order, with the capability it was asked for. */
 const seen = vi.hoisted(() => ({ readers: [] as Array<{ kind: string; roles: string[] | undefined; capability: string }> }));
 
-vi.mock('../../src/services/ai-inputs.js', () => {
+vi.mock('../../src/services/ai/inputs.js', () => {
     const note = (reader: { kind: string; auth: { roles?: string[] } | null }, capability: string) =>
         seen.readers.push({ kind: reader.kind, roles: reader.auth?.roles, capability });
     return {
@@ -43,7 +43,7 @@ vi.mock('../../src/services/ai/completion.js', () => {
         completeForOwner: vi.fn(async () => ({ content: 'the answer', usage: { costUsd: 0.001, totalTokens: 5 } })),
     };
 });
-vi.mock('../../src/services/ai-transcription.js', () => ({
+vi.mock('../../src/services/ai/transcription.js', () => ({
     transcribeForOwner: vi.fn(async () => ({
         text: 'heard', model: 'stub/stt', language: 'en', seconds: 1, usage: { totalTokens: 1, costUsd: 0.0001, costExact: true },
     })),

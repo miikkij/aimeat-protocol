@@ -18,7 +18,7 @@ export const AIMEAT_XMP_NS = 'https://aimeat.io/ns/provenance/1.0/';
 
 /** What a file says about itself. */
 export interface EmbedFacts {
-  /** The IPTC digital source type URI, from services/ai-provenance-adapters.ts (toIptc, iptcComposite). */
+  /** The IPTC digital source type URI, from services/ai/provenance-adapters.ts (toIptc, iptcComposite). */
   digitalSourceType: string;
   /** One sentence a person reads in a file viewer. */
   description: string;

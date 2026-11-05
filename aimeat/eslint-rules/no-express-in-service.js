@@ -60,7 +60,7 @@ const EXEMPT = new Set([
   // doors — the same class as owner-session above, and its second caller is another HTTP door.
   'src/services/external-login.ts',
   // Reads the caller off the request to decide a provenance mark. Should take the caller instead.
-  'src/services/ai-provenance-marks.ts',
+  'src/services/ai/provenance-marks.ts',
   // Reads the caller off the request to decide accountant access. Should take the caller instead.
   'src/services/finance/accountant-access.ts',
 ]);

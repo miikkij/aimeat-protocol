@@ -18,7 +18,7 @@ import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { error } from '../middleware/envelope.js';
 import { serveStoredFile, type StoredFileReader } from '../utils/http-range.js';
 import { verifyDownloadToken, DownloadTokenError, servesFileVersion } from '../services/download-token.js';
-import type { ServedProvenance } from '../services/ai-provenance-marks.js';
+import type { ServedProvenance } from '../services/ai/provenance-marks.js';
 
 /** What the download route takes from storageFilesRouter: the byte reader and the provenance marks. */
 export interface DownloadRouteDeps {

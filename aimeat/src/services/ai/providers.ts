@@ -64,7 +64,7 @@ import { stripTrailingSlashes } from '../../utils/url-validator.js';
 import {
   isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM, egressOriginsOf,
   isProviderKeyEnvName, PROVIDER_KEY_ENV_RULE, PROVIDER_KEY_ENV_PREFIX,
-} from '../ai-provider-common.js';
+} from './provider-common.js';
 import {
   FIXED_BASE_URLS, FIXED_PROVIDER_TYPES, isFixedType,
   type AiAdapterType, type AiCapability, type AiTarget, type FixedProviderType,
@@ -91,7 +91,7 @@ export interface ProviderCapabilityConfig {
   voice?: string;
   /**
    * Speech only: the PCM the provider sends, for a local or OpenAI-compatible server whose answer
-   * does not say it. The speech answer's `audio` block reports them (services/ai-voice-audio.ts);
+   * does not say it. The speech answer's `audio` block reports them (services/ai/voice-audio.ts);
    * OpenAI and OpenRouter need none (24000 Hz, mono, s16le).
    */
   sampleRate?: number;
@@ -181,7 +181,7 @@ export interface AiProvider {
 
 /**
  * What each type can do on this node now. The model's own capabilities come from the catalogue (V4);
- * this is the adapter's side. `speech` needs an OpenAI-style /audio/speech (services/ai-voice.ts);
+ * this is the adapter's side. `speech` needs an OpenAI-style /audio/speech (services/ai/voice.ts);
  * `embed` and `files` are configurable now and called from V5.
  */
 export const TYPE_CAPABILITIES: Readonly<Record<AiAdapterType, readonly AiCapability[]>> = {

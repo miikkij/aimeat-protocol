@@ -53,7 +53,7 @@ import { logger } from '../../utils/logger.js';
 import { parseWelcomeMat } from '../../services/welcome-mat-parse.js';
 import {
     resolveAiClient, decideBranch, capabilityOf, aiClientVariantOptions, type BranchDecision, type AiClientResolution,
-} from '../../services/ai-tool-branch.js';
+} from '../../services/ai/tool-branch.js';
 import {
     ONBOARDING_KEYS, recordOnboardingEvent, recordWelcomeMatPasted, recordAiModelDetected,
 } from '../../services/onboarding-funnel.js';

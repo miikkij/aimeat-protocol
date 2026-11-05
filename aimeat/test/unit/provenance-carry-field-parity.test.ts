@@ -5,7 +5,7 @@
  *   dropped on the way to the node. No error, no log — the write succeeds and the field is simply
  *   not in the record.
  *
- *   The reason it keeps recurring is a two-surface split. `src/services/ai-provenance-input.ts` (in
+ *   The reason it keeps recurring is a two-surface split. `src/services/ai/provenance-input.ts` (in
  *   src/mcp/ until 2026-11-04) is the NODE's own MCP surface; `src/tool-dispatch/ai-provenance-carry.ts` is what BOTH the shell
  *   `aimeat connect call` path and the connector's MCP tools go through — and crews reach the node
  *   only through `aimeat connect serve`. Adding a field to the first changes nothing a crew can
@@ -21,7 +21,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { toDeclareBody } from '../../src/tool-dispatch/ai-provenance-carry.js';
-import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../../src/services/ai-provenance-input.js';
+import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../../src/services/ai/provenance-input.js';
 
 /**
  * Where each accepted input field must land in the declare body. Renames and nestings are spelled

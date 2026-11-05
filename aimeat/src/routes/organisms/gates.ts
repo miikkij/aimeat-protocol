@@ -64,7 +64,7 @@ import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../
 import { logger } from '../../utils/logger.js';
 import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace-tool-ops.js';
-import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 import { fencedSpaceRefusal } from '../../services/fenced-space.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
 

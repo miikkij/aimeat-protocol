@@ -127,18 +127,18 @@ import {
   DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai/completion.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
-import { getAdminAiUsage } from '../services/ai-usage-admin.js';
-import { getUsageHistory } from '../services/ai-usage-history.js';
-import { transcribeForOwner } from '../services/ai-transcription.js';
+import { getAdminAiUsage } from '../services/ai/usage-admin.js';
+import { getUsageHistory } from '../services/ai/usage-history.js';
+import { transcribeForOwner } from '../services/ai/transcription.js';
 import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
-import { generateForOwner } from '../services/ai-image.js';
+import { generateForOwner } from '../services/ai/image.js';
 import { readCallFiles, readCallerAudio, readImageInputs } from '../services/ai/call-files.js';
 import { readCallRole } from '../services/ai/call-guards.js';
 import { generateDownloadToken } from '../services/download-token.js';
 
 /** How long the signed address of a private picture loads without a sign-in. */
 const IMAGE_DOWNLOAD_TTL_SECONDS = 3600;
-import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
 import { updatePrivateRecord } from '../services/private-record.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';

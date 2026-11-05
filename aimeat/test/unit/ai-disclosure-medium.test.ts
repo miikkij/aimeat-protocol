@@ -6,22 +6,22 @@
  *   Reported by originalmiskate.com on 2026-10-08: a public speech clip's record read "This text was
  *   written by AI", because no record could say it was audio, and a record minted while its item
  *   was private kept "no label owed" after the item went public. buildDisclosure() picks the words
- *   by medium (services/ai-disclosure-served.ts disclosureWording) and servedDisclosure()
- *   (services/ai-provenance-marks.ts) decides again for the surface the item is served on.
+ *   by medium (services/ai/disclosure-served.ts disclosureWording) and servedDisclosure()
+ *   (services/ai/provenance-marks.ts) decides again for the surface the item is served on.
  * @structure buildDisclosure per medium · servedDisclosure against the served visibility
  * @usage pnpm exec vitest run test/unit/ai-disclosure-medium.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-08 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { buildDisclosure } from '../../src/services/ai-provenance.js';
-import { servedDisclosure } from '../../src/services/ai-provenance-marks.js';
+import { buildDisclosure } from '../../src/services/ai/provenance.js';
+import { servedDisclosure } from '../../src/services/ai/provenance-marks.js';
 import { createT } from '../../src/i18n.js';
 import {
   AI_PROVENANCE_SPEC_V1, AiProvenanceSchema,
   type AiProvenance, type AiMediaKind, type AiProvenanceLevel, type AiHumanInvolvement,
 } from '../../src/models/ai-provenance-schemas.js';
-import type { SurfaceContext } from '../../src/services/ai-disclosure.js';
+import type { SurfaceContext } from '../../src/services/ai/disclosure.js';
 
 const en = createT('en');
 const publicPage: SurfaceContext = { visibility: 'public', humanAudience: true };

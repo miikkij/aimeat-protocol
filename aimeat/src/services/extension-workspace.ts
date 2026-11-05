@@ -105,7 +105,7 @@ import { buildRowCalls, type ExtensionWorkspaceRefusal } from './extension-works
 import { archiveRecordsBatchOp } from './archive.js';
 import { extensionMarker, fencedSpaceRefusal } from './fenced-space.js';
 import { emitChange, emitWorkspaceChange } from './event-bus.js';
-import { isNonHumanPrincipal } from './ai-provenance.js';
+import { isNonHumanPrincipal } from './ai/provenance.js';
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)

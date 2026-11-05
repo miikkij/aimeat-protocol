@@ -24,7 +24,7 @@
 import type { Storage, AiProvenanceRecordRow, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { MemoryDbService, BulkWriteItem, BulkWriteOptions } from './db/memory-db-service.js';
-import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
+import { provenanceForWrite, storeHeldProvenance } from './ai/provenance.js';
 import { memoryContentBytes, memoryContentHashes } from '../utils/memory-content.js';
 import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
 import { ownerGhiiOf } from '../utils/gaii.js';

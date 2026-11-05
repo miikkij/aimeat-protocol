@@ -1,7 +1,7 @@
 /**
  * @file test/unit/ai-job-keys.test.ts
  * @description An AI job and a scheduled AI job read no record the node keeps for itself into a
- *   prompt, and write no answer over one (services/ai-job-keys.ts).
+ *   prompt, and write no answer over one (services/ai/job-keys.ts).
  *
  *   Both kinds of job send every record they read to the model provider, and write the answer at a
  *   key the caller names. Before this rule the AI job refused only a reserved RESULT key, and the

@@ -25,7 +25,7 @@ import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import {
   readAllowance, debitAllowance, grantAllowance, remainingOf, nodeKeyStanding,
-} from '../../src/services/ai-allowance.js';
+} from '../../src/services/ai/allowance.js';
 
 const TEST_ENC_KEY_HEX = 'a'.repeat(64);
 

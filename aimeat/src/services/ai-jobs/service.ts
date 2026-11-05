@@ -108,7 +108,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
 import { AiCompletionError } from '../ai/completion.js';
-import { aiJobKeyRefusal } from '../ai-job-keys.js';
+import { aiJobKeyRefusal } from '../ai/job-keys.js';
 import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
@@ -584,7 +584,7 @@ export class AiJobService implements AiJobStarter {
 
     /**
      * What a job reads into its prompt and where it writes its answer: none of the records the node
-     * keeps for itself. The one rule both kinds of AI job ask (services/ai-job-keys.ts). Asked at the
+     * keeps for itself. The one rule both kinds of AI job ask (services/ai/job-keys.ts). Asked at the
      * start and again when a restart brings a queued job back, so a job stored before the rule is
      * held to it too; the prompt assembly asks once more at the read.
      */

@@ -76,7 +76,7 @@ export interface AiCapabilityConfig extends DecideConfig {
    * means the node pays for nothing and everyone brings their own, which is how every node behaved
    * before this existed.
    *
-   * Shared by everyone here, so the node meters each person itself (services/ai-allowance.ts). That
+   * Shared by everyone here, so the node meters each person itself (services/ai/allowance.ts). That
    * is the shape OpenRouter's terms allow: the node runs its own product on its own key, and nobody
    * is handed raw API access.
    */
@@ -84,7 +84,7 @@ export interface AiCapabilityConfig extends DecideConfig {
   /** Free starting allowance in USD, applied once per person. 0 (the default) grants nothing. */
   chatFreeAllowanceUsd: number;
   /**
-   * What the node's key does for a person whose allowance is spent (services/ai-allowance.ts
+   * What the node's key does for a person whose allowance is spent (services/ai/allowance.ts
    * nodeKeyStanding). 'refuse' (the default): it pays for nothing more, whatever model the call
    * names; a call that names none still gets the free fallback model. 'limits': it keeps paying, up
    * to the two daily ceilings below. The operator decides (Jouni, 2026-10-05; secaudit 2026-10 AI-1).

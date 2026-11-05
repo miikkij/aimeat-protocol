@@ -44,7 +44,7 @@ import { resolveRecipient, type Principal, type OpResult } from './agent-v2-mess
 import { nodeContext } from './node-context.js';
 import { emitDelivery, emitTaskMoved } from './event-bus.js';
 import { logger } from '../utils/logger.js';
-import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
+import { provenanceForWrite, storeHeldProvenance } from './ai/provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { isStopped } from './agent-stop-rules.js';
 

@@ -12,7 +12,7 @@
  *     into one pass changes not one byte of what a visitor receives.
  */
 import type { AimeatConfig } from '../../src/config.js';
-import type { ServedProvenance } from '../../src/services/ai-provenance-marks.js';
+import type { ServedProvenance } from '../../src/services/ai/provenance-marks.js';
 import type { AppDiscoverySpec } from '../../src/utils/app-agent-discovery.js';
 import type { AppHeadSpec } from '../../src/utils/app-head-meta.js';
 

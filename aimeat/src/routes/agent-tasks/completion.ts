@@ -49,8 +49,8 @@ import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js'
 import { recordTaskEvent, setTodoStatus } from '../../services/agent-task-write.js';
 import { AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
-import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
-import { loadServedProvenance, provenanceItemBlock } from '../../services/ai-provenance-marks.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
+import { loadServedProvenance, provenanceItemBlock } from '../../services/ai/provenance-marks.js';
 import type { TaskRouteHelpers } from './helpers.js';
 
 export function registerTaskCompletionRoutes(

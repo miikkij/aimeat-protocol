@@ -56,13 +56,13 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai/completion.js';
-import { readAiFile } from '../ai-inputs.js';
-import { aiFileRefusal, AiInputHiddenError, type AiReadViewer } from '../ai-read-viewer.js';
+import { readAiFile } from '../ai/inputs.js';
+import { aiFileRefusal, AiInputHiddenError, type AiReadViewer } from '../ai/read-viewer.js';
 import { jobReader, jobCaller, jobWriter, jobReadViewer } from './starter.js';
 import { memoryWriterAsk } from '../memory-publish-gate.js';
 import { warningsNote } from '../classification/reader.js';
-import { generateForOwner, type GenerateForOwnerResult } from '../ai-image.js';
-import { transcribeForOwner } from '../ai-transcription.js';
+import { generateForOwner, type GenerateForOwnerResult } from '../ai/image.js';
+import { transcribeForOwner } from '../ai/transcription.js';
 import { principalCaller } from '../caller-facts.js';
 import { aiOpOf } from './op.js';
 import { AiJobError, type AiJobRecord, type AiJobClassificationWarnings } from './types.js';
@@ -108,7 +108,7 @@ export async function assertAudioInReach(
     const meta = await deps.storage.getStorageFileMeta(ownerGhii, audioKey);
     if (!meta) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${audioKey}".`);
     // A file the job's viewer may not read (the owner's private audio, for an agent that does not
-    // read as the owner) is refused at the start, before anything queues (services/ai-read-viewer.ts).
+    // read as the owner) is refused at the start, before anything queues (services/ai/read-viewer.ts).
     const refusal = await aiFileRefusal(deps.storage, deps.config, viewer, meta);
     if (refusal) throw new AiJobError('SCOPE_DENIED', 403, refusal);
     const maxMb = deps.config.sttMaxMb;
@@ -177,7 +177,7 @@ export async function runJobOp(
         const key = job.audio_key ?? '';
         // Read again here, bytes and all: the start checked the metadata only, and the file may have
         // been deleted while the job queued.
-        // The one loader of what a model reads (services/ai-inputs.ts), as whoever started the job;
+        // The one loader of what a model reads (services/ai/inputs.ts), as whoever started the job;
         // a job with no starter recorded reads as an AI (starter.ts).
         // The same viewer the start asked (starter.ts jobReadViewer), asked again on the bytes.
         const reader = jobReader({ storage, config }, job);

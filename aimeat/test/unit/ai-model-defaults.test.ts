@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
 import {
   resolveModelFor, resolveSttLanguage, resolveTtsVoice, holdsImplicitFreeModel, type ModelRole,
-} from '../../src/services/ai-model-defaults.js';
+} from '../../src/services/ai/model-defaults.js';
 
 const ROLES: ModelRole[] = ['chat', 'reasoning', 'execution', 'vision', 'stt', 'image'];
 

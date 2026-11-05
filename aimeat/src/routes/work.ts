@@ -95,7 +95,7 @@ import { emitChange } from '../services/event-bus.js';
 import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
 import { refreshTrustScore } from '../services/trust.js';
 import { identitiesActingFor } from '../services/db/owner-identity.js';
-import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
+import { loadServedProvenance, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 
 // The webhook log kept its address here when fireWebhook moved to the shared service.
 export { getWebhookLog } from '../services/work-lifecycle.js';

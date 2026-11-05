@@ -1,6 +1,6 @@
 # 06 AI and models
 
-> Checked against AIMEAT node 4.2.0 (commit 5ec62c24a) on 2026-11-01. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 20a29b0f0) on 2026-11-05. Maintained with the code: see the README for how.
 
 This page is for the architect and the security officer who decide which AI model sources the node may use, and for the administrator who connects them. It answers: which provider types exist and what each can do, who holds the keys, how the node limits where a key and a prompt may go, what data reaches a model and when, how data is kept to a local model, how spend is limited and measured, what the node does for EU AI Act transparency, and what IT prepares for each model source.
 
@@ -39,13 +39,13 @@ A provider record has no field for a custom header, an `api-key` header, a token
 
 | Source | Who sets it | Where the key is | Source |
 |---|---|---|---|
-| The node's OpenRouter key (`node-openrouter`) | operator | `AIMEAT_OPENROUTER_INSTANCE_KEY`. It goes only to OpenRouter's own hosts, never to an address a person or app named | `aimeat/src/services/ai/node-openrouter-key.ts`, `aimeat/src/services/ai-allowance.ts` |
-| The node's other providers | operator | `AIMEAT_AI_PROVIDERS`: a JSON array of records whose `auth` names an environment variable (`AIMEAT_AI_KEY_<NAME>`, a vendor-style `*_API_KEY`), never the key itself. A record naming any other variable is refused | `aimeat/src/services/config-schema-ai.ts`, `aimeat/src/services/ai-provider-common.ts` |
+| The node's OpenRouter key (`node-openrouter`) | operator | `AIMEAT_OPENROUTER_INSTANCE_KEY`. It goes only to OpenRouter's own hosts, never to an address a person or app named | `aimeat/src/services/ai/node-openrouter-key.ts`, `aimeat/src/services/ai/allowance.ts` |
+| The node's other providers | operator | `AIMEAT_AI_PROVIDERS`: a JSON array of records whose `auth` names an environment variable (`AIMEAT_AI_KEY_<NAME>`, a vendor-style `*_API_KEY`), never the key itself. A record naming any other variable is refused | `aimeat/src/services/config-schema-ai.ts`, `aimeat/src/services/ai/provider-common.ts` |
 | Built-in local servers | operator | `AIMEAT_AI_BUILTIN_PROVIDERS`: `lmstudio` (1234), `ollama` (11434), `llamacpp` (8080) on loopback, no key | `aimeat/src/services/ai/providers.ts` |
 | A person's own providers | the person in person (their session or an owner-level personal access token), or an agent they gave `account:security`; there is no MCP tool for it (`aimeat/src/routes/ai-providers.ts`) | a memory record `ai.providers.<id>`; the key in a separate encrypted record `ai.apikey.provider.<id>` (AES-256-GCM, `AIMEAT_ENCRYPTION_KEY`) | `aimeat/src/services/ai/provider-store.ts` |
 | An agent's own key | the person, for one agent | `ai.apikey.agent.<agent>.<id>`, encrypted | `aimeat/src/services/ai/provider-store.ts` |
 
-Which key pays for a call: the person's (or agent's) own key first, then the node's key while the person has allowance left, then the free fallback model when one is set (the default is `openrouter/free`), then nothing (`aimeat/src/services/ai-allowance.ts`, `aimeat/.env.example`). A person with their own key is not metered against the node's allowance.
+Which key pays for a call: the person's (or agent's) own key first, then the node's key while the person has allowance left, then the free fallback model when one is set (the default is `openrouter/free`), then nothing (`aimeat/src/services/ai/allowance.ts`, `aimeat/.env.example`). A person with their own key is not metered against the node's allowance.
 
 ## Egress controls
 
@@ -68,18 +68,18 @@ Which key pays for a call: the person's (or agent's) own key first, then the nod
 | Node default models | the model per role when the person set none: `AIMEAT_MODEL_DEFAULT_CHAT`, `_REASONING`, `_EXECUTION`, `_VISION`, `_STT`, `_IMAGE`, `_TTS`, `_EMBED` | operator | `aimeat_admin_config_set` |
 | Daily budget and model settings | the person's daily spend limit in USD, per-app caps, legacy model choices, by propose-then-confirm | the person | `aimeat_operator_ai_config` |
 
-Sources: `aimeat/src/services/ai/roles.ts`, `aimeat/src/services/ai/policy.ts`, `aimeat/src/services/ai/routing.ts`, `aimeat/src/services/ai-model-defaults.ts`. The node picks providers per call from these records (`aimeat/src/services/ai/route-plan.ts`).
+Sources: `aimeat/src/services/ai/roles.ts`, `aimeat/src/services/ai/policy.ts`, `aimeat/src/services/ai/routing.ts`, `aimeat/src/services/ai/model-defaults.ts`. The node picks providers per call from these records (`aimeat/src/services/ai/route-plan.ts`).
 
 ### Which model roles a node needs
 
 | Role | Used by | When it is missing | Source |
 |---|---|---|---|
 | Text (chat, reasoning, execution) | the chat, apps (`AIMEAT.ai.complete`), agents through `/v1/llm`, classification judgement, refinery extraction | on the node's key, a call that named no model and cannot be paid for gets the free fallback model (`AIMEAT_MODEL_FREE_FALLBACK`, default `openrouter/free`), and the answer says so; set it empty, or `AIMEAT_AI_FREE_MODEL_LAST_RESORT=false`, to refuse instead | `aimeat/src/services/ai/unset-model.ts`, `aimeat/.env.example` |
-| Vision | reading images in a call | the node default `AIMEAT_MODEL_DEFAULT_VISION` applies when the person set none; what a call does with neither was not traced for this page | `aimeat/src/services/ai-model-defaults.ts` |
+| Vision | reading images in a call | the node default `AIMEAT_MODEL_DEFAULT_VISION` applies when the person set none; what a call does with neither was not traced for this page | `aimeat/src/services/ai/model-defaults.ts` |
 | Transcription (STT) | the microphone, `aimeat_ai_transcribe` | refused with `NO_STT_MODEL`; a new person cannot use the microphone until a model is set | `aimeat/src/services/ai/unset-model.ts` |
 | Image | `aimeat_image_generate` | refused with `NO_IMAGE_MODEL` | `aimeat/src/services/ai/unset-model.ts` |
 | Speech (TTS) | voice answers | refused with `NO_TTS_MODEL` | `aimeat/src/services/ai/unset-model.ts` |
-| Embedding | `aimeat_ai_embed`, for apps and agents that store vectors | refused with `NO_EMBED_MODEL`. The node's own memory search does not use embeddings, so search keeps working. Changing the embedding model makes stored vectors incomparable | `aimeat/src/services/ai-embed.ts`, `aimeat/src/services/config-schema-ai.ts` |
+| Embedding | `aimeat_ai_embed`, for apps and agents that store vectors | refused with `NO_EMBED_MODEL`. The node's own memory search does not use embeddings, so search keeps working. Changing the embedding model makes stored vectors incomparable | `aimeat/src/services/ai/embed.ts`, `aimeat/src/services/config-schema-ai.ts` |
 | Decision model (System 1) | typed decisions (`aimeat_decide`), mail classification in the refinery | refused when no decision provider is usable: no hosted key (node or person) and no local decision provider | `aimeat/src/services/decide/service.ts` |
 
 ## Decision provider (System 1) and ordinary model calls (System 2)
@@ -121,7 +121,7 @@ When classification is on, content at a level with `externalAi: refused` (every 
 
 | Control | Setting or tool | Default | Source |
 |---|---|---|---|
-| Free starting allowance per person on the node's key | `AIMEAT_CHAT_FREE_ALLOWANCE_USD` | 0 | `aimeat/src/services/ai-allowance.ts` |
+| Free starting allowance per person on the node's key | `AIMEAT_CHAT_FREE_ALLOWANCE_USD` | 0 | `aimeat/src/services/ai/allowance.ts` |
 | What the node's key does when the allowance is spent | `AIMEAT_AI_NODE_KEY_WHEN_SPENT` (`refuse` or `limits`) | `refuse` | `aimeat/.env.example` |
 | Daily limits on the node's key, per account and for the node | `AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD`, `AIMEAT_AI_NODE_KEY_NODE_DAILY_USD` | 1, 10 | `aimeat/.env.example` |
 | Longest answer on the node's key; price held before the call | `AIMEAT_AI_NODE_KEY_MAX_OUTPUT_TOKENS` | 32000 | `aimeat/.env.example` |

@@ -203,7 +203,7 @@ await test('4d. Patching an ai schedule cannot smuggle a foreign namespace in (C
 
 // A scheduled AI job sends every record it reads to the model provider and writes its answer where
 // the schedule says, so it reads none of the records the node keeps for itself and writes over none
-// of them (services/ai-job-keys.ts): the AI settings and key, the payout record, the spend cap, a key
+// of them (services/ai/job-keys.ts): the AI settings and key, the payout record, the spend cap, a key
 // only the node writes. Refused on create, on edit, and again when it fires (secaudit 2026-09: A6-1).
 await test('4g. An ai schedule naming a record the node keeps, as input or as output, is refused 403 RESERVED_KEY', async () => {
     for (const extra of [

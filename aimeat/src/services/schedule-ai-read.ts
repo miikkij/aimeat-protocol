@@ -12,7 +12,7 @@
  *   not memory:read-as-owner, whose own memory read of its owner's or a sibling's private record is
  *   refused, set up a schedule over that record and read it back in the answer (secaudit 2026-10, r49,
  *   the scheduled variant). The AI job start closed the same read with the viewer of
- *   services/ai-read-viewer.ts; a fired schedule now reads with the same viewer, built from its maker
+ *   services/ai/read-viewer.ts; a fired schedule now reads with the same viewer, built from its maker
  *   as services/schedule-actor.ts finds it at the fire.
  *
  *   WHO READS EVERYTHING. The owner in person, an app grant of the owner, and a maker holding
@@ -45,7 +45,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import { localAccountName, parseGaiiLoose } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { aiReadViewerOf, hiddenRecordError, type AiReadViewer } from './ai-read-viewer.js';
+import { aiReadViewerOf, hiddenRecordError, type AiReadViewer } from './ai/read-viewer.js';
 import { callerFromAuth } from './caller-context.js';
 import { claimOnceOnlyStep, keptBefore, madeBefore } from './once-only-step.js';
 import { visibleToSameOwnerReader } from './owner-scope-read.js';

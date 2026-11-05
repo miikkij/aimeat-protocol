@@ -102,7 +102,7 @@ export interface AiProvenanceRepository {
    * `unreviewedPublicOnly` is the population the sweep and the report's detail list decide about —
    * a record whose content is publicly readable and where nobody reviewed the substance. Whether
    * each one owes a label is decided by the caller for the content as it is now, not read from the
-   * block stored at mint (services/ai-transparency-report.ts).
+   * block stored at mint (services/ai/transparency-report.ts).
    */
   listAiProvenance(query?: AiProvenanceListQuery): Promise<{ items: AiProvenanceRecordRow[]; total: number }>;
 

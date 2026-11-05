@@ -798,19 +798,19 @@
       },
       "why": "Reviewed 2026-10-11, the node's own read: the workplace record (reserved prefix) to update it, and a completed task's result records to change their visibility from private to the workspace the owner named. The value is written back untouched and shown to nobody here; who may read it afterwards is still decided per reader by the record's own classification label at read time."
     },
-    "src/services/ai-allowance.ts": {
+    "src/services/ai/allowance.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter. The third read (2026-10-25, secaudit2026oct22) is the same counter, read once outside the per-account queue so a read that needs no starter grant does not wait in it."
     },
-    "src/services/ai-image.ts": {
+    "src/services/ai/image.ts": {
       "reads": {
         "getStorageFileMeta": 1
       },
       "why": "Reviewed 2026-10-21 (secaudit 2026-10, the image publish gate), the node's own read: the metadata of the storage key the caller named, read only to see whether a public file already stands there before a gated caller is refused; no content is read and nothing is returned."
     },
-    "src/services/ai-inputs.ts": {
+    "src/services/ai/inputs.ts": {
       "reads": {
         "getMemory": 2,
         "getOwnerScopeMemory": 1,
@@ -849,13 +849,13 @@
       },
       "why": "Reviewed 2026-11-04 (moved unchanged from ai-jobs/service.ts writeResult), serves a write: the version of the result record is read so the job's answer is written on it (expectedVersion); nothing read is handed to a caller."
     },
-    "src/services/ai-usage-history.ts": {
+    "src/services/ai/usage-history.ts": {
       "reads": {
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
     },
-    "src/services/ai-usage-record.ts": {
+    "src/services/ai/usage-record.ts": {
       "reads": {
         "getMemory": 3
       },
@@ -1742,7 +1742,7 @@
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-22 (secaudit 2026-10, v83), the node's own read: a run item's record is read only to learn whether the caller may see it; the content a model reads still comes through services/ai-inputs.ts."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-22 (secaudit 2026-10, v83), the node's own read: a run item's record is read only to learn whether the caller may see it; the content a model reads still comes through services/ai/inputs.ts."
     },
     "src/services/decide/service.ts": {
       "reads": {
@@ -2072,7 +2072,7 @@
       "reads": {
         "getOwnerScopeMemory": 1
       },
-      "why": "Reviewed 2026-10-27 (secaudit2026oct26, goal model work), the node's own read: a record an agent named in a goal is looked up only for its namespace and visibility, to learn whether that agent may read it before the model work starts; its value is not read on. What the model reads comes through services/ai-inputs.ts when the job runs."
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26, goal model work), the node's own read: a record an agent named in a goal is looked up only for its namespace and visibility, to learn whether that agent may read it before the model work starts; its value is not read on. What the model reads comes through services/ai/inputs.ts when the job runs."
     },
     "src/services/goals/goals-model.ts": {
       "reads": {
@@ -2829,7 +2829,7 @@
       "reads": {
         "getMemory": 2
       },
-      "why": "Reviewed 2026-10-22 (secaudit 2026-10, r49), the node's own read: the once-only step's own record under system@<node>, and a record a scheduled AI job names, read only to learn whether the saver may see it before the schedule is saved; the content the job's model reads comes through services/ai-inputs.ts when it runs."
+      "why": "Reviewed 2026-10-22 (secaudit 2026-10, r49), the node's own read: the once-only step's own record under system@<node>, and a record a scheduled AI job names, read only to learn whether the saver may see it before the schedule is saved; the content the job's model reads comes through services/ai/inputs.ts when it runs."
     },
     "src/services/schedule-extension-keep.ts": {
       "reads": {

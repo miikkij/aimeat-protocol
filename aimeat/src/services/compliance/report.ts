@@ -59,7 +59,7 @@ import { FontService } from '../themes/fonts.js';
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
   type AiTransparencyReport,
-} from '../ai-transparency-report.js';
+} from '../ai/transparency-report.js';
 import {
   classifyUseCase, effectiveQuestionnaire, readUseCases, UNCLASSIFIED,
   type ComplianceQuestionnaire, type ComplianceRiskVerdict, type ComplianceUseCase,

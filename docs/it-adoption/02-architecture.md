@@ -1,6 +1,6 @@
 # 02 Architecture
 
-> Checked against AIMEAT node 4.2.0 (commit 02cca5c1b) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 20a29b0f0) on 2026-11-05. Maintained with the code: see the README for how.
 
 This page is for the architect and the network or firewall owner. It names the components a node is made of, the traffic that comes in, every outbound destination the code can reach with the setting that turns it on, the egress guards, the resource figures the repository gives, and what changes between an on-premises and a cloud installation. The outbound tables are written so that you can copy them into a firewall request. How many nodes and processes to run, and what runs beside a node, is on [18 Scope and deployment patterns](18-scope-and-deployment-patterns.md).
 

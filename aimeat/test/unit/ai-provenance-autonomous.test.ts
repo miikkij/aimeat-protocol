@@ -22,7 +22,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   stampAutonomousOutput, provenanceForWrite, ProvenanceScopeError, INFERRED_FROM_PRINCIPAL_NOTE,
-} from '../../src/services/ai-provenance.js';
+} from '../../src/services/ai/provenance.js';
 import type { AiProvenanceRecordRow } from '../../src/storage/interface.js';
 import type { Storage } from '../../src/storage/interface.js';
 

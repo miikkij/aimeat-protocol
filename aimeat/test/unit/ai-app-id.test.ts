@@ -1,6 +1,6 @@
 /**
  * @file test/unit/ai-app-id.test.ts
- * @description One name per app in the AI budget (services/ai-app-id.ts), on the three forms the AI
+ * @description One name per app in the AI budget (services/ai/app-id.ts), on the three forms the AI
  *   doors actually recorded on aimeat.io: `paatospaja`, `paatospaja.html` and
  *   `happydude500001/puhe.html`.
  * @version-history
@@ -11,7 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   canonicalAiAppId, namesSignedApp, appSpentToday, appQuotaFor, appAllowlisted, mergePerApp,
-} from '../../src/services/ai-app-id.js';
+} from '../../src/services/ai/app-id.js';
 
 const OWNER = 'happydude500001@aimeat-finland-001-genesis';
 

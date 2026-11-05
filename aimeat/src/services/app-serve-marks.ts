@@ -103,7 +103,7 @@ import { applyAppHeadMeta, type AppHeadSpec } from '../utils/app-head-meta.js';
 import { escapeHtml } from '../utils/html-escape.js';
 import {
   PROVENANCE_HTML_MARK, aiDisclosureParts, markDocumentElement, type ServedProvenance,
-} from './ai-provenance-marks.js';
+} from './ai/provenance-marks.js';
 
 /** The attribute that names the reviewer tag, and the idempotency marker for it. */
 export const REVIEWED_MARK = 'name="aimeat-reviewed-by"';

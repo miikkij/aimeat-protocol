@@ -249,9 +249,9 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/ai-allowance.ts",
+    "from": "src/services/ai/allowance.ts",
     "to": "src/services/ai/completion.ts",
-    "unresolvedTo": "./ai/completion.js",
+    "unresolvedTo": "./completion.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -269,7 +269,7 @@
         ]
       },
       {
-        "name": "src/services/ai-allowance.ts",
+        "name": "src/services/ai/allowance.ts",
         "dependencyTypes": [
           "local",
           "import"

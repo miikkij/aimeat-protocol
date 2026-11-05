@@ -34,14 +34,14 @@ import { error, success } from '../middleware/envelope.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
 import { retryAfterOf } from '../services/account-limits.js';
-import { streamReply, streamSpeech } from '../services/ai-voice.js';
+import { streamReply, streamSpeech } from '../services/ai/voice.js';
 import { logger } from '../utils/logger.js';
 import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../models/ai-voice-contract.js';
-import { createVoiceResult } from '../services/ai-voice-result.js';
+import { createVoiceResult } from '../services/ai/voice-result.js';
 import { aiCallerOf } from './ai-policy.js';
-import { namesSignedApp } from '../services/ai-app-id.js';
-import { setProvenanceHeaders, envelopeMeta, type ServedProvenance } from '../services/ai-provenance-marks.js';
-import { toIetfHeader } from '../services/ai-provenance-adapters.js';
+import { namesSignedApp } from '../services/ai/app-id.js';
+import { setProvenanceHeaders, envelopeMeta, type ServedProvenance } from '../services/ai/provenance-marks.js';
+import { toIetfHeader } from '../services/ai/provenance-adapters.js';
 import { AI_PROVENANCE_SPEC_V1 } from '../models/ai-provenance-schemas.js';
 
 /**
@@ -65,7 +65,7 @@ function withRecordUrl(event: Record<string, unknown>): Record<string, unknown> 
 /**
  * App tokens may not charge another app's quota by changing a body field. The body may name the
  * signed app the way /v1/ai/complete and the aimeat-ai library do (its file name, with or without
- * `.html`) or by its full `owner/filename` (services/ai-app-id.ts namesSignedApp); the call is
+ * `.html`) or by its full `owner/filename` (services/ai/app-id.ts namesSignedApp); the call is
  * attributed to the signed reference either way.
  */
 export function voiceAppId(req: Request, requested?: string): string | undefined {

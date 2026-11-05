@@ -14,7 +14,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { provenanceForWrite } from './ai-provenance.js';
+import type { provenanceForWrite } from './ai/provenance.js';
 import type { reconcileAfterSourceWrite } from './exchange-projection.js';
 import type { publishRequestedBody } from './publish-requests/ask.js';
 

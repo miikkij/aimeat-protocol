@@ -75,8 +75,8 @@ import {
     boardVisibleToCaller, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
 } from '../services/board-write.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
-import { writeProvenanceEcho } from '../services/ai-provenance-result.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
+import { writeProvenanceEcho } from '../services/ai/provenance-result.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { resourceRefusal } from './resource-refusal.js';

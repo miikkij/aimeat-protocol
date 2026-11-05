@@ -54,10 +54,10 @@ import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../services/resource-events.js';
 import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
-import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
+import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai/provenance-marks.js';
 import { sendAgentMessage } from '../services/agent-message-send.js';
 import { agentIsStopped } from '../services/agent-stop.js';
-import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;

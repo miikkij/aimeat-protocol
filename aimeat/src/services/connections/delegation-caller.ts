@@ -20,7 +20,7 @@
  *
  *   THE LABEL. Delegations were written as free labels (`app:funvids` in the suite) and keep working
  *   as they are, with no stored change: `app:` and `eco:` in front are dropped, and the rest names an
- *   app the way the AI doors already accept a body app id (services/ai-app-id.ts namesSignedApp): its
+ *   app the way the AI doors already accept a body app id (services/ai/app-id.ts namesSignedApp): its
  *   file name with or without `.html`, or its full `owner/filename`. A channel owner who types the full
  *   `owner/filename` binds the delegation to exactly that app.
  *
@@ -42,7 +42,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { VerifiedToken } from '../../auth/jwt.js';
-import { namesSignedApp } from '../ai-app-id.js';
+import { namesSignedApp } from '../ai/app-id.js';
 import { localAccountOf, ownerGhiiOf, resolveIdentity } from '../../utils/gaii.js';
 import { serialByKey } from '../../utils/serial-by-key.js';
 import { filePublishRequest, readPublishRequest, effectiveState } from '../publish-requests/store.js';

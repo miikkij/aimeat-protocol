@@ -25,7 +25,7 @@
       "digest": "sha256:9823b75b60d5dd8f313cb74f"
     },
     "02-architecture.md": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-05",
       "watches": [
         "aimeat/src/storage/storage-factory.ts",
         "aimeat/deploy/aimeat.service",
@@ -35,7 +35,7 @@
         "aimeat/src/services/connections/providers-files.ts",
         "aimeat/src/server-bootstrap/drain.ts"
       ],
-      "digest": "sha256:9ab4198efa657bfd7f38315e"
+      "digest": "sha256:4398939694f6ca1797a8ac44"
     },
     "03-shared-responsibility.md": {
       "reviewedOn": "2026-11-04",
@@ -71,7 +71,7 @@
       "digest": "sha256:2771e162385378c51550fefa"
     },
     "06-ai-and-models.md": {
-      "reviewedOn": "2026-11-01",
+      "reviewedOn": "2026-11-05",
       "watches": [
         "aimeat/src/services/ai/adapters/index.ts",
         "aimeat/src/services/ai/adapters/sdk.ts",
@@ -79,7 +79,7 @@
         "aimeat/src/services/ai/providers.ts",
         "aimeat/src/services/ai/openrouter-region.ts"
       ],
-      "digest": "sha256:6fa688b45c8a057d593bd92e"
+      "digest": "sha256:476f6658027cbf2fcdba4898"
     },
     "07-security.md": {
       "reviewedOn": "2026-11-04",
@@ -186,7 +186,7 @@
       "digest": "sha256:4a124591b51f02e11c124e14"
     },
     "18-scope-and-deployment-patterns.md": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-05",
       "watches": [
         "aimeat/src/services/scheduler-fire-claim.ts",
         "aimeat/src/services/once-only-step.ts",
@@ -213,7 +213,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:a5ef70a029007ee00790c8a7"
+      "digest": "sha256:179af5852f2eba91e2bdda6a"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -286,7 +286,7 @@
       "aimeat/src/storage/storage-factory.ts": "fd01b973fcdeec83",
       "aimeat/deploy/aimeat.service": "e43be11816ba9577",
       "aimeat/Dockerfile": "a730e25abfdcb643",
-      "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca",
+      "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c",
       "docs/operations/production-deployment.md": "9c0c46739bbcfbd3",
       "aimeat/src/services/connections/providers-files.ts": "da32d7a599fad1c0",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1"
@@ -313,11 +313,11 @@
       "aimeat/src/services/connections/drive-files.ts": "b49a3a7cea3b7bbe"
     },
     "06-ai-and-models.md": {
-      "aimeat/src/services/ai/adapters/index.ts": "b0c3e188f7fb76a1",
+      "aimeat/src/services/ai/adapters/index.ts": "65c67e56fbf43ea3",
       "aimeat/src/services/ai/adapters/sdk.ts": "b7c86872fb7946c4",
-      "aimeat/src/services/ai/types.ts": "f061dd208fa5c6d7",
-      "aimeat/src/services/ai/providers.ts": "0b4639df7e8b2084",
-      "aimeat/src/services/ai/openrouter-region.ts": "672c84b7cd47d0ca"
+      "aimeat/src/services/ai/types.ts": "0f3be25098513231",
+      "aimeat/src/services/ai/providers.ts": "d617ea224e998cf0",
+      "aimeat/src/services/ai/openrouter-region.ts": "cc0fd7c4ff0b861c"
     },
     "07-security.md": {
       "aimeat/src/config-posture.ts": "894828b56e3d3e8a",
@@ -409,13 +409,13 @@
       "aimeat/src/mcp/legacy-sessions.ts": "4784fea1f0026443",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "7b3830783830cfb7",
+      "aimeat/src/services/ai-jobs/service.ts": "c6b46235bc263958",
       "aimeat/src/services/config-apply.ts": "91fae249f6d8349e",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "295bb61dbdb21da8",
+      "aimeat/security/process-local-baseline.json": "9272f6535ebca988",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",

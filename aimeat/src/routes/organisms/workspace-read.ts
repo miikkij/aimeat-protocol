@@ -83,10 +83,10 @@ import { buildOrganismOverview, buildWorkspaceOverview, listWorkspaces, collectW
 import { buildInstructionBlocks } from '../../services/hello-mcp.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
-import { loadServedProvenanceMany } from '../../services/ai-provenance-marks.js';
-import { provenanceForWrite, ProvenanceScopeError } from '../../services/ai-provenance.js';
-import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
-import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
+import { loadServedProvenanceMany } from '../../services/ai/provenance-marks.js';
+import { provenanceForWrite, ProvenanceScopeError } from '../../services/ai/provenance.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
+import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
 import { fresherRec } from './shared.js';
 import { sharedPublishedProvenanceIds } from '../../services/share-provenance.js';
 import { loadWorkspaceContent } from '../../services/workspace-content.js';

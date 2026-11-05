@@ -62,13 +62,13 @@
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
 import { completeForOwner } from '../ai/completion.js';
-import { generateForOwner } from '../ai-image.js';
-import { transcribeForOwner } from '../ai-transcription.js';
+import { generateForOwner } from '../ai/image.js';
+import { transcribeForOwner } from '../ai/transcription.js';
 import { aiOpOf, aiOpRefusal } from '../ai-jobs/op.js';
 import { template } from './engine-util.js';
 import { reportOutcome, type ResultWrite } from './engine-answer.js';
 import { logger } from '../../utils/logger.js';
-import { readAiRecords, readAiFile } from '../ai-inputs.js';
+import { readAiRecords, readAiFile } from '../ai/inputs.js';
 import { runReader } from './run-reader.js';
 import { workflowAiCaller } from './ai-caller.js';
 import type { AiCallerContext } from '../ai/caller-context.js';
@@ -139,7 +139,7 @@ export function dispatchAiStep(
   // prompt. A storage key, so the run's keyPrefix (a memory-key prefix) does not apply to it.
   const transcribe = async (): Promise<ResultWrite | undefined> => {
     const audioKey = template(action.audio_key ?? '', run.vars);
-    // The one loader of what a model reads (services/ai-inputs.ts).
+    // The one loader of what a model reads (services/ai/inputs.ts).
     const file = await readAiFile(deps.storage, reader, ownerGhii, audioKey, { capability: 'transcription' });
     if (!file) throw new Error(`audio_key "${audioKey}" is not a file in the owner's storage`);
     const r = await transcribeForOwner(deps.storage, deps.config, ownerGhii, {
