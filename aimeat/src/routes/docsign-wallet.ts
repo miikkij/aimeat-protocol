@@ -30,6 +30,11 @@
  *     node address, because the first real wallet signature vanished without a trace.
  *   v1.3.1 — 2026-10-10 — DOCUMENT_NEEDED says why in plain words, not "made from a hash"
  *     (pnpm check:plain-language).
+ *   v1.5.0 — 2026-11-05 — The wallet's request object, document and two answer endpoints declare the
+ *     'docsign-wallet' credential strategy (src/auth/credential-strategies.ts), which checks the
+ *     session, its document token or its state with the same refusals; "/" keeps its own lookup,
+ *     because a form that matches no session passes on to the next route (codebase analysis
+ *     2026-11-03, decision 2 of 2026-11-05).
  *   v1.4.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 import { Router, raw, urlencoded, type Request, type Response } from 'express';
@@ -44,9 +49,10 @@ import { callerOf } from '../middleware/caller.js';
 import { DocsignError, signedDocument, nextPdfToSign } from '../services/docsign/records.js';
 import { readOwnFile } from '../services/docsign/files.js';
 import {
-  walletStatus, startWalletSignature, walletSessionStatus, walletRequestObject, walletDocument, receiveWalletResponse,
+  walletStatus, startWalletSignature, walletSessionStatus, walletRequestObject, walletDocument, answerWalletResponse,
   receiveWalletResponseByState,
 } from '../services/docsign/eudi.js';
+import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
 import { docsignMaxBytes } from '../config-docsign.js';
 import { rawBodyBytes } from '../utils/raw-body.js';
 import { logger } from '../utils/logger.js';
@@ -131,9 +137,11 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
 
   // ── what the wallet calls ──
 
-  router.get('/v1/docsign/wallet/:session/request', enabled, walletLimit, async (req, res) => {
+  // What the wallet presents (the session, its document token, its state) is verified by the
+  // 'docsign-wallet' credential strategy, with the refusals walletSessionFor() gives.
+  router.get('/v1/docsign/wallet/:session/request', enabled, walletLimit, acceptCredential('docsign-wallet', { config, proof: 'session' }), async (req, res) => {
     try {
-      const jws = await walletRequestObject(ctx, req.params.session as string);
+      const jws = await walletRequestObject(ctx, credentialOf(req, 'docsign-wallet'));
       logger.info('docsign: a wallet fetched the request object', { session: String(req.params.session).slice(0, 8), agent: String(req.headers['user-agent'] ?? '').slice(0, 80) });
       res.setHeader('Content-Type', 'application/oauth-authz-req+jwt');
       res.setHeader('Cache-Control', 'no-store');
@@ -141,9 +149,9 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
     } catch (err) { fail(res, err); }
   });
 
-  router.get('/v1/docsign/wallet/:session/document/:token', enabled, walletLimit, (req, res) => {
+  router.get('/v1/docsign/wallet/:session/document/:token', enabled, walletLimit, acceptCredential('docsign-wallet', { config, proof: 'document' }), (req, res) => {
     try {
-      const doc = walletDocument(req.params.session as string, req.params.token as string);
+      const doc = walletDocument(credentialOf(req, 'docsign-wallet'));
       logger.info('docsign: a wallet downloaded the document', { session: String(req.params.session).slice(0, 8), bytes: doc.bytes.length });
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Cache-Control', 'no-store');
@@ -152,9 +160,9 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
     } catch (err) { fail(res, err); }
   });
 
-  router.post('/v1/docsign/wallet/:session/response', enabled, walletLimit, walletForm, async (req, res) => {
+  router.post('/v1/docsign/wallet/:session/response', enabled, walletLimit, walletForm, acceptCredential('docsign-wallet', { config, proof: 'state' }), async (req, res) => {
     try {
-      const out = await receiveWalletResponse(ctx, req.params.session as string, (req.body ?? {}) as Record<string, unknown>);
+      const out = await answerWalletResponse(ctx, credentialOf(req, 'docsign-wallet'), (req.body ?? {}) as Record<string, unknown>);
       res.json(out);
     } catch (err) { fail(res, err); }
   });
@@ -165,10 +173,9 @@ export function docsignWalletRouter(config: AimeatConfig, storage: Storage): Rou
   // what the EU test registrar issued. "/" takes only a form whose state belongs to an open session;
   // everything else passes on as if this route were not here.
   const isForm = (req: Request) => /application\/x-www-form-urlencoded/i.test(req.headers['content-type'] || '');
-  router.post('/v1/docsign/wallet/response', enabled, walletLimit, walletForm, async (req, res) => {
+  router.post('/v1/docsign/wallet/response', enabled, walletLimit, walletForm, acceptCredential('docsign-wallet', { config, proof: 'by-state' }), async (req, res) => {
     try {
-      const out = await receiveWalletResponseByState(ctx, (req.body ?? {}) as Record<string, unknown>);
-      if (!out) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No open wallet session has that state.')); return; }
+      const out = await answerWalletResponse(ctx, credentialOf(req, 'docsign-wallet'), (req.body ?? {}) as Record<string, unknown>);
       res.json(out);
     } catch (err) { fail(res, err); }
   });
