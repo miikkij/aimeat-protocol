@@ -305,6 +305,7 @@
     "POST /v1/federation/heartbeat": "UNREVIEWED — reads its body without a schema (seeded 2026-10-27).",
     "POST /v1/federation/key-exchange": "UNREVIEWED — reads its body without a schema (seeded 2026-10-27).",
     "POST /v1/federation/link-invites": "UNREVIEWED — reads its body without a schema (seeded 2026-10-27).",
+    "POST /v1/federation/memory/list": "UNREVIEWED — reads its body without a schema. Until 2026-11-05 the gate counted it as checked because its handler called Date.parse( on the timestamp, which the PARSES pattern took for a schema parse; that window check moved into the 'federation-peer' credential strategy (codebase analysis 2026-11-03, decision 2 of 2026-11-05), so the route shows as what it always was. A schema here would answer an over-long field with VALIDATION_ERROR where the route answers today, so it waits for its own change.",
     "POST /v1/federation/message": "UNREVIEWED — reads its body without a schema (seeded 2026-10-27).",
     "POST /v1/federation/message/reaction": "UNREVIEWED — reads its body without a schema (seeded 2026-10-27).",
     "POST /v1/federation/message/receipt": "UNREVIEWED — reads its body without a schema (seeded 2026-10-27).",

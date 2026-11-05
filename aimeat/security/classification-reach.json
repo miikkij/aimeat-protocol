@@ -571,12 +571,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organisms.ui preferences record."
     },
-    "src/routes/organisms/intake-thread.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-10-13, the node's own read: the thread record and the reply record of ONE conversation, by the record id that is the hash of the visitor's token. They are read to append the visitor's next message, to decide the caps, and to answer the visitor the turns of their own conversation: the visitor's own words and the answers the owner's side wrote for that visitor (role, text and time only; no other field of either record leaves). A classification label on a reply record does not hide an answer from the visitor it was written to. 2026-10-15 (feature-list audit #64): the expiry sweep and the forget deletion moved to services/intake-thread-retention.ts, so two reads left this file."
-    },
     "src/routes/organisms/intake.ts": {
       "reads": {
         "listAllMemory": 1
@@ -2168,6 +2162,12 @@
         "listAllMemory": 3
       },
       "why": "Reviewed 2026-10-15 (feature-list audit #64), the node's own read: the registry of conversation forms in the system namespace, each conversation form's config records found once on the first run, and the thread records of a form (keys, form_id and the last visitor turn's time) to find the conversations past the form's keeping time and delete them with every version. Nothing read here is returned to any caller; the scheduled job and the visitor's forget route only delete."
+    },
+    "src/services/intake/visitor-thread.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-13, the node's own read: the thread record and the reply record of ONE conversation, by the record id that is the hash of the visitor's token. They are read to append the visitor's next message, to decide the caps, and to answer the visitor the turns of their own conversation: the visitor's own words and the answers the owner's side wrote for that visitor (role, text and time only; no other field of either record leaves). A classification label on a reply record does not hide an answer from the visitor it was written to. 2026-10-15 (feature-list audit #64): the expiry sweep and the forget deletion moved to services/intake-thread-retention.ts, so two reads left the route. 2026-11-05: the one remaining read (latestThreadRecord) moved unchanged from routes/organisms/intake-thread.ts to this file, which the route and the 'intake-visitor' credential strategy both call (codebase analysis 2026-11-03, decision 2 of 2026-11-05)."
     },
     "src/services/internet-opening/opening-store.ts": {
       "reads": {
