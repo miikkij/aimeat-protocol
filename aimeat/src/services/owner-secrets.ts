@@ -36,6 +36,9 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-11-05 — A shared value's binding row named under the other data key of the ring is found and
+ *     kept (otherRingKeys), so making a second data key current binds nothing anew (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-10-27 — An owner's approval counts only while the installer account it names is the one that
  *     existed when it was given (installerPredates): an account registered later under an erased
  *     installer's name does not inherit it (secaudit2026oct26).
@@ -72,7 +75,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { SecretApproval, SecretBinding, SecretRecord } from '../storage/types/secrets.js';
 import { createHmac } from 'node:crypto';
-import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
+import { encrypt, decrypt, getEncryptionKey, keyRingOf } from './encryption.js';
 import { logger } from '../utils/logger.js';
 import { answerNotifications } from './notification-answers.js';
 
@@ -617,8 +620,16 @@ export async function resolveSecretForHeaders(deps: {
       // The shared map had no host binding at all: any address the script named received the
       // operator's credential. Bound to the host of its first use now, under a row that names the
       // value by an HMAC, so the operator storing a new value starts a new binding.
-      const row = sharedBindingName(name, alt, key, config.nodeId);
-      const bound = (await storage.getSecret(sharedOwner, row))?.hosts ?? [];
+      // With a second data key the row may still be named under the other key: the first row that
+      // exists keeps its binding, and a new one is named under the current key.
+      let row = sharedBindingName(name, alt, key, config.nodeId);
+      let stored = await storage.getSecret(sharedOwner, row);
+      for (const other of stored ? [] : otherRingKeys(key)) {
+        const older = sharedBindingName(name, alt, other, config.nodeId);
+        const found = await storage.getSecret(sharedOwner, older);
+        if (found) { row = older; stored = found; break; }
+      }
+      const bound = stored?.hosts ?? [];
       if (!host || (bound.length && !bound.includes(host))) {
         return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
       }
@@ -721,4 +732,10 @@ export function sharedBindingOwner(extName: string): string {
 export function sharedBindingName(name: string, value: string, key: Buffer | null, nodeId: string): string {
   const mac = createHmac('sha256', key ?? Buffer.from(nodeId, 'utf8')).update(`shared-secret:${name}:${value}`).digest('hex');
   return `${name}#${mac.slice(0, 24)}`;
+}
+
+/** The data keys of `key`'s ring other than `key` itself: none on a node with one data key. */
+export function otherRingKeys(key: Buffer | null): Buffer[] {
+  if (!key) return [];
+  return [...keyRingOf(key).keys.values()].filter(k => !k.equals(key));
 }

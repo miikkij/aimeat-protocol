@@ -13,6 +13,9 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   2026-11-05 — SealedColumnRepository: the data key's re-encrypt job reads every sealed column a
+ *     page at a time and writes a resealed value only over the value it read (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 — bootLock() is a transaction-scoped advisory lock, held by a transaction left open
  *     until the release, so it holds through a connection pooler (codebase analysis 2026-11-03, item
  *     HA stage 3).
@@ -159,6 +162,7 @@ import type { SsoConnectionRepository } from './repositories/sso-connection.repo
 import type { McpServerRepository } from './repositories/mcp-server.repository.js';
 import type { HeldAccountNameRepository } from './repositories/held-names.repository.js';
 import type { EphemeralClaimRepository } from './repositories/ephemeral-claim.repository.js';
+import type { SealedColumnRepository } from './repositories/sealed-column.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository, MemoryShapeRepository,
@@ -205,6 +209,7 @@ export interface Storage extends
   McpServerRepository,
   HeldAccountNameRepository,
   EphemeralClaimRepository,
+  SealedColumnRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

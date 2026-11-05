@@ -14,6 +14,9 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.7.0 — 2026-11-05 — nodeKeyDataKeys(): with a second data key the database copy is sealed with
+ *     the current data key and opens under either (codebase analysis 2026-11-03, decision 4a of
+ *     2026-11-05). One data key: unchanged.
  *   v1.6.1 — 2026-11-04 — The key file's AES-GCM goes through utils/aes-gcm.ts, the node's one
  *     implementation; the file's form is unchanged (codebase analysis 2026-11-03, item B9).
  *   v1.6.0 — 2026-11-01 — The node keys sign the outside party's access token too
@@ -89,6 +92,23 @@ import { errorFields } from '../utils/error-fields.js';
 import {
   configureNodeKeySecrets, nodeKeySecretsAvailable, NodeKeyLockedError, type NodeKeySecrets,
 } from '../storage/node-key-at-rest.js';
+
+/**
+ * The data keys the node key's database copy is sealed and opened with. On a node with one data key
+ * that is AIMEAT_ENCRYPTION_KEY alone, as before. With AIMEAT_ENCRYPTION_KEY_1 set, the row is sealed
+ * with the key AIMEAT_ENCRYPTION_KEY_CURRENT names and opens under either, the way every other stored
+ * secret does (services/encryption.ts getEncryptionKey; codebase analysis 2026-11-03, decision 4a of
+ * 2026-11-05). The TOTP key never seals this row, as before.
+ */
+export function nodeKeyDataKeys(config: Pick<AimeatConfig, 'encryptionKey'> & Partial<Pick<AimeatConfig, 'encryptionKey1' | 'encryptionKeyCurrent'>>): Pick<NodeKeySecrets, 'dataKeyHex' | 'olderDataKeyHexes'> {
+  const first = config.encryptionKey ?? process.env.AIMEAT_ENCRYPTION_KEY ?? null;
+  const second = config.encryptionKey1 || null;
+  if (!second || !/^[0-9a-fA-F]{64}$/.test(second)) return { dataKeyHex: first };
+  const secondCurrent = config.encryptionKeyCurrent === 1 || !first;
+  return secondCurrent
+    ? { dataKeyHex: second, olderDataKeyHexes: first ? [first] : [] }
+    : { dataKeyHex: first, olderDataKeyHexes: [second] };
+}
 
 // ── P3-8: Node Key Encryption Helpers ────────────────────────────────
 
@@ -444,7 +464,7 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
     // key. Set before the first read, so the providers open the row with them.
     const secrets: NodeKeySecrets = {
       passphrase: config.keyPassphrase || process.env.AIMEAT_KEY_PASSPHRASE || null,
-      dataKeyHex: config.encryptionKey ?? process.env.AIMEAT_ENCRYPTION_KEY ?? null,
+      ...nodeKeyDataKeys(config),
     };
     configureNodeKeySecrets(secrets);
     let nodeKey = await readStoredNodeKey(config, storage);

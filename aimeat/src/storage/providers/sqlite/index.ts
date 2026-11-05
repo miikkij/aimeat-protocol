@@ -15,6 +15,8 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   2026-11-05 — sealedColumnMethods bound (the data key's re-encrypt job; codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 — ephemeralClaimMethods bound (ephemeral_claim; codebase analysis 2026-11-03,
  *     high-availability stage 2).
  *   2026-11-04 — The kept memory totals (schema-memory-totals.ts) after initializeSchema (codebase
@@ -98,6 +100,7 @@ import { fileMethods } from './methods/files.js';
 import { financeMethods } from './methods/finance.js';
 import { heldNameMethods } from './methods/held-names.js';
 import { ephemeralClaimMethods } from './methods/ephemeral-claims.js';
+import { sealedColumnMethods } from './methods/sealed-columns.js';
 import { identityMethods } from './methods/identity.js';
 import { identityExtraMethods } from './methods/identity-extras.js';
 import { knowledgeMethods } from './methods/knowledge.js';
@@ -313,6 +316,7 @@ Object.assign(
   financeMethods,
   heldNameMethods,
   ephemeralClaimMethods,
+  sealedColumnMethods,
   identityMethods,
   identityExtraMethods,
   knowledgeMethods,

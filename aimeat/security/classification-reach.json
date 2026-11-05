@@ -2189,6 +2189,12 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: the first-MCP-call marker and the first note are existence checks, and journey.state is the owner's own path record shown back to the same owner and their own AI; no content goes to a model or another principal."
     },
+    "src/services/key-reencrypt/job.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-05 (codebase analysis 2026-11-03, decision 4a of 2026-11-05), the node's own read: the re-encrypt job's state record key-rotation.reencrypt under the node's system identity; no person's content is read here. The secrets it reseals are read and written through record-cas.ts updateMemoryRecord and storage swapSealedColumn, never shown, and only the place of a value that does not open reaches the operator."
+    },
     "src/services/knowledge-link-owner-keep.ts": {
       "reads": {
         "listMemoryForOwners": 1

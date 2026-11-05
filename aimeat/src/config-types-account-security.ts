@@ -28,6 +28,9 @@
  *   TWO_STEP_REQUIRED_VALUES · PASSWORD_SIGN_IN_VALUES · SIGN_IN_LOCKOUT_VALUES · accountSecurityDefaults()
  * @usage import type { AccountSecurityConfig } from './config-types-account-security.js';
  * @version-history
+ *   v1.3.0 — 2026-11-05 — encryptionKey1 (AIMEAT_ENCRYPTION_KEY_1) and encryptionKeyCurrent
+ *     (AIMEAT_ENCRYPTION_KEY_CURRENT, default 0): a second data key in the ring (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.2.0 — 2026-11-02 — signInLockout (AIMEAT_SIGN_IN_LOCKOUT: off, on), off by default (Jouni, 08.02).
  *   v1.1.0 — 2026-11-02 — twoStepRequired (AIMEAT_TWO_STEP_REQUIRED: off, operators, everyone) and
  *     passwordSignIn (AIMEAT_PASSWORD_SIGN_IN: on, operators, off), from an IT review of the node.
@@ -82,6 +85,10 @@ export interface AccountSecurityConfig {
 
   // General-purpose encryption key (fallback: totpSecretEncryptionKey)
   encryptionKey: string | null;
+  /** AIMEAT_ENCRYPTION_KEY_1: a second data key, key 1 of the ring (services/encryption.ts). Null on a node with one key. */
+  encryptionKey1: string | null;
+  /** AIMEAT_ENCRYPTION_KEY_CURRENT: which data key seals new values, 0 (default, AIMEAT_ENCRYPTION_KEY) or 1. */
+  encryptionKeyCurrent: number;
 }
 
 /**
@@ -110,6 +117,8 @@ export function accountSecurityDefaults(baseUrl: string, siteName: string): Acco
     passwordSignIn: pick(process.env.AIMEAT_PASSWORD_SIGN_IN, PASSWORD_SIGN_IN_VALUES, 'on'),
     signInLockout: pick(process.env.AIMEAT_SIGN_IN_LOCKOUT, SIGN_IN_LOCKOUT_VALUES, 'off'),
     encryptionKey: process.env.AIMEAT_ENCRYPTION_KEY ?? null,
+    encryptionKey1: process.env.AIMEAT_ENCRYPTION_KEY_1 || null,
+    encryptionKeyCurrent: process.env.AIMEAT_ENCRYPTION_KEY_CURRENT === '1' ? 1 : 0,
   };
 }
 

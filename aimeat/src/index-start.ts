@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — The TOTP key warning counts AIMEAT_ENCRYPTION_KEY_1 as a key (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 — The stop reaches the workflow engine and the scheduler through nodeContext()
  *     (services/node-context.ts; codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The stop releases this process's lease just before it closes the event bus, so another
@@ -244,7 +246,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     logger.info(`──────────────────────────────────────────────────────────`);
 
     // Security warnings
-    if (config.totpEnabled && !config.encryptionKey && !config.totpSecretEncryptionKey) {
+    if (config.totpEnabled && !config.encryptionKey && !config.totpSecretEncryptionKey && !config.encryptionKey1) {
       // A secret is never stored in plain text since 2026-10-09 (services/totp.ts): without a key
       // the setup endpoint refuses instead.
       logger.warn('SECURITY: TOTP is enabled but neither AIMEAT_ENCRYPTION_KEY nor AIMEAT_TOTP_ENCRYPTION_KEY is set, so nobody can set up two-step sign-in.');

@@ -29,7 +29,8 @@
  *   opens storage on its own). Opened values are cached per row and per secret, because PBKDF2 at
  *   100 000 rounds on every federation signature would cost tens of milliseconds each.
  * @structure NodeKeySecrets · NodeKeyLockedError · SEALED_NODE_KEY_PREFIX · configureNodeKeySecrets ·
- *   isSealedNodeKey · sealNodePrivateKey · openNodePrivateKey · nodeKeySecretsAvailable
+ *   isSealedNodeKey · sealNodePrivateKey · openNodePrivateKey · nodeKeySecretsAvailable ·
+ *   nodeKeyRowSealedWith · nodeKeySecretsNow
  * @usage
  *   // storage provider
  *   setNodeKey(pub, priv) → store sealNodePrivateKey(priv, pub)
@@ -40,6 +41,9 @@
  *     SHA-256 of them (code scanning alert 1726).
  *   v1.0.2 — 2026-11-04 — AES-GCM through utils/aes-gcm.ts, the node's one implementation; the
  *     `nk1:` form is unchanged (codebase analysis 2026-11-03, item B9).
+ *   v1.1.0 — 2026-11-05 — With a second data key, a `nk1:e:` row opens under the ring's other key
+ *     too (olderDataKeyHexes), and nodeKeyRowSealedWith() tells the re-encrypt job which key sealed it.
+ *     The `nk1:` form is unchanged (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  */
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { gcmOpen, gcmSeal } from '../utils/aes-gcm.js';
@@ -47,8 +51,14 @@ import { gcmOpen, gcmSeal } from '../utils/aes-gcm.js';
 export interface NodeKeySecrets {
   /** AIMEAT_KEY_PASSPHRASE. */
   passphrase?: string | null;
-  /** AIMEAT_ENCRYPTION_KEY, 64 hex characters. */
+  /** AIMEAT_ENCRYPTION_KEY, 64 hex characters: the data key a row is sealed with. */
   dataKeyHex?: string | null;
+  /**
+   * The ring's other data key, when AIMEAT_ENCRYPTION_KEY_1 is set (services/encryption.ts): a row
+   * sealed with it still opens, and the re-encrypt job seals it again with `dataKeyHex`. Empty or
+   * absent on a node with one data key.
+   */
+  olderDataKeyHexes?: string[];
 }
 
 /** The stored row cannot be opened with the secrets this process has. */
@@ -76,7 +86,17 @@ export function configureNodeKeySecrets(secrets: NodeKeySecrets | null): void {
 }
 
 function secretsNow(): NodeKeySecrets {
-  return configured ?? { passphrase: process.env.AIMEAT_KEY_PASSPHRASE ?? null, dataKeyHex: process.env.AIMEAT_ENCRYPTION_KEY ?? null };
+  if (configured) return configured;
+  const first = process.env.AIMEAT_ENCRYPTION_KEY ?? null;
+  const second = process.env.AIMEAT_ENCRYPTION_KEY_1 || null;
+  // The environment's second data key, as auth/node-keys.ts nodeKeyDataKeys() reads it from the config.
+  if (!second || !dataKeyOf(second)) return { passphrase: process.env.AIMEAT_KEY_PASSPHRASE ?? null, dataKeyHex: first };
+  const secondCurrent = process.env.AIMEAT_ENCRYPTION_KEY_CURRENT === '1' || !first;
+  return {
+    passphrase: process.env.AIMEAT_KEY_PASSPHRASE ?? null,
+    dataKeyHex: secondCurrent ? second : first,
+    olderDataKeyHexes: secondCurrent ? (first ? [first] : []) : [second],
+  };
 }
 
 function dataKeyOf(hex: string | null | undefined): Buffer | null {
@@ -141,14 +161,54 @@ export function openNodePrivateKey(stored: string, publicKey: string, secrets: N
     }
     key = dk;
   }
-  let plain: string;
-  try {
-    plain = gcmOpen(key, { iv: Buffer.from(ivHex, 'hex'), tag: Buffer.from(tagHex, 'hex'), ct: Buffer.from(ctHex, 'hex') }, aadOf(publicKey)).toString('utf8');
-  } catch {
+  const sealed = { iv: Buffer.from(ivHex, 'hex'), tag: Buffer.from(tagHex, 'hex'), ct: Buffer.from(ctHex, 'hex') };
+  // A row sealed with the data key may be under the ring's other key (olderDataKeyHexes), tried after
+  // the current one; with one data key the list is empty and the row opens or is refused as before.
+  const candidates = kind === 'e' ? [key, ...(secrets.olderDataKeyHexes ?? []).map(dataKeyOf).filter((k): k is Buffer => !!k)] : [key];
+  const tried = firstKeyThatOpens(candidates, sealed, publicKey);
+  if (!('plain' in tried)) {
     // The GCM tag check failed: turned into a refusal that names the secret.
     throw new NodeKeyLockedError(`The node key in the database does not open with the ${kind === 'p' ? 'AIMEAT_KEY_PASSPHRASE' : 'AIMEAT_ENCRYPTION_KEY'} this server has: the value changed, or the row was altered.`, publicKey);
   }
+  const plain = tried.plain;
   if (opened.size > 8) opened.clear();
   opened.set(cacheKey, { plain, passphrase: secrets.passphrase ?? null, dataKeyHex: secrets.dataKeyHex ?? null });
   return plain;
+}
+
+/**
+ * Which secret a stored row is sealed with, for the data key's re-encrypt job: `plain` (not sealed),
+ * `passphrase` (AIMEAT_KEY_PASSPHRASE, untouched by a data key rotation), `current` (opens with the
+ * data key that seals now), `older` (opens only with the ring's other data key, so sealing it again
+ * moves it) or `unreadable` (opens with none of them).
+ */
+export function nodeKeyRowSealedWith(stored: string, publicKey: string, secrets: NodeKeySecrets = secretsNow()): 'plain' | 'passphrase' | 'current' | 'older' | 'unreadable' {
+  if (!isSealedNodeKey(stored)) return 'plain';
+  const parts = stored.slice(SEALED_NODE_KEY_PREFIX.length).split(':');
+  if (parts.length !== 5) return 'unreadable';
+  if (parts[0] === 'p') return 'passphrase';
+  if (parts[0] !== 'e') return 'unreadable';
+  const sealed = { iv: Buffer.from(parts[2], 'hex'), tag: Buffer.from(parts[3], 'hex'), ct: Buffer.from(parts[4], 'hex') };
+  const keysOf = (hexes: Array<string | null | undefined>): Buffer[] => hexes.map(dataKeyOf).filter((k): k is Buffer => !!k);
+  if ('plain' in firstKeyThatOpens(keysOf([secrets.dataKeyHex]), sealed, publicKey)) return 'current';
+  return 'plain' in firstKeyThatOpens(keysOf(secrets.olderDataKeyHexes ?? []), sealed, publicKey) ? 'older' : 'unreadable';
+}
+
+/** The first of `keys` the row opens with, and its plain text; or the last failure when none opens. */
+function firstKeyThatOpens(keys: Buffer[], sealed: { iv: Buffer; tag: Buffer; ct: Buffer }, publicKey: string): { plain: string } | { failure: unknown } {
+  let failure: unknown = new Error('no key to open the node key row with');
+  for (const k of keys) {
+    try {
+      return { plain: gcmOpen(k, sealed, aadOf(publicKey)).toString('utf8') };
+    } catch (err) {
+      // The tag check failed for this key; the next key may be the one, and the failure is answered when none is.
+      failure = err;
+    }
+  }
+  return { failure };
+}
+
+/** The secrets this process seals and opens the row with (configured, or read from the environment). */
+export function nodeKeySecretsNow(): NodeKeySecrets {
+  return secretsNow();
 }

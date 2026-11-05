@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-05 -- definitions/key-reencrypt.ts: aimeat_admin_key_reencrypt (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.x -- 2026-11-02 -- definitions/connection-files.ts: aimeat_files_browse, _get and _write (SharePoint and OneDrive).
  *   v1.x -- 2026-11-01 -- definitions/build-with-you.ts: aimeat_build_request_submit, _status and aimeat_trail_list.
  *   v1.x -- 2026-11-01 -- definitions/dataspace.ts: aimeat_dataspace (plan doc-mvwxcas3dom3, D8.3).
@@ -120,6 +122,7 @@ import { partyTools } from './definitions/party.js';
 import { buildWithYouTools } from './definitions/build-with-you.js';
 import { dataspaceTools } from './definitions/dataspace.js';
 import { datapackageSellTools } from './definitions/datapackage-sell.js';
+import { keyReencryptTools } from './definitions/key-reencrypt.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -174,6 +177,7 @@ const CATALOG = [
     ...buildWithYouTools,
     ...datapackageSellTools,
     ...dataspaceTools,
+    ...keyReencryptTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

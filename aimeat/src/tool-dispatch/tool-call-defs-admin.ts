@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.13.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt (GET and POST /v1/admin/encryption/reencrypt;
+ *     codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.12.0 -- 2026-10-31 -- aimeat_admin_federation_settlement_ceiling_set (PUT /v1/federation/peers/
  *     :nodeId/settlement-ceiling; secaudit2026oct31w2 round 10).
  *   v1.11.0 -- 2026-10-02 -- aimeat_package_sale action review (POST /v1/package-sales/catalogue/review).
@@ -205,5 +207,12 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
                 group_id: requiredString(input, 'group_id'), code: requiredString(input, 'code'),
             });
         },
+    },
+    {
+        // → GET /v1/admin/encryption/reencrypt, POST /v1/admin/encryption/reencrypt
+        name: 'aimeat_admin_key_reencrypt',
+        handler: ({ client }, input) => (optionalString(input, 'action') === 'start'
+            ? client.post('/v1/admin/encryption/reencrypt', {})
+            : client.get('/v1/admin/encryption/reencrypt')),
     },
 ];
