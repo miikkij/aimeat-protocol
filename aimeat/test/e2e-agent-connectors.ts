@@ -10,8 +10,9 @@
  *   of the same owner connecting is offered nothing.
  *
  *   THE REFUSALS. Another owner sees and changes none of it, an app grant reads none of it, an agent
- *   without agent:write cannot rename, forgetting is the owner in person, and an unknown connector
- *   is refused before anything is written.
+ *   without agent:write can neither rename nor forget, an ecosystem app cannot forget, and an unknown
+ *   connector is refused before anything is written. An agent holding agent:write may forget a
+ *   disconnected machine (Jouni 2026-11-05, decision 13a).
  *
  *   THE CHAT PATH. The same list, the same naming and the same proposal go through the node's own
  *   MCP server as an agent, because a person asks their own AI for an agent on a named machine.
@@ -21,6 +22,9 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-connectors
  * @version-history
+ *   v1.2.0 — 2026-11-05 — Forgetting admits the callers renaming admits (Jouni 2026-11-05, decision
+ *     13a of the codebase analysis 2026-11-03): the refusal case is an agent without agent:write and
+ *     an ecosystem app instead of a `*` agent, and an agent with agent:write forgets a machine.
  *   v1.1.0 — 2026-10-10 — The home's read of the same state (GET /v1/home/agents): each worker
  *     with its machine and whether it waits, one agent by name, and the refusals (an agent, an
  *     ecosystem app, no credential, another owner).
@@ -748,11 +752,17 @@ async function run() {
             `expected 409 CONNECTOR_ONLINE, got ${r.status} ${r.body?.error?.code}`);
     });
 
-    await test('forgetting is the owner in person, and never reaches another account', async () => {
+    // Jouni 2026-11-05, decision 13a: forgetting admits the callers renaming admits (the looser of the
+    // two verbs decides), so the refusal here is an agent without agent:write and an ecosystem app,
+    // no longer every agent. The agent that may forget is below.
+    await test('forgetting takes the callers renaming takes, and never reaches another account', async () => {
         dLaptop.close();
         await until('the laptop to read as disconnected', async () => (await connectorOf(LAPTOP))?.online === false);
-        const asAgent = await forget({ Authorization: `Bearer ${seatServer.token}` }, LAPTOP);
-        assert(asAgent.status === 403, `an agent carrying the owner's name is not the owner: got ${asAgent.status}`);
+        const asAgent = await forget({ Authorization: `Bearer ${reader.token}` }, LAPTOP);
+        assert(asAgent.status === 403, `an agent without agent:write: expected 403, got ${asAgent.status}`);
+        const eco = await mintEcoToken(a.owner, authA, 'forget-eco');
+        const asEco = await forget({ Authorization: `Bearer ${eco}` }, LAPTOP);
+        assert(asEco.status === 403, `an ecosystem app: expected 403, got ${asEco.status}`);
         const asOther = await forget(authB, LAPTOP);
         assert(asOther.status === 404, `another owner must not learn it exists: got ${asOther.status}`);
         assert(!!(await connectorOf(LAPTOP)), 'and it is still listed');
@@ -778,6 +788,14 @@ async function run() {
         assert(!!(await recordOf('retarget-watcher'))?.enrolled_at, 'and it holds a key now');
         const laptop = await connectorOf(LAPTOP);
         assert(!(laptop.waiting as string[]).includes('retarget-watcher'), 'the laptop no longer lists it as waiting');
+    });
+
+    await test('an agent of the owner holding agent:write forgets a disconnected machine (decision 13a)', async () => {
+        const featured = 'fff-features';
+        assert((await connectorOf(featured))?.online === false, 'setup: the featured machine is away');
+        const r = await forget({ Authorization: `Bearer ${seatServer.token}` }, featured);
+        assert(r.status === 200, `forget by the agent ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(!(await connectorOf(featured)), 'it has left the owner\'s list');
     });
 
     await test('the owner forgets a disconnected machine, and its agents stay', async () => {

@@ -18,6 +18,9 @@
  *   - GET    /v1/shares/incoming     -- What has been shared WITH me
  *   - DELETE /v1/shares/:shareId     -- Stop sharing
  * @version-history
+ *   2026-11-05 -- PATCH /v1/groups/:id/members/:identifier admits the owner's agent holding
+ *     consent:groups, as DELETE of the same member does, and acts on groups owned by the owner's GHII
+ *     (codebase analysis 2026-11-03, decision 13a of 2026-11-05: the looser of a path's verbs decides).
  *   2026-10-16 -- POST /v1/groups, POST /v1/groups/:id/members and DELETE /v1/groups/:id/members/:identifier
  *     admit the owner's agent holding consent:groups, the word aimeat_group_create, _add_member and
  *     _remove_member declare, and act on groups owned by the OWNER's GHII, as the MCP tools do: the node
@@ -238,10 +241,12 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── PATCH /v1/groups/:id/members/:identifier -- Update member permissions ── */
-  router.patch('/v1/groups/:id/members/:identifier', requireAuth(), requireRole('owner'), async (req, res) => {
+  // WHO. As DELETE below: the owner, or their agent holding consent:groups, on the owner's groups
+  // (codebase analysis 2026-11-03, decision 13a of 2026-11-05: the looser of a path's verbs decides).
+  router.patch('/v1/groups/:id/members/:identifier', requireAuth(), requireRole('agent'), requireScope('consent:groups'), async (req, res) => {
     const id = req.params.id as string;
     const identifier = req.params.identifier as string;
-    const ownerGaii = resolve(req);
+    const ownerGaii = groupOwner(req);
 
     const group = await storage.getSharingGroup(id);
     if (!group) {

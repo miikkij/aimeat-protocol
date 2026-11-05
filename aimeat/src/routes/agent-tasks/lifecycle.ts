@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — DELETE /v1/agents/:name/tasks/:id admits the callers PATCH admits: the task's owner,
+ *     or the task's own agent at readiness 'standard', which may now delete its task when it is not
+ *     active (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
  *   2026-10-28 — /queue decides on the agent record as it is: the node no longer narrows an agent
  *     holding `*` by itself (Jouni, 2026-10-28; services/scope-use.ts).
  *   2026-10-18 — /queue reads the agent through startFactsOf (services/scope-auto-narrow.ts): an agent
@@ -37,7 +40,7 @@ import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from
 import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
-import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../services/resource-events.js';
@@ -177,7 +180,10 @@ export function registerTaskLifecycleRoutes(
 
   /* ── DELETE /v1/agents/:name/tasks/:id -- Delete a task + clean its traces ──
    *
-   * Owner-only. Deletable in any state EXCEPT 'active' -- a running task must be
+   * WHO. As PATCH above: the owner of the task, or the task's own agent at readiness 'standard'
+   * (canAccessTask); never an app grant. It was the owner only until 2026-11-05, when Jouni ruled that
+   * the looser of a path's verbs decides (codebase analysis 2026-11-03, decision 13a).
+   * Deletable in any state EXCEPT 'active' -- a running task must be
    * cancelled or paused first so we don't orphan a live runner mid-execution.
    * Everything else (draft/queued/revision_requested/paused/stalled/done/failed)
    * can be removed.
@@ -189,7 +195,7 @@ export function registerTaskLifecycleRoutes(
    *     runner daemon scans on every poll
    * The agent's actual deliverable/output memory is intentionally preserved.
    */
-  router.delete('/v1/agents/:name/tasks/:id', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.delete('/v1/agents/:name/tasks/:id', requireAuth(), requireReadiness('standard', config, storage), async (req, res) => {
     const id = req.params.id as string;
     const agentName = req.params.name as string;
 

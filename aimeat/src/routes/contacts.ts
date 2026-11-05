@@ -15,6 +15,9 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   2026-11-05 — PATCH /v1/contacts/:contactId admits the owner's agent holding messages:send, as
+ *     DELETE does, and acts on the owner's address book (codebase analysis 2026-11-03, decision 13a
+ *     of 2026-11-05: where two verbs of one path check differently, the looser side decides).
  *   2026-10-27 — POST /v1/contacts and PATCH /v1/contacts/:contactId check their bodies with
  *     validateBody (models/write-body-schemas.ts): a too-long or junk value is a 400 naming the field.
  *   2026-10-15 — POST /v1/contacts and DELETE /v1/contacts/:contactId admit the owner's agent holding
@@ -229,12 +232,15 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /* ── PATCH /v1/contacts/:contactId — what the OWNER knows about a saved person (name, note,
    * tags, links, relation). Never touches opt-out, bounce or suppression: that is the recipient's
-   * state, not the owner's note about them. ── */
-  router.patch('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('owner'), validateBody(ContactUpdateBody, config.nodeId), async (req, res) => {
+   * state, not the owner's note about them.
+   * WHO. As DELETE below: the owner in person, or their agent holding messages:send, on the owner's
+   * address book (codebase analysis 2026-11-03, decision 13a of 2026-11-05: the looser of a path's
+   * verbs decides). ── */
+  router.patch('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:send'), validateBody(ContactUpdateBody, config.nodeId), async (req, res) => {
     const contactId = decodeURIComponent(req.params.contactId as string);
     const b = (req.body ?? {}) as Record<string, unknown>;
     try {
-      const person = await updatePersonContact(storage, resolve(req), contactId, {
+      const person = await updatePersonContact(storage, callerOf(req, config.nodeId, storage).ownerGhii, contactId, {
         name: typeof b.name === 'string' ? b.name : undefined,
         note: b.note === undefined ? undefined : (typeof b.note === 'string' ? b.note : null),
         tags: Array.isArray(b.tags) ? b.tags.filter((t): t is string => typeof t === 'string') : undefined,

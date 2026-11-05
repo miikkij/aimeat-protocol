@@ -213,6 +213,7 @@ sequenceDiagram
 - **Clearance.** When classification is on, an agent reads content only up to its clearance. `AIMEAT_AGENT_CLEARANCE_DEFAULT` (`classification.agent_clearance_default`) sets it for new agents; empty means no limit, which is the default. An approving agent passes on no looser clearance than its own (`aimeat/src/routes/agents/device-auth-approve.ts`).
 - **The owner sees what their agents hold.** A record an agent stored is its owner's. The reverse is not true: an agent reading its owner's private data goes through the ordinary visibility and consent checks (`.claude/rules/security.md`).
 - **Removal.** Deleting an agent revokes its sessions before the agent is removed, and closes its MCP sessions (`aimeat/src/routes/agents/management.ts`). An operator lists every agent on the node with `aimeat_admin_agents`.
+- **One path, one set of callers.** Where two writing verbs of one route path admit different callers, the owner's agent gets the looser of the two, and no app, ecosystem app or visitor from another node gains anything (decision of 2026-11-05). So an agent holding `agent:write` may forget a connector computer that is not connected, as it may rename one (`aimeat/src/routes/agents-v2/connectors.ts`); an agent holding `messages:send` may edit a contact card, as it may remove one (`aimeat/src/routes/contacts.ts`); an agent holding `consent:groups` may change a group member's permissions, as it may remove the member (`aimeat/src/routes/sharing-groups.ts`); and a task's own agent may delete its task when the task is not running (`aimeat/src/routes/agent-tasks/lifecycle.ts`). `pnpm check:verb-parity` lists every path whose verbs still differ, with the reason (`aimeat/security/verb-parity-baseline.json`).
 
 ### Actions that need the person in person
 
@@ -225,7 +226,6 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 | Turning classification off, or from `all` to `owner` | `aimeat/src/services/handbooks/admin.ts` |
 | A classification exception for one item | `aimeat/src/services/classification/exception-admin.ts` |
 | Password, recovery address, second factor, passkeys, export and erasure of the account (an agent only with the exact `account:security` tick; an app never) | `aimeat/src/auth/account-security.ts`, `aimeat/src/routes/owners.ts` |
-| Forgetting a connector computer | `aimeat/src/routes/agents-v2/connectors.ts` |
 | Attaching a local `stdio` MCP server (operator only) | `aimeat/.env.example` |
 
 ## Tokens and sessions

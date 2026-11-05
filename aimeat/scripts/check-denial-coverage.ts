@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-11-05 -- ROUTE_CEILING 448: DELETE /v1/agents/{name}/tasks/{id} is refused to another agent of
+ *     the same owner by test/e2e-verb-parity-unified.ts (codebase analysis 2026-11-03, decision 13a).
  *   2026-11-04 -- ROUTE_CEILING 449: GET /v1/themes/choice is refused to a stranger on a signed-in-only
  *     node by e2e-content-access-gate.
  *   2026-11-01 -- ROUTE_CEILING 450: GET /v1/admin/compliance/report is refused to a non-operator by
@@ -128,7 +130,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 449;
+export const ROUTE_CEILING = 448;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-05 -- e2e-verb-parity-unified.ts joins the list (not the guard tier): a contact's card, a group member's permissions and a task's deletion admit the callers the other verb of the same path admits (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
  *   2026-11-04 -- e2e-two-process-leases.ts joins the list (not the guard tier): two processes of one node on one database run an AI job once, a sweep once per round, and take a killed process's jobs over (codebase analysis 2026-11-03, item HA 2.5-2.7).
  *   2026-11-04 -- e2e-two-process-bus.ts joins the list (not the guard tier): two processes of one node on one PostgreSQL database share the event bus (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 -- e2e-app-versions-access.ts joins the list (not the guard tier): an app's version list answers what the app's read answers for that caller, and carries no content (codebase analysis 2026-11-03, item A1).
@@ -1784,6 +1785,8 @@ const ALL_SUITES = [
     'test/e2e-mcp-mail-connection-tools.ts',
     'test/e2e-mcp-proxy-tools.ts',
     'test/e2e-mcp-owner-only-parity.ts',
+    // The writing verbs of one path admit the same callers, the looser deciding (decision 13a).
+    'test/e2e-verb-parity-unified.ts',
     'test/e2e-mcp-agent-self-tools.ts',
     'test/e2e-mcp-v2-tools.ts',
     'test/e2e-mcp-crew-schedule-tools.ts',

@@ -10845,14 +10845,16 @@ paths:
                           connector:
                             $ref: '#/components/schemas/AgentConnector'
         '400': { description: An empty name, or one over 60 characters }
-        '403': { description: 'No agent:write, or an app or ecosystem principal' }
+        '403': { description: 'Not the account holder, and no agent:write; or an app or ecosystem principal' }
         '404': { description: No such connector on this account }
         '409': { description: 'Another connector carries that name (NAME_TAKEN), or the name given as address fits more than one (AMBIGUOUS_CONNECTOR)' }
     delete:
       operationId: forgetConnector
       summary: Forget a connector that is not connected
       description: |
-        THE ACCOUNT HOLDER IN PERSON. Removes the connector from the owner's list. Its agents stay:
+        The same callers as the rename: the account holder, or their agent holding `agent:write`
+        (or `account:security`); an app or ecosystem principal is refused. Removes the connector
+        from the owner's list. Its agents stay:
         they are records on the node. An agent that was waiting for this connector is then offered
         to whichever of the owner's connectors connects next. A connected connector is refused
         (CONNECTOR_ONLINE), because it would be listed again at once.
@@ -10867,7 +10869,7 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: Forgotten }
-        '403': { description: Not the account holder in person }
+        '403': { description: 'Not the account holder, and no agent:write; or an app or ecosystem principal' }
         '404': { description: No such connector on this account }
         '409': { description: The connector is connected right now }
 
@@ -63678,7 +63680,9 @@ paths:
       operationId: deleteAgentTask
       summary: Delete a task
       description: >
-        Delete a task (owner only). Any task can be deleted EXCEPT one that is
+        Delete a task. The same callers as PATCH: the task's owner, or the
+        task's own agent at readiness `standard`; an app grant is refused.
+        Any task can be deleted EXCEPT one that is
         currently `active` -- a running task must be cancelled or paused first.
         Deletion also removes the task's event log and cleans its operational
         memory traces (the agent's live-status keys `agents.{name}.tasks.{id}.*`
@@ -66421,7 +66425,8 @@ paths:
         linked to. Never touches opt-out, bounce or suppression — that is the recipient's
         delivery state, and a card edit that could clear an opt-out would turn fixing a typo into
         a way to resume mailing someone who asked you to stop. The address is not editable here.
-        Absent and not-yours answer identically (404).
+        Absent and not-yours answer identically (404). The owner in person, or the owner's agent
+        holding messages:send, acts on the owner's address book, as for DELETE.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -72150,7 +72155,10 @@ paths:
     patch:
       operationId: updateSharingGroupMember
       summary: Update a member's role
-      description: Change a member's role in the sharing group. Requires admin role.
+      description: >-
+        Change a member's role in a sharing group the account owns. The owner in person, or their agent
+        holding `consent:groups`, as for removing the member. An app grant and an ecosystem app are
+        refused with 403.
       tags: [Sharing Groups]
       security:
         - BearerAuth: []
