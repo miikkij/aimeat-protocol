@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-05 -- givePlaceDefaultToEveryAgent, last: on a store place every agent that has not had the place's
+ *     default gets it, once per agent (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-01 -- moveEcosystemSubscriptionsByOwnerOnce, after the welcome page step: the node-wide ecosystem
  *     subscription record moves to one record per owner (secaudit2026oct31w2 round 12).
  *   2026-11-01 -- recordPointerStateOnce, right after the data package audience step: the sale terms and
@@ -107,6 +109,7 @@ import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover
 import { settleUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
 import { markPlatformFeeWritersOnce } from '../commerce/platform-fee-writers.js';
 import { askUncertainAccountantGrantsOnce } from '../services/finance/accountant-grant-ask.js';
+import { givePlaceDefaultToEveryAgent } from '../services/place-agent-scopes.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -239,4 +242,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // (services/finance/accountant-grant-ask.ts).
   await askUncertainAccountantGrantsOnce(storage, config)
     .catch(err => logger.error('Failed to look for the older accountant grants to ask about; the next boot tries again', { error: String(err) }));
+  // On a store place (site.purchase_plan set) every agent that has not had the place's default gets it
+  // now, once per agent, so a token mint only copies the record (services/place-agent-scopes.ts; codebase
+  // analysis 2026-11-03, decision 8b of 2026-11-05). Last, so no step above sees a list it widened;
+  // awaited, so no agent's first token after the update meets a record without the words. Off a store
+  // place it reads nothing.
+  await givePlaceDefaultToEveryAgent(storage, config)
+    .catch(err => logger.error('Failed to give the store place\'s default to the existing agents; the next boot tries again', { error: String(err) }));
 }

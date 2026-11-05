@@ -29,6 +29,9 @@
  *   cd aimeat && pnpm check:single-entry --list    # every file each rule counts
  *   cd aimeat && pnpm check:single-entry --seed operator-role   # rewrite one rule's ceilings
  * @version-history
+ *   2026-11-05 — Rule scope-widen-at-mint also counts the step for the existing agents
+ *     (givePlaceDefaultToEveryAgent, placeDefaultAfterSettings); the four mints are off the baseline and the
+ *     approval doors are on it (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   v1.13.0 — 2026-11-04 — Rules aes-gcm and token-key: AES-256-GCM goes through utils/aes-gcm.ts
  *     (baseline empty), and a JWT is signed or verified by hand only where the baseline names the
  *     outside party whose key it uses (codebase analysis 2026-11-03, item B9).
@@ -232,10 +235,10 @@ export const RULES: Rule[] = [
   },
   {
     id: 'scope-widen-at-mint',
-    label: 'An agent\'s scopes are decided when it is approved and kept on its record; a token mint copies them. The store place\'s default (services/place-agent-scopes.ts) is added only where the baseline says why, so a sixth door cannot widen at mint (codebase analysis 2026-11-03, B7; round 13 had four commits on this default alone)',
-    pattern: /\b(widenForPlace|widenAndAnnounce|applyPlaceDefault)\(/,
-    // The default's own module and the one function the mints call.
-    skipDirs: ['src/services/place-agent-scopes.ts', 'src/routes/agents/announce-scopes.ts'],
+    label: 'An agent\'s scopes are decided when it is approved and kept on its record; a token mint copies them and adds nothing. The store place\'s default (services/place-agent-scopes.ts) is given only at a door that approves an agent and by the step for the existing agents, each listed with why in the baseline, so no mint can widen (codebase analysis 2026-11-03, B7; decision 8b of 2026-11-05; round 13 had four commits on this default alone)',
+    pattern: /\b(widenForPlace|widenAndAnnounce|applyPlaceDefault|givePlaceDefaultToEveryAgent|placeDefaultAfterSettings)\(/,
+    // The default's own module.
+    skipDirs: ['src/services/place-agent-scopes.ts'],
   },
   {
     id: 'token-mint',

@@ -36,6 +36,8 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   2026-11-05 — On a store place a basic agent gets the place's default when the owner's press makes it
+ *     (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-10-19 — The GET gives each basic agent that exists as an agent record its `avatar`, null otherwise, read in services/basic-agents.ts so aimeat_agent_basics_get answers it too.
  *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 — A basic agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
@@ -71,6 +73,7 @@ import { recordAccountEvent } from '../../services/account-events.js';
 import { logger } from '../../utils/logger.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
+import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 // The capability name and the wait live with the sequence that uses them
 // (services/agent-enrolment-offer.ts). Re-exported here because the migration route imported them
@@ -199,7 +202,9 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
         // is the honest value for "nothing pinned", and every v2 door tests `identityVersion === 2`
         // together with a non-empty key before believing anything.
         publicKey: '',
-        defaultScopes: template.scopes,
+        // The owner's press approves the agent, so on a store place it gets the place's default now
+        // (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
+        defaultScopes: await applyPlaceDefault(storage, config, gaii, template.scopes),
         trustScore: 50,
         morselBalance: 0,
         createdAt: now,

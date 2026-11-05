@@ -46,7 +46,7 @@
       "digest": "sha256:894c892df3b876b9a0c7ad54"
     },
     "04-identity-access.md": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-05",
       "watches": [
         "aimeat/src/services/external-login.ts",
         "aimeat/src/services/oidc-providers.ts",
@@ -56,9 +56,10 @@
         "aimeat/src/routes/setup.ts",
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/two-step-setup.ts",
-        "aimeat/src/routes/ghii/login-two-step.ts"
+        "aimeat/src/routes/ghii/login-two-step.ts",
+        "aimeat/src/services/place-agent-scopes.ts"
       ],
-      "digest": "sha256:e6a6d7f824162a00b2c348a5"
+      "digest": "sha256:16d99ed025628a8cdf166821"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-02",
@@ -213,7 +214,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:179af5852f2eba91e2bdda6a"
+      "digest": "sha256:763e2746ef9adf0e4f1e2917"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -304,7 +305,8 @@
       "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
       "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
       "aimeat/src/services/two-step-setup.ts": "e8f73c13e7d1f680",
-      "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c"
+      "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c",
+      "aimeat/src/services/place-agent-scopes.ts": "dfc05b718b9315bc"
     },
     "05-data-protection.md": {
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
@@ -410,7 +412,7 @@
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
       "aimeat/src/services/ai-jobs/service.ts": "c6b46235bc263958",
-      "aimeat/src/services/config-apply.ts": "91fae249f6d8349e",
+      "aimeat/src/services/config-apply.ts": "9a4e295d031eff60",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",

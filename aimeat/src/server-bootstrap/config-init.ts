@@ -12,6 +12,8 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   2026-11-05 — A purchase plan the Consul watch applies gives the store place's default to the agents that have
+ *     not had it (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — installRequestMemo prepares the storage for the request memo (services/request-memo.ts),
  *     after the file stores and before the perf-trace Proxy (codebase analysis 2026-11-03, item C2).
  *   2026-11-04 — The PostgreSQL pool reads storage.request_statement_ms from the config for a statement
@@ -76,6 +78,7 @@ import { bindAppAuditConfig } from '../services/app-audit-archive.js';
 import type { Storage } from '../storage/interface.js';
 import { installFileStores } from '../services/file-store/file-store-resolver.js';
 import { logger } from '../utils/logger.js';
+import { placeDefaultAfterSettings } from '../services/place-agent-scopes.js';
 import type { ConfigSources } from '../server.js';
 
 export interface ConfigInitResult {
@@ -162,6 +165,9 @@ export async function initializeConfig(
         const { applied, atRestart } = applyConsulValues(config, changes, { running: true });
         provenance.markConsul(applied);
         provenance.markConsulAtRestart(atRestart);
+        // A purchase plan that arrived now gives the store place's default to the agents that have not
+        // had it (services/place-agent-scopes.ts; decision 8b of 2026-11-05). It logs its own failure.
+        void placeDefaultAfterSettings(storage, config, applied);
       });
     } catch (err) {
       logger.warn(`Consul config load failed: ${(err as Error).message}`);
