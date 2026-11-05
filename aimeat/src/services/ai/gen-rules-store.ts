@@ -13,7 +13,7 @@
  *   delegated write reaches it through the memory API.
  *
  *   THE NODE'S LEVELS AT MINT TIME. Provenance is minted on some forty write paths that carry no
- *   config (services/ai-provenance.ts), and each of them must record the rules in force for an image
+ *   config (services/ai/provenance.ts), and each of them must record the rules in force for an image
  *   or a video that arrives. bindGenRulesConfig() keeps a reference to the node's live config object
  *   (the Config tab changes it in place), set once when the gen-rules router mounts at start.
  * @structure

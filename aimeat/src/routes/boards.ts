@@ -110,8 +110,8 @@ import { operatorOverride, rolesWithOperator } from '../services/operator-overri
 import { resolveIdentity, isSameOwner, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
-} from '../services/ai-provenance-marks.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+} from '../services/ai/provenance-marks.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

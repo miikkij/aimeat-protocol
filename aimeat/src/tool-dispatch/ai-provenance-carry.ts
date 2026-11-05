@@ -97,7 +97,7 @@
  *     record on the envelope carrier and every `resp.data ?? resp` in the connector dropped it.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 11.
  */
-import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../services/ai-provenance-input.js';
+import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../services/ai/provenance-input.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 
 // The bytes a memory value's provenance record is about, from the node's own definition rather than
@@ -424,7 +424,7 @@ export async function carryDeclaration(
 export function withProvenanceEcho(payload: unknown, echo: ProvenanceEcho | undefined): unknown {
   if (!echo) return payload;
   if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-    // A route that recorded the declaration answers with its own block (services/ai-provenance-echo.ts).
+    // A route that recorded the declaration answers with its own block (services/ai/provenance-echo.ts).
     // That answer is what was stored, so it stands; an echo built here could only say less.
     const own = (payload as Record<string, unknown>).ai_provenance;
     if (own && typeof own === 'object') return payload;

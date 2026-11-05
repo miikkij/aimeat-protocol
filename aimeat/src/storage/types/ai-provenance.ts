@@ -139,7 +139,7 @@ export interface AiProvenanceFacet {
   /** Does the record's pre-rendered `disclosure` block say a label was required AT MINT? */
   disclosureRequired: boolean;
   /** The reason recorded at mint (`disclosure.reason`), or null. It carries the publisher's
-   *  declarations a serve-time decision reads back (services/ai-disclosure-served.ts). */
+   *  declarations a serve-time decision reads back (services/ai/disclosure-served.ts). */
   reason: string | null;
   /** The record's `mediaKind`, or null for a record that does not state one. */
   mediaKind: string | null;
@@ -150,7 +150,7 @@ export interface AiProvenanceListQuery extends AiProvenanceFacetQuery {
   /**
    * Only records whose content is public and where nobody reviewed the substance: the population
    * the sweep decides about. Whether each one owes a label is decided for its content as it is now
-   * (services/ai-transparency-report.ts), not read from the block stored at mint.
+   * (services/ai/transparency-report.ts), not read from the block stored at mint.
    */
   unreviewedPublicOnly?: boolean;
   /**

@@ -49,8 +49,8 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import type { WorkspaceProvenanceLink } from '../storage/repositories/ai-provenance.repository.js';
-import { publiclyResolvable } from './ai-provenance.js';
-import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock, type ServeOptions } from './ai-provenance-marks.js';
+import { publiclyResolvable } from './ai/provenance.js';
+import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock, type ServeOptions } from './ai/provenance-marks.js';
 import { createPublicCollectors } from './workspace-public-collectors.js';
 import { readerFor } from './classification/reader.js';
 import { shareIsOpen, isDocPublicAt, readShareMetaOf } from './workspace-share.js';
@@ -107,7 +107,7 @@ export const SHARE_SCAN_LIMIT = 5000;
 /**
  * The records in a report's population (one owner or the node, since a day) that an open workspace
  * share serves to anyone. The SQL rule counts them private, so the transparency roll-up and the
- * compliance report add them to the public counts (services/ai-transparency-report.ts). `capped`
+ * compliance report add them to the public counts (services/ai/transparency-report.ts). `capped`
  * says the candidates ran past SHARE_SCAN_LIMIT and some were not asked.
  */
 export async function sharePublicInScope(
@@ -148,7 +148,7 @@ export async function findShareOpenedProvenanceByHash(
 /**
  * The provenance ids of these items that an open share serves to anyone now: for a member read,
  * whose items the SQL predicate decides as private although the share has put them on the open
- * link. Pass the result as `alsoPublic` (services/ai-provenance-marks.ts).
+ * link. Pass the result as `alsoPublic` (services/ai/provenance-marks.ts).
  */
 export function shareOpenedIdsOf(
   share: ResolvedShare, items: Array<{ type: string; id: string; aiProvenanceId?: string | null }>,
@@ -193,7 +193,7 @@ export async function sharedPublishedProvenanceIds(
 /**
  * Items as a share or a member read serves them: the internal `aiProvenanceId` replaced by the item's
  * `ai_provenance` block (id, record, record_url). One query for the whole page. Whoever may read the
- * item may know how it was made (services/ai-provenance-marks.ts). A share route passes the share's
+ * item may know how it was made (services/ai/provenance-marks.ts). A share route passes the share's
  * surface (`{ surface: { visibility: shareServedVisibility(share) } }`), so the label each item owes
  * is decided for the reader the share serves.
  */

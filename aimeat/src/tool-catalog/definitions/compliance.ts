@@ -39,7 +39,7 @@ import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
 /**
- * The scoped compliance documents, as services/compliance-docs-schemas.ts COMPLIANCE_DOC_KINDS names
+ * The scoped compliance documents, as services/compliance/docs-schemas.ts COMPLIANCE_DOC_KINDS names
  * them. Written here because the catalog imports nothing above utils/ (.dependency-cruiser.cjs,
  * tool-catalog-is-a-bottom-layer); test/unit/compliance-docs.test.ts holds the two lists equal.
  */

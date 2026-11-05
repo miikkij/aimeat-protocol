@@ -56,7 +56,7 @@ import { logger } from '../../utils/logger.js';
 import { fixedBaseUrlOf, regionOverrideOf } from './providers.js';
 import type { RoutingRules } from './routing.js';
 import { nodeOpenRouterKey } from './node-openrouter-key.js';
-import { resolveModelFor } from '../ai-model-defaults.js';
+import { resolveModelFor } from './model-defaults.js';
 
 /**
  * The model the node's chat and agents use when a call names none and the person chose none: the

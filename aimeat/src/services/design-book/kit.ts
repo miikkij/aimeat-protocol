@@ -45,7 +45,7 @@ import { ORNAMENT_SET_IDS } from '../../data/atelier-ornament-sets.js';
 import { getAppTemplateIndex } from '../../data/app-templates.js';
 import { validateSignatureTokens, AppUiError } from '../app-ui/validate.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { systemGhiiFor } from '../compliance-register.js';
+import { systemGhiiFor } from '../compliance/register.js';
 import { DesignBookError } from './errors.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 import { SET_STAGE, STAGE_CSS } from './ornament.js';

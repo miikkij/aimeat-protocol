@@ -50,7 +50,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardPostRecord, BoardRecord } from '../storage/interface.js';
 import { executeHooks } from './hooks.js';
-import { provenanceForWrite, provenanceDeclarationRefusal } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from './ai/provenance.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { notifyBoardSubscribers } from './board-subscribers.js';

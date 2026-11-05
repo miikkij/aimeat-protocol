@@ -12,8 +12,8 @@
  *   2026-10-31 — Initial (secaudit2026oct26 outside-02b).
  */
 import { describe, it, expect } from 'vitest';
-import { acceptedCopyLevel, completeIfSigned, signedPdfLevel } from '../../src/services/compliance-agreements-sign.js';
-import { OptionsSchema, ReviewSchema, type Agreement, type AgreementSignature, type AgreementVersion } from '../../src/services/compliance-agreements-schemas.js';
+import { acceptedCopyLevel, completeIfSigned, signedPdfLevel } from '../../src/services/compliance/agreements-sign.js';
+import { OptionsSchema, ReviewSchema, type Agreement, type AgreementSignature, type AgreementVersion } from '../../src/services/compliance/agreements-schemas.js';
 
 const now = '2026-10-31T10:00:00.000Z';
 const valid = (level: string, source: string | null) => ({ level, trust: { source } });

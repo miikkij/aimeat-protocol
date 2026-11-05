@@ -26,7 +26,7 @@
 /**
  * What the gateway does for one call. `speak` and `embed` are named now so the vocabulary is
  * whole; the gateway implements `text`, `image` and `transcribe` (voice streams keep their own
- * transport, services/ai-voice.ts, because they emit audio before the provider has finished).
+ * transport, services/ai/voice.ts, because they emit audio before the provider has finished).
  */
 export type AiOp = 'text' | 'image' | 'speak' | 'transcribe' | 'embed';
 

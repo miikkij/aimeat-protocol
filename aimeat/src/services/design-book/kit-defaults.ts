@@ -33,7 +33,7 @@ import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { resolveAppOwnerScope } from '../app-owner-scope.js';
-import { systemGhiiFor } from '../compliance-register.js';
+import { systemGhiiFor } from '../compliance/register.js';
 import { isOrganismOwner } from '../organism-ownership.js';
 import { updateMemoryRecord } from '../record-cas.js';
 import { DesignBookError } from './errors.js';

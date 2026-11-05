@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { Storage } from '../../src/storage/interface.js';
-import { provenanceDeclarationRefusal } from '../../src/services/ai-provenance.js';
+import { provenanceDeclarationRefusal } from '../../src/services/ai/provenance.js';
 
 const AGENT = 'claude#alice@test-node';
 const storageWith = (defaultScopes: string[]) => ({

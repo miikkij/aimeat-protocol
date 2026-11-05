@@ -35,7 +35,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import {
     readWorkspaceOp, writeWorkspaceDraftsOp, workspaceCallerOf, type WorkspaceOpRefusal, type WorkspaceOpsCaller,
 } from '../../services/workspace-tool-ops.js';
-import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
 
 export function registerOrganismWorkspaceToolRoutes(
     router: Router, config: AimeatConfig, storage: Storage,

@@ -32,7 +32,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { cached, invalidateKey, TTL } from './cache.js';
-import { readAllowance, remainingOf } from './ai-allowance.js';
+import { readAllowance, remainingOf } from './ai/allowance.js';
 import { allowanceShown } from './ai/node-key-balance.js';
 import { hasOwnAiKey } from './own-key-coverage.js';
 import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';

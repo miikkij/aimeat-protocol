@@ -53,7 +53,7 @@ import { presentMemories, presentMemory } from '../services/classification/prese
 import { readerForAgent } from '../services/classification/reader.js';
 import { shareCarriesKey } from '../services/group-shares-classification.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { readProvenance } from '../services/ai-provenance-result.js';
+import { readProvenance } from '../services/ai/provenance-result.js';
 import { searchMemoryRecords } from '../services/memory-query.js';
 
 export function registerMemoryExtendedTools(

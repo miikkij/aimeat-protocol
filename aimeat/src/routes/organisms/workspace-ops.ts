@@ -113,7 +113,7 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { workspaceTarget } from '../../services/classification/containers.js';
 import { classifyContainerAfterWrite } from '../../services/classify-on-write.js';
 import { withItemProvenance, shareOpenedIdsOf } from '../../services/share-provenance.js';
-import { loadServedProvenance, loadServedProvenanceMany, setProvenanceHeaders, envelopeMeta, provenanceMarkdownNote } from '../../services/ai-provenance-marks.js';
+import { loadServedProvenance, loadServedProvenanceMany, setProvenanceHeaders, envelopeMeta, provenanceMarkdownNote } from '../../services/ai/provenance-marks.js';
 import type { OrganismHelpers } from './shared.js';
 import { logger } from '../../utils/logger.js';
 

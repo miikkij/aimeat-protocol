@@ -64,7 +64,7 @@ import { regionDeclaration } from '../services/ai/openrouter-region.js';
 import { AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_SCHEMA_PATH } from '../models/ai-provenance-schemas.js';
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
-} from '../services/ai-transparency-report.js';
+} from '../services/ai/transparency-report.js';
 
 /** Official section titles, quoted verbatim from the Code of Practice signature form. A section
  *  whose title is not held here is published by number alone — a paraphrased title in a compliance

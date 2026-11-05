@@ -21,7 +21,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireLocalSession, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { MessageSendAsOwnerSchema } from '../models/message-schemas.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { sendAsOwner } from '../services/message-send-as-owner.js';
 import { resolveIdentity } from '../utils/gaii.js';
 

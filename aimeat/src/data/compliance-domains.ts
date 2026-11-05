@@ -6,7 +6,7 @@
  *   which law a register's data falls under, the lowest classification label its containers must
  *   carry, and what the law asks for on top. A domain is a statement about the LAW; the label is a
  *   statement about how SENSITIVE the content is. A domain raises its containers' labels to its floor
- *   (services/compliance-domain-floor.ts) and never lowers one.
+ *   (services/compliance/domain-floor.ts) and never lowers one.
  *
  *   THE NODE DECIDES NOTHING BY A DOMAIN'S ID. Every behaviour comes from the fields: `minLabel`
  *   decides the floor, `dpiaRequired` puts a missing impact assessment in the gap list, and

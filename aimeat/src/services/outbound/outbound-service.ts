@@ -100,7 +100,7 @@ import { safeHttpsUrl } from './campaign-markup.js';
 import { loadSenderIdentity } from './sender-identity.js';
 import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
 import { disclosureHeaders, isDeclared, type AiDisclosure } from './ai-disclosure.js';
-import { provenanceForWrite, storeHeldProvenance } from '../ai-provenance.js';
+import { provenanceForWrite, storeHeldProvenance } from '../ai/provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import { takeMailSendOnNode } from '../account-limits.js';
 import { sendMail } from '../mail-gate.js';

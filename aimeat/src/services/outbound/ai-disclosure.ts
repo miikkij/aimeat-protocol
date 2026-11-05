@@ -22,7 +22,7 @@
  *
  *   THE NAME IS BORROWED, NOT INVENTED. The header NAME comes from the IETF's AI-Disclosure draft
  *   (draft-abaris-aicdh), whose own `mode` vocabulary is none | ai-modified | ai-originated |
- *   machine-generated (services/ai-provenance-adapters.ts toIetfHeader). The four VALUES used here —
+ *   machine-generated (services/ai/provenance-adapters.ts toIetfHeader). The four VALUES used here —
  *   none | ai-assisted | ai-generated | autonomous — are the W3C Community Group's DRAFT
  *   `ai-disclosure` list, which reads better to a person inspecting a header. The final report
  *   (2026-10-09) settled on human-only | ai-assisted | ai-autonomous for HTML, which toW3cHtml now

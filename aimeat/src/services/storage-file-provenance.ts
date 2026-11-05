@@ -19,7 +19,7 @@ import type { Storage, StorageFileRecord, AiProvenanceRecordRow } from '../stora
 import {
     provenanceForWrite, provenanceDeclarationRefusal, contentHashOf,
     ProvenanceScopeError, type DeclaredProvenance,
-} from './ai-provenance.js';
+} from './ai/provenance.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };

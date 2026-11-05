@@ -69,7 +69,7 @@ import {
 import { readerFor } from '../services/classification/reader.js';
 import { chatEnabled, chatPayer, runChatTurn, resetChatSession, endChatSession } from '../services/chat-session.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
-import { readAllowance, remainingOf } from '../services/ai-allowance.js';
+import { readAllowance, remainingOf } from '../services/ai/allowance.js';
 import { allowanceShown } from '../services/ai/node-key-balance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
 import { recordFirstChatTurn } from '../services/onboarding-funnel.js';

@@ -23,7 +23,7 @@
  *   v1.1.0 -- 2026-09-29 -- Files are read through readAiFile with a classification reader (TARGET-082).
  */
 import type { Storage } from '../storage/interface.js';
-import { readAiFile } from './ai-inputs.js';
+import { readAiFile } from './ai/inputs.js';
 import type { ContentReader } from './classification/reader.js';
 import type { PromptImage } from './goose-acp.js';
 import { extractFileText, extractableKind, isLegacyOfficeFile, NAME, type ExtractOptions } from './file-text/index.js';
@@ -80,7 +80,7 @@ export async function readAttachments(
     const out: ReadAttachments = { images: [], quoted: [], notes: [], skipped: [] };
 
     for (const key of keys.slice(0, MAX_ATTACHMENTS_PER_TURN)) {
-        // The one loader of what a model reads (services/ai-inputs.ts): classification first.
+        // The one loader of what a model reads (services/ai/inputs.ts): classification first.
         const file = await readAiFile(storage, reader, gaii, key, { capability: 'text' });
         if (!file) {
             logger.warn(`[chat] attachment not found for ${gaii}: ${key}`);

@@ -53,7 +53,7 @@ import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
 import { detectLocale } from '../i18n.js';
 import { appCsp } from '../utils/app-csp.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
-import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../services/ai/provenance-marks.js';
 import { appReviewedBy } from '../services/app-marks.js';
 import { escapeHtml } from '../utils/html-escape.js';
 import { countVisit } from '../services/visibility/visibility-counter.js';

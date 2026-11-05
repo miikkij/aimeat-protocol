@@ -19,7 +19,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, type DeclaredProvenance } from './ai/provenance.js';
 
 /** Who publishes the skill and what they said about how it was written. */
 export interface SkillPublishProvenance {

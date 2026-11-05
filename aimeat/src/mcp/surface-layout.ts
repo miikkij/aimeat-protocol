@@ -40,7 +40,7 @@ import { SiteError } from '../services/site.js';
 import { SurfaceLayoutService, type LayoutSubmission } from '../services/surface-layout/service.js';
 import { blocksForSurface, operatorLabelKey } from '../services/surface-layout/registry.js';
 import type { SurfaceId } from '../services/surface-layout/types.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

@@ -10,7 +10,7 @@
  *                                caller: an owner, an agent (its own key and lists count) or an app
  *                                (its grant and its meta count). `app_id` names the app a caller
  *                                acts for, as on every AI call.
- *     POST /v1/ai/embed          vectors for a list of texts (services/ai-embed.ts).
+ *     POST /v1/ai/embed          vectors for a list of texts (services/ai/embed.ts).
  *
  *   Both need `ai:use` (an owner session passes), as every AI route does (auth/ai-gate.ts).
  * @structure aiCapabilitiesRouter(config, storage)
@@ -33,7 +33,7 @@ import { retryAfterOf } from '../services/account-limits.js';
 import { callerOf } from '../middleware/caller.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
 import { aiCapabilitiesView } from '../services/ai/capabilities.js';
-import { embedForOwner } from '../services/ai-embed.js';
+import { embedForOwner } from '../services/ai/embed.js';
 import { readCallRole } from '../services/ai/call-guards.js';
 import { aiCallerOf } from './ai-policy.js';
 

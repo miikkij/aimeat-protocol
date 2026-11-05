@@ -1,6 +1,6 @@
 /**
  * @file test/unit/ai-label-icon-parity.test.ts
- * @description The browser cannot import src/services/ai-provenance-adapters.ts, so
+ * @description The browser cannot import src/services/ai/provenance-adapters.ts, so
  *   public/components/ai-label-icons.js carries the only other copy of the EU-icon truth table on this
  *   platform. A second copy of a mapping is a defect waiting to happen; this test is what turns it
  *   into a loud one. It runs BOTH implementations over the whole cross-product of the frozen enums
@@ -25,7 +25,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { toEuIcon } from '../../src/services/ai-provenance-adapters.js';
+import { toEuIcon } from '../../src/services/ai/provenance-adapters.js';
 import {
   AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_LEVELS, AI_HUMAN_INVOLVEMENT,
 } from '../../src/models/ai-provenance-schemas.js';

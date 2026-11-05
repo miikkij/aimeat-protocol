@@ -29,7 +29,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { mediaKindOfValue, type AiProvenanceLevel, type AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput, type DeclaredProvenance } from './ai/provenance.js';
 import { documentContentBytes, memoryContentBytes } from '../utils/memory-content.js';
 import { readPublishSpace } from './workspace-write-items.js';
 

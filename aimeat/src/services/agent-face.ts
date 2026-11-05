@@ -60,7 +60,7 @@ import { getOwnerScopePublicMemory } from './owner-memory.js';
 import { renderAppMarkdown, FORMAT_MD_BUSY } from './app-format-md.js';
 import {
   loadServedProvenance, provenanceFrontmatter, provenanceMarkdownNote, setProvenanceHeaders,
-} from './ai-provenance-marks.js';
+} from './ai/provenance-marks.js';
 
 /** The memory key an app's agent face lives under (PUBLIC record, app owner's GHII) —
  *  same identifier family as the WebMCP tool manifest `apps.{filename}.tools`. */

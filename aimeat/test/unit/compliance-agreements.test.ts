@@ -13,10 +13,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import { SCC_2021_915, SCC_2021_915_SHA256 } from '../../src/data/legal/eu-scc-2021-915.js';
-import { canonicalText, textHashOf } from '../../src/services/compliance-agreements-render.js';
-import { finalizeNotices, statusOf } from '../../src/services/compliance-agreements.js';
-import { changedParts } from '../../src/services/compliance-agreements-ops.js';
-import { OptionsSchema, type Agreement, type AgreementVersion } from '../../src/services/compliance-agreements-schemas.js';
+import { canonicalText, textHashOf } from '../../src/services/compliance/agreements-render.js';
+import { finalizeNotices, statusOf } from '../../src/services/compliance/agreements.js';
+import { changedParts } from '../../src/services/compliance/agreements-ops.js';
+import { OptionsSchema, type Agreement, type AgreementVersion } from '../../src/services/compliance/agreements-schemas.js';
 import { createHash } from 'node:crypto';
 
 const now = '2026-10-24T10:00:00.000Z';

@@ -19,7 +19,7 @@ import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
-import { loadServedProvenance, setProvenanceHeaders, type ServedProvenance } from '../services/ai-provenance-marks.js';
+import { loadServedProvenance, setProvenanceHeaders, type ServedProvenance } from '../services/ai/provenance-marks.js';
 import { detectLocale, type Locale } from '../i18n.js';
 
 /** A page's AI-provenance record as served, and what the visible label needs to render. */

@@ -48,7 +48,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { warningField } from '../../services/classification-exits.js';
 import { shareCarriesKey } from '../../services/group-shares-classification.js';
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
-import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
+import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
 import { type MemoryRouteCtx, visibilityToZone } from './shared.js';
 import { callerOf } from '../../middleware/caller.js';
 import { denyScope403 } from '../../auth/deny.js';

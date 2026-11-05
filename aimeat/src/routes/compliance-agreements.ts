@@ -5,7 +5,7 @@
  * @description Data processing agreements (GDPR art. 28) over REST (plan doc-mvmr4i2wdk0p): the
  *   operator makes, sends, announces and ends them; the counterparty, when it has an account here,
  *   reads its own, sends a signed copy back and objects to a change. Every route names the caller and
- *   hands it to services/compliance-agreements-ops.ts or -sign.ts, which the MCP tool
+ *   hands it to services/compliance/agreements-ops.ts or -sign.ts, which the MCP tool
  *   aimeat_compliance_agreement calls too.
  *
  *   THE WORDS. compliance:read to read and compliance:write to act, which no wildcard carries; an owner
@@ -40,12 +40,12 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE } from '../utils/scope-coverage.js';
 import { callerOf } from '../middleware/caller.js';
-import { AgreementError, operatorAccess } from '../services/compliance-agreements-access.js';
+import { AgreementError, operatorAccess } from '../services/compliance/agreements-access.js';
 import {
   breachNoticeOp, createOp, deletionDoneOp, documentOp, endOp, getOp, listOp, mineOp, newVersionOp, noticeOp, objectOp, patchOp, sendOp,
-} from '../services/compliance-agreements-ops.js';
-import { confirmOp, signedCopyOp } from '../services/compliance-agreements-sign.js';
-import { agreementGaps } from '../services/compliance-agreements-gaps.js';
+} from '../services/compliance/agreements-ops.js';
+import { confirmOp, signedCopyOp } from '../services/compliance/agreements-sign.js';
+import { agreementGaps } from '../services/compliance/agreements-gaps.js';
 
 export function complianceAgreementsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();

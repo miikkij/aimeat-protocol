@@ -64,7 +64,7 @@ import { memoryCeilings } from './memory-ceilings.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { isHtmlPageValue } from './html-page.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
-import { storeHeldProvenance } from './ai-provenance.js';
+import { storeHeldProvenance } from './ai/provenance.js';
 import { provenanceForDocEdit } from './workspace-doc-provenance.js';
 import { documentContentBytes } from '../utils/memory-content.js';
 import { emitChange } from './event-bus.js';

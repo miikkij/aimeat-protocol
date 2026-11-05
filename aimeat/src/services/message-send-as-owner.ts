@@ -30,13 +30,13 @@
  */
 import type { DeliveryCtx } from './message-delivery.js';
 import type { MessageAttachmentInput } from '../models/message-schemas.js';
-import type { DeclaredProvenance } from './ai-provenance.js';
+import type { DeclaredProvenance } from './ai/provenance.js';
 import { sendDirectMessage, mapMessageAttachments } from './message-send.js';
 import { sendGroupMessage } from './conversation-group.js';
 import { resolveGroupTarget } from './message-alias.js';
 import { takeSendTurn } from './message-send-limit.js';
 import { mintMessageProvenance } from './message-provenance.js';
-import { provenanceDeclarationRefusal } from './ai-provenance.js';
+import { provenanceDeclarationRefusal } from './ai/provenance.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 

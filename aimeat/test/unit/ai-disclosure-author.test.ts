@@ -1,7 +1,7 @@
 /**
  * @file test/unit/ai-disclosure-author.test.ts
  * @description The node does not speak over an app's own AI-disclosure declaration
- *   (src/services/ai-disclosure-author.ts, through the real serve pass in app-serve-marks.ts).
+ *   (src/services/ai/disclosure-author.ts, through the real serve pass in app-serve-marks.ts).
  *
  *   Under the W3C AI Content Disclosure report (Final Community Group Report, 2026-10-09) the first
  *   `<meta name="ai-disclosure">` in the head is the page default and a valid value on `<html>`
@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { applyServeMarks } from '../../src/services/app-serve-marks.js';
 import { stripServedMarks } from '../../src/services/app-serve-marks-strip.js';
-import { authorDisclosure, traceAuthorDisclosure } from '../../src/services/ai-disclosure-author.js';
+import { authorDisclosure, traceAuthorDisclosure } from '../../src/services/ai/disclosure-author.js';
 import { logger } from '../../src/utils/logger.js';
 import { provFixture } from './serve-marks-fixtures.js';
 

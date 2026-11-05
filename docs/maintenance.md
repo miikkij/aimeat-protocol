@@ -72,7 +72,7 @@ statement matches code. A passing check is a structural check, not a content rev
 - Configuration changes: configuration reference, deployment examples and affected operator guides.
 - Frontend changes: frontend guidance and any documented user steps.
 - Parser or loader changes: CSM/MSM/extension manuals and runtime examples.
-- Provider changes: the setup table `aimeat/src/services/ai-tool-setup.ts`, checked against the provider's own documentation.
+- Provider changes: the setup table `aimeat/src/services/ai/tool-setup.ts`, checked against the provider's own documentation.
 - A release: check user entry points against that release and remove stale fixed counts.
 - Anything an operator configures, a default, a sign-in method, an outbound connection, a security
   control or a limit: the page of the [IT adoption package](it-adoption/README.md) that states it.

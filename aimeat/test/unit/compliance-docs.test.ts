@@ -12,10 +12,10 @@
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9).
  */
 import { describe, it, expect } from 'vitest';
-import { COMPLIANCE_DOC_KINDS } from '../../src/services/compliance-docs-schemas.js';
+import { COMPLIANCE_DOC_KINDS } from '../../src/services/compliance/docs-schemas.js';
 import { COMPLIANCE_DOC_KINDS as CATALOG_KINDS } from '../../src/tool-catalog/definitions/compliance.js';
-import { docKey, scopeOfKey } from '../../src/services/compliance-docs.js';
-import { frameworkVerdicts } from '../../src/services/compliance-derived.js';
+import { docKey, scopeOfKey } from '../../src/services/compliance/docs.js';
+import { frameworkVerdicts } from '../../src/services/compliance/derived.js';
 import { CLASSIFICATION_PACKS } from '../../src/data/classification-packs.js';
 import { COMPLIANCE_DOMAINS } from '../../src/data/compliance-domains.js';
 import { DEFAULT_LABELS } from '../../src/services/classification/defaults.js';

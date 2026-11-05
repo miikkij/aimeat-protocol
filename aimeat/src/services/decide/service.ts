@@ -100,11 +100,11 @@ import type {
   AiDecisionKeyScope, AiDecisionOutcome, AiDecisionStatsGroup, AiDecisionStatsGroupBy,
 } from '../../storage/interface.js';
 import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError, PROVIDER_KEY_REFUSED_STATUS } from '../ai/completion.js';
-import { nodeKeyStanding, debitAllowance } from '../ai-allowance.js';
+import { nodeKeyStanding, debitAllowance } from '../ai/allowance.js';
 import { readProgramMap, NODE_READ } from '../data-map/data-map-access.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
-import { canonicalAiAppId } from '../ai-app-id.js';
+import { canonicalAiAppId } from '../ai/app-id.js';
 import { createScrubber } from './scrub.js';
 import { checkDecideRequest, DEFAULT_DECIDE_LIMITS, type JevQuestion } from './limits.js';
 import { callSystemOne, SystemOneError, type SystemOneAnswer } from './systemone-client.js';
@@ -409,7 +409,7 @@ function mapProviderError(e: SystemOneError, scope: AiDecisionKeyScope, provider
 export async function decideForOwner(
   storage: Storage, config: AimeatConfig, callerIn: DecideCaller, inputIn: DecideInput,
 ): Promise<DecideResult> {
-  // One name per app, whichever door asked (services/ai-app-id.ts): an app token's `app.html` and
+  // One name per app, whichever door asked (services/ai/app-id.ts): an app token's `app.html` and
   // the `app` an app names itself are the same app, with one cap and one row in the register.
   const caller: DecideCaller = { ...callerIn, appId: canonicalAiAppId(callerIn.appId, callerIn.gaii) };
   // 1 ── switch, shape, limits

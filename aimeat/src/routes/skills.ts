@@ -76,9 +76,9 @@ import { logger } from '../utils/logger.js';
 import { SkillValidationError, isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill-md.js';
 import { readSkillFileInput, skillFileBytes, skillFileEncodings } from '../services/skill-files.js';
 import { parseSkillVisibility, SKILL_VISIBILITY_HINT } from '../services/skill-audience.js';
-import { ProvenanceScopeError } from '../services/ai-provenance.js';
-import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
-import { provenanceWriteEcho } from '../services/ai-provenance-echo.js';
+import { ProvenanceScopeError } from '../services/ai/provenance.js';
+import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
+import { provenanceWriteEcho } from '../services/ai/provenance-echo.js';
 import { readerFor } from '../services/classification/reader.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import {

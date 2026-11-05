@@ -249,9 +249,9 @@
   },
   {
     "type": "cycle",
-    "from": "src/services/ai-allowance.ts",
+    "from": "src/services/ai/allowance.ts",
     "to": "src/services/ai/completion.ts",
-    "unresolvedTo": "./ai/completion.js",
+    "unresolvedTo": "./completion.js",
     "dependencyTypes": [
       "local",
       "import"
@@ -269,7 +269,7 @@
         ]
       },
       {
-        "name": "src/services/ai-allowance.ts",
+        "name": "src/services/ai/allowance.ts",
         "dependencyTypes": [
           "local",
           "import"
@@ -1244,8 +1244,8 @@
   {
     "type": "cycle",
     "from": "src/data/compliance-questionnaire.ts",
-    "to": "src/services/compliance-register.ts",
-    "unresolvedTo": "../services/compliance-register.js",
+    "to": "src/services/compliance/register.ts",
+    "unresolvedTo": "../services/compliance/register.js",
     "dependencyTypes": [
       "local",
       "type-only",
@@ -1257,7 +1257,7 @@
     },
     "cycle": [
       {
-        "name": "src/services/compliance-register.ts",
+        "name": "src/services/compliance/register.ts",
         "dependencyTypes": [
           "local",
           "type-only",

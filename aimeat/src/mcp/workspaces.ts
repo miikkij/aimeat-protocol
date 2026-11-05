@@ -214,7 +214,7 @@ import { registerWorkspaceMemberTools } from './workspace-members.js';
 import { registerWorkspaceMemberChangeTools } from './workspace-member-changes.js';
 import { unfileDeletedDocument } from '../services/workspace-member-changes.js';
 import { registerWorkspaceTransferTool } from './workspace-transfer.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';

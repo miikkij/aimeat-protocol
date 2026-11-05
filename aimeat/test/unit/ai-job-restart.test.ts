@@ -18,7 +18,7 @@ import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 /** The model call: held until released while `hold` is on, answered at once otherwise. */
 const model = vi.hoisted(() => ({ hold: false, calls: 0, release: [] as Array<() => void> }));
 
-vi.mock('../../src/services/ai-inputs.js', () => ({
+vi.mock('../../src/services/ai/inputs.js', () => ({
     readAiRecords: vi.fn(async (_d: unknown, _r: unknown, _o: string, keys: Array<{ key: string }>) => keys.map(k => ({ key: k.key, value: 'v' }))),
     readAiFile: vi.fn(async () => null),
 }));

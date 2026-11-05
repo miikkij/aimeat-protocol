@@ -6,7 +6,7 @@
  *   CSS custom property, so the app can keep its own bottom UI out from under the node's marks.
  *
  *   THE PROBLEM THIS SOLVES. Fixed marks ride every served app, on one row at the bottom-left: the
- *   visible AI label (top layer, services/ai-provenance-marks.ts), the aimeat.io attribution bolt
+ *   visible AI label (top layer, services/ai/provenance-marks.ts), the aimeat.io attribution bolt
  *   (utils/app-badge.ts) and, when the browser offers it, the install button
  *   (public/js/install-chip.js). Both marks are deliberate and both stay — the badge is the permanent
  *   attribution, the label is an Art. 50 compliance mark. But an app with its own fixed bottom bar

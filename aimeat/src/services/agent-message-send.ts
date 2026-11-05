@@ -46,7 +46,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { AgentMessageCreateSchema } from '../models/agent-message-schemas.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai/provenance.js';
 import { emitChange } from './event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';

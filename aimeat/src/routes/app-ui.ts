@@ -36,7 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
-import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
+import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
 import { buildUiCatalogue } from '../services/app-ui/catalogue.js';
 import { buildUiCatalogueView, catalogueMode } from '../services/app-ui/catalogue-index.js';
 import { validateUiLayout, AppUiError } from '../services/app-ui/validate.js';

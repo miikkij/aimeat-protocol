@@ -16,7 +16,7 @@ vi.mock('../../src/services/notify.js', () => ({
   notify: vi.fn(async (_s: unknown, to: string, input: unknown) => { sent.push({ to, input }); return { stored: true, pushed: false, held: false, muted: false }; }),
 }));
 
-const { bareNameOnlyEntry, appAllowlisted } = await import('../../src/services/ai-app-id.js');
+const { bareNameOnlyEntry, appAllowlisted } = await import('../../src/services/ai/app-id.js');
 const { noticeBareNameMatch, APP_NAME_NOTICES_KEY } = await import('../../src/services/ai/app-name-notice.js');
 
 const OWNER = 'alice@aimeat-local-001-dev';

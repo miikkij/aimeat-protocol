@@ -189,7 +189,7 @@ import {
     writeStorageFile, mintStorageUploadUrl, changeStorageFileVisibility, type StorageProvenanceInput,
 } from '../services/storage-file-write.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
-import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type ServedProvenance } from '../services/ai-provenance-marks.js';
+import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type ServedProvenance } from '../services/ai/provenance-marks.js';
 import { generateDownloadToken } from '../services/download-token.js';
 import { storageDownloadRouter } from './storage-files-download.js';
 import { odpsRedirectFor } from '../services/datapackage/odps-read.js';

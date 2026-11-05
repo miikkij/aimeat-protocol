@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { MODEL_RECOMMENDATION, MODEL_REVIEW_MAX_AGE_DAYS, modelReviewAgeDays } from '../../src/services/model-recommendation.js';
-import { buildAiToolSetup } from '../../src/services/ai-tool-setup.js';
+import { buildAiToolSetup } from '../../src/services/ai/tool-setup.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-example' } as never;
 

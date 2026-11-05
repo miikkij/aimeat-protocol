@@ -81,7 +81,7 @@ import { isValidAgentName } from '../../utils/gaii.js';
 import {
   isObj, isLoopbackHost as LOOPBACK, PROVIDER_ID_RE, PROVIDER_ID_PROBLEM as ID_PROBLEM, providerIdOf, egressOriginsOf,
   isProviderKeyEnvName, PROVIDER_KEY_ENV_RULE,
-} from '../ai-provider-common.js';
+} from '../ai/provider-common.js';
 import { DecideError } from './errors.js';
 import { estimateTokens, type JevQuestion, type LimitViolation } from './limits.js';
 import { SYSTEMONE_ADAPTERS } from './systemone-client.js';
@@ -238,7 +238,7 @@ export function providerAllowOrigins(provider: DecisionProvider, config: AimeatC
 }
 
 // providerIdOf, the id rule, isObj, the loopback test and the egress list parser live in
-// services/ai-provider-common.ts since v1.4.0: System 2's provider records use the same ones.
+// services/ai/provider-common.ts since v1.4.0: System 2's provider records use the same ones.
 
 /**
  * Read one provider record from untrusted input: the operator's JSON or an owner's request body.

@@ -167,20 +167,20 @@ import { NODE_OPENROUTER_ID, type ProviderParams } from './providers.js';
 import { planRoute, refusalFor, type AiCandidate } from './route-plan.js';
 import { runRoute, type AiRoute } from './route-run.js';
 import { callCost } from './catalog/price.js';
-import { mintProvenance } from '../ai-provenance.js';
+import { mintProvenance } from './provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
-import { debitAllowance, nodeKeyStanding } from '../ai-allowance.js';
+import { resolveModelFor, type ModelRole } from './model-defaults.js';
+import { debitAllowance, nodeKeyStanding } from './allowance.js';
 import { holdNodeKeyCandidates, nodeKeyOutputCap } from './node-key-hold.js';
 import { emptyAttemptsCostUsd, withEmptyAttemptsCost, emptyAttemptsCostOf } from './failed-attempts.js';
 import type { AiCallOutcome, AiCallSettlement } from './call-outcome.js';
 import { textCallInputTokens } from './call-size.js';
 import { noticeBareNameMatch } from './app-name-notice.js';
-import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from '../ai-usage-record.js';
+import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from './usage-record.js';
 import { agentCapRefusal, aiAskerOf } from '../agent-ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
-import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from '../ai-daily-budget.js';
+import { DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd } from './daily-budget.js';
 export { todayKey, getTodayUsage, recordAiUsage, type UsageRecord, DEFAULT_DAILY_BUDGET_USD, getDailyBudgetUsd };
 
 // DEFAULT_DAILY_BUDGET_USD and getDailyBudgetUsd live in ai-daily-budget.ts (a leaf, so the ledger's
@@ -458,7 +458,7 @@ async function planAiCall(
   }
 
   // The model each role gave before providers existed: the owner's setting, then the node's default
-  // (services/ai-model-defaults.ts), and for text, with nothing chosen anywhere, OpenRouter's
+  // (services/ai/model-defaults.ts), and for text, with nothing chosen anywhere, OpenRouter's
   // free-models router. It is what the migrated provider and the node's own provider use when a call
   // names no model, so an owner who set nothing new sees nothing change.
   const textModel = (opts.modelRole === 'reasoning' && roleModel('reasoning'))

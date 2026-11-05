@@ -18,8 +18,8 @@
  */
 import type { ConversationRecord } from '../storage/interface.js';
 import type { DeliveryCtx } from './message-delivery.js';
-import type { DeclaredProvenance } from './ai-provenance.js';
-import { provenanceDeclarationRefusal } from './ai-provenance.js';
+import type { DeclaredProvenance } from './ai/provenance.js';
+import { provenanceDeclarationRefusal } from './ai/provenance.js';
 import { mintMessageProvenance } from './message-provenance.js';
 import { takeSendTurn } from './message-send-limit.js';
 import { startGroupConversation, type GroupManageError, type MemberOutcome } from './conversation-group-manage.js';

@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The one status table and reason policy every AI path uses (services/ai/errors.ts), the
- *   speech answer's audio block and voice check (services/ai-voice-audio.ts) and the picture sniffer
+ *   speech answer's audio block and voice check (services/ai/voice-audio.ts) and the picture sniffer
  *   (services/openrouter.ts sniffImage). aiprov plan, workstream A (A1, A2, A4, A6, A8, A13): until
  *   2026-10-08 a permanent 4xx was 502 "try again shortly" on six of seven AI paths.
  * @version-history
@@ -14,7 +14,7 @@ import {
   AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, nodeFailureOf, providerFailureOf, providerReason,
   providerReasonFromText, providerStatusError, redactKeyShaped, retryAfterHeader,
 } from '../../src/services/ai/errors.js';
-import { speechAudioOf, checkSpeechVoice, speechFormatHint } from '../../src/services/ai-voice-audio.js';
+import { speechAudioOf, checkSpeechVoice, speechFormatHint } from '../../src/services/ai/voice-audio.js';
 import { sniffImage } from '../../src/services/openrouter.js';
 import type { AiCandidate } from '../../src/services/ai/route-plan.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';

@@ -20,7 +20,7 @@
  *   compliance surface cannot afford.
  *
  *   THE ROUTES HOLD NO LOGIC. Validation, classification and the roll-up live in
- *   services/compliance-register.ts and services/compliance-report.ts, which the MCP tools call too.
+ *   services/compliance/register.ts and services/compliance/report.ts, which the MCP tools call too.
  *   A second implementation behind the tool surface is how the same defect came to be fixed three
  *   times inside one MCP tool.
  * @structure
@@ -58,14 +58,14 @@ import { recordUsageCall } from '../services/usage/usage-buffer.js';
 import { logger } from '../utils/logger.js';
 import {
   buildComplianceReport, complianceUnlabelledDetail, MONTH_RE,
-} from '../services/compliance-report.js';
-import { draftRegisterFromActivity } from '../services/compliance-draft.js';
+} from '../services/compliance/report.js';
+import { draftRegisterFromActivity } from '../services/compliance/draft.js';
 import {
   QuestionnaireSchema, UseCasesSchema, effectiveQuestionnaire, readUseCases,
   writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport, storedReportKind,
   type ComplianceQuestionnaire,
-} from '../services/compliance-register.js';
-import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
+} from '../services/compliance/register.js';
+import { saveComplianceSnapshot } from '../services/compliance/monthly-job.js';
 import { builtInQuestionIds } from '../data/compliance-questionnaire.js';
 
 export function adminComplianceRouter(config: AimeatConfig, storage: Storage): Router {

@@ -56,7 +56,7 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { readProvenance } from '../services/ai-provenance-result.js';
+import { readProvenance } from '../services/ai/provenance-result.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {

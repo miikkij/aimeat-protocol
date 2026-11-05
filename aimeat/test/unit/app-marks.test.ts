@@ -18,7 +18,7 @@ import { applyAppHeadMeta } from '../../src/utils/app-head-meta.js';
 import {
   parseMarksInput, parseAuthorInput, appBadgeOn, appInstallChipOn, appReviewedBy, AUTHOR_NAME_MAX,
 } from '../../src/services/app-marks.js';
-import { buildDisclosure } from '../../src/services/ai-provenance.js';
+import { buildDisclosure } from '../../src/services/ai/provenance.js';
 import { SERVE_MARK_CASES, FIXTURE_CONFIG, provFixture } from './serve-marks-fixtures.js';
 import type { AppManifest } from '../../src/storage/types/apps.js';
 

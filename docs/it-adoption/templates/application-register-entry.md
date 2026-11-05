@@ -44,7 +44,7 @@ Copy the rows into your application register, CMDB or ISMS form; most such forms
 
 | Field | Answer | Source |
 |---|---|---|
-| Data held | Accounts and profiles; people's memory records and files; shared workspaces; published apps and their data; agents and their tokens; messages; consent ledger; AI usage ledger; sign-in and security log | `aimeat/src/services/compliance-derived.ts` (`nodeRegistersDraft`), [data ownership](../../data-ownership.md) |
+| Data held | Accounts and profiles; people's memory records and files; shared workspaces; published apps and their data; agents and their tokens; messages; consent ledger; AI usage ledger; sign-in and security log | `aimeat/src/services/compliance/derived.ts` (`nodeRegistersDraft`), [data ownership](../../data-ownership.md) |
 | Where data is stored | In the database; stored files too (`StorageFile` table), unless `AIMEAT_FILE_STORE` puts their bytes in an S3 bucket or an Azure container [ORGANIZATION] *say which* | [Backup and restore](../../operations/backup-and-restore.md#what-a-node-is) |
 | Secrets at rest | AI keys, vault entries, TOTP secrets and attached MCP server tokens are encrypted with `AIMEAT_ENCRYPTION_KEY`; the node key with `AIMEAT_KEY_PASSPHRASE` | [Backup and restore](../../operations/backup-and-restore.md) |
 | Highest confidentiality class allowed | [ORGANIZATION] *e.g. "Confidential; no TL-classified material".* | Classification is off by default (`AIMEAT_CLASSIFICATION`); [data classification](../../data-classification.md) |
@@ -69,15 +69,15 @@ Copy the rows into your application register, CMDB or ISMS form; most such forms
 
 | Field | Answer | Source |
 |---|---|---|
-| Processes personal data | Yes: at least accounts, the sign-in and security log, the consent ledger, the AI usage ledger and people's own content | `aimeat/src/services/compliance-derived.ts` (`nodeRegistersDraft`) |
+| Processes personal data | Yes: at least accounts, the sign-in and security log, the consent ledger, the AI usage ledger and people's own content | `aimeat/src/services/compliance/derived.ts` (`nodeRegistersDraft`) |
 | Records of processing | The node drafts its own registers and each app's; review and store them on the admin Compliance page | `aimeat_compliance_register_read` (part `registers_draft`), [data classification](../../data-classification.md), template: [processing record](processing-record.md) |
-| Processors | AI providers whose prompts leave the server, the SMTP relay and the hosting, as configured; you add contract, country and transfer basis | `aimeat/src/services/compliance-derived.ts` (`derivedProcessors`) |
+| Processors | AI providers whose prompts leave the server, the SMTP relay and the hosting, as configured; you add contract, country and transfer basis | `aimeat/src/services/compliance/derived.ts` (`derivedProcessors`) |
 | Data location | [ORGANIZATION] *Country of the server and of its backups.* | |
-| Transfers outside the EU/EEA | Depends on the model provider. On the node's OpenRouter key: region `eu` processes prompts in the EU/EEA, the United Kingdom or Switzerland (adequacy); `us` and `any` rest on the SCC in OpenRouter's agreement; OpenRouter keeps account and billing records in the United States whatever the region. A local model sends nothing out | [OpenRouter region](../../operations/openrouter-region.md), `aimeat/src/services/compliance-derived.ts` |
+| Transfers outside the EU/EEA | Depends on the model provider. On the node's OpenRouter key: region `eu` processes prompts in the EU/EEA, the United Kingdom or Switzerland (adequacy); `us` and `any` rest on the SCC in OpenRouter's agreement; OpenRouter keeps account and billing records in the United States whatever the region. A local model sends nothing out | [OpenRouter region](../../operations/openrouter-region.md), `aimeat/src/services/compliance/derived.ts` |
 | Region chosen | [ORGANIZATION] *eu, us or any, fallback, and whether people may choose.* | `AIMEAT_AI_OPENROUTER_REGION`, `AIMEAT_AI_OPENROUTER_REGION_FALLBACK` |
-| Federation peers | Not processors and not recorded as transfers: a copy for another node is stopped only when its label may not leave the organism; content without such a label, which is all content while classification is off, goes to peers unrecorded | `aimeat/src/services/compliance-processing.ts` (limit `federation-peers-not-processors`) |
+| Federation peers | Not processors and not recorded as transfers: a copy for another node is stopped only when its label may not leave the organism; content without such a label, which is all content while classification is off, goes to peers unrecorded | `aimeat/src/services/compliance/processing.ts` (limit `federation-peers-not-processors`) |
 | DPIA | [ORGANIZATION] *Reference, or the reason none is needed.* The node keeps impact assessments (part `dpias`) and reports a missing one as a gap for data domains that need it | `aimeat/src/data/compliance-domains.ts`, [data classification](../../data-classification.md) |
-| Transfer impact assessment | [ORGANIZATION] *Reference for each processor outside the EU/EEA.* The node lists those processors as transfers | `aimeat/src/services/compliance-derived.ts` (`transfersOf`) |
+| Transfer impact assessment | [ORGANIZATION] *Reference for each processor outside the EU/EEA.* The node lists those processors as transfers | `aimeat/src/services/compliance/derived.ts` (`transfersOf`) |
 | Data subject rights | Account export and erasure are built in; requests are logged with a one-month deadline | [Data ownership](../../data-ownership.md), [data classification](../../data-classification.md) |
 
 ## User, permission and administrator management

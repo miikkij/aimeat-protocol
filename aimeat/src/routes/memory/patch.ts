@@ -123,7 +123,7 @@ import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
-import { stampAgentWrite, storeHeldProvenance } from '../../services/ai-provenance.js';
+import { stampAgentWrite, storeHeldProvenance } from '../../services/ai/provenance.js';
 import { applyMergePatch } from '../../utils/json-merge-patch.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';

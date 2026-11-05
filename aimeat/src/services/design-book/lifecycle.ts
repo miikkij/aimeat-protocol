@@ -50,7 +50,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { systemGhiiFor } from '../compliance-register.js';
+import { systemGhiiFor } from '../compliance/register.js';
 import { UI_LAYOUT_PRESETS } from '../app-ui/layouts.js';
 import { AMBIENTS, type AtelierAmbient } from '../../data/atelier-ambients.js';
 import { EFFECTS, type AtelierEffect } from '../../data/atelier-effects.js';

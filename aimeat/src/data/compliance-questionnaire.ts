@@ -41,7 +41,7 @@
  *   v1.0.0 — 2026-08-23 — BR-02. Structured on the Act's own lists because no first customer has
  *     been named; the set is data precisely so the first real one can reshape it without a release.
  */
-import type { ComplianceQuestionnaire } from '../services/compliance-register.js';
+import type { ComplianceQuestionnaire } from '../services/compliance/register.js';
 
 /** Bumped when the questions below change. The stored record carries its own, which may differ. */
 export const QUESTIONNAIRE_SEED_VERSION = '2026-10-29';

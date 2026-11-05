@@ -16,9 +16,9 @@ import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { takeAiCall, requireAiCallTurn, retryAfterOf } from '../../src/services/account-limits.js';
 import { AiCompletionError } from '../../src/services/ai/errors.js';
-import { embedForOwner } from '../../src/services/ai-embed.js';
-import { generateForOwner } from '../../src/services/ai-image.js';
-import { transcribeForOwner } from '../../src/services/ai-transcription.js';
+import { embedForOwner } from '../../src/services/ai/embed.js';
+import { generateForOwner } from '../../src/services/ai/image.js';
+import { transcribeForOwner } from '../../src/services/ai/transcription.js';
 
 const NODE = 'aimeat-local-001-dev';
 let n = 0;

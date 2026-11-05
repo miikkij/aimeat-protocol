@@ -1,16 +1,16 @@
 # Template: record of processing activities (GDPR Article 30)
 
-> Checked against AIMEAT node 4.2.0 (commit 269f425b1) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit e2be032fb) on 2026-11-04. Maintained with the code: see the README for how.
 
 ## How to use
 
-Article 30(1) of the GDPR lists what a controller's record must contain: the controller and its contacts, the purposes, the categories of data subjects and of personal data, the recipients, transfers to third countries with their safeguards, the time limits for erasure where possible, and a general description of the security measures ([Regulation (EU) 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj)). The node drafts most of this from what it holds: open the admin Compliance page (`/v1/admin?tab=compliance`) or ask an operator's AI for `aimeat_compliance_register_read` with part `registers_draft`, review each draft, and store it with `aimeat_compliance_register_write` ([data classification](../../data-classification.md), "Records of processing"). This template carries the same drafts so you can review them on paper first or keep the record in your own register; the stored version on the node is the one the node checks against its data maps, labels and deadlines. A field marked `[ORGANIZATION]` is a decision the node cannot make for you. The node checks the record against its own data and cannot check it against the world (`aimeat/src/services/compliance-processing.ts`, limit `registers-are-statements`).
+Article 30(1) of the GDPR lists what a controller's record must contain: the controller and its contacts, the purposes, the categories of data subjects and of personal data, the recipients, transfers to third countries with their safeguards, the time limits for erasure where possible, and a general description of the security measures ([Regulation (EU) 2016/679](https://eur-lex.europa.eu/eli/reg/2016/679/oj)). The node drafts most of this from what it holds: open the admin Compliance page (`/v1/admin?tab=compliance`) or ask an operator's AI for `aimeat_compliance_register_read` with part `registers_draft`, review each draft, and store it with `aimeat_compliance_register_write` ([data classification](../../data-classification.md), "Records of processing"). This template carries the same drafts so you can review them on paper first or keep the record in your own register; the stored version on the node is the one the node checks against its data maps, labels and deadlines. A field marked `[ORGANIZATION]` is a decision the node cannot make for you. The node checks the record against its own data and cannot check it against the world (`aimeat/src/services/compliance/processing.ts`, limit `registers-are-statements`).
 
 ## Part A: controller
 
 | Article 30(1)(a) field | Answer | Source |
 |---|---|---|
-| Controller name and contact | [ORGANIZATION] *Legal name, address, privacy email; the node reads them from the operator settings.* | `AIMEAT_OPERATOR_NAME`, `AIMEAT_OPERATOR_EMAIL`, `aimeat/src/services/compliance-derived.ts` |
+| Controller name and contact | [ORGANIZATION] *Legal name, address, privacy email; the node reads them from the operator settings.* | `AIMEAT_OPERATOR_NAME`, `AIMEAT_OPERATOR_EMAIL`, `aimeat/src/services/compliance/derived.ts` |
 | Joint controller | [ORGANIZATION] *Name and contact, or "none".* | |
 | Representative in the EU | [ORGANIZATION] *Only for a controller established outside the EU.* | |
 | Data protection officer | [ORGANIZATION] *"Name, email", or "not appointed".* | `AIMEAT_OPERATOR_DPO_CONTACT` |
@@ -18,7 +18,7 @@ Article 30(1) of the GDPR lists what a controller's record must contain: the con
 
 ## Part B: processing activities the node drafts on every installation
 
-The five registers below are drafted for the installation with the operator as controller and a review every 12 months (`aimeat/src/services/compliance-derived.ts`, `nodeRegistersDraft`). Values marked "draft" are what the node fills; confirm or change each.
+The five registers below are drafted for the installation with the operator as controller and a review every 12 months (`aimeat/src/services/compliance/derived.ts`, `nodeRegistersDraft`). Values marked "draft" are what the node fills; confirm or change each.
 
 ### B1. User accounts
 
@@ -79,15 +79,15 @@ The five registers below are drafted for the installation with the operator as c
 
 | Activity | What the node drafts | Source | Your part |
 |---|---|---|---|
-| Members of each organism | Controller role; contract; members and invited people; account name, role, membership status, invitations; kept while the membership lasts and until the organism is deleted; the organism itself as the one container (its workspaces are not listed) | `aimeat/src/services/compliance-derived.ts` (`organismRegisterDraft`) | [ORGANIZATION] *For each organism: who is controller (your organisation, a unit, a partner), and a register per workspace that holds personal data.* |
-| Each app whose personal data someone other than its user can read, or that keeps regulated data | Purpose from the app's data map; the data families the map marks as personal; recipients from what the map says leaves; retention when the map says "until deleted"; regulated domains stated or proposed | `aimeat/src/services/compliance-derived.ts` (`appRegisterDraft`) | [ORGANIZATION] *The app owner confirms purpose, legal basis and retention. An app with no data map has no draft, and the report names it as a gap.* |
-| People registered to an app without an account | Controller role; email address, display name, role in the app, what each person keeps in the app; kept until the person or the owner removes the registration | `aimeat/src/services/compliance-register-drafts.ts` (`appPartiesRegister`) | [ORGANIZATION] *Legal basis and the notice those people see.* |
+| Members of each organism | Controller role; contract; members and invited people; account name, role, membership status, invitations; kept while the membership lasts and until the organism is deleted; the organism itself as the one container (its workspaces are not listed) | `aimeat/src/services/compliance/derived.ts` (`organismRegisterDraft`) | [ORGANIZATION] *For each organism: who is controller (your organisation, a unit, a partner), and a register per workspace that holds personal data.* |
+| Each app whose personal data someone other than its user can read, or that keeps regulated data | Purpose from the app's data map; the data families the map marks as personal; recipients from what the map says leaves; retention when the map says "until deleted"; regulated domains stated or proposed | `aimeat/src/services/compliance/derived.ts` (`appRegisterDraft`) | [ORGANIZATION] *The app owner confirms purpose, legal basis and retention. An app with no data map has no draft, and the report names it as a gap.* |
+| People registered to an app without an account | Controller role; email address, display name, role in the app, what each person keeps in the app; kept until the person or the owner removes the registration | `aimeat/src/services/compliance/register-drafts.ts` (`appPartiesRegister`) | [ORGANIZATION] *Legal basis and the notice those people see.* |
 
-The Compliance page counts the node's and each app's drafts beside the stored registers until each is reviewed and stored (`aimeat/src/services/compliance-register-drafts.ts`); an organism's draft is read with `aimeat_compliance_register_read`, scope `organism`, part `registers_draft` (`aimeat/src/services/compliance-docs-ops.ts`).
+The Compliance page counts the node's and each app's drafts beside the stored registers until each is reviewed and stored (`aimeat/src/services/compliance/register-drafts.ts`); an organism's draft is read with `aimeat_compliance_register_read`, scope `organism`, part `registers_draft` (`aimeat/src/services/compliance/docs-ops.ts`).
 
 ## Part D: recipients, processors and transfers
 
-The node lists as processors the AI providers whose prompts leave the server, the SMTP relay and the hosting, from its configuration; you add the contract, the country and the transfer basis to each (`aimeat/src/services/compliance-derived.ts`, `derivedProcessors`). Every processor outside the EU/EEA, or with no country written, is listed as a transfer (`transfersOf`).
+The node lists as processors the AI providers whose prompts leave the server, the SMTP relay and the hosting, from its configuration; you add the contract, the country and the transfer basis to each (`aimeat/src/services/compliance/derived.ts`, `derivedProcessors`). Every processor outside the EU/EEA, or with no country written, is listed as a transfer (`transfersOf`).
 
 | Recipient | When it receives data | Node's draft | Your part |
 |---|---|---|---|
@@ -99,7 +99,7 @@ The node lists as processors the AI providers whose prompts leave the server, th
 | Local models | Nothing leaves the server when the model is at a loopback address; an operator provider at an internal origin listed in `AIMEAT_AI_PROVIDER_EGRESS` also counts as local, although data crosses the network to it | Not listed: a provider the node counts as local is not a processor (`aimeat/src/services/ai/providers.ts`) | [ORGANIZATION] *Name any internal model host as a recipient yourself.* |
 | Email provider | Recipient addresses and message content of mail the node sends | Processor `email-smtp` when `AIMEAT_SMTP_HOST` is set | [ORGANIZATION] *Provider, country, agreement.* |
 | Hosting provider | Everything on the server | Processor `hosting` when `AIMEAT_OPERATOR_HOSTING_NAME` is set, with `AIMEAT_OPERATOR_HOSTING_LOCATION` as country | [ORGANIZATION] *Agreement reference.* |
-| Federation peers | Only with federation on, and only what a person shares and its label allows | Not a processor and not recorded as a transfer: a copy for another node is stopped only when its label may not leave the organism; content without such a label, which is all content while classification is off, goes to peers unrecorded (`aimeat/src/services/compliance-processing.ts`, limit `federation-peers-not-processors`) | [ORGANIZATION] *Whether you federate; if so, each peer's operator and the agreement with it.* [Federation](../../operations/federation.md) |
+| Federation peers | Only with federation on, and only what a person shares and its label allows | Not a processor and not recorded as a transfer: a copy for another node is stopped only when its label may not leave the organism; content without such a label, which is all content while classification is off, goes to peers unrecorded (`aimeat/src/services/compliance/processing.ts`, limit `federation-peers-not-processors`) | [ORGANIZATION] *Whether you federate; if so, each peer's operator and the agreement with it.* [Federation](../../operations/federation.md) |
 | Payment providers | Payment data, when a seller on the node takes payments | Not drafted: each seller uses their own Stripe account and keys; the node needs no Stripe setting of its own ([bookkeeping](../../operations/bookkeeping.md)) | [ORGANIZATION] *Whether selling is allowed on your node.* |
 | Outside mail accounts a person connects | Mail the person's agent reads or sends | Not drafted | [ORGANIZATION] *Whether staff may connect them.* [Connecting an outside account](../../connecting-an-outside-account.md) |
 
@@ -124,4 +124,4 @@ The node lists as processors the AI providers whose prompts leave the server, th
 
 ## Open questions
 
-- OPEN: How long does the node keep the sign-in and security log and the AI usage ledger in its database, and is either one pruned by a scheduled job? The node's drafts for `node-security-log` and `node-ai-usage` state no retention (`aimeat/src/services/compliance-derived.ts`). The maintainer named in `.github/SECURITY.md` can answer.
+- OPEN: How long does the node keep the sign-in and security log and the AI usage ledger in its database, and is either one pruned by a scheduled job? The node's drafts for `node-security-log` and `node-ai-usage` state no retention (`aimeat/src/services/compliance/derived.ts`). The maintainer named in `.github/SECURITY.md` can answer.

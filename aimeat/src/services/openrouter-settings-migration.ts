@@ -34,7 +34,7 @@
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { Storage } from '../storage/interface.js';
-import { holdsImplicitFreeModel } from './ai-model-defaults.js';
+import { holdsImplicitFreeModel } from './ai/model-defaults.js';
 import { logger } from '../utils/logger.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
 import { CAS_ATTEMPTS } from './record-cas.js';

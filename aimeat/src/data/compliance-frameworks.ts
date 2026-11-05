@@ -8,7 +8,7 @@
  *   control. The EU AI Act stays where it is, as the use-case register's own set
  *   (data/compliance-questionnaire.ts).
  *
- *   THE SAME CLASSIFIER. Each framework is a ComplianceQuestionnaire, and services/compliance-register.ts
+ *   THE SAME CLASSIFIER. Each framework is a ComplianceQuestionnaire, and services/compliance/register.ts
  *   classifyUseCase reads it as it reads the AI Act set: an answer implies a class, the most severe
  *   wins, and ANY UNANSWERED QUESTION LEAVES THE FRAMEWORK UNCLASSIFIED rather than "does not apply".
  *   Silence is not a considered no. A question whose answer decides nothing implies nothing.
@@ -25,7 +25,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C6.1–C6.8).
  */
-import type { ComplianceQuestionnaire } from '../services/compliance-register.js';
+import type { ComplianceQuestionnaire } from '../services/compliance/register.js';
 
 export interface ComplianceFramework {
   id: string;

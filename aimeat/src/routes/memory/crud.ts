@@ -94,8 +94,8 @@ import { presentMemories } from '../../services/classification/present-memory.js
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { warningField } from '../../services/classification-exits.js';
-import { parseDeclaredProvenanceInput } from '../../services/ai-provenance-input.js';
-import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
+import { parseDeclaredProvenanceInput } from '../../services/ai/provenance-input.js';
+import { provenanceWriteEcho } from '../../services/ai/provenance-echo.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
 import { organismReadableRecords } from '../../services/organism-namespace-access.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -274,7 +274,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       created_at: record.createdAt,
       updated_at: record.updatedAt,
       // The provenance record the write carries (attached, declared or stamped), null for none, and,
-      // when the caller declared or named one, what was recorded (services/ai-provenance-echo.ts):
+      // when the caller declared or named one, what was recorded (services/ai/provenance-echo.ts):
       // the connector and the CLI dispatch hand that block back as it is.
       ai_provenance_id: record.aiProvenanceId ?? null,
       ...(await provenanceWriteEcho(storage, config, { storedId: record.aiProvenanceId, declared: declaration.declared, declaredId: ai_provenance_id })),

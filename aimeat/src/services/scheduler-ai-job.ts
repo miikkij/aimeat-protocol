@@ -44,13 +44,13 @@ import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { completeForOwner } from './ai/completion.js';
 import { isSameOwner, localAccountName } from '../utils/gaii.js';
 import { readerForCaller } from './classification/reader.js';
-import { aiJobKeyRefusal } from './ai-job-keys.js';
-import { readAiRecords } from './ai-inputs.js';
+import { aiJobKeyRefusal } from './ai/job-keys.js';
+import { readAiRecords } from './ai/inputs.js';
 import { unattendedReader } from './ai-jobs/starter.js';
 import { scheduleActor } from './schedule-actor.js';
 import { writeMemoryRecord } from './memory-write.js';
 import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
-import { AiInputHiddenError } from './ai-read-viewer.js';
+import { AiInputHiddenError } from './ai/read-viewer.js';
 import { aiScheduleFireViewer } from './schedule-ai-read.js';
 import { instructionHoldAtFire } from './schedule-instruction-hold.js';
 import { noteAgentRefusal } from './agent-refusals.js';
@@ -155,7 +155,7 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, stored: S
     throw new Error(`AI job "${job.id}": ${unwritable} The model was not called. Change where this schedule stores its answer, or delete the schedule.`);
   }
 
-  // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
+  // The one loader of what a model reads (services/ai/inputs.ts): the credential mask and the
   // classification check. A schedule fires with nobody present, so it reads as an AI (TARGET-082 V4,
   // decided 2026-09-29): an agent's schedule as that agent, any other as an unattended run (below).
   // And it hands the model only the

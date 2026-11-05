@@ -798,19 +798,19 @@
       },
       "why": "Reviewed 2026-10-11, the node's own read: the workplace record (reserved prefix) to update it, and a completed task's result records to change their visibility from private to the workspace the owner named. The value is written back untouched and shown to nobody here; who may read it afterwards is still decided per reader by the record's own classification label at read time."
     },
-    "src/services/ai-allowance.ts": {
+    "src/services/ai/allowance.ts": {
       "reads": {
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter. The third read (2026-10-25, secaudit2026oct22) is the same counter, read once outside the per-account queue so a read that needs no starter grant does not wait in it."
     },
-    "src/services/ai-image.ts": {
+    "src/services/ai/image.ts": {
       "reads": {
         "getStorageFileMeta": 1
       },
       "why": "Reviewed 2026-10-21 (secaudit 2026-10, the image publish gate), the node's own read: the metadata of the storage key the caller named, read only to see whether a public file already stands there before a gated caller is refused; no content is read and nothing is returned."
     },
-    "src/services/ai-inputs.ts": {
+    "src/services/ai/inputs.ts": {
       "reads": {
         "getMemory": 2,
         "getOwnerScopeMemory": 1,
@@ -849,13 +849,13 @@
       },
       "why": "Reviewed 2026-11-04 (moved unchanged from ai-jobs/service.ts writeResult), serves a write: the version of the result record is read so the job's answer is written on it (expectedVersion); nothing read is handed to a caller."
     },
-    "src/services/ai-usage-history.ts": {
+    "src/services/ai/usage-history.ts": {
       "reads": {
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
     },
-    "src/services/ai-usage-record.ts": {
+    "src/services/ai/usage-record.ts": {
       "reads": {
         "getMemory": 3
       },
@@ -1268,40 +1268,40 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only that the company page file exists."
     },
-    "src/services/compliance-agreements-ops.ts": {
+    "src/services/compliance/agreements-ops.ts": {
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF of a sent agreement version, which the node itself rendered and stored when the version was sent (pdfKey), handed back to the operator or the agreement's counterparty after services/compliance-agreements-access.ts decided they may read the agreement."
+      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF of a sent agreement version, which the node itself rendered and stored when the version was sent (pdfKey), handed back to the operator or the agreement's counterparty after services/compliance/agreements-access.ts decided they may read the agreement."
     },
-    "src/services/compliance-agreements-sign.ts": {
+    "src/services/compliance/agreements-sign.ts": {
       "reads": {
         "getStorageFile": 2
       },
       "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF the node rendered for a version, compared byte for byte with a returned signed copy and attached to the in-force e-mail. The second read (2026-10-27, secaudit2026oct26) is the node's own copy of a returned signed copy, kept beside the version's PDF when it was checked, hashed again before the operator's yes records it; nothing of it is shown. A copy a person uploads is read through readOwnFile (docsign/files.ts), which applies the classification reader, and a scan goes to a model only after reader.useForAi()."
     },
-    "src/services/compliance-agreements.ts": {
+    "src/services/compliance/agreements.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 1
       },
-      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: a data processing agreement is a record of system@<node>, never anyone's content; who reads it is decided in services/compliance-agreements-access.ts."
+      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: a data processing agreement is a record of system@<node>, never anyone's content; who reads it is decided in services/compliance/agreements-access.ts."
     },
-    "src/services/compliance-ask-makers.ts": {
+    "src/services/compliance/ask-makers.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-28, the node's own read: compliance.makerAsks under the node's system identity, the dates each app's maker was last asked for the AI Act answers. No person's content is read or returned."
     },
-    "src/services/compliance-docs.ts": {
+    "src/services/compliance/docs.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 1,
         "listAllMemoryMeta": 1
       },
-      "why": "Written 2026-10-23 (plan doc-mvlftkh9zmc9), the node's own read: the compliance documents are records of system@<node> (records of processing, processors, requests, breaches, impact assessments, framework answers), never anyone's content; who reads them is decided in services/compliance-docs-access.ts."
+      "why": "Written 2026-10-23 (plan doc-mvlftkh9zmc9), the node's own read: the compliance documents are records of system@<node> (records of processing, processors, requests, breaches, impact assessments, framework answers), never anyone's content; who reads them is decided in services/compliance/docs-access.ts."
     },
-    "src/services/compliance-register.ts": {
+    "src/services/compliance/register.ts": {
       "reads": {
         "getMemory": 4,
         "listAllMemoryMeta": 1
@@ -1742,7 +1742,7 @@
         "getMemory": 2,
         "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-22 (secaudit 2026-10, v83), the node's own read: a run item's record is read only to learn whether the caller may see it; the content a model reads still comes through services/ai-inputs.ts."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-22 (secaudit 2026-10, v83), the node's own read: a run item's record is read only to learn whether the caller may see it; the content a model reads still comes through services/ai/inputs.ts."
     },
     "src/services/decide/service.ts": {
       "reads": {
@@ -2072,7 +2072,7 @@
       "reads": {
         "getOwnerScopeMemory": 1
       },
-      "why": "Reviewed 2026-10-27 (secaudit2026oct26, goal model work), the node's own read: a record an agent named in a goal is looked up only for its namespace and visibility, to learn whether that agent may read it before the model work starts; its value is not read on. What the model reads comes through services/ai-inputs.ts when the job runs."
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26, goal model work), the node's own read: a record an agent named in a goal is looked up only for its namespace and visibility, to learn whether that agent may read it before the model work starts; its value is not read on. What the model reads comes through services/ai/inputs.ts when the job runs."
     },
     "src/services/goals/goals-model.ts": {
       "reads": {
@@ -2829,7 +2829,7 @@
       "reads": {
         "getMemory": 2
       },
-      "why": "Reviewed 2026-10-22 (secaudit 2026-10, r49), the node's own read: the once-only step's own record under system@<node>, and a record a scheduled AI job names, read only to learn whether the saver may see it before the schedule is saved; the content the job's model reads comes through services/ai-inputs.ts when it runs."
+      "why": "Reviewed 2026-10-22 (secaudit 2026-10, r49), the node's own read: the once-only step's own record under system@<node>, and a record a scheduled AI job names, read only to learn whether the saver may see it before the schedule is saved; the content the job's model reads comes through services/ai/inputs.ts when it runs."
     },
     "src/services/schedule-extension-keep.ts": {
       "reads": {

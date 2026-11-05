@@ -22,7 +22,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { groupActor, openGroupAs } from '../services/conversation-group-open.js';
 import {
   answerGroupInvitation, changeGroupMembers, groupView, leaveGroupConversation, listGroupInvitations, readGroupFor,

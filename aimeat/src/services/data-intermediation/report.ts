@@ -6,7 +6,7 @@
  *   section 12 on the Compliance page): the setting and what it means, the provider's notification
  *   record, the findings with their reasons and the regulation they cite, and the Article 12 checklist.
  *   GET /v1/admin/compliance/report, GET /v1/compliance/report/mine and aimeat_compliance_report carry
- *   it through services/compliance-report.ts, so one builder serves all three.
+ *   it through services/compliance/report.ts, so one builder serves all three.
  *
  *   THE OWNER'S SLICE is the owner's own findings and the notification of the organisms they manage;
  *   the node's record and the other accounts' items are not in it.
@@ -21,8 +21,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { signedInOnly } from '../../config-visibility.js';
-import { readDoc } from '../compliance-docs.js';
-import type { IntermediationNotification } from '../compliance-docs-schemas.js';
+import { readDoc } from '../compliance/docs.js';
+import type { IntermediationNotification } from '../compliance/docs-schemas.js';
 import { isOrgManager } from '../workspace-access.js';
 import { DGA_REFS, type Art12Row, type DgaRef, type IntermediationFinding } from './contract.js';
 import { art12Rows } from './art12.js';

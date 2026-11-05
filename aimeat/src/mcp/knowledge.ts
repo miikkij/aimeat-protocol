@@ -68,8 +68,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
-import { writeProvenanceEcho, readProvenanceMany } from '../services/ai-provenance-result.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
+import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
 import {
     addKnowledgePackageEntry, type KnowledgeManifestValue,
 } from '../services/knowledge-package-entry.js';

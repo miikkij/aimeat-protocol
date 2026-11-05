@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import {
   toIptc, toW3cHtml, toIetfHeader, toEuIcon, toC2paAssertion,
   type W3cAiDisclosure,
-} from '../../src/services/ai-provenance-adapters.js';
+} from '../../src/services/ai/provenance-adapters.js';
 import {
   AI_PROVENANCE_SPEC_V1,
   type AiProvenance, type AiProvenanceLevel, type AiHumanInvolvement,

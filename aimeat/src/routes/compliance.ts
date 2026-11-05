@@ -36,7 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
-import { buildComplianceReport, MONTH_RE } from '../services/compliance-report.js';
+import { buildComplianceReport, MONTH_RE } from '../services/compliance/report.js';
 
 /**
  * The word this repo already uses for reading an owner's own activity ledger.

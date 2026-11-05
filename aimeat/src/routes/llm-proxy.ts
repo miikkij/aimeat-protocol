@@ -98,7 +98,7 @@ import { chatCallInputTokens } from '../services/ai/call-size.js';
 import { callCost } from '../services/ai/catalog/price.js';
 import type { CostSource } from '../services/ai/types.js';
 import { logger } from '../utils/logger.js';
-import { servedProvenanceOf, setProvenanceHeaders, recordUrlFor } from '../services/ai-provenance-marks.js';
+import { servedProvenanceOf, setProvenanceHeaders, recordUrlFor } from '../services/ai/provenance-marks.js';
 
 /** A turn can take minutes when the model is reasoning; the default socket timeout is not enough. */
 const TURN_TIMEOUT_MS = 10 * 60_000;

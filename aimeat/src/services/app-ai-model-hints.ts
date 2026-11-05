@@ -21,7 +21,7 @@
  */
 import { catalogModel } from './ai/catalog/store.js';
 import { parseModelRef } from './ai/policy.js';
-import { declarationLacksModel, type DeclaredProvenance } from './ai-provenance.js';
+import { declarationLacksModel, type DeclaredProvenance } from './ai/provenance.js';
 import type { AppArtifactFinding } from './app-artifact-lint.js';
 
 /** The hint a declaration earns when it says a model made the app and not which model. */

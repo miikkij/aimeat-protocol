@@ -31,7 +31,7 @@
  */
 import { chromium, type Browser } from 'playwright-core';
 import { HEADLESS_NO_NETWORK_ARGS, HEADLESS_CONTEXT_OPTIONS, headlessRequestHandlerFor } from '../services/headless-network.js';
-import { egressOriginsOf } from '../services/ai-provider-common.js';
+import { egressOriginsOf } from '../services/ai/provider-common.js';
 import { browserInstallHint } from '../services/headless-browser-install.js';
 
 function arg(name: string, def?: string): string | undefined {

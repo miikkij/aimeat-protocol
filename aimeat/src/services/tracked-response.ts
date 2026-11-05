@@ -53,7 +53,7 @@ import { notify } from './notify.js';
 import { sendDirectMessage } from './message-send.js';
 import { trackKey, untrackKey } from './track-registry.js';
 import type { DeliveryCtx } from './message-delivery.js';
-import { stampAutonomousOutput } from './ai-provenance.js';
+import { stampAutonomousOutput } from './ai/provenance.js';
 import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
 import { isSameOwner } from '../utils/gaii.js';

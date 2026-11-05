@@ -11,7 +11,7 @@
  *   v1.0.0 — 2026-10-29 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { appReach } from '../../src/services/compliance-app-reach.js';
+import { appReach } from '../../src/services/compliance/app-reach.js';
 import type { DataMap, DataMapRow } from '../../src/services/data-map/data-map-types.js';
 
 const row = (what: string, where: string, readers: string, personalData: unknown = 'yes'): DataMapRow => ({

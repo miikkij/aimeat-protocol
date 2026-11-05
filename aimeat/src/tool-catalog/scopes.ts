@@ -197,7 +197,7 @@ export const toolScopeWords = (entry: ToolScope | undefined): string[] =>
  * (`ai_provenance`) on several of them. Naming a tool here would hide the whole tool from an agent
  * that merely cannot assert how its content was made, when the honest default (the node records what
  * it observed) needs no permission. The check lives where a declaration is minted,
- * services/ai-provenance.ts provenanceForWrite, and mirrors requireScope() exactly.
+ * services/ai/provenance.ts provenanceForWrite, and mirrors requireScope() exactly.
  */
 export const TOOL_SCOPES: Record<string, ToolScope> = Object.fromEntries(
     CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.scope !== undefined).map(d => [d.name, d.scope!]),

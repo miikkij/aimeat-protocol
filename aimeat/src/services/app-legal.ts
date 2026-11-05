@@ -59,7 +59,7 @@ import { recordAppAudit } from './app-audit.js';
 import { renderMarkdownLite } from '../utils/markdown-lite.js';
 import { appDisplayName } from './app-agent-surfaces.js';
 import { AppToolsDocSchema, toolMoneyPrices } from '../models/app-tool-schemas.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, ProvenanceScopeError, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, ProvenanceScopeError, type DeclaredProvenance } from './ai/provenance.js';
 import { logger } from '../utils/logger.js';
 import { escapeHtml as esc } from '../utils/html-escape.js';
 

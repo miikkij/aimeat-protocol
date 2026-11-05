@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-10-28 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { appAiSignals } from '../../src/services/compliance-app-signals.js';
+import { appAiSignals } from '../../src/services/compliance/app-signals.js';
 import type { DataMap, DataMapRow } from '../../src/services/data-map/data-map-types.js';
 
 const row = (over: Partial<DataMapRow>): DataMapRow => ({

@@ -39,7 +39,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { systemGhiiFor } from '../compliance-register.js';
+import { systemGhiiFor } from '../compliance/register.js';
 import type { BuildNotes } from '../app-build-notes.js';
 import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 

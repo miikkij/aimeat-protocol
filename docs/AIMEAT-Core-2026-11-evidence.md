@@ -214,10 +214,10 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | PACE-09 | met | `aimeat/src/services/metered-settlement.ts:122-185` (`chargePacing`: one transaction; debit, burn at `burnRate`, an existing operator share `:133-136`, the rest to the provider, every ledger row; `reverse` gives it all back); burn rate 10 % by default `aimeat/src/config.ts:317`; chokepoint `aimeat/src/services/metered-access.ts:335-347`; own use free `aimeat/src/services/extension-access/pacing.ts:75` | The operator share applies only to flows that had a marketplace fee before the pacing ruling; with no operator account it burns. |
 | PACE-10 | met | `aimeat/src/commerce/pacing-pack.ts:43-49` (`insufficientMorselsMessage`: the daily allowance and, when the operator sells one, the pacing pack); used by checkout `aimeat/src/commerce/session-service.ts:594` and by the metered refusal `aimeat/src/services/extension-access/metered-response.ts`; `aimeat/src/services/extension-access/pacing.ts:81-86` | |
 | PACE-11 | **gap** | | Capabilities exposed the pacing amount as `cost.morsels`; since 4.0.0 it is `cost.toll_morsels`, and the old name is deprecated until 5.0.0 (`aimeat/src/services/toll-morsels-names.ts`). Listing rows call it `basePrice` (PACE-05); board code calls it a price (`aimeat/src/services/board-post.ts`). |
-| PACE-12 | met | `aimeat/src/services/usage-metering.ts:79,226-250`; `aimeat/src/services/ai-usage-record.ts:185-212`; `aimeat/src/routes/ledger.ts:170-345` | |
+| PACE-12 | met | `aimeat/src/services/usage-metering.ts:79,226-250`; `aimeat/src/services/ai/usage-record.ts:186-213`; `aimeat/src/routes/ledger.ts:170-345` | |
 | PACE-13 | met | No conversion path found | |
 | PACE-14 | met | `requireScope('ai:use')` in 14 places | |
-| PACE-15 | met | `aimeat/src/services/ai/call-guards.ts:98-120`; `aimeat/src/services/ai-daily-budget.ts:20`; `aimeat/src/services/ai/completion.ts:478-480` | |
+| PACE-15 | met | `aimeat/src/services/ai/call-guards.ts:98-120`; `aimeat/src/services/ai/daily-budget.ts:21`; `aimeat/src/services/ai/completion.ts:478-480` | |
 | PACE-16 | met | `aimeat/src/services/ai/call-guards.ts:47-56,75-92`; `aimeat/src/services/ai/route-plan.ts:326` | |
 | PACE-17 | n/a | A rule about profile claims | |
 | PACE-18 | met | `aimeat/src/models/offer-schemas.ts:174-189` | |
@@ -265,16 +265,16 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 |---|---|---|---|
 | PROV-01 | met | `aimeat/src/routes/ai-provenance.ts:190-195`; `aimeat/src/models/ai-provenance-schemas.ts:296-363` | |
 | PROV-02 | n/a | Reader rule | |
-| PROV-03 | partial | Stated at `aimeat/src/services/ai-provenance.ts:597`, `aimeat/src/models/ai-provenance-schemas.ts:143` | Not verified that no publish path raises the value. |
+| PROV-03 | partial | Stated at `aimeat/src/services/ai/provenance.ts:598`, `aimeat/src/models/ai-provenance-schemas.ts:143` | Not verified that no publish path raises the value. |
 | PROV-04 | met | `aimeat/src/models/ai-provenance-schemas.ts` (camelCase record) | The MCP wrapper says `record_url`, the envelope wrapper `recordUrl`; both are wrappers, as Core allows. |
 | PROV-05 | n/a | Editorial rule | |
 | PROV-06 | met | `aimeat/src/storage/repositories/ai-provenance.repository.ts:5-8,41-116` (no update, no delete) | |
 | PROV-07 | met (4.0.0) | `PROVENANCE_SWITCH_LOCAL_ONLY_IN` and `aiProvenanceFromEnv` in `aimeat/src/config-ai-label.ts`, read by `aimeat/src/config.ts`; the start-up check says the setting was refused (`aimeat/src/config-posture.ts`); test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | From 4.0.0 a public node records whatever `AIMEAT_AI_PROVENANCE` says; a local node keeps the switch (ruling Q17). Before 4.0.0 the switch still works on a public node, and the start-up check says it stops working in 4.0.0. |
 | PROV-08 | met | `aimeat/src/services/app-serve-marks-strip.ts:173`; `aimeat/src/services/app-publish.ts:284-293`; `aimeat/src/services/app-serve-marks.ts:240` | HTML only. |
-| PROV-09 | met | `aimeat/src/services/ai-provenance-marks.ts:618-647` | |
+| PROV-09 | met | `aimeat/src/services/ai/provenance-marks.ts:619-648` | |
 | PROV-10 | met | `aimeat/src/routes/ai-provenance.ts:152,201-227` (60 a minute per address) | |
 | PROV-11 | met | `aimeat/src/routes/ai-provenance.ts:240` | |
-| PROV-12 | partial | `aimeat/src/services/ai-provenance-marks.ts:282-287` | Not verified on every re-serialising route. |
+| PROV-12 | partial | `aimeat/src/services/ai/provenance-marks.ts:283-288` | Not verified on every re-serialising route. |
 | PROV-13 | met | `disclosure` computed in `aimeat/src/models/ai-provenance-schemas.ts` | |
 | PROV-14 | met (SHOULD) | Served labels, `aimeat/src/config-ai-label.ts` | |
 | PROV-15 | met | `aimeat/src/config-ai-label.ts:20-26` (`off` becomes `strict` on a public node) | |
@@ -304,7 +304,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | MCP-10 | met | All 430 catalog names begin `aimeat_` | No check enforces it. |
 | MCP-11 | met | `aimeat/src/tool-dispatch/index.ts:82` (`withDeclaredInputOnly`); `pnpm check:mcp-schemas` | |
 | MCP-12 | partial (SHOULD) | `aimeat/src/mcp/tool-error.ts` | 333 older failures keep three text shapes. |
-| MCP-13 | met | `aimeat/src/services/ai-provenance-result.ts`; `aimeat/src/services/ai-provenance-marks.ts:245,262-266` | |
+| MCP-13 | met | `aimeat/src/services/ai/provenance-result.ts`; `aimeat/src/services/ai/provenance-marks.ts:246,263-267` | |
 | MCP-14 | met | `aimeat/src/services/mcp-client/hops.ts:39-85`; `aimeat/src/mcp/index.ts:392-401` | Answers a JSON-RPC error, not HTTP 508. |
 | DISC-01 | met (4.0.0) | `coreDiscoveryFields` in `aimeat/src/services/core-discovery.ts` (`CORE_PROTOCOL_FROM` 4.0.0), spread into `/.well-known/aimeat` (`aimeat/src/routes/wellknown.ts`) and `GET /` `this_node` (`aimeat/src/routes/bootstrap.ts`); `endpoints.mcp` names the MCP endpoint, `endpoints.auth` stays a string and names the owner sign-in `/v1/ghii/login`, and the additive `endpoints.sign_in` object names each current way to get a token (changes inside v1 are additive, §0.2); `CORE_PROTOCOL_VERSION` in `aimeat/src/utils/protocol-version.ts`, held to `x-aimeat-protocol` in `openapi.yaml` by `aimeat/security/protocol-versions.json` (`aimeat-core`); test `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts` | From 4.0.0 both documents state `protocol_version: "2026-11"` and the claimed profiles; before it both fields are left out, because a 3.x node does not keep the edition's removals. |
 | DISC-02 | met (4.0.0) | `aimeat/src/services/core-discovery.ts` (header) | No earlier edition has a dated name and a 3.x peer states no protocol version, so a 4.0.0 node accepts no earlier edition it could name, and `protocol_versions_accepted` is left out until it does. |

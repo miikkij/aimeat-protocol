@@ -305,11 +305,11 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/ai-client-families.ts :: map :: VARIANT_BY_ID": {
+    "src/services/ai/client-families.ts :: map :: VARIANT_BY_ID": {
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/ai-disclosure-author.ts :: set :: traced": {
+    "src/services/ai/disclosure-author.ts :: set :: traced": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -317,7 +317,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/ai-voice.ts :: map :: speechPrices": {
+    "src/services/ai/voice.ts :: map :: speechPrices": {
       "count": 1,
       "reason": "DEBT"
     },
@@ -601,7 +601,7 @@
       "count": 1,
       "reason": "DEBT"
     },
-    "src/services/compliance-agreements-gaps.ts :: interval :: scheduleAgreementSweep": {
+    "src/services/compliance/agreements-gaps.ts :: interval :: scheduleAgreementSweep": {
       "count": 1,
       "reason": "DEBT"
     },

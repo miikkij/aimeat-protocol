@@ -26,7 +26,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { loadServedProvenance, type ServedProvenance } from './ai-provenance-marks.js';
+import { loadServedProvenance, type ServedProvenance } from './ai/provenance-marks.js';
 import { appReadRefusal, type AppReader } from './app-read-gate.js';
 
 /** A refusal, with the HTTP status the REST route answers and the code both surfaces carry. */

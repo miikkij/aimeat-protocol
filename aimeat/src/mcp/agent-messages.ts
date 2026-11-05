@@ -42,8 +42,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
-import { writeProvenanceEcho, readProvenanceMany } from '../services/ai-provenance-result.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
+import { writeProvenanceEcho, readProvenanceMany } from '../services/ai/provenance-result.js';
 import { sendAgentMessage } from '../services/agent-message-send.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 

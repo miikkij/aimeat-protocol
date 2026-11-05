@@ -63,7 +63,7 @@ const ADAPTERS: Record<AiAdapterType, AiAdapter> = {
   xai: { type: 'xai', ops: new Set<AiOp>(['text', 'image', 'transcribe']), language: languageModel, image: sdkImageModel, transcription: sdkTranscriptionModel },
   mistral: { type: 'mistral', ops: new Set<AiOp>(['text', 'transcribe', 'embed']), language: languageModel, transcription: sdkTranscriptionModel, embedding: embeddingModel },
   // An installed extension's `ai.<op>` actions (V6). Which ops it has is its manifest's answer,
-  // checked by the runner; speech runs in services/ai-voice.ts, as for every type.
+  // checked by the runner; speech runs in services/ai/voice.ts, as for every type.
   extension: {
     type: 'extension', ops: new Set<AiOp>(['text', 'image', 'transcribe', 'embed']),
     language: extensionLanguageModel, image: extensionImageModel,

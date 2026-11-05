@@ -12,7 +12,7 @@
  *
  *   `clauses` is Sections I to III. `annexes` is the four annex templates (I parties, II description
  *   of the processing, III technical and organisational measures, IV sub-processors), whose headings
- *   the generator (services/compliance-agreements-generate.ts) reuses word for word. The choices the
+ *   the generator (services/compliance/agreements-generate.ts) reuses word for word. The choices the
  *   clauses leave open (Clause 1 option, Clause 5, Clause 7.7 option and period) are recorded in the
  *   agreement and printed beside the text, never written into it.
  * @structure SccLanguage · SCC_2021_915 · SCC_2021_915_SHA256

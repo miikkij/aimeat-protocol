@@ -192,7 +192,7 @@ export function registerCoreHandlers(
   // compliance.report.<YYYY-MM>. Dynamic import for the same reason as the two above: a node whose
   // operator never looks at this never loads it.
   scheduler.registerCoreHandler('compliance-report-monthly', async () => {
-    const { runComplianceMonthlyReport } = await import('./compliance-monthly-job.js');
+    const { runComplianceMonthlyReport } = await import('./compliance/monthly-job.js');
     await runComplianceMonthlyReport(config, storage);
   });
 
@@ -206,7 +206,7 @@ export function registerCoreHandlers(
   // The makers of apps that use AI and have left the EU AI Act questions open get a message with a
   // ready prompt, at most once per app per fortnight (compliance-ask-makers.ts).
   scheduler.registerCoreHandler('compliance-ask-makers', async () => {
-    const { askMakersForAiAct } = await import('./compliance-ask-makers.js');
+    const { askMakersForAiAct } = await import('./compliance/ask-makers.js');
     await askMakersForAiAct(storage, config);
   });
 

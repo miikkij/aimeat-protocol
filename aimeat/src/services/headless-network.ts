@@ -43,7 +43,7 @@
 import type { AimeatConfig } from '../config.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readBodyCapped } from '../utils/read-capped.js';
-import { egressOriginsOf } from './ai-provider-common.js';
+import { egressOriginsOf } from './ai/provider-common.js';
 import { logger } from '../utils/logger.js';
 
 /**

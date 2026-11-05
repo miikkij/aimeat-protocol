@@ -41,7 +41,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { stampAutonomousOutput } from '../ai-provenance.js';
+import { stampAutonomousOutput } from '../ai/provenance.js';
 import { template } from './engine-util.js';
 import { failDownstream } from './engine-readiness.js';
 import type { WorkflowRun, WorkflowStep, WorkflowHumanQuestion } from '../../models/workflow-schemas.js';

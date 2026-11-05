@@ -32,7 +32,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
-import { provenanceForWrite, storeHeldProvenance } from '../ai-provenance.js';
+import { provenanceForWrite, storeHeldProvenance } from '../ai/provenance.js';
 import type { CompanyRecord } from '../../models/company-schemas.js';
 import { CompanyError, requireOwnCompany } from './company-service.js';
 

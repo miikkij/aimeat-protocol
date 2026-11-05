@@ -134,7 +134,7 @@ import type { Storage, AppManifest, AppManifestCortex } from '../storage/interfa
 import { emitAppVersion } from './event-bus.js';
 import { isAnnounceable, postAppBoardAnnouncement, recordAppActivity } from './app-announce.js';
 import { recordAccountEvent } from './account-events.js';
-import { provenanceForWrite, provenanceDeclarationRefusal } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from './ai/provenance.js';
 import { sanitizeDescriptions } from './app-publish-helpers.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { unknownModelHints, provenanceModelFindings } from './app-ai-model-hints.js';

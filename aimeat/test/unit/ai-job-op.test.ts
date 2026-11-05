@@ -46,7 +46,7 @@ vi.mock('../../src/services/ai/completion.js', () => {
         }),
     };
 });
-vi.mock('../../src/services/ai-image.js', () => ({
+vi.mock('../../src/services/ai/image.js', () => ({
     generateForOwner: vi.fn(async (_s: unknown, _c: unknown, gaii: string, input: unknown) => {
         calls.image.push({ gaii, input });
         return {
@@ -56,7 +56,7 @@ vi.mock('../../src/services/ai-image.js', () => ({
         };
     }),
 }));
-vi.mock('../../src/services/ai-transcription.js', () => ({
+vi.mock('../../src/services/ai/transcription.js', () => ({
     transcribeForOwner: vi.fn(async (_s: unknown, _c: unknown, gaii: string, input: unknown) => {
         calls.transcribe.push({ gaii, input });
         return {

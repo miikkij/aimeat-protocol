@@ -12,8 +12,8 @@
  *   2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
-import { completeIfSigned, docsignLevel, signedLine } from '../../src/services/compliance-agreements-sign.js';
-import { OptionsSchema, type Agreement, type AgreementSignature, type AgreementVersion } from '../../src/services/compliance-agreements-schemas.js';
+import { completeIfSigned, docsignLevel, signedLine } from '../../src/services/compliance/agreements-sign.js';
+import { OptionsSchema, type Agreement, type AgreementSignature, type AgreementVersion } from '../../src/services/compliance/agreements-schemas.js';
 
 const now = '2026-10-27T10:00:00.000Z';
 const wallet = (level: string, test: boolean) => ({ validation: { level, test } });

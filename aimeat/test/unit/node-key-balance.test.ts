@@ -28,7 +28,7 @@ import { providerStatusError, isNoCreditFailure } from '../../src/services/ai/er
 import { classifyFailure } from '../../src/services/ai/route-run.js';
 import { allowanceShown, markNodeKeySpent, nodeKeySpent, readNodeKeyBalance, resetNodeKeyBalanceForTests } from '../../src/services/ai/node-key-balance.js';
 import { setRouting } from '../../src/services/ai/routing.js';
-import { debitAllowance } from '../../src/services/ai-allowance.js';
+import { debitAllowance } from '../../src/services/ai/allowance.js';
 
 const NODE = 'node-balance';
 const KEY_LIMIT_WORDS = 'Key limit exceeded (total limit). Manage it using https://openrouter.ai/workspaces/default/keys/abc123 $0.02 of $0.01 used; does not reset.';

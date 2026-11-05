@@ -21,7 +21,7 @@
  *   v1.0.0 — 2026-08-23 — BR-02.
  */
 import { describe, it, expect } from 'vitest';
-import { draftRegisterFromActivity } from '../../src/services/compliance-draft.js';
+import { draftRegisterFromActivity } from '../../src/services/compliance/draft.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { DataMap } from '../../src/services/data-map/data-map-types.js';

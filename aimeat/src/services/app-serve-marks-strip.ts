@@ -75,7 +75,7 @@ import { APP_INFO_MARK } from '../utils/app-info-badge.js';
 import { INTERNET_OPEN_MARK } from '../utils/app-internet-open-badge.js';
 import { RESERVE_MARK } from '../utils/app-chrome-reserve.js';
 import { APP_REF_MARK, DISCOVERY_MARK } from '../utils/app-agent-discovery.js';
-import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
+import { PROVENANCE_HTML_MARK } from './ai/provenance-marks.js';
 import { REVIEWED_MARK } from './app-serve-marks.js';
 import { FRAME_SUPPORT_MARK } from '../utils/app-frame-assets.js';
 import { BEHAVIOUR_MARK } from './visibility/behaviour-script.js';

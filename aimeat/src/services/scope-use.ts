@@ -17,7 +17,7 @@
  *
  *   HOW IT IS FED. requireScope (auth/middleware.ts) notes the words it admitted a `*` agent for, the
  *   MCP tool wrapper (mcp/tool-usage-wrap.ts) notes the word each tool needs, and the provenance
- *   check notes provenance:write when it admits a declaration (services/ai-provenance.ts). All are
+ *   check notes provenance:write when it admits a declaration (services/ai/provenance.ts). All are
  *   synchronous and buffered, as the usage stream is: a call never waits on this, and a write never
  *   fails a call. Another word checked inline rather than through requireScope is not seen, which
  *   is why the card says that a narrowed agent may later ask for a word, and why that request

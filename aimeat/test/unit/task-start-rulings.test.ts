@@ -25,7 +25,7 @@ import {
     noteScopeUse, flushScopeUse, readScopeUse, wildcardStatus, OBSERVE_DAYS,
 } from '../../src/services/scope-use.js';
 import { narrowAgent } from '../../src/services/scope-narrowing.js';
-import { provenanceForWrite } from '../../src/services/ai-provenance.js';
+import { provenanceForWrite } from '../../src/services/ai/provenance.js';
 import { decideTaskStart, floorScopesOf } from '../../src/services/agent-task-rules.js';
 
 const NODE = 'aimeat-test-001';

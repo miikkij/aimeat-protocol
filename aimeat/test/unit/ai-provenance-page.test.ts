@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { safeHref, provenancePage } from '../../src/services/ai-provenance-page.js';
+import { safeHref, provenancePage } from '../../src/services/ai/provenance-page.js';
 import type { AiProvenance } from '../../src/models/ai-provenance-schemas.js';
 
 /**

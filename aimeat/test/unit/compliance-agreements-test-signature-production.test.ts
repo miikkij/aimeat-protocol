@@ -15,9 +15,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import { completeIfSigned, syncDocsign, testSignaturesInForce } from '../../src/services/compliance-agreements-sign.js';
-import { readAgreement, statusOf, writeNewAgreement } from '../../src/services/compliance-agreements.js';
-import { OptionsSchema, type Agreement, type AgreementSignature, type AgreementVersion } from '../../src/services/compliance-agreements-schemas.js';
+import { completeIfSigned, syncDocsign, testSignaturesInForce } from '../../src/services/compliance/agreements-sign.js';
+import { readAgreement, statusOf, writeNewAgreement } from '../../src/services/compliance/agreements.js';
+import { OptionsSchema, type Agreement, type AgreementSignature, type AgreementVersion } from '../../src/services/compliance/agreements-schemas.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';

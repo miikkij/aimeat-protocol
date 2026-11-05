@@ -41,7 +41,7 @@ export const LABEL_ROUTES: Array<{ file: string; literal: string; why: string }>
     { file: 'src/routes/site-layout.ts', literal: 'freeform_provenance', why: 'the layout read carries each passage\'s record' },
     { file: 'src/routes/designbook.ts', literal: 'partProvenanceIds(', why: 'a Design Book part carries its record' },
     { file: 'src/routes/knowledge/sharing.ts', literal: 'entry_provenance', why: 'a package export carries each entry\'s record' },
-    { file: 'src/services/ai-transparency-report.ts', literal: 'sharePublicInScope', why: 'the compliance counts see what an open share serves' },
+    { file: 'src/services/ai/transparency-report.ts', literal: 'sharePublicInScope', why: 'the compliance counts see what an open share serves' },
 ];
 
 export function createAiLabelViewsCheck(deps: {

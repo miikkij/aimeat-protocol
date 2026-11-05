@@ -93,7 +93,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/welcome-mat-prompt.ts',
     'aimeat/src/services/draft-offer-prompt.ts',
     'aimeat/src/services/offerings-handbook.ts',
-    'aimeat/src/services/ai-tool-setup.ts',
+    'aimeat/src/services/ai/tool-setup.ts',
     'aimeat/src/services/skill-bundle',
     'aimeat/src/cli/connect/onboarding-prompt.ts',
     'aimeat/src/data/builtin-skills.ts',
@@ -304,7 +304,7 @@ function main(): void {
     const age = modelReviewAgeDays();
     if (age > MODEL_REVIEW_MAX_AGE_DAYS) {
         console.error(`\n✗ the model recommendation was last checked ${age} days ago (${MODEL_RECOMMENDATION.reviewedOn}; the limit is ${MODEL_REVIEW_MAX_AGE_DAYS}).`
-            + '\n    Open the sources listed at the top of aimeat/src/services/ai-tool-setup.ts, confirm the model names and the menu paths,'
+            + '\n    Open the sources listed at the top of aimeat/src/services/ai/tool-setup.ts, confirm the model names and the menu paths,'
             + '\n    then move reviewedOn in aimeat/src/services/model-recommendation.ts. The skills aimeat-first-conversation and aimeat-guided-journey read the same names from there.');
         process.exit(1);
     }

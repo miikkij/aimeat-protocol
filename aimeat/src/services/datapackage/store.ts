@@ -99,7 +99,7 @@ import { writeStorageFile } from '../storage-file-write.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../resource-events.js';
 import {
     provenanceForWrite, storeHeldProvenance, contentHashOf as recordHashOf, type DeclaredProvenance,
-} from '../ai-provenance.js';
+} from '../ai/provenance.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';

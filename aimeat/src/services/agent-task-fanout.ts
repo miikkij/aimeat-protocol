@@ -84,7 +84,7 @@ import { closeItemsForTask } from './open-items.js';
 import { reclaimTaskLiveTrace } from '../routes/agent-tasks/helpers.js';
 import { recordPublicActivity } from './public-activity.js';
 import { emitChange } from './event-bus.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai/provenance.js';
 import { isOnboardingTestTask } from './onboarding-test-task.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';

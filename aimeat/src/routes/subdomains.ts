@@ -173,7 +173,7 @@ import { error } from '../middleware/envelope.js';
 import { readCompanyPortfolioPage } from '../services/company/company-portfolio.js';
 import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
-} from '../services/ai-provenance-marks.js';
+} from '../services/ai/provenance-marks.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
 import { servedBadgeOn, appInstallChipOn, appReviewedBy } from '../services/app-marks.js';
 import { legalLinksFor } from '../services/app-legal.js';

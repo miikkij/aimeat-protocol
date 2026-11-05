@@ -17,7 +17,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { systemGhiiFor } from '../compliance-register.js';
+import { systemGhiiFor } from '../compliance/register.js';
 import { PART_KEY_PREFIX, partKey } from './service.js';
 
 /** Part id → the provenance record id its stored row carries; parts without one are absent. */

@@ -34,7 +34,7 @@ import { migrateImplicitFreeModelOnce } from '../../src/services/openrouter-sett
 import { migrateAppToolsKeysOnce } from '../../src/services/app-tools-key.js';
 import { noticeFailingComponents } from '../../src/services/design-book/component-notice.js';
 import { partKey } from '../../src/services/design-book/service.js';
-import { IMPLICIT_FREE_MODEL } from '../../src/services/ai-model-defaults.js';
+import { IMPLICIT_FREE_MODEL } from '../../src/services/ai/model-defaults.js';
 
 requirePostgresWhenAsked('boot-migration-races');
 

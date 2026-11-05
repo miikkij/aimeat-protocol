@@ -33,7 +33,7 @@
  *     export as the route that carries it (codebase analysis 2026-11-03, item B6).
  *   v1.0.0 — 2026-09-26 — Initial: a Design Book part.
  */
-import { systemGhiiFor } from '../services/compliance-register.js';
+import { systemGhiiFor } from '../services/compliance/register.js';
 import { isServiceNamespace, ownerOfServiceNamespace } from './service-namespace.js';
 import { localAccountName } from './gaii.js';
 

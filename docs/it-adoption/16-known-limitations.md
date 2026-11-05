@@ -132,7 +132,7 @@ carry are below, grouped by topic, each with the page that explains it.
 - AI provenance records, workspace rows, finance records and other shared records survive account deletion under a pseudonym.
 - An outside file store with no folder prefix is never swept, so its objects stay after their rows are gone.
 - The account export lists files as metadata, not bytes. The account export, the memory export and account erasure have no MCP tool.
-- The per-day AI usage records (`ai-usage.<account>.<day>`, written with no time limit) and the account event archive are never pruned by a job, and no tool prunes them (`aimeat/src/services/ai-usage-record.ts`). The archived usage call and event rows have an operator route, `POST /v1/admin/usage/archive/prune`, which removes rows before a date the operator gives; no MCP tool does this (`aimeat/src/routes/admin-usage.ts`).
+- The per-day AI usage records (`ai-usage.<account>.<day>`, written with no time limit) and the account event archive are never pruned by a job, and no tool prunes them (`aimeat/src/services/ai/usage-record.ts`). The archived usage call and event rows have an operator route, `POST /v1/admin/usage/archive/prune`, which removes rows before a date the operator gives; no MCP tool does this (`aimeat/src/routes/admin-usage.ts`).
 - No automatic retention was found for workspace rows and their revisions, AI provenance, agent activity or direct messages.
 - Content written while classification is off carries no label until a rule, a scan or a person gives it one.
 - A provider the operator configures at an internal origin listed in `AIMEAT_AI_PROVIDER_EGRESS` counts as `local` for classified content, although the data crosses the network to it.

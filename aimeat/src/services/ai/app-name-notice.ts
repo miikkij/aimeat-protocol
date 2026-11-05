@@ -7,7 +7,7 @@
  *
  *   WHY. Since 2026-10-25 an app's call is checked under the app its grant names (`bob/notes.html`),
  *   and an entry saved under the name an app calls itself (`notes`) keeps holding for it, so lists
- *   written before then keep working (services/ai-app-id.ts entryNamesApp; the contract is
+ *   written before then keep working (services/ai/app-id.ts entryNamesApp; the contract is
  *   test/unit/ai-app-id.test.ts). That entry also holds for any other author's app of the same file
  *   name that the owner granted AI use. The match stays, as decided, and is made visible: the first
  *   time an entry lets a given app in this way, the owner gets a notice that names the app and says
@@ -19,7 +19,7 @@
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
 import type { Storage } from '../../storage/interface.js';
-import { bareNameOnlyEntry, canonicalAiAppId } from '../ai-app-id.js';
+import { bareNameOnlyEntry, canonicalAiAppId } from './app-id.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';

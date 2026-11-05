@@ -44,13 +44,13 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
-import { generateForOwner } from '../services/ai-image.js';
+import { generateForOwner } from '../services/ai/image.js';
 import { readImageInputs } from '../services/ai/call-files.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
-import { recordUrlFor } from '../services/ai-provenance-marks.js';
+import { recordUrlFor } from '../services/ai/provenance-marks.js';
 import { principalCaller, type CallerContext } from '../services/caller-context.js';
 
 export function registerAiImageTool(

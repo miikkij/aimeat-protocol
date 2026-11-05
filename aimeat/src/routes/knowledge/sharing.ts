@@ -61,7 +61,7 @@ import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-import { loadServedProvenanceMany, provenanceItemBlock } from '../../services/ai-provenance-marks.js';
+import { loadServedProvenanceMany, provenanceItemBlock } from '../../services/ai/provenance-marks.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { checkAudienceWrite } from '../../services/audience-write.js';
 import {

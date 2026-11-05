@@ -15,7 +15,7 @@ This page is for the sysadmin and the SOC that must watch a node. It lists what 
 | **Account events** | What happened on one account that its holder should know: agent connected or removed, password changed, two-step sign-in armed or reset by an operator, passkey added, reused sign-in token, operator access, consent granted or revoked, app granted, AI key changed, and more | Database, per account | The person's "what has happened" view | `aimeat/src/services/account-events.ts`, `aimeat/src/storage/types/account-events.ts`, `aimeat/src/routes/account-events.ts` |
 | **Consent audit** | Each refused read and each consent grant or revoke. Allowed reads are not audited | Database, written within a second of the event | Consent views; `aimeat_consent_list` | [Security practices](../coding-guidelines/security.md), `aimeat/src/services/access-guard.ts`, `aimeat/src/services/consent-audit-buffer.ts` |
 | **Classification audit** | Content with an audited label shown to or used by an AI (who, item, label, capability, model); every refusal, label change and exception | Database, written within a second of the event, the same reader, item and action in one minute as one row with a count | `GET /v1/classification/audit`, `aimeat_classification` | `aimeat/src/services/classification/audit.ts`, [Data classification](../data-classification.md) |
-| **AI usage** | Spend per model, app, agent and day; which tools were called and which refused or failed | Usage tables | `aimeat_usage_report` (per owner), `aimeat_admin_usage` (operator) | `aimeat/src/services/ai-usage-record.ts`, `aimeat/src/services/ai-usage-admin.ts` |
+| **AI usage** | Spend per model, app, agent and day; which tools were called and which refused or failed | Usage tables | `aimeat_usage_report` (per owner), `aimeat_admin_usage` (operator) | `aimeat/src/services/ai/usage-record.ts`, `aimeat/src/services/ai/usage-admin.ts` |
 | **Agent activity** | An agent's own counters and daily history | Database | `aimeat_agent_activity` (the agent itself); the owner reads the trail | `aimeat/src/routes/agent-activity.ts` |
 | **App audit log** | Per app, its own audit entries | Database; old entries move to one archive record per app per year | App page; `aimeat_app_manage` | `aimeat/src/services/app-audit.ts`, `AIMEAT_APP_AUDIT_KEEP` |
 | **Security incidents** | Data a start-time migration or check could not place, kept and quarantined for a decision | Database | Admin Security page, `aimeat_admin_security_overview`, `aimeat_admin_incident_resolve` | `aimeat/src/routes/admin-security.ts` |
@@ -39,7 +39,7 @@ Faults: an MCP tool that failed inside the node logs `[mcp-fault]`, a REST reque
 | Workflow and action run log | 30 days | `AIMEAT_EXECUTION_LOG_RETENTION_DAYS` | `aimeat/src/config-data-access.ts` |
 | Decision records | 365 days | `AIMEAT_DECIDE_RETENTION_DAYS` | `aimeat/.env.example` |
 | App audit log | keep all, older entries archived per year | `AIMEAT_APP_AUDIT_KEEP` (0 keeps all) | `aimeat/.env.example` |
-| Kept compliance reports | stored as records with their version history; the monthly job prunes nothing | none found | `aimeat/src/services/compliance-monthly-job.ts` |
+| Kept compliance reports | stored as records with their version history; the monthly job prunes nothing | none found | `aimeat/src/services/compliance/monthly-job.ts` |
 
 Records in the database are in every database backup, so the backup retention in [11 Backup and recovery](11-backup-recovery.md) extends these periods.
 

@@ -39,7 +39,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { DirectMessageAttachment, InteractivePayload, SharingGroupRecord, Storage } from '../storage/interface.js';
-import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, type DeclaredProvenance } from './ai/provenance.js';
 import { messageProvenanceContent } from './message-provenance.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { isAddressableRecipient } from '../utils/messaging.js';

@@ -31,7 +31,7 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNeedsPermission } from '../middleware/refusals.js';
 import { callerOf } from '../middleware/caller.js';
 import { GroupCreateSchema, GroupMembersSchema, GroupLeaveSchema, GroupInvitationAnswerSchema } from '../models/message-schemas.js';
-import { toDeclaredProvenance } from '../services/ai-provenance-input.js';
+import { toDeclaredProvenance } from '../services/ai/provenance-input.js';
 import { groupActor, groupErrorStatus, openGroupAs } from '../services/conversation-group-open.js';
 import {
   answerGroupInvitation, changeGroupMembers, groupView, leaveGroupConversation, listGroupInvitations, readGroupFor,

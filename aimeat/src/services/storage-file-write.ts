@@ -120,7 +120,7 @@ import { checkStorageQuota, chargeOverage } from './quota.js';
 import { generateUploadToken, buildUploadMeta } from './upload-token.js';
 import { emitRecordChange, emitRecordChangePriorUnknown } from './event-bus.js';
 import { isAnonymousGaii } from '../routes/memory/shared.js';
-import { storeHeldProvenance } from './ai-provenance.js';
+import { storeHeldProvenance } from './ai/provenance.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
     provenanceForStoredBytes, storageProvenanceMintRefusal,

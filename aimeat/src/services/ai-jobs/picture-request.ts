@@ -15,7 +15,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import type { GenerateForOwnerResult } from '../ai-image.js';
+import type { GenerateForOwnerResult } from '../ai/image.js';
 import { fileFilePublishRequest } from '../storage-file-publish.js';
 import { logger } from '../../utils/logger.js';
 

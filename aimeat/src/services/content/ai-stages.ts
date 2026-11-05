@@ -35,7 +35,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { completeForOwner } from '../ai/completion.js';
 import { decideForOwner } from '../decide/service.js';
-import { transcribeForOwner } from '../ai-transcription.js';
+import { transcribeForOwner } from '../ai/transcription.js';
 import type { AiCallerContext } from '../ai/caller-context.js';
 import { logger } from '../../utils/logger.js';
 import { redact, parseJsonAnswer } from '../refinery/message.js';

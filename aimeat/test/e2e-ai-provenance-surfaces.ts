@@ -51,7 +51,7 @@ function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 /**
  * `selector{declarations}` pairs from a stylesheet, each tagged with the at-rule it sits inside.
  *
- * The visible label's CSS is one long string built in services/ai-provenance-marks.ts, and matching
+ * The visible label's CSS is one long string built in services/ai/provenance-marks.ts, and matching
  * it with a substring regex is what let this suite rot: a pattern hunting for a rule that hides ONLY
  * the details link also matched `#aimeat-ai-label b,#aimeat-ai-label a{display:none}`, which hides
  * the link together with the text and is a different statement. Selectors and declarations in that

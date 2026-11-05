@@ -21,7 +21,7 @@ import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { loadCatalog } from '../../src/services/ai/catalog/store.js';
 import { resolveOwnerModel } from '../../src/services/notebook-ai.js';
-import { debitAllowance } from '../../src/services/ai-allowance.js';
+import { debitAllowance } from '../../src/services/ai/allowance.js';
 
 const NODE = 'node-notebook';
 let n = 0;

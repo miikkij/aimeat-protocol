@@ -44,8 +44,8 @@ import {
   claimWorkForDelivery, releaseWorkClaim,
 } from '../services/exchange-work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
-import { parseDeclaredProvenanceInput } from '../services/ai-provenance-input.js';
-import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai-provenance.js';
+import { parseDeclaredProvenanceInput } from '../services/ai/provenance-input.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from '../services/ai/provenance.js';
 
 /** Deliver a same-node inbox message about a work event: exchangeRouter's own `notify`. */
 export type ExchangeNotify = (senderOwner: string, recipientOwner: string, subject: string, body: string) => Promise<void>;

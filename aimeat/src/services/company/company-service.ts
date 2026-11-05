@@ -43,7 +43,7 @@ import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js'
 import type { CompanyRecord, NewCompanyInput, CompanyFrontPage } from '../../models/company-schemas.js';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_RE } from '../subdomain-names.js';
 import { localAccountName } from '../../utils/gaii.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, type DeclaredProvenance } from '../ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, type DeclaredProvenance } from '../ai/provenance.js';
 
 export class CompanyError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {

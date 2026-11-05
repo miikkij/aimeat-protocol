@@ -16,9 +16,9 @@ import type { AimeatConfig } from '../../config.js';
 import { decrypt, getEncryptionKey } from '../encryption.js';
 import type { ProviderType } from '../openrouter.js';
 import { AiCompletionError } from './errors.js';
-import { appSpentToday, appQuotaFor, appAllowlisted } from '../ai-app-id.js';
-import type { UsageRecord } from '../ai-usage-record.js';
-import { getDailyBudgetUsd } from '../ai-daily-budget.js';
+import { appSpentToday, appQuotaFor, appAllowlisted } from './app-id.js';
+import type { UsageRecord } from './usage-record.js';
+import { getDailyBudgetUsd } from './daily-budget.js';
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).
@@ -59,7 +59,7 @@ export function assertProviderAllowed(config: AimeatConfig, baseUrl: string): vo
 export function assertAppAllowed(prefs: Record<string, unknown>, appId?: string, ownerGhii?: string): void {
   const allowlist = Array.isArray(prefs.app_allowlist) ? (prefs.app_allowlist as string[]) : null;
   if (!allowlist) return;
-  // Under any of the app's names (services/ai-app-id.ts): an entry saved as `app.html` still allows `app`.
+  // Under any of the app's names (services/ai/app-id.ts): an entry saved as `app.html` still allows `app`.
   if (appId && !appAllowlisted(allowlist, appId, ownerGhii)) {
     throw new AiCompletionError('APP_NOT_ALLOWED', 403,
       `App "${appId}" is not in your AI allowlist. Enable it from Settings.`);
@@ -107,7 +107,7 @@ export function assertWithinBudget(
     // Per-app cap. By DEFAULT an app may spend the whole daily budget the owner set (the "AI apps
     // daily budget") — there is no separate hidden per-app default. An explicit app_quotas.<app>
     // override throttles that one app below the budget when the owner wants it.
-    // One app, one cap, whatever name a door recorded it under (services/ai-app-id.ts).
+    // One app, one cap, whatever name a door recorded it under (services/ai/app-id.ts).
     const appQuota = appQuotaFor(prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined, appId, ownerGhii, dailyBudget);
     const appSpent = appSpentToday(usage.per_app, appId, ownerGhii);
     if (appSpent >= appQuota) {

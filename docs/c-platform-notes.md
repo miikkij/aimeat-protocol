@@ -11,7 +11,7 @@ Choose a connection from what the client can do.
 
 Every node serves its per-tool setup at `GET /v1/ai-tools`: the steps, the fields, the plans each
 tool needs, and a link to the vendor's own documentation. Its source is
-`aimeat/src/services/ai-tool-setup.ts`. Provider plans and menus change independently of AIMEAT,
+`aimeat/src/services/ai/tool-setup.ts`. Provider plans and menus change independently of AIMEAT,
 so check the vendor's page that each entry links before relying on a plan restriction.
 
 ## Client configuration from the AIMEAT CLI
