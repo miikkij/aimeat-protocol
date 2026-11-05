@@ -1212,7 +1212,10 @@
       // A share link a person with no account opens (services/parties/invite.ts, WP9b). In
       // data/spa-page-paths.ts too, or F5 is a 404.
       '/v1/shared-data': () => import('/views/shared-data.js' + B),
-      '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
+      // An AI label's "how this was made" record, read with the session on a signed-in-only node
+      // (middleware/content-access-gate.ts). In data/spa-page-paths.ts too, or F5 is a 404.
+      '/v1/provenance-open': () => import('/views/provenance-open.js' + B),
+      '/v1/aimeat-os':  () => import('/views/aimeat-os.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),
       // The Agents section (2026-09-01, Agent v2 V3). Addressed /v1/fleet because /v1/agents

@@ -21,10 +21,17 @@
  *   - .tp-section / .tp-h2 / .tp-p / .tp-note / .tp-muted
  *   - .tp-facts / .tp-fact — the operator + supervisor definition list
  *   - .tp-code / .tp-links
- * @usage preloaded from spa.html; classes emitted by /views/transparency.js
+ *   - .tp-record / .tp-record-frame — an AI label's record page read with the session
+ *     (/views/provenance-open.js): the server's page in a frame as wide as the window, as tall as the
+ *     document once it has loaded (the view measures it; the min-height holds until then)
+ * @usage preloaded from spa.html; classes emitted by /views/transparency.js and /views/provenance-open.js
  * @version-history
+ *   v1.1.0 — 2026-11-05 — .tp-record and .tp-record-frame for /views/provenance-open.js.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 10.
  */
+
+.tp-record { width: 100%; }
+.tp-record-frame { display: block; width: 100%; min-height: 32rem; border: 0; }
 
 .tp-hero { padding-bottom: var(--sp-4, 16px); }
 /* The intro reads as body text, so it starts where every section below it starts. Centred under a

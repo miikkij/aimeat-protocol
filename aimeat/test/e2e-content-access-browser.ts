@@ -15,6 +15,8 @@
  *   Self-spawns its own node (the shared runner keeps the node open).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-browser
  * @version-history
+ *   v1.1.0 — 2026-11-05 — An AI label's record link: a browser goes to /v1/provenance-open, which reads
+ *     the record with the session; an API caller and a stranger keep the 401, another account the 404.
  *   v1.0.0 — 2026-10-19 — Initial.
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -187,6 +189,46 @@ async function main() {
             const open = await fetch(`${BASE}/v1/apps/${owner}/browser-audit.html/open`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${other}` }, body: '{}' });
             const code = ((await open.json()) as any)?.error?.code;
             assert(open.status === 403 && code === 'ACCESS_DENIED', `another account opened it: ${open.status} ${code}`);
+        });
+
+        let recordId = '';
+        await test('an AI label\'s record link opens for a signed-in person: the browser goes to the record page, which reads the record with the session', async () => {
+            // The label inside an app opens GET /v1/provenance/:id in a new tab, which carries no session,
+            // so the gate answered every signed-in person 401 (seen on orgnode.example 2026-11-05).
+            const d = await fetch(`${BASE}/v1/provenance`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ level: 'ai-generated', humanInvolvement: 'none', content: 'browser audit text' }) });
+            const dj = await d.json() as any;
+            recordId = dj?.data?.id ?? dj?.data?.provenance?.id ?? '';
+            assert(d.status === 201 && !!recordId, `declare ${d.status} ${JSON.stringify(dj).slice(0, 200)}`);
+            const tab = await fetch(`${BASE}/v1/provenance/${recordId}`, { redirect: 'manual', headers: { Accept: PAGE_ACCEPT } });
+            const tabBody = await tab.text();
+            assert(tab.status === 302 && tab.headers.get('location') === `/v1/provenance-open?id=${recordId}`, `the tab: ${tab.status} ${tab.headers.get('location')} ${tabBody.slice(0, 120)}`);
+            assert(tab.headers.get('cache-control') === 'no-store', 'cacheable redirect');
+            const page = await browser(`/v1/provenance-open?id=${recordId}`);
+            assert(page.status === 200 && page.ct.includes('text/html'), `the record page: ${page.status} ${page.ct}`);
+            assert(!page.body.includes('browser audit text') && !page.body.includes(owner), 'the shell carried the record');
+            for (const file of ['/views/provenance-open.js', '/css/views/transparency.css']) {
+                const r = await browser(file, '*/*');
+                assert(r.status === 200, `${file}: ${r.status}`);
+            }
+            // What the page asks: the same route with the session, for the readable page.
+            const read = await fetch(`${BASE}/v1/provenance/${recordId}`, { headers: { Accept: 'text/html', Authorization: `Bearer ${token}` } });
+            const readBody = await read.text();
+            assert(read.status === 200 && (read.headers.get('content-type') ?? '').includes('text/html') && readBody.includes(recordId), `the read with the session: ${read.status}`);
+        });
+
+        await test('FAILURE: the record stays closed to a stranger and to an API caller without a session, and another account gets the route\'s not-found page', async () => {
+            for (const path of [`/v1/provenance/${recordId}`, `/v1/provenance/by-hash/${'a'.repeat(64)}`]) {
+                const r = await browser(path, 'application/json');
+                assert(refusedByGate(r), `${path} answered an API caller without a session ${r.status}`);
+            }
+            const byHash = await browser(`/v1/provenance/by-hash/${'a'.repeat(64)}`);
+            assert(refusedByGate(byHash), `the hash lookup took the redirect: ${byHash.status}`);
+            // The record page itself holds nothing: the read behind it is the route's decision.
+            const other = (await registerOwner(BASE, `brwprov${Date.now() % 100000}`)).token;
+            const read = await fetch(`${BASE}/v1/provenance/${recordId}`, { headers: { Accept: 'text/html', Authorization: `Bearer ${other}` } });
+            const body = await read.text();
+            assert(read.status === 404 && !body.includes('browser audit text') && !body.includes(owner), `another account read a private record: ${read.status}`);
         });
 
         console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

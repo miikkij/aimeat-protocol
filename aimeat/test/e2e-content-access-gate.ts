@@ -20,6 +20,7 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-11-05 — The shell test opens /v1/provenance-open, where an AI label's record link goes.
  *   2026-11-04 — GET /v1/health/live and /v1/health/ready are open (HA stage 1). The route list is read
  *     asynchronously: the synchronous read held the event loop past the node's keep-alive timeout, and
  *     the first request after it failed with ECONNRESET on the closed pooled socket.
@@ -272,7 +273,9 @@ async function main() {
             for (const path of ['/', '/v1/portal', '/v1/how-it-works', '/v1/publicworkspaceviewer?org=x&ws=y', `/v1/portfolio/${owner}`,
                 `/v1/app-open?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/invite?token=x', '/v1/app-grant', '/v1/oauth-round?state=x', '/v1/allow?agent=x&need=y',
                 // The links an AI hands a person, which a new tab opens with no session.
-                `/v1/appcat/structure?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/secret-allow?secret=x', '/v1/eco-capability-allow?app=x']) {
+                `/v1/appcat/structure?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/secret-allow?secret=x', '/v1/eco-capability-allow?app=x',
+                // Where an AI label's record link goes (middleware/content-access-gate.ts provenanceOpenRedirect).
+                '/v1/provenance-open?id=x']) {
                 const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'text/html' } });
                 const body = await res.text();
                 assert(res.status === 200, `${path}: ${res.status}`);

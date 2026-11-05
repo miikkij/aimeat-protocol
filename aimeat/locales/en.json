@@ -6313,6 +6313,12 @@
     "generatorHint": "Building something more complex with background services and data pipelines?",
     "generatorLink": "Try the Generator"
   },
+  "provenanceOpen": {
+    "loading": "Opening the record…",
+    "missing": "The address names no record.",
+    "failed": "The record could not be read. Try again in a moment.",
+    "errorTitle": "The record does not open"
+  },
   "appOpen": {
     "opening": "Opening the app…",
     "loginTitle": "Sign in to open this app",

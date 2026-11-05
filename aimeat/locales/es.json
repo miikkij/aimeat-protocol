@@ -5832,6 +5832,12 @@
     "generatorHint": "¿Construyendo algo más complejo, con servicios en segundo plano y cadenas de datos?",
     "generatorLink": "Prueba el generador"
   },
+  "provenanceOpen": {
+    "loading": "Abriendo el registro…",
+    "missing": "La dirección no indica ningún registro.",
+    "failed": "No se pudo leer el registro. Inténtalo de nuevo dentro de un momento.",
+    "errorTitle": "El registro no se abre"
+  },
   "appOpen": {
     "opening": "Abriendo la aplicación…",
     "loginTitle": "Inicia sesión para abrir esta aplicación",

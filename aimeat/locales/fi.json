@@ -7050,6 +7050,12 @@
     "generatorHint": "Rakennatko jotain monimutkaisempaa taustapalveluilla ja dataputkilla?",
     "generatorLink": "Kokeile Generaattoria"
   },
+  "provenanceOpen": {
+    "loading": "Avataan tietuetta…",
+    "missing": "Osoitteessa ei ole tietueen tunnusta.",
+    "failed": "Tietuetta ei voitu lukea. Yritä hetken päästä uudelleen.",
+    "errorTitle": "Tietue ei aukea"
+  },
   "appOpen": {
     "opening": "Avataan sovellusta…",
     "loginTitle": "Kirjaudu sisään avataksesi sovelluksen",

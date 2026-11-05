@@ -45,6 +45,9 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.7 — 2026-11-05 — A browser navigation to GET /v1/provenance/:id goes to /v1/provenance-open, the
+ *     SPA page that reads the record with the session: an AI label's "how this was made" link opens a
+ *     new tab, which carries no session, so it answered a signed-in person 401 (seen on orgnode.example).
  *   v1.4.6 — 2026-11-04 — GET /v1/health/live and /v1/health/ready are open, as /v1/health is (codebase analysis 2026-11-03, HA stage 1).
  *   v1.4.5 — 2026-11-04 — A theme's stylesheet, the added faces' stylesheet and the font files are open:
  *     the shell loads them with <link>, which carries no session, so a custom theme never reached a
@@ -81,13 +84,14 @@
  *     (seen on orgnode.example). API callers and the app's sub-routes keep the 401.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V1).
  */
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { signedInOnly } from '../config-visibility.js';
 import { isNodeAccount } from '../services/audience.js';
 import { mirroredPages } from '../data/public-pages.js';
 import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
 import { localAccountName } from '../utils/gaii.js';
+import { prefersHtmlPage } from '../services/markdown-negotiation.js';
 import type { Storage } from '../storage/interface.js';
 import {
   anyOpenings, isAppOpenToInternet, isOpenedIntakeRoute, isTargetOpenToInternet,
@@ -262,6 +266,24 @@ function appOpenRedirect(method: string, path: string, accept: string | undefine
   return `/v1/app-open?app=${encodeURIComponent(`${m[1]}/${m[2]}`)}`;
 }
 
+/** GET /v1/provenance/:id, the record a visible AI label's "how this was made" link names. */
+const PROVENANCE_READ = /^\/v1\/provenance\/([\w-]+)$/;
+
+/**
+ * A browser navigation to a provenance record goes to the SPA page that reads it with the session
+ * (views/provenance-open.js). The label inside an app opens the record in a new tab, and a new tab
+ * sends no credential even for a signed-in person, so on a signed-in-only node every label's link
+ * answered a raw 401. The test is the route's own (prefersHtmlPage), so only a client that would have
+ * got the readable page is redirected; an API caller keeps the 401, and the page's read decides what
+ * the session may see. The redirect names only the id the browser asked for.
+ */
+function provenanceOpenRedirect(req: Request): string | null {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return null;
+  const m = PROVENANCE_READ.exec(req.path);
+  if (!m || !prefersHtmlPage(req)) return null;
+  return `/v1/provenance-open?id=${encodeURIComponent(m[1])}`;
+}
+
 /** True for GET /v1/apps/:owner/:filename of an app opened to the internet. */
 function openedAppRead(method: string, path: string): boolean {
   if ((method !== 'GET' && method !== 'HEAD') || !anyOpenings()) return false;
@@ -307,7 +329,7 @@ export function contentAccessGate(
     // The apex read of an app opened to the internet: the route serves it as on an open node
     // (routes/apps/read.ts asks appAudience, which answers anyone for it).
     if (openedAppRead(req.method, req.path)) return next();
-    const openPage = appOpenRedirect(req.method, req.path, req.headers.accept);
+    const openPage = appOpenRedirect(req.method, req.path, req.headers.accept) ?? provenanceOpenRedirect(req);
     if (openPage) {
       res.setHeader('Cache-Control', 'no-store');
       res.redirect(302, openPage);
