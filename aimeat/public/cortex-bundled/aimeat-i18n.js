@@ -26,6 +26,10 @@
  *   AIMEAT.fmt.{use,useProfile,region,timezone,number,date,time,dateTime,relative,money,morsels,
  *               resolvedTimeZone,zoneLabel}
  * @version-history
+ *   v1.4.1 — 2026-11-05 — fmt.useProfile() reads the profile with the app's own aimeat-auth session
+ *     (the cookie fetch answered 401 on every app origin); a timeZone the caller names is kept, so a
+ *     UTC-pinned calendar day no longer moves in the person's zone. Codebase analysis 2026-11-03,
+ *     decision 10b of 2026-11-05.
  *   v1.1.0 — 2026-09-12 — AIMEAT.fmt: the formatting half, driven by the profile rather than by the
  *     language, with money() refusing morsels.
  *   v1.0.0 — 2026-06-26 — Initial: inline + memory-backed translations, switcher, DOM applier.
@@ -177,9 +181,13 @@
    */
   function wordTag() { return (typeof getLocale === 'function' && getLocale()) || undefined; }
 
-  /** Merge the reader's clock into an option bag. Nothing set: the browser's own zone applies. */
+  /**
+   * Merge the reader's clock into an option bag. Nothing set: the browser's own zone applies.
+   * A timeZone the caller named is kept: a calendar day pinned to UTC (the served libraries'
+   * calendar()) must not be re-read in the person's zone, or it moves a day for zones past UTC+12.
+   */
   function withZone(opts) {
-    if (!fmtState.timezone) return opts || {};
+    if (!fmtState.timezone || (opts && opts.timeZone)) return opts || {};
     var out = {}; for (var k in (opts || {})) out[k] = opts[k];
     out.timeZone = fmtState.timezone; return out;
   }
@@ -204,8 +212,27 @@
   /**
    * Read the settings off the signed-in person's profile, when the app is running on their node.
    * Resolves to the settings either way; a signed-out reader simply follows their browser.
+   *
+   * WITH THE APP'S OWN SESSION. An app signs in through aimeat-auth, which holds a bearer token, not
+   * a cookie: the plain same-origin fetch this used before carried no credential and answered 401
+   * on every app origin, so the settings never arrived. With aimeat-auth loaded the read goes
+   * through session.fetch, the same read aimeat-auth's own AIMEAT.auth.displayPrefs() makes.
+   * Signed out, or a visitor from another node (their profile lives on their home node): no read,
+   * and the browser. A page without aimeat-auth keeps the plain fetch it always had.
    */
   function useProfile() {
+    var auth = AIMEAT.auth;
+    if (auth && typeof auth.getSession === 'function') {
+      var s = auth.getSession();
+      if (!s || s.federated || typeof s.fetch !== 'function') return Promise.resolve(use(null));
+      return Promise.resolve()
+        .then(function () { return s.fetch('/v1/ghii/me'); })
+        .then(function (body) { return use(body && body.ok ? body.data : null); })
+        .catch(function (e) {
+          console.warn('[aimeat-i18n] Reading the display settings failed; dates follow the browser:', e && e.message);
+          return use(null);
+        });
+    }
     return fetch('/v1/ghii/me', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (body) { return use(body && body.data); })

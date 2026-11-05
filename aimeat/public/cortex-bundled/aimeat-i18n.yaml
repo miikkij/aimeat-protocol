@@ -11,6 +11,10 @@ metadata:
   visibility: public
 
 spec:
+  # 1.4.1 — fmt.useProfile() reads the profile with the app's own aimeat-auth session; the cookie
+  # fetch it used answered 401 on every app origin, so the person's settings never arrived. A
+  # timeZone the caller names is kept (a UTC-pinned calendar day no longer moves in the person's
+  # zone). Codebase analysis 2026-11-03, decision 10b of 2026-11-05.
   # 1.4.0 — A WORD IS NOT A UNIT: fmt.relative and fmt.duration follow the app's LANGUAGE, because
   # "3 päivää sitten" and "1pv 23t" are words; numbers, dates and clocks keep following the regional
   # format. Also fmt.duration itself, and `num` as a name beside `number` (three callers asked for
@@ -18,7 +22,7 @@ spec:
   # The version is what makes an ALREADY-INSTALLED cortex refresh: the seeder skips one whose stored
   # version matches the bundled manifest, so shipping new library code without moving this line
   # leaves every existing node serving the old file forever.
-  version: "1.4.0"
+  version: "1.4.1"
   license: MIT
   components:
     - type: prompt
@@ -104,7 +108,7 @@ spec:
         AIMEAT.i18n.apply(root?) → void  (translates every [data-i18n] element's textContent, or [data-i18n-attr])
 
         ── AIMEAT.fmt — how things are written. Driven by the PROFILE, never by the language. ──
-        AIMEAT.fmt.useProfile() → Promise<{region, timezone}>  (reads the signed-in person's settings from this node)
+        AIMEAT.fmt.useProfile() → Promise<{region, timezone}>  (reads the signed-in person's settings from this node, with the app's aimeat-auth session)
         AIMEAT.fmt.use({ region?, timezone? }) → {region, timezone}  (when your app already holds them; null in either = follow the browser)
         AIMEAT.fmt.region() → string|null      AIMEAT.fmt.timezone() → string|null
         AIMEAT.fmt.date(v, opts?) → string     AIMEAT.fmt.time(v, opts?) → string     AIMEAT.fmt.dateTime(v, opts?) → string

@@ -21,6 +21,8 @@
  *     its YAML's (surface and ui-motion had already drifted a patch behind it): aimeat-charts 1.1.3
  *     draws on a canvas id, aimeat-surface 1.2.0 reads "12,000.00" as twelve thousand, aimeat-ui-motion
  *     1.0.2 no longer leaves a staggered and then highlighted element invisible.
+ *   v1.4.1 — 2026-11-05 — aimeat-i18n 1.4.1: fmt.useProfile() reads with the app's aimeat-auth session,
+ *     and a timeZone the caller names is kept (codebase analysis 2026-11-03, decision 10b of 2026-11-05).
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -523,7 +525,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js"></script>'],
     requires: [],
-    version: '1.4.0',
+    version: '1.4.1',
     license: 'MIT',
     apiSurface: 'AIMEAT.i18n',
     aiDoc: 'AIMEAT.i18n — init(dictionaries), t(key), setLocale/getLocale, locales(), available(), LanguageSwitcher component, apply() over [data-i18n] elements.',
