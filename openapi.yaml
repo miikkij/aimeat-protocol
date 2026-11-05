@@ -40320,6 +40320,12 @@ paths:
         invitations (429 TOO_MANY_INVITES); inviting the same address again renews its invitation
         and replaces its link, and cancelling it stops the link.
 
+        An agent or the app's own token is not told whether the address has an account here: it
+        always stores an invitation. On a node that sends mail, each such invitation counts against
+        the account's emailed-invitation allowance, the one organism email invitations use (20 in ten
+        minutes for the owner and all their agents and apps together), before anything is stored;
+        past it the answer is 429 RATE_LIMITED with `retry_after_sec`.
+
 
         MANAGERS. A member whose role the carry plan lists in `manageRoles` may call this too, but
         may not approve anybody INTO a managing role, nor change or renew somebody who holds one
@@ -75920,12 +75926,15 @@ paths:
                             description: |
                               How many people a group send would reach, counted the same way the
                               send itself counts them. A person is reachable only through the
-                              notification address on their GHII record.
+                              notification address on their GHII record, and only once they have
+                              verified it.
                             properties:
                               accounts: { type: integer }
-                              with_address: { type: integer }
+                              with_address: { type: integer, description: Accounts with a verified address }
                               operators: { type: integer }
-                              operators_with_address: { type: integer }
+                              operators_with_address: { type: integer, description: Operators with a verified address }
+                              unverified: { type: integer, description: Accounts whose address is not verified; a send to everyone skips them }
+                              operators_unverified: { type: integer, description: Operators whose address is not verified; a send to the operators skips them }
                           sent:
                             type: object
                             description: |
@@ -75999,7 +76008,9 @@ paths:
       description: |
         Sends a notification email with the given subject and body to a recipient group
         ('operators' or 'all'). Requires operator role. Returns 400 if email is disabled
-        or the group is invalid.
+        or the group is invalid. Only verified addresses receive it, as with every mail to an
+        account's own address; `skipped_unverified` says how many accounts in the group were
+        skipped because their address is not verified.
       security:
         - BearerAuth: []
       requestBody:
@@ -76030,6 +76041,7 @@ paths:
                         properties:
                           sent: { type: integer }
                           total: { type: integer }
+                          skipped_unverified: { type: integer, description: Accounts in the group whose address is not verified; nothing was sent to them }
                           group: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -78539,6 +78551,21 @@ paths:
                           expires_at: { type: string }
                           owner_private_key: { type: string, description: Present only when a new key was minted }
                           owner_public_key: { type: string }
+                          key_credentials:
+                            type: object
+                            description: |
+                              Present only on the first sign-in of an account a code key made: the key is
+                              replaced by a new password, shown here once. The same details are emailed to
+                              the account's address when the account has verified it. When it has not,
+                              nothing is mailed now, `email_held` is true and `email_note` says so, and the
+                              mail goes when the address is verified (unless the password has changed by
+                              then).
+                            properties:
+                              username: { type: string, description: The exact sign-in name }
+                              password: { type: string, description: The new password that replaced the key }
+                              email_sent: { type: boolean, description: Whether the email with these details left now }
+                              email_held: { type: boolean, description: 'Present when the address is not verified: true when the email waits for the address to be verified, false when this node cannot keep it to send later (no data key)' }
+                              email_note: { type: string, description: Present with email_held. A sentence for the person about the email. }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

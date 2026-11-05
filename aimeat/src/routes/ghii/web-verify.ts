@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — A verified address receives the first sign-in's credentials that waited for it
+ *     (key-credentials.ts sendHeldKeyCredentials; codebase analysis 2026-11-03, decision 14a of 2026-11-05).
  *   2026-11-05 — On a store place the account's app agent gets the place's default when a mailbox proof makes or
  *     renews it, once (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — The registration code goes through mail-gate.ts sendMail as sign-in mail (codebase analysis 2026-11-03, item B3).
@@ -98,6 +100,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
+import { sendHeldKeyCredentials } from '../../services/key-credentials.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
@@ -527,6 +530,8 @@ export function registerWebVerifyRoutes(
         // (services/app-member-invites.ts). Best-effort for the same reason.
         await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
             .catch(err => { logger.warn('verify-email: app invitations are best-effort', { error: String(err) }); });
+        // A code key's first sign-in credentials that waited for a proven address go now (never throws).
+        await sendHeldKeyCredentials(storage, config, ghii);
 
         // Create an agent if not exists, then issue JWT
         const { agent, privateKey: agentPrivKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);

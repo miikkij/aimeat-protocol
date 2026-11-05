@@ -2066,7 +2066,7 @@
         "failed": "epäonnistui",
         "failedSub": "luovutti neljän yrityksen jälkeen",
         "reach": "tavoitettavissa",
-        "reachSub": "{total} tilistä on osoite"
+        "reachSub": "{total} tilistä on vahvistettu osoite"
       },
       "test": {
         "title": "Lähetä testiviesti",
@@ -2099,7 +2099,7 @@
         "colTemplate": "Pohja",
         "colSent": "Lähetetty",
         "hardCoded": "koodissa",
-        "note": "Kukaan ei saa näitä, ellei tilillä ole ilmoitusosoitetta. Luvut ovat laskureiden kokonaissummia; viestejä itseään ei säilytetä.",
+        "note": "Kukaan ei saa näitä, ellei tilillä ole ilmoitusosoitetta. Pääsyavaimen tunnukset ja ryhmäviesti lähtevät vain osoitteeseen, jonka henkilö on vahvistanut. Luvut ovat laskureiden kokonaissummia; viestejä itseään ei säilytetä.",
         "when": {
           "verification": "Joku rekisteröityy tai lisää tililleen sähköpostiosoitteen",
           "magic_link": "Joku pyytää kirjautumista ilman salasanaa",
@@ -2112,7 +2112,7 @@
       },
       "group": {
         "title": "Lähetä ryhmälle",
-        "lead": "Yksi viesti kaikille ryhmän jäsenille, joiden tilillä on sähköpostiosoite. Se lähtee ilmoituksena, yksi viesti vastaanottajaa kohti ilman yhteistä vastaanottajakenttää, eikä sitä saa peruttua.",
+        "lead": "Yksi viesti kaikille ryhmän jäsenille, joiden tilillä on vahvistettu sähköpostiosoite. Se lähtee ilmoituksena, yksi viesti vastaanottajaa kohti ilman yhteistä vastaanottajakenttää, eikä sitä saa peruttua.",
         "group": "Ryhmä",
         "operators": "Ylläpitäjät",
         "everyone": "Kaikki",
@@ -2121,13 +2121,15 @@
         "body": "Viesti",
         "bodyPlaceholder": "Pelkkää tekstiä. Se kääritään ilmoituspohjaan.",
         "send": "Lähetä {n} vastaanottajalle",
-        "nobody": "Kenelläkään ei ole osoitetta",
+        "nobody": "Kenelläkään ei ole vahvistettua osoitetta",
         "sending": "Lähetetään",
         "note": "Lähetetään yksi kerrallaan. Vastaanottaja, jonka palvelin torjuu, ohitetaan ja loput lähtevät silti.",
         "done": "Lähetetty {sent} vastaanottajalle {total}:sta.",
+        "doneSkipped": "Lähetetty {sent} vastaanottajalle {total}:sta. {skipped} ohitettiin, koska heidän osoitettaan ei ole vahvistettu.",
         "whoTitle": "Kuka saa viestin",
         "ofN": "{n}/{total}",
-        "whoHint": "Pois jääneillä ei ole tilillään sähköpostiosoitetta. Heidät ohitetaan, eikä virhettä ilmoiteta."
+        "unverified": "Osoite vahvistamatta, ohitetaan",
+        "whoHint": "Pois jääneillä ei ole tilillään sähköpostiosoitetta, tai he eivät ole vahvistaneet sitä. Heidät ohitetaan, eikä virhettä ilmoiteta."
       },
       "tpl": {
         "title": "Pohjat",

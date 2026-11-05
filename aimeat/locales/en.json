@@ -2052,7 +2052,7 @@
         "failed": "failed",
         "failedSub": "gave up after four attempts",
         "reach": "can be reached",
-        "reachSub": "of {total} accounts have an address"
+        "reachSub": "of {total} accounts have a verified address"
       },
       "test": {
         "title": "Send a test message",
@@ -2085,7 +2085,7 @@
         "colTemplate": "Template",
         "colSent": "Sent",
         "hardCoded": "hard-coded",
-        "note": "A person receives any of these only if they have a notification address on their account. The counts are lifetime totals from this instance's own counters; the messages themselves are not stored.",
+        "note": "A person receives any of these only if they have a notification address on their account. The access key credentials and the group message go only to an address the person has verified. The counts are lifetime totals from this instance's own counters; the messages themselves are not stored.",
         "when": {
           "verification": "Someone signs up, or adds an email address to an account",
           "magic_link": "Someone asks to sign in without a password",
@@ -2098,7 +2098,7 @@
       },
       "group": {
         "title": "Send to a group",
-        "lead": "One message to everyone in the group who has an email address on their account. It goes out as a notification, one message per recipient with no shared To or Cc, and it cannot be recalled.",
+        "lead": "One message to everyone in the group who has a verified email address on their account. It goes out as a notification, one message per recipient with no shared To or Cc, and it cannot be recalled.",
         "group": "Group",
         "operators": "Operators",
         "everyone": "Everyone",
@@ -2107,13 +2107,15 @@
         "body": "Message",
         "bodyPlaceholder": "Plain text. It is wrapped in the notification template.",
         "send": "Send to {n}",
-        "nobody": "Nobody has an address",
+        "nobody": "Nobody has a verified address",
         "sending": "Sending",
         "note": "Sent one at a time. A recipient the server refuses is skipped and the rest still go.",
         "done": "Sent to {sent} of {total}.",
+        "doneSkipped": "Sent to {sent} of {total}. {skipped} skipped because their address is not verified.",
         "whoTitle": "Who receives it",
         "ofN": "{n} of {total}",
-        "whoHint": "The people left out have no email address on their account. They are skipped, and no error is reported."
+        "unverified": "Address not verified, skipped",
+        "whoHint": "The people left out have no email address on their account, or have not verified it. They are skipped, and no error is reported."
       },
       "tpl": {
         "title": "Templates",
