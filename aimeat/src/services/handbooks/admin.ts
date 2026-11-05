@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.33.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt: replacing the data key (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.32.0 -- 2026-11-02 -- consent.app_party_signups_per_hour and consent.app_party_pending_hours (secaudit2026nov02d round 13).
  *   v1.31.0 -- 2026-11-01 -- aimeat_admin_app_party_registrations: the apps that ask to let people register, and the decision (WP9b).
  *   v1.30.0 -- 2026-11-01 -- Data intermediation: the setting, section 12 of the report and the part
@@ -200,6 +202,15 @@ requested, open or refused) and, with \`action: "decide"\`, approves or refuses 
 same list. One network address may sign up to the apps \`consent.app_party_signups_per_hour\` times an
 hour (30; 0 is no limit), and a signup nobody confirms keeps its place in the app's 1000 people for
 \`consent.app_party_pending_hours\` after its last link (24; 0 keeps it until the owner removes it).
+
+**Replacing the data key (operator).** Every stored secret is sealed with the node's data key. The
+keys are set in the environment only, never through a tool: AIMEAT_ENCRYPTION_KEY_1 adds a second key
+and AIMEAT_ENCRYPTION_KEY_CURRENT=1 makes it the key new secrets are sealed with. Then
+\`aimeat_admin_key_reencrypt\` with \`action: "start"\` moves the stored secrets to it in the
+background, and every secret keeps opening while it runs; with no action it answers the keys, the last
+run, and \`says\`, what the operator can do now. A value that opens with neither key is counted and
+left as it is. The old key may be removed only when \`old_key_removable\` is true, and that is the
+operator's own step. The Config page's group Node shows the same.
 
 **Where stored files keep their bytes (operator).** By default the node's database holds them. The
 operator can send new files to one S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any

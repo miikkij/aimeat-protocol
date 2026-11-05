@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-05 -- aimeat-node-operations: replacing the data key, with aimeat_admin_key_reencrypt
+ *     (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-02 -- aimeat-node-operations: the go-live walk names auth.sign_in_lockout, off by default.
  *   2026-11-02 -- aimeat-node-operations: the go-live walk reads the two sign-in policy settings
  *     (auth.two_step_required, auth.password_sign_in), and says an AI may tighten them, not loosen them.
@@ -171,6 +173,16 @@ in order. Read each one first, show the operator what you found, and change a se
    backup exists and whether a restore has been tried on another machine.
 Report the result as a short list: ready, missing (with what fills it and who provides it), and
 the operator's decisions still open.
+
+## Replacing the data key
+The data key seals every stored secret. The keys are set in the server's environment by whoever runs
+it, never through a tool: a second key (AIMEAT_ENCRYPTION_KEY_1) on every process first, then
+AIMEAT_ENCRYPTION_KEY_CURRENT=1 to seal new secrets with it. \`aimeat_admin_key_reencrypt\` reads which
+keys the node holds and how the last re-encrypt run went; with \`action: "start"\`, on the operator's
+word, it moves the stored secrets to the current key in the background, and every secret keeps opening
+while it runs. Tell the operator the old key may be removed only when \`old_key_removable\` is true, and
+that a copy of it stays with the backups taken before. A value that opens with neither key is left as
+it is and named by its place: ask the operator what to do with it.
 
 ## After an update
 Every step an update brings runs by itself when the node starts: there is no script to run by hand,

@@ -49,6 +49,10 @@
       "count": 1,
       "reason": "What this process releases at its own stop."
     },
+    "src/services/key-reencrypt/job.ts :: set :: runningHere": {
+      "count": 1,
+      "reason": "Keeps a second start in this process from running a second loop. Across processes the lease lease.key-reencrypt decides who runs the job, and the job's state is a stored record every process reads."
+    },
     "src/services/process-lease.ts :: map :: keepers": {
       "count": 1,
       "reason": "This process's own lease keepers; other processes read the stored lease records, not this map."

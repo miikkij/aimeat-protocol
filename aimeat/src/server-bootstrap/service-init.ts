@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-05 — resumeReencryptAtBoot: a data key re-encrypt job left running is taken up again
+ *     (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 — The mail service, scheduler, workflow engine, AI job service and connector tunnel manager go into the node
  *     context (services/node-context.ts provideNodeService) at the same points the five set*Active* handles were set
  *     (codebase analysis 2026-11-03, item D-i).
@@ -192,6 +194,7 @@ import { removeDeletedAgentsConnections } from '../services/connections/agent-or
 import { getEncryptionKey } from '../services/encryption.js';
 import { sealPlaintextTotpSecrets } from '../services/totp.js';
 import { sealPlaintextConfigSecrets } from '../services/config-at-rest-rows.js';
+import { resumeReencryptAtBoot } from '../services/key-reencrypt/job.js';
 
 export interface ServiceInitResult {
   maintenance: MaintenanceCache;
@@ -324,6 +327,9 @@ export async function initializeServices(
   // on a value it can prove is plain, reads its rewrite back first, and never throws.
   await sealPlaintextTotpSecrets(storage, config);
   await sealPlaintextConfigSecrets(storage, config);
+  // A data key re-encrypt job a stopped process left running is taken up again (services/key-reencrypt/
+  // job.ts). Not awaited; on a node with one data key it reads nothing.
+  resumeReencryptAtBoot(storage, config);
 
   // Bring the built-in node-scope skills into step with this build. A skill edited on THIS node is
   // left alone and named in the log; an untouched one follows the repo. Before 2026-08-25 this was

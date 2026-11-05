@@ -28,6 +28,8 @@
  *   approvalOf · ownerMayUse · sealCredential · ownerStoreSpec
  * @usage const rec = await readOwnerStores(ctx, 'alice'); const entry = rec && defaultEntry(rec);
  * @version-history
+ *   v1.2.1 — 2026-11-05 — credentialContext exported for the data key's re-encrypt job (codebase
+ *     analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.2.0 — 2026-10-31 — An entry keeps its last browser check (browserAccess).
  *   v1.1.0 — 2026-10-30 — Several named stores per person, one of them the default; a first-version
  *     record is read as one entry named `main` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -106,7 +108,8 @@ export function ownerStoreMode(config: AimeatConfig): 'off' | 'operator' | 'self
 }
 
 const storeKey = (account: string) => `${OWNER_STORE_PREFIX}${account}`;
-const credentialContext = (account: string, nodeId: string) => `file-store:${account}@${nodeId}`;
+/** The context a person's store credential is bound to; the data key's re-encrypt job reseals it with it. */
+export const credentialContext = (account: string, nodeId: string) => `file-store:${account}@${nodeId}`;
 
 /** The id a new entry's files are read by. */
 export function ownerEntryStoreId(ownerGhii: string, name: string): string {

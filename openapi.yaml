@@ -40193,6 +40193,42 @@ paths:
       responses:
         '200': { description: '`{ app, registration }`' }
         '409': { description: 'NOT_REQUESTED or PARTY_REGISTRATION_OFF' }
+  /v1/admin/encryption/reencrypt:
+    get:
+      operationId: adminKeyReencryptStatus
+      summary: The data keys this node holds, and the last run of the re-encrypt job
+      description: >
+        Operator-only. `ring.keys` are the data key ids this node holds (0 is AIMEAT_ENCRYPTION_KEY,
+        1 is AIMEAT_ENCRYPTION_KEY_1) and `ring.current` the one new secrets are sealed with. `job` is
+        the last run (state running, done or failed; the key it moves values to; counts of values
+        checked, already current, moved, unreadable and changed while it ran; where the unreadable
+        values are), or null. `old_key_values` is how many values the last finished run left under
+        another key, `old_key_removable` whether the other key may now be removed from the
+        environment, and `says` what the operator can do now. Reads nothing stored on a node with one
+        data key. No key material is answered. Same as aimeat_admin_key_reencrypt.
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ ring: { keys, current }, job, old_key_values, old_key_removable, says }`' }
+        '403': { description: Not the operator }
+    post:
+      operationId: adminKeyReencryptStart
+      summary: Start moving every stored secret to the current data key
+      description: >
+        Operator-only. Starts the re-encrypt job in the background: every stored secret sealed with
+        another data key is sealed again with the current one, a batch at a time, each write made only
+        over the value that was read. Every secret keeps opening while it runs, and a restarted node
+        takes the job up again. A value that opens with neither key is never changed or deleted, only
+        counted. Answers 202 with the status when it started, 200 when a run is already going.
+        The keys are set in the environment only; this route takes no body. Same as
+        aimeat_admin_key_reencrypt with action start.
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: 'A run is already going: `{ started: false, ring, job, old_key_values, old_key_removable, says }`' }
+        '202': { description: 'Started: `{ started: true, ring, job, old_key_values, old_key_removable, says }`' }
+        '403': { description: Not the operator }
+        '409': { description: 'ONE_DATA_KEY: the node holds one data key, so there is nothing to move' }
   /v1/apps/{owner}/{filename}/members:
     get:
       operationId: appMembersList

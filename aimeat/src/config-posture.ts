@@ -14,6 +14,8 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   2026-11-05 — No data key warning while AIMEAT_ENCRYPTION_KEY_1 holds the secrets after the first key
+ *     was removed (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-10-16 — POWERFUL_AGENT_SCOPES drops memory:delete and names memory:purge and agent:delete:
  *     a delete into the bin may be a default, a removal that cannot come back may not (invariant 8 as
  *     ruled by the developer on 2026-10-16). The start-up warning about the shipped default stops.
@@ -73,7 +75,8 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   if (config.anonymousMode) w.push('AIMEAT_ANONYMOUS=true — anyone can act as the shared anonymous identity.');
   if (config.allowPrivateEgress) w.push('AIMEAT_ALLOW_PRIVATE_EGRESS=true — server-side fetches can reach loopback/internal services (SSRF).');
   if (config.federationOpenJoin) w.push('AIMEAT_FEDERATION_OPEN_JOIN=true — any peer can federate without operator approval.');
-  if (!config.encryptionKey) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
+  // A node whose first data key was removed after a rotation holds its secrets under the second.
+  if (!config.encryptionKey && !config.encryptionKey1) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
   if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil footgun.');
   if (config.statsAccess === 'public') w.push('AIMEAT_STATS_ACCESS=public — internal metrics are exposed to anyone.');
   // The rest of the knob table in security-development-dna.md §3 (QA audit S10-05, F7d-05).

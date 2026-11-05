@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit c1fe5ca66) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit f36018fcd) on 2026-11-05. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -131,7 +131,7 @@ flowchart LR
 | Passkey | No: the device is the factor | `aimeat/src/routes/passkeys.ts` |
 | Admin key sign-in on `/v1/admin` | Removed in 4.0.0: refused (410) for every account | `aimeat/src/routes/admin.ts` |
 
-- The secret is encrypted with `AIMEAT_ENCRYPTION_KEY` (or `AIMEAT_TOTP_ENCRYPTION_KEY`); with neither, nobody can arm TOTP (`aimeat/.env.example`).
+- The secret is encrypted with `AIMEAT_ENCRYPTION_KEY` (or `AIMEAT_TOTP_ENCRYPTION_KEY`, or `AIMEAT_ENCRYPTION_KEY_1` when the data key is being replaced and the second key is current); with none, nobody can arm TOTP (`aimeat/.env.example`, [Key rotation](../operations/key-rotation.md)).
 - **Recovery.** A person removes their own factor with a current code or a backup code. An operator can remove another person's factor without a code (`DELETE /v1/admin/owners/:name/totp`, `aimeat_admin_totp_reset`); the password still stands, the person gets an account event naming the operator, and the node logs a warning. An operator cannot reset their own factor: another operator or a backup code does it (`aimeat/src/services/totp-recovery.ts`).
 
 ## Requiring two-step sign-in, limiting password sign-in
