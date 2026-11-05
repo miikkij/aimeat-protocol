@@ -8,6 +8,9 @@
  *   this month, and the whole feature switched off.
  * @usage cd aimeat && pnpm exec vitest run test/unit/inactivity-nudge.test.ts
  * @version-history
+ *   v1.1.2 — 2026-11-05 — The mail service comes from a mocked nodeContext() instead of a mocked
+ *     getActiveEmailService; no assertion changed (codebase analysis 2026-11-03, item D-i; Jouni
+ *     2026-11-05, decision 5).
  *   v1.1.1 — 2026-11-04 — The fake storage answers createMemoryIfAbsent and setMemoryIfVersion through its
  *     setMemory: both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.1.0 — 2026-11-04 — The verified fixture carries the flag and the hash the code-confirm paths
@@ -19,8 +22,12 @@ import { createHash } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const sendRaw = vi.hoisted(() => vi.fn(async () => true));
-const getActiveEmailService = vi.hoisted(() => vi.fn(() => ({ enabled: true, sendRaw })));
-vi.mock('../../src/services/email.js', () => ({ getActiveEmailService }));
+const nodeContext = vi.hoisted(() => vi.fn(() => ({
+    scheduler: null, email: { enabled: true, sendRaw }, aiJobs: null, workflow: null, tunnel: null,
+})));
+vi.mock('../../src/services/node-context.js', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../src/services/node-context.js')>()), nodeContext,
+}));
 
 const {
     runInactivityNudgeJob, lastSeenAt, mayEmailOwner, INACTIVITY_DAYS, NUDGE_COOLDOWN_DAYS,
