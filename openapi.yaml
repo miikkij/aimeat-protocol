@@ -2334,7 +2334,9 @@ components:
           $ref: '#/components/schemas/Visibility'
         group_id:
           type: string
-          description: Sharing group ID (required when visibility is 'group')
+          description: >-
+            Sharing group ID. Required when visibility is 'group', unless the record already has a group,
+            which it then keeps; refused with 400 INVALID_INPUT without one.
         tags:
           type: array
           items:
@@ -2411,10 +2413,12 @@ components:
         code and one-sentence message, is in `warnings` of every write that can ask for public on
         such a node: stored files and their presigned mint, user skills, packages, knowledge packages
         and their entries, data packages, and workspace shares (access open is stored as account).
+        GROUP_NOT_NAMED: a record an older node stored at `group` with no group was rewritten without
+        naming one, so it still opens to nobody but its owner. A new record of that kind is refused.
       required: [code, message]
       additionalProperties: true
       properties:
-        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY, PUBLISH_NOT_ASKED, PUBLIC_IS_SIGNED_IN_HERE] }
+        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY, PUBLISH_NOT_ASKED, PUBLIC_IS_SIGNED_IN_HERE, GROUP_NOT_NAMED] }
         message: { type: string }
         how_to_fix: { type: string }
         shadowed_by: { type: string, description: 'SHADOWED_BY_OWNER_COPY: the owner GHII whose copy owner-scope reads resolve to' }
@@ -19576,7 +19580,9 @@ paths:
                   description: Expected current version (optimistic lock)
                 group_id:
                   type: string
-                  description: With visibility `group`, the group that reads the record.
+                  description: >-
+                    With visibility `group`, the group that reads the record. Left out, the record keeps
+                    the group it has; a record with none is refused with 400 INVALID_INPUT.
                 ai_provenance_id:
                   type: string
                   description: Attach an AI provenance record of your own account to the new value.
@@ -19685,6 +19691,8 @@ paths:
         subtree of the same key without losing each other's writes. The node reads, merges, and
         compare-and-swaps; a writer that loses the swap re-reads and re-merges, so its subtree lands
         on top of the winner's rather than over it. Creates the record when the key does not exist.
+        PATCH takes no group id: visibility `group` on a record that has no group is refused with 400
+        INVALID_INPUT, and a record that has one keeps it.
 
 
         Merge rules are RFC 7386: an object merges key by key, `null` DELETES that key, and a scalar
@@ -19928,7 +19936,8 @@ paths:
                           The visibilities POST /v1/memory takes, `organism:<organism id>` included;
                           absent means private. Any other value, `workspace` included, fails that entry
                           under failed[], and so does an organism the writer's account is not an active
-                          member of. A record a workspace reads is written through the workspace.
+                          member of, and an entry at `group` that names no group on a record that has
+                          none. A record a workspace reads is written through the workspace.
                       tags:
                         type: array
                         items: { type: string }
@@ -19979,6 +19988,8 @@ paths:
         An ai_provenance_id is retained only when it resolves on this node to the caller's account
         and its content hash matches the imported value. Otherwise the content origin remains unstated.
         Without a supplied handle, an existing matching origin is retained on overwrite.
+        An import takes no group id: an entry at `group` keeps the group its record has, and with none
+        it is stored `private`, its data kept.
         Import emits its existing memory-written and live-update notifications; it does not replay
         the single-write workflow, automation or federation dispatch.
       tags: [Memory]
@@ -27416,7 +27427,8 @@ paths:
         applies, and a caller that may not write it there is refused (403 ACCESS_DENIED
         or CONSENT_REQUIRED, 404 NOT_FOUND for an organism that does not exist). A
         Design Book part is not copied: 403 DESIGN_BOOK_PART names GET /v1/designbook/{id},
-        the one door that reads a part.
+        the one door that reads a part. A copy takes no group id, so visibility `group` onto a
+        record that has no group is refused with 400 INVALID_INPUT.
 
         The source is read the way GET /v1/memory/{gaii}/{key} reads it: a record the caller's
         classification hides from them answers 404 like an absent one (TARGET-082). Where
@@ -55667,6 +55679,8 @@ paths:
         members (every account of this node) and organism:<id> (that organism's active members) sit
         between owner and public; the export hands such an entry to whom it admits. An organism the
         writer is not an active member of is 400 NOT_ORGANISM_MEMBER, and nothing is written.
+        `group` needs `group_id` unless the entry's record already has a group: without one, 400
+        INVALID_INPUT, and nothing is written.
       tags: [Knowledge]
       security:
         - BearerAuth: []

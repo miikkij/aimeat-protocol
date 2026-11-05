@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-05 — A write at 'group' that names no group and finds none on the record is refused with 400
+ *     INVALID_INPUT, nothing stored (storage/memory-sharing.ts). A row an older node stored that way
+ *     stays writable and the write carries the warning GROUP_NOT_NAMED.
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — No guard for a storage without the CAS methods: both are required on Storage
@@ -160,6 +163,7 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { canonicalAppToolsKey } from './app-tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
+import { isNamedGroup, memoryGroupRefusal } from '../storage/memory-sharing.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js';
 import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from './memory-publish-gate.js';
@@ -341,6 +345,10 @@ export async function writeMemoryRecord(
         const closed = closedNodeLevel(config, input.visibility, 'members' as const, { from: existing?.visibility });
         if (closed.warning) { input = { ...input, visibility: closed.level, groupId: undefined, workspaceRef: undefined }; closedNode = closed.warning; }
     }
+    // A group record names its group, or finds one on the record it replaces (storage/memory-sharing.ts).
+    // Asked of the level the record will have, before anything is stored.
+    const noGroup = memoryGroupRefusal(input.visibility, input.groupId, existing);
+    if (noGroup) return { ok: false, ...noGroup };
     // The label's audience cap (plan doc-mvdipuyqraas, L3.2), before the publish gate: refused, nothing stored.
     const capped = input.gatePublic ? await memoryCapRefusal({ storage, config }, caller, [memoryTarget(caller.targetGaii, input.key)], input.visibility, existing?.visibility, input.pipeline) : null;
     if (capped) return capped;
@@ -476,7 +484,7 @@ export async function writeMemoryRecord(
         value: input.value,
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
         visibility: input.visibility,
-        ...(input.visibility === 'group' && input.groupId ? { groupId: input.groupId } : {}),
+        ...(input.visibility === 'group' && isNamedGroup(input.groupId) ? { groupId: input.groupId } : {}),
         ...(input.visibility === 'workspace' && input.workspaceRef !== undefined ? { workspaceRef: input.workspaceRef } : {}),
         tags: Array.isArray(input.tags) ? input.tags : [],
         ttlHours: input.ttlHours ?? null,
@@ -530,6 +538,14 @@ export async function writeMemoryRecord(
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
     if (closedNode) warnings.push({ ...closedNode });
+    // Past the refusal above, group with no group and none on the record is a row an older node stored.
+    if (input.visibility === 'group' && !isNamedGroup(input.groupId) && !existing?.groupId) {
+        warnings.push({
+            code: 'GROUP_NOT_NAMED',
+            message: 'This record is at visibility "group" with no group, so it opens to nobody but its owner. '
+                + 'Send group_id to share it, or visibility "private" to keep it to yourself.',
+        });
+    }
 
     // 8. The request the publish gate asked for (step 3a), now that the record it names exists.
     let publishRequest: ReturnType<typeof publishRequestedBody> | undefined;

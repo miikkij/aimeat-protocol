@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — A bulk entry at 'group' that names no group and finds none on the record fails by name
+ *     (storage/memory-sharing.ts). An import takes no group id, so its entry at 'group' keeps the group
+ *     its record has, or is stored private with its data kept. The import wrote it to nobody.
  *   2026-11-04 — getMemoryByKeys called without a non-null assertion: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The bulk write and the import announce with emitRecordChangePriorUnknown: the same
@@ -134,6 +137,7 @@ import { writeMemoryBatch } from '../../services/memory-batch-write.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
+import { isNamedGroup, memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { discoverMemory } from '../../services/memory-discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
@@ -224,6 +228,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // 'organism:<id>' names an organism the writer's account is an active member of (the single write's rule).
       const audience = await organismVisibilityRefusal(storage, e.visibility, { identity: resolve(req), federated: isForeignPrincipal(req.auth) });
       if (audience) { preFailed.push({ key, status: 'failed', reason: `${audience.code}: ${audience.message}` }); continue; }
+      // A group record names its group, or finds one on the record it replaces (the single write's rule).
+      // The read runs only for an entry at 'group' that names none.
+      const noGroup = e.visibility === 'group' && !isNamedGroup(e.group_id) ? memoryGroupRefusal('group', undefined, await storage.getMemoryMeta(gaii, key)) : null;
+      if (noGroup) { preFailed.push({ key, status: 'failed', reason: `${noGroup.code}: ${noGroup.message}` }); continue; }
       // Making a record public, by a caller with nobody on this node to ask: that entry is refused.
       // A closed node stores it at 'members' instead (services/memory-batch-write.ts), so it asks nothing.
       if (publishAsk.kind === 'refused' && e.visibility === 'public' && !signedInOnly(config) && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
@@ -243,7 +251,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         visibility: (e.visibility ?? memoryVisibilityDefault(config)) as MemoryRecord['visibility'],
         tags: Array.isArray(e.tags) ? e.tags : [],
         ttlHours: typeof e.ttl_hours === 'number' ? e.ttl_hours : null,
-        ...(e.group_id ? { groupId: e.group_id } : {}),
+        ...(isNamedGroup(e.group_id) ? { groupId: e.group_id } : {}),
       });
     }
 
@@ -453,13 +461,16 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const asked = await batchWriteAsks({ storage, config }, req, gaii, s.key, s.entry.value);
       if ('refusal' in asked) { failed.push({ key: renameOf.get(s.key) ?? s.key, reason: asked.refusal }); continue; }
       if (asked.ask) ownerAsks.push(asked.ask);
+      // An import takes no group id. Its entry at 'group' keeps the group the record has, and with none
+      // it is a word this import cannot restore: private keeps the data with the same reader, its owner.
+      const groupKept = s.entry.visibility === 'group' && !!(await storage.getMemoryMeta(gaii, s.key))?.groupId;
       items.push({
         key: s.key,
         value: asked.value,
         // An entry with no visibility takes the node's starting level (plan V5.1); a word this
         // import does not restore is still stored private.
         visibility: (s.entry.visibility === undefined ? memoryVisibilityDefault(config)
-          : ['private', 'owner', 'group', 'members', 'public'].includes(s.entry.visibility as string) ? s.entry.visibility : 'private') as MemoryRecord['visibility'],
+          : groupKept || ['private', 'owner', 'members', 'public'].includes(s.entry.visibility as string) ? s.entry.visibility : 'private') as MemoryRecord['visibility'],
         tags: Array.isArray(s.entry.tags) ? s.entry.tags as string[] : [],
         ttlHours: typeof s.entry.ttl_hours === 'number' ? s.entry.ttl_hours : null,
         ...(typeof s.entry.ai_provenance_id === 'string' ? { aiProvenanceId: s.entry.ai_provenance_id } : {}),

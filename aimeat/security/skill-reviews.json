@@ -59,7 +59,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:76941f2fce28a24b67e29732"
+      "digest": "sha256:b53e37e1eae879249b5772f3"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-11-05",
@@ -385,7 +385,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:7f7c1f990b78aa3bc4cf795d",
+      "digest": "sha256:ab120d5f1590620de997b016",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -712,7 +712,7 @@
       "aimeat/src/services/schedule-gate.ts": "4d2c13ef4ace9e0e",
       "aimeat/src/mcp/agent-schedules.ts": "e765a5170e850f1e",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "168debe4df9511ba",
-      "aimeat/src/services/schedule-write.ts": "4e557423e294e535"
+      "aimeat/src/services/schedule-write.ts": "328a030e6be264be"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
@@ -767,7 +767,7 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "bb42109735a58663",
+      "aimeat/src/routes/memory/bulk.ts": "dce3c7a750b34c83",
       "aimeat/src/routes/memory/key.ts": "3c8ab9c45cc81ee5",
       "aimeat/src/services/memory-bin.ts": "d1da26595d5c18d2",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",

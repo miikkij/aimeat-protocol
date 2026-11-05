@@ -11,6 +11,7 @@
  * @structure renderPackage · entryRow · sourceRows · relationDoors
  * @usage import { renderPackage } from './package.js';
  * @version-history
+ *   v1.18.1 -- 2026-11-05 -- An entry's visibility button no longer steps through "group", which it stored with no group.
  *   v1.18.0 -- 2026-10-18 -- Who can read the package is the first tag under its title, and a read-only entry's tag, the AudienceBadge (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.17.0 -- 2026-09-26 -- On the component kit (page group G7): the page is the SettingsPage (via
  *     frame.js renderPage, marks and the rail as data), the strip the FigureStrip, the sections
@@ -63,7 +64,9 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { List, Row, Name, Cell, Doors, Panel } from '/components/List.js';
 import { c, day, rel, ctWord, maturityWord, synthWord, visWord, relWord, manifestOf, statsOf, pkgId, entryText, renderPage } from './frame.js';
 
-const VIS_CYCLE = ['private', 'owner', 'group', 'public'];
+// No 'group': this button names no group, and the node refuses a group entry without one. An entry
+// already at 'group' moves on to 'private'.
+const VIS_CYCLE = ['private', 'owner', 'public'];
 const libraryUrl = (id) => '/v1/publicknowledgeviewer?id=' + encodeURIComponent(id);
 
 /** An entry's sources: verified (green) or unchecked (coral), the title (a link that opens beside when it has an address), its type. */

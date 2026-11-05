@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — POST /v1/agents/import stores a bundle record at 'group' as private: a bundle names no group.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-29 -- PATCH /v1/agents/:name/scopes lets the owner's agent holding agent:permissions-add add
@@ -272,7 +273,9 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
         }, {
           key: m.key,
           value: m.value,
-          visibility: (['private', 'owner', 'group', 'members', 'public'].includes(m.visibility) ? m.visibility : 'private'),
+          // Not 'group': a bundle names no group and the new agent's record has none, so private keeps
+          // the data with the same reader, its owner, where the shared write would refuse the record.
+          visibility: (['private', 'owner', 'members', 'public'].includes(m.visibility) ? m.visibility : 'private'),
           tags: Array.isArray(m.tags) ? m.tags : [],
           ttlHours: typeof m.ttl_hours === 'number' ? m.ttl_hours : null,
           pipeline: 'rest.agent_import',

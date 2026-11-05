@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-11-05 — visibility 'group' on a record that has no group is refused with 400 INVALID_INPUT:
+ *     this route takes no group id (storage/memory-sharing.ts).
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveWorkflowEngine (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The 501 NOT_SUPPORTED answers for a storage without setMemoryIfVersion or
@@ -86,6 +88,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { success, error } from '../../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
+import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 import { closedNodeLevel, type ClosedNodeWarning } from '../../services/closed-node-level.js';
@@ -301,6 +304,12 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // the node's starting level (plan V5.1); a new record held back by the publish gate is private.
       const levelAfter = (wantVisibility ?? existing?.visibility
         ?? (askedToPublish ? 'private' : memoryVisibilityDefault(config))) as MemoryRecord['visibility'];
+      // PATCH takes no group id, so a record at 'group' keeps the group it has (storage/memory-sharing.ts).
+      const noGroup = memoryGroupRefusal(levelAfter, undefined, existing);
+      if (noGroup) {
+        res.status(noGroup.status).json(error(config.nodeId, noGroup.code, noGroup.message));
+        return;
+      }
 
       if (if_version !== undefined && (existing?.version ?? 0) !== if_version) {
         res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',

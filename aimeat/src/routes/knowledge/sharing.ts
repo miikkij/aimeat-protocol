@@ -6,6 +6,8 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — The entry visibility PATCH refuses 'group' with no group_id on a record that has no
+ *     group, with 400 INVALID_INPUT (storage/memory-sharing.ts).
  *   2026-10-31 — The sharing PATCH reads catalog_listed as the boolean setKnowledgeSharing stores, so a
  *     truthy non-boolean (1, "yes") asks the publish gate and is lowered on a closed node as true is
  *     (secaudit 2026-10-31 inv-09).
@@ -68,7 +70,8 @@ import {
   KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, KNOWLEDGE_ENTRY_LEVELS,
   packageAudienceOf, entryRecordVisibility, knowledgeAudienceAllows,
 } from '../../services/knowledge-audience.js';
-import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry } from '../../services/knowledge-sharing.js';
+import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry, knowledgeEntryKey } from '../../services/knowledge-sharing.js';
+import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
@@ -188,6 +191,12 @@ export function registerSharingRoutes(
     if (!entry) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Entry not found in package'));
       return;
+    }
+
+    // An entry at 'group' names its group, or its record has one (storage/memory-sharing.ts).
+    if (visibility === 'group') {
+      const noGroup = memoryGroupRefusal('group', groupId, await storage.getMemoryMeta(ownerGaii, knowledgeEntryKey(packageId, entry.key)));
+      if (noGroup) { res.status(noGroup.status).json(error(config.nodeId, noGroup.code, noGroup.message)); return; }
     }
 
     // A closed node keeps the entry at 'members' and says so (plan V1.6), before the gate.

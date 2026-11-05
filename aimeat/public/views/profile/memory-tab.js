@@ -5,6 +5,8 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.5.1 — 2026-11-05 — handleQuickVis no longer opens the edit form for 'group': that form has no group
+ *     picker since v1.1.0 of memory-tab/components.js, so saving it stored a group record with no group.
  *   v3.5.0 — 2026-10-30 — The upload passes on the store the person picked (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v3.4.0 — 2026-10-21 — The Files list and its count leave out contentclass-text/ files (userFiles).
  *   v3.3.0 — 2026-10-16 — A failed load of the records or the files is drawn as one (the could-not-load
@@ -598,14 +600,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
     } catch (err) { swallowed('memory-tab', err); setKeyRulesPopover(null); }
   }
 
-  // Quick visibility change from the expanded detail. 'group' needs a group pick,
-  // so it routes to the edit modal where the group select lives.
+  // Quick visibility change from the expanded detail. The menus offer no move to 'group': a group is
+  // picked in the row's share panel, which is where a group gets its reach.
   async function handleQuickVis(m, newVis) {
     if (newVis === (m.visibility || 'private')) return;
-    if (newVis === 'group') {
-      setEditModal({ key: m.key, value: typeof m.value === 'object' ? JSON.stringify(m.value, null, 2) : String(m.value || ''), visibility: 'group', version: m.version, isJson: typeof m.value === 'object' });
-      return;
-    }
     const resp = await memoryService.updateMemoryVisibility(m.key, newVis, m.version);
     if (resp.ok === false) showToast(resp.error?.message || t('profile.error'), true);
     loadMemories();

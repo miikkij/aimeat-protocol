@@ -582,6 +582,13 @@ await test('26b. aimeat_storage_upload refuses visibility group with no group_id
     assert(read?.result?.contents?.[0]?.text === 'Not found', 'the refused file exists');
 });
 
+await test('26c. aimeat_memory_write refuses visibility group with no group_id, and says what to send', async () => {
+    const key = `cd.nogroup.${STAMP}`;
+    const out = await callTool(reqSession, 'aimeat_memory_write', { key, value: 1, visibility: 'group' });
+    assert(out.isError, `a group record with no group was stored: ${out.text}`);
+    assert(out.text.includes('group_id'), `the refusal must say what to send: ${out.text}`);
+});
+
 await test('27. A storage key the caller does not hold answers "Not found" rather than another namespace', async () => {
     const read = await mcpRpc(reqSession, 'resources/read', { uri: `aimeat://storage/${encodeURIComponent(`cd-missing-${STAMP}.txt`)}` });
     assert(read?.result?.contents?.[0]?.text === 'Not found',
