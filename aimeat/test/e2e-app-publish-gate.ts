@@ -27,6 +27,7 @@
  *   visible afterwards) · blocking artifacts on all three REST doors · the warnings · next_steps
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-publish-gate
  * @version-history
+ *   (2026-11-05) The Atelier specification has seven parts: `motion` was split from `look` in effc2bcaa.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.3.0 — 2026-09-05 — THE RECIPE AND THE ACCEPTANCE (wish-atelier-always-excellent, part 4):
  *     the served Atelier spec carries the four customisation doors, `describe()`, the fork's price
@@ -426,13 +427,13 @@ const publish = (token: string, body: Record<string, unknown>) =>
         const list = await json('/v1/prompts/build-app-atelier/sections');
         assert(list.status === 200, `parts list ${list.status}`);
         const ids = (list.body.data.parts as any[]).map(p => p.id);
-        assert(JSON.stringify(ids) === JSON.stringify(['start', 'genre', 'libraries', 'book', 'patterns', 'look']), `parts: ${JSON.stringify(ids)}`);
+        assert(JSON.stringify(ids) === JSON.stringify(['start', 'genre', 'libraries', 'book', 'patterns', 'look', 'motion']), `parts: ${JSON.stringify(ids)}`);
         for (const p of list.body.data.parts as any[]) assert(p.chars > 1000 && p.chars <= 24000, `${p.id} is ${p.chars} characters`);
         const start = await json('/v1/prompts/build-app-atelier/sections/start');
         assert(start.status === 200 && start.body.data.spec_token === atelierToken, 'part start carries the Atelier token');
         assert((start.body.data.prompt as string).includes('build-app-atelier/<id>'), 'part start says how to read the others');
         const none = await json('/v1/prompts/build-app-atelier/sections/no-such-part');
-        assert(none.status === 404 && /start, genre, libraries, book, patterns, look/.test(none.body.error.message), `an unknown part names the ones there are: ${JSON.stringify(none.body.error)}`);
+        assert(none.status === 404 && /start, genre, libraries, book, patterns, look, motion/.test(none.body.error.message), `an unknown part names the ones there are: ${JSON.stringify(none.body.error)}`);
     });
 
     await test('the Atelier shell is served, declares its track, and points at its own guide', async () => {

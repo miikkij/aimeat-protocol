@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-11-05 — 17c, 17d: the Atelier specification has seven parts; `motion` was split from `look` in effc2bcaa.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-14 — 17n, 17o: tier "places" and "places/admin", where things are on the node's own
  *     pages, the same on MCP and REST, and a part that does not exist on both.
@@ -520,7 +521,7 @@ async function main() {
         await test('17c. the Atelier parts each arrive whole, and between them carry the whole specification', async () => {
             const fullTxt = await fetch(`${BASE}/v1/prompts/build-app-atelier?format=txt`).then(r => r.text());
             const list = await json('/v1/prompts/build-app-atelier/sections');
-            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,look', `the parts in order: ${JSON.stringify(list.body.data.parts)}`);
+            assert(list.body.data.parts.map((p: any) => p.id).join() === 'start,genre,libraries,book,patterns,look,motion', `the parts in order: ${JSON.stringify(list.body.data.parts)}`);
             let carried = 0;
             for (const p of list.body.data.parts) {
                 const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/' + p.id } }, 404);
@@ -580,10 +581,10 @@ async function main() {
             assert(handbook.includes('aimeat_designbook_keep'), 'the handbook every agent reads first says what to do when the person says an app turned out well');
         });
 
-        await test('17d. an Atelier part that does not exist is an error that names the four there are', async () => {
+        await test('17d. an Atelier part that does not exist is an error that names the ones there are', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'build-app-atelier/no-such-part' } }, 406);
             assert(body.result?.isError === true, 'MCP: isError');
-            assert(/start, genre, libraries, book, patterns, look/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
+            assert(/start, genre, libraries, book, patterns, look, motion/.test(toolText(body)), `it names the parts: ${toolText(body).slice(0, 200)}`);
         });
 
         // The feature map (guided journey P6): what this node can do, in parts an AI can read once it
