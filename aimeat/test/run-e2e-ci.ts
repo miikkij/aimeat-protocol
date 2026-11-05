@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-05 -- e2e-place-agent-default-at-approval.ts joins the list (not the guard tier): a store place's default is given at approval and when the plan is set, and a mint adds nothing (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-05 -- e2e-single-process-lease.ts joins the list (not the guard tier): with one process per node, the default, a process of a new name takes the previous process's @activate run and queued AI jobs at once (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   2026-11-05 -- e2e-key-reencrypt.ts joins the list (not the guard tier): replacing the data key with a second key and the re-encrypt job, over REST and MCP (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 -- e2e-two-process-leases.ts joins the list (not the guard tier): two processes of one node on one database run an AI job once, a sweep once per round, and take a killed process's jobs over (codebase analysis 2026-11-03, item HA 2.5-2.7).
@@ -1163,6 +1164,9 @@ const ALL_SUITES = [
     // through the MCP server they attached (aimeat-commercial-1c, crew54).
     'test/e2e-build-with-you-send.ts',
     'test/e2e-place-agent-scopes.ts',
+    // The store place's default given at approval and when the plan is set; a mint adds nothing
+    // (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
+    'test/e2e-place-agent-default-at-approval.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',

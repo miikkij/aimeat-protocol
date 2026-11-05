@@ -10,6 +10,8 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-11-05 — An agent's token and refresh copy its record and add nothing: a store place's default is given at
+ *     approval and when the plan is set (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — The challenge Map and its sweep timer are removed: GET /v1/auth/challenge wrote to it and no code read it, so its answer is unchanged. The signatures POST /v1/auth/token spends are kept in the node's storage (auth/signed-request.ts; codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-02 — An agent's token and refresh on a store place carry the place's default words (services/place-agent-scopes.ts).
  *   2026-10-27 — DELETE /v1/auth/sessions tells the person which of their Full and operator access tokens still act as them (services/owner-tokens-kept-notice.ts; secaudit2026oct26).
@@ -119,7 +121,6 @@ import { ecosystemRefreshDecision, ECO_REAPPROVAL_SECONDS } from '../services/ec
 import { randomBytes } from 'node:crypto';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
 import { getStats } from '../services/stats.js';
-import { widenAndAnnounce } from './agents/announce-scopes.js';
 
 export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -300,9 +301,10 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         owner: agentOwner,
         node: config.nodeId,
         roles,
-        // On a store place the agent has the place's tools by default, written to its record first
-        // (services/place-agent-scopes.ts; Jouni 2.11 07.42). Elsewhere: its record as it is.
-        scopes: await widenAndAnnounce(storage, config, agent),
+        // The agent's record as it is. On a store place the place's default is on the record already,
+        // given at approval or by the step when the plan was set; a mint adds nothing
+        // (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
+        scopes: agent.defaultScopes ?? [],
       }, config.jwtTtlSeconds, sessionId);
 
       await storage.createSession({
@@ -562,8 +564,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // requireRole('owner'/'operator') after one refresh (those gates check role,
       // not scope) — an intra-owner privilege escalation / scope collapse.
       freshRoles = ['agent'];
-      // The store place's default, as at the token above (services/place-agent-scopes.ts).
-      freshScopes = await widenAndAnnounce(storage, config, agent);
+      // The record as it is, as at the token above: a mint adds nothing (services/place-agent-scopes.ts).
+      freshScopes = agent.defaultScopes ?? [];
     } else if (req.auth!.roles.includes('ecosystem')) {
       // The same rule as the agent branch, for the principal class it forgot. `else` handed the
       // OWNER's roles to anything that was not an agent, and an ecosystem app is not an agent: one

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — POST /v1/agents/import marks the imported agent as having had a store place's default (`*` covers
+ *     it) at approval (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   2026-10-29 -- PATCH /v1/agents/:name/scopes lets the owner's agent holding agent:permissions-add add
@@ -113,6 +115,7 @@ import { actionPricingFromRecord } from '../../services/action-pacing.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config-pacing.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
+import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 /** Why the read-through doors are the owner's in person: letting an agent read mail is consent. */
 const READ_IN_PERSON = 'Letting an agent read your mail is your own decision, so only you, signed in yourself, can make it here.';
@@ -247,8 +250,10 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       // Postgres store fills ['*'] for a missing list and SQLite left it empty, so an imported agent
       // held every scope on one backend and none on the other (Jouni, 2026-10-15: Postgres is the
       // reference). Set here rather than as a storage default, because elsewhere an empty list is
-      // the recorded state "no list", which the scope migrations treat on its own.
-      defaultScopes: ['*'],
+      // the recorded state "no list", which the scope migrations treat on its own. On a store place the
+      // place's default is added at this approval; `*` covers every word of it, so it only marks the agent
+      // as having had it (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
+      defaultScopes: await applyPlaceDefault(storage, config, newGaii, ['*']),
       createdAt: now,
       lastSeen: now,
     });

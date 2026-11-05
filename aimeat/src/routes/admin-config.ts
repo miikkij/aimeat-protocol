@@ -18,6 +18,8 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-11-05 -- A purchase plan the Consul import applies gives the store place's default to the agents that
+ *     have not had it, as PUT does (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 -- DELETE removes the saved value through resetConfigValue, which asks the setting's own
  *     row whether an AI may reset it; the Consul import writes through storeConfigValue. The answers are
  *     the same (codebase analysis 2026-11-03, item B4).
@@ -82,6 +84,7 @@ import { applyConsulValues } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { recordOperatorNodeAct } from '../services/operator-access-audit.js';
+import { placeDefaultAfterSettings } from '../services/place-agent-scopes.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 
 export function adminConfigRouter(
@@ -243,6 +246,9 @@ export function adminConfigRouter(
             }
             if (provenance) { provenance.markDatabase(applied); provenance.markDatabaseAtRestart(atRestart); }
         } else if (provenance) provenance.markConsulAtRestart(atRestart);
+        // A purchase plan that arrived now gives the store place's default to the agents that have not had it
+        // (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
+        await placeDefaultAfterSettings(storage, config, applied);
 
         res.json(success(config.nodeId, {
             imported: applied.length + atRestart.length, total: Object.keys(values).length,

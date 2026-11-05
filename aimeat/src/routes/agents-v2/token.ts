@@ -24,6 +24,8 @@
  * @structure registerAgentV2TokenRoute(router, config, storage)
  * @usage registerAgentV2TokenRoute(router, config, storage);
  * @version-history
+ *   2026-11-05 — The minted scopes are the record's and nothing is added: a store place's default is given at
+ *     approval and when the plan is set (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   v1.4.0 — 2026-11-02 — The minted scopes carry a store place's default for agents (services/place-agent-scopes.ts).
  *   v1.3.0 — 2026-10-31 — The per-IP limit is the setting agentTokenRateLimitMax (default 600), not a fixed 60.
  *   v1.2.0 — 2026-10-11 — The two refusals of the key carry `details.reason: 'key_not_pinned'`. A
@@ -43,7 +45,6 @@ import { isValidGAII } from '../../utils/gaii.js';
 import { verifyCardJws, base64KeyToJwkX } from '../../services/agent-card.js';
 import { spendAssertion } from '../../services/assertion-spend.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
-import { widenAndAnnounce } from '../agents/announce-scopes.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 
@@ -173,9 +174,9 @@ export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, 
     const ttl = config.agentV2TokenTtlSeconds;
     // Roles are NAMED, never inherited: `['agent']` and nothing else, whatever the owner's own roles
     // are. Scopes are what the OWNER granted this agent, never what the assertion asked for. On a store
-    // place that is the place's default the first time (services/place-agent-scopes.ts): this is the
-    // mint a crew's run uses, so the default did not reach crew agents without it (crew75, 2.11).
-    const scopes = await widenAndAnnounce(storage, config, agent);
+    // place the record holds the place's default already, given at approval or when the plan was set
+    // (services/place-agent-scopes.ts; decision 8b of 2026-11-05): this mint copies it and adds nothing.
+    const scopes = agent.defaultScopes ?? [];
     let token: string;
     try {
       token = await issueJWT({

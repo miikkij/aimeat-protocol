@@ -56,9 +56,10 @@
         "aimeat/src/routes/setup.ts",
         "aimeat/src/services/sign-in-policy.ts",
         "aimeat/src/services/two-step-setup.ts",
-        "aimeat/src/routes/ghii/login-two-step.ts"
+        "aimeat/src/routes/ghii/login-two-step.ts",
+        "aimeat/src/services/place-agent-scopes.ts"
       ],
-      "digest": "sha256:79ff72b9c7af28965dba9c92"
+      "digest": "sha256:7623c683511c81703eab725d"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-02",
@@ -213,7 +214,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:241ececded5c028ba6fca732"
+      "digest": "sha256:a5b39395d5fac22b50ff3891"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -304,7 +305,8 @@
       "aimeat/src/routes/setup.ts": "1e524077dd7b7111",
       "aimeat/src/services/sign-in-policy.ts": "2d844d819ddedd3b",
       "aimeat/src/services/two-step-setup.ts": "e8f73c13e7d1f680",
-      "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c"
+      "aimeat/src/routes/ghii/login-two-step.ts": "fc63cd4e8d48695c",
+      "aimeat/src/services/place-agent-scopes.ts": "dfc05b718b9315bc"
     },
     "05-data-protection.md": {
       "aimeat/src/services/classification/defaults.ts": "9a1f7806ae99e25e",
@@ -410,12 +412,12 @@
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
       "aimeat/src/services/ai-jobs/service.ts": "c6b46235bc263958",
-      "aimeat/src/services/config-apply.ts": "91fae249f6d8349e",
+      "aimeat/src/services/config-apply.ts": "9a4e295d031eff60",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",
       "docs/operations/federation.md": "cda244de75d54c60",
       "docs/coding-guidelines/environment-configs.md": "46126df69c7c4961",
-      "aimeat/security/process-local-baseline.json": "9272f6535ebca988",
+      "aimeat/security/process-local-baseline.json": "78287af0f7c48066",
       "aimeat/src/storage/providers/postgres-kysely/migrate.ts": "a781a101482401fe",
       "aimeat/src/services/maintenance-cache.ts": "404838b62fc539a8",
       "aimeat/src/server-bootstrap/drain.ts": "39464fdddc21bff1",
