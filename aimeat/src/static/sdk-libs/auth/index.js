@@ -10,6 +10,9 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.9.0 — 2026-11-05 — AIMEAT.auth.displayPrefs(): the signed-in person's own region and clock,
+ *     read from their profile (display-prefs.js), which the served libraries' dates and numbers now
+ *     follow; the bundle version moves. Codebase analysis 2026-11-03, decision 10b of 2026-11-05.
  *   v1.8.0 — 2026-11-02 — `?auth_step=two_step_setup#two_step=<token>` opens the sign-in dialog on the
  *     two-step enrolment step (required two-step sign-in); the bundle version moves.
  *   v1.7.0 — 2026-10-09 — `?auth_step=second_factor` opens the sign-in dialog on its code view: an
@@ -51,6 +54,8 @@ import { attach } from '../_core/namespace.js';
 import { readLocales, aimeatReadLang, aimeatApplyLang, aimeatRestoreLang } from './locale.js';
 import { paletteRegistry, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
 import { aimeatRestoreMode } from './theme.js';
+import { makeDisplayPrefs } from './display-prefs.js';
+import { on } from './events.js';
 
 // ── Boot: first-time OIDC signup prompt (after the callback bounced back with ?aimeat_signup=1) ──
 if (typeof document !== 'undefined' && document.addEventListener) {
@@ -107,6 +112,12 @@ auth.setLang = function (lang) { aimeatApplyLang(String(lang).toLowerCase()); };
 auth.getPalette = function () { return aimeatReadPalette(); };
 auth.setPalette = function (id) { aimeatApplyPalette(String(id).toLowerCase()); };
 auth.getPalettes = function () { return paletteRegistry().map(function (p) { return { id: p.id, label: p.label, swatch: p.swatch }; }); };
+// The signed-in person's own date-and-number format and clock, { region, timezone } (null = the
+// browser's). Every served library's _core/format.js asks this; the profile read starts at the
+// first call, and 'aimeat-prefs-change' on window says when it changed what is shown.
+var displayPrefs = makeDisplayPrefs(function () { return auth.getSession(); });
+auth.displayPrefs = displayPrefs.current;
+on('logout', displayPrefs.forget);
 
 // Apply the stored palette at parse time (before any UI mounts), so a published app follows the
 // user's chosen look with zero app code — the same free ride the mode snippet gives light/dark.
@@ -118,4 +129,4 @@ if (typeof document !== 'undefined' && document.readyState === 'loading' && docu
 }
 
 const ns = attach('auth', auth);
-ns.version = '2026-11-02-001';
+ns.version = '2026-11-05-001';
