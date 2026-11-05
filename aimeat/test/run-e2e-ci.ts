@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-05 -- e2e-verb-parity-unified.ts joins the list (not the guard tier): a contact's card, a group member's permissions and a task's deletion admit the callers the other verb of the same path admits (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
  *   2026-11-05 -- e2e-place-agent-default-at-approval.ts joins the list (not the guard tier): a store place's default is given at approval and when the plan is set, and a mint adds nothing (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-05 -- e2e-single-process-lease.ts joins the list (not the guard tier): with one process per node, the default, a process of a new name takes the previous process's @activate run and queued AI jobs at once (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   2026-11-05 -- e2e-key-reencrypt.ts joins the list (not the guard tier): replacing the data key with a second key and the re-encrypt job, over REST and MCP (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
@@ -1798,6 +1799,8 @@ const ALL_SUITES = [
     'test/e2e-mcp-mail-connection-tools.ts',
     'test/e2e-mcp-proxy-tools.ts',
     'test/e2e-mcp-owner-only-parity.ts',
+    // The writing verbs of one path admit the same callers, the looser deciding (decision 13a).
+    'test/e2e-verb-parity-unified.ts',
     'test/e2e-mcp-agent-self-tools.ts',
     'test/e2e-mcp-v2-tools.ts',
     'test/e2e-mcp-crew-schedule-tools.ts',

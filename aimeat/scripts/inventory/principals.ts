@@ -26,6 +26,8 @@
  * @structure PRINCIPALS · GUARD_EFFECTS · principalsFor(guards) · scopesFrom(guards)
  * @usage const { principals, unknown } = principalsFor(['requireAuth()', "requireScope('memory:write')"]);
  * @version-history
+ *   v1.5.0 — 2026-11-05 — requireOwnerPrincipalOrScope is an authorization gate: the account holder,
+ *     or any principal holding the word (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
  *   v1.4.0 — 2026-11-04 — acceptCredential (src/auth/credential-strategies.ts) narrows a door to the new
  *     class 'outside-credential', or to that plus the unauthenticated classes when its kind admits a
  *     request with no credential (codebase analysis 2026-11-03, item B8).
@@ -96,7 +98,7 @@ export const AUTHORIZATION_GATES = [
     'requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
     'requireOwnerPrincipal', 'requireScimConnection', 'requireOperatorPrincipal',
     'requireExternalPrincipal', 'requireOwnerSession', 'workspaceAccess', 'workspaceAccessMiddleware',
-    'requireOwnerMailboxRead', 'requireScopeOrOwnApp', 'requireRestScope',
+    'requireOwnerMailboxRead', 'requireScopeOrOwnApp', 'requireRestScope', 'requireOwnerPrincipalOrScope',
 ];
 
 /**
@@ -125,6 +127,8 @@ export const GUARD_EFFECTS: Record<string, { admits: Principal[] | null; note?: 
      */
     requireRestScope: { admits: AUTHENTICATED, note: 'narrows by scope word from 4.0.0; before it counts the missing word and allows' },
     requireScopeUnlessSelf: { admits: AUTHENTICATED, note: 'narrows by scope word; an agent acting on its own record passes' },
+    /** requireOwnerPrincipal OR requireScope(word), for a path whose two verbs had one each (auth/owner-principal-or-scope.ts, decision 13a). */
+    requireOwnerPrincipalOrScope: { admits: AUTHENTICATED, note: 'the account holder, or any principal holding the word' },
     /**
      * A scoped external principal: agent OR ecosystem app, with owner and operator also passing
      * because they act for their own. A deliberate superset of requireRole('agent').

@@ -24,6 +24,9 @@
  *   cd aimeat && pnpm check:route-scopes --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:route-scopes --seed     # rewrite the exemption file from today's state
  * @version-history
+ *   v1.4.1 — 2026-11-05 — requireOwnerPrincipalOrScope counts: it admits the account holder or a
+ *     principal holding the word, so it stops one that lacks it (codebase analysis 2026-11-03,
+ *     decision 13a of 2026-11-05).
  *   v1.4.0 — 2026-10-12 — The gate asks whether a chain stops a scoped principal that lacks the word
  *     (stopsUnscopedPrincipal, Core 2026-11 AUTHZ-01): requireRole('agent'), requireExternalPrincipal,
  *     requireRoleOrScope('agent', …) and workspaceAccess no longer count, and requireRestScope does. A
@@ -71,6 +74,7 @@ const SCOPE_GATE_CALLS = [
     'requireScope(', 'requireAnyScope(', 'requireRestScope(', 'requireScopeOrOwnApp(', 'requireScopeUnlessSelf(',
     'requireOwnerMailboxRead(', 'requireOperatorPrincipal(', 'requireOperator(', 'requireScimConnection',
     'requireOwnerPrincipal(', 'requireOwnerSession(', 'requireOwnerPrincipalOrVerifiedRelay(',
+    'requireOwnerPrincipalOrScope(',
 ];
 const PERSON_ROLE = /requireRole\(\s*['"](owner|operator)['"]\s*\)|requireRoleOrScope\(\s*['"]owner['"]/;
 
