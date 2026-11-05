@@ -10,6 +10,10 @@
  * @structure setCarryPlan · setMember · removeRosterMember
  * @usage const out = await setMember(storage, config, caller, { owner, filename }, req.body);
  * @version-history
+ *   v1.2.0 — 2026-11-05 — An invitation an agent or an app sends by email counts against the account's
+ *     emailed-invitation allowance (account-limits.ts takeInviteEmailOnNode) before anything is written,
+ *     as the organism invitation does; 429 RATE_LIMITED past it (codebase analysis 2026-11-03,
+ *     decision 14a of 2026-11-05).
  *   v1.1.0 — 2026-11-01 — POST .../members takes `party`: an outside party of the app's owner joins the
  *     roster with a role and no grant (services/app-parties/owner.ts); removing one sends no notice (plan D4.1).
  *   v1.0.0 — 2026-10-05 — Moved out of the handlers of routes/app-members.ts by extraction;
@@ -34,6 +38,9 @@ import { rosterContext, rosterBucketOf, rosterAudit, type MembersCtx, type Roste
 import { MANAGER_ROLE_MSG, type AppRef } from './app-roster-ops.js';
 import { done, refuse, type AppOpOutcome } from './app-op-outcome.js';
 import { setPartyMember } from './app-parties/owner.js';
+import { takeInviteEmailOnNode } from './account-limits.js';
+import { nodeContext } from './node-context.js';
+import type { AccountTurnTaken } from './mail-gate.js';
 
 const forbidden = (message: string) => refuse(403, 'FORBIDDEN', message);
 const bad = (message: string, code = 'INVALID_INPUT') => refuse(400, code, message);
@@ -139,10 +146,13 @@ export async function setCarryPlan(
 
 /**
  * POST .../members with `email` for an address that belongs to no verified account: store an
- * invitation and email it. The address was already looked up (and counted) by the caller.
+ * invitation and email it. A person in their own session (the owner or a manager) reaches this after
+ * the counted address lookup; an agent or an app (`inPerson` false) takes one emailed invitation from
+ * its account's allowance here, before anything is written, when the node sends mail.
  */
 async function invite(
-  storage: Storage, config: AimeatConfig, c: MembersCtx, args: { email: string; role: string; note?: string; lang: string | undefined },
+  storage: Storage, config: AimeatConfig, c: MembersCtx,
+  args: { email: string; role: string; note?: string; lang: string | undefined; inPerson: boolean },
 ): Promise<AppOpOutcome> {
   const open = await listInvites(storage, c.appId);
   const hash = inviteEmailHash(args.email);
@@ -150,11 +160,19 @@ async function invite(
     return refuse(429, 'TOO_MANY_INVITES',
       `This app has ${open.length} open invitations, the most one app may hold. Cancel some, or wait for them to expire after ${INVITE_DAYS} days.`);
   }
+  // The mail is counted as every other emailed invitation is (services/invitations.ts): per account,
+  // the owner and every agent and app acting for them together. No mail, nothing to count.
+  let turn: AccountTurnTaken | undefined;
+  if (!args.inPerson && nodeContext().email?.enabled) {
+    const taken = await takeInviteEmailOnNode(c.callerGaii);
+    if (!taken.ok) return refuse(429, taken.code, taken.message, { retry_after_sec: taken.retryAfterSec });
+    turn = taken;
+  }
   const urls = await resolveAppUrls(config, storage, [{ owner: c.owner, filename: c.filename }]);
   const { invite: inv, emailSent, acceptUrl } = await sendAppInvite(storage, config, {
     appId: c.appId, filename: c.filename, email: args.email, role: args.role, note: args.note, invitedBy: c.callerGaii,
     inviterName: (await displayNamesOf(storage, [c.callerAccount])).get(c.callerAccount) || c.callerAccount,
-    appUrl: Object.values(urls)[0] ?? `${config.baseUrl}${appDeepLink(c.appId)}`, lang: noticeLang(args.lang),
+    appUrl: Object.values(urls)[0] ?? `${config.baseUrl}${appDeepLink(c.appId)}`, lang: noticeLang(args.lang), turn,
   });
   // The address, as the owner's and the managers' invitation list shows it: the history is read
   // by the same people, and an invitation has no account to name.
@@ -212,7 +230,7 @@ export async function setMember(
     // (POST /v1/contacts/resolve). Anybody else asking here (the app's own token, an agent, a
     // manager) gets an invitation whatever the address is, so the answer tells them nothing about
     // who has an account; the account holder accepts it from their mail (secaudit 2026-10, APP-3).
-    if (!isOwnerInPerson(caller)) return invite(storage, config, c, { email, role, note, lang });
+    if (!isOwnerInPerson(caller)) return invite(storage, config, c, { email, role, note, lang, inPerson: false });
     let hit: Awaited<ReturnType<typeof resolveContactEmail>>;
     try {
       hit = await resolveContactEmail(storage, c.callerGaii, email);
@@ -221,7 +239,7 @@ export async function setMember(
       throw e;
     }
     const verified = hit.found ? (await storage.getGHII(hit.ghii))?.emailVerifiedAt : null;
-    if (!hit.found || !verified) return invite(storage, config, c, { email, role, note, lang });
+    if (!hit.found || !verified) return invite(storage, config, c, { email, role, note, lang, inPerson: true });
     account = accountOf(hit.owner);
     found = { account, displayName: hit.display_name };
   }

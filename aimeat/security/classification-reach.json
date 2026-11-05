@@ -2189,6 +2189,12 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: the first-MCP-call marker and the first note are existence checks, and journey.state is the owner's own path record shown back to the same owner and their own AI; no content goes to a model or another principal."
     },
+    "src/services/key-credentials.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-05 (codebase analysis 2026-11-03, decision 14a), the node's own read: the held first sign-in credentials in the pseudo-owner namespace key-credentials-held, which the node itself wrote at the first sign-in; the sealed password is mailed once to the account's own verified address and goes to no model or other principal."
+    },
     "src/services/knowledge-link-owner-keep.ts": {
       "reads": {
         "listMemoryForOwners": 1

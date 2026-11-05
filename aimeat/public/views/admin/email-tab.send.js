@@ -15,6 +15,9 @@
  *     group send reaches
  *
  * @version-history
+ *   v2.1.0 — 2026-11-05 — The group send reaches verified addresses only: the box says how many of the
+ *     chosen group are skipped as unverified, and the result line says how many were skipped
+ *     (codebase analysis 2026-11-03, decision 14a of 2026-11-05).
  *   v2.0.0 — 2026-09-27 — The sections draw library components (Section, Beside, TextField,
  *     TextArea, Tabs, Loud, Box, Readings, Note) and write no class. The message type and the group
  *     are a chooser of tabs; the server's reply is a box whose head carries the time and the answer
@@ -137,7 +140,10 @@ export function GroupSend({ recipients }) {
     setResult(null);
     try {
       const res = await sendGroupEmail(group, subject, body);
-      setResult({ ok: true, text: E('group.done', { sent: num(res.data.sent), total: num(res.data.total) }) });
+      const skipped = res.data.skipped_unverified ?? 0;
+      setResult({ ok: true, text: skipped
+        ? E('group.doneSkipped', { sent: num(res.data.sent), total: num(res.data.total), skipped: num(skipped) })
+        : E('group.done', { sent: num(res.data.sent), total: num(res.data.total) }) });
       setSubject('');
       setBody('');
     } catch (e) {
@@ -149,7 +155,10 @@ export function GroupSend({ recipients }) {
   const who = html`<${Reply} label=${E('group.whoTitle')}
     rows=${[
       { key: 'ops', name: E('group.operators'), value: E('group.ofN', { n: num(r.operators_with_address ?? 0), total: num(r.operators ?? 0) }) },
-      { key: 'all', name: E('group.everyone'), value: E('group.ofN', { n: num(r.with_address ?? 0), total: num(r.accounts ?? 0) }), last: true },
+      { key: 'all', name: E('group.everyone'), value: E('group.ofN', { n: num(r.with_address ?? 0), total: num(r.accounts ?? 0) }) },
+      // Accounts of the chosen group whose address is not verified: the send skips them.
+      { key: 'unverified', name: E('group.unverified'),
+        value: num((group === 'operators' ? r.operators_unverified : r.unverified) ?? 0), last: true },
     ]}
     hint=${E('group.whoHint')} />`;
 

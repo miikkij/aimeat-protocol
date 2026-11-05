@@ -1166,7 +1166,7 @@
         "failed": "fallaron",
         "failedSub": "se rindieron tras cuatro intentos",
         "reach": "se puede alcanzar",
-        "reachSub": "de {total} cuentas tienen dirección"
+        "reachSub": "de {total} cuentas tienen dirección verificada"
       },
       "test": {
         "title": "Enviar un mensaje de prueba",
@@ -1199,7 +1199,7 @@
         "colTemplate": "Plantilla",
         "colSent": "Enviados",
         "hardCoded": "en el código",
-        "note": "Una persona recibe algo de esto solo si tiene una dirección de notificación en su cuenta. Las cifras son totales de los contadores; los mensajes en sí no se guardan.",
+        "note": "Una persona recibe algo de esto solo si tiene una dirección de notificación en su cuenta. Los datos de acceso de la clave y el mensaje al grupo solo van a una dirección que la persona ha verificado. Las cifras son totales de los contadores; los mensajes en sí no se guardan.",
         "when": {
           "verification": "Alguien se registra, o añade una dirección a su cuenta",
           "magic_link": "Alguien pide entrar sin contraseña",
@@ -1212,7 +1212,7 @@
       },
       "group": {
         "title": "Enviar a un grupo",
-        "lead": "Un mensaje para todos los del grupo que tengan una dirección en su cuenta. Sale como notificación, un mensaje por destinatario y sin Para ni Cc compartidos, y no se puede recuperar.",
+        "lead": "Un mensaje para todos los del grupo que tengan una dirección verificada en su cuenta. Sale como notificación, un mensaje por destinatario y sin Para ni Cc compartidos, y no se puede recuperar.",
         "group": "Grupo",
         "operators": "Operadores",
         "everyone": "Todos",
@@ -1221,13 +1221,15 @@
         "body": "Mensaje",
         "bodyPlaceholder": "Texto plano. Se envuelve en la plantilla de notificación.",
         "send": "Enviar a {n}",
-        "nobody": "Nadie tiene dirección",
+        "nobody": "Nadie tiene dirección verificada",
         "sending": "Enviando",
         "note": "Se envían de uno en uno. Si el servidor rechaza a alguien, se salta y los demás salen igual.",
         "done": "Enviado a {sent} de {total}.",
+        "doneSkipped": "Enviado a {sent} de {total}. Se saltaron {skipped} porque su dirección no está verificada.",
         "whoTitle": "Quién lo recibe",
         "ofN": "{n} de {total}",
-        "whoHint": "Los que quedan fuera no tienen dirección en su cuenta. Se saltan, y no se informa de ningún error."
+        "unverified": "Dirección sin verificar, se salta",
+        "whoHint": "Los que quedan fuera no tienen dirección en su cuenta, o no la han verificado. Se saltan, y no se informa de ningún error."
       },
       "tpl": {
         "title": "Plantillas",

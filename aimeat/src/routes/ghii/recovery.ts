@@ -6,6 +6,8 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — A verified address receives the first sign-in's credentials that waited for it
+ *     (key-credentials.ts sendHeldKeyCredentials; codebase analysis 2026-11-03, decision 14a of 2026-11-05).
  *   2026-11-04 — The code, reset and username mails go through mail-gate.ts sendMail as sign-in mail (codebase analysis 2026-11-03, item B3).
  *   2026-11-02 — The password sign-in policy (services/sign-in-policy.ts): with it off,
  *     /password/reset-request and /password/reset answer 403 PASSWORD_SIGN_IN_OFF before anything is
@@ -70,6 +72,7 @@ import { passwordResetEmail } from '../../services/email-template-reset.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
+import { sendHeldKeyCredentials } from '../../services/key-credentials.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { recordAuthFailure } from '../../services/auth-audit.js';
@@ -261,6 +264,8 @@ export function registerRecoveryRoutes(
         // An app roster invitation sent to this address becomes a membership (services/app-member-invites.ts).
         await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
             .catch(err => { logger.warn('recovery: app invitations are best-effort', { error: String(err) }); });
+        // A code key's first sign-in credentials that waited for a proven address go now (never throws).
+        await sendHeldKeyCredentials(storage, config, ghii);
 
         res.json(success(config.nodeId, {
             ok: true,

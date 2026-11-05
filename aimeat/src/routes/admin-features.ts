@@ -12,6 +12,10 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.6.0 — 2026-11-05 — The group mail goes to verified addresses only: GET /v1/admin/email/status
+ *     adds recipients.unverified and recipients.operators_unverified, and POST
+ *     /v1/admin/email/send-group answers skipped_unverified (codebase analysis 2026-11-03, decision 14a
+ *     of 2026-11-05).
  *   v1.5.1 — 2026-11-04 — The test and group mail go through mail-gate.ts sendMail as operator mail (codebase analysis 2026-11-03, item B3).
  *   v1.5.0 — 2026-10-25 — secaudit2026oct22: PUT /v1/admin/ghii/:ghii, DELETE …/email and DELETE
  *     /v1/admin/ghii/:ghii write the operator trail (recordOperatorAction, area 'identity') when the
@@ -246,6 +250,8 @@ export function adminFeaturesRouter(
                 with_address: reach.all.length,
                 operators: reach.operatorAccounts,
                 operators_with_address: reach.operators.length,
+                unverified: reach.unverified,
+                operators_unverified: reach.operatorsUnverified,
             },
             sent: emailCounts(),
         }));
@@ -301,17 +307,19 @@ export function adminFeaturesRouter(
             res.status(400).json(error(config.nodeId, 'EMAIL_DISABLED', 'Email service is not configured'));
             return;
         }
-        // The same count the status route prints on the button, from the same function.
+        // The same count the status route prints on the button, from the same function. It lists
+        // verified addresses only, and counts the accounts whose address it skips.
         const reach = await emailReach(storage);
         const recipients = group === 'operators' ? reach.operators : reach.all;
+        const skippedUnverified = group === 'operators' ? reach.operatorsUnverified : reach.unverified;
         const { html: mailHtml, text: mailText } = notificationEmailHtml(subject as string, body as string);
         let sent = 0;
         for (const addr of recipients) {
-            const ok = await sendMail(services.emailService, { kind: 'operator', to: addr, why: 'The operator\'s group mail, to the addresses emailReach lists.' },
+            const ok = await sendMail(services.emailService, { kind: 'operator', to: addr, why: 'The operator\'s group mail, to the verified addresses emailReach lists.' },
                 { form: 'html', subject: subject as string, html: mailHtml, text: mailText }) === 'sent';
             if (ok) sent++;
         }
-        res.json(success(config.nodeId, { sent, total: recipients.length, group }));
+        res.json(success(config.nodeId, { sent, total: recipients.length, skipped_unverified: skippedUnverified, group }));
         emitChange('features');
     }));
 

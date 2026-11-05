@@ -27,6 +27,9 @@
  *   applyAppInvitesForVerifiedEmail
  * @usage await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii);
  * @version-history
+ *   v1.4.0 — 2026-11-05 — sendAppInvite takes `turn`: the emailed-invitation turn the caller took for
+ *     an agent or an app, which the mail carries as its count (codebase analysis 2026-11-03,
+ *     decision 14a of 2026-11-05).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   v1.3.1 — 2026-11-04 — The invitation mail goes through mail-gate.ts sendMail as a third-party mail
@@ -46,7 +49,7 @@ import { approveMember, appStem } from './app-member-approve.js';
 import { appMemberInviteEmail, type NoticeLang } from './app-member-notices.js';
 import { inviteEmailHash } from './invitations.js';
 import { nodeContext } from './node-context.js';
-import { sendMail } from './mail-gate.js';
+import { sendMail, type AccountTurnTaken } from './mail-gate.js';
 import { mintAppInviteLink, cancelAppInviteLinks } from './app-invite-link.js';
 import type { AimeatConfig } from '../config.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
@@ -143,13 +146,15 @@ export async function removeInvite(storage: Storage, appId: string, emailHash: s
  * @param input.lang the email's language (en, fi or es)
  * @param input.appUrl the address a person opens the app at (routes/apps/helpers.ts resolveAppUrls)
  * @param input.inviterName who invites, as the recipient should read it (their display name)
+ * @param input.turn the account's emailed-invitation turn, taken for an agent or an app
+ *   (app-roster-write.ts); absent for a person in their own session, counted by the address lookup
  */
 export async function sendAppInvite(
   storage: Storage,
   config: AimeatConfig,
   input: {
     appId: string; filename: string; email: string; role: string; note?: string; invitedBy: string;
-    inviterName: string; appUrl: string; lang: NoticeLang;
+    inviterName: string; appUrl: string; lang: NoticeLang; turn?: AccountTurnTaken;
   },
 ): Promise<{ invite: AppMemberInvite; emailSent: boolean; acceptUrl: string | null }> {
   const invite = await putInvite(storage, {
@@ -178,9 +183,11 @@ export async function sendAppInvite(
     try {
       emailSent = await sendMail(mail, {
         kind: 'third-party', to: input.email.trim(),
-        // Only the owner in person reaches this through the counted contacts lookup (app-roster-write.ts);
-        // an app token, an agent or a manager comes here directly, bounded by the open-invitation cap alone.
-        count: { uncounted: 'At most MAX_OPEN_INVITES_PER_APP open per app; the owner in person is also counted as an address lookup (takeEmailLookup) by app-roster-write.ts.' },
+        // An agent or an app carries the account's emailed-invitation turn (app-roster-write.ts); a
+        // person in their own session was counted by the contacts lookup (takeEmailLookup) instead.
+        count: input.turn
+          ? { turn: input.turn }
+          : { uncounted: 'A person in their own session: counted as an address lookup (takeEmailLookup) by app-roster-write.ts, and at most MAX_OPEN_INVITES_PER_APP open per app.' },
       }, { form: 'html', subject, html, text }) === 'sent';
     } catch (err) {
       logger.warn('app-member-invites: the invitation email failed, the invitation stands', { error: String(err) });
