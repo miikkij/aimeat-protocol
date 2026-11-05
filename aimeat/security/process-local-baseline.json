@@ -157,6 +157,10 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/mcp/tool-schema-cache.ts :: let :: enabled": {
+      "count": 1,
+      "reason": "A per-process cache switch: each process builds its own cache of tool JSON Schemas, nothing is shared or needs to be."
+    },
     "src/mcp/session-registry.ts :: map :: openSessions": {
       "count": 1,
       "reason": "DEBT"
