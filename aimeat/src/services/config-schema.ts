@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-11-06 — extensions.zip_max_files (AIMEAT_EXT_ZIP_MAX_FILES, 1-10000), the ZIP file cap 5e367ec01
+ *     added to config.ts, so the Config tab shows it.
  *   2026-10-29 — The file_store rows (config-schema-file-store.ts) after the storage quota; the marketplace
  *     and commerce core rows move to config-schema-commerce.ts unchanged (max-file-lines).
  *   2026-10-25 — extensions.install_role says what operator means: only the operator's account, its
@@ -323,6 +325,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // run regardless of how many calls it is allowed to attempt.
   { key: 'extensionMaxApiCalls', dotPath: 'extensions.max_api_calls', envVar: 'AIMEAT_EXT_MAX_API_CALLS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max API calls per extension execution', range: '1-10000' },
   { key: 'extensionMaxCodeSizeKb', dotPath: 'extensions.max_code_size_kb', envVar: 'AIMEAT_EXT_MAX_CODE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16 && (v as number) <= 2048, immutable: false, description: 'Max code size per extension (KB)', range: '16-2048' },
+  // upload-zip.ts reads it on every upload, so a change applies to the next ZIP without a restart.
+  { key: 'extensionZipMaxFiles', dotPath: 'extensions.zip_max_files', envVar: 'AIMEAT_EXT_ZIP_MAX_FILES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max files in one extension or cortex ZIP, manifest included', range: '1-10000' },
   { key: 'extensionMaxInstalled', dotPath: 'extensions.max_installed', envVar: 'AIMEAT_EXT_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max installed extensions', range: '1-100' },
   { key: 'extInstallRole', dotPath: 'extensions.install_role', envVar: 'AIMEAT_EXT_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Who installs extensions and changes their code: operator (only the operator\'s account, its agents included) or owner (every account holder, and an agent holding ext:write)' },
   { key: 'maxExtensionsPerOwner', dotPath: 'extensions.max_per_owner', envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max extensions per owner', range: '1-100' },

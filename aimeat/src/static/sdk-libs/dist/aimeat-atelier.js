@@ -11171,16 +11171,18 @@
     });
   }
 
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/deep-compare-strict.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.6/node_modules/@cfworker/json-schema/dist/esm/deep-compare-strict.js
   function deepCompareStrict(a, b) {
     const typeofa = typeof a;
     if (typeofa !== typeof b) {
       return false;
     }
-    if (Array.isArray(a)) {
-      if (!Array.isArray(b)) {
-        return false;
-      }
+    const aIsArray = Array.isArray(a);
+    const bIsArray = Array.isArray(b);
+    if (aIsArray !== bIsArray) {
+      return false;
+    }
+    if (aIsArray) {
       const length = a.length;
       if (length !== b.length) {
         return false;
@@ -11203,6 +11205,9 @@
         return false;
       }
       for (const k of aKeys) {
+        if (!Object.prototype.hasOwnProperty.call(b, k)) {
+          return false;
+        }
         if (!deepCompareStrict(a[k], b[k])) {
           return false;
         }
@@ -11212,15 +11217,40 @@
     return a === b;
   }
 
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/pointer.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.6/node_modules/@cfworker/json-schema/dist/esm/pointer.js
   function encodePointer(p) {
-    return encodeURI(escapePointer(p));
+    return encodeURI(escapePointer(p)).replace(/#/g, "%23");
   }
   function escapePointer(p) {
     return p.replace(/~/g, "~0").replace(/\//g, "~1");
   }
 
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/dereference.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.6/node_modules/@cfworker/json-schema/dist/esm/dereference.js
+  var uriFragmentCharacter = /^[A-Za-z0-9._~!$&'()*+,;=:@/?-]$/;
+  var uriPercentEncoding = /^%[0-9A-Fa-f]{2}$/;
+  var uriUnreservedCharacter = /^[A-Za-z0-9._~-]$/;
+  function normalizeURIFragment(fragment) {
+    let normalized = "";
+    for (let index = 0; index < fragment.length; ) {
+      const character = fragment[index];
+      const encoded = fragment.slice(index, index + 3);
+      if (character === "%" && uriPercentEncoding.test(encoded)) {
+        const decoded = String.fromCharCode(parseInt(encoded.slice(1), 16));
+        normalized += uriUnreservedCharacter.test(decoded) ? decoded : encoded.toUpperCase();
+        index += 3;
+        continue;
+      }
+      const codePoint = String.fromCodePoint(fragment.codePointAt(index));
+      normalized += uriFragmentCharacter.test(codePoint) ? codePoint : encodeURIComponent(codePoint);
+      index += codePoint.length;
+    }
+    return normalized;
+  }
+  function resolveURI(reference, baseURI) {
+    const url = new URL(reference, baseURI.href);
+    url.hash = url.hash ? normalizeURIFragment(url.hash.slice(1)) : "";
+    return url;
+  }
   var schemaArrayKeyword = {
     prefixItems: true,
     items: true,
@@ -11247,6 +11277,7 @@
     enum: true,
     const: true,
     required: true,
+    dependentRequired: true,
     type: true,
     maximum: true,
     minimum: true,
@@ -11266,9 +11297,9 @@
   var initialBaseURI = typeof self !== "undefined" && self.location && self.location.origin !== "null" ? new URL(self.location.origin + self.location.pathname + location.search) : new URL("https://github.com/cfworker");
   function dereference(schema, lookup = /* @__PURE__ */ Object.create(null), baseURI = initialBaseURI, basePointer = "") {
     if (schema && typeof schema === "object" && !Array.isArray(schema)) {
-      const id = schema.$id || schema.id;
+      const id = schema.$id || schema["id"];
       if (id) {
-        const url = new URL(id, baseURI.href);
+        const url = resolveURI(id, baseURI);
         if (url.hash.length > 1) {
           lookup[url.href] = schema;
         } else {
@@ -11284,7 +11315,7 @@
       return lookup;
     }
     const schemaURI = baseURI.href + (basePointer ? "#" + basePointer : "");
-    if (lookup[schemaURI] !== void 0) {
+    if (lookup[schemaURI] !== void 0 && lookup[schemaURI] !== schema) {
       throw new Error(`Duplicate schema URI "${schemaURI}".`);
     }
     lookup[schemaURI] = schema;
@@ -11298,23 +11329,21 @@
       });
     }
     if (schema.$ref && schema.__absolute_ref__ === void 0) {
-      const url = new URL(schema.$ref, baseURI.href);
-      url.hash = url.hash;
+      const url = resolveURI(schema.$ref, baseURI);
       Object.defineProperty(schema, "__absolute_ref__", {
         enumerable: false,
         value: url.href
       });
     }
     if (schema.$recursiveRef && schema.__absolute_recursive_ref__ === void 0) {
-      const url = new URL(schema.$recursiveRef, baseURI.href);
-      url.hash = url.hash;
+      const url = resolveURI(schema.$recursiveRef, baseURI);
       Object.defineProperty(schema, "__absolute_recursive_ref__", {
         enumerable: false,
         value: url.href
       });
     }
     if (schema.$anchor) {
-      const url = new URL("#" + schema.$anchor, baseURI.href);
+      const url = resolveURI("#" + schema.$anchor, baseURI);
       lookup[url.href] = schema;
     }
     for (let key in schema) {
@@ -11341,39 +11370,47 @@
     return lookup;
   }
 
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/format.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.6/node_modules/@cfworker/json-schema/dist/esm/format.js
   var DATE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
   var DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  var TIME = /^(\d\d):(\d\d):(\d\d)(\.\d+)?(z|[+-]\d\d(?::?\d\d)?)?$/i;
-  var HOSTNAME = /^(?=.{1,253}\.?$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[-0-9a-z]{0,61}[0-9a-z])?)*\.?$/i;
+  var TIME = /^(\d\d):(\d\d):(\d\d)(\.\d+)?(z|([+-])(\d\d):(\d\d))?$/i;
+  var HOSTNAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[-0-9a-z]{0,61}[0-9a-z])?)*$/i;
   var URIREF = /^(?:[a-z][a-z0-9+\-.]*:)?(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'"()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'"()*+,;=:@]|%[0-9a-f]{2})*)*)?(?:\?(?:[a-z0-9\-._~!$&'"()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'"()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i;
-  var URITEMPLATE = /^(?:(?:[^\x00-\x20"'<>%\\^`{|}]|%[0-9a-f]{2})|\{[+#./;?&=,!@|]?(?:[a-z0-9_]|%[0-9a-f]{2})+(?::[1-9][0-9]{0,3}|\*)?(?:,(?:[a-z0-9_]|%[0-9a-f]{2})+(?::[1-9][0-9]{0,3}|\*)?)*\})*$/i;
+  var URITEMPLATE = /^(?:(?:[^\x00-\x20\x7f"<>%\\^`{|}]|%[0-9a-f]{2})|\{[+#./;?&=,!@|]?(?:[a-z0-9_]|%[0-9a-f]{2})+(?:\.(?:[a-z0-9_]|%[0-9a-f]{2})+)*(?::[1-9][0-9]{0,3}|\*)?(?:,(?:[a-z0-9_]|%[0-9a-f]{2})+(?:\.(?:[a-z0-9_]|%[0-9a-f]{2})+)*(?::[1-9][0-9]{0,3}|\*)?)*\})*$/i;
   var URL_ = /^(?:(?:https?|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u{00a1}-\u{ffff}0-9]+-?)*[a-z\u{00a1}-\u{ffff}0-9]+)(?:\.(?:[a-z\u{00a1}-\u{ffff}0-9]+-?)*[a-z\u{00a1}-\u{ffff}0-9]+)*(?:\.(?:[a-z\u{00a1}-\u{ffff}]{2,})))(?::\d{2,5})?(?:\/[^\s]*)?$/iu;
-  var UUID = /^(?:urn:uuid:)?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
+  var UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
   var JSON_POINTER = /^(?:\/(?:[^~/]|~0|~1)*)*$/;
   var JSON_POINTER_URI_FRAGMENT = /^#(?:\/(?:[a-z0-9_\-.!$&'()*+,;:=@]|%[0-9a-f]{2}|~0|~1)*)*$/i;
   var RELATIVE_JSON_POINTER = /^(?:0|[1-9][0-9]*)(?:#|(?:\/(?:[^~/]|~0|~1)*)*)$/;
+  var EMAIL_ADDRESS = /^("(?:[\x20-\x21\x23-\x5b\x5d-\x7e]|\\[\x20-\x7e])*"|[a-z0-9.!#$%&'*+/=?^_`{|}~-]+)@(.+)$/i;
   var EMAIL = (input) => {
-    if (input[0] === '"')
+    const matches = input.match(EMAIL_ADDRESS);
+    if (!matches)
       return false;
-    const [name, host, ...rest] = input.split("@");
-    if (!name || !host || rest.length !== 0 || name.length > 64 || host.length > 253)
+    const name = matches[1];
+    const host = matches[2];
+    if (!name || !host || name.length > 64 || host.length > 253)
       return false;
-    if (name[0] === "." || name.endsWith(".") || name.includes(".."))
+    if (name[0] !== '"' && (name[0] === "." || name.endsWith(".") || name.includes(".."))) {
       return false;
-    if (!/^[a-z0-9.-]+$/i.test(host) || !/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(name))
-      return false;
-    return host.split(".").every((part) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i.test(part));
+    }
+    if (host.startsWith("[") && host.endsWith("]")) {
+      const address = host.slice(1, -1);
+      if (/^ipv6:/i.test(address))
+        return IPV6.test(address.slice(5));
+      return IPV4.test(address);
+    }
+    return HOSTNAME.test(host);
   };
   var IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
   var IPV6 = /^((([0-9a-f]{1,4}:){7}([0-9a-f]{1,4}|:))|(([0-9a-f]{1,4}:){6}(:[0-9a-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){5}(((:[0-9a-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){4}(((:[0-9a-f]{1,4}){1,3})|((:[0-9a-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){3}(((:[0-9a-f]{1,4}){1,4})|((:[0-9a-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){2}(((:[0-9a-f]{1,4}){1,5})|((:[0-9a-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){1}(((:[0-9a-f]{1,4}){1,6})|((:[0-9a-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9a-f]{1,4}){1,7})|((:[0-9a-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))$/i;
-  var DURATION = (input) => input.length > 1 && input.length < 80 && (/^P\d+([.,]\d+)?W$/.test(input) || /^P[\dYMDTHS]*(\d[.,]\d+)?[YMDHS]$/.test(input) && /^P([.,\d]+Y)?([.,\d]+M)?([.,\d]+D)?(T([.,\d]+H)?([.,\d]+M)?([.,\d]+S)?)?$/.test(input));
+  var DURATION = (input) => /^P(?:\d+W|(?:(?:\d+Y(?:\d+M(?:\d+D)?)?|\d+M(?:\d+D)?|\d+D)(?:T(?:\d+H(?:\d+M(?:\d+S)?)?|\d+M(?:\d+S)?|\d+S))?|T(?:\d+H(?:\d+M(?:\d+S)?)?|\d+M(?:\d+S)?|\d+S)))$/.test(input);
   function bind(r) {
     return r.test.bind(r);
   }
   var format = {
     date: date2,
-    time: time2.bind(void 0, false),
+    time: time2.bind(void 0, true),
     "date-time": date_time,
     duration: DURATION,
     uri,
@@ -11397,25 +11434,46 @@
     const matches = str.match(DATE);
     if (!matches)
       return false;
-    const year = +matches[1];
-    const month = +matches[2];
-    const day3 = +matches[3];
-    return month >= 1 && month <= 12 && day3 >= 1 && day3 <= (month == 2 && isLeapYear(year) ? 29 : DAYS[month]);
+    const yearPart = matches[1];
+    const monthPart = matches[2];
+    const dayPart = matches[3];
+    if (!yearPart || !monthPart || !dayPart)
+      return false;
+    const year = +yearPart;
+    const month = +monthPart;
+    const day3 = +dayPart;
+    const maxDay = month == 2 && isLeapYear(year) ? 29 : DAYS[month];
+    return month >= 1 && month <= 12 && day3 >= 1 && maxDay !== void 0 && day3 <= maxDay;
   }
   function time2(full, str) {
     const matches = str.match(TIME);
     if (!matches)
       return false;
-    const hour = +matches[1];
-    const minute = +matches[2];
-    const second = +matches[3];
-    const timeZone = !!matches[5];
-    return (hour <= 23 && minute <= 59 && second <= 59 || hour == 23 && minute == 59 && second == 60) && (!full || timeZone);
+    const hourPart = matches[1];
+    const minutePart = matches[2];
+    const secondPart = matches[3];
+    if (!hourPart || !minutePart || !secondPart)
+      return false;
+    const hour = +hourPart;
+    const minute = +minutePart;
+    const second = +secondPart;
+    const timeZone = matches[5];
+    const offsetSign = matches[6];
+    const offsetHour = +(matches[7] ?? 0);
+    const offsetMinute = +(matches[8] ?? 0);
+    if (hour > 23 || minute > 59 || second > 60 || offsetHour > 23 || offsetMinute > 59 || full && timeZone === void 0) {
+      return false;
+    }
+    if (second < 60)
+      return true;
+    const offsetDirection = offsetSign === "+" ? 1 : offsetSign === "-" ? -1 : 0;
+    const utcMinute = (hour * 60 + minute - offsetDirection * (offsetHour * 60 + offsetMinute) + 24 * 60) % (24 * 60);
+    return utcMinute === 23 * 60 + 59;
   }
   var DATE_TIME_SEPARATOR = /t|\s/i;
   function date_time(str) {
-    const dateTime2 = str.split(DATE_TIME_SEPARATOR);
-    return dateTime2.length == 2 && date2(dateTime2[0]) && time2(true, dateTime2[1]);
+    const [datePart, timePart, extra] = str.split(DATE_TIME_SEPARATOR);
+    return datePart !== void 0 && timePart !== void 0 && extra === void 0 && date2(datePart) && time2(true, timePart);
   }
   var NOT_URI_FRAGMENT = /\/|:/;
   var URI_PATTERN = /^(?:[a-z][a-z0-9+\-.]*:)(?:\/?\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:]|%[0-9a-f]{2})*@)?(?:\[(?:(?:(?:(?:[0-9a-f]{1,4}:){6}|::(?:[0-9a-f]{1,4}:){5}|(?:[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){4}|(?:(?:[0-9a-f]{1,4}:){0,1}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){3}|(?:(?:[0-9a-f]{1,4}:){0,2}[0-9a-f]{1,4})?::(?:[0-9a-f]{1,4}:){2}|(?:(?:[0-9a-f]{1,4}:){0,3}[0-9a-f]{1,4})?::[0-9a-f]{1,4}:|(?:(?:[0-9a-f]{1,4}:){0,4}[0-9a-f]{1,4})?::)(?:[0-9a-f]{1,4}:[0-9a-f]{1,4}|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?))|(?:(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4})?::[0-9a-f]{1,4}|(?:(?:[0-9a-f]{1,4}:){0,6}[0-9a-f]{1,4})?::)|[Vv][0-9a-f]+\.[a-z0-9\-._~!$&'()*+,;=:]+)\]|(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)|(?:[a-z0-9\-._~!$&'()*+,;=]|%[0-9a-f]{2})*)(?::\d*)?(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*|\/(?:(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)?|(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})+(?:\/(?:[a-z0-9\-._~!$&'()*+,;=:@]|%[0-9a-f]{2})*)*)(?:\?(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?(?:#(?:[a-z0-9\-._~!$&'()*+,;=:@/?]|%[0-9a-f]{2})*)?$/i;
@@ -11434,15 +11492,7 @@
     }
   }
 
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/types.js
-  var OutputFormat;
-  (function(OutputFormat2) {
-    OutputFormat2[OutputFormat2["Flag"] = 1] = "Flag";
-    OutputFormat2[OutputFormat2["Basic"] = 2] = "Basic";
-    OutputFormat2[OutputFormat2["Detailed"] = 4] = "Detailed";
-  })(OutputFormat || (OutputFormat = {}));
-
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/ucs2-length.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.6/node_modules/@cfworker/json-schema/dist/esm/ucs2-length.js
   function ucs2length(s) {
     let result = 0;
     let length = s.length;
@@ -11461,7 +11511,33 @@
     return result;
   }
 
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/validate.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.6/node_modules/@cfworker/json-schema/dist/esm/validate.js
+  function hasOwnProperty(instance, key) {
+    return Object.prototype.hasOwnProperty.call(instance, key);
+  }
+  function decimalInteger(value) {
+    const coefficientAndExponent = Math.abs(value).toString().split("e");
+    const coefficient = coefficientAndExponent[0];
+    const exponent = coefficientAndExponent[1] ?? "0";
+    const point = coefficient.indexOf(".");
+    const fractionLength = point === -1 ? 0 : coefficient.length - point - 1;
+    return [
+      BigInt(coefficient.replace(".", "")),
+      Number(exponent) - fractionLength
+    ];
+  }
+  function isMultipleOf(instance, divisor) {
+    if (!Number.isFinite(instance) || !Number.isFinite(divisor) || divisor <= 0) {
+      return false;
+    }
+    const [instanceCoefficient, instanceExponent] = decimalInteger(instance);
+    const [divisorCoefficient, divisorExponent] = decimalInteger(divisor);
+    const exponentDifference = instanceExponent - divisorExponent;
+    if (exponentDifference >= 0) {
+      return instanceCoefficient * 10n ** BigInt(exponentDifference) % divisorCoefficient === 0n;
+    }
+    return instanceCoefficient % (divisorCoefficient * 10n ** BigInt(-exponentDifference)) === 0n;
+  }
   function validate(instance, schema, draft = "2019-09", lookup = dereference(schema), shortCircuit = true, recursiveAnchor = null, instanceLocation = "#", schemaLocation = "#", evaluated = /* @__PURE__ */ Object.create(null)) {
     if (schema === true) {
       return { valid: true, errors: [] };
@@ -11633,8 +11709,7 @@ Known schemas:
       const keywordLocation = `${schemaLocation}/anyOf`;
       const errorsLength = errors.length;
       let anyValid = false;
-      for (let i = 0; i < $anyOf.length; i++) {
-        const subSchema = $anyOf[i];
+      for (const [i, subSchema] of $anyOf.entries()) {
         const subEvaluated = Object.create(evaluated);
         const result = validate(instance, subSchema, draft, lookup, shortCircuit, $recursiveAnchor === true ? recursiveAnchor : null, instanceLocation, `${keywordLocation}/${i}`, subEvaluated);
         errors.push(...result.errors);
@@ -11658,8 +11733,7 @@ Known schemas:
       const keywordLocation = `${schemaLocation}/allOf`;
       const errorsLength = errors.length;
       let allValid = true;
-      for (let i = 0; i < $allOf.length; i++) {
-        const subSchema = $allOf[i];
+      for (const [i, subSchema] of $allOf.entries()) {
         const subEvaluated = Object.create(evaluated);
         const result = validate(instance, subSchema, draft, lookup, shortCircuit, $recursiveAnchor === true ? recursiveAnchor : null, instanceLocation, `${keywordLocation}/${i}`, subEvaluated);
         errors.push(...result.errors);
@@ -11707,8 +11781,10 @@ Known schemas:
     }
     if ($if !== void 0) {
       const keywordLocation = `${schemaLocation}/if`;
-      const conditionResult = validate(instance, $if, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, keywordLocation, evaluated).valid;
+      const ifEvaluated = /* @__PURE__ */ Object.create(null);
+      const conditionResult = validate(instance, $if, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, keywordLocation, ifEvaluated).valid;
       if (conditionResult) {
+        Object.assign(evaluated, ifEvaluated);
         if ($then !== void 0) {
           const thenResult = validate(instance, $then, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, `${schemaLocation}/then`, evaluated);
           if (!thenResult.valid) {
@@ -11735,7 +11811,7 @@ Known schemas:
     if (instanceType === "object") {
       if ($required !== void 0) {
         for (const key of $required) {
-          if (!(key in instance)) {
+          if (!hasOwnProperty(instance, key)) {
             errors.push({
               instanceLocation,
               keyword: "required",
@@ -11780,10 +11856,10 @@ Known schemas:
       if ($dependentRequired !== void 0) {
         const keywordLocation = `${schemaLocation}/dependantRequired`;
         for (const key in $dependentRequired) {
-          if (key in instance) {
+          if (hasOwnProperty(instance, key)) {
             const required = $dependentRequired[key];
             for (const dependantKey of required) {
-              if (!(dependantKey in instance)) {
+              if (!hasOwnProperty(instance, dependantKey)) {
                 errors.push({
                   instanceLocation,
                   keyword: "dependentRequired",
@@ -11796,10 +11872,10 @@ Known schemas:
         }
       }
       if ($dependentSchemas !== void 0) {
-        for (const key in $dependentSchemas) {
+        for (const [key, dependentSchema] of Object.entries($dependentSchemas)) {
           const keywordLocation = `${schemaLocation}/dependentSchemas`;
-          if (key in instance) {
-            const result = validate(instance, $dependentSchemas[key], draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, `${keywordLocation}/${encodePointer(key)}`, evaluated);
+          if (hasOwnProperty(instance, key)) {
+            const result = validate(instance, dependentSchema, draft, lookup, shortCircuit, recursiveAnchor, instanceLocation, `${keywordLocation}/${encodePointer(key)}`, evaluated);
             if (!result.valid) {
               errors.push({
                 instanceLocation,
@@ -11814,11 +11890,11 @@ Known schemas:
       if ($dependencies !== void 0) {
         const keywordLocation = `${schemaLocation}/dependencies`;
         for (const key in $dependencies) {
-          if (key in instance) {
+          if (hasOwnProperty(instance, key)) {
             const propsOrSchema = $dependencies[key];
             if (Array.isArray(propsOrSchema)) {
               for (const dependantKey of propsOrSchema) {
-                if (!(dependantKey in instance)) {
+                if (!hasOwnProperty(instance, dependantKey)) {
                   errors.push({
                     instanceLocation,
                     keyword: "dependencies",
@@ -11845,14 +11921,15 @@ Known schemas:
       let stop = false;
       if ($properties !== void 0) {
         const keywordLocation = `${schemaLocation}/properties`;
-        for (const key in $properties) {
-          if (!(key in instance)) {
+        for (const [key, propertySchema] of Object.entries($properties)) {
+          if (!hasOwnProperty(instance, key)) {
             continue;
           }
           const subInstancePointer = `${instanceLocation}/${encodePointer(key)}`;
-          const result = validate(instance[key], $properties[key], draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, `${keywordLocation}/${encodePointer(key)}`);
+          const result = validate(instance[key], propertySchema, draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, `${keywordLocation}/${encodePointer(key)}`);
+          thisEvaluated[key] = true;
           if (result.valid) {
-            evaluated[key] = thisEvaluated[key] = true;
+            evaluated[key] = true;
           } else {
             stop = shortCircuit;
             errors.push({
@@ -11868,17 +11945,17 @@ Known schemas:
       }
       if (!stop && $patternProperties !== void 0) {
         const keywordLocation = `${schemaLocation}/patternProperties`;
-        for (const pattern in $patternProperties) {
+        for (const [pattern, subSchema] of Object.entries($patternProperties)) {
           const regex2 = new RegExp(pattern, "u");
-          const subSchema = $patternProperties[pattern];
           for (const key in instance) {
             if (!regex2.test(key)) {
               continue;
             }
             const subInstancePointer = `${instanceLocation}/${encodePointer(key)}`;
             const result = validate(instance[key], subSchema, draft, lookup, shortCircuit, recursiveAnchor, subInstancePointer, `${keywordLocation}/${encodePointer(pattern)}`);
+            thisEvaluated[key] = true;
             if (result.valid) {
-              evaluated[key] = thisEvaluated[key] = true;
+              evaluated[key] = true;
             } else {
               stop = shortCircuit;
               errors.push({
@@ -12053,7 +12130,7 @@ Known schemas:
           if (contained >= ($minContains || 0)) {
             errors.length = errorsLength;
           }
-          if ($minContains === void 0 && $maxContains === void 0 && contained === 0) {
+          if ($minContains === void 0 && contained === 0) {
             errors.splice(errorsLength, 0, {
               instanceLocation,
               keyword: "contains",
@@ -12171,8 +12248,7 @@ Known schemas:
         }
       }
       if ($multipleOf !== void 0) {
-        const remainder = instance % $multipleOf;
-        if (Math.abs(0 - remainder) >= 11920929e-14 && Math.abs($multipleOf - remainder) >= 11920929e-14) {
+        if (!isMultipleOf(instance, $multipleOf)) {
           errors.push({
             instanceLocation,
             keyword: "multipleOf",
@@ -12219,7 +12295,7 @@ Known schemas:
     return { valid: errors.length === 0, errors };
   }
 
-  // node_modules/.pnpm/@cfworker+json-schema@4.1.1/node_modules/@cfworker/json-schema/dist/esm/validator.js
+  // node_modules/.pnpm/@cfworker+json-schema@4.1.6/node_modules/@cfworker/json-schema/dist/esm/validator.js
   var Validator = class {
     constructor(schema, draft = "2019-09", shortCircuit = true) {
       __publicField(this, "schema");

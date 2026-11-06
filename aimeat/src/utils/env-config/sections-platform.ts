@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Realtime, load-balancer, extensions, generator, app-origin, cortex, portfolio, agent-scope, moderation, setup, consul, metrics config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.3 — 2026-11-06 — AIMEAT_EXT_ZIP_MAX_FILES (default 1000) in the extensions section.
  *   v1.1.2 — 2026-10-16 — The stated defaults of AIMEAT_EXT_INSTALL_ROLE (owner), AIMEAT_APP_ORIGIN_ENABLED (on for a public profile) and AIMEAT_DEFAULT_AGENT_SCOPES say what the loader does (QA audit D8-04).
  *   v1.1.1 — 2026-10-10 — The static TURN pair says it is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23).
  *   v1.1.0 — 2026-10-09 — AIMEAT_TURN_SECRET and AIMEAT_TURN_TTL_SECONDS; the static TURN pair is marked deprecated.
@@ -156,6 +157,12 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
           description: 'Max extension code size (KB)',
           value: String(config.extensionMaxCodeSizeKb),
           defaultVal: '256',
+        },
+        {
+          envVar: 'AIMEAT_EXT_ZIP_MAX_FILES',
+          description: 'Max files in one extension or cortex ZIP, manifest included',
+          value: String(config.extensionZipMaxFiles),
+          defaultVal: '1000',
         },
         {
           envVar: 'AIMEAT_EXT_MAX_INSTALLED',
