@@ -46,6 +46,9 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.10.0 — 2026-11-06 — `appBody`: the app's name and description as a visible block at the start
+ *     of the body (utils/app-page-body.ts), for an app a search engine may index (TARGET-089). A spec
+ *     without it produces the same bytes, so the goldens are unchanged.
  *   v1.9.0 — 2026-11-01 — The attribution badge speaks the visitor's language (appBadge.*), the one the
  *     AI label and the other marks speak; it was English on every page.
  *   v1.8.1 — 2026-10-25 — aiDisclosureParts reads the author's document, so an app that declares its
@@ -100,6 +103,7 @@ import {
   APP_REF_MARK, DISCOVERY_MARK, agentDiscoverySnippet, appRefSnippet, type AppDiscoverySpec,
 } from '../utils/app-agent-discovery.js';
 import { applyAppHeadMeta, type AppHeadSpec } from '../utils/app-head-meta.js';
+import { APP_BODY_MARK, appPageBodySnippet, type AppPageBodySpec } from '../utils/app-page-body.js';
 import { escapeHtml } from '../utils/html-escape.js';
 import {
   PROVENANCE_HTML_MARK, aiDisclosureParts, markDocumentElement, type ServedProvenance,
@@ -162,6 +166,27 @@ function infoMarkup(info: NonNullable<ServeMarksSpec['info']>): string {
       reloaded: t('appInfoBadge.reloaded'),
     },
   });
+}
+
+/**
+ * One past the `<body …>` tag that directly follows the head, or -1. "Directly" is the guard: only a
+ * `<body>` with nothing but whitespace and comments between it and the first `</head>` is taken for
+ * the real one, so a `<body>` written inside an app's script or template is never a place to write.
+ * A document without that shape gets -1, and its caller writes at the end of the body instead.
+ */
+function bodyOpenEnd(html: string): number {
+  const head = /<\/head\s*>/i.exec(html);
+  if (!head) return -1;
+  let at = head.index + head[0].length;
+  for (;;) {
+    while (at < html.length && /\s/.test(html[at])) at++;
+    if (!html.startsWith('<!--', at)) break;
+    const end = html.indexOf('-->', at + 4);
+    if (end < 0) return -1;
+    at = end + 3;
+  }
+  const tag = findOpenTag(html.slice(at, at + 2048), 'body');
+  return tag && tag.start === 0 ? at + tag.end : -1;
 }
 
 /** Before `</head>` when there is one; else before the body opens; else at the front. */
@@ -261,6 +286,12 @@ export interface ServeMarksSpec {
   /** The `<head>` metadata the app almost certainly has none of. */
   headMeta?: AppHeadSpec;
   /**
+   * The app's name and description as a visible block at the start of the body
+   * (utils/app-page-body.ts), for a reader that does not run JavaScript. Only for an app a search
+   * engine may index; absent, the bytes are what they were before (TARGET-089).
+   */
+  appBody?: AppPageBodySpec;
+  /**
    * The CALLER states that these bytes are an HTML document, overruling the sniff below.
    *
    * The sniff looks for a closing `</body>` or `</html>`, and three published apps on aimeat.io
@@ -317,6 +348,14 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     if (spec.discovery && !text.includes(DISCOVERY_MARK)) parts.push(agentDiscoverySnippet(spec.discovery));
     // ONE splice, through the one helper that knows about the last-`</body>` rule.
     if (parts.length) out = injectBeforeClosingTag(out, parts.join(''));
+    // The app's name and description open the body, where a reader meets them first. A document
+    // whose body does not directly follow its head gets them at the end of the body instead, with
+    // the same one helper, because guessing where such a body starts could write into content.
+    if (spec.appBody && !text.includes(APP_BODY_MARK)) {
+      const block = appPageBodySnippet(spec.appBody);
+      const at = bodyOpenEnd(out);
+      out = at >= 0 ? out.slice(0, at) + block + out.slice(at) : injectBeforeClosingTag(out, block);
+    }
     // The app's own identity block goes to the START of the head instead, because an app reads it
     // from its first line of script (AIMEAT.atelier.appRef(), the mosaic's own boot). At the end of
     // the body it arrived after every inline script and read as null at parse time.

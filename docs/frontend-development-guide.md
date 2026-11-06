@@ -61,7 +61,7 @@ JSDoc you write. It emits nothing.
 
 **`pnpm check:importmap`** is a separate guard, because `tsc` cannot catch this case. Every absolute
 first-party import (`/js/…`, `/components/…`, `/views/…`) must have an identity entry in the
-`spa.html` importmap. Without one, the module loads without the `?v=BUILD_ID` stamp and can stay
+`spa.html` importmap. Without one, the module loads without its `?v=` content tag and can stay
 stale after a deploy. The same check refuses a view stylesheet that has no `<link>` in `spa.html`.
 
 `pnpm lint` and `pnpm typecheck:frontend` run in the pre-commit hook. `check:importmap` runs in
@@ -979,26 +979,30 @@ Admin keys live under `dashboard.*`, and the newer tabs under `admin.*`. Convent
 
 ---
 
-## ES Module Cache Busting (Importmap + BUILD_ID)
+## ES Module Cache Busting (Importmap + content tags)
 
 **Problem:** an ES module stays in the browser's module registry for the whole SPA session. Once a
 module is loaded, the browser reuses it without fetching it again, even after a server restart has
 deployed new code.
 
-**Solution:** `src/routes/portal-spa.ts` sets `BUILD_ID` (a timestamp) when the process starts, and
-`serveSpa()` stamps the shell's first-party assets with `?v=BUILD_ID` on every response.
-`src/routes/portal.ts` imports and re-exports `serveSpa()` and calls it for each SPA route.
+**Solution:** `serveSpa()` in `src/routes/portal-spa.ts` tags the shell's first-party assets with
+`?v=<content hash>` on every response, one hash per file (`src/utils/asset-version.ts`). A changed
+file gets a new address; an unchanged file keeps its address across deploys. Until 2026-11-06 every
+file carried the build stamp, so each release gave all ~790 files new addresses at once, and Search
+Console listed 4 515 of them as crawled and not indexed (TARGET-090).
 
 **How it works:**
 
 1. `spa.html` has an importmap with identity entries such as
-   `"/js/services/foo.js": "/js/services/foo.js"`.
-2. `stampAssets()` in `portal-spa.ts` appends `?v=BUILD_ID` to every importmap value that starts
-   with `/` and ends in `.js` or `.mjs`, and to every first-party `<link rel="stylesheet">`: the view
-   sheets, `theme.css`, `poster.css`, the component sheets and `/lib`.
-3. `serveSpa()` injects `window.__B = "?v=BUILD_ID"`, and the dynamic imports in `ROUTES` append it
-   (`import('/views/help.js' + B)`).
-4. The same injected script sets `window.__BUILD_ID` and, after load, calls `watchBuild()` in
+   `"/js/services/foo.js": "/js/services/foo.js"`, and one for every view `ROUTES` imports.
+2. `stampAssets()` in `portal-spa.ts` appends the file's own `?v=<hash>` to every importmap value
+   that starts with `/` and ends in `.js` or `.mjs`, and to every first-party
+   `<link rel="stylesheet">`: the view sheets, `theme.css`, `poster.css`, the component sheets and
+   `/lib`. A path with no file under `public/` keeps the build stamp.
+3. The dynamic imports in `ROUTES` name the plain path (`import('/views/help.js')`) and the importmap
+   maps it. Never append a query to one: `'/views/help.js?v=…'` is not the importmap's key, so it
+   loads a second copy of a module the views share. `test/unit/spa-asset-stamp.test.ts` holds both.
+4. `serveSpa()` injects `window.__BUILD_ID`, and the same script sets `window.__BUILD_ID` and, after load, calls `watchBuild()` in
    `public/lib/live-updates.js`. Every live stream opens with `event: hello` carrying the build
    (`src/routes/sse.ts`), and a restart drops every stream, so the reconnect reads the new build and
    the page reloads itself. A signed-out page holds a visitor stream for it
@@ -1011,13 +1015,13 @@ The stamp is added by the regular expression; no code change is needed.
 
 **What needs no importmap entry:**
 
-- Relative imports (`./profile/some-tab.js`): they resolve against a parent module that is already
-  stamped.
+- Relative imports (`./profile/some-tab.js`): they resolve to a plain address, which the importmap
+  maps when it has an entry for it and the server revalidates (`no-cache` with an ETag) when not.
 - Bare specifiers already in the map (`preact`, `htm`).
 - CSS files: `stampAssets()` stamps every stylesheet link.
 
 **Key files:** `public/spa.html` (the importmap, the stylesheet links and `ROUTES`),
-`src/routes/portal-spa.ts` (`BUILD_ID`, `serveSpa()`, `stampAssets()`).
+`src/routes/portal-spa.ts` (`BUILD_ID`, `serveSpa()`, `stampAssets()`), `src/utils/asset-version.ts`.
 
 Files under `public/` are also served `no-cache` with an ETag, so during development a reload
 fetches an edited file without a restart.

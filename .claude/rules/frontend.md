@@ -12,7 +12,7 @@ A shape of the design language is a class in `poster.css`; a view sheet composes
 
 Full architecture, component library, cache-busting and SSE: `docs/frontend-development-guide.md`. Two mechanisms bite often:
 
-- **A new shared JS module** on an absolute path (`/js/services/foo.js`) needs an identity entry in the importmap in `public/spa.html`. `portal.ts` stamps `?v=BUILD_ID` automatically. Relative imports, bare specifiers and CSS need no entry.
+- **A new shared JS module** on an absolute path (`/js/services/foo.js`) needs an identity entry in the importmap in `public/spa.html`. `portal-spa.ts` tags it with its own content hash (`?v=`) automatically. A new view in `ROUTES` gets an entry too and is imported by its plain path, never with a query appended. Relative imports, bare specifiers and CSS need no entry.
 - **A route of its own that listens for `aimeat-live-update` opens the stream itself**: `useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session])` from `/lib/live-updates.js`. Only that call (and the profile, admin, home and fleet shells) dispatches the event; a listener on any other route never fires, and the page keeps what it loaded with. Hit twice: the home's subroutes (2026-10-11) and the app structure page and App Catalog (2026-11-01, an app showed 4/8 "working" after it was published at 8/8).
 - **Every profile or admin tab showing server data** re-fetches on the `aimeat-live-update` window event (static-data, pure-nav and push-pref tabs excepted):
   ```javascript

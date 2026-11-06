@@ -15,6 +15,7 @@
  *   silence: an app's own element that only looks like a mark is never touched.
  * @usage pnpm exec vitest run test/unit/app-serve-marks-strip.test.ts
  * @version-history
+ *   v1.6.0 - 2026-11-06 - The app body (TARGET-089) round-trips, alone and with every other mark.
  *   v1.5.0 - 2026-10-25 - The internet-open line round-trips, alone and with every other mark.
  *   v1.4.0 - 2026-10-19 - Modern nonblocking cookie loader and both legacy banner shapes round-trip.
  *   2026-10-18 -- The app-info mark round-trips too, alone and with every other mark.
@@ -82,6 +83,11 @@ const INTERNET_OPEN: NonNullable<ServeMarksSpec['internetOpen']> = {
   text: 'Tämä sivu on auki kaikille internetissä.', who: 'Example Oy & <Kumppanit> · orgnode.example',
 };
 
+/** The app body as routes/subdomains.ts hands it over: a name and words that must be escaped. */
+const APP_BODY: NonNullable<ServeMarksSpec['appBody']> = {
+  name: 'Nosto & <Laskin>', description: 'Laskee nostovoiman: "kuorma" </div> ja ääkköset.', lang: 'fi',
+};
+
 const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['every mark', FULL,
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-ref', 'badge', 'chrome-reserve']],
@@ -102,6 +108,10 @@ const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['the internet-open line alone, in Finnish', { isDocument: true, internetOpen: INTERNET_OPEN }, ['internet-open']],
   ['every mark and the internet-open line', { ...FULL, info: INFO, internetOpen: INTERNET_OPEN },
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-info', 'app-ref', 'badge', 'chrome-reserve', 'internet-open']],
+  ['the app body alone, in Finnish', { isDocument: true, appBody: APP_BODY }, ['app-body']],
+  ['the app body with no language and no description', { isDocument: true, appBody: { name: 'Demo', description: '' } }, ['app-body']],
+  ['every mark and the app body', { ...FULL, info: INFO, appBody: APP_BODY },
+    ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-body', 'app-info', 'app-ref', 'badge', 'chrome-reserve']],
 ];
 
 describe('stripServedMarks: a served copy comes back as the author\'s bytes', () => {

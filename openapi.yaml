@@ -37912,7 +37912,7 @@ paths:
                               url: { type: string }
                               index_url: { type: string }
                               page_count: { type: integer }
-                              app_host_count: { type: integer, description: App hosts the sitemap index will list. 0 while announce_apps is off }
+                              app_host_count: { type: integer, description: App hosts the sitemap index will list (search-visible apps with a description of their own). 0 while announce_apps is off }
                               announce_apps:
                                 type: boolean
                                 description: The seo.announce_apps setting. False leaves every app out of the sitemap index and out of IndexNow notices; the apps stay reachable.
@@ -37960,6 +37960,15 @@ paths:
                               blocked: { type: integer }
                               hidden: { type: integer }
                               gated: { type: integer }
+                              without_description:
+                                type: array
+                                description: Search-visible apps with no description of their own. They stay indexable at their address and are left out of the sitemaps and of IndexNow notices until the owner writes one.
+                                items:
+                                  type: object
+                                  properties:
+                                    owner: { type: string }
+                                    filename: { type: string }
+                                    name: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

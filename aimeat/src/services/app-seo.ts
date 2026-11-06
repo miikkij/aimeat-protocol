@@ -36,6 +36,9 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.3.0 — 2026-11-06 — appOwnDescription() and appSeoListable(): an app with no description of its
+ *     own is left out of the sitemaps and the IndexNow notices, and stays indexable at its address
+ *     (TARGET-089 Y2).
  *   v1.2.0 — 2026-10-25 — On a node with signed-in content access, search visibility waits for an
  *     operator's approval in either mode (services/internet-opening/).
  *   v1.1.2 — 2026-10-11 — `gated` reads the app's pacing amount (`tollMorsels`); a morsel is pacing,
@@ -102,6 +105,30 @@ export function appSeoState(app: AppSummaryRecord, config: AimeatConfig): AppSeo
   // approval (services/internet-opening/), and its link is otherwise shared by hand.
   if ((config.appsSeoMode === 'review' || signedInOnly(config)) && !seo.approvedBy) return 'pending';
   return 'on';
+}
+
+/**
+ * The app's description in its owner's own words: the search description they typed, else the
+ * description they published the app with, else the first of its per-language descriptions. Empty
+ * when they wrote none. Never the generated fallback appSeoMeta uses for the meta tag, because that
+ * sentence is the node's, not the app's.
+ */
+export function appOwnDescription(app: AppSummaryRecord): string {
+  const m = app.manifest;
+  return m?.seo?.description?.trim() || m?.description?.trim()
+    || Object.values(m?.descriptions ?? {}).map((d) => (typeof d === 'string' ? d.trim() : '')).find(Boolean) || '';
+}
+
+/**
+ * Whether the node may point a search engine at this app: the sitemap index, the app origin's own
+ * sitemap and every IndexNow notice. An app has to be search-visible AND carry a description of its
+ * own, because an app with no words of its own is the thin page Bing named when it kept aimeat.io
+ * out of its index (TARGET-089 Y2, Platform Development Notes doc-mus9ip9musb4). The app stays
+ * indexable at its address; it is only not announced. `seo.announce_apps` is asked by the callers,
+ * because the app origin's own sitemap answers whatever that node-wide switch says.
+ */
+export function appSeoListable(app: AppSummaryRecord, config: AimeatConfig): boolean {
+  return appSeoIndexable(app, config) && appOwnDescription(app) !== '';
 }
 
 /** The single decision every surface asks. */
@@ -233,7 +260,7 @@ export async function applyOwnerSeoUpdate(
   // Only on the way IN. IndexNow is a "this changed, come look" hint and has no way to say "stop
   // indexing this" — the robots.txt and the noindex header the same switch flipped are what
   // withdraw an app, and engines act on those on their own schedule.
-  if (appSeoIndexable(after, config)) {
+  if (appSeoListable(after, config)) {
     const site = (await storage.listSubdomainSites())
       .find(s => s.enabled && s.kind === 'app' && s.target === `${target.ownerName}/${target.filename}`);
     await announceApp(config, storage,

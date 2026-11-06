@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.9 — 2026-11-06 — GET /index.html is a redirect to the front page (TARGET-091).
  *   v1.0.8 — 2026-11-01 — GET /v1/dataset/{owner}/{name} is a page (the public dataset page, WP9b).
  *   v1.0.7 — 2026-11-01 — GET /sitemap-datasets.xml is answered as a static document, like the portfolio sitemap.
  *   v1.0.6 — 2026-10-27 — POST /v1/a2a/directory is declared in routes/a2a.ts with router.use.
@@ -75,6 +76,7 @@ const NOT_API: Record<string, string> = {
     'GET /v1/terms/{}': PAGE,
     'GET /{}/{}': 'On the bare app host: redirects to the app\'s own subdomain, or serves the app\'s HTML.',
     'GET /everything': REDIRECT,
+    'GET /index.html': REDIRECT,
     'GET /docs/specs/{}': 'Redirects the record-contract address records carried before 2026-10-11 to GET /v1/specs/{name}.',
     'GET /start': REDIRECT,
     'GET /v1/admin/ui': REDIRECT,

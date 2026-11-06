@@ -15,6 +15,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.37.0 — 2026-11-06 — An app a search engine may index is served with its name and its owner's
+ *     description as a visible block at the start of the body (utils/app-page-body.ts, TARGET-089).
  *   v1.36.5 — 2026-11-04 — RESERVED_SUBDOMAINS, SUBDOMAIN_RE, DRAFT_LABEL_SUFFIX, draftBaseLabel and
  *     ensureAppSubdomain moved unchanged to services/subdomain-names.ts: services imported them from
  *     this route, which closed a 14-file run-time import cycle (codebase analysis 2026-11-03, item D-d).
@@ -184,7 +186,7 @@ import { appAiUse } from '../services/app-ai-use.js';
 import { appInfoMarkFor } from '../services/app-news.js';
 import { internetOpenMarkFor } from '../services/internet-opening/opening-mark.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
-import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage } from '../services/app-seo.js';
+import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage, appOwnDescription } from '../services/app-seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { countPageView } from '../services/signals/page-views.js';
@@ -328,6 +330,16 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
             baseUrl: discover.baseUrl, toolNames: discover.toolNames,
             webmcp: wantsWebmcpBridge(relaxed),
+          }
+        : undefined,
+      // The app's name and description, visible in the document as sent (TARGET-089). Only for an
+      // app a search engine may index, and only the owner's own words: the generated fallback
+      // description ("… an application published on AIMEAT by …") is the node's text, not the app's.
+      appBody: indexable && discover?.origin
+        ? {
+            name: app.manifest?.name?.trim() || seoMeta.title,
+            description: appOwnDescription(app),
+            lang: seoMeta.lang,
           }
         : undefined,
       headMeta: discover?.origin

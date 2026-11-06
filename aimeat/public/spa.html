@@ -1029,7 +1029,46 @@
       "/views/command-palette.js": "/views/command-palette.js",
       "/views/profile/organisms/mindmap.js": "/views/profile/organisms/mindmap.js",
       "/views/profile/organisms/readme-panel.js": "/views/profile/organisms/readme-panel.js",
-      "/views/profile/organisms/timeline-panel.js": "/views/profile/organisms/timeline-panel.js"
+      "/views/profile/organisms/timeline-panel.js": "/views/profile/organisms/timeline-panel.js",
+      "/views/admin.js": "/views/admin.js",
+      "/views/agent-allow.js": "/views/agent-allow.js",
+      "/views/agent-solo.js": "/views/agent-solo.js",
+      "/views/aimeat-os.js": "/views/aimeat-os.js",
+      "/views/app-grant.js": "/views/app-grant.js",
+      "/views/app-open.js": "/views/app-open.js",
+      "/views/appcat.js": "/views/appcat.js",
+      "/views/build-story.js": "/views/build-story.js",
+      "/views/business.js": "/views/business.js",
+      "/views/changelog.js": "/views/changelog.js",
+      "/views/chat.js": "/views/chat.js",
+      "/views/connect-story.js": "/views/connect-story.js",
+      "/views/dataset.js": "/views/dataset.js",
+      "/views/design-lab/frame.js": "/views/design-lab/frame.js",
+      "/views/doc-solo.js": "/views/doc-solo.js",
+      "/views/eco-capability-allow.js": "/views/eco-capability-allow.js",
+      "/views/everything.js": "/views/everything.js",
+      "/views/glossary.js": "/views/glossary.js",
+      "/views/help.js": "/views/help.js",
+      "/views/home/agents-page.js": "/views/home/agents-page.js",
+      "/views/home/trail.js": "/views/home/trail.js",
+      "/views/how-it-works.js": "/views/how-it-works.js",
+      "/views/invite-accept.js": "/views/invite-accept.js",
+      "/views/landing.js": "/views/landing.js",
+      "/views/members.js": "/views/members.js",
+      "/views/oauth-round.js": "/views/oauth-round.js",
+      "/views/portal-classic.js": "/views/portal-classic.js",
+      "/views/portal-dev.js": "/views/portal-dev.js",
+      "/views/portfolio.js": "/views/portfolio.js",
+      "/views/profile.js": "/views/profile.js",
+      "/views/provenance-open.js": "/views/provenance-open.js",
+      "/views/public-knowledge-viewer.js": "/views/public-knowledge-viewer.js",
+      "/views/public-workspace-viewer.js": "/views/public-workspace-viewer.js",
+      "/views/secret-allow.js": "/views/secret-allow.js",
+      "/views/shared-data.js": "/views/shared-data.js",
+      "/views/sign-in-first.js": "/views/sign-in-first.js",
+      "/views/start.js": "/views/start.js",
+      "/views/transparency.js": "/views/transparency.js",
+      "/views/use-with-ai.js": "/views/use-with-ai.js"
     }
   }
   </script>
@@ -1163,78 +1202,78 @@
     }
 
     // ── Route definitions ──
-    // window.__B is injected by the server as "?v=BUILD_ID" to bust the browser's
-    // ES module cache on every server restart (HTTP no-cache/ETag alone is
-    // insufficient — modules stay in the module registry for the full session).
-    const B = window.__B || '';
+    // Every view is an importmap entry, and the server tags each entry with its file's content hash
+    // (routes/portal-spa.ts stampAssets), so a changed view gets a new address and an unchanged one
+    // keeps its address across deploys (TARGET-090). No "?v=" is appended here: an import with its
+    // own query would bypass the importmap and load a second copy of a module the views share.
     const ROUTES = {
       // Landing/portal split (2026-06-10): the route serves the logged-out landing;
       // logged-in visitors are forwarded to /v1/profile by the view itself. The old
       // portal view stays reachable at /v1/classic (prompt boxes / "Build").
-      '/v1/portal':      () => import('/views/landing.js' + B),
+      '/v1/portal':      () => import('/views/landing.js'),
       // /v1/pricing is gone (2026-08-28): the store is its own AIMEAT instance and the only place
       // a price exists. The server redirects the old address there, or to the front page.
-      '/v1/start':       () => import('/views/start.js' + B),
-      '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
+      '/v1/start':       () => import('/views/start.js'),
+      '/v1/how-it-works': () => import('/views/how-it-works.js'),
       // Two showroom companions (2026-08-28): the whole change log, and the story of how an app
       // gets built here. Both are also spaRoutes in routes/portal.ts, or F5 is a 404.
-      '/v1/changelog':   () => import('/views/changelog.js' + B),
-      '/v1/how-an-app-builds': () => import('/views/build-story.js' + B),
+      '/v1/changelog':   () => import('/views/changelog.js'),
+      '/v1/how-an-app-builds': () => import('/views/build-story.js'),
       // Everything in AIMEAT (2026-09-15): the whole feature list, generated from the repo's file.
       // A spaRoute in routes/portal.ts too, and /everything redirects here.
-      '/v1/everything':  () => import('/views/everything.js' + B),
+      '/v1/everything':  () => import('/views/everything.js'),
       // The connect story (2026-08-29): what "connect the AI you already use" means, told before
       // the account exists. A spaRoute in routes/portal.ts too, or F5 is a 404.
-      '/v1/connect-your-ai': () => import('/views/connect-story.js' + B),
-      '/v1/glossary':    () => import('/views/glossary.js' + B),
-      '/v1/business':    () => import('/views/business.js' + B),
-      '/v1/transparency': () => import('/views/transparency.js' + B),
-      '/v1/chat':        () => import('/views/chat.js' + B),
-      '/v1/profile':     () => import('/views/profile.js' + B),
-      '/v1/home':        () => import('/views/home/index.js' + B),
-      '/v1/app-grant':   () => import('/views/app-grant.js' + B),
+      '/v1/connect-your-ai': () => import('/views/connect-story.js'),
+      '/v1/glossary':    () => import('/views/glossary.js'),
+      '/v1/business':    () => import('/views/business.js'),
+      '/v1/transparency': () => import('/views/transparency.js'),
+      '/v1/chat':        () => import('/views/chat.js'),
+      '/v1/profile':     () => import('/views/profile.js'),
+      '/v1/home':        () => import('/views/home/index.js'),
+      '/v1/app-grant':   () => import('/views/app-grant.js'),
       // Opening an app, a welcome page or a company front page that needs a sign-in (routes/apps/open.ts,
       // routes/page-open.ts). A spaRoute in routes/portal.ts too.
-      '/v1/app-open':    () => import('/views/app-open.js' + B),
-      '/v1/invite':      () => import('/views/invite-accept.js' + B),
+      '/v1/app-open':    () => import('/views/app-open.js'),
+      '/v1/invite':      () => import('/views/invite-accept.js'),
       // The owner confirms a sign-in round an agent started (secrets audit 2026-10-09). A spaRoute
       // in routes/portal.ts too, or F5 is a 404.
-      '/v1/oauth-round': () => import('/views/oauth-round.js' + B),
+      '/v1/oauth-round': () => import('/views/oauth-round.js'),
       // The owner allows what their agent asked for with one press (services/permission-ask.ts).
       // A spaRoute in routes/portal.ts too, or F5 is a 404.
-      '/v1/allow':       () => import('/views/agent-allow.js' + B),
+      '/v1/allow':       () => import('/views/agent-allow.js'),
       // The owner allows an extension to send one of their secrets to one address (services/secret-approvals.ts).
       // A spaRoute in routes/portal.ts too, or F5 is a 404.
-      '/v1/secret-allow': () => import('/views/secret-allow.js' + B),
+      '/v1/secret-allow': () => import('/views/secret-allow.js'),
       // The owner allows another account's capability to have their outside app run one action
       // (services/eco-capability-approvals.ts). A spaRoute in routes/portal.ts too, or F5 is a 404.
-      '/v1/eco-capability-allow': () => import('/views/eco-capability-allow.js' + B),
+      '/v1/eco-capability-allow': () => import('/views/eco-capability-allow.js'),
       // A share link a person with no account opens (services/parties/invite.ts, WP9b). In
       // data/spa-page-paths.ts too, or F5 is a 404.
-      '/v1/shared-data': () => import('/views/shared-data.js' + B),
+      '/v1/shared-data': () => import('/views/shared-data.js'),
       // An AI label's "how this was made" record, read with the session on a signed-in-only node
       // (middleware/content-access-gate.ts). In data/spa-page-paths.ts too, or F5 is a 404.
-      '/v1/provenance-open': () => import('/views/provenance-open.js' + B),
-      '/v1/aimeat-os':  () => import('/views/aimeat-os.js' + B),
-      '/v1/classic':     () => import('/views/portal-classic.js' + B),
-      '/v1/portfolio':   () => import('/views/portfolio.js' + B),
+      '/v1/provenance-open': () => import('/views/provenance-open.js'),
+      '/v1/aimeat-os':  () => import('/views/aimeat-os.js'),
+      '/v1/classic':     () => import('/views/portal-classic.js'),
+      '/v1/portfolio':   () => import('/views/portfolio.js'),
       // The Agents section (2026-09-01, Agent v2 V3). Addressed /v1/fleet because /v1/agents
       // is the API; the menu and the page call it Agents. A spaRoute in routes/portal.ts
       // too, or F5 is a 404.
-      '/v1/fleet':       () => import('/views/fleet.js' + B),
-      '/v1/members':     () => import('/views/members.js' + B),
-      '/v1/admin':       () => import('/views/admin.js' + B),
+      '/v1/fleet':       () => import('/views/fleet.js'),
+      '/v1/members':     () => import('/views/members.js'),
+      '/v1/admin':       () => import('/views/admin.js'),
       // appcat: the app catalogue on the component library, beside the old /app-catalog.html
       // (Jouni, 2026-09-27). A spaRoute in routes/portal.ts too.
-      '/v1/appcat':      () => import('/views/appcat.js' + B),
+      '/v1/appcat':      () => import('/views/appcat.js'),
       // One app's structure and status, from the first moment of building (2026-10-29). A spaRoute
       // in routes/portal.ts too.
-      '/v1/appcat/structure': () => import('/views/appcat/structure.js' + B),
-      '/v1/help':       () => import('/views/help.js' + B),
-      '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js' + B),
-      '/v1/publicworkspaceviewer': () => import('/views/public-workspace-viewer.js' + B),
+      '/v1/appcat/structure': () => import('/views/appcat/structure.js'),
+      '/v1/help':       () => import('/views/help.js'),
+      '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js'),
+      '/v1/publicworkspaceviewer': () => import('/views/public-workspace-viewer.js'),
       // The design lab's preview page: one interface part in a frame, drawn with no header or footer.
-      '/v1/design-lab/frame': () => import('/views/design-lab/frame.js' + B),
+      '/v1/design-lab/frame': () => import('/views/design-lab/frame.js'),
     };
 
     // Match route, handling query params for special views
@@ -1248,19 +1287,19 @@
     function matchRoute(pathname, search) {
       // Dev portal is ?view=dev on /v1/portal
       if (pathname === '/v1/portal' && search.includes('view=dev')) {
-        return () => import('/views/portal-dev.js' + B);
+        return () => import('/views/portal-dev.js');
       }
       // Single-agent pop-out window: /v1/profile?solo=<agentName>
       if (pathname === '/v1/profile' && /[?&]solo=/.test(search)) {
-        return () => import('/views/agent-solo.js' + B);
+        return () => import('/views/agent-solo.js');
       }
       // The whole account record, and the archive behind it: /v1/home?history=1
       if (pathname === '/v1/home' && /[?&]history=/.test(search)) {
-        return () => import('/views/home/history.js' + B);
+        return () => import('/views/home/history.js');
       }
       // The place's activity log, every action done in it (/v1/home?trail=1, "Rakennamme kanssasi").
       if (pathname === '/v1/home' && /[?&]trail=/.test(search)) {
-        return () => import('/views/home/trail.js' + B);
+        return () => import('/views/home/trail.js');
       }
       // The home's agent pages: a new agent before it exists (/v1/home?new-agent=1), one agent at
       // work (/v1/home?agent=<name>), and the computers agents run on (/v1/home?computers=1; the
@@ -1268,52 +1307,52 @@
       // The account's overview (/v1/home?overview=1[&focus=<item id>]), checked first: a focus
       // value names an agent or an app and must not open that page instead.
       if (pathname === '/v1/home' && /[?&]overview=/.test(search)) {
-        return () => import('/views/home/overview.js' + B);
+        return () => import('/views/home/overview.js');
       }
       if (pathname === '/v1/home' && /[?&]new-agent=/.test(search)) {
-        return () => import('/views/home/agent-new.js' + B);
+        return () => import('/views/home/agent-new.js');
       }
       // The agents' goals: a new goal from one sentence (/v1/home?new-goal=1) and one goal with what
       // waits for the person, what came out and how it got there (/v1/home?goal=<id>).
       if (pathname === '/v1/home' && /[?&]new-goal=/.test(search)) {
-        return () => import('/views/home/goal-new.js' + B);
+        return () => import('/views/home/goal-new.js');
       }
       if (pathname === '/v1/home' && /[?&]goal=/.test(search)) {
-        return () => import('/views/home/goal.js' + B);
+        return () => import('/views/home/goal.js');
       }
       // Every agent on a page of its own, the header's Agents link: /v1/home?agents=1.
       if (pathname === '/v1/home' && /[?&]agents=/.test(search)) {
-        return () => import('/views/home/agents-page.js' + B);
+        return () => import('/views/home/agents-page.js');
       }
       // One piece of an agent's work and what it produced: /v1/home?agent=<name>&work=<task id>.
       // Before the agent's own page, whose address it extends.
       if (pathname === '/v1/home' && /[?&]agent=/.test(search) && /[?&]new-app=/.test(search)) {
-        return () => import('/views/home/agent-app.js' + B);
+        return () => import('/views/home/agent-app.js');
       }
       if (pathname === '/v1/home' && /[?&]agent=/.test(search) && /[?&]work=/.test(search)) {
-        return () => import('/views/home/agent-work.js' + B);
+        return () => import('/views/home/agent-work.js');
       }
       if (pathname === '/v1/home' && /[?&]agent=/.test(search)) {
-        return () => import('/views/home/agent.js' + B);
+        return () => import('/views/home/agent.js');
       }
       if (pathname === '/v1/home' && /[?&](computers|machines)=/.test(search)) {
-        return () => import('/views/home/machines.js' + B);
+        return () => import('/views/home/machines.js');
       }
       // Single-document pop-out window: /v1/profile?doc=<org>:<ws>:<type>:<id>
       if (pathname === '/v1/profile' && /[?&]doc=/.test(search)) {
-        return () => import('/views/doc-solo.js' + B);
+        return () => import('/views/doc-solo.js');
       }
       // Portfolio public view: /v1/portfolio/<username>
       if (pathname.startsWith('/v1/portfolio/') && pathname !== '/v1/portfolio/') {
-        return () => import('/views/portfolio.js' + B);
+        return () => import('/views/portfolio.js');
       }
       // The public dataset page of one data package: /v1/dataset/<owner>/<name> (routes/portal.ts, WP9b)
       if (/^\/v1\/dataset\/[^/]+\/[^/]+\/?$/.test(pathname)) {
-        return () => import('/views/dataset.js' + B);
+        return () => import('/views/dataset.js');
       }
       // One app's "Use with your AI" guide: /v1/use-with-ai/<owner>/<file>
       if (/^\/v1\/use-with-ai\/[^/]+\/[^/]+\/?$/.test(pathname)) {
-        return () => import('/views/use-with-ai.js' + B);
+        return () => import('/views/use-with-ai.js');
       }
       return ROUTES[pathname] || ROUTES['/v1/portal'];
     }
@@ -1324,7 +1363,7 @@
     // API would refuse each view's reads anyway. The address stays, so the view opens once the
     // session arrives (App routes again on a sign-in change). Not in matchRoute: findRoute asks that
     // one whether a /v1/ address is the SPA's at all, and the answer must not depend on the session.
-    const SIGN_IN_FIRST = () => import('/views/sign-in-first.js' + B);
+    const SIGN_IN_FIRST = () => import('/views/sign-in-first.js');
     function viewFor(pathname, search) {
       return signInFirst(pathname, !!getSession()) ? SIGN_IN_FIRST : matchRoute(pathname, search);
     }

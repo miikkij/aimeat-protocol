@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-06 -- e2e-search-visibility.ts joins the list (not the guard tier): noindex on scripts and stylesheets on every host family, content tags, the app body and /index.html (TARGET-090, 089, 091).
  *   2026-11-04 -- e2e-two-process-leases.ts joins the list (not the guard tier): two processes of one node on one database run an AI job once, a sweep once per round, and take a killed process's jobs over (codebase analysis 2026-11-03, item HA 2.5-2.7).
  *   2026-11-04 -- e2e-two-process-bus.ts joins the list (not the guard tier): two processes of one node on one PostgreSQL database share the event bus (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 -- e2e-app-versions-access.ts joins the list (not the guard tier): an app's version list answers what the app's read answers for that caller, and carries no content (codebase analysis 2026-11-03, item A1).
@@ -607,6 +608,9 @@ const ALL_SUITES = [
     'test/e2e-app-origin.ts',
     // Self-spawns its own server with the portfolio-origin flag ON (same pattern).
     'test/e2e-portfolio-origin.ts',
+    // Self-spawns its own node with both origins provisioned: noindex on scripts and stylesheets on
+    // every host family, content tags, the app body, the description rule and /index.html.
+    'test/e2e-search-visibility.ts',
     // Self-spawns its own node set to signed-in content access, with both origins provisioned.
     'test/e2e-content-access-gate.ts',
     // Self-spawns its own signed-in-only node: what a signed-in browser sends without a credential.

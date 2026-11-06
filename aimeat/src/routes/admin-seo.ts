@@ -27,6 +27,9 @@
  *                                       POST /v1/admin/apps/:owner/:filename/seo-approve
  * @usage registerAdminSeoRoutes(router, config, storage, canonicalOwner);
  * @version-history
+ *   v1.4.0 — 2026-11-06 — The status lists the search-visible apps with no description of their own
+ *     (apps.without_description), and app_host_count leaves them out, as the sitemap index does
+ *     (TARGET-089 Y2).
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-10-01 — The status reports seo.announce_apps, and app_host_count follows it.
  *   v1.1.1 — 2026-09-26 — The app owner in the two per-app doors comes from localAccountName
@@ -44,7 +47,7 @@ import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { sitemapPages } from '../data/public-pages.js';
-import { appSeoState, type AppSeoState } from '../services/app-seo.js';
+import { appSeoIndexable, appSeoListable, appSeoState, type AppSeoState } from '../services/app-seo.js';
 import { readIndexNowRuns } from '../services/indexnow-log.js';
 import { planAnnouncement, announceEverything, type AnnounceScope } from '../services/indexnow-site.js';
 import { safeFetch } from '../utils/url-validator.js';
@@ -88,6 +91,12 @@ export async function buildSeoStatus(config: AimeatConfig, storage: Storage) {
     on: 0, off: 0, pending: 0, blocked: 0, hidden: 0, gated: 0,
   };
   for (const app of apps) byState[appSeoState(app, config)] += 1;
+  // The search-visible apps with no description of their own: indexable at their address, never
+  // announced (appSeoListable, TARGET-089 Y2). Listed by name so the operator can ask the owner.
+  const withoutDescription = apps
+    .filter((app) => appSeoIndexable(app, config) && !appSeoListable(app, config))
+    .map((app) => ({ owner: localAccountName(app.ownerGaii), filename: app.filename, name: app.manifest?.name ?? app.filename }));
+  const listable = apps.filter((app) => appSeoListable(app, config)).length;
 
   const keyUrl = config.indexNowKey ? `${b}/${config.indexNowKey}.txt` : null;
   const [runs, plan, key] = await Promise.all([
@@ -126,8 +135,8 @@ export async function buildSeoStatus(config: AimeatConfig, storage: Storage) {
       index_url: `${b}/sitemap-index.xml`,
       page_count: sitemapPages().length,
       // How many app hosts the index will actually list. The same decision the index itself makes,
-      // including the operator's seo.announce_apps switch.
-      app_host_count: config.seoAnnounceApps ? byState.on : 0,
+      // including the operator's seo.announce_apps switch and the description rule.
+      app_host_count: config.seoAnnounceApps ? listable : 0,
       announce_apps: config.seoAnnounceApps,
     },
     verification: {
@@ -155,6 +164,8 @@ export async function buildSeoStatus(config: AimeatConfig, storage: Storage) {
       mode: config.appsSeoMode,
       total: apps.length,
       ...byState,
+      // Search-visible, and left out of the sitemaps and IndexNow until the owner writes a description.
+      without_description: withoutDescription,
     },
   };
 }
