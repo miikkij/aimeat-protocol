@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.39.0 — 2026-11-06 — extensionZipMaxFiles (AIMEAT_EXT_ZIP_MAX_FILES, default 1000): files one extension or cortex ZIP may hold (was a fixed 50 in upload-zip.ts).
  *   v1.38.0 — 2026-11-03 — mcpCapabilityUseApproval (AIMEAT_MCP_CAPABILITY_USE_APPROVAL, default operators; secaudit2026nov02d round 13b).
  *   v1.37.0 — 2026-11-01 — buildCode (AIMEAT_SITE_BUILD_CODE, config-site-contacts.ts): the store's build code for a place.
  *   v1.36.0 — 2026-10-29 — fileStoreDefaults() (config-file-store.ts): where stored files keep their bytes; the x402 lines move to config-x402.ts unchanged (max-file-lines).
@@ -670,6 +671,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     pacingPackPrice: parseInt(process.env.AIMEAT_PACING_PACK_PRICE ?? '0', 10),
     pacingPackCurrency: process.env.AIMEAT_PACING_PACK_CURRENCY === 'USD' ? 'USD' : 'EUR',
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
+    extensionZipMaxFiles: parseInt(process.env.AIMEAT_EXT_ZIP_MAX_FILES ?? '1000', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
     ...extensionLoadDefaults(),

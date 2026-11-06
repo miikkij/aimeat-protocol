@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.32.0 — 2026-11-06 — extensionZipMaxFiles.
  *   v1.31.0 — 2026-11-04 — The SMTP fields moved to config-types-smtp.ts (SmtpConfig, mixed in) unchanged
  *     (max-file-lines), with smtpConnectTimeoutMs and smtpSocketTimeoutMs (codebase analysis 2026-11-03, HA stage 1).
  *   v1.30.0 — 2026-11-02 — emailReportsPerSenderDay (secaudit2026nov02d round 13).
@@ -722,6 +723,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   /** Currency of the pacing pack price. AIMEAT_PACING_PACK_CURRENCY, default EUR. */
   pacingPackCurrency: string;
   extensionMaxCodeSizeKb: number;
+  /** Files one extension or cortex ZIP may hold, manifest included. AIMEAT_EXT_ZIP_MAX_FILES, default 1000. */
+  extensionZipMaxFiles: number;
   extensionMaxInstalled: number;
   maxExtensionsPerOwner: number;
 

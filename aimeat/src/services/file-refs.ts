@@ -27,6 +27,10 @@
  *   const h = await fileHandleFor(storage, config, `${ownerGhii}/${key}`, { gaii: agentGaii });
  *   if (h.access !== 'granted') return refuse(h.reason);
  * @version-history
+ *   v1.3.0 — 2026-11-06 — The accessor may carry `mailbox`, the mailbox it reads in its owner's name: an
+ *     attachment of a message in that mailbox resolves as granted (mailbox/attachment-read.ts). An agent
+ *     holding messages:read-as-owner was handed the attachment's reference by the thread and refused
+ *     `no_matching_consent` when it opened it.
  *   v1.2.0 — 2026-10-26 — resolveFileRef reads the account's own extension file by its short key
  *     `ext/<name>/...` as the stored `ext/<account>/<name>/...`, for the account and its agents, when
  *     the key as written names no file (owner namespaces, secaudit2026oct22).
@@ -53,6 +57,8 @@ import { fileTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
 import { ownExtensionFileKey } from './component-address.js';
 import { localAccountName } from '../utils/gaii.js';
+import type { MailboxReader } from './owner-mailbox-reads.js';
+import { mailboxAttachmentReadable } from './mailbox/attachment-read.js';
 
 /** A handle for one of the caller's OWN files may live an hour (parity with GET /v1/storage?mode=handle). */
 export const OWN_HANDLE_TTL_SECONDS = 3600;
@@ -68,6 +74,9 @@ export interface FileRefAccessor {
     owner?: string;
     /** The caller's classification reader (TARGET-082): a file it may not see resolves as absent. */
     reader: ContentReader;
+    /** The mailbox this caller may read in its owner's name, when it may (messages:read-as-owner):
+     *  an attachment of a message in that mailbox is read with the message (mailbox/attachment-read.ts). */
+    mailbox?: MailboxReader | null;
 }
 
 export type FileRefAccess = 'granted' | 'denied' | 'missing';
@@ -172,7 +181,10 @@ export async function resolveFileRef(
         return { access: 'denied', ref: canonical, ownerGaii: gaii, key, reason: 'members_only' };
     }
 
-    const decision = await authorizeRead(storage, config, {
+    // An attachment of a message the caller may read in its owner's name is read with the message;
+    // every other file goes through the guard (mailbox/attachment-read.ts).
+    const viaMailbox = !own && accessor.mailbox ? await mailboxAttachmentReadable(storage, accessor.mailbox, gaii, key) : false;
+    const decision = viaMailbox ? { allowed: true, reason: 'mailbox_attachment' } : await authorizeRead(storage, config, {
         ownerGaii: gaii,
         accessorGaii: accessor.gaii,
         resourceKey: `storage:${key}`,

@@ -324,6 +324,7 @@ Each extension declares resource limits in its manifest. The node enforces these
 | CPU timeout | `limits.timeout_ms` | 5000 ms | `AIMEAT_EXT_TIMEOUT_MS` |
 | API calls per action | `limits.max_api_calls` | 500 on the node, and what a manifest asks for is capped by it | `AIMEAT_EXT_MAX_API_CALLS` |
 | Script size | N/A | 256 KB per script | `AIMEAT_EXT_MAX_CODE_SIZE_KB` |
+| Files in a ZIP upload | N/A | 1000, manifest included | `AIMEAT_EXT_ZIP_MAX_FILES` |
 | Max extensions | N/A | 20 | `AIMEAT_EXT_MAX_INSTALLED` |
 | Pacing per call | `actions[].tollMorsels` | node default | `AIMEAT_EXT_MAX_DEBIT` (100) |
 | One answer read by `ctx.fetch` | `limits.fetch_max_mb` | 4 MB | 32 MB at most |

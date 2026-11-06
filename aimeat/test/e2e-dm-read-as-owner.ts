@@ -19,6 +19,8 @@
  *   - another owner's app and another owner's agent reach THEIR owner's mailbox and never this one.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dm-read-as-owner
  * @version-history
+ *   v1.1.0 — 2026-11-06 — 10b: the delegate opens a mailbox attachment over MCP and GET /v1/pub, and
+ *     the word opens nothing next to it.
  *   v1.0.0 — 2026-09-12 — Initial, with messages:read-as-owner and the app read door.
  */
 import * as ed from '@noble/ed25519';
@@ -354,6 +356,69 @@ await test('10. CROSS-OWNER: bob\'s agent and bob\'s app read BOB\'s mailbox, ne
         const own = await json(`/v1/messages/conversations/${encodeURIComponent(bobToAlice.conversationId)}`, bearer(token));
         assert(own.body.data.messages.some((m: any) => m.body === BOB_SAYS), `${who} could not read bob's own copy`);
     }
+});
+
+// The attachment of a message the agent may read. The received copy is a PRIVATE file in the owner's
+// storage, and the file read went through the consent guard alone, which keeps an agent out of its
+// owner's private files: the agent read the message, was handed the attachment's ref, and opening it
+// answered no_matching_consent. The delegation that reads the message reads its attachment, and nothing
+// next to it.
+await test('10b. The agent holding messages:read-as-owner opens a mailbox attachment, and nothing next to it', async () => {
+    const attbot = await createAgent(alice.name, alice.token, 'attbot', ['messages:read-as-owner', 'storage:read']);
+    const storebot = await createAgent(alice.name, alice.token, 'storebot', ['messages:read', 'storage:read']);
+    const bobfilebot = await createAgent(bob.name, bob.token, 'bobfilebot', ['messages:read-as-owner', 'storage:read']);
+    const text = `invoice from bob ${stamp}`;
+    const upload = (token: string, key: string, data: string) => json('/v1/storage', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ key, data: Buffer.from(data).toString('base64'), mime_type: 'text/plain', visibility: 'private' }),
+    });
+    const up = await upload(bob.token, `out/invoice-${stamp}.txt`, text);
+    assert(up.status === 201 || up.status === 200, `bob's upload: ${up.status} ${JSON.stringify(up.body).slice(0, 200)}`);
+    const BODY = `bob sends an invoice ${stamp}`;
+    const sent = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+        body: JSON.stringify({ to: alice.ghii, body: BODY, attachments: [{ storage_key: `out/invoice-${stamp}.txt`, mime: 'text/plain', size: text.length, kind: 'file', name: 'invoice.txt' }] }),
+    });
+    assert(sent.status === 201, `send with attachment: ${sent.status} ${JSON.stringify(sent.body).slice(0, 200)}`);
+    const inbox = await json('/v1/messages/inbox', bearer(alice.token));
+    const got = (inbox.body.data.messages as any[]).find(m => m.body === BODY);
+    const localKey = got?.attachments?.[0]?.localKey as string;
+    assert(got?.attachments?.[0]?.mode === 'duplicate' && !!localKey, `setup: alice should own her copy: ${JSON.stringify(got?.attachments)}`);
+    const pubPath = (key: string) => `/v1/pub/${encodeURIComponent(alice.ghii)}/${key.split('/').map(encodeURIComponent).join('/')}`;
+
+    // MCP: the ref the thread hands out opens.
+    const mcp = await connectMcp(attbot.gaii, attbot.key);
+    const thread = await mcp.call('aimeat_dm_thread_as_owner', { conversation_id: sent.body.data.message.conversationId });
+    assert(thread.ok, `thread: ${JSON.stringify(thread.body).slice(0, 300)}`);
+    const ref = (toolResult(thread.body).messages ?? []).find((m: any) => m.body === BODY)?.attachments?.[0]?.ref;
+    assert(ref === `${alice.ghii}/${localKey}`, `the thread should hand out the owner's copy as ref: ${ref}`);
+    const dl = await mcp.call('aimeat_storage_download', { key: ref });
+    const dlText = (dl.body.result?.content ?? []).find((c: any) => c.type === 'text')?.text ?? '{}';
+    assert(dl.ok, `aimeat_storage_download refused the attachment: ${dlText.slice(0, 300)}`);
+    const bytes = await fetch(JSON.parse(dlText).download_url);
+    assert(bytes.status === 200 && (await bytes.text()) === text, `the handle should serve the attachment: ${bytes.status}`);
+
+    // REST (the connector's aimeat_storage_download): the same file, through GET /v1/pub.
+    const rest = await fetch(`${BASE}${pubPath(localKey)}`, bearer(attbot.token));
+    assert(rest.status === 200 && (await rest.text()) === text, `GET /v1/pub should serve the attachment to attbot: ${rest.status}`);
+
+    // Refusals: no messages:read-as-owner; the owner's other private file; a private file merely placed
+    // under a dm/ key; another owner's agent.
+    const plain = await fetch(`${BASE}${pubPath(localKey)}`, bearer(storebot.token));
+    assert(plain.status === 403, `an agent without messages:read-as-owner opened the attachment: ${plain.status}`);
+    const plainMcp = await (await connectMcp(storebot.gaii, storebot.key)).call('aimeat_storage_download', { key: ref });
+    assert(!plainMcp.ok, 'an agent without messages:read-as-owner opened the attachment over MCP');
+    const other = await upload(alice.token, `notes/secret-${stamp}.txt`, 'not mail');
+    assert(other.status === 201 || other.status === 200, `alice's upload: ${other.status}`);
+    const otherRead = await fetch(`${BASE}${pubPath(`notes/secret-${stamp}.txt`)}`, bearer(attbot.token));
+    assert(otherRead.status === 403, `the mailbox word opened the owner's other private file: ${otherRead.status}`);
+    const forgedKey = `dm/${sent.body.data.message.conversationId}/not-a-message/x${stamp}`;
+    const forged = await upload(alice.token, forgedKey, 'placed, not received');
+    assert(forged.status === 201 || forged.status === 200, `alice's dm/ upload: ${forged.status} ${JSON.stringify(forged.body).slice(0, 200)}`);
+    const forgedRead = await fetch(`${BASE}${pubPath(forgedKey)}`, bearer(attbot.token));
+    assert(forgedRead.status === 403, `a file merely placed under a dm/ key opened: ${forgedRead.status}`);
+    const cross = await fetch(`${BASE}${pubPath(localKey)}`, bearer(bobfilebot.token));
+    assert(cross.status === 403, `another owner's agent opened alice's attachment: ${cross.status}`);
 });
 
 await test('11. Unauthenticated is 401 on all four', async () => {

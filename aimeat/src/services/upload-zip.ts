@@ -12,6 +12,11 @@
  * @usage
  *   import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
  * @version-history
+ *   v1.4.0 — 2026-11-06 — The file cap is config.extensionZipMaxFiles (AIMEAT_EXT_ZIP_MAX_FILES,
+ *     default 1000) instead of a fixed 50. An extension built from a route table has one script per
+ *     action, so a 130-action extension (131 files with its manifest) was refused with "ZIP contains
+ *     more than 50 files" although every script was within its size cap and the inline door has no
+ *     file cap at all. The refusal now names the setting. Cortex ZIPs share the cap.
  *   v1.0.0 — 2026-05-02 — Initial implementation
  *   v1.1.0 — 2026-07-05 — Adopt the shared isUnsafeName guard from safe-zip (adds backslash /
  *     drive-letter / null-byte rejection on top of ../ and absolute paths).
@@ -34,9 +39,15 @@ import { isUnsafeName } from './safe-zip.js';
 import { buildExtensionRecordFromManifest } from './extension-manifest.js';
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
-const MAX_FILES = 50;
+/** Files one extension or cortex ZIP may hold when config.extensionZipMaxFiles is unset (tests). */
+export const DEFAULT_ZIP_MAX_FILES = 1000;
 const MAX_DEPTH = 5;
 const DECOMPRESSION_RATIO = 10;
+
+function zipMaxFiles(config: AimeatConfig): number {
+    const n = config.extensionZipMaxFiles;
+    return Number.isInteger(n) && n > 0 ? n : DEFAULT_ZIP_MAX_FILES;
+}
 
 // ── Extension ZIP ──
 
@@ -63,14 +74,15 @@ export async function parseExtensionZip(
         return { ok: false, error: 'Not a valid ZIP file (missing magic bytes)' };
     }
 
-    const maxBytes = config.extensionMaxCodeSizeKb * 1024 * MAX_FILES;
+    const maxFiles = zipMaxFiles(config);
+    const maxBytes = config.extensionMaxCodeSizeKb * 1024 * maxFiles;
     if (buffer.length > maxBytes) {
         return { ok: false, error: `ZIP exceeds maximum size of ${Math.round(maxBytes / 1024)}KB` };
     }
 
     let files: Map<string, Buffer>;
     try {
-        files = await extractZipEntries(buffer);
+        files = await extractZipEntries(buffer, maxFiles);
     } catch (err) {
         return { ok: false, error: `ZIP extraction failed: ${(err as Error).message}` };
     }
@@ -123,14 +135,15 @@ export async function parseCortexZip(
         return { ok: false, error: 'Not a valid ZIP file (missing magic bytes)' };
     }
 
-    const maxBytes = config.cortexMaxLibSizeKb * 1024 * MAX_FILES;
+    const maxFiles = zipMaxFiles(config);
+    const maxBytes = config.cortexMaxLibSizeKb * 1024 * maxFiles;
     if (buffer.length > maxBytes) {
         return { ok: false, error: 'ZIP exceeds maximum size' };
     }
 
     let files: Map<string, Buffer>;
     try {
-        files = await extractZipEntries(buffer);
+        files = await extractZipEntries(buffer, maxFiles);
     } catch (err) {
         return { ok: false, error: `ZIP extraction failed: ${(err as Error).message}` };
     }
@@ -172,7 +185,7 @@ export async function parseCortexZip(
 
 // ── Internal ZIP extraction ──
 
-function extractZipEntries(buffer: Buffer): Promise<Map<string, Buffer>> {
+function extractZipEntries(buffer: Buffer, maxFiles: number): Promise<Map<string, Buffer>> {
     return new Promise((resolve, reject) => {
         yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
             if (err) return reject(err);
@@ -186,9 +199,9 @@ function extractZipEntries(buffer: Buffer): Promise<Map<string, Buffer>> {
 
             zipfile!.on('entry', (entry: yauzl.Entry) => {
                 fileCount++;
-                if (fileCount > MAX_FILES) {
+                if (fileCount > maxFiles) {
                     zipfile!.close();
-                    return reject(new Error(`ZIP contains more than ${MAX_FILES} files`));
+                    return reject(new Error(`ZIP contains more than ${maxFiles} files (this node's AIMEAT_EXT_ZIP_MAX_FILES)`));
                 }
 
                 const fileName: string = entry.fileName;

@@ -11,6 +11,9 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-06 -- GET /v1/pub serves an attachment of a message in the caller's owner's mailbox to a
+ *     caller that may read that mailbox in the owner's name (services/mailbox/attachment-read.ts); an
+ *     agent holding messages:read-as-owner was refused CONSENT_DENIED no_matching_consent.
  *   2026-11-01 -- DELETE hands the shared delete its caller, so a company's page key asks what the company
  *     page route asks (services/storage-page-keys.ts; secaudit2026oct31w2 round 11); the handler is now
  *     routes/storage-files-delete.ts.
@@ -183,6 +186,8 @@ import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/
 import { isOrganismVisibilityWord, STORED_VISIBILITY_WORDS } from '../utils/visibility-words.js';
 import { isStoredVisibility } from '../services/organism-visibility.js';
 import { callerOf } from '../middleware/caller.js';
+import { mailboxReaderOf } from '../services/owner-mailbox-reads.js';
+import { mailboxAttachmentReadable } from '../services/mailbox/attachment-read.js';
 import { denyScope403 } from '../auth/deny.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import {
@@ -600,9 +605,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
+        // An attachment of a message the caller may read in its owner's name (messages:read-as-owner,
+        // or an app holding messages:read) is read with the message, consent layer or not
+        // (services/mailbox/attachment-read.ts). The storage:read check below still applies.
+        const mailboxReader = req.auth?.sub && !isAnonymousPrincipal(req.auth) ? mailboxReaderOf(req.auth, config.nodeId) : null;
+        const viaMailbox = mailboxReader ? await mailboxAttachmentReadable(storage, mailboxReader, gaii, key) : false;
+
         // Consent layer off → preserve the legacy existence-hiding behavior. An 'organism:<id>' file is
         // decided by membership, not consent, so it goes on to the guard either way.
-        if (!config.consentEnabled && !isOrganismVisibilityWord(file.visibility)) {
+        if (!config.consentEnabled && !viaMailbox && !isOrganismVisibilityWord(file.visibility)) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             return;
         }
@@ -632,7 +643,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 'Reading a file that is not public needs the "storage:read" scope. Ask the owner to grant it, or read only public files.');
             return;
         }
-        const result = await authorizeRead(storage, config, {
+        const result = viaMailbox ? { allowed: true, reason: 'mailbox_attachment' } : await authorizeRead(storage, config, {
             ownerGaii: gaii,
             accessorGaii,
             resourceKey: `storage:${key}`,
