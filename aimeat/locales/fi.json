@@ -28527,6 +28527,8 @@
     "seo.fAbout": "Teksti (markdown)",
     "seo.fAboutLang": "Tekstin kieli",
     "seo.aboutWords": "{n} sanaa",
+    "seo.aboutNeeded": "Hakukoneet näkevät sovelluksen vasta, kun sen omassa tekstissä on vähintään {n} sanaa. Kirjoita ensin teksti sovelluksesta alle.",
+    "seo.aboutShortOn": "Hakukoneet saavat lukea sovelluksen, mutta tämä palvelin ei kerro siitä niille: sovelluksen omassa tekstissä on {have} sanaa, ja siinä pitää olla vähintään {n}. Kirjoita teksti sovelluksesta alle.",
     "seo.aboutSave": "Tallenna teksti",
     "seo.aboutRemove": "Poista teksti",
     "seo.aboutNoLang": "Valitse kieli, jolla teksti on kirjoitettu.",

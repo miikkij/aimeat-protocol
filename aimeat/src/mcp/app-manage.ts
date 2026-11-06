@@ -23,6 +23,8 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-11-06 — action seo answers own_words and own_words_min, and switching search on below 150 words
+ *     of the app's own text is refused with what to write (TARGET-093).
  *   2026-11-04 — action versions answers what the app read answers for the session: a hidden app is
  *     NOT_FOUND to another account, an app that needs a sign-in is refused to a caller it does not open
  *     for (services/app-read-gate.ts; codebase analysis 2026-11-03, item A1).
@@ -188,7 +190,8 @@ export function registerAppManageTool(
             case 'seo': {
                 const out = await ownerAppSeo(storage, config, { callerGaii, filename, seo: pick(args, ['index', 'title', 'description', 'keywords', 'image', 'lang']) });
                 if ('error' in out) return plainRefusal(out.error);
-                return answer({ filename, state: out.state, ...(out.note ? { note: out.note } : {}), seo: out.seo });
+                return answer({ filename, state: out.state, ...(out.note ? { note: out.note } : {}), seo: out.seo,
+                    own_words: out.own_words, own_words_min: out.own_words_min });
             }
             case 'marks': {
                 const out = await ownerAppMarks(storage, config, { callerGaii, filename, marks: pick(args, ['badge', 'install', 'aiUse', 'info', 'tucked']) });

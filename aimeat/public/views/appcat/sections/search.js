@@ -17,6 +17,9 @@
  * @structure meta · SearchSection({ d })
  * @usage const mod = await import('./sections/search.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.3.0 — 2026-11-06 — The text about the app is written whether search is on or off, and the
+ *     switch-on waits for 150 words of the app's own text, with a note that says so (the server
+ *     refuses less).
  *   v1.2.0 — 2026-11-06 — "About this app": the owner writes the longer text about the app (markdown)
  *     and names its language; the app page shows it under the description while the app is in search
  *     engines (PATCH { about, about_lang }, TARGET-093).
@@ -91,6 +94,22 @@ const ABOUT_LANGS = ['fi', 'en', 'es'];
 /** How many words a text has, as the page counts them for the owner. */
 function wordCount(text) {
   return (String(text || '').match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
+}
+
+/** The server's floor for an app page's own text (APP_OWN_WORDS_MIN in services/app-seo.ts). */
+const OWN_WORDS_MIN = 150;
+
+/**
+ * The app page's own words as the server counts them (appOwnWords in services/app-seo.ts): the name,
+ * the description search uses and the text about the app, a markdown link's address left out. The
+ * server decides; this only keeps the switch from offering what it would refuse.
+ */
+function ownWords(app) {
+  const m = (app && app.manifest) || {};
+  const desc = (m.seo && m.seo.description && m.seo.description.trim()) || (m.description && m.description.trim())
+    || Object.values(m.descriptions || {}).map((v) => (typeof v === 'string' ? v.trim() : '')).find(Boolean) || '';
+  const about = ((m.about && m.about.text) || '').replace(/\]\([^)\s]*\)/g, ']');
+  return ([m.name || '', desc, about].join(' ').match(/[\p{L}\p{N}][\p{L}\p{N}'’.-]*/gu) || []).length;
 }
 
 /**
@@ -172,21 +191,26 @@ export default function SearchSection({ d }) {
 
   const on = !!(data.seo && data.seo.index === true);
   const gated = data.state === 'gated' || data.state === 'hidden';
+  // Switching on needs OWN_WORDS_MIN words of the app's own text (TARGET-093); the server refuses less.
+  const short = ownWords(d.app) < OWN_WORDS_MIN;
   const title = (data.seo && data.seo.title) || data.name;
   const sentence = (data.seo && data.seo.description) || data.description;
   // The state line stands on the old page's grey whatever the state: the old page named tinted grounds
   // per state but defined none of them, so every state showed on the same grey.
   return html`
     <${Note} kind="hint" chapter>${x('seo.intro')}<//>
-    <${Note} kind="state">${stateLine(data.state, data.blockReason)}<//>
+    <${Note} kind="state">${data.state === 'on' && short
+      ? x('seo.aboutShortOn', { n: OWN_WORDS_MIN, have: ownWords(d.app) })
+      : stateLine(data.state, data.blockReason)}<//>
     ${gated ? null : html`
+      ${!on && short ? html`<${Note} kind="hint" chapter>${x('seo.aboutNeeded', { n: OWN_WORDS_MIN })}<//>` : null}
       <${Actions} chapter apart>${on
         ? html`<${Action} small disabled=${busy} onClick=${() => write({ index: false })}>${x('seo.turnOff')}<//>`
-        : html`<${Loud} control disabled=${busy} onClick=${() => write({ index: true })}>${x('seo.turnOn')}<//>`}<//>
+        : html`<${Loud} control disabled=${busy || short} onClick=${() => write({ index: true })}>${x('seo.turnOn')}<//>`}<//>
       ${on ? html`
         <${Actions} chapter apart><${Action} small expanded=${editor} onClick=${() => setEditor(!editor)}>${x(editor ? 'seo.hideWording' : 'seo.editWording')}<//><//>
         ${editor ? html`<${Wording} d=${d} data=${data} busy=${busy} onSave=${write} />` : null}
         <${SubHeading} level=${4} part>${x('seo.previewTitle')}<//>
-        <${SearchCard} image=${data.shot || undefined} noImage=${x('seo.noShot')} title=${title} desc=${sentence} />
-        <${About} d=${d} busy=${busy} setBusy=${setBusy} />` : null}`}`;
+        <${SearchCard} image=${data.shot || undefined} noImage=${x('seo.noShot')} title=${title} desc=${sentence} />` : null}`}
+    <${About} d=${d} busy=${busy} setBusy=${setBusy} />`;
 }

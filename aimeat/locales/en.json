@@ -27805,6 +27805,8 @@
     "seo.fAbout": "Text (markdown)",
     "seo.fAboutLang": "Language of the text",
     "seo.aboutWords": "{n} words",
+    "seo.aboutNeeded": "Search engines see the app only when its own text has at least {n} words. Write the text about the app below first.",
+    "seo.aboutShortOn": "Search engines may read the app, but this server does not tell them about it: the app's own text has {have} words, and it needs at least {n}. Write the text about the app below.",
     "seo.aboutSave": "Save text",
     "seo.aboutRemove": "Remove text",
     "seo.aboutNoLang": "Choose the language the text is written in.",

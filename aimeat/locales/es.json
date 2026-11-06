@@ -26167,6 +26167,8 @@
     "seo.fAbout": "Texto (markdown)",
     "seo.fAboutLang": "Idioma del texto",
     "seo.aboutWords": "{n} palabras",
+    "seo.aboutNeeded": "Los buscadores ven la aplicación solo cuando su propio texto tiene al menos {n} palabras. Escribe primero abajo el texto sobre la aplicación.",
+    "seo.aboutShortOn": "Los buscadores pueden leer la aplicación, pero este servidor no les avisa de ella: el propio texto de la aplicación tiene {have} palabras y necesita al menos {n}. Escribe abajo el texto sobre la aplicación.",
     "seo.aboutSave": "Guardar texto",
     "seo.aboutRemove": "Quitar texto",
     "seo.aboutNoLang": "Elige el idioma en que está escrito el texto.",

@@ -36,6 +36,8 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   2026-11-06 — meta carries the owner's text about the app (manifest.about) for the About section
+ *     (TARGET-093).
  *   2026-11-01 — The section "People registered without an account" after the builders (sections/people.js; WP9d).
  *   2026-10-31 — shotUrl takes the listing's screenshot address when it carries a screenshot grant: the
  *     screenshot of an app that opens for fewer people follows who may open it (secaudit2026oct31w2 round 10, W2-12).
@@ -226,6 +228,7 @@ function DetailView({ given, onClose }) {
     category: manifest.category || 'utility',
     usesCortex: manifest.usesCortex || [],
     forkedFrom: manifest.forkedFrom || null,
+    about: manifest.about || null,
   };
 
   const ids = [];

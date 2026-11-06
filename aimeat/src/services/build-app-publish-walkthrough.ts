@@ -8,6 +8,8 @@
  * @structure publishWalkthrough(nodeUrl)
  * @usage if (!isImprove) body += publishWalkthrough(nodeUrl);
  * @version-history
+ *   v1.1.0 — 2026-11-06 — One line: search needs 150 words of the app's own text, so the builder also
+ *     writes the text about the app (TARGET-093).
  *   v1.0.1 — 2026-10-17 — The V2.6 line is shorter, so part `start` of the layered spec stays under its 24,000-character cap.
  *   v1.0.0 — 2026-10-17 — Moved unchanged from build-app-prompt.ts.
  */
@@ -23,6 +25,8 @@ export function publishWalkthrough(nodeUrl: string): string {
   body += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
   body += 'What I get: the app goes live on my own AIMEAT node at its own address, and I get a link to share. It starts UNLISTED (only I can find it) — from my catalogue I can list it publicly in the community catalogue, launch it, publish updates (older versions are always kept), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n';
   // Additive (plan doc-mvcn6c7e4e5q V2.6): "unlisted" is about lists, not about who opens the link.
-  body += 'Unlisted is about lists: the link still opens it. In its settings I choose who may open it.\n\n';
+  body += 'Unlisted is about lists: the link still opens it. In its settings I choose who may open it.\n';
+  // Additive (TARGET-093, Jouni 2026-11-06): search needs 150 words of the app's own text.
+  body += 'Search engines find it only when I switch that on, and the node allows it once the app\'s page has 150 words of its own text: so also write me 150 to 400 words for people about the app (what it does, for whom, how it is used, only true facts), to paste at Search → About this app.\n\n';
   return body;
 }

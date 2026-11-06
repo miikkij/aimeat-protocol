@@ -12,9 +12,11 @@
  *   Two things kept as the old page did them: "Added" is the moment this page opened the app, not
  *   when it was published (F315), and the icon and the tags live only in this page session until the
  *   next publish (F316): the node is not told.
- * @structure meta (with doors) · AboutSection({ d })
+ * @structure meta (with doors) · AboutSection({ d }) · OwnText({ about })
  * @usage loaded by the detail view: import('./sections/about.js')
  * @version-history
+ *   v1.3.0 — 2026-11-06 — The owner's text about the app ("About this app", manifest.about, written in
+ *     the Search section) under the facts, as Markdown in the text's own language (TARGET-093).
  *   v1.2.0 — 2026-10-18 — The Edit door is the owner's only.
  *   v1.1.0 — 2026-10-02 — A fact says who answers ?format=md: the app's own extension action
  *     (manifest.formatMd, from aimeat-format-md) or the node's stored page and converted HTML.
@@ -29,6 +31,8 @@ import { getSession } from '/js/services/auth.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Facts } from '/components/Facts.js';
+import { SubHeading } from '/components/SubHeading.js';
+import { Markdown } from '/components/Markdown.js';
 import { Fields } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { dateTime } from '/js/format.js';
@@ -151,5 +155,19 @@ export default function AboutSection({ d }) {
   ];
   return html`
     ${shown ? html`<${Note} kind="lead" chapter>${shown}<//>` : null}
-    <${Facts} tiles rows=${rows} />`;
+    <${Facts} tiles rows=${rows} />
+    <${OwnText} about=${m.about} />`;
+}
+
+/**
+ * The owner's longer text about the app (TARGET-093), the same text the app's own page shows a reader
+ * without JavaScript, rendered by the safe Markdown component in the text's own language. Written in
+ * the Search section; nothing here when the owner has written none.
+ */
+function OwnText({ about }) {
+  if (!about || !about.text) return null;
+  return html`<div lang=${about.lang || undefined}>
+    <${SubHeading} level=${4} part="apart">${x('seo.aboutTitle')}<//>
+    <${Markdown} text=${about.text} />
+  </div>`;
 }

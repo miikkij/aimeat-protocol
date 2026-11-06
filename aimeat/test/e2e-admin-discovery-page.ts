@@ -12,6 +12,8 @@
  *   test/unit/indexnow.test.ts proves the grouping, the per-host key location, the log and the
  *   stamp against a recorded fetch.
  * @version-history
+ *   v1.0.1 -- 2026-11-06 -- The findable app gets a text about it with its search switch: search and the
+ *     plan need 150 words of the app's own text (TARGET-093).
  *   v1.0.0 -- 2026-09-11 -- Initial: the three doors' gates, the status shape, the plan, the refusal.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-discovery-page
@@ -109,7 +111,9 @@ await test('An application its owner made findable joins the plan and the status
     assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
     const off = await json('/v1/admin/seo/indexnow/plan?scope=all', { headers: auth(opToken) });
     assert(!off.body.data.apps.some((a: any) => a.filename === filename), 'a freshly published app is not findable, so it is not in the plan');
-    const ask = await json(`/v1/apps/${encodeURIComponent(filename)}`, { method: 'PATCH', headers: auth(opToken), body: JSON.stringify({ seo: { index: true } }) });
+    // Search on, and the plan, need 150 words of the app's own text (TARGET-093): the text comes with it.
+    const about = Array.from({ length: 16 }, () => 'The page says hello and proves that a findable app joins the plan.').join('\n\n');
+    const ask = await json(`/v1/apps/${encodeURIComponent(filename)}`, { method: 'PATCH', headers: auth(opToken), body: JSON.stringify({ about, about_lang: 'en', seo: { index: true } }) });
     assert(ask.status === 200, `owner asks ${ask.status}: ${JSON.stringify(ask.body.error)}`);
     const r = await json('/v1/admin/seo/indexnow/plan?scope=all', { headers: auth(opToken) });
     assert(r.status === 200, `plan ${r.status}: ${JSON.stringify(r.body.error)}`);

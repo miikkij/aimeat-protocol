@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-06 — Search engines: the switch needs 150 words of the app's own text, written first as
+ *     settings `about` + `about_lang` (TARGET-093).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-01 — AIMEAT.iam for every member, aimeat-parties for the signup and sign-in only; party_stop and party_resume (WP9d).
  *   2026-11-01 — Users with no AIMEAT account: aimeat-parties.js and the party actions of aimeat_app_manage (plan D4).
@@ -86,6 +88,15 @@ surface — MCP, the connector, and \`/local/call\`. Everything else about one a
 name), seo, marks, legal, audit, versions, lineage, screenshot, visitors, ui_get/ui_set, cost,
 preview_link, bundled agents, members and backup_export. A call with a missing or foreign field is refused
 with every problem named at once.
+
+**Search engines.** A published app stays out of search until its owner switches it on
+(\`aimeat_app_manage\` action \`seo\`, \`index: true\`). The node refuses that switch while the app's page
+has fewer than 150 words of its own text (its name, its description and the text about the app), and
+it tells search engines only about an app that has them. So write the text about the app first:
+action \`settings\` with \`about\` (markdown, 150 to 400 words for people: what the app does, for whom
+and how it is used, only facts you can check, no instructions to an AI) and \`about_lang\` (the
+language it is written in). The app's page and its App Catalog page show it under the description,
+and the \`seo\` answer gives \`own_words\`.
 
 **How people and AIs find the owner's apps.** \`aimeat_visibility_report\` covers the whole place, every
 app at once, with no setup: people by channel (an AI answer, search, social, another site, direct), which

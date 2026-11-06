@@ -6,6 +6,9 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-06 — `seo: { index: true }` on an app not yet in search is refused before the first write
+ *     when the page would carry fewer than 150 words of the app's own text, counting the text the same
+ *     request writes (TARGET-093, Jouni 2026-11-06).
  *   2026-11-06 — PATCH takes `about` and `about_lang` through services/app-settings.ts (presentation
  *     fields), and the answer carries both (TARGET-093).
  *   2026-10-31 — PATCH takes `screenshot_public` through services/app-settings.ts, and the answer
@@ -75,7 +78,7 @@ import {
     applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput, appAccessMembershipRefusal,
     SETTINGS_PRESENTATION_FIELDS, SETTINGS_OFFERING_FIELDS, type AppSettingsField, type AppSettingsInput,
 } from '../../services/app-settings.js';
-import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput } from '../../services/app-seo.js';
+import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput, appOwnWords, prospectiveApp, thinPageRefusal, APP_OWN_WORDS_MIN } from '../../services/app-seo.js';
 import {
     applyOwnerMarksUpdate, appMarksState, parseMarksInput, parseAuthorInput, AUTHOR_NEEDS_OWNER_PRINCIPAL,
 } from '../../services/app-marks.js';
@@ -381,6 +384,19 @@ export function registerForkManageRoutes(
             return;
         }
         body = gate.body;
+
+        // Switching search on needs a page with enough of the app's own text (TARGET-093). Asked here,
+        // before the first write, with the name, description and text about the app this same request
+        // brings, so a body that writes the text and switches search on together is judged on the
+        // text it writes, and a refused one writes nothing.
+        const seoBody = body.seo as Record<string, unknown> | undefined;
+        if (seoBody && typeof seoBody === 'object' && seoBody.index === true && app.manifest?.seo?.index !== true) {
+            const words = appOwnWords(prospectiveApp(app, body));
+            if (words < APP_OWN_WORDS_MIN) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', thinPageRefusal(words)));
+                return;
+            }
+        }
 
         // Each field is independent and only touched when present in the body, so a
         // parked-only PATCH never clears the access code (and vice-versa).

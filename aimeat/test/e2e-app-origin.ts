@@ -10,6 +10,8 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-11-06 — Phase 10 switches search on with a text about the app in the same request: search
+ *     needs 150 words of the app's own text (TARGET-093, Jouni 2026-11-06).
  *   2026-11-06 — The discovery block is one statement and four links (TARGET-092): the owner and the app
  *     id with its extension are asserted in the block's webmcp and skills addresses, not in text lines.
  *   2026-10-25 — Phases 13 and 14 address `<label>.localhost` with a real Host (onApexSub): X-Subdomain
@@ -1070,7 +1072,9 @@ async function main() {
         });
 
         await test('the owner switches it on and all four surfaces follow', async () => {
-            const r = await seoPatch({ seo: { index: true } });
+            // Search on needs 150 words of the app's own text (TARGET-093), so the text comes with it.
+            const about = Array.from({ length: 16 }, () => 'Origin Demo shows how an app answers on its own address.').join('\n\n');
+            const r = await seoPatch({ about, about_lang: 'en', seo: { index: true } });
             assert(r.status === 200, `PATCH → ${r.status}: ${JSON.stringify(r.body.error)}`);
             assert(r.body.data.seo.state === 'on', `state ${r.body.data.seo.state}`);
             const v = await crawlerView();

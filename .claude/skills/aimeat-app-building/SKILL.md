@@ -45,9 +45,9 @@ Non-negotiables that flow enforces:
 
 App sources live in the `aimeat-apps/` repo, not in this protocol repo.
 
-## When an app is finished: five records beside it
+## When an app is finished: six records beside it
 
-An app is not done when it is published and works. It is done when these five exist, and "done" is not said to Jouni before that. Every one of them is written for whoever opens the app next, who has only these to go on.
+An app is not done when it is published and works. It is done when these six exist, and "done" is not said to Jouni before that. Every one of them is written for whoever opens the app next, who has only these to go on.
 
 | Record | What it says | How it is written | The publish answer shows it as |
 |---|---|---|---|
@@ -55,7 +55,10 @@ An app is not done when it is published and works. It is done when these five ex
 | **Bound skill** | how to USE the app | `aimeat_skill_publish`, `metadata.binding: app:{owner}/{file}` | `next_steps.bound_skills_count` |
 | **Data map** | what the app is for, and per family of keys or files where it lives, who owns and reads it, and why there | `aimeat_datamap_set { app, data_map }` | `next_steps.data_map_present` |
 | **Design spec** | purpose, screens, data, decisions and why, AI and agents, open questions, traps | `aimeat_app_manage { action: "spec_set", filename, markdown }` (`spec` answers the outline) | `next_steps.design_spec_present` |
+| **Text about the app** | for a person who finds the app: what it does, for whom, how it is used; 150 to 400 words of checkable facts, no instructions to an AI | `aimeat_app_manage { action: "settings", filename, about, about_lang }` | `own_words` in the `seo` answer |
 | **App Development Note** | how it was built: commits, prod ids, what broke, what is open | a document in `ws-mslr8u99kzk` (the `note-writer` agent) | not in the answer: it is ours, not the node's |
+
+The text about the app is what its page and its App Catalog page show under the description, and the only text a search engine reads there before the app draws itself. The node refuses to switch search on while the page has fewer than 150 words of the app's own text (name, description and this text), and announces only an app that has them (TARGET-093, 2026-11-06). Write it in the language of the description and set `about_lang` to match: the page's `lang` attribute follows it.
 
 Three habits keep them from being forgotten:
 

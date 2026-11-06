@@ -7,6 +7,7 @@
  *   app now, so the case exists only as older data (one search-visible app on aimeat.io on
  *   2026-11-06), and this is where the rule is proven.
  * @version-history
+ *   v1.1.0 — 2026-11-06 — Listing also needs 150 words of the app's own text (Jouni, TARGET-093).
  *   v1.0.0 — 2026-11-06 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -34,9 +35,18 @@ describe('appOwnDescription', () => {
   });
 });
 
+/** A text about the app long enough to carry a page past APP_OWN_WORDS_MIN (160 words). */
+const LONG_ABOUT = { text: Array.from({ length: 16 }, () => 'Notes keeps short notes and finds them again later by word.').join('\n\n'), lang: 'en' };
+
 describe('appSeoListable', () => {
-  it('lists a search-visible app with a description', () => {
-    expect(appSeoListable(app({ description: 'A place for notes.' }), cfg)).toBe(true);
+  it('lists a search-visible app with a description and at least 150 words of its own text', () => {
+    expect(appSeoListable(app({ description: 'A place for notes.', about: LONG_ABOUT }), cfg)).toBe(true);
+  });
+
+  it('leaves out a search-visible app whose page has fewer than 150 words of its own (TARGET-093)', () => {
+    const short = app({ description: 'A place for notes.' });
+    expect(appSeoIndexable(short, cfg)).toBe(true);
+    expect(appSeoListable(short, cfg)).toBe(false);
   });
 
   it('leaves out a search-visible app with no description, which stays indexable', () => {
@@ -45,8 +55,8 @@ describe('appSeoListable', () => {
     expect(appSeoListable(bare, cfg)).toBe(false);
   });
 
-  it('leaves out an app that is not search-visible, whatever its description says', () => {
-    expect(appSeoListable(app({ description: 'Words.', seo: { index: false } }), cfg)).toBe(false);
-    expect(appSeoListable(app({ description: 'Words.' }), { ...cfg, seoIndexing: 'off' } as AimeatConfig)).toBe(false);
+  it('leaves out an app that is not search-visible, whatever its text says', () => {
+    expect(appSeoListable(app({ description: 'Words.', about: LONG_ABOUT, seo: { index: false } }), cfg)).toBe(false);
+    expect(appSeoListable(app({ description: 'Words.', about: LONG_ABOUT }), { ...cfg, seoIndexing: 'off' } as AimeatConfig)).toBe(false);
   });
 });

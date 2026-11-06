@@ -36,6 +36,10 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.5.0 — 2026-11-06 — Switching search on is refused below APP_OWN_WORDS_MIN words of the app's own
+ *     text (thinPageRefusal), and appSeoListable asks the same floor, so an app already on is kept out
+ *     of the sitemaps and IndexNow until its text is written. The seo answer carries own_words and
+ *     own_words_min, and a note when the page is short (Jouni 2026-11-06, TARGET-093).
  *   v1.4.0 — 2026-11-06 — appOwnWords() and APP_OWN_WORDS_MIN: the words of the app's own text the
  *     server writes into its page, for the SEO status's list of thin pages (TARGET-093).
  *   v1.3.0 — 2026-11-06 — appOwnDescription() and appSeoListable(): an app with no description of its
@@ -140,13 +144,16 @@ export function appOwnWords(app: AppSummaryRecord): number {
 /**
  * Whether the node may point a search engine at this app: the sitemap index, the app origin's own
  * sitemap and every IndexNow notice. An app has to be search-visible AND carry a description of its
- * own, because an app with no words of its own is the thin page Bing named when it kept aimeat.io
+ * own AND at least APP_OWN_WORDS_MIN words of its own text on its page (name, description and the
+ * text about the app), because a page with few words of its own is the thin page Bing named when it kept aimeat.io
  * out of its index (TARGET-089 Y2, Platform Development Notes doc-mus9ip9musb4). The app stays
  * indexable at its address; it is only not announced. `seo.announce_apps` is asked by the callers,
  * because the app origin's own sitemap answers whatever that node-wide switch says.
  */
 export function appSeoListable(app: AppSummaryRecord, config: AimeatConfig): boolean {
-  return appSeoIndexable(app, config) && appOwnDescription(app) !== '';
+  // Since TARGET-093 (Jouni 2026-11-06) the page must also carry APP_OWN_WORDS_MIN words of the
+  // app's own text: a name and a one-line description is the thin page Bing named.
+  return appSeoIndexable(app, config) && appOwnDescription(app) !== '' && appOwnWords(app) >= APP_OWN_WORDS_MIN;
 }
 
 /** The single decision every surface asks. */
@@ -259,9 +266,21 @@ export async function applyOwnerSeoUpdate(
   config: AimeatConfig,
   target: { ownerGaii: string; ownerName: string; filename: string },
   input: unknown,
-): Promise<{ state: AppSeoState; note: string; seo: AppSeo } | { error: string }> {
+): Promise<{ state: AppSeoState; note: string; seo: AppSeo; own_words: number; own_words_min: number } | { error: string }> {
   const parsed = parseOwnerSeoInput(input);
   if ('error' in parsed) return parsed;
+
+  // Switching search on needs a page worth finding (TARGET-093, Jouni 2026-11-06): at least
+  // APP_OWN_WORDS_MIN words of the app's own text. Asked before the write, and only on the way in,
+  // so an app already on is not switched off by this rule; it is left out of the sitemaps instead
+  // (appSeoListable).
+  if (parsed.seo.index === true) {
+    const before = await storage.getApp(target.ownerGaii, target.filename);
+    const words = before ? appOwnWords(before) : 0;
+    if (before && before.manifest?.seo?.index !== true && words < APP_OWN_WORDS_MIN) {
+      return { error: thinPageRefusal(words) };
+    }
+  }
 
   await storage.updateAppMeta(target.ownerGaii, target.filename, { seo: parsed.seo });
 
@@ -285,7 +304,43 @@ export async function applyOwnerSeoUpdate(
       { ownerGaii: target.ownerGaii, ownerName: target.ownerName, filename: target.filename }, site?.subdomain);
   }
 
-  return { state, note: seoNote(state), seo: after.manifest?.seo ?? {} };
+  const ownWords = appOwnWords(after);
+  const short = state === 'on' && ownWords < APP_OWN_WORDS_MIN ? ` ${thinPageNote(ownWords)}` : '';
+  return { state, note: seoNote(state) + short, seo: after.manifest?.seo ?? {}, own_words: ownWords, own_words_min: APP_OWN_WORDS_MIN };
+}
+
+/**
+ * The app as it will read after a settings body is written: its name, description and text about
+ * the app taken from the body where the body names them. Only for counting words before a write, so
+ * PATCH can refuse a search switch it would refuse after the write, before anything is written.
+ */
+export function prospectiveApp(app: AppSummaryRecord, body: Record<string, unknown>): AppSummaryRecord {
+  const m = app.manifest;
+  const about = typeof body.about === 'string'
+    ? (body.about.trim() ? { text: body.about, lang: typeof body.about_lang === 'string' ? body.about_lang : m?.about?.lang ?? '' } : undefined)
+    : m?.about;
+  return {
+    ...app,
+    manifest: {
+      ...m,
+      ...(typeof body.name === 'string' ? { name: body.name } : {}),
+      ...(typeof body.description === 'string' ? { description: body.description } : {}),
+      about,
+    },
+  } as AppSummaryRecord;
+}
+
+/** Why switching search on was refused, and what to write. Shared by REST and the MCP tool. */
+export function thinPageRefusal(words: number): string {
+  return `This app's page has ${words} words of its own text (its name, its description and the text about the app), `
+    + `and search engines are pointed only at a page with at least ${APP_OWN_WORDS_MIN}. Write the text about the app first: `
+    + '150 to 400 words for people on what it does, for whom and how it is used, with the language it is written in '
+    + '(settings: about and about_lang; on the app\'s page in the App Catalog, Search > About this app). Then switch search on.';
+}
+
+/** For an app already in search engines whose page is still short: what keeps it out of the sitemaps. */
+export function thinPageNote(words: number): string {
+  return `Its page has ${words} words of its own text, under the ${APP_OWN_WORDS_MIN} it needs to be listed in the sitemaps and announced: write the text about the app (settings: about and about_lang).`;
 }
 
 /**
@@ -301,7 +356,7 @@ export async function ownerAppSeo(
   storage: Storage,
   config: AimeatConfig,
   args: { callerGaii: string; filename: string; seo?: Record<string, unknown> },
-): Promise<{ state: AppSeoState; note?: string; seo: AppSeo } | { error: string }> {
+): Promise<{ state: AppSeoState; note?: string; seo: AppSeo; own_words: number; own_words_min: number } | { error: string }> {
   const scope = await resolveAppOwnerScope(storage, config, args.callerGaii);
   if (!scope) return { error: 'This connection is not acting for an owner, so it has no app catalogue to change.' };
 
@@ -312,7 +367,13 @@ export async function ownerAppSeo(
   // agent asking "is my app findable" and an agent saying "make it findable" are the same call with
   // and without a field, and answering the first with a write would be surprising.
   if (!args.seo || Object.keys(args.seo).length === 0) {
-    return { state: appSeoState(app, config), seo: app.manifest?.seo ?? {} };
+    const ownWords = appOwnWords(app);
+    const state = appSeoState(app, config);
+    // How much of its own text the page carries, and what to write when it is short: switching on
+    // needs APP_OWN_WORDS_MIN words, and an app already on is not announced below it.
+    const note = ownWords >= APP_OWN_WORDS_MIN ? undefined
+      : state === 'on' ? thinPageNote(ownWords) : thinPageRefusal(ownWords);
+    return { state, ...(note ? { note } : {}), seo: app.manifest?.seo ?? {}, own_words: ownWords, own_words_min: APP_OWN_WORDS_MIN };
   }
 
   return applyOwnerSeoUpdate(storage, config,

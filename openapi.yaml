@@ -38332,7 +38332,10 @@ paths:
                     already there, so flipping `index` does not drop a title you wrote last month.
                     `approvedBy` and `approvedAt` are the operator's answer in review mode and are
                     dropped from this body rather than rejected, so a client may safely echo back the
-                    object it just read.
+                    object it just read. Switching `index` on is refused with 400 INVALID_INPUT, and
+                    nothing in the body is written, while the app's page has fewer than 150 words of
+                    its own text (name, description and `about`, counting an `about` sent in the same
+                    body); the message names the count. An app already on stays on.
                 marks:
                   type: object
                   description: >-

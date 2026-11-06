@@ -10,6 +10,8 @@
  *   so: the endpoint answers 202 and validates later. The test "groups by host" fails on that code.
  *
  * @version-history
+ *   v1.0.3 — 2026-11-06 — The fixture app carries a text about the app, as a listed app now needs 150
+ *     words of its own text (TARGET-093).
  *   v1.0.2 — 2026-11-06 — The fixture app carries a description, as a published app must; the plan
  *     leaves out a search-visible app with none (TARGET-089 Y2). The two tests that went red here had
  *     a setup that no longer matched production, where a publish refuses an empty description.
@@ -56,8 +58,10 @@ const app = (over: Partial<AppSummaryRecord> = {}): AppSummaryRecord => ({
   ownerGaii: 'alice@node.example',
   ownerName: 'alice',
   filename: 'notes.html',
-  // A description, as every app published since the publish began to require one has.
-  manifest: { name: 'Notes', description: 'A place for notes.', seo: { index: true } },
+  // A description, as every app published since the publish began to require one has, and a text
+  // about the app long enough for the page to be listed (150 words of its own, TARGET-093).
+  manifest: { name: 'Notes', description: 'A place for notes.', seo: { index: true },
+    about: { text: Array.from({ length: 16 }, () => 'Notes keeps short notes and finds them again later by word.').join('\n\n'), lang: 'en' } },
   ...over,
 } as AppSummaryRecord);
 

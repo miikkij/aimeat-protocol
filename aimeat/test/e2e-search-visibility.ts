@@ -21,6 +21,9 @@
  *       API no longer lets anyone make one.
  *   TARGET-091: /index.html on the apex answers 301 to `/`.
  * @version-history
+ *   v1.3.0 — 2026-11-06 — Jouni's rule of 2026-11-06: switching search on below 150 words of the app's
+ *     own text is refused before anything is written (REST and MCP), the seo answer says the count,
+ *     and an app in search whose text goes stays in search but leaves the sitemap index.
  *   v1.2.0 — 2026-11-06 — TARGET-093: the text about the app, set with aimeat_app_manage settings and
  *     PATCH, on the page under the description in its language, in and out of the SEO status's thin
  *     list, removed with an empty string, and refused to a second owner.
@@ -120,6 +123,8 @@ async function main() {
         const FINDABLE = { filename: 'findable-demo.html', sub: 'findable-demo', name: 'Findable Demo',
             description: 'Measures how far a paper plane flies and keeps every throw.' };
         const UNLISTED = { filename: 'unlisted-demo.html', sub: 'unlisted-demo', name: 'Unlisted Demo' };
+        /** Enough of the app's own text for search to be switched on (TARGET-093): 16 sentences, 160 words. */
+        const SETUP_ABOUT = Array.from({ length: 16 }, () => 'The lab measures how far each paper plane flies and keeps it.').join('\n\n');
         const HTML = '<!DOCTYPE html><html><head><title>x</title></head>\n<body><div id="root"></div>'
             + '<script>document.getElementById("root").textContent = "drawn";</script></body></html>';
 
@@ -139,8 +144,29 @@ async function main() {
                 // The per-app subdomain is assigned on the first open of the apex address.
                 await fetch(`${BASE}/v1/apps/${owner}/${app.filename}?mode=inline`, { redirect: 'manual' });
             }
-            const r = await json(`/v1/apps/${FINDABLE.filename}`, token, 'PATCH', { seo: { index: true } });
+            // Search on needs 150 words of the app's own text (TARGET-093): this request brings the
+            // text with it, and the route counts it before the first write.
+            const r = await json(`/v1/apps/${FINDABLE.filename}`, token, 'PATCH', { about: SETUP_ABOUT, about_lang: 'en', seo: { index: true } });
             assert(r.status === 200, `seo on: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+        });
+
+        await test('switching search on for an app with too little text of its own is refused, and nothing is written', async () => {
+            const r = await json(`/v1/apps/${UNLISTED.filename}`, token, 'PATCH', { name: 'Renamed Unlisted', seo: { index: true } });
+            assert(r.status === 400 && /150/.test(JSON.stringify(r.body)), `expected a 400 naming the 150-word floor, got ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+            const page = await on('app', '/', UNLISTED.sub);
+            assert(/noindex/i.test(page.header('x-robots-tag') ?? ''), 'the thin app became search-visible');
+            const list = await fetch(`${BASE}/v1/apps?limit=200`).then((x) => x.json()) as any;
+            const row = (list.data?.apps ?? []).find((a: any) => a.filename === UNLISTED.filename);
+            assert(row && row.manifest?.name === UNLISTED.name, `the refused request still renamed the app: ${row?.manifest?.name}`);
+        });
+
+        await test('the seo action over MCP says how many words the page has and how many it needs', async () => {
+            const agent = await makeAgent(BASE, { name: owner, token }, ['app:write', 'app:read']);
+            const s = await openSession(BASE, agent.token);
+            const r = await callTool(s, 'aimeat_app_manage', { action: 'seo', filename: UNLISTED.filename });
+            assert(!r.isError && /"own_words":\s*\d+/.test(r.text) && /"own_words_min":\s*150/.test(r.text), `answer: ${r.text.slice(0, 300)}`);
+            const on2 = await callTool(s, 'aimeat_app_manage', { action: 'seo', filename: UNLISTED.filename, index: true });
+            assert(on2.isError && /150/.test(on2.text), `switching on a thin app over MCP: ${on2.text.slice(0, 300)}`);
         });
 
         console.log('\nTARGET-089: the app\'s name and description in the document as sent');
@@ -189,7 +215,13 @@ async function main() {
         const ABOUT = Array.from({ length: 16 }, (_, i) =>
             `Paragraph ${i + 1} says what the paper plane lab measures and how a thrower uses it.`).join('\n\n');
 
-        await test('the SEO status lists the app as thin while it has no text about it', async () => {
+        await test('an app in search whose text is taken off is listed as thin, stays in search, and leaves the sitemap index', async () => {
+            const off = await json(`/v1/apps/${FINDABLE.filename}`, token, 'PATCH', { about: '' });
+            assert(off.status === 200, `taking the text off: ${off.status}`);
+            const page = await on('app', '/', FINDABLE.sub);
+            assert(!/noindex/i.test(page.header('x-robots-tag') ?? ''), 'an app already in search was taken out of it');
+            const index = await on('apex', '/sitemap-index.xml');
+            assert(!index.body.includes(`${FINDABLE.sub}.${APP_HOST}`), 'a page under 150 words is still in the sitemap index');
             const r = await json('/v1/admin/seo/status', token);
             const thin = (r.body.data ?? r.body).apps.thin_text as Array<{ filename: string; words: number; has_about: boolean }>;
             const row = thin.find((a) => a.filename === FINDABLE.filename);
