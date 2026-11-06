@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-11-06 — aimeat_storage_download opens an attachment of the owner's mailbox for an agent holding
+ *     messages:read-as-owner (services/mailbox/attachment-read.ts); it answered no_matching_consent.
  *   2026-11-01 — aimeat_storage_delete hands the shared delete the session's caller, for the keys a page
  *     origin serves (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   2026-10-31 — aimeat_storage_upload takes `direct`: the upload_url is in the file store itself and the
@@ -77,6 +79,8 @@ import type { CallerContext } from '../services/caller-context.js';
 import { choiceIdOf } from '../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../storage/blob/blob-types.js';
 import { directUploadFields } from '../services/direct-upload-answer.js';
+import { delegateReaderFor, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** The refusals of a named store (services/storage-file-write.ts StoreChoiceRefusalCode), answered as `CODE: message`. */
 const STORE_CODES = new Set<string>(['UNKNOWN_STORE', 'STORE_NOT_SELECTABLE', 'STORE_NOT_TAKING_FILES', 'STORE_NOT_REACHABLE', 'NO_OWN_STORAGE']);
@@ -232,8 +236,11 @@ export function registerCoreStorageTools(
         },
         async ({ key, owner, inline }) => {
             const ref = owner ? `${owner}/${key}` : key;
+            // An agent holding messages:read-as-owner opens the attachments of the mailbox it reads
+            // (services/mailbox/attachment-read.ts); the word is outside every wildcard.
+            const mailbox = scopeIsCovered(sessionScopes, MESSAGES_READ_AS_OWNER_SCOPE) ? delegateReaderFor(agentGaii, config.nodeId) : null;
             const resolved = await resolveFileRef(storage, config, ref, {
-                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii), reader: readerForAgent({ storage, config }, agentGaii),
+                gaii: agentGaii, sub: agentGaii, owner: localAccountName(agentGaii), reader: readerForAgent({ storage, config }, agentGaii), mailbox,
             });
             if (resolved.access !== 'granted' || !resolved.file) {
                 // Name the alternative instead of a bare "not found": asking for the OWNER's file by

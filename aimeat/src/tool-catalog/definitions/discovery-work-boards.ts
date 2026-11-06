@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-06 — aimeat_storage_download says that a mailbox attachment opens with messages:read-as-owner.
  *   2026-11-01 — aimeat_discover names a dataset entry's `freshness` (plan doc-mvwxcas3dom3, D6.1).
  *   2026-11-01 — aimeat_discover names the `dataset` type and what its entry carries (plan doc-mvwxcas3dom3, D1.1).
  *   2026-11-01 — aimeat_datapackage_withdraw: withdraw a data package, or with purge delete its files,
@@ -354,7 +355,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_storage_download',
-        description: 'Get a stored file by key, or by REFERENCE for a file you do not own. Storage holds binaries (images, video, large blobs), so by default this returns a HANDLE — a resource_link plus a presigned, TTL-limited download_url and metadata (mime_type, size) — NOT the bytes. Fetch the download_url out-of-band (or hand it to a human/tool); never read large binary into the conversation. Set inline=true only for small text files (<= 32 KB) to get the content directly. To open a file your OWNER uploaded, or one that arrived as a DM or task attachment, pass owner="<owner@node>" (the `ref` field on those attachments already carries it). The read is authorized as YOU: it works when the file is visibility:"owner"/"members"/"public", shared into a group or workspace you belong to, or covered by a consent grant. Requires the storage:read scope.',
+        description: 'Get a stored file by key, or by REFERENCE for a file you do not own. Storage holds binaries (images, video, large blobs), so by default this returns a HANDLE — a resource_link plus a presigned, TTL-limited download_url and metadata (mime_type, size) — NOT the bytes. Fetch the download_url out-of-band (or hand it to a human/tool); never read large binary into the conversation. Set inline=true only for small text files (<= 32 KB) to get the content directly. To open a file your OWNER uploaded, or one that arrived as a DM or task attachment, pass owner="<owner@node>" (the `ref` field on those attachments already carries it). The read is authorized as YOU: it works when the file is visibility:"owner"/"members"/"public", shared into a group or workspace you belong to, or covered by a consent grant. An attachment of a message in your owner\'s mailbox also opens when you hold messages:read-as-owner (pass the `ref` that aimeat_dm_thread_as_owner gives). Requires the storage:read scope.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Download Storage File', readOnlyHint: true },
