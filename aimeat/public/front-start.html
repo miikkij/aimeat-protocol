@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <!--
   @file front-start.html
-  @description The English "accelerate your AI" front page: this is a demo site, connect your
-    own AI and run agents even on your own computer, registration is free, the five levels and
-    how they match McKinsey's four, and the two ways to an AIMEAT of your own. The Finnish
-    sibling is front-start.fi.html. Same skeleton, same /front-start.css and /front-start.js.
-    Served at / when AIMEAT_FRONT_PAGE=start, and reachable at /front-start.html either way.
+  @description The English front page: the hero with rotating slogans and a chat demo, what you
+    get, four apps that run on aimeat.io, who it is for, governance, and the two paths (try it
+    free, or an AIMEAT of your own from the store). The Finnish sibling is front-start.fi.html.
+    Same skeleton, same /front-start.css and /front-start.js. Served at / when
+    AIMEAT_FRONT_PAGE=start, and reachable at /front-start.html either way.
   @version-history
+    v2.0.0 - 2026-11-06 - The etusivu-mock v1.4.0 design (Jouni: "front-start liveksi mock
+      v1.4:stä"). The main call to action opens the store (https://store.aimeat.io/), the second
+      one /v1/connect-your-ai. App screenshots instead of the mock's videos.
     v1.0.1 - 2026-10-26 - Loads /v1/libs/aimeat-webmcp.js?expose=node, as spa.html does: the root
       served this page without it from 2026-10-21, and isitagentready.com found no WebMCP tools.
     v1.0.0 - 2026-10-21 - Initial: the canvas design Jouni approved on 2026-10-21.
@@ -15,8 +18,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AIMEAT · Accelerate your AI</title>
-  <meta name="description" content="aimeat.io is a free demo site. Connect your own AI, let agents do the work, and see how much faster AI makes your own work. Signing up asks for nothing." />
+  <title>AIMEAT · AI handles the tasks, you set the direction</title>
+  <meta name="description" content="AIMEAT puts memory, agents and approvals in one place. AI does the work and suggests the next step, and you decide. Try it free or get an AIMEAT of your own." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <link rel="stylesheet" href="/front-start.css">
   <script src="/front-start.js" defer></script>
@@ -25,220 +28,201 @@
 </head>
 <body>
 
-  <div class="fs-banner"><strong>This is a demo site.</strong> Here you find out how much faster AI makes your own work.</div>
-
-  <header class="fs-top">
-    <div class="fs-wrap">
-      <a class="fs-brand" href="/" aria-label="AIMEAT, front page">AIME<span class="heart">&#9829;</span><span class="brand-at">AT</span></a>
-      <nav class="fs-nav" aria-label="Main menu">
-        <a href="https://experience-center.apps.aimeat.io">Experience Center</a>
-        <a href="/v1/publicworkspaceviewer?org=d0d999ef-712b-408b-91e9-e074cfac3bae&amp;ws=ws-mvcjbdt2c03&amp;type=pages&amp;id=doc-mvckn9b3mub7&amp;view=page">The story</a>
-        <a href="/v1/portal">Everything here</a>
-        <a id="fs-enter" href="/v1/portal">Sign in</a>
-        <a class="fs-lang" href="/front-start.fi.html" lang="fi" hreflang="fi">FI</a>
-        <a class="fs-btn fs-btn--cream" href="/v1/connect-your-ai">Start free</a>
+  <header class="nav">
+    <div class="wrap">
+      <a class="logo" href="/" aria-label="AIMEAT, front page">AIME<span class="heart">&#9829;</span><span class="brand-at">AT</span></a>
+      <nav aria-label="Main menu">
+        <a href="#get">What you get</a>
+        <a href="#apps">Apps</a>
+        <a href="#who">Who it is for</a>
+        <a href="#governance">Governance</a>
+        <a href="#start">Prices</a>
       </nav>
+      <a class="lang fs-lang" href="/front-start.fi.html" lang="fi" hreflang="fi">FI</a>
+      <a class="btn sec sm" id="fs-enter" href="/v1/portal">Sign in</a>
+      <a class="btn pri sm" href="https://store.aimeat.io/">Own AIMEAT</a>
     </div>
   </header>
 
-  <section class="fs-hero">
-    <div class="fs-wrap">
-      <div class="fs-hero-text">
-        <p class="fs-mono">Free demo · open source</p>
-        <h1>Accelerate your AI. <span>Reach level 5.</span></h1>
-        <p class="fs-hero-lead">Connect your own AI to this site. It gets a memory, tools and agents that do the work for you. The agents can also run on your own computer, safely and with your permission.</p>
-        <div class="fs-ctas">
-          <a class="fs-btn fs-btn--lg fs-btn--sun" href="/v1/connect-your-ai">Start free</a>
-          <a class="fs-btn fs-btn--lg fs-btn--ghost-light" href="https://experience-center.apps.aimeat.io">Try the Experience Center</a>
+  <div class="hero" id="top">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow-live">Free demo · open source</p>
+        <div class="slogan-rot" aria-live="polite">
+          <h1 id="slogan">AI handles the tasks. <span>You set the direction.</span></h1>
         </div>
-        <ul class="fs-ticks">
-          <li>Signing up asks for nothing</li>
-          <li>Completely free</li>
-          <li>Your data stays yours</li>
-        </ul>
-      </div>
-      <div class="fs-ladder" role="img" aria-label="Five levels: you start at level 1 and rise to level 5">
-        <div class="fs-steps" aria-hidden="true">
-          <div class="fs-step">1</div><div class="fs-step">2</div><div class="fs-step">3</div><div class="fs-step">4</div><div class="fs-step">5</div>
+        <div class="slogan-dots" id="slogan-dots" aria-hidden="true"></div>
+        <p class="lead">Memory, agents and approvals in one place. AI does the work and suggests the next step. You hold the reins.</p>
+        <p class="lead it"><b>IT and management:</b> permissions, the log, the EU AI Act and GDPR in one place.</p>
+        <div class="ctas">
+          <a class="btn pri" href="https://store.aimeat.io/">Get your own AIMEAT</a>
+          <a class="btn sec" href="/v1/connect-your-ai">Try it free</a>
         </div>
-        <div class="fs-ladder-legend" aria-hidden="true"><span>You start here</span><span>The goal</span></div>
+        <ul class="badges"><li>Trial without a card</li><li>Your data stays yours</li><li>Open source</li></ul>
+      </div>
+      <div class="chat" aria-label="Example: how work goes in the chat">
+        <div class="top"><span class="dot"></span>Your AI · AIMEAT</div>
+        <div class="chips" id="chips" role="group" aria-label="Pick an example">
+          <button type="button" data-s="0" aria-pressed="true">CADENCE</button>
+          <button type="button" data-s="1" aria-pressed="false">Agent</button>
+          <button type="button" data-s="2" aria-pressed="false">Approval</button>
+        </div>
+        <div class="stage" id="stage" aria-live="polite">
+          <div class="msg me show">Go through my contacts. Who should I approach this week, and why? Help me sharpen the goal.</div>
+        </div>
+        <button type="button" class="replay" id="replay">Show again</button>
       </div>
     </div>
-  </section>
+  </div>
 
-  <section id="levels" class="fs-wrap fs-section fs-section--first">
-    <div class="fs-head">
-      <h2 class="fs-h2">Five levels. Where are you now?</h2>
-      <p class="fs-lead">Each level gives your AI a new ability. Pick a level to see what you can ask for once you are there.</p>
-    </div>
-    <div class="fs-levels" role="group" aria-label="Pick a level">
-      <button type="button" class="fs-level" aria-pressed="true" data-n="1" data-mck="Matches McKinsey level 1 (13x)" data-example="Sum up these meeting notes in three points.">
-        <span class="fs-level-n">1</span><span class="fs-level-name">Managed access</span>
-        <span class="fs-level-body">You use an approved AI, and your data stays protected. The AI helps with single tasks.</span>
-      </button>
-      <button type="button" class="fs-level" aria-pressed="false" data-n="2" data-mck="Matches McKinsey level 1 (13x)" data-example="Remember that my client always wants the report on Fridays.">
-        <span class="fs-level-n">2</span><span class="fs-level-name">Skilled use</span>
-        <span class="fs-level-body">Say it once, and every one of your AIs knows it. Instructions that work are shared with others.</span>
-      </button>
-      <button type="button" class="fs-level" aria-pressed="false" data-n="3" data-mck="Matches McKinsey level 2 (14x)" data-example="Make a page where people sign up for next week's event.">
-        <span class="fs-level-n">3</span><span class="fs-level-name">Integrated</span>
-        <span class="fs-level-body">The AI reads your data directly, with your permissions. It builds an app or a report from one request.</span>
-      </button>
-      <button type="button" class="fs-level" aria-pressed="false" data-n="4" data-mck="Matches McKinsey level 2 (14x)" data-example="Every morning, fetch the new requests for quotes and tell me which ones fit us.">
-        <span class="fs-level-n">4</span><span class="fs-level-name">Agents at work</span>
-        <span class="fs-level-body">An agent does a defined job on its own, under its own identity. You approve the decisions.</span>
-      </button>
-      <button type="button" class="fs-level" aria-pressed="false" data-n="5" data-mck="Opens McKinsey levels 3 and 4 (20x and 31x)" data-example="Put two agents and my team on the monthly review. I approve it before it goes out.">
-        <span class="fs-level-n">5</span><span class="fs-level-name">AI-native</span>
-        <span class="fs-level-body">People and agents work side by side. Every action can be traced.</span>
-      </button>
-    </div>
-    <div class="fs-try" aria-live="polite">
-      <div class="fs-try-side">
-        <span class="fs-mono">Level <span id="fs-try-n">1</span>: try it in chat</span>
-        <a id="fs-try-mck" href="#mckinsey">Matches McKinsey level 1 (13x)</a>
-      </div>
-      <p class="fs-try-quote" id="fs-try-quote">“Sum up these meeting notes in three points.”</p>
-    </div>
-  </section>
-
-  <section id="mckinsey" class="fs-wrap fs-section">
-    <div class="fs-head">
-      <p class="fs-mono fs-kicker-red">The same path in research</p>
-      <h2 class="fs-h2">McKinsey: the value of AI grows in four levels</h2>
-      <p class="fs-lead">McKinsey studied 471 companies owned by private equity, across 31 industries. It sorted the value AI brings into four levels. The multiple is the company's value over its revenue, as a median.</p>
-    </div>
-    <div class="fs-mck">
-      <div class="fs-mck-card">
-        <span class="fs-mck-tag">McKinsey level 1</span><span class="fs-mck-x">13x</span>
-        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-13"></span></div>
-        <span class="fs-mck-name">Experiments</span>
-        <span class="fs-mck-body">Separate trials and personal tools. AI is not part of the workflows.</span>
-        <span class="fs-chip">AIMEAT levels 1–2</span>
-      </div>
-      <div class="fs-mck-card">
-        <span class="fs-mck-tag">McKinsey level 2</span><span class="fs-mck-x">14x</span>
-        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-14"></span></div>
-        <span class="fs-mck-name">Efficiency</span>
-        <span class="fs-mck-body">AI is in the workflows. Productivity and margin improve.</span>
-        <span class="fs-chip">AIMEAT levels 3–4</span>
-      </div>
-      <div class="fs-mck-card fs-mck-card--dark">
-        <span class="fs-mck-tag">McKinsey level 3</span><span class="fs-mck-x">20x</span>
-        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-20"></span></div>
-        <span class="fs-mck-name">The product changes</span>
-        <span class="fs-mck-body">AI is part of the product or the service. It starts to show in sales.</span>
-        <span class="fs-chip">AIMEAT level 5 opens this</span>
-      </div>
-      <div class="fs-mck-card fs-mck-card--dark">
-        <span class="fs-mck-tag">McKinsey level 4</span><span class="fs-mck-x">31x</span>
-        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-31"></span></div>
-        <span class="fs-mck-name">New business</span>
-        <span class="fs-mck-body">The company builds new AI services and data products.</span>
-        <span class="fs-chip">AIMEAT level 5 opens this</span>
-      </div>
-    </div>
-    <div class="fs-two">
-      <div class="fs-note">
-        <h3>Productivity alone does not raise value</h3>
-        <p>Levels 1 and 2 are close: 13x and 14x. Value rises when AI changes what the company sells. AIMEAT levels 1 to 4 are the base. Level 5 opens McKinsey levels 3 and 4.</p>
-      </div>
-      <div class="fs-note">
-        <h3>Our view: you do not need a separate AI team</h3>
-        <p>McKinsey names the shortage of skilled people as the biggest obstacle, and says level 4 needs separate AI teams. When people and agents work on the same platform, AI is inside every team. You can build new services with the people you already have.</p>
-      </div>
-    </div>
-    <h3 class="fs-h3">What the platform must give at each step</h3>
-    <ol class="fs-path">
-      <li><span class="fs-path-step">0 → 1</span><span class="fs-path-need"><strong>Needed:</strong> the data stays with the company, and the tools are approved.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> an AIMEAT of your own, in the company's own environment. The company picks its AI provider and uses its own key.</span></li>
-      <li><span class="fs-path-step">1 → 2</span><span class="fs-path-need"><strong>Needed:</strong> shared knowledge and shared instructions.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> shared workspaces where people collect decisions, instructions and ways of working that work. Ready-made app templates.</span></li>
-      <li><span class="fs-path-step">2 → 3</span><span class="fs-path-need"><strong>Needed:</strong> the AI reads the company's data directly.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> any AI connects with one connection (MCP). It reads and writes with the user's permissions.</span></li>
-      <li><span class="fs-path-step">3 → 4</span><span class="fs-path-need"><strong>Needed:</strong> agents act on their own in a defined area.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> every agent has its own identity and its own permissions. You decide whether an agent acts on its own, writes a draft or asks first. Work can start on a schedule or from an event.</span></li>
-      <li><span class="fs-path-step">4 → 5</span><span class="fs-path-need"><strong>Needed:</strong> trust that rests on traceability.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> every piece of content shows whether a person or an AI made it, with which model and from which sources. Decisions are recorded, and an agent's work stays visible afterwards.</span></li>
-    </ol>
-    <p class="fs-source">Source: McKinsey, <a href="https://www.mckinsey.com/capabilities/business-building/our-insights/beyond-productivity-how-ai-creates-value-in-private-equity" rel="noopener">Beyond productivity: How AI creates value in private equity</a>. Matching the levels to AIMEAT's levels is our own reading.</p>
-  </section>
-
-  <section class="fs-wrap fs-section">
-    <h2 class="fs-h2">Three steps, and your AI is at work</h2>
-    <ol class="fs-cards3">
-      <li class="fs-card"><span class="fs-card-n">01</span><h3>Create an account</h3><p>No forms, no card, no commitment. The account appears when you start.</p></li>
-      <li class="fs-card"><span class="fs-card-n">02</span><h3>Connect your AI</h3><p>Claude, ChatGPT, Codex, Cursor and VS Code connect with one connection. If your AI cannot, you get a ready-made prompt to paste into the chat.</p></li>
-      <li class="fs-card"><span class="fs-card-n">03</span><h3>Ask in the chat</h3><p>You work in the same chat as before. There is no new interface to learn.</p></li>
-    </ol>
-  </section>
-
-  <section class="fs-wrap fs-section">
-    <div class="fs-agents">
-      <div class="fs-agents-text">
-        <h2>Agents can even run on your own computer</h2>
-        <p>An agent is an AI that does the work on its own. You can run it on your own computer, and it works with your data. You decide what it may do.</p>
-      </div>
-      <ul class="fs-checks">
-        <li>You approve every agent before it starts work.</li>
-        <li>You choose what it may read and write.</li>
-        <li>You see every action, and every action is labelled.</li>
-        <li>You stop or remove an agent at any time.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="fs-wrap fs-section">
-    <div class="fs-agents">
-      <div class="fs-agents-text">
-        <h2>EU rules are built in</h2>
-        <p>You work through your own AI. AIMEAT labels and records what the EU rules ask for, so you can show it. All of it is in the same open-source code under the MIT licence. Nothing is behind a paid tier.</p>
-      </div>
-      <ul class="fs-checks">
-        <li>AI Act: everything an AI made is labelled, and where it came from is recorded.</li>
-        <li>GDPR: you take your data with you or delete it, and every time an operator opens it, it is recorded.</li>
-        <li>eIDAS: you check signatures against the EU trusted lists, and you can sign a PDF with an EU Digital Identity Wallet.</li>
-        <li>Your IT gets a ready adoption package that is checked against the code.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="fs-wrap fs-section">
-    <div class="fs-head">
-      <h2 class="fs-h2">Want an AIMEAT of your own?</h2>
-      <p class="fs-lead">The demo is shared by everyone. Your own AIMEAT belongs to you or your company alone. Even if we disappeared tomorrow, the environment would stay with you.</p>
-    </div>
-    <div class="fs-own">
-      <div class="fs-own-card">
-        <h3>Buy from us</h3>
-        <p>We set up an instance of your own and keep it up to date. You own the data.</p>
-        <div class="fs-grow"></div>
-        <a class="fs-btn fs-btn--ink" href="/v1/pricing">See prices</a>
-      </div>
-      <div class="fs-own-card">
-        <h3>Install it yourself</h3>
-        <p>The source code is open on GitHub. Let your AI install it: paste this prompt into the chat.</p>
-        <div class="fs-prompt" id="fs-prompt">Install AIMEAT on my computer following the instructions at github.com/<wbr>miikkij/<wbr><span class="fs-nowrap">aimeat-protocol</span>, and tell me when it is running.</div>
-        <div class="fs-grow"></div>
-        <div class="fs-row">
-          <button type="button" class="fs-btn fs-btn--ink" id="fs-copy">Copy the prompt</button>
-          <a class="fs-btn fs-btn--ghost" href="https://github.com/miikkij/aimeat-protocol" rel="noopener">Open GitHub</a>
+  <section class="alt reveal" id="get">
+    <div class="wrap">
+      <p class="eyebrow">What you get today</p>
+      <h2>Memory, agents and a trail in one place.</h2>
+      <p class="sub">A shared memory, agents that wait for your approval, and a trail that holds up to an audit.</p>
+      <div class="g3">
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></div>
+          <h3>Shared memory</h3>
+          <p>Goals, contacts, decisions and instructions, saved once. The chat, the agents and the team use the same memory, so nothing needs explaining twice.</p>
+          <div class="ex">“Remember next quarter's goal, and who is not called without my OK.”</div>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 17h6"/></svg></div>
+          <h3>Agents and approval</h3>
+          <p>An agent suggests the next step, writes a draft or runs a chain of work. Nothing goes out until you approve it.</p>
+          <div class="ex">“Suggest five contacts for this week. Send nothing.”</div>
+        </div>
+        <div class="card">
+          <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg></div>
+          <h3>A trail for the audit</h3>
+          <p>Who, what, when and with which model. What the AI made is labelled. You answer the board and IT without a separate project.</p>
+          <div class="ex">“Show everything that went out this week.” → the log opens.</div>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="fs-wrap fs-section fs-section--last">
-    <h2 class="fs-h2">Find out more</h2>
-    <div class="fs-more">
-      <a href="https://experience-center.apps.aimeat.io"><span class="fs-more-title">Experience Center</span><span class="fs-more-body">Learn the whole ecosystem by trying it, one step at a time.</span><span class="fs-more-go">Open →</span></a>
-      <a href="/v1/publicworkspaceviewer?org=d0d999ef-712b-408b-91e9-e074cfac3bae&amp;ws=ws-mvcjbdt2c03&amp;type=pages&amp;id=doc-mvckn9b3mub7&amp;view=page"><span class="fs-more-title">The door is open</span><span class="fs-more-body">A story in six chapters: why your AIs belong under one roof.</span><span class="fs-more-go">Read the story →</span></a>
-      <a href="/v1/portal"><span class="fs-more-title">Everything here</span><span class="fs-more-body">All that is here: apps, boards, agents and what is happening right now.</span><span class="fs-more-go">Open the full view →</span></a>
-      <a href="/v1/everything"><span class="fs-more-title">All features</span><span class="fs-more-body">Everything AIMEAT can do, on one page.</span><span class="fs-more-go">See the features →</span></a>
-      <a href="/v1/changelog"><span class="fs-more-title">Changelog</span><span class="fs-more-body">What has been done and when, newest first.</span><span class="fs-more-go">Read the changelog →</span></a>
+  <section class="reveal" id="apps">
+    <div class="wrap">
+      <p class="eyebrow">Made with AIMEAT</p>
+      <h2>Apps that already work.</h2>
+      <p class="sub">These apps run on aimeat.io now. Open one and try it.</p>
+      <div class="g4">
+        <a class="card app" href="https://safereach.apps.aimeat.io/">
+          <img src="/front-start-media/safereach.jpg" width="640" height="360" alt="The SAFEREACH campaign view and its approval queue" loading="lazy">
+          <div class="t"><p class="who">Sales · approval</p><h3>SAFEREACH</h3><p>AI drafts a B2B message. A named person approves it and sends it from their own mailbox.</p><span class="go">Open →</span></div>
+        </a>
+        <a class="card app" href="https://tosite.apps.aimeat.io/">
+          <img src="/front-start-media/tosite.jpg" width="640" height="360" alt="TOSITE reads a photographed receipt" loading="lazy">
+          <div class="t"><p class="who">Finance</p><h3>TOSITE</h3><p>Photograph a receipt. The model proposes the booking, and you check it. A VAT summary and files for the accountant.</p><span class="go">Open →</span></div>
+        </a>
+        <a class="card app" href="https://soitinkaveri.apps.aimeat.io/">
+          <img src="/front-start-media/soitinkaveri.jpg" width="640" height="360" alt="The Soitinkaveri practice history" loading="lazy">
+          <div class="t"><p class="who">Hobby</p><h3>Soitinkaveri</h3><p>Practise an instrument: see the pitch and the fingering, play from scores and follow your own progress.</p><span class="go">Open →</span></div>
+        </a>
+        <a class="card app" href="https://tv-opas.apps.aimeat.io/">
+          <img src="/front-start-media/tv-opas.jpg" width="640" height="360" alt="The TV-OPAS list of what is on now" loading="lazy">
+          <div class="t"><p class="who">Media</p><h3>TV-OPAS</h3><p>Free TV channels on one list. See what is on now and plan the week's viewing.</p><span class="go">Open →</span></div>
+        </a>
+      </div>
     </div>
   </section>
 
-  <footer class="fs-foot">
-    <div class="fs-wrap">
-      <span>AIMEAT · open source · demo site</span>
-      <span class="fs-foot-links"><a href="/v1/everything">All features</a><a href="/v1/changelog">Changelog</a><a href="/v1/transparency">AI transparency</a><a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">GitHub</a></span>
-      <span>An AI drafted the text on this page, and a person approved it.</span>
+  <section class="alt reveal" id="who">
+    <div class="wrap">
+      <p class="eyebrow">Who it is for</p>
+      <h2>Who AIMEAT is made for.</h2>
+      <p class="sub">For sales that wants to know the next step. For a team with a shared memory. For management that keeps the reins.</p>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Who it is for">
+        <button type="button" role="tab" id="tab-0" aria-controls="persona-0" aria-selected="true">Sales and managers</button>
+        <button type="button" role="tab" id="tab-1" aria-controls="persona-1" aria-selected="false" tabindex="-1">Team and operations</button>
+        <button type="button" role="tab" id="tab-2" aria-controls="persona-2" aria-selected="false" tabindex="-1">IT and management</button>
+      </div>
+      <div class="persona" id="persona-0" role="tabpanel" aria-labelledby="tab-0">
+        <div>
+          <h3>CADENCE: you know whom to call, and why.</h3>
+          <p>CADENCE keeps contacts, companies, deals and tasks in one place. AI suggests the next step and gives the reason. You decide.</p>
+          <ul><li>The next step suggested, not sent</li><li>A reason for every suggestion</li><li>Goals and memory in one place</li></ul>
+        </div>
+        <div class="say"><div class="q">Contracts renew next quarter. Whom should I approach this week? Give the reasons.</div><div class="a">Five suggestions with reasons. The drafts wait in SAFEREACH. Do you approve the first two?</div></div>
+      </div>
+      <div class="persona" id="persona-1" role="tabpanel" aria-labelledby="tab-1" hidden>
+        <div>
+          <h3>Agents, a shared memory and a shared workspace.</h3>
+          <p>The team uses the same memory and the same workspace. An agent runs a chain of work, but only what you approve goes out. Everyone sees how AI is used.</p>
+          <ul><li>A shared memory and workspace</li><li>Agents' work goes to an approval queue</li><li>The same trail for everyone: who did what</li></ul>
+        </div>
+        <div class="say"><div class="q">Start an agent: prepare the contract renewals and suggest meeting times. Send nothing.</div><div class="a">3 briefs and 2 times are in the queue. The team sees the same state. They wait for your approval.</div></div>
+      </div>
+      <div class="persona" id="persona-2" role="tabpanel" aria-labelledby="tab-2" hidden>
+        <div>
+          <h3>All AI experiments in one place.</h3>
+          <p>Employees already use AI. AIMEAT makes that use visible: permissions, the log, AI labels, and export and deletion of data under GDPR.</p>
+          <ul><li>Who uses what, with which model</li><li>Approval before anything goes out</li><li>Your own server: the data does not move elsewhere</li></ul>
+        </div>
+        <div class="say"><div class="q">Show which teams used AI on customer data this month.</div><div class="a">3 teams and 41 events. All of them are in the log, and 2 wait for approval.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="reveal" id="governance">
+    <div class="wrap gov">
+      <div>
+        <p class="eyebrow">Governance</p>
+        <h2>Put AI to use, under control.</h2>
+        <p class="sub">Employees' AI experiments in one place. Permissions, the log and data export are ready, without a separate project.</p>
+        <div class="log" role="img" aria-label="Example of an event log">
+          <div class="h"># Trail · today</div>
+          08:12  Maija · TOSITE · booked a receipt · model labelled<br>
+          08:30  Agent · Quote #41 · draft · waiting for approval<br>
+          08:31  Jari · approved · reason recorded<br>
+          09:02  IT · export (GDPR) · 1 person · done
+        </div>
+        <ul class="eu"><li>EU AI Act</li><li>GDPR</li><li>Your own data</li><li>Free to change vendor</li></ul>
+      </div>
+      <div class="govlist">
+        <div class="govitem"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg></div><div><b>The AI's part is labelled</b><span>Every app and every output says what the AI did and how.</span></div></div>
+        <div class="govitem"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></div><div><b>A log of everything</b><span>Who, what, when and with which model. You see it yourself, and you do not have to ask the vendor.</span></div></div>
+        <div class="govitem"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/></svg></div><div><b>Permissions and your own keys</b><span>You decide what each AI and agent may read and do. Approval before anything is sent.</span></div></div>
+        <div class="govitem"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></div><div><b>Your data stays yours</b><span>Your own AIMEAT on your own server, or from us. The data does not stay on anyone else's platform.</span></div></div>
+        <div class="govitem"><div class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div><div><b>Data export and deletion</b><span>A person's data out, or deleted, with one request, under GDPR.</span></div></div>
+        <p class="research">Background for management: <a href="https://www.mckinsey.com/capabilities/business-building/our-insights/beyond-productivity-how-ai-creates-value-in-private-equity" rel="noopener">McKinsey: how AI creates value</a> · <a href="/v1/transparency">Transparency report</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="alt reveal" id="start">
+    <div class="wrap">
+      <p class="eyebrow">Two paths</p>
+      <h2>Start by trying it. Make it your own when you are ready.</h2>
+      <p class="sub">Both work the same way. The difference is whose server the data is on.</p>
+      <div class="paths">
+        <div class="path">
+          <p class="tag">1 · Try</p>
+          <h3>Free trial</h3>
+          <p>Connect your own AI and make your first tool today.</p>
+          <ul><li>No card</li><li>Ready in a couple of minutes</li><li>A shared trial server</li></ul>
+          <a class="btn sec" href="/v1/connect-your-ai">Try it free</a>
+        </div>
+        <div class="path b">
+          <p class="tag">2 · Make it yours</p>
+          <h3>Your own AIMEAT</h3>
+          <p class="price">Solo €29 a month</p>
+          <p>A server of your own, for you or your company: your own data, your own users, your own control.</p>
+          <ul><li>All your data under your control</li><li>Users, permissions and the log</li><li>Help with the setup</li></ul>
+          <a class="btn pri" href="https://store.aimeat.io/">See prices and order →</a>
+        </div>
+      </div>
+      <p class="dev">A developer? Install it yourself: <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">the open source code on GitHub</a> · <a href="/v1/connect-your-ai">connect an AI (MCP)</a></p>
+    </div>
+  </section>
+
+  <footer class="f">
+    <div class="wrap">
+      <div><b>AIMEAT</b> · AI that you keep the reins on</div>
+      <nav aria-label="Footer menu"><a href="/v1/privacy">Privacy</a><a href="/v1/terms">Terms</a><a href="/v1/transparency">Transparency</a><a href="/v1/everything">All features</a><a href="/v1/changelog">Changelog</a><a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">GitHub</a><a class="fs-lang" href="/front-start.fi.html" lang="fi" hreflang="fi">Suomeksi</a></nav>
+      <p class="demo-note">aimeat.io is a public trial server. Do not store sensitive data there. Your own AIMEAT keeps the data with you. An AI drafted the text on this page, and a person approved it.</p>
     </div>
   </footer>
 

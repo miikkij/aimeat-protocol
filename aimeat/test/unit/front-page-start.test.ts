@@ -13,6 +13,7 @@
  *     own title and description.
  * @usage cd aimeat && pnpm exec vitest run test/unit/front-page-start.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-06 — The page's new headline and titles (the etusivu-mock v1.4.0 design).
  *   v1.2.0 — 2026-11-02 — A browser that lists Finnish anywhere gets Finnish; a marked pick beats it.
  *   v1.1.0 — 2026-10-27 — The head metadata the shell gets: the page was sent as read from disk, so
  *     aimeat.io's front page had no canonical, og:* or JSON-LD from 2026-10-21 (AGENTSCAN S10, S12, S13).
@@ -74,13 +75,13 @@ describe('AIMEAT_FRONT_PAGE=start', () => {
         expect(fi.headers.get('vary') ?? '').toMatch(/Accept-Language/i);
         const fiText = await fi.text();
         expect(fiText).toContain('<html lang="fi">');
-        expect(fiText).toContain('Kiihdytä tekoälysi.');
+        expect(fiText).toContain('Tekoäly hoitaa tehtävät.');
 
         const en = await fetch(`${url}/?lang=en`, { headers: { Accept: 'text/html', 'Accept-Language': 'fi-FI' } });
         expect(en.status).toBe(200);
         const enText = await en.text();
         expect(enText).toContain('<html lang="en">');
-        expect(enText).toContain('Accelerate your AI.');
+        expect(enText).toContain('AI handles the tasks.');
     });
 
     it('gives Finnish to a browser that lists Finnish anywhere, and a pick on this device beats it', async () => {
@@ -105,7 +106,7 @@ describe('AIMEAT_FRONT_PAGE=start', () => {
 
     it('carries the node head metadata and keeps its own title and description', async () => {
         const url = await serve({ ...base, frontPage: 'start' });
-        for (const [lang, title] of [['en', 'AIMEAT · Accelerate your AI'], ['fi', 'AIMEAT · Kiihdytä tekoälysi']] as const) {
+        for (const [lang, title] of [['en', 'AIMEAT · AI handles the tasks, you set the direction'], ['fi', 'AIMEAT · Tekoäly hoitaa tehtävät, sinä päätät suunnan']] as const) {
             const res = await fetch(`${url}/?lang=${lang}`, { headers: { Accept: 'text/html' } });
             const html = await res.text();
             const head = html.slice(0, html.indexOf('</head>'));
@@ -128,7 +129,7 @@ describe('AIMEAT_FRONT_PAGE=start', () => {
         const res = await fetch(`${url}/`, { headers: { Accept: 'text/html', 'Accept-Language': 'fi' } });
         const text = await res.text();
         expect(text).not.toContain('front-start.css');
-        expect(text).not.toContain('Kiihdytä tekoälysi.');
+        expect(text).not.toContain('Tekoäly hoitaa tehtävät.');
     });
 
     it('answers JSON for a JSON request whatever the switch says', async () => {
