@@ -14,6 +14,8 @@
  *   v1.16.0 -- 2026-11-04 -- The node's own pages allow scripts from the node only: cdnjs.cloudflare.com
  *     and cdn.jsdelivr.net leave script-src, since no node page loads from them (codebase analysis
  *     2026-11-03, item A13). The App Catalog's own policy is unchanged.
+ *   v1.16.0 -- 2026-11-06 -- /index.html on the apex answers 301 to `/` (TARGET-091 Y2); it was a 404
+ *     that Google had found.
  *   v1.15.1 -- 2026-10-31 -- A .md file under public/ is no-cache with an ETag like JS, CSS and
  *     HTML: the help page's text stayed a week old in the browser after an update.
  *   v1.15.0 -- 2026-10-31 -- /locales is no-cache with an ETag, as the JS and CSS are: a reload
@@ -291,6 +293,16 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
         serveSpa(res, spaFile, config);
       });
     }
+
+    // /index.html is the front page's conventional second address. There is no such file, so it
+    // answered 404, and Google had found the address (TARGET-091 Y2, Search Console 2026-11-05). One
+    // page, one URL: a 301 to `/`. The Location is a constant, never built from the request, so the
+    // redirect cannot be pointed anywhere else. On the apex only: an app or a portfolio origin
+    // decides what its own /index.html means.
+    app.get('/index.html', (req, res, next) => {
+      if (req.appOrigin || req.portfolioOrigin) { next(); return; }
+      res.redirect(301, '/');
+    });
 
     // The node's robots.txt source, read once per boot (it only changes with a deploy). It carries
     // the safe public default ("search=yes, ai-input=yes, ai-train=no" — matching the per-bot

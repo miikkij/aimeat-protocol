@@ -23,6 +23,8 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.5.0 — 2026-11-06 — An app with no description of its own serves no sitemap.xml and its
+ *     robots.txt names none (appSeoListable, TARGET-089 Y2).
  *   v1.4.0 — 2026-10-20 — The app's MCP server card states 2026-07-28 and lists every revision the
  *     node serves in supportedProtocolVersions (MCP SDK v2 migration step 8, plan item 9).
  *   v1.3.2 — 2026-10-19 — The app's MCP server card states the revision the node negotiates (MCP_PROTOCOL_VERSION,
@@ -47,7 +49,7 @@ import { MCP_PROTOCOL_VERSION, MCP_SERVED_REVISIONS } from '../mcp/protocol-vers
 import { buildAppAgentFace } from '../services/agent-face.js';
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
-import { appSeoIndexable, appHasIconImage, appIconKey } from '../services/app-seo.js';
+import { appSeoIndexable, appSeoListable, appHasIconImage, appIconKey } from '../services/app-seo.js';
 import { legalLinksFor, renderLegalPage, LEGAL_KIND_INFO } from '../services/app-legal.js';
 import { APP_LEGAL_KINDS } from '../storage/types/apps.js';
 import { detectLocale } from '../i18n.js';
@@ -169,8 +171,10 @@ export function registerAppOriginDocs(
         + `User-agent: *\nDisallow: /\n`);
       return;
     }
+    // The Sitemap line only when the sitemap route below answers one, so the two cannot disagree.
+    const sitemapLine = appSeoListable(app, config) ? `\nSitemap: ${origin}/sitemap.xml\n` : '';
     res.type('text/plain; charset=utf-8').send(
-      `${header}User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`);
+      `${header}User-agent: *\nAllow: /\n${sitemapLine}`);
   });
 
   router.get('/sitemap.xml', async (req: Request, res: Response, next) => {
@@ -181,7 +185,9 @@ export function registerAppOriginDocs(
     // worse than either answer alone. The agent-facing documents on this origin — llms.txt, the
     // MCP card — are unaffected: they address a reader who was sent here, not one deciding what to
     // crawl, and that reader is welcome either way.
-    if (!appSeoIndexable(app, config)) return next();
+    // Listable, not only indexable: an app with no description of its own gets no sitemap, and its
+    // robots.txt names none (TARGET-089 Y2).
+    if (!appSeoListable(app, config)) return next();
     const origin = appOriginFor(req, config);
     const now = new Date().toISOString().split('T')[0];
     // Pages a person reads: the app and its own legal pages. llms.txt, AGENTS.md and sitemap.md

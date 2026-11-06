@@ -21,6 +21,8 @@
  * @usage
  *   const out = await announceEverything(config, storage, { scope: 'all', by: operatorName });
  * @version-history
+ *   v1.3.0 — 2026-11-06 — "all" names an app only when it has a description of its own
+ *     (appSeoListable, TARGET-089 Y2).
  *   v1.2.0 — 2026-11-01 — "all" carries the public data packages' pages too, the list of
  *     /sitemap-datasets.xml (plan doc-mvwxcas3dom3, D1.4).
  *   v1.1.0 — 2026-10-01 — With seo.announce_apps off, "all" carries the pages alone.
@@ -30,7 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppSummaryRecord } from '../storage/types/apps.js';
 import { sitemapPages } from '../data/public-pages.js';
-import { appSeoIndexable } from './app-seo.js';
+import { appSeoListable } from './app-seo.js';
 import { submitToIndexNow, appSubmitUrls, groupByHost, stampAnnounced } from './indexnow.js';
 import type { IndexNowRun } from './indexnow-log.js';
 import { publicDatasetPages } from './datapackage/catalogue-facts.js';
@@ -77,7 +79,8 @@ export async function planAnnouncement(
       if (s.enabled && s.kind === 'app' && s.target) subFor.set(s.target, s.subdomain);
     }
     for (const app of all) {
-      if (!appSeoIndexable(app, config)) continue;
+      // An app with no description of its own is not announced (TARGET-089 Y2).
+      if (!appSeoListable(app, config)) continue;
       const subdomain = subFor.get(`${app.ownerName}/${app.filename}`);
       apps.push({ ownerGaii: app.ownerGaii, ownerName: app.ownerName, filename: app.filename, subdomain });
       urls.push(...appSubmitUrls(config, app, subdomain));

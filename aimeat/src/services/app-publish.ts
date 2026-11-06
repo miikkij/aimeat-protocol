@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-06 — A publish announces the app to IndexNow only when it has a description of its own
+ *     (appSeoListable, TARGET-089 Y2).
  *   2026-10-31 — A new version keeps the owner's `screenshotPublic` (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-27 — A version published through an app's grant also names that app (`publishedByApp`), and the owner hears of it when the app is another author's (services/app-published-by-app.ts; secaudit2026oct26).
  *   2026-10-25 — Every version's manifest names who published it (`publishedBy`), so the owner's own app asks the owner before a version another account published gets a permission the owner's grant lacks (services/own-app-consent.ts; secaudit2026oct22).
@@ -157,7 +159,7 @@ import type { DataMapStamp } from './data-map/data-map-types.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { ensureAppSubdomain } from './subdomain-names.js';
-import { appSeoIndexable } from './app-seo.js';
+import { appSeoListable } from './app-seo.js';
 import { announceApp } from './indexnow.js';
 import { logger } from '../utils/logger.js';
 import { refreshAppDependencies } from './dependency-map.js';
@@ -620,7 +622,8 @@ export async function publishApp(
   // (services/app-announce.ts). A settings change that makes it public announces it then.
   const published = input.source !== 'package-install' ? await storage.getApp(ownerGhii, filename) : null;
   const announces = isAnnounceable(published);
-  if (published && appSeoIndexable(published, config)) {
+  // Listable: an app with no description of its own is not announced (TARGET-089 Y2).
+  if (published && appSeoListable(published, config)) {
     const site = /\.html?$/i.test(filename)
       ? (await storage.listSubdomainSites())
         .find(s => s.enabled && s.kind === 'app' && s.target === `${ownerName}/${filename}`)

@@ -21,13 +21,15 @@
  *   v1.2.0 — 2026-11-01 — /sitemap-datasets.xml lists the public data packages at their public page,
  *     and the sitemap index names it (plan doc-mvwxcas3dom3, D1.4).
  *   v1.2.1 — 2026-11-02 — A dataset's lastmod is escaped like its loc (secaudit2026nov02d round 13).
+ *   v1.3.0 — 2026-11-06 — The sitemap index lists an app only when it also has a description of its
+ *     own (appSeoListable, TARGET-089 Y2).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { sitemapPages } from '../data/public-pages.js';
 import { apexOnly } from './agent-docs.js';
-import { appSeoIndexable } from '../services/app-seo.js';
+import { appSeoListable } from '../services/app-seo.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -94,7 +96,9 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
         // three decisions it did not make: the operator's per-app block, the owner's own switch,
         // and the review mode. Four surfaces ask this question and all four must agree, so none of
         // them recomputes it. Its first step is the gated-app rule this line used to be.
-        if (!appSeoIndexable(app, config)) continue;
+        // Listable, not only indexable: an app with no description of its own stays out of the
+        // index (TARGET-089 Y2); the operator sees which ones in the SEO status.
+        if (!appSeoListable(app, config)) continue;
         const owner = localAccountName(app.ownerGaii);
         const sub = subFor.get(`${owner}/${app.filename}`);
         if (!sub) continue;

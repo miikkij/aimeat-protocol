@@ -10,6 +10,8 @@
  * @structure Mermaid({ chart }) — chart is the Mermaid source string.
  * @usage import { Mermaid } from '/components/Mermaid.js';  html`<${Mermaid} chart=${src} />`
  * @version-history
+ *   v1.3.1 — 2026-11-06 — The script address carries no build stamp, so it does not change on every
+ *     deploy (TARGET-090); no-cache and the ETag keep it fresh.
  *   v1.3.0 — 2026-10-25 — Loads Mermaid 12 from /lib/mermaid@12/ (ELK layout, new shapes); the
  *     initialize options are unchanged and all still valid in 12.
  *   v1.2.0 — 2026-09-27 — Draws its own names: .mmd is .mermaid-diagram and .mmd-fallback is
@@ -34,7 +36,9 @@ function loadMermaid() {
   if (_promise) return _promise;
   _promise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = '/lib/mermaid@12/mermaid.min.js' + (window.__B || '');
+    // No build stamp on the address: the file is served with no-cache and an ETag, so a browser
+    // revalidates it on every load, and its address stays the same across deploys (TARGET-090).
+    s.src = '/lib/mermaid@12/mermaid.min.js';
     s.onload = () => {
       try {
         window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral', flowchart: { htmlLabels: false }, suppressErrorRendering: true });

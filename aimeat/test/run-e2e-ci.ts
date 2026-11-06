@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-06 -- e2e-search-visibility.ts joins the list (not the guard tier): noindex on scripts and stylesheets on every host family, content tags, the app body and /index.html (TARGET-090, 089, 091).
  *   2026-11-05 -- e2e-verb-parity-unified.ts joins the list (not the guard tier): a contact's card, a group member's permissions and a task's deletion admit the callers the other verb of the same path admits (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
  *   2026-11-05 -- e2e-place-agent-default-at-approval.ts joins the list (not the guard tier): a store place's default is given at approval and when the plan is set, and a mint adds nothing (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-05 -- e2e-single-process-lease.ts joins the list (not the guard tier): with one process per node, the default, a process of a new name takes the previous process's @activate run and queued AI jobs at once (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
@@ -611,6 +612,9 @@ const ALL_SUITES = [
     'test/e2e-app-origin.ts',
     // Self-spawns its own server with the portfolio-origin flag ON (same pattern).
     'test/e2e-portfolio-origin.ts',
+    // Self-spawns its own node with both origins provisioned: noindex on scripts and stylesheets on
+    // every host family, content tags, the app body, the description rule and /index.html.
+    'test/e2e-search-visibility.ts',
     // Self-spawns its own node set to signed-in content access, with both origins provisioned.
     'test/e2e-content-access-gate.ts',
     // Self-spawns its own signed-in-only node: what a signed-in browser sends without a credential.

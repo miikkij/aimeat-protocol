@@ -16,12 +16,17 @@
  *   - BUILD_ID            — the served pages' cache-busting stamp, named after the code
  *   - publicSiteLinks()   — the site-link block injected as window.__SITE
  *   - serveSpa()          — the shell, with head metadata, nonces and cache busting
- *   - stampAssets()       — the build stamp on every importmap module and stylesheet link
+ *   - stampAssets()       — each importmap module and stylesheet link gets its file's content tag
  *   - resolvePublicFile() — locate a file under public/ from src/ or dist/
  * @usage
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.16.0 — 2026-11-06 — stampAssets() tags each importmap module and stylesheet with its own
+ *     content hash (utils/asset-version.ts) instead of the build stamp, so a deploy changes the
+ *     address of the files that changed and of no other. The build stamp stays the fallback for a
+ *     path with no file under public/ (TARGET-090 Y2: 4 515 .js addresses with a `?v=` tag sat in
+ *     Search Console as "Crawled, currently not indexed", a new set after every release).
  *   v1.15.0 — 2026-11-04 — BUILD_ID names the code (a clean stamped build's commit and built_at), so
  *     a restart on the same build no longer reloads every open page; PROCESS_BUILD_ID keeps the
  *     per-process stamp for GET /v1/build (codebase analysis 2026-11-03, item A7).
@@ -75,6 +80,7 @@ import { restoreSessionHint } from '../services/owner-session.js';
 import { buildGlossaryBody } from './glossary.js';
 import { SIGN_IN_STEP_PATHS } from '../data/sign-in-steps.js';
 import { pageBuildId, runningBuild } from '../utils/build-stamp.js';
+import { publicAssetVersioner, type AssetVersioner } from '../utils/asset-version.js';
 
 /**
  * The site-link block handed to the browser, with empty entries dropped so the injected
@@ -128,6 +134,14 @@ export const PROCESS_BUILD_ID = Date.now().toString(36);
  * the per-process value, so a restart there still busts the cache.
  */
 export const BUILD_ID = pageBuildId(runningBuild(), PROCESS_BUILD_ID);
+
+/**
+ * The content tag of each first-party file the shell links. Frozen exactly when BUILD_ID names the
+ * code: a clean stamped build's public/ does not change under the running process, so a file is
+ * hashed once. Anywhere else the size and mtime are checked per page load, so an edit in a source
+ * checkout reaches the next reload.
+ */
+const assetVersionOf: AssetVersioner = publicAssetVersioner(BUILD_ID !== PROCESS_BUILD_ID);
 
 /**
  * Serve spa.html with:
@@ -276,38 +290,45 @@ export function serveSpa(
     `<!-- AIMEAT v${version} · build ${BUILD_ID} -->\n</head>`,
   );
 
-  html = stampAssets(html, v);
+  html = stampAssets(html, v, assetVersionOf);
 
   res.setHeader('Cache-Control', 'no-cache');
   res.type('text/html').send(html);
 }
 
 /**
- * The build stamp on the shell's first-party assets: every importmap module and every stylesheet
- * link, so a deploy serves new CSS together with the new markup that needs it.
+ * A version tag on each of the shell's first-party assets: every importmap module and every
+ * stylesheet link, so a deploy serves new CSS together with the new markup that needs it.
+ *
+ * The tag is the file's own content hash when `versionOf` knows the file, and `v` (the build stamp)
+ * otherwise. A content tag changes only when the file does, so an unchanged module keeps its address
+ * across deploys and neither a browser nor a crawler fetches it again (TARGET-090 Y2). Every module
+ * the shell loads goes through the importmap, the views' dynamic imports included (public/spa.html
+ * ROUTES), so one module has one address and one instance.
  */
-export function stampAssets(html: string, v: string): string {
-  // Stamp ALL importmap values with the build version — generic regex replaces
-  // any value starting with "/" (local path), so new importmap entries are
-  // automatically cache-busted without touching this code.
+export function stampAssets(html: string, v: string, versionOf: AssetVersioner = () => null): string {
+  const tagFor = (path: string): string => versionOf(path) ?? v;
+
+  // Every importmap value that is a local path ("/..."), so a new importmap entry is tagged without
+  // touching this code.
   html = html.replace(
     /("imports"\s*:\s*\{)([\s\S]*?)(\})/,
     (_match, prefix, entries, suffix) => {
       const stamped = entries.replace(
-        /:\s*"(\/[^"?]+\.(js|mjs))"/g,
-        `: "$1${v}"`,
+        /:\s*"(\/[^"?]+\.(?:js|mjs))"/g,
+        (_m: string, path: string) => `: "${path}${tagFor(path)}"`,
       );
       return prefix + stamped + suffix;
     },
   );
 
-  // Stamp EVERY first-party stylesheet link: the view sheets, the shell's own sheets (theme, poster,
+  // EVERY first-party stylesheet link: the view sheets, the shell's own sheets (theme, poster,
   // dialog, ...), the component sheets and /lib. Until 2026-09-23 only the view sheets, theme.css and
   // margin-pattern.css were stamped, so a browser could keep the old poster.css and component sheets
   // beside new markup that needed the new ones. A second origin ("//...") is left alone.
   html = html.replace(
     /(<link rel="stylesheet" href=")(\/(?!\/)[^"?]+\.css)(")/g,
-    `$1$2${v}$3`
+    (_m: string, open: string, path: string, close: string) => `${open}${path}${tagFor(path)}${close}`,
   );
   return html;
 }

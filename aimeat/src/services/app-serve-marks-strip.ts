@@ -51,6 +51,8 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.6.0 — 2026-11-06 — The app body (#aimeat-app-body, utils/app-page-body.ts): the app's name and
+ *     description the serve pass writes for a search-visible app (TARGET-089).
  *   v1.5.1 — 2026-10-25 — The `<html>` tag is found with findDocumentElement
  *     (utils/html-document-element.ts), the same scan markDocumentElement uses, so a `<html>` in a
  *     comment is not taken for it.
@@ -79,12 +81,13 @@ import { PROVENANCE_HTML_MARK } from './ai/provenance-marks.js';
 import { REVIEWED_MARK } from './app-serve-marks.js';
 import { FRAME_SUPPORT_MARK } from '../utils/app-frame-assets.js';
 import { BEHAVIOUR_MARK } from './visibility/behaviour-script.js';
+import { APP_BODY_MARK } from '../utils/app-page-body.js';
 import { findDocumentElement } from '../utils/html-document-element.js';
 
 /** Which of the node's marks a removal was. One word per block the serve pass writes. */
 export type ServedMarkKind =
   | 'chrome-reserve' | 'badge' | 'ai-use' | 'app-info' | 'internet-open' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by'
-  | 'frame-support' | 'owner-tags' | 'behaviour';
+  | 'frame-support' | 'owner-tags' | 'behaviour' | 'app-body';
 
 /** One kind of mark taken out of an upload, with everything of that kind summed. */
 export interface ServedMarkRemoval {
@@ -145,6 +148,8 @@ const OWNER_TAGS_OPEN = '<script data-aimeat-tags>';
  */
 const OWNER_TAGS_BANNER = /(?:<script data-aimeat-cookie-banner>|<link rel="stylesheet" href="[^"<>]*\/cookieconsent\.css"><script src="[^"<>]*\/cookieconsent\.umd\.js"><\/script>(?:<script data-aimeat-cookie-banner>|<script>\(function\(\)\{function r\(\)\{CookieConsent\.run\())/y;
 const BEHAVIOUR_OPEN = `<script ${BEHAVIOUR_MARK}>`;
+/** The app body opens with its marker and, when the app declares a language, a `lang` after it. */
+const APP_BODY_OPEN = `<div ${APP_BODY_MARK}`;
 
 /** The order removals are reported in, so one upload always reads the same way. */
 const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string }> = [
@@ -161,6 +166,7 @@ const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string
   { mark: 'frame-support', marker: FRAME_SUPPORT_MARK, words: 'the isolated frame\'s support script' },
   { mark: 'owner-tags', marker: 'data-aimeat-tags', words: 'the owner\'s own analytics tags and the cookie banner they bring' },
   { mark: 'behaviour', marker: BEHAVIOUR_MARK, words: 'the on-page behaviour script' },
+  { mark: 'app-body', marker: APP_BODY_MARK, words: 'the app\'s name and description the node writes into the page for search engines' },
 ];
 
 /** A served copy re-served by an older node can carry two generations; more than this is not a copy. */
@@ -378,6 +384,16 @@ function findCuts(text: string): Cut[] {
   for (const at of anchors(BEHAVIOUR_OPEN)) {
     const end = scriptEnd(at + BEHAVIOUR_OPEN.length);
     if (end > 0) cut('behaviour', at, end);
+  }
+
+  // The app's name and description: one `<div>` holding a style, an `<h1>`, a paragraph and a
+  // script, never a `<div>`. The style and the script are raw text and the words are escaped, so the
+  // first `</div>` in markup is its end.
+  for (const at of anchors(APP_BODY_OPEN)) {
+    const tagEnd = text.indexOf('>', at);
+    if (tagEnd < 0 || !/^<div id="aimeat-app-body"(?: lang="[A-Za-z0-9-]{2,12}")?>$/.test(text.slice(at, tagEnd + 1))) continue;
+    const end = endOf(tagEnd + 1, '</div>');
+    if (end > 0) cut('app-body', at, end);
   }
 
   // Sorted, and an overlap keeps the earlier cut: no rule above can produce one from a real serve,
