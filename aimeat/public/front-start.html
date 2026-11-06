@@ -7,6 +7,9 @@
     Same skeleton, same /front-start.css and /front-start.js. Served at / when
     AIMEAT_FRONT_PAGE=start, and reachable at /front-start.html either way.
   @version-history
+    v2.0.1 - 2026-11-06 - The store links carry ?lang=en, so the store opens in the page's language.
+      "Sign in" opens the sign-in dialog of /v1/libs/aimeat-auth.js on this page instead of going
+      to /v1/portal.
     v2.0.0 - 2026-11-06 - The etusivu-mock v1.4.0 design (Jouni: "front-start liveksi mock
       v1.4:stä"). The main call to action opens the store (https://store.aimeat.io/), the second
       one /v1/connect-your-ai. App screenshots instead of the mock's videos.
@@ -22,7 +25,9 @@
   <meta name="description" content="AIMEAT puts memory, agents and approvals in one place. AI does the work and suggests the next step, and you decide. Try it free or get an AIMEAT of your own." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <link rel="stylesheet" href="/front-start.css">
-  <script src="/front-start.js" defer></script>
+  <script type="module" src="/front-start.js"></script>
+  <!-- The node's sign-in dialog, which "Sign in" opens on this page. -->
+  <script src="/v1/libs/aimeat-auth.js" defer></script>
   <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
   <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
 </head>
@@ -40,7 +45,7 @@
       </nav>
       <a class="lang fs-lang" href="/front-start.fi.html" lang="fi" hreflang="fi">FI</a>
       <a class="btn sec sm" id="fs-enter" href="/v1/portal">Sign in</a>
-      <a class="btn pri sm" href="https://store.aimeat.io/">Own AIMEAT</a>
+      <a class="btn pri sm" href="https://store.aimeat.io/?lang=en">Own AIMEAT</a>
     </div>
   </header>
 
@@ -55,7 +60,7 @@
         <p class="lead">Memory, agents and approvals in one place. AI does the work and suggests the next step. You hold the reins.</p>
         <p class="lead it"><b>IT and management:</b> permissions, the log, the EU AI Act and GDPR in one place.</p>
         <div class="ctas">
-          <a class="btn pri" href="https://store.aimeat.io/">Get your own AIMEAT</a>
+          <a class="btn pri" href="https://store.aimeat.io/?lang=en">Get your own AIMEAT</a>
           <a class="btn sec" href="/v1/connect-your-ai">Try it free</a>
         </div>
         <ul class="badges"><li>Trial without a card</li><li>Your data stays yours</li><li>Open source</li></ul>
@@ -211,7 +216,7 @@
           <p class="price">Solo €29 a month</p>
           <p>A server of your own, for you or your company: your own data, your own users, your own control.</p>
           <ul><li>All your data under your control</li><li>Users, permissions and the log</li><li>Help with the setup</li></ul>
-          <a class="btn pri" href="https://store.aimeat.io/">See prices and order →</a>
+          <a class="btn pri" href="https://store.aimeat.io/?lang=en">See prices and order →</a>
         </div>
       </div>
       <p class="dev">A developer? Install it yourself: <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">the open source code on GitHub</a> · <a href="/v1/connect-your-ai">connect an AI (MCP)</a></p>

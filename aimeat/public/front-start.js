@@ -9,17 +9,22 @@
  *   3. The audience tabs show one panel at a time.
  *   4. A signed-in visitor gets a "Your home" link (/v1/home) in place of "Sign in". No
  *      automatic redirect: this page is the public front page, and a signed-in visitor may
- *      still want to read it.
+ *      still want to read it. A guest's "Sign in" opens the sign-in dialog of the auth lib.
  *   5. The EN/FI link stores the person's pick, so the front page at / keeps it on this device.
  *   6. Sections fade in once as they scroll into view.
- *   Plain same-origin script, no modules, no importmap entry needed.
+ *   An ES module (type="module", deferred by the browser) for its one import, showLoginModal from
+ *   /js/services/auth.js, which itself imports nothing; the page has no importmap and needs none.
  * @version-history
+ *   v2.1.0 - 2026-11-06 - "Sign in" opens the sign-in dialog on this page instead of going to
+ *     /v1/portal (Jouni: the dialog opens at once). A finished sign-in goes to /v1/home.
  *   v2.0.0 - 2026-11-06 - The etusivu-mock v1.4.0 design: slogans, chat demo and audience tabs
  *     replace the level picker and the copy button. Parts 4 and 5 are unchanged.
  *   v1.1.0 - 2026-11-02 - The EN/FI link stores the pick (Jouni: the person can change the language).
  *   v1.0.0 - 2026-10-21 - Initial: level picker (scrolls its answer into view on a phone, quote
  *     marks by language), copy button, signed-in link.
  */
+import { showLoginModal } from '/js/services/auth.js';
+
 (function () {
   'use strict';
 
@@ -332,17 +337,33 @@
     });
   });
 
-  // 4. Signed-in visitor: a link home instead of "Sign in".
+  // 4. Signed-in visitor: a link home instead of "Sign in". A guest's "Sign in" opens the node's
+  //    sign-in dialog on this page (the auth lib, /v1/libs/aimeat-auth.js, which also has the
+  //    register tab); /v1/portal stays the link's address for a browser without the lib.
+  var enter = document.getElementById('fs-enter');
+  var signedIn = false;
   try {
     var raw = localStorage.getItem('aimeat_session');
-    if (raw && JSON.parse(raw).jwt) {
-      var enter = document.getElementById('fs-enter');
-      if (enter) {
-        enter.textContent = FI ? 'Kotiisi' : 'Your home';
-        enter.setAttribute('href', '/v1/home');
-      }
-    }
+    signedIn = !!(raw && JSON.parse(raw).jwt);
   } catch (err) { console.warn('[front-start] session not readable, staying a guest:', err.message); }
+  if (enter && signedIn) {
+    enter.textContent = FI ? 'Kotiisi' : 'Your home';
+    enter.setAttribute('href', '/v1/home');
+  }
+  if (enter && !signedIn) {
+    enter.addEventListener('click', function (e) {
+      // The dialog speaks the stored language; the page the person is reading is the better guess.
+      try { localStorage.setItem('aimeat-lang', document.documentElement.lang); } catch (err) {
+        console.warn('[front-start] storage refused the language, the dialog uses its own pick:', err.message);
+      }
+      var shown = showLoginModal({
+        redirect: '/v1/home',
+        onLogin: function () { window.location.assign('/v1/home'); }
+      });
+      // Without the auth lib the link's own address (/v1/portal) opens the sign-in page instead.
+      if (shown) e.preventDefault();
+    });
+  }
 
   // 5. The EN/FI link is the person's pick: the address / keeps it on this device.
   $$('.fs-lang').forEach(function (link) {

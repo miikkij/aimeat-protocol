@@ -7,6 +7,9 @@
     Same skeleton, same /front-start.css and /front-start.js. Served at / when
     AIMEAT_FRONT_PAGE=start, and reachable at /front-start.fi.html either way.
   @version-history
+    v2.0.1 - 2026-11-06 - The store links carry ?lang=fi, so the store opens in Finnish (Jouni:
+      the front page and the store in the same language). "Kirjaudu" opens the sign-in dialog of
+      /v1/libs/aimeat-auth.js on this page instead of going to /v1/portal.
     v2.0.0 - 2026-11-06 - The etusivu-mock v1.4.0 design (Jouni: "front-start liveksi mock
       v1.4:stä"). The main call to action opens the store (https://store.aimeat.io/), the second
       one /v1/connect-your-ai. App screenshots instead of the mock's videos.
@@ -21,7 +24,9 @@
   <meta name="description" content="AIMEAT kokoaa muistin, agentit ja hyväksynnät yhteen paikkaan. Tekoäly tekee työn ja ehdottaa seuraavan askeleen, ja sinä päätät. Kokeile ilmaiseksi tai hanki oma AIMEAT." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <link rel="stylesheet" href="/front-start.css">
-  <script src="/front-start.js" defer></script>
+  <script type="module" src="/front-start.js"></script>
+  <!-- The node's sign-in dialog, which "Kirjaudu" opens on this page. -->
+  <script src="/v1/libs/aimeat-auth.js" defer></script>
   <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
   <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
 </head>
@@ -39,7 +44,7 @@
       </nav>
       <a class="lang fs-lang" href="/front-start.html" lang="en" hreflang="en">EN</a>
       <a class="btn sec sm" id="fs-enter" href="/v1/portal">Kirjaudu</a>
-      <a class="btn pri sm" href="https://store.aimeat.io/">Oma AIMEAT</a>
+      <a class="btn pri sm" href="https://store.aimeat.io/?lang=fi">Oma AIMEAT</a>
     </div>
   </header>
 
@@ -54,7 +59,7 @@
         <p class="lead">Muisti, agentit ja hyväksynnät samassa paikassa. Tekoäly tekee työn ja ehdottaa seuraavan askeleen. Sinä pidät ohjat.</p>
         <p class="lead it"><b>IT ja johto:</b> oikeudet, loki, EU:n tekoälysäädös ja GDPR samassa paikassa.</p>
         <div class="ctas">
-          <a class="btn pri" href="https://store.aimeat.io/">Hanki oma AIMEAT</a>
+          <a class="btn pri" href="https://store.aimeat.io/?lang=fi">Hanki oma AIMEAT</a>
           <a class="btn sec" href="/v1/connect-your-ai">Kokeile ilmaiseksi</a>
         </div>
         <ul class="badges"><li>Kokeilu ilman korttia</li><li>Data pysyy sinulla</li><li>Avoin lähdekoodi</li></ul>
@@ -210,7 +215,7 @@
           <p class="price">Solo 29 €/kk</p>
           <p>Oma palvelin sinulle tai yrityksellesi: oma data, omat käyttäjät, oma hallinta.</p>
           <ul><li>Kaikki tietosi omassa hallinnassa</li><li>Käyttäjät, oikeudet ja loki</li><li>Tuki käyttöönottoon</li></ul>
-          <a class="btn pri" href="https://store.aimeat.io/">Katso hinnat ja tilaa →</a>
+          <a class="btn pri" href="https://store.aimeat.io/?lang=fi">Katso hinnat ja tilaa →</a>
         </div>
       </div>
       <p class="dev">Kehittäjä? Asenna itse: <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">avoin lähdekoodi GitHubissa</a> · <a href="/v1/connect-your-ai">liitä tekoäly (MCP)</a></p>
