@@ -269,6 +269,7 @@ Extensions run in a QuickJS sandbox compiled to WASM (`quickjs-emscripten`, `src
 | `AIMEAT_EXT_TIMEOUT_MS` | CPU time one action may use. A manifest may ask for less, down to a floor fixed in code | `extensionTimeoutMs` |
 | `AIMEAT_EXT_MAX_API_CALLS` | `ctx` API calls one invocation may make | `extensionMaxApiCalls` |
 | `AIMEAT_EXT_MAX_CODE_SIZE_KB` | The largest script an action may have | `extensionMaxCodeSizeKb` |
+| `AIMEAT_EXT_ZIP_MAX_FILES` | Files one extension or cortex ZIP upload may hold, manifest included (default 1000) | `extensionZipMaxFiles` |
 | `AIMEAT_EXT_MAX_DEBIT` | The most morsels one call may debit. Not on the Config tab | `extensionMaxDebitPerCall` |
 | `AIMEAT_EXT_MAX_INSTALLED` | Extensions installed on the node | `extensionMaxInstalled` |
 | `AIMEAT_MAX_EXTENSIONS_PER_OWNER` | Extensions one owner may install | `maxExtensionsPerOwner` |
