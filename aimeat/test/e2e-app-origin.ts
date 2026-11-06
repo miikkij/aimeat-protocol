@@ -10,6 +10,8 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-11-06 — The discovery block is one statement and four links (TARGET-092): the owner and the app
+ *     id with its extension are asserted in the block's webmcp and skills addresses, not in text lines.
  *   2026-10-25 — Phases 13 and 14 address `<label>.localhost` with a real Host (onApexSub): X-Subdomain
  *     counts only when it equals the Host's label (secaudit2026oct22, subdomain-label-from-client-headers).
  *   2026-10-25 — Phase 2 (secaudit2026oct22): a runnable /v1/apps request on the bare app host 301s to
@@ -278,9 +280,10 @@ async function main() {
             assert(res.status === 200, `expected 200, got ${res.status}`);
             const body = res.body;
             assert(body.includes('<noscript id="aimeat-agent-discovery">'), 'a script-free discovery block is present');
-            assert(body.includes(`app_id: ${filename}`), `the app id is stated with its extension: ${filename}`);
-            assert(body.includes(`owner:  ${owner}`), 'the owner is stated');
-            assert(body.includes('/webmcp'), 'it points at the callable-tool listing');
+            // Since TARGET-092 (2026-11-06) the block is one statement and four links; the owner and the
+            // app id with its extension are in the links' addresses and in #aimeat-app-ref below.
+            assert(body.includes(`/v1/apps/${owner}/${filename}/webmcp"`), `the block links the callable-tool listing of ${owner}/${filename}, the app id with its extension`);
+            assert(body.includes(`/v1/apps/${owner}/${filename}/skills"`), 'and the skills bound to it');
             assert(body.includes('rel="mcp-server"'), 'and links the MCP server card for a raw-HTML reader');
             // The identity block parses as served (JSON escapes, not HTML entities) and sits in the head,
             // so AIMEAT.atelier.appRef() works from the app's first line.
@@ -312,7 +315,7 @@ async function main() {
             const res = await onAppOrigin('/', 'origin-tagless');
             assert(res.status === 200, `expected 200, got ${res.status}`);
             assert(res.body.includes('<noscript id="aimeat-agent-discovery">'), 'no discovery block');
-            assert(res.body.includes(`app_id: ${taglessFile}`), 'the discovery block does not name the app');
+            assert(res.body.includes(`/${taglessFile}/webmcp"`), 'the discovery block does not name the app');
             assert(res.body.includes('aimeat-app-badge'), 'no attribution badge');
             // The app's identity block now leads a document with no head, because the front is the one
             // place guaranteed to be ahead of the app's first script (appref-block-is-injected-after-your-

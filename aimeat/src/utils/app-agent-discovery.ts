@@ -22,6 +22,10 @@
  *   goes and whether the document can take it is decided once, in services/app-serve-marks.ts.
  * @usage import { agentDiscoverySnippet, appRefSnippet } from '../utils/app-agent-discovery.js';
  * @version-history
+ *   v3.0.0 — 2026-11-06 — The noscript block is one statement and four links (?format=md, webmcp,
+ *     skills, /.well-known/mcp.json), at most 30 words, with no heading and no instruction
+ *     (TARGET-092, Jouni's decision of 2026-11-06). The two links, the WebMCP bridge and
+ *     #aimeat-app-ref are unchanged.
  *   v2.2.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v2.2.0 — 2026-09-13 — The `#aimeat-app-ref` block leaves the body markup for appRefSnippet(),
  *     which the marks pass puts at the start of the head. At the end of the body it arrived after
@@ -92,41 +96,28 @@ const esc = escapeHtml;
  * document already has, which is why this can ride on every app rather than being opt-in.
  */
 export function agentDiscoverySnippet(spec: AppDiscoverySpec): string {
-  const base = spec.baseUrl.replace(/\/+$/, '');
-  const name = spec.appName || spec.filename;
-  const tools = (spec.toolNames ?? []).filter(Boolean);
+  const app = `${spec.baseUrl.replace(/\/+$/, '')}/v1/apps/${encodeURIComponent(spec.owner)}/${encodeURIComponent(spec.filename)}`;
+  // The sentence is 15 words beside the name, so a name is cut at 15 words to keep the block at 30.
+  const nameWords = (spec.appName || spec.filename).trim().split(/\s+/);
+  const name = nameWords.length > 15 ? `${nameWords.slice(0, 15).join(' ')}…` : nameWords.join(' ');
 
-  const lines: string[] = [];
-  lines.push(`${name} — an app on AIMEAT.`);
-  if (spec.description) lines.push(spec.description);
-  lines.push('');
-  lines.push('FOR AN AGENT READING THIS PAGE');
-  lines.push('');
-  // The single most valuable fact, because it is the one that is guessed wrong.
-  lines.push(`owner:  ${spec.owner}`);
-  lines.push(`app_id: ${spec.filename}   (a filename — it keeps its extension; the subdomain drops it)`);
-  lines.push('');
-  if (tools.length) {
-    lines.push(`This app sells ${tools.length} tool${tools.length === 1 ? '' : 's'}: ${tools.join(', ')}.`);
-    lines.push('Each carries a full input and output schema, so nothing has to be inferred from this page.');
-    lines.push('');
-  }
-  lines.push('What to read, in order:');
-  lines.push(`  ${base}/v1/apps/${encodeURIComponent(spec.owner)}/${encodeURIComponent(spec.filename)}/webmcp`);
-  lines.push('      the callable tools of THIS app, with their schemas and prices');
-  lines.push(`  /.well-known/mcp.json`);
-  lines.push('      this node\'s MCP server card (served on this host too)');
-  lines.push(`  ?format=md`);
-  lines.push('      this app\'s own agent-facing description, as markdown');
-  lines.push(`  ${base}/v1/apps/${encodeURIComponent(spec.owner)}/${encodeURIComponent(spec.filename)}/skills`);
-  lines.push('      skills bound to this app — the method, not just the API');
-  lines.push('');
-  lines.push('A priced tool answers an unpaid POST with 402 and an x402 `accepts` block stating how to');
-  lines.push('pay, so the calling convention can be learned from the service itself.');
+  // ONE STATEMENT AND FOUR LINKS (TARGET-092, Jouni 2026-11-06). Until then this was a ~160-word
+  // briefing headed "FOR AN AGENT READING THIS PAGE": the largest text on every app page, the same
+  // template on each, read by a crawler without JavaScript and seen by no person, and addressed to
+  // an AI, which is what Bing named when it kept aimeat.io out of its index in 2026
+  // (Platform Development Notes doc-mus9ip9musb4). Everything it said is in the linked documents:
+  // the owner and the app id with its extension in ?format=md and in #aimeat-app-ref, the tools with
+  // their schemas and prices in webmcp, the method in skills, the server in mcp.json. The block
+  // states a fact and gives no instruction, and test/unit/app-agent-discovery.test.ts holds it under
+  // 30 words.
+  const sentence = `${esc(name)} is an app on AIMEAT, described in `
+    + `<a href="?format=md">markdown</a>, <a href="${esc(app)}/webmcp">tools</a>, `
+    + `<a href="${esc(app)}/skills">skills</a> and an `
+    + `<a href="/.well-known/mcp.json">MCP server card</a>.`;
 
   return `<link rel="mcp-server" href="/.well-known/mcp.json">`
     + `<link rel="alternate" type="text/markdown" href="?format=md" title="Agent-facing description">`
-    + `<noscript ${DISCOVERY_MARK}><pre>${esc(lines.join('\n'))}</pre></noscript>`
+    + `<noscript ${DISCOVERY_MARK}><p>${sentence}</p></noscript>`
     // The machine-readable twin of these facts is appRefSnippet(), which goes into the head.
     // The WebMCP bridge, from THIS origin (not the apex): an app author's own
     // `script-src 'self'` then still allows it. `defer` runs it once the document is parsed, and

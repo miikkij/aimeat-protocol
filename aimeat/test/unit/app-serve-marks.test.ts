@@ -12,6 +12,10 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.10.0 — 2026-11-06 — The nine goldens that carry the agent-discovery block were re-captured for
+ *     the tenth intentional output change: the noscript block is one statement and four links
+ *     (TARGET-092). Each differs from its old golden only inside `<noscript id="aimeat-agent-discovery">`
+ *     (checked byte for byte when re-captured, with that element's content cut out of both).
  *   v1.9.0 — 2026-10-25 — Goldens updated for the ninth intentional output change: the `ai-disclosure`
  *     meta and the `<html>` attribute carry the final W3C report's value (`ai-autonomous` where the
  *     draft word `autonomous` stood). 10 of 19 cases changed, exactly the ten that carry a

@@ -21,6 +21,8 @@
  *       API no longer lets anyone make one.
  *   TARGET-091: /index.html on the apex answers 301 to `/`.
  * @version-history
+ *   v1.1.0 — 2026-11-06 — TARGET-092: the agent block's shape (one statement, at most 30 words, four
+ *     links, no heading), the two head links, and the four linked addresses answering 200.
  *   v1.0.0 — 2026-11-06 — Initial (TARGET-090, TARGET-089, TARGET-091).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=search-visibility
@@ -151,6 +153,32 @@ async function main() {
             assert(block.includes(`<p>${FINDABLE.description}</p>`), `description missing: ${block.slice(0, 400)}`);
             assert(block.includes('<script src="/js/app-body.js" defer></script>'), 'the removal script is missing');
             assert(!/display:\s*none|visibility:\s*hidden|position:/i.test(block), `the block hides or positions itself: ${block.slice(0, 400)}`);
+        });
+
+        await test('the agent block is one statement of at most 30 words with four links, and the head links stay (TARGET-092)', async () => {
+            const r = await on('app', '/', FINDABLE.sub);
+            const block = /<noscript id="aimeat-agent-discovery">([\s\S]*?)<\/noscript>/.exec(r.body)?.[1] ?? '';
+            const text = block.replace(/<[^>]+>/g, '');
+            assert(block !== '', 'no agent block');
+            assert((text.match(/\S+/g) ?? []).length <= 30, `${(text.match(/\S+/g) ?? []).length} words: ${text}`);
+            assert(!/FOR AN AGENT|READING THIS PAGE/i.test(text), `the old heading is still there: ${text}`);
+            const hrefs = [...block.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+            assert(hrefs.length === 4 && hrefs[0] === '?format=md' && hrefs[3] === '/.well-known/mcp.json'
+                && hrefs[1].endsWith(`/v1/apps/${owner}/${FINDABLE.filename}/webmcp`) && hrefs[2].endsWith(`/v1/apps/${owner}/${FINDABLE.filename}/skills`),
+                `links ${JSON.stringify(hrefs)}`);
+            assert(r.body.includes('<link rel="mcp-server" href="/.well-known/mcp.json">'), 'rel=mcp-server is missing');
+            assert(r.body.includes('<link rel="alternate" type="text/markdown" href="?format=md"'), 'rel=alternate markdown is missing');
+        });
+
+        await test('the four addresses the agent block links answer 200', async () => {
+            const md = await on('app', '/?format=md', FINDABLE.sub);
+            assert(md.status === 200 && /markdown/.test(md.header('content-type') ?? ''), `?format=md: ${md.status} ${md.header('content-type')}`);
+            const card = await on('app', '/.well-known/mcp.json', FINDABLE.sub);
+            assert(card.status === 200, `mcp.json: ${card.status}`);
+            for (const tail of ['webmcp', 'skills']) {
+                const res = await fetch(`${BASE}/v1/apps/${owner}/${FINDABLE.filename}/${tail}`);
+                assert(res.status === 200, `${tail}: ${res.status}`);
+            }
         });
 
         await test('an app nobody may find gets no block: its bytes stay as they were', async () => {
