@@ -24,6 +24,7 @@
  *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
  *   v1.5.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
  *   2026-10-31 — updateAppMeta sets or takes off `screenshotPublic` (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-06 — updateAppMeta replaces or takes off `about`, the owner's text about the app (TARGET-093).
  *   v1.6.0 — 2026-10-11 — Every manifest read (app, listing row, draft) goes through
  *     normalizeAppManifestPacing: a stored `priceMorsels` is the app's pacing amount `tollMorsels`.
  *   v1.7.0 — 2026-10-12 — setAppParked becomes setAppListing (the `parked` and `community` pair in
@@ -381,6 +382,7 @@ export const appMethods = {
       legal?: Partial<Record<AppLegalKind, AppLegalDoc | null>>;
       designSpec?: AppManifest['designSpec'] | null;
       screenshotPublic?: boolean | null;
+      about?: AppManifest['about'] | null;
     },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue shows). Read the current
@@ -420,6 +422,11 @@ export const appMethods = {
     if (meta.screenshotPublic !== undefined) {
       if (meta.screenshotPublic === true) manifest.screenshotPublic = true;
       else delete manifest.screenshotPublic;
+    }
+    // The owner's text about the app: replaced whole, taken off with null.
+    if (meta.about !== undefined) {
+      if (meta.about === null) delete manifest.about;
+      else manifest.about = meta.about;
     }
     await this.db.updateTable('App')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -20,7 +20,9 @@ describe('appPageBodySnippet', () => {
     const out = appPageBodySnippet({ name: 'A & <b>', description: '"x" </div>', lang: 'fi' });
     expect(out).toContain('<h1>A &amp; &lt;b&gt;</h1>');
     expect(out).toContain('<p>&quot;x&quot; &lt;/div&gt;</p>');
-    expect(out).toContain('<div id="aimeat-app-body" lang="fi">');
+    // No text about the app, so no language is claimed: the app's declared language is not the
+    // language its description was written in (TARGET-093).
+    expect(out).toContain('<div id="aimeat-app-body">');
     expect(out.split('</div>').length).toBe(2);
   });
 
@@ -36,10 +38,48 @@ describe('appPageBodySnippet', () => {
   });
 });
 
+describe('appPageBodySnippet: the text about the app (TARGET-093)', () => {
+  const ABOUT = '## How it works\n\nPick a **rope** and a load.\n\n- one\n- two\n\nSee [the guide](https://example.org/g).';
+
+  it('shows the text under the description, headed in the text\'s language, and states that language', () => {
+    const fi = appPageBodySnippet({ ...BODY, about: { text: ABOUT, lang: 'fi' } });
+    expect(fi).toContain('<div id="aimeat-app-body" lang="fi">');
+    expect(fi.indexOf('<p>Laskee nostovoiman')).toBeLessThan(fi.indexOf('<section><h2>Tietoa sovelluksesta</h2>'));
+    expect(fi).toContain('<h2>How it works</h2>');
+    expect(fi).toContain('<p>Pick a <strong>rope</strong> and a load.</p>');
+    expect(fi).toContain('<ul><li>one</li><li>two</li></ul>');
+    expect(fi).toContain('<a href="https://example.org/g">the guide</a>');
+    expect(appPageBodySnippet({ ...BODY, about: { text: ABOUT, lang: 'en' } })).toContain('<h2>About this app</h2>');
+    expect(appPageBodySnippet({ ...BODY, about: { text: ABOUT, lang: 'es' } })).toContain('<h2>Acerca de esta aplicación</h2>');
+    // A language the node has no words for gets the English heading and keeps its own tag.
+    const sv = appPageBodySnippet({ ...BODY, about: { text: ABOUT, lang: 'sv' } });
+    expect(sv).toContain('lang="sv"');
+    expect(sv).toContain('<h2>About this app</h2>');
+  });
+
+  it('turns no markup in the text into markup: no script, no raw HTML, no javascript: link', () => {
+    const out = appPageBodySnippet({ ...BODY, about: {
+      text: '<script>alert(1)</script>\n\n<img src=x onerror=alert(2)>\n\n[click](javascript:alert(3)) and </div><div>',
+      lang: 'en' } });
+    expect(out).not.toMatch(/<script>alert|<img|javascript:|onerror=alert\(2\)>/);
+    expect(out).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    // The link's address ends at its first ")" and is refused, so the label stays as text.
+    expect(out).toContain('<p>click) and &lt;/div&gt;&lt;div&gt;</p>');
+    // Still one element to strip: the block's own </div> is its only one.
+    expect(out.split('</div>').length).toBe(2);
+    expect(out).not.toContain('<div><');
+  });
+
+  it('writes no section and no language for an empty text, and refuses a malformed tag', () => {
+    expect(appPageBodySnippet({ ...BODY, about: { text: '  ', lang: 'fi' } })).not.toMatch(/<section>|lang=/);
+    expect(appPageBodySnippet({ ...BODY, about: { text: 'x', lang: 'fi" onload="y' } })).toContain('<div id="aimeat-app-body">');
+  });
+});
+
 describe('applyServeMarks with appBody', () => {
   it('opens the body with the block', () => {
     const out = serve('<!DOCTYPE html><html><head><title>t</title></head>\n<!-- c -->\n<body class="x"><canvas></canvas></body></html>');
-    expect(out).toMatch(/<body class="x"><div id="aimeat-app-body" lang="fi">.*<h1>Noste<\/h1><p>Laskee nostovoiman ja näyttää kuorman\.<\/p>.*<\/div><canvas>/s);
+    expect(out).toMatch(/<body class="x"><div id="aimeat-app-body">.*<h1>Noste<\/h1><p>Laskee nostovoiman ja näyttää kuorman\.<\/p>.*<\/div><canvas>/s);
   });
 
   it('is written at the end of the body when the body does not directly follow the head', () => {

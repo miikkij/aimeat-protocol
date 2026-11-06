@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-11-06 — A new version keeps the owner's `about`, the text about the app (TARGET-093).
  *   2026-11-06 — A publish announces the app to IndexNow only when it has a description of its own
  *     (appSeoListable, TARGET-089 Y2).
  *   2026-10-31 — A new version keeps the owner's `screenshotPublic` (secaudit2026oct31w2 round 10, W2-12).
@@ -476,6 +477,8 @@ export async function publishApp(
   if (prev?.legal) manifest.legal = prev.legal;
   // The owner's "show the screenshot to everyone" is a settings choice no publish door carries.
   if (prev?.screenshotPublic) manifest.screenshotPublic = true;
+  // So is the owner's text about the app (TARGET-093): a new build does not unsay it.
+  if (prev?.about) manifest.about = prev.about;
 
   // What the app DECLARES survives a version whose author forgot the meta tag; what the node
   // OBSERVES is re-measured from the bytes being published, never carried. HTML only — there is

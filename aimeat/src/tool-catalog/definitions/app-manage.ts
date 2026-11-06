@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-06 — settings takes `about` and `about_lang`: the owner's longer text about the app, shown on
+ *     the app page under the description (TARGET-093).
  *   2026-11-01 — party_stop and party_resume: the owner stops a registered person and lets it in again (WP9d).
  *   2026-11-01 — member_set takes `party` (an outside party of the owner), and parties, party_remove and
  *     party_registration_set manage the people who register to the app without an account (plan D4.1 to D4.3).
@@ -124,6 +126,8 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // settings
     name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version. For structure_set: the app\'s name while it is not published yet.' },
     descriptions: { type: 'object', description: 'For settings: the description per language, { "fi": "…", "es": "…" }.', zod: z.record(z.string(), z.string().max(INPUT_LIMITS.description)) },
+    about: { type: 'string', description: 'For settings: a longer text about the app for people, in markdown, 150 to 400 words: what it does, for whom and how it is used. The app page shows it under the description, also to a reader without JavaScript such as a search engine, headed "About this app" in the text\'s language. Write facts the app really has, and no instructions to an AI. Send about_lang with a new text. An empty string removes it.', zod: z.string().max(8000) },
+    about_lang: { type: 'string', description: 'For settings: the language the about text is written in, such as "fi" or "en". The page states it to search engines.', zod: z.string().max(20) },
     listing: { type: 'string', enum: ['listed', 'community', 'unlisted'], description: 'For settings: where the app is listed. listed: everywhere, including search and other nodes. community: only in the community list of people signed in to this node, nowhere public. unlisted: only in your own list. A link opens the app in all three.' },
     parked: { type: 'boolean', description: 'For settings: the older two-state switch. true is listing "unlisted", false is listing "listed". Prefer listing.' },
     forkable: { type: 'boolean', description: 'For settings: true lets anyone signed in fork the app into their own catalogue.' },
@@ -197,7 +201,7 @@ export interface AppManageAction {
 const F = (required: string[], optional: string[] = []): Record<string, boolean> =>
     Object.fromEntries([...required.map(f => [f, true] as const), ...optional.map(f => [f, false] as const)]);
 
-const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'listing', 'parked', 'forkable', 'access_code', 'open_to', 'screenshot_public', 'protection'];
+const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'about', 'about_lang', 'listing', 'parked', 'forkable', 'access_code', 'open_to', 'screenshot_public', 'protection'];
 
 /**
  * The member roster. Each action is one route of routes/app-members.ts and names the word that route

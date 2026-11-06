@@ -38,6 +38,7 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   2026-11-06 — `about`: the owner set or took off the text about the app (TARGET-093).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-01 — `party.stopped`, `party.resumed`: a person registered to the app stopped or let in again (WP9d).
@@ -106,6 +107,8 @@ export type AppAuditAction =
   | 'screenshot_public'
   | 'protection'
   | 'name' | 'description'
+  // The owner's longer text about the app, shown on the app page (TARGET-093): set or taken off.
+  | 'about'
   | 'dev.granted' | 'dev.revoked'
   // The design spec beside the app (services/app-design-spec.ts): each write, and the owner's removal.
   | 'design_spec.set' | 'design_spec.cleared'

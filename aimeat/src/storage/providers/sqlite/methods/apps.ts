@@ -24,6 +24,7 @@
  *     (the one-time assertion spend, secaudit 2026-09 N5).
  *   v1.9.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
  *   2026-10-31 — updateAppMeta sets or takes off `screenshotPublic` (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-06 — updateAppMeta replaces or takes off `about`, the owner's text about the app (TARGET-093).
  *   v1.10.0 — 2026-10-05 — revokeToken, revokeTokenIfAbsent, isTokenRevoked, cleanExpiredRevocations moved to
  *     identity.ts; createSubdomainSite, getSubdomainSite, listSubdomainSites, updateSubdomainSite,
  *     deleteSubdomainSite, deserializeSubdomainSite moved to subdomain-sites.ts; createAppGrant, getAppGrant,
@@ -198,6 +199,7 @@ export const appMethods = {
       legal?: Partial<Record<AppLegalKind, AppLegalDoc | null>>;
       designSpec?: AppManifest['designSpec'] | null;
       screenshotPublic?: boolean | null;
+      about?: AppManifest['about'] | null;
     },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
@@ -241,6 +243,11 @@ export const appMethods = {
     if (meta.screenshotPublic !== undefined) {
       if (meta.screenshotPublic === true) manifest.screenshotPublic = true;
       else delete manifest.screenshotPublic;
+    }
+    // The owner's text about the app: replaced whole, taken off with null.
+    if (meta.about !== undefined) {
+      if (meta.about === null) delete manifest.about;
+      else manifest.about = meta.about;
     }
     const result = this.db.prepare(
       'UPDATE apps SET manifest = ? WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?'

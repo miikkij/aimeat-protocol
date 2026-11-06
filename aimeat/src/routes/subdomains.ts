@@ -15,6 +15,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.38.0 — 2026-11-06 — The app body carries the owner's text about the app, and its `lang` is that
+ *     text's language instead of the language the app declares (TARGET-093).
  *   v1.37.0 — 2026-11-06 — An app a search engine may index is served with its name and its owner's
  *     description as a visible block at the start of the body (utils/app-page-body.ts, TARGET-089).
  *   v1.36.5 — 2026-11-04 — RESERVED_SUBDOMAINS, SUBDOMAIN_RE, DRAFT_LABEL_SUFFIX, draftBaseLabel and
@@ -339,7 +341,9 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
         ? {
             name: app.manifest?.name?.trim() || seoMeta.title,
             description: appOwnDescription(app),
-            lang: seoMeta.lang,
+            // The owner's text about the app, under the description (TARGET-093); its language is
+            // the block's `lang`.
+            about: app.manifest?.about,
           }
         : undefined,
       headMeta: discover?.origin

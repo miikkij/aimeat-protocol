@@ -110,6 +110,9 @@ const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-info', 'app-ref', 'badge', 'chrome-reserve', 'internet-open']],
   ['the app body alone, in Finnish', { isDocument: true, appBody: APP_BODY }, ['app-body']],
   ['the app body with no language and no description', { isDocument: true, appBody: { name: 'Demo', description: '' } }, ['app-body']],
+  ['the app body with a text about the app (TARGET-093)', { isDocument: true, appBody: { ...APP_BODY,
+    about: { text: '## Käyttö\n\nValitse **köysi**.\n\n- yksi\n- kaksi\n\n```\n</div><div>\n```\n\n[Opas](https://example.org/)', lang: 'fi' } } },
+    ['app-body']],
   ['every mark and the app body', { ...FULL, info: INFO, appBody: APP_BODY },
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-body', 'app-info', 'app-ref', 'badge', 'chrome-reserve']],
 ];

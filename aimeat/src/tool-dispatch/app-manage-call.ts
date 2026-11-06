@@ -16,6 +16,7 @@
  *   2026-11-01 -- member_set forwards `party`; parties, party_remove and party_registration_set reach
  *     /v1/apps/{owner}/{app}/parties (plan doc-mvwxcas3dom3, D4).
  *   2026-10-31 -- settings forwards `screenshot_public` (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-06 -- settings forwards `about` and `about_lang` (TARGET-093).
  *   2026-10-30 -- structure_set forwards `proposals`.
  *   2026-10-29 -- structure, structure_set and plans over GET and PUT .../structure and GET /v1/app-plans.
  *   2026-10-25 -- subdomain_set forwards `origin` (secaudit2026oct22).
@@ -78,7 +79,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
 
     switch (checked.action) {
         case 'settings':
-            return client.patch(`/v1/apps/${file}`, pick(input, ['owner', 'name', 'description', 'descriptions', 'listing', 'parked', 'forkable', 'access_code', 'open_to', 'screenshot_public', 'protection']));
+            return client.patch(`/v1/apps/${file}`, pick(input, ['owner', 'name', 'description', 'descriptions', 'about', 'about_lang', 'listing', 'parked', 'forkable', 'access_code', 'open_to', 'screenshot_public', 'protection']));
         case 'seo':
             return client.patch(`/v1/apps/${file}`, { seo: pick(input, ['index', 'title', 'description', 'keywords', 'image', 'lang']) });
         case 'marks':

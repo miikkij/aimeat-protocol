@@ -5365,6 +5365,9 @@
     "label": "Julkaise oma sovelluksesi palvelussa {{site}}",
     "free": "Julkaise oma sovelluksesi ilmaiseksi"
   },
+  "appBody": {
+    "about": "Tietoa sovelluksesta"
+  },
   "aiUseBadge": {
     "title": "Käytä sovellusta omalla tekoälylläsi",
     "counts": "Sovelluksen työkaluja: {{tools}} · Taitoja: {{skills}}",
@@ -28517,6 +28520,16 @@
     "seo.saveFailed": "Tallennus ei mennyt läpi.",
     "seo.previewTitle": "Mitä ihmiset näkevät",
     "seo.noShot": "Kuvakaappausta ei ole. Ota se Toiminnot-kohdasta, niin siitä tulee jaetun linkin kuva.",
+    "seo.aboutTitle": "Tietoa sovelluksesta",
+    "seo.aboutIntro": "Pidempi teksti ihmisille: mitä sovellus tekee, kenelle se on ja miten sitä käytetään. Sovelluksen sivu näyttää tekstin kuvauksen alla, ja hakukoneet lukevat sen. Kirjoita 150–400 sanaa.",
+    "seo.aboutEdit": "Kirjoita teksti",
+    "seo.aboutHide": "Valmis",
+    "seo.fAbout": "Teksti (markdown)",
+    "seo.fAboutLang": "Tekstin kieli",
+    "seo.aboutWords": "{n} sanaa",
+    "seo.aboutSave": "Tallenna teksti",
+    "seo.aboutRemove": "Poista teksti",
+    "seo.aboutNoLang": "Valitse kieli, jolla teksti on kirjoitettu.",
     "monetize.fulfillCall": "Välitön kutsu",
     "monetize.fulfillTask": "Agenttitehtävä",
     "monetize.taskToOwner": "tehtävä sinulle",

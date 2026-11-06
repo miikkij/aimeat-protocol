@@ -35,9 +35,12 @@
  *     that was not public at its publish was not announced then (Jouni's ruling, plan doc-mvcn6c7e4e5q).
  *   2026-10-31 — `screenshot_public` (boolean): the owner shows the screenshot of an app that opens
  *     for fewer people to everyone; the answer carries it (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-06 — `about` (markdown, at most 8000 characters, empty removes it) and `about_lang` (the
+ *     language it is written in): the owner's longer text about the app, shown on the app page under
+ *     the description; the answer carries both (TARGET-093).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppProtection, AppRecord, AppListing } from '../storage/interface.js';
+import type { Storage, AppProtection, AppRecord, AppListing, AppAbout } from '../storage/interface.js';
 import { appListingOf } from '../storage/interface.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../utils/app-protect.js';
 import { recordAppAudit, type AppAuditAction } from './app-audit.js';
@@ -49,7 +52,13 @@ import { classifyContainerAfterWrite } from './classify-on-write.js';
 import { appTarget } from './classification/containers.js';
 
 /** How an app presents itself: a rung that stops at `presentation` may write these. */
-export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions'] as const;
+export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions', 'about', 'about_lang'] as const;
+
+/** The longest text about an app, in characters: room for the 150 to 400 words it is meant for, and more. */
+export const APP_ABOUT_MAX_CHARS = 8000;
+
+/** A BCP 47 language tag as the about text's language: `fi`, `en`, `pt-BR`. */
+const LANG_TAG = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/;
 
 /** How an app is offered: needs the `operate` rung on a delegated app. */
 export const SETTINGS_OFFERING_FIELDS = ['access_code', 'open_to', 'screenshot_public', 'listing', 'parked', 'forkable', 'protection'] as const;
@@ -87,6 +96,11 @@ export type AppSettingsInput = Partial<Record<AppSettingsField, unknown>>;
 /** A body that passed validation, with only the fields it carried. */
 export interface ParsedAppSettings {
     meta: { name?: string; description?: string; descriptions?: Record<string, string> };
+    /**
+     * Present when `about` or `about_lang` was in the body. `text` null takes the text off; a text
+     * with no `lang` keeps the language the app's text already has (checked on write).
+     */
+    about?: { text?: string | null; lang?: string };
     /** Present when `access_code` was in the body; `code` undefined clears it. */
     accessCode?: { code: string | undefined };
     /** Present when `access` was in the body: the value to store, null for anyone. */
@@ -104,6 +118,10 @@ export interface AppSettingsState {
     filename: string;
     name: string | undefined;
     description: string | undefined;
+    /** The owner's text about the app (markdown), shown on the app page; null when there is none. */
+    about: string | null;
+    /** The language the text about the app is written in; null when there is no text. */
+    about_lang: string | null;
     protected: boolean;
     /** Where the app is listed: listed, community (signed-in members only) or unlisted. */
     listing: AppListing;
@@ -166,6 +184,21 @@ export function parseOwnerSettingsInput(
             if (trimmed.length > 0) cleaned[loc] = trimmed;
         }
         settings.meta.descriptions = cleaned;
+    }
+    // The longer text about the app (TARGET-093): markdown for people, shown on the app page under
+    // the description. An empty string takes it off. `about_lang` names the language it is written
+    // in, because the page states that language to a search engine.
+    if ('about' in body) {
+        if (typeof body.about !== 'string') return bad('about must be a string (markdown); an empty string removes it');
+        const text = body.about.replace(/\r\n/g, '\n').trim();
+        if (text.length > APP_ABOUT_MAX_CHARS) return bad(`about must be at most ${APP_ABOUT_MAX_CHARS} characters`);
+        settings.about = { text: text.length > 0 ? text : null };
+    }
+    if ('about_lang' in body) {
+        if (typeof body.about_lang !== 'string' || !LANG_TAG.test(body.about_lang.trim())) {
+            return bad('about_lang must be the language tag of the about text, such as "fi" or "en"');
+        }
+        settings.about = { ...settings.about, lang: body.about_lang.trim() };
     }
     if ('access_code' in body) {
         const accessCode = body.access_code;
@@ -258,6 +291,23 @@ export async function applyOwnerSettingsUpdate(
     const accessRefusal = await appAccessMembershipRefusal(storage, ownerName, settings.access?.store ?? null);
     if (accessRefusal) return { refusal: accessRefusal };
 
+    // The text about the app, settled before the first write: a text needs a language, and a
+    // language alone needs a text to belong to. Undefined leaves it, null takes it off.
+    let aboutWrite: AppAbout | null | undefined;
+    if (settings.about) {
+        const current = before.manifest?.about;
+        const { text, lang } = settings.about;
+        if (text === null) {
+            aboutWrite = null;
+        } else {
+            const nextText = text ?? current?.text;
+            const nextLang = lang ?? current?.lang;
+            if (!nextText) return bad('about_lang needs a text about the app: send about with it');
+            if (!nextLang) return bad('about_lang is required with a new text about the app: the language it is written in, such as "fi" or "en"');
+            aboutWrite = { text: nextText, lang: nextLang };
+        }
+    }
+
     const notes: string[] = [];
     // Every change to how this app is offered lands in its audit log (services/app-audit.ts),
     // under the principal that made it: the agent's GAII when an agent did, so the owner can tell
@@ -283,6 +333,23 @@ export async function applyOwnerSettingsUpdate(
             notes.push('Name updated. The app link is unchanged.');
         } else {
             notes.push('Description updated.');
+        }
+    }
+
+    if (aboutWrite !== undefined) {
+        if (aboutWrite === null) {
+            await storage.updateAppMeta(ownerGaii, filename, { about: null });
+            await audit('about', { on: false });
+            notes.push('The text about the app was removed. The app page shows the name and the description.');
+        } else {
+            const { text: nextText, lang: nextLang } = aboutWrite;
+            await storage.updateAppMeta(ownerGaii, filename, { about: aboutWrite });
+            // The text is public on the app page, so it meets the detection rules as the description does.
+            classifyContainerAfterWrite({ storage, config }, appTarget(ownerGaii, filename),
+                String(metaUpdate.name ?? before.manifest?.name ?? filename),
+                [metaUpdate.description ?? before.manifest?.description ?? '', nextText].join('\n'));
+            await audit('about', { on: true, lang: nextLang });
+            notes.push(`The text about the app is set (${nextLang}). The app page shows it under the description.`);
         }
     }
 
@@ -363,6 +430,8 @@ export function appSettingsState(app: AppRecord | null | undefined, filename: st
         filename,
         name: app?.manifest?.name,
         description: app?.manifest?.description,
+        about: app?.manifest?.about?.text ?? null,
+        about_lang: app?.manifest?.about?.lang ?? null,
         protected: !!app?.accessCode,
         listing: appListingOf(app ?? {}),
         open_to: appAccessOf(app),

@@ -31,9 +31,16 @@
  * @usage
  *   parts.push(appPageBodySnippet({ name: 'Noste', description: 'Lift calculator for …', lang: 'fi' }));
  * @version-history
+ *   v1.1.0 — 2026-11-06 — The owner's text about the app (AppManifest.about) under the description, as
+ *     a section headed "About this app" in the text's language, its markdown rendered by
+ *     utils/page-body.ts. The block's `lang` is the about text's language, and absent without one: the
+ *     language an app declares was written there before, and lattice's English description was marked
+ *     Finnish (TARGET-093).
  *   v1.0.0 — 2026-11-06 — Initial (TARGET-089 V1).
  */
 import { escapeHtml } from './html-escape.js';
+import { renderMarkdownBody } from './page-body.js';
+import { createT, type Locale } from '../i18n.js';
 
 /** The attribute the block is recognised by, on serve (idempotency) and on publish (the strip). */
 export const APP_BODY_MARK = 'id="aimeat-app-body"';
@@ -44,9 +51,18 @@ export interface AppPageBodySpec {
   name: string;
   /** The app's description as its owner wrote it. An empty one writes no paragraph. */
   description: string;
-  /** The language the description is written in, when the app declares one. */
+  /**
+   * Kept for callers; no longer written as the block's `lang`. The language an app DECLARES is not
+   * the language its owner wrote the description in (lattice declared Finnish over an English
+   * description), and a wrong `lang` tells a search engine something false (TARGET-093).
+   */
   lang?: string;
+  /** The owner's longer text about the app: markdown and the language it is written in. */
+  about?: { text: string; lang: string };
 }
+
+/** The node's locales: the about heading is in the text's language when the node speaks it. */
+const LOCALES: readonly Locale[] = ['en', 'fi', 'es'];
 
 /**
  * The block. Its style sits inside it, so removing the block removes its style too, and every rule
@@ -54,15 +70,29 @@ export interface AppPageBodySpec {
  * is written, so an owner's name cannot open an element.
  */
 export function appPageBodySnippet(spec: AppPageBodySpec): string {
-  const lang = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/.test(spec.lang ?? '') ? ` lang="${spec.lang}"` : '';
   const description = spec.description.trim();
+  const aboutText = spec.about?.text.trim() ?? '';
+  const aboutLang = spec.about && LANG_TAG.test(spec.about.lang) ? spec.about.lang : '';
+  // The block's `lang` is the language of the owner's text about the app, the one place the owner
+  // says which language they wrote in. Without it the block states no language rather than a guess.
+  const lang = aboutText && aboutLang ? ` lang="${aboutLang}"` : '';
+  const base = aboutLang.split('-')[0] as Locale;
+  const heading = createT(LOCALES.includes(base) ? base : 'en')('appBody.about');
   return `<div ${APP_BODY_MARK}${lang}>`
     + '<style>#aimeat-app-body{display:block;box-sizing:border-box;max-width:44rem;margin:24px auto;'
     + 'padding:0 16px;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}'
     + '#aimeat-app-body h1{font-size:28px;line-height:1.2;margin:0 0 8px}'
-    + '#aimeat-app-body p{margin:0}</style>'
+    + '#aimeat-app-body h2,#aimeat-app-body h3{font-size:20px;line-height:1.3;margin:20px 0 8px}'
+    + '#aimeat-app-body p,#aimeat-app-body ul,#aimeat-app-body ol{margin:0 0 12px}</style>'
     + `<h1>${escapeHtml(spec.name.trim())}</h1>`
     + (description ? `<p>${escapeHtml(description)}</p>` : '')
+    // The markdown renderer escapes every character before it writes a tag, emits a fixed tag set
+    // (headings from h2 down, paragraphs, lists, quotes, code, bold, links on http, https, mailto or
+    // a path) and never a <div>, so the strip on publish still ends the block at its first </div>.
+    + (aboutText ? `<section><h2>${escapeHtml(heading)}</h2>${renderMarkdownBody(aboutText)}</section>` : '')
     + '<script src="/js/app-body.js" defer></script>'
     + '</div>';
 }
+
+/** A BCP 47 tag such as `fi`, `en` or `pt-BR`; anything else is not written into the page. */
+const LANG_TAG = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/;

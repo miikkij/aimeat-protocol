@@ -37962,6 +37962,18 @@ paths:
                               blocked: { type: integer }
                               hidden: { type: integer }
                               gated: { type: integer }
+                              own_words_min: { type: integer, description: The working floor of an app page's own words (150) }
+                              thin_text:
+                                type: array
+                                description: Search-visible apps whose page carries fewer than own_words_min words of their own text (name, description and the text about the app), fewest first.
+                                items:
+                                  type: object
+                                  properties:
+                                    owner: { type: string }
+                                    filename: { type: string }
+                                    name: { type: string }
+                                    words: { type: integer }
+                                    has_about: { type: boolean }
                               without_description:
                                 type: array
                                 description: Search-visible apps with no description of their own. They stay indexable at their address and are left out of the sitemaps and of IndexNow notices until the owner writes one.
@@ -38241,6 +38253,18 @@ paths:
                 description:
                   type: string
                   description: 1-2000 chars; new description (cannot be empty)
+                about:
+                  type: string
+                  maxLength: 8000
+                  description: >-
+                    A longer text about the app for people, in markdown (150 to 400 words is the
+                    intent): what it does, for whom and how it is used. The app page shows it under the
+                    description in the block the server writes, headed "About this app" in the text's
+                    language, rendered with every character escaped. A new text needs `about_lang`. An
+                    empty string removes it. The answer carries `about` and `about_lang`.
+                about_lang:
+                  type: string
+                  description: The language the about text is written in, a BCP 47 tag such as `fi` or `en`; the page states it to search engines.
                 access_code:
                   type: string
                   nullable: true
@@ -38384,6 +38408,8 @@ paths:
                           filename: { type: string }
                           name: { type: string }
                           description: { type: string }
+                          about: { type: string, nullable: true, description: The owner's text about the app (markdown); null when there is none }
+                          about_lang: { type: string, nullable: true, description: The language the about text is written in; null when there is none }
                           protected: { type: boolean }
                           listing: { type: string, enum: [listed, community, unlisted] }
                           screenshot_public: { type: boolean, description: True when the owner shows the screenshot to everyone }

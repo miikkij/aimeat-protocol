@@ -36,6 +36,8 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.4.0 — 2026-11-06 — appOwnWords() and APP_OWN_WORDS_MIN: the words of the app's own text the
+ *     server writes into its page, for the SEO status's list of thin pages (TARGET-093).
  *   v1.3.0 — 2026-11-06 — appOwnDescription() and appSeoListable(): an app with no description of its
  *     own is left out of the sitemaps and the IndexNow notices, and stays indexable at its address
  *     (TARGET-089 Y2).
@@ -117,6 +119,22 @@ export function appOwnDescription(app: AppSummaryRecord): string {
   const m = app.manifest;
   return m?.seo?.description?.trim() || m?.description?.trim()
     || Object.values(m?.descriptions ?? {}).map((d) => (typeof d === 'string' ? d.trim() : '')).find(Boolean) || '';
+}
+
+/** The working floor for an app page's own text (TARGET-093); no search engine publishes one. */
+export const APP_OWN_WORDS_MIN = 150;
+
+/**
+ * How many words of the app's own text its page carries for a reader without JavaScript: the name,
+ * the description and the text about the app, as the server writes them (utils/app-page-body.ts).
+ * Markdown punctuation is not a word. Words the app's own HTML draws are not counted here: the node
+ * would have to parse every app to know them, and a single-file app draws its words with script.
+ */
+export function appOwnWords(app: AppSummaryRecord): number {
+  // A markdown link's address is not shown on the page, so it is not a word of it; its label is.
+  const about = (app.manifest?.about?.text ?? '').replace(/\]\([^)\s]*\)/g, ']');
+  const text = [app.manifest?.name ?? '', appOwnDescription(app), about].join(' ');
+  return (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’.-]*/gu) ?? []).length;
 }
 
 /**

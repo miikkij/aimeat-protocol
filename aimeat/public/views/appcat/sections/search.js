@@ -17,6 +17,9 @@
  * @structure meta · SearchSection({ d })
  * @usage const mod = await import('./sections/search.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.2.0 — 2026-11-06 — "About this app": the owner writes the longer text about the app (markdown)
+ *     and names its language; the app page shows it under the description while the app is in search
+ *     engines (PATCH { about, about_lang }, TARGET-093).
  *   v1.1.0 — 2026-09-27 — Parity with the old page (sections-c): the state line on the old grey for
  *     every state (the old page defined no tinted grounds), the door rows 10px apart, the wording
  *     editor as label.dtl-stat-label over .modal-input, the heading as its h4 and the preview as
@@ -30,6 +33,7 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Fields } from '/components/Field.js';
+import { Choice } from '/components/Choice.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { SearchCard } from '/components/SearchPreview.js';
 import { x } from '/views/appcat/i18n.js';
@@ -81,6 +85,62 @@ function Wording({ d, data, busy, onSave }) {
     <${Actions} chapter apart><${Loud} control disabled=${busy} onClick=${save}>${x('seo.save')}<//><//>`;
 }
 
+/** The languages offered for the text about the app: the node's three, plus the one it has now. */
+const ABOUT_LANGS = ['fi', 'en', 'es'];
+
+/** How many words a text has, as the page counts them for the owner. */
+function wordCount(text) {
+  return (String(text || '').match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
+}
+
+/**
+ * The owner's longer text about the app (TARGET-093): markdown, shown on the app page under the
+ * description, in the block a reader without JavaScript gets. Saved with PATCH { about, about_lang };
+ * an empty text is removed.
+ */
+function About({ d, busy, setBusy }) {
+  const app = d.app || {};
+  const stored = (app.manifest && app.manifest.about) || null;
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(stored ? stored.text : '');
+  const [lang, setLang] = useState(stored ? stored.lang : '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the fields start over only for another app
+  useEffect(() => { setText(stored ? stored.text : ''); setLang(stored ? stored.lang : ''); setOpen(false); }, [d.ref]);
+  const langs = ABOUT_LANGS.includes(lang) || !lang ? ABOUT_LANGS : [...ABOUT_LANGS, lang];
+
+  const save = async (body) => {
+    if (busy) return;
+    if (body.about && !body.about_lang) { d.notice(x('seo.aboutNoLang'), 'info'); return; }
+    setBusy(true);
+    try {
+      const answer = await patchApp(d.filename, body);
+      const said = answer.note || x('seo.saved');
+      d.notice(said, noticeKind(said));
+      if (!body.about) { setText(''); setLang(''); }
+      d.reload?.();
+    } catch (err) {
+      const said = errorText(err, x('seo.saveFailed'));
+      d.notice(said, noticeKind(said));
+    }
+    setBusy(false);
+  };
+
+  return html`
+    <${SubHeading} level=${4} part>${x('seo.aboutTitle')}<//>
+    <${Note} kind="hint" chapter>${x('seo.aboutIntro')}<//>
+    <${Actions} chapter apart><${Action} small expanded=${open} onClick=${() => setOpen(!open)}>${x(open ? 'seo.aboutHide' : 'seo.aboutEdit')}<//><//>
+    ${open ? html`
+      <${Fields} plain chapter>
+        <${Choice} label=${x('seo.fAboutLang')} value=${lang} onChange=${setLang} options=${langs.map((l) => [l, l])} />
+        <${TextArea} label=${x('seo.fAbout')} value=${text} onInput=${setText} rows=${12} maxLength=${8000} />
+      <//>
+      <${Note} kind="quiet" chapter>${x('seo.aboutWords', { n: wordCount(text) })}<//>
+      <${Actions} chapter apart>
+        <${Loud} control disabled=${busy || !text.trim()} onClick=${() => save({ about: text.trim(), about_lang: lang })}>${x('seo.aboutSave')}<//>
+        ${stored ? html`<${Action} small disabled=${busy} onClick=${() => save({ about: '' })}>${x('seo.aboutRemove')}<//>` : null}
+      <//>` : null}`;
+}
+
 export default function SearchSection({ d }) {
   const [data, setData] = useState(() => (d.app ? fromRow(d.app) : null));
   const [busy, setBusy] = useState(false);
@@ -127,5 +187,6 @@ export default function SearchSection({ d }) {
         <${Actions} chapter apart><${Action} small expanded=${editor} onClick=${() => setEditor(!editor)}>${x(editor ? 'seo.hideWording' : 'seo.editWording')}<//><//>
         ${editor ? html`<${Wording} d=${d} data=${data} busy=${busy} onSave=${write} />` : null}
         <${SubHeading} level=${4} part>${x('seo.previewTitle')}<//>
-        <${SearchCard} image=${data.shot || undefined} noImage=${x('seo.noShot')} title=${title} desc=${sentence} />` : null}`}`;
+        <${SearchCard} image=${data.shot || undefined} noImage=${x('seo.noShot')} title=${title} desc=${sentence} />
+        <${About} d=${d} busy=${busy} setBusy=${setBusy} />` : null}`}`;
 }

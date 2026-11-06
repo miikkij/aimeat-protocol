@@ -4310,6 +4310,9 @@
     "label": "Publica tu propia aplicación en {{site}}",
     "free": "Publica tu propia aplicación gratis"
   },
+  "appBody": {
+    "about": "Acerca de esta aplicación"
+  },
   "aiUseBadge": {
     "title": "Usa esta aplicación con tu IA",
     "counts": "Herramientas de la aplicación: {{tools}} · Habilidades: {{skills}}",
@@ -26157,6 +26160,16 @@
     "seo.saveFailed": "No se guardó.",
     "seo.previewTitle": "Lo que verá la gente",
     "seo.noShot": "Todavía no hay captura de pantalla: toma una desde Acciones y será la imagen de un enlace compartido.",
+    "seo.aboutTitle": "Acerca de esta aplicación",
+    "seo.aboutIntro": "Un texto más largo para las personas: qué hace la aplicación, para quién es y cómo se usa. La página de la aplicación lo muestra bajo la descripción, y los buscadores también lo leen. Escribe de 150 a 400 palabras.",
+    "seo.aboutEdit": "Escribir el texto",
+    "seo.aboutHide": "Listo",
+    "seo.fAbout": "Texto (markdown)",
+    "seo.fAboutLang": "Idioma del texto",
+    "seo.aboutWords": "{n} palabras",
+    "seo.aboutSave": "Guardar texto",
+    "seo.aboutRemove": "Quitar texto",
+    "seo.aboutNoLang": "Elige el idioma en que está escrito el texto.",
     "monetize.fulfillCall": "Llamada al momento",
     "monetize.fulfillTask": "Tarea de agente",
     "monetize.taskToOwner": "tarea para ti",

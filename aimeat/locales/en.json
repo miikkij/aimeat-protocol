@@ -5257,6 +5257,9 @@
     "label": "Publish your own app on {{site}}",
     "free": "Publish your own app for free"
   },
+  "appBody": {
+    "about": "About this app"
+  },
   "aiUseBadge": {
     "title": "Use this app with your AI",
     "counts": "App tools: {{tools}} · Skills: {{skills}}",
@@ -27795,6 +27798,16 @@
     "seo.saveFailed": "That did not save.",
     "seo.previewTitle": "What people will see",
     "seo.noShot": "No screenshot yet — take one from Actions and it becomes the picture on a shared link.",
+    "seo.aboutTitle": "About this app",
+    "seo.aboutIntro": "A longer text for people: what the app does, who it is for and how it is used. The app page shows it under the description, and search engines read it too. Write 150 to 400 words.",
+    "seo.aboutEdit": "Write the text",
+    "seo.aboutHide": "Done",
+    "seo.fAbout": "Text (markdown)",
+    "seo.fAboutLang": "Language of the text",
+    "seo.aboutWords": "{n} words",
+    "seo.aboutSave": "Save text",
+    "seo.aboutRemove": "Remove text",
+    "seo.aboutNoLang": "Choose the language the text is written in.",
     "monetize.fulfillCall": "Instant call",
     "monetize.fulfillTask": "Agent task",
     "monetize.taskToOwner": "task to you",

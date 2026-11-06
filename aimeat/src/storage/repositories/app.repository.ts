@@ -48,6 +48,7 @@
  *     (null anyone, 'signed-in', 'organism:<id>'). Migration 0104.
  *   2026-10-31 — updateAppMeta takes `screenshotPublic` (true sets it, false or null takes it off):
  *     the owner shows the screenshot of an access-limited app to everyone (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-11-06 — updateAppMeta takes `about`, the owner's text about the app (TARGET-093).
  *   2026-11-04 — Add listAppVersionSummaries(): the version list without the content (codebase
  *     analysis 2026-11-03, item A1).
  *   2026-11-04 — Add findOperatorHiddenApps(): which of the named apps the operator hid, for the public
@@ -179,6 +180,8 @@ export interface AppRepository {
              * true sets it; false or null takes it off (the screenshot follows who may open the app).
              */
             screenshotPublic?: boolean | null;
+            /** The owner's text about the app: replaced whole, null takes it off (TARGET-093). */
+            about?: import('../interface.js').AppAbout | null;
         },
     ): Promise<boolean>;
     /**

@@ -21,6 +21,9 @@
  *       API no longer lets anyone make one.
  *   TARGET-091: /index.html on the apex answers 301 to `/`.
  * @version-history
+ *   v1.2.0 — 2026-11-06 — TARGET-093: the text about the app, set with aimeat_app_manage settings and
+ *     PATCH, on the page under the description in its language, in and out of the SEO status's thin
+ *     list, removed with an empty string, and refused to a second owner.
  *   v1.1.0 — 2026-11-06 — TARGET-092: the agent block's shape (one statement, at most 30 words, four
  *     links, no heading), the two head links, and the four linked addresses answering 200.
  *   v1.0.0 — 2026-11-06 — Initial (TARGET-090, TARGET-089, TARGET-091).
@@ -36,6 +39,7 @@ import { join, resolve } from 'node:path';
 import { hostRequest, type HostResponse } from './helpers/host-request.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const PORT = process.env.E2E_SEARCH_VISIBILITY_PORT ?? '28531';
 const BASE = `http://localhost:${PORT}`;
@@ -179,6 +183,66 @@ async function main() {
                 const res = await fetch(`${BASE}/v1/apps/${owner}/${FINDABLE.filename}/${tail}`);
                 assert(res.status === 200, `${tail}: ${res.status}`);
             }
+        });
+
+        // TARGET-093: the owner's text about the app.
+        const ABOUT = Array.from({ length: 16 }, (_, i) =>
+            `Paragraph ${i + 1} says what the paper plane lab measures and how a thrower uses it.`).join('\n\n');
+
+        await test('the SEO status lists the app as thin while it has no text about it', async () => {
+            const r = await json('/v1/admin/seo/status', token);
+            const thin = (r.body.data ?? r.body).apps.thin_text as Array<{ filename: string; words: number; has_about: boolean }>;
+            const row = thin.find((a) => a.filename === FINDABLE.filename);
+            assert(!!row && row.words < 150 && row.has_about === false, `thin_text ${JSON.stringify(thin)}`);
+        });
+
+        await test('an agent sets the text about the app with aimeat_app_manage settings', async () => {
+            const agent = await makeAgent(BASE, { name: owner, token }, ['app:write', 'app:read']);
+            const s = await openSession(BASE, agent.token);
+            const r = await callTool(s, 'aimeat_app_manage', { action: 'settings', filename: FINDABLE.filename, about: ABOUT, about_lang: 'en' });
+            assert(!r.isError, `the tool refused: ${r.text.slice(0, 300)}`);
+            assert(r.text.includes('"about_lang":"en"') || r.text.includes('about_lang'), `the answer does not carry the text: ${r.text.slice(0, 300)}`);
+        });
+
+        await test('the page shows the text under the description, headed in its language, and states that language', async () => {
+            const r = await on('app', '/', FINDABLE.sub);
+            const at = r.body.indexOf('<div id="aimeat-app-body"');
+            const block = r.body.slice(at, r.body.indexOf('</div>', at));
+            assert(block.startsWith('<div id="aimeat-app-body" lang="en">'), `lang: ${block.slice(0, 60)}`);
+            assert(block.indexOf(`<p>${FINDABLE.description}</p>`) < block.indexOf('<section><h2>About this app</h2>'), 'the section is not under the description');
+            assert(block.includes('<p>Paragraph 16 says what the paper plane lab measures and how a thrower uses it.</p>'), 'the text is not on the page');
+        });
+
+        await test('the owner changes the language over REST, and the heading follows it', async () => {
+            const r = await json(`/v1/apps/${FINDABLE.filename}`, token, 'PATCH', { about_lang: 'fi' });
+            assert(r.status === 200 && r.body.data?.about_lang === 'fi', `PATCH: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+            const page = await on('app', '/', FINDABLE.sub);
+            assert(page.body.includes('<div id="aimeat-app-body" lang="fi">') && page.body.includes('<h2>Tietoa sovelluksesta</h2>'), 'heading or lang did not follow');
+            const bad = await json(`/v1/apps/${FINDABLE.filename}`, token, 'PATCH', { about: 'A new text with no language given at all.', about_lang: 'not a tag' });
+            assert(bad.status === 400, `a malformed language got ${bad.status}`);
+        });
+
+        await test('the SEO status no longer lists the app once its text is set', async () => {
+            const r = await json('/v1/admin/seo/status', token);
+            const thin = (r.body.data ?? r.body).apps.thin_text as Array<{ filename: string }>;
+            assert(!thin.some((a) => a.filename === FINDABLE.filename), `still thin: ${JSON.stringify(thin)}`);
+        });
+
+        await test('a second owner cannot set the text of the first owner\'s app', async () => {
+            const other = (await registerOwner(BASE, `${owner}c`)).token;
+            const r = await json(`/v1/apps/${FINDABLE.filename}`, other, 'PATCH', { about: 'Not yours.', about_lang: 'en' });
+            assert(r.status === 404 || r.status === 403, `a second owner's PATCH got ${r.status}`);
+            const page = await on('app', '/', FINDABLE.sub);
+            assert(!page.body.includes('Not yours.'), 'the second owner\'s text reached the page');
+        });
+
+        await test('an empty text removes the section, and the block states no language', async () => {
+            const r = await json(`/v1/apps/${FINDABLE.filename}`, token, 'PATCH', { about: '' });
+            assert(r.status === 200 && r.body.data?.about === null, `PATCH: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+            const page = await on('app', '/', FINDABLE.sub);
+            assert(page.body.includes('<div id="aimeat-app-body">') && !page.body.includes('<section><h2>'), 'the section is still there');
+            // Put it back for the later tests that read the page.
+            await json(`/v1/apps/${FINDABLE.filename}`, token, 'PATCH', { about: ABOUT, about_lang: 'en' });
         });
 
         await test('an app nobody may find gets no block: its bytes stay as they were', async () => {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-06 — AppManifest.about (AppAbout): the owner's longer text about the app, shown on the app
+ *     page (TARGET-093). In the manifest JSON, so no column on either backend.
  *   2026-11-04 — AppVersionSummary: one version as the version list shows it, without the content
  *     (codebase analysis 2026-11-03, item A1). No column on either backend.
  *   2026-10-31 — AppManifest gains `screenshotPublic`: the owner shows the screenshot of an app that
@@ -176,6 +178,14 @@ export function mergeLegal(
   return Object.keys(next).length ? next : undefined;
 }
 
+/** The owner's longer text about an app (AppManifest.about). */
+export interface AppAbout {
+  /** Markdown, at most APP_ABOUT_MAX_CHARS characters, rendered with every character escaped. */
+  text: string;
+  /** The language the text is written in, a BCP 47 tag such as `fi` or `en`. */
+  lang: string;
+}
+
 export interface AppManifest {
   /** Summary of the roadmap committed with this app version. */
   roadmap?: { at: string; version: number; done: number; wanted: number };
@@ -194,6 +204,13 @@ export interface AppManifest {
    * every publish. No effect on an app anyone may open.
    */
   screenshotPublic?: boolean;
+  /**
+   * The owner's longer text about the app, for people: what it does, for whom and how it is used
+   * (markdown, written in `lang`). The app page opens with it under the name and the description, in
+   * the server-written block a reader without JavaScript gets (utils/app-page-body.ts, TARGET-093).
+   * Set through the app's settings (`about`, `about_lang`), copied forward by every publish.
+   */
+  about?: AppAbout;
   /**
    * Who published this version: the principal of the publish (a GHII, a GAII or an `eco:` app).
    * Public provenance. Absent on versions published before 2026-10-25. The owner's own app asks the
