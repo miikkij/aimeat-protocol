@@ -535,7 +535,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [undici](https://undici.nodejs.org) | 7.30.2 | MIT |
 | [unicode-properties](https://github.com/devongovett/unicode-properties) | 1.4.1 | MIT |
 | [unicode-trie](https://github.com/devongovett/unicode-trie) | 2.0.0 | MIT |
-| [unpdf](https://github.com/unjs/unpdf#readme) | 1.9.1 | MIT |
+| [unpdf](https://github.com/unjs/unpdf#readme) | 2.1.0 | MIT |
 | [unpipe](https://github.com/stream-utils/unpipe#readme) | 1.0.0 | MIT |
 | [util-deprecate](https://github.com/TooTallNate/util-deprecate) | 1.0.2 | MIT |
 | [util](https://github.com/browserify/node-util) | 0.12.5 | MIT |
@@ -12291,7 +12291,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### unpdf 1.9.1
+### unpdf 2.1.0
 
 ```text
 MIT License

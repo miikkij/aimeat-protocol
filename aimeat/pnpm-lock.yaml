@@ -219,8 +219,8 @@ importers:
         specifier: ^7.30.1
         version: 7.30.2
       unpdf:
-        specifier: ^1.9.1
-        version: 1.9.1
+        specifier: ^2.1.0
+        version: 2.1.0
       uuid:
         specifier: ^14.0.3
         version: 14.0.3
@@ -3475,9 +3475,9 @@ packages:
   unicode-trie@2.0.0:
     resolution: {integrity: sha512-x7bc76x0bm4prf1VLg79uhAzKw8DVboClSN5VxJuQ+LKDOVEW9CdH+VY7SP+vX7xCYQqzzgQpFqz15zeLvAtZQ==}
 
-  unpdf@1.9.1:
-    resolution: {integrity: sha512-nO1npM2kNyd4hj1fKzUVU6bvnWjDSxI97eycM/DgzI83dYyW+pNRI9NeMQVEfef8fI3Q06i9lkMeE1HxrQqKoA==}
-    engines: {node: '>=22'}
+  unpdf@2.1.0:
+    resolution: {integrity: sha512-G/Hsrm++g0EoubUhV8TDFItq6oQ+FUu9EMvIRtHUwseKXB0iJoCvaLvBGOpYUBqyvggv/XfxhYYtohL2QpE3xQ==}
+    engines: {node: '>=24'}
     peerDependencies:
       '@napi-rs/canvas': ^0.1.69 || ^1.0.0
     peerDependenciesMeta:
@@ -6952,7 +6952,7 @@ snapshots:
       pako: 0.2.9
       tiny-inflate: 1.0.3
 
-  unpdf@1.9.1: {}
+  unpdf@2.1.0: {}
 
   unpipe@1.0.0: {}
 
