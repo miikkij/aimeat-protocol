@@ -34,6 +34,8 @@
  *   cd aimeat && pnpm check:verb-parity --list     # every path with two writing verbs, and its guards
  *   cd aimeat && pnpm check:verb-parity --seed     # write today's differences into the baseline
  * @version-history
+ *   v1.0.1 — 2026-11-06 — requireRestScope(a, { orScope: b }) and requireRestScope(b, { orScope: a })
+ *     read as one guard (eitherWord): both admit a holder of either word.
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B4).
  */
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync } from 'node:fs';
@@ -67,6 +69,17 @@ const NOT_A_GUARD = /^(validate\w*\(|rateLimit\(|\w*(Limit|Limiter)(\(|$)|expres
 
 /** Source text with the white space out and one kind of quote, so formatting never makes a difference. */
 const norm = (text: string): string => text.replace(/\s+/g, '').replace(/"/g, '\'');
+
+/**
+ * requireRestScope(a, { orScope: b }) admits a holder of either word, so it is the same guard as
+ * requireRestScope(b, { orScope: a }); the two words are written in sorted order. The order still
+ * decides which word the refusal and the deprecation count name (auth/rest-scope-gate.ts), so a route
+ * keeps its own word first.
+ */
+const eitherWord = (guard: string): string => guard.replace(
+  /^requireRestScope\('([^']+)',\{orScope:'([^']+)'\}\)$/,
+  (_m, a: string, b: string) => `requireRestScope(${[a, b].sort().map(w => `'${w}'`).join('|')})`,
+);
 
 /** A route path with its parameter names out: `/v1/x/:id?` reads `/v1/x/:?`. */
 export const pathKey = (p: string): string => p.replace(/:[A-Za-z_$][\w$]*/g, ':');
@@ -106,7 +119,7 @@ export function routesOf(file: string, source = readFileSync(file, 'utf-8')): Ro
   return calls.map((call) => {
     const args = call.arguments;
     const middle = args.slice(1, Math.max(1, args.length - 1));
-    const guards = [...new Set([...fileWide, ...middle.flatMap(expand)])].filter(g => !NOT_A_GUARD.test(g)).sort();
+    const guards = [...new Set([...fileWide, ...middle.flatMap(expand)].map(eitherWord))].filter(g => !NOT_A_GUARD.test(g)).sort();
     const { line } = sf.getLineAndCharacterOfPosition(call.getStart(sf));
     return { file: rel, line: line + 1, verb: (call.expression as ts.PropertyAccessExpression).name.text.toUpperCase(), path: literalText(args[0])!, guards };
   });

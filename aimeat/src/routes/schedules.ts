@@ -32,7 +32,8 @@
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
  *   2026-11-06 — PATCH and DELETE /v1/schedules/:id both take workflow:write or memory:write (decision
- *     13a of 2026-11-05, verb parity); PATCH asked only the first and DELETE only the second.
+ *     13a of 2026-11-05, verb parity); PATCH asked only the first and DELETE only the second. Each
+ *     keeps its own word first, which the refusal and the deprecation count name.
  *   2026-10-27 — PATCH answers `approval_request` when a sibling agent's new instruction waits for the
  *     owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
  *   2026-10-20 — The write caller says when it is an ecosystem app and carries its roles, so PATCH,
@@ -397,7 +398,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── DELETE /v1/schedules/:id — cancel ──
-  router.delete('/v1/schedules/:id', requireAuth(), requireRestScope('workflow:write', { orScope: 'memory:write' }), async (req, res) => {
+  router.delete('/v1/schedules/:id', requireAuth(), requireRestScope('memory:write', { orScope: 'workflow:write' }), async (req, res) => {
     const id = req.params.id as string;
     const out = await deleteScheduleRecord({ storage, config, scheduler }, writeCaller(req), id);
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }

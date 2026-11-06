@@ -62590,7 +62590,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      x-aimeat-scope: { word: 'workflow:write', enforcedIn: '4.0.0', orScope: 'memory:write' }
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0', orScope: 'workflow:write' }
       operationId: deleteSchedule
       summary: Cancel and remove a schedule (the owner may delete agent-created ones)
       tags: [Schedules]

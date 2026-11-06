@@ -19,6 +19,8 @@
  *   The version is mocked as test/unit/removals-4-0-0.test.ts mocks it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-gates.test.ts
  * @version-history
+ *   2026-11-06 — PATCH and DELETE /v1/schedules/:id each keep their word and name the other as orScope
+ *     (decision 13a of 2026-11-05, verb parity).
  *   v1.0.0 — 2026-10-12 — Initial (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -129,8 +131,8 @@ const GATED: Row[] = [
     { file: 'src/routes/organisms/workspace-access.ts', method: 'GET', path: '/v1/organisms/:id/workspace-access', word: 'organism:invite' },
     { file: 'src/routes/organisms/workspace-access.ts', method: 'GET', path: '/v1/organisms/:id/workspaces', word: 'organism:read' },
     { file: 'src/routes/organisms/workspace-access.ts', method: 'POST', path: '/v1/organisms/:id/workspace-access', word: 'organism:invite' },
-    { file: 'src/routes/schedules.ts', method: 'DELETE', path: '/v1/schedules/:id', word: 'memory:write' },
-    { file: 'src/routes/schedules.ts', method: 'PATCH', path: '/v1/schedules/:id', word: 'workflow:write' },
+    { file: 'src/routes/schedules.ts', method: 'DELETE', path: '/v1/schedules/:id', word: 'memory:write', orScope: 'workflow:write' },
+    { file: 'src/routes/schedules.ts', method: 'PATCH', path: '/v1/schedules/:id', word: 'workflow:write', orScope: 'memory:write' },
     { file: 'src/routes/schedules.ts', method: 'POST', path: '/v1/agents/:name/schedules', word: 'task:write' },
     { file: 'src/routes/schedules.ts', method: 'POST', path: '/v1/schedules', word: 'task:write' },
     { file: 'src/routes/schedules.ts', method: 'POST', path: '/v1/schedules/:id/trigger', word: 'task:write' },
