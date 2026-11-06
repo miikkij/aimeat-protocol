@@ -99,6 +99,7 @@ export function createAssetVersioner(root: string | undefined, opts: { frozen: b
   };
 }
 
+// process-local: each process hashes the files it serves; a second process computes the same tags from the same files.
 let shared: AssetVersioner | undefined;
 
 /**

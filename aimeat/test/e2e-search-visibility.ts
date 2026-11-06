@@ -190,6 +190,20 @@ async function main() {
             assert(data.sitemap.app_host_count === 1, `app_host_count ${data.sitemap.app_host_count}`);
         });
 
+        await test('the SEO status, which names other people\'s apps, is refused to a second owner and to nobody signed in', async () => {
+            const other = (await registerOwner(BASE, `${owner}b`)).token;
+            const second = await json('/v1/admin/seo/status', other);
+            assert(second.status === 403, `a second owner got ${second.status}`);
+            const anon = await fetch(`${BASE}/v1/admin/seo/status`);
+            assert(anon.status === 401, `nobody signed in got ${anon.status}`);
+            // Nor can the second owner switch search on for the first owner's app: the filename
+            // names an app in their own account, where there is none.
+            const steal = await json(`/v1/apps/${UNLISTED.filename}`, other, 'PATCH', { seo: { index: true } });
+            assert(steal.status === 404 || steal.status === 403, `a second owner's PATCH got ${steal.status}`);
+            const still = await on('app', '/', UNLISTED.sub);
+            assert(!still.body.includes('aimeat-app-body') && /noindex/i.test(still.header('x-robots-tag') ?? ''), 'the first owner\'s app became search-visible');
+        });
+
         console.log('\nTARGET-090: JavaScript and CSS say noindex, and their tag follows their content');
 
         const families: Array<[Family, string]> = [['apex', ''], ['app', FINDABLE.sub], ['bare-app', ''], ['portfolio', owner]];
