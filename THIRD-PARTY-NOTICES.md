@@ -293,7 +293,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [emoji-regex](https://mths.be/emoji-regex) | 8.0.0 | MIT |
 | [enabled](https://github.com/3rd-Eden/enabled#readme) | 2.0.0 | MIT |
 | [encodeurl](https://github.com/pillarjs/encodeurl#readme) | 2.0.1 | MIT |
-| [entities](https://github.com/fb55/entities#readme) | 8.1.0 | BSD-2-Clause |
+| [entities](https://github.com/fb55/entities#readme) | 9.0.0 | BSD-2-Clause |
 | [env-paths](https://github.com/sindresorhus/env-paths#readme) | 4.0.0 | MIT |
 | [es-define-property](https://github.com/ljharb/es-define-property#readme) | 1.0.1 | MIT |
 | [es-errors](https://github.com/ljharb/es-errors#readme) | 1.3.0 | MIT |
@@ -426,7 +426,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [p-locate](https://github.com/sindresorhus/p-locate#readme) | 4.1.0 | MIT |
 | [p-try](https://github.com/sindresorhus/p-try#readme) | 2.2.0 | MIT |
 | [pako](https://github.com/nodeca/pako) | 0.2.9 | MIT |
-| [parse5](https://parse5.js.org) | 8.0.1 | MIT |
+| [parse5](https://parse5.js.org) | 8.1.0 | MIT |
 | [parseurl](https://github.com/pillarjs/parseurl#readme) | 1.3.3 | MIT |
 | [path-exists](https://github.com/sindresorhus/path-exists#readme) | 4.0.0 | MIT |
 | [path-key](https://github.com/sindresorhus/path-key#readme) | 3.1.1 | MIT |
@@ -5663,7 +5663,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### entities 8.1.0
+### entities 9.0.0
 
 ```text
 Copyright (c) Felix Böhm
@@ -9915,7 +9915,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### parse5 8.0.1
+### parse5 8.1.0
 
 ```text
 Copyright (c) 2013-2019 Ivan Nikulin (ifaaan@gmail.com, https://github.com/inikulin)
