@@ -10,6 +10,9 @@
  *   so: the endpoint answers 202 and validates later. The test "groups by host" fails on that code.
  *
  * @version-history
+ *   v1.0.2 — 2026-11-06 — The fixture app carries a description, as a published app must; the plan
+ *     leaves out a search-visible app with none (TARGET-089 Y2). The two tests that went red here had
+ *     a setup that no longer matched production, where a publish refuses an empty description.
  *   v1.0.1 — 2026-11-01 — The fake storage answers the data package catalogue scan, which the "all"
  *     plan now reads for the public dataset pages (plan doc-mvwxcas3dom3, D1.4); E2E covers its content.
  *   v1.0.0 — 2026-09-11 — Initial.
@@ -53,7 +56,8 @@ const app = (over: Partial<AppSummaryRecord> = {}): AppSummaryRecord => ({
   ownerGaii: 'alice@node.example',
   ownerName: 'alice',
   filename: 'notes.html',
-  manifest: { name: 'Notes', seo: { index: true } },
+  // A description, as every app published since the publish began to require one has.
+  manifest: { name: 'Notes', description: 'A place for notes.', seo: { index: true } },
   ...over,
 } as AppSummaryRecord);
 
@@ -207,6 +211,8 @@ describe('planAnnouncement and announceEverything: what "everything" is', () => 
     app({ filename: 'secret.html', manifest: { name: 'Secret', seo: { index: false } } }),
     app({ filename: 'gated.html', accessCode: 'x', manifest: { name: 'Gated', seo: { index: true } } }),
     app({ filename: 'nosub.html' }),
+    // Search-visible but with no description of its own: indexable, never announced (TARGET-089 Y2).
+    app({ filename: 'bare.html', manifest: { name: 'Bare', description: '', seo: { index: true } } }),
   ];
   const sites = [{ enabled: true, kind: 'app', target: 'alice/turbo.html', subdomain: 'turbo' }];
 
@@ -226,7 +232,7 @@ describe('planAnnouncement and announceEverything: what "everything" is', () => 
     expect(plan.urls).toContain('https://turbo.apps.node.example/');
     expect(plan.urls).toContain('https://node.example/v1/apps/alice/turbo.html');
     expect(plan.urls).toContain('https://node.example/v1/apps/alice/nosub.html');
-    expect(plan.urls.some((u) => u.includes('secret') || u.includes('gated'))).toBe(false);
+    expect(plan.urls.some((u) => u.includes('secret') || u.includes('gated') || u.includes('bare'))).toBe(false);
     expect(plan.hosts.map((h) => h.host).sort()).toEqual(['https://node.example', 'https://turbo.apps.node.example']);
   });
 
