@@ -18,6 +18,9 @@
  * @structure CONTENT_CLASSES_SKILL_ENTRY
  * @usage import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
  * @version-history
+ *   v1.3.2 — 2026-11-06 — The fingerprint is made on request only, one item after the person's yes;
+ *     the skill no longer offers stages.profile as "the setting for everything that arrives", which is
+ *     how one owner's every agent-written text came to be fingerprinted on their key.
  *   v1.3.1 — 2026-11-03 — "Model steps: ask first": a refused permission carries the address where
  *     the person allows it; hand them that.
  *   v1.3.0 — 2026-11-03 — "A workspace document has one fingerprint, shared": who sees and makes it,
@@ -69,8 +72,8 @@ document) the node reads it and keeps its **facts**. One item, one set of facts:
    belongs to, from one decision with a yes-or-no question per class, so an item can be in several),
    \`extract\` (each class's properties as a JSON-LD entity typed \`cc:<class>\` and the class's
    schema.org type), \`propose\` (a new class when none fits, or new properties a class lacks),
-   \`profile\` (the fingerprint, below). Every one is **off by default** and spends the owner's AI
-   allowance.
+   \`profile\` (the fingerprint, below; made only on request, never on arrival). Every one is **off by
+   default** and spends the owner's AI allowance.
 
 "Content class" is the kind of thing an item is. It is not the node's sensitivity classification
 (who may read what), and not the MIME type.
@@ -152,10 +155,13 @@ question: a high share of ? is worth saying first ("most of it states things wit
 them"). \`with_profile: true\` adds each section's heading and one-sentence claim, for "which part is
 the weak one?".
 
-No profile yet: the profile step is off (ask before running it, as for every model step:
-\`aimeat_content_inspect { kind, key, stages: ["profile"] }\`, or the setting for everything that
-arrives, \`aimeat_content_settings { patch: { stages: { profile: true } } }\`; the Data Wallet page
-does not show this switch yet, so it is changed from chat). When the node's decision model is on, it
+No profile yet: make it on request, one item at a time, after the person said yes for that item:
+\`aimeat_content_inspect { kind, key, stages: ["profile"] }\`. A fingerprint is never made on arrival,
+and an inspect or a scan that names no stages makes none, whatever the settings say; a scan with
+\`stages: ["profile"]\` fingerprints every item it reaches, so narrow it with \`keys\` or
+\`memory_prefix\` and tell the person how many items that is before you start it. \`stages.profile\` in
+the settings only lets a workspace that turned \`autoProfile\` on fingerprint the documents this person
+publishes there. When the node's decision model is on, it
 marks the sections and the fingerprint model writes only the headings, claims and topics
 (\`profile.labels: "decide"\`, and the tag's last line names both); otherwise the fingerprint model
 does all of it. The fingerprint model is DeepSeek V4 Pro unless the operator chose another;

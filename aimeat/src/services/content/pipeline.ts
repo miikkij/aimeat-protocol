@@ -25,6 +25,9 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.5.0 — 2026-11-06 — The profile stage runs only when the caller names it (stagesToRun). With
+ *     stages.profile on, every text an owner's agents wrote was fingerprinted on arrival, on the
+ *     owner's key, when the owner had meant to try it on two records.
  *   v1.4.1 — 2026-11-03 — ContentError carries `details` for the error envelope.
  *   v1.4.0 — 2026-11-03 — A published workspace document's profile stage is not run here: its
  *     fingerprint is one and shared (shared-profile.ts).
@@ -98,9 +101,13 @@ export interface InspectResult {
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
-/** The stages to run: asked ones, or the settings'; model stages only when the settings or the ask turn them on. */
+/**
+ * The stages to run: asked ones, or the settings'; model stages only when the settings or the ask turn
+ * them on. The profile stage (the fingerprint) runs only when the caller names it: never on arrival,
+ * and never from the settings on an inspect or a scan that named no stages.
+ */
 export function stagesToRun(settings: ContentSettings, asked: StageName[] | undefined, automatic: boolean): StageName[] {
-  if (automatic || !asked) return (Object.keys(settings.stages) as StageName[]).filter((s) => settings.stages[s]);
+  if (automatic || !asked) return (Object.keys(settings.stages) as StageName[]).filter((s) => settings.stages[s] && s !== 'profile');
   return [...new Set(asked)];
 }
 

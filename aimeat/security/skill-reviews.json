@@ -32,7 +32,7 @@
       "digest": "sha256:255a43a31ee4bd4a603a5475"
     },
     "node:aimeat-content-classes": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-06",
       "watches": [
         "aimeat/src/services/content/pipeline.ts",
         "aimeat/src/services/content/ai-stages.ts",
@@ -42,7 +42,7 @@
         "aimeat/src/services/content/shared-profile.ts",
         "aimeat/src/services/content/shared-profile-settings.ts"
       ],
-      "digest": "sha256:2e8d5e6a124e4ef7b583ad67"
+      "digest": "sha256:2aeacaab9c4df95839a5f0e4"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -817,7 +817,7 @@
       "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
     },
     "node:aimeat-content-classes": {
-      "aimeat/src/services/content/pipeline.ts": "6bab427f8adb7188",
+      "aimeat/src/services/content/pipeline.ts": "c0e79c05c342d571",
       "aimeat/src/services/content/ai-stages.ts": "96d3366e8f153380",
       "aimeat/src/services/content/service.ts": "fa9119a4bc3a9a63",
       "aimeat/src/services/content/settings.ts": "75ca4524dd531ba0",

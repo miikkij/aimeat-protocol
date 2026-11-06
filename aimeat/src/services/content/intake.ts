@@ -22,7 +22,8 @@
  *   gone MEMORY_QUIET_MS without a new write (a note saved while it is typed is read once), and of a
  *   workspace document only its published `.latest`.
  *
- *   WHAT IS SKIPPED. The pipeline's own records (`contentclass.` keys, `contentclass-text/` files),
+ *   WHAT IS SKIPPED. The pipeline's own records (`contentclass.` keys, and every `contentclass-` file:
+ *   the kept text and a fingerprint's sections),
  *   the node's reserved and server-written keys, app icons and screenshots, the node's own and
  *   anonymous namespaces, and an extension's or ecosystem app's namespace.
  * @structure contentAfterStore · contentAfterRemove · installContentIntake · flushContentIntake ·
@@ -35,6 +36,9 @@
  *     its workspace or organism turned that on and the publisher's own settings run the profile step.
  *   v1.2.0 — 2026-11-04 — A memory write another process made is not read here: the process that
  *     wrote reads it, once (event-bus.ts origin rule; codebase analysis 2026-11-03, HA stage 2, e2-bus).
+ *   v1.3.0 — 2026-11-06 — A fingerprint's sections file (`contentclass-profile/`) is not read on
+ *     arrival. It was: each fingerprint stored one, the file arrived, was fingerprinted, and stored the
+ *     next, without end (4601 of one owner's 4654 fingerprints in three days).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -64,7 +68,10 @@ let worker: Promise<void> | null = null;
 let dropped = 0;
 let installed = false;
 
-const SKIP_FILE_PREFIXES = ['contentclass-text/', 'apps/icons/', 'apps/screenshots/', 'anonymous/'];
+/** `contentclass-` covers every file the pipeline stores itself: its kept text (`contentclass-text/`)
+ *  and a fingerprint's sections (`contentclass-profile/`). Reading one of them would make a new one. */
+const OWN_FILE_PREFIX = 'contentclass-';
+const SKIP_FILE_PREFIXES = [OWN_FILE_PREFIX, 'apps/icons/', 'apps/screenshots/', 'anonymous/'];
 
 /** The account an identity belongs to, when it is a local person or one of their agents; else null. */
 function ownerOf(identity: string, nodeId: string): string | null {
@@ -158,7 +165,7 @@ export function contentAfterStore(deps: Deps, ownerGaii: string, key: string): v
  * This is the lifecycle's first half; the scan's prune removes facts whose memory record is gone.
  */
 export function contentAfterRemove(deps: Deps, ownerGaii: string, key: string): void {
-  if (key.startsWith('contentclass-text/')) return;
+  if (key.startsWith(OWN_FILE_PREFIX)) return;
   const ownerGhii = ownerOf(ownerGaii, deps.config.nodeId);
   if (!ownerGhii) return;
   const sourceId = sourceIdOf({ kind: 'file', owner: ownerGaii, key });

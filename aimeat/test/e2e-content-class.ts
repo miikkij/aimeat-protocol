@@ -37,6 +37,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-content-class.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-content-class.ts
  * @version-history
+ *   2026-11-06 — Test 12b: the fingerprint is made only on request; with the profile step on, an
+ *     arriving text and an inspect on the settings make none. Test 12: the sections file is never read
+ *     on arrival (each reading had stored the next file, without end).
  *   2026-11-03 — Tests 4 and 9: an agent refused a permission by the content service gets the address
  *     where its person allows it, on REST (`details.allow_url` and a next action) and over MCP.
  *   2026-11-03 — Test 13: a workspace document's shared fingerprint: one for every reader, read with
@@ -575,6 +578,11 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(JSON.stringify(p.sections.map((x: any) => x[3])) === '["+","~","?"]', `marks ${JSON.stringify(p.sections)}`);
     assert(p.topics.length === 2 && Math.abs(p.topics.reduce((a: number, t: any) => a + t.share, 0) - 1) < 0.01, `topics ${JSON.stringify(p.topics)}`);
     assert(typeof p.detailKey === 'string' && p.detailKey.startsWith('contentclass-profile/'), `detailKey ${p.detailKey}`);
+    // The sections file is the pipeline's own output: it is never read on arrival. It was, and each
+    // reading stored the next file, without end (2026-11-06).
+    await sleep(800);
+    const ownFile = await json(factsPath(p.detailKey), { headers: auth(D.token) });
+    assert(ownFile.status === 404, `the sections file was read on arrival ${ownFile.status}`);
     // The owner chose no fingerprint model: the node's default (content_class.profile_model) is asked.
     const asked = mail.seen.chat.filter((c: any) => JSON.stringify(c).includes('You write the headings, one-sentence claims and topics')).pop() as any;
     assert(JSON.stringify(asked ?? {}).includes('~deepseek/deepseek-pro-latest'), `the profile asked ${JSON.stringify(asked)?.slice(0, 200)}`);
@@ -608,6 +616,32 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(!viaMcp?.result?.isError && body.fingerprint?.lines?.length === 5 && body.profile_sections?.length === 3, `facts over MCP ${toolText(viaMcp).slice(0, 300)}`);
     const listing = await mcpCall(agent, 'aimeat_content_facts', { with_profile: true });
     assert(listing?.result?.isError === true && toolText(listing).includes('with_profile'), `with_profile on a listing ${toolText(listing).slice(0, 200)}`);
+  });
+
+  await test('12b. the fingerprint is made only on request: with the profile step on, an arriving text and an inspect on the settings make none', async () => {
+    const E = await setupOwner('e');
+    const on = await json('/v1/content/settings', { method: 'PUT', headers: auth(E.token),
+      body: JSON.stringify({ onArrival: true, minTextChars: 200, sources: { files: true, memory: true, workspace: true }, stages: { profile: true } }) });
+    assert(on.status === 200 && on.body.data.settings.stages.profile === true, `settings ${on.status} ${JSON.stringify(on.body?.error)}`);
+    const asksBefore = mail.seen.chat.filter((c: any) => JSON.stringify(c).includes('You write the headings, one-sentence claims and topics')).length;
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(E.token), body: JSON.stringify({ key: 'notes.arrived.heat', value: fingerprintDoc(), visibility: 'private' }) });
+    assert(w.status === 201, `memory ${w.status}`);
+    // The record is read once it has gone ten seconds without a new write (intake.ts MEMORY_QUIET_MS).
+    let f: any = null;
+    for (let i = 0; i < 60 && !f; i++) {
+      await sleep(500);
+      const r = await json(factsPath('notes.arrived.heat', 'memory'), { headers: auth(E.token) });
+      if (r.status === 200) f = r.body.data.facts;
+    }
+    assert(!!f, 'the arrived record was not read');
+    assert(!f.profile && !f.stages.profile, `a fingerprint was made on arrival ${JSON.stringify(f.stages)}`);
+    const plain = await json('/v1/content/inspect', { method: 'POST', headers: auth(E.token), body: JSON.stringify({ source: { kind: 'memory', key: 'notes.arrived.heat' } }) });
+    assert(plain.status === 200 && !plain.body.data.ran.includes('profile') && !plain.body.data.facts.profile, `inspect on the settings ${JSON.stringify(plain.body?.data?.ran ?? plain.body?.error)}`);
+    const asksAfter = mail.seen.chat.filter((c: any) => JSON.stringify(c).includes('You write the headings, one-sentence claims and topics')).length;
+    assert(asksAfter === asksBefore, `the fingerprint model was asked ${asksAfter - asksBefore} times`);
+    // Named, it is made.
+    const asked = await json('/v1/content/inspect', { method: 'POST', headers: auth(E.token), body: JSON.stringify({ source: { kind: 'memory', key: 'notes.arrived.heat' }, stages: ['profile'] }) });
+    assert(asked.status === 200 && asked.body.data.ran.includes('profile') && asked.body.data.facts.profile, `on request ${JSON.stringify(asked.body?.data?.skipped ?? asked.body?.error)}`);
   });
 
   await test('13. a workspace document has one shared fingerprint: every reader sees the same one, a new version makes it stale, only an editor makes it again or corrects it', async () => {
