@@ -107,7 +107,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 461 npm packages that travel inside the `aimeat` package. Build and test
+The 465 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -163,18 +163,22 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@peculiar/asn1-android](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/android#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-asym-key](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/asym-key#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-cms](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/cms#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-cms](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/cms#readme) | 3.0.0 | MIT |
 | [@peculiar/asn1-csr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/csr#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-ecc](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ecc#readme) | 2.11.0 | MIT |
-| [@peculiar/asn1-ocsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ocsp#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-ocsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ocsp#readme) | 3.0.0 | MIT |
 | [@peculiar/asn1-pfx](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pfx#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-pkcs8](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs8#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-pkcs9](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs9#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-rsa](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/rsa#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-schema](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/schema#readme) | 2.11.0 | MIT |
-| [@peculiar/asn1-tsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/tsp#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-schema](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/schema#readme) | 3.0.0 | MIT |
+| [@peculiar/asn1-tsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/tsp#readme) | 3.0.0 | MIT |
 | [@peculiar/asn1-x509-attr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-attr#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-x509-attr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-attr#readme) | 3.0.0 | MIT |
 | [@peculiar/asn1-x509-post-quantum](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-post-quantum#readme) | 2.11.0 | MIT |
 | [@peculiar/asn1-x509](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-x509](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509#readme) | 3.0.0 | MIT |
 | [@peculiar/utils](https://github.com/PeculiarVentures/pvtsutils#readme) | 2.0.3 | MIT |
 | [@peculiar/utils](https://github.com/PeculiarVentures/pvtsutils#readme) | 4.1.0 | MIT |
 | [@peculiar/x509](https://github.com/PeculiarVentures/x509#readme) | 2.2.0 | MIT |
@@ -1784,7 +1788,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/asn1-cms 2.11.0, @peculiar/asn1-csr 2.11.0, @peculiar/asn1-ecc 2.11.0, @peculiar/asn1-ocsp 2.11.0, @peculiar/asn1-pfx 2.11.0, @peculiar/asn1-pkcs8 2.11.0, @peculiar/asn1-rsa 2.11.0, @peculiar/asn1-schema 2.11.0, @peculiar/asn1-x509-attr 2.11.0, @peculiar/asn1-x509 2.11.0
+### @peculiar/asn1-cms 2.11.0, @peculiar/asn1-cms 3.0.0, @peculiar/asn1-csr 2.11.0, @peculiar/asn1-ecc 2.11.0, @peculiar/asn1-ocsp 3.0.0, @peculiar/asn1-pfx 2.11.0, @peculiar/asn1-pkcs8 2.11.0, @peculiar/asn1-rsa 2.11.0, @peculiar/asn1-schema 2.11.0, @peculiar/asn1-schema 3.0.0, @peculiar/asn1-x509-attr 2.11.0, @peculiar/asn1-x509-attr 3.0.0, @peculiar/asn1-x509 2.11.0, @peculiar/asn1-x509 3.0.0
 
 ```text
 MIT License
@@ -1810,7 +1814,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/asn1-tsp 2.11.0
+### @peculiar/asn1-tsp 3.0.0
 
 ```text
 MIT License
