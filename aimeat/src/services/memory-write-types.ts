@@ -117,7 +117,8 @@ export interface MemoryWriteWarning {
     // PUBLISH_NOT_ASKED: stored at the level it had, and the request to make it public could not be
     // filed (too many already wait for the owner). PUBLIC_IS_SIGNED_IN_HERE: asked public on a node
     // that shows its content to signed-in accounts only, stored at 'members' (closed-node-level.ts).
-    code: 'SHADOWED_BY_OWNER_COPY' | 'PUBLISH_NOT_ASKED' | 'PUBLIC_IS_SIGNED_IN_HERE';
+    // GROUP_NOT_NAMED: a row an older node stored at 'group' with no group, rewritten without naming one.
+    code: 'SHADOWED_BY_OWNER_COPY' | 'PUBLISH_NOT_ASKED' | 'PUBLIC_IS_SIGNED_IN_HERE' | 'GROUP_NOT_NAMED';
     message: string;
     [detail: string]: unknown;
 }

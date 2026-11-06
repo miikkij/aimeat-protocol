@@ -8,6 +8,8 @@
  * @structure registerCopyRoute(router, ctx)
  * @usage registerCopyRoute(router, ctx)   // from registerBulkRoutes, at the position the route had
  * @version-history
+ *   v1.3.2 — 2026-11-05 — A copy at visibility 'group' onto a record that has no group is refused with
+ *     400 INVALID_INPUT: this route takes no group id (storage/memory-sharing.ts).
  *   v1.3.1 — 2026-10-24 — The shared anonymous agent copies only anonymous.* keys (403 FORBIDDEN, the
  *     answer POST /v1/memory gives), so a copy no longer writes its public or members records outside
  *     that namespace (secaudit2026oct22).
@@ -47,6 +49,7 @@ import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
+import { memoryGroupRefusal } from '../../storage/memory-sharing.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
 import { keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from '../../services/memory-publish-gate.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -157,6 +160,9 @@ export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
     // had (a new one: private) and the request is filed after the write.
     // Before it, the closed node (plan V1.6): a copy made public there lands at 'members' and says so.
     const closed = closedNodeLevel(config, (targetVis as MemoryRecord['visibility']) || 'private', 'members' as const, { from: existing?.visibility });
+    // A copy takes no group id, so a copy at 'group' lands on a record that has one (storage/memory-sharing.ts).
+    const noGroup = memoryGroupRefusal(closed.level, undefined, existing);
+    if (noGroup) { res.status(noGroup.status).json(error(config.nodeId, noGroup.code, noGroup.message)); return; }
     // The label's audience cap (plan doc-mvdipuyqraas, L3.2), before the publish gate and before the
     // label is carried: the source's label (which the copy takes) and the copy's own place both count.
     const capped = await memoryCapRefusal({ storage, config }, callerOf(req, config.nodeId, storage),

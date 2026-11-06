@@ -146,8 +146,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const groupId = optionalString(input, 'group_id');
             if (tags) body.tags = tags;
             if (ttlHours !== undefined) body.ttl_hours = ttlHours;
-            // Required whenever visibility is 'group'. Without it the write is refused, or worse,
-            // stored with a visibility the caller asked for and a group the node never heard of.
+            // Required when visibility is 'group' on a record that has no group: the route refuses the
+            // write without it, because such a record opens to nobody but its owner.
             if (groupId) body.group_id = groupId;
             // Where the record LIVES, which is a different question from `visibility`, who may read
             // it. Without this every write from this door landed under the agent however the caller

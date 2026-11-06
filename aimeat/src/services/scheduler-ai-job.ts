@@ -15,6 +15,8 @@
  * @structure runAiJob(storage, config, job)
  * @usage scheduler.registerKindExecutor('ai', (job) => runAiJob(storage, config, job));
  * @version-history
+ *   v1.4.1 -- 2026-11-05 -- An answer at 'group' with no group on its record fails the run before the
+ *     model is called: the memory write refuses it (storage/memory-sharing.ts).
  *   v1.4.0 -- 2026-10-31 -- What the memory write refuses whatever the answer is (an organism audience the
  *     maker is not a member of, an organism.* output key the maker may not write) is asked before the
  *     reads and the model call, and the run fails with the reason, so a schedule stored before the
@@ -56,6 +58,7 @@ import { instructionHoldAtFire } from './schedule-instruction-hold.js';
 import { noteAgentRefusal } from './agent-refusals.js';
 import { agentSessionCaller, callerFromAuth } from './caller-context.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
+import { memoryGroupRefusal } from '../storage/memory-sharing.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 
 /** A workspace's manifest record, whose write rule compares the value it stores (services/fenced-space.ts). */
@@ -71,10 +74,13 @@ const MANIFEST_KEY = /^organism\.[^.]+\.w\.[^.]+\.meta\.manifest$/;
  */
 async function answerWriteRefusal(
   storage: Storage, config: AimeatConfig,
-  writer: { principal: string; roles: string[]; scopes: string[] }, key: string, visibility: unknown,
+  writer: { principal: string; targetGaii: string; roles: string[]; scopes: string[] }, key: string, visibility: unknown,
 ): Promise<string | null> {
   const audience = await organismVisibilityRefusal(storage, visibility, { identity: writer.principal });
   if (audience) return audience.message;
+  // A schedule names no group, so its answer at 'group' lands on a record that has one (storage/memory-sharing.ts).
+  const noGroup = visibility === 'group' ? memoryGroupRefusal('group', undefined, await storage.getMemoryMeta(writer.targetGaii, key)) : null;
+  if (noGroup) return noGroup.message;
   if (key.startsWith('organism.') && !MANIFEST_KEY.test(key)) {
     const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
       principal: writer.principal, owner: localAccountName(writer.principal), roles: writer.roles, scopes: writer.scopes,

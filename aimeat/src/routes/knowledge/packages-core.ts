@@ -6,6 +6,7 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-11-05 — An imported entry at 'group' is stored private: an import names no group.
  *   2026-11-04 — No prefix scan for a storage without getMemoryByKeysAnyOwner: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-10-24 — POST /v1/knowledge/import refuses the shared anonymous principal with
@@ -156,6 +157,11 @@ export function registerPackagesCoreRoutes(
         const entryOverride = overrides.entries[String(entry.key ?? '').split('/').pop() ?? ''];
         if (entryOverride?.visibility) entry.visibility = entryOverride.visibility;
       }
+    }
+    // An import names no group, so an entry at 'group' would open to nobody but its owner. Private keeps
+    // the entry with the same reader, and PATCH .../entries/{key}/visibility shares it with a group.
+    if (Array.isArray(pkg.entries)) {
+      for (const entry of pkg.entries) if (entry.visibility === 'group') entry.visibility = 'private';
     }
 
     // Validate manifest structure

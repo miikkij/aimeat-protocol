@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-05 — Section 2: an imported entry at `group` keeps its record's group, or is stored private (routes/memory/bulk.ts).
  *   2026-11-02 — Section 6: erasure removes the person's own MCP servers and their own sign-ins on
  *     shared ones (owner-erasure.ts step mcp_user_credentials).
  *   2026-11-01 — Section 5: a table's freshness and the versions still in use (plan doc-mvwxcas3dom3, D6).
@@ -176,7 +177,9 @@ What an export leaves out, and why:
   for each failure. The person's limits on keys and value size apply. An entry with no visibility
   gets the level this node gives a new entry: private unless the operator chose otherwise. An entry
   whose classification limits who may see it more narrowly than its visibility fails with
-  \`LABEL_CAPS_AUDIENCE\`.
+  \`LABEL_CAPS_AUDIENCE\`. An import names no sharing group, so an entry at \`group\` keeps the group
+  its record already has, and with none it is stored private with its data kept. Share it afterwards
+  with \`PUT /v1/memory/{key}\` and \`group_id\`.
 - **An organism or a workspace:** \`aimeat_organism_import\` or \`aimeat_workspace_transfer\` with
   \`direction: "import"\`. Both create a NEW organism or workspace; members and the board are not
   restored. A ZIP that fails the safety checks is refused and kept aside for the operator.

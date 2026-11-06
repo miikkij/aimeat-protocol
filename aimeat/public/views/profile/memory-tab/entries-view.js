@@ -8,6 +8,7 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.3.1 -- 2026-11-05 -- The expanded row's visibility menu offers "group" only on a record already at it, like the other menus: this menu names no group.
  *   v2.3.0 -- 2026-10-18 -- A key's visibility tag is the AudienceBadge: who can read it in words (Private, "<organism> members", Signed-in, Public), still the button that opens the picker (plan doc-mvcn6c7e4e5q, V6.4).
  *   v2.2.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry instead of a
  *     loading line that never ends (QA audit F6-05).
@@ -267,7 +268,7 @@ export function renderEntries(ctx) {
           `}
         <${Line}>
           <${Note} kind="meta" inline>${visLabel}<//>
-          <${Select} fit ariaLabel=${visLabel} value=${m.visibility || 'private'} options=${visWords(VIS_OPTIONS)}
+          <${Select} fit ariaLabel=${visLabel} value=${m.visibility || 'private'} options=${visWords(VIS_OPTIONS.filter(v => v !== 'group' || m.visibility === 'group'))}
             onChange=${(next) => handleQuickVis(m, next)} />
         <//>
         <${Actions}>

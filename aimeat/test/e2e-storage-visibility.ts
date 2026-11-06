@@ -980,6 +980,28 @@ const assertNotStored = async (key: string) => {
     assert(res.status === 404, `the refused file exists: ${res.status}`);
 };
 
+await test('40d2. A group_id that names no group is refused on every upload route, nothing stored and no URL or session', async () => {
+    const group_id = `no-such-group-${Date.now()}`;
+    const send = (path: string, extra: object) => json(path, {
+        method: 'POST', headers: agentAAuth(),
+        body: JSON.stringify({ key: noGroupKey, mime_type: 'text/plain', visibility: 'group', group_id, ...extra }),
+    });
+    const inline = await send('/v1/storage', { data: testContentB64 });
+    assertNoGroupRefusal(inline.status, inline.body);
+    const presigned = await send('/v1/storage', { mode: 'presigned' });
+    assertNoGroupRefusal(presigned.status, presigned.body);
+    assert(!presigned.body.data?.upload_url, 'a URL was minted');
+    const chunked = await send('/v1/storage/upload/init', { chunk_size: 1024, total_chunks: 1 });
+    assertNoGroupRefusal(chunked.status, chunked.body);
+    assert(!chunked.body.data?.upload_id, 'an upload session was opened');
+    const legacy = await send('/v1/memory/files', { content: testContentB64 });
+    assertNoGroupRefusal(legacy.status, legacy.body);
+    const legacyPresigned = await send('/v1/memory/files', { mode: 'presigned' });
+    assertNoGroupRefusal(legacyPresigned.status, legacyPresigned.body);
+    assert(!legacyPresigned.body.data?.upload_url, 'a URL was minted');
+    await assertNotStored(noGroupKey);
+});
+
 await test('40e. POST /v1/storage inline, group with no group_id → 400, nothing stored', async () => {
     const { status, body } = await json('/v1/storage', {
         method: 'POST', headers: agentAAuth(),

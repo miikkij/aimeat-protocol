@@ -31,6 +31,7 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-11-05 — Section 5: an `ai` schedule's answer at `group` needs an output record that has a group (services/schedule-write.ts).
  *   2026-11-02 — Section 5: an agent_task schedule's `deliver: "owner"`, the node hands the result to the
  *     owner when the person was promised it (services/task-result-delivery.ts), and the target agent's
  *     notify tool goes out of its definition (services/delivery-crew.ts).
@@ -272,7 +273,9 @@ AGENT_NOT_FOUND. The rest is \`GET /v1/schedules\`, \`GET\`, \`PATCH\` and \`DEL
 /v1/schedules/{id}\`, and \`POST /v1/schedules/{id}/trigger\`. An \`ai\` schedule can name
 \`output_visibility\` for its answer in the body; the node refuses a word memory does not use, and an
 \`organism:<id>\` that names an organism the maker's account is not in, both when the schedule is
-created and when it is edited. With nothing named the answer stays private.
+created and when it is edited. A schedule names no sharing group, so \`group\` is refused too unless
+the record at \`output_key\` already has a group, which it then keeps: write that record once with
+\`group_id\` first. With nothing named the answer stays private.
 
 **Steps are joined by memory keys, not by order.** No schedule waits for another to finish. Put the
 steps at different times (fetch at 06:00, write at 07:00), and name the exact memory key each step

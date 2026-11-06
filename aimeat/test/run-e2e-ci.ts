@@ -503,6 +503,8 @@
  *            count under the totals.
  *   v1.12.0 -- 2026-10-08 -- Add e2e-ai-provenance-served.ts: the disclosure decided when a record
  *            is served, and the label's words by medium.
+ *   v1.13.0 -- 2026-11-05 -- Add e2e-memory-group-binding.ts: a group record names its group on every
+ *            memory write route.
  */
 
 import { execSync } from 'node:child_process';
@@ -1689,6 +1691,8 @@ const ALL_SUITES = [
     // The other half of the same feature: e2e-sharing-groups proves a group can be MANAGED,
     // this proves it grants a cross-owner read (and that removing a member takes it away).
     'test/e2e-group-sharing.ts',
+    // A group record names its group, on every route that writes a memory record.
+    'test/e2e-memory-group-binding.ts',
     // Sharing a KEY SPACE rather than one record at a time: a pattern covers keys written later,
     // one record can be in several shares, and both sides can see what was given.
     'test/e2e-key-space-shares.ts',

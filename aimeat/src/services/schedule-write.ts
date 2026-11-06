@@ -106,6 +106,7 @@ import { readerForCaller } from './classification/reader.js';
 import { emitChange } from './event-bus.js';
 import type { FileRefAccessor } from './file-refs.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
+import { memoryGroupRefusal } from '../storage/memory-sharing.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
 import { scheduleFileDenial } from './schedule-file-access.js';
 import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
@@ -301,7 +302,7 @@ async function checkConnectionsPublishInput(
  * when no visibility is named: the fire then stores the record private.
  */
 async function aiOutputVisibilityRefusal(
-    storage: Storage, raw: unknown, callerIdentity: string,
+    storage: Storage, raw: unknown, callerIdentity: string, owner: string, outputKey: unknown,
 ): Promise<ScheduleWriteRefusal | null> {
     if (raw === undefined || raw === null) return null;
     if (!memoryWriteVisibilitySchema.safeParse(raw).success) {
@@ -310,6 +311,10 @@ async function aiOutputVisibilityRefusal(
             message: 'output_visibility must be private, owner, group, members, public or "organism:<organism id>".',
         };
     }
+    // A schedule names no group, so its answer at 'group' lands on a record that has one (2026-11-05).
+    const stored = raw === 'group' && typeof outputKey === 'string' ? await storage.getMemoryMeta(owner, outputKey) : null;
+    const noGroup = memoryGroupRefusal(raw, undefined, stored);
+    if (noGroup) return { ok: false, ...noGroup };
     const audience = await organismVisibilityRefusal(storage, raw, { identity: callerIdentity });
     return audience ? { ok: false, ...audience } : null;
 }
@@ -513,7 +518,7 @@ export async function createScheduleRecord(
         if (kept) return { ok: false, ...kept };
         // The answer lands in the owner's namespace at this word, so it answers to memory's audience
         // rules here as well as at the fire (secaudit 2026-10).
-        const badVisibility = await aiOutputVisibilityRefusal(storage, body.output_visibility, caller.identity);
+        const badVisibility = await aiOutputVisibilityRefusal(storage, body.output_visibility, caller.identity, owner, body.output_key);
         if (badVisibility) return badVisibility;
         // The schedule reads for its maker (services/schedule-ai-read.ts): no record of the owner or a
         // sibling that the maker may not read itself. The fire asks again, for records written later.
@@ -672,7 +677,7 @@ export async function updateScheduleRecord(
             if (kept) return { ok: false, ...kept };
             // And the create's rule about who the answer may be shown to. Both spellings, as above.
             const badVisibility = await aiOutputVisibilityRefusal(
-                storage, p.outputVisibility ?? p.output_visibility, caller.identity,
+                storage, p.outputVisibility ?? p.output_visibility, caller.identity, job.ownerScope ?? ownerScope, p.outputKey ?? p.output_key,
             );
             if (badVisibility) return badVisibility;
             // And the create's rule about whose records it reads, asked of whoever gives the new input.

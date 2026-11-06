@@ -17,6 +17,7 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-11-05 -- Init refuses a group_id naming no group too, before any chunk.
  *   2026-11-04 -- Init refuses visibility 'group' with no group_id before any chunk (storage-file-write.ts
  *     groupBindingRefusal); complete asks again at the shared write.
  *   2026-11-01 -- Init refuses a company's page key to a caller the company page route would refuse,
@@ -122,7 +123,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
                 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"'));
             return;
         }
-        const unbound = groupBindingRefusal(level, group_id);
+        const unbound = await groupBindingRefusal(storage, level, group_id);
         if (unbound) {
             res.status(unbound.status).json(error(config.nodeId, unbound.code, unbound.message));
             return;
