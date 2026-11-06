@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-11-06 — settings carries `about` and `about_lang` (TARGET-093).
  *   2026-11-01 — party_stop and party_resume (WP9d).
  *   2026-11-01 — parties, party_remove and party_registration_set, and member_set's party field (plan D4).
  *   2026-10-31 — settings' screenshot_public field (secaudit2026oct31w2 round 10, W2-12).
@@ -61,7 +62,7 @@ const VALUE: Record<string, unknown> = {
     filename: 'shop.html', owner: 'alice', index: true, title: 'zqxtitle', description: 'zqxdesc', keywords: ['zqxkw'],
     image: 'https://x/zqximg.png', lang: 'fi', badge: false, install: true, aiUse: false, info: false, tucked: true, kind: 'privacy', format: 'markdown',
     content: 'zqxcontent', remove: true, limit: 7, playtest: true, days: 9, on: true, geo: 'region', detail: ['zqxdetail'],
-    layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, listing: 'unlisted', parked: true,
+    layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, about: 'zqxabout', about_lang: 'zqxlang', listing: 'unlisted', parked: true,
     forkable: true, access_code: 'zqxcode', open_to: 'organism:zqxopen', screenshot_public: true, protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
     subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, origin: 'publisher', bundled_agent: 'zqxagent',
     runner_agent: 'zqxrunner', organism_id: 'zqxorg', values: { zqxfield: 'zqxvalue' },
