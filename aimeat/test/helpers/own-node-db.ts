@@ -29,6 +29,8 @@
  *   spawn('node', [...nodeEntryArgs(), 'start', ...db.args], { env: { ...process.env, ...db.env, … } });
  *   Object.assign(config, db.config);              // an in-process node, after loadConfig()
  * @version-history
+ *   2026-11-06 — opts.backend asks for PostgreSQL whatever the run names (test/unit/key-reencrypt.test.ts on
+ *     CI's unit lane, which sets DATABASE_URL alone).
  *   2026-10-16 — Initial (QA audit P1-02, P7-04, F18-02, S6-10, D4-02).
  */
 import { createHash } from 'node:crypto';
@@ -62,9 +64,12 @@ export function runBackend(): 'sqlite' | 'postgres-kysely' {
  * A database for one own node. `tag` names the node within the suite (`core-jobs`, `peer-a`).
  * `opts.memory` keeps SQLite in memory on a SQLite run, for an in-process node that had 'memory'.
  * `opts.sqlitePath` names the SQLite file on a SQLite run, for a suite that opens it itself.
+ * `opts.backend: 'postgres-kysely'` asks for PostgreSQL whatever the run names, for a unit test that runs
+ * a PostgreSQL half whenever DATABASE_URL is set (CI's unit step sets DATABASE_URL and no AIMEAT_DB).
  */
-export async function ownNodeDb(tag: string, opts: { memory?: boolean; sqlitePath?: string } = {}): Promise<OwnNodeDb> {
-    if (runBackend() === 'postgres-kysely') {
+export async function ownNodeDb(tag: string, opts: { memory?: boolean; sqlitePath?: string; backend?: 'postgres-kysely' } = {}): Promise<OwnNodeDb> {
+    if (opts.backend === 'postgres-kysely' && !RUN_URL) throw new Error(`ownNodeDb('${tag}') asked for PostgreSQL, and neither DATABASE_URL nor AIMEAT_DB_URL is set.`);
+    if (opts.backend === 'postgres-kysely' || runBackend() === 'postgres-kysely') {
         const dbUrl = siblingUrl(RUN_URL, tag);
         await freshDatabase(RUN_URL, dbUrl);
         return {

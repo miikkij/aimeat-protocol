@@ -24,6 +24,8 @@
  *   cd aimeat && pnpm exec vitest run test/unit/key-reencrypt.test.ts
  *   cd aimeat && node --env-file=.env.test.postgres-kysely --import tsx node_modules/vitest/vitest.mjs run test/unit/key-reencrypt.test.ts
  * @version-history
+ *   v1.0.2 — 2026-11-06 — The PostgreSQL half asks ownNodeDb for PostgreSQL by name: CI's unit lane sets
+ *     DATABASE_URL and no AIMEAT_DB, so the helper handed it no database URL and every case failed there.
  *   v1.0.1 — 2026-11-05 — The two-key config runs with several processes per node, since the job case
  *     starts two processes on one database and one process per node is now the default (decision 6a).
  *   v1.0.0 — 2026-11-05 — Initial (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
@@ -66,7 +68,8 @@ async function database(provider: string): Promise<{ open(): Promise<TestStorage
     cleanups.push(async () => { for (const s of opened) await s.close(); rmSync(dir, { recursive: true, force: true }); });
     return { async open() { const s = await createStorage({ provider: 'sqlite', sqlitePath: file }) as TestStorage; opened.push(s); return s; } };
   }
-  const db = await ownNodeDb('key-reencrypt');
+  // The PostgreSQL half runs whenever DATABASE_URL is set; CI's unit lane sets no AIMEAT_DB, so ask for it by name.
+  const db = await ownNodeDb('key-reencrypt', { backend: 'postgres-kysely' });
   const opened: TestStorage[] = [];
   cleanups.push(async () => { for (const s of opened) await s.close(); });
   return { async open() { const s = await createStorage({ provider: 'postgres-kysely', dbUrl: db.dbUrl }) as TestStorage; opened.push(s); return s; } };
