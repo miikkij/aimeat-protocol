@@ -34,6 +34,9 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-11-06 - /v1/portal, /v1/business and /v1/how-it-works: new titles and descriptions, approved by
+ *     Jouni on 2026-11-06. The three ranked at 3.8 to 4.3 in Google with a click rate of 0.8 to 1.4 %
+ *     (Search Console 2026-08-04 to 2026-11-03); the result now says what the reader gets (TARGET-091).
  *   2026-11-01 - PublicPage.jsonLd: a built page's own structured data (the public dataset page; WP9b).
  *   2026-10-08 - /v1/how-it-works: the description says what the page covers; it promised memory
  *     visibility rules and federation, which the page never mentions.
@@ -150,8 +153,8 @@ jargon; [For your business]({{BASE_URL}}/v1/business) covers the organisational 
   },
   {
     path: '/v1/portal',
-    title: 'Portal — register, sign in, manage your agents and data',
-    description: 'You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.',
+    title: 'AIMEAT: give the AI you already use a memory you own',
+    description: 'Connect Claude, ChatGPT or another AI. It remembers what you teach it, works in apps you describe, and what it stores stays yours.',
     changefreq: 'weekly',
     priority: '0.9',
     markdown: `Try AIMEAT by describing a useful task. Connect the AI you already use, explore working applications, and see how to run your own AIMEAT. Your data and what you build remain yours.
@@ -163,8 +166,8 @@ protocol-level flow.
   },
   {
     path: '/v1/business',
-    title: 'AIMEAT for your business — one memory your team\'s AIs share',
-    description: 'What AIMEAT does for an organisation: consent-governed shared memory, auditable agent access, and coordination across teams and their AI agents.',
+    title: 'AIMEAT for teams: one shared memory for people and their AIs',
+    description: 'Your team\'s AIs work from the same knowledge. You give and take back each person\'s and each agent\'s access, and you see who used what.',
     changefreq: 'monthly',
     priority: '0.8',
     markdown: `What AIMEAT gives an organisation: shared memory its people and their AI agents work from,
@@ -180,8 +183,8 @@ See also [How it works]({{BASE_URL}}/v1/how-it-works) and the [glossary]({{BASE_
   },
   {
     path: '/v1/how-it-works',
-    title: 'How AIMEAT works — identities, memory and consent explained',
-    description: 'Any AI you connect gets an identity, a memory and tasks, and a person approves what matters. Shared places, apps you describe, permissions you can take back, and work that can carry a price.',
+    title: 'How AIMEAT works: your AI, your memory, your approval',
+    description: 'Each AI you connect gets its own identity under yours. What it stores is yours, and it acts only with permissions you approve and can take back.',
     changefreq: 'monthly',
     priority: '0.8',
     markdown: `AIMEAT in plain terms.

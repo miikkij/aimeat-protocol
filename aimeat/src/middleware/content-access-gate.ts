@@ -45,6 +45,8 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.8 — 2026-11-06 — GET /index.html is open beside /everything and /start: a constant 301 to the
+ *     front page, which holds no content (TARGET-091).
  *   v1.4.7 — 2026-11-05 — A browser navigation to GET /v1/provenance/:id goes to /v1/provenance-open, the
  *     SPA page that reads the record with the session: an AI label's "how this was made" link opens a
  *     new tab, which carries no session, so it answered a signed-in person 401 (seen on orgnode.example).
@@ -108,7 +110,8 @@ export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; w
   // ── The SPA shell and its page addresses (no content in this mode, see the header) ──
   { method: 'GET', path: /^\/$/, why: 'the front page shell' },
   { method: 'GET', path: /^\/(spa|app-silent|app-catalog)\.html$/, why: 'shell files' },
-  { method: 'GET', path: /^\/(everything|start)$/, why: 'redirects to shell pages' },
+  // /index.html: a constant 301 to `/` (server-bootstrap/static-files.ts, TARGET-091).
+  { method: 'GET', path: /^\/(everything|start|index\.html)$/, why: 'redirects to shell pages' },
   { method: 'GET', path: /^\/v1\/(portal|echat)$/, why: 'SPA page addresses served outside the portal list' },
   // The same list routes/portal.ts serves spa.html on, so a page served there opens from a link here.
   { method: 'GET', path: wholePaths(SPA_PAGE_PATHS), why: 'SPA page addresses' },
