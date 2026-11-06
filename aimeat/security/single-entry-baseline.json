@@ -253,10 +253,6 @@
         "count": 1,
         "why": "Sets the callerKind label in a record; decides nothing."
       },
-      "src/routes/schemas.ts": {
-        "count": 1,
-        "why": "The owner role or the operator (isOperatorCaller) may define a schema: a role test, not the in-person question."
-      },
       "src/routes/skills.ts": {
         "count": 1,
         "why": "Asks whether the caller is an agent session."

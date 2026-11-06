@@ -17,9 +17,14 @@
  *       unchanged; a deactivation removes only the row its own account holds;
  *     - GET /v1/schemas shows each lock's pattern and holder and no schema body, without a credential.
  * @version-history
+ *   2026-11-06 — PUT and DELETE ask one rule (decision 13a of 2026-11-05, verb parity): the owner's
+ *     agent holding memory:write sets and removes its own lock, the owner removes a lock their agent
+ *     holds, and an agent without the word and an app are refused both verbs.
  *   2026-10-16 — Initial (QA audit S2-04, F05a-01, S7-01).
  */
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
+import { appGrantToken } from './helpers/purpose-kit.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -198,6 +203,61 @@ await test('B\'s own cortex activates; its deactivation removes its row and leav
     assert(rows.some(r => r.apply_to === 'exact'), `the operator's exact lock went with B's deactivation: ${JSON.stringify(rows)}`);
     await json(`/v1/memory/${encodeURIComponent(key)}/schema?apply_to=exact`, { method: 'DELETE', headers: auth(opToken) });
     await json(`/v1/cortex/${encodeURIComponent(name)}`, { method: 'DELETE', headers: auth(bToken) });
+});
+
+console.log('\nWho may set and remove a lock: one rule on PUT and DELETE (decision 13a of 2026-11-05)');
+
+// PUT admitted the owner role and the operator, DELETE any principal holding memory:write. One rule
+// now holds on both verbs: the owner in person, the owner's agent holding memory:write, and the
+// operator; an app grant or an ecosystem app only for a lock it holds itself; never a visitor.
+const AG_KEY = `slrag${stamp}.rec`;
+const OWNED_KEY = `slrown${stamp}.rec`;
+
+await test('the owner\'s agent holding memory:write sets, changes and removes a lock of its own', async () => {
+    const agent = await makeAgent(BASE, { name: aName, token: aToken }, ['memory:write'], `slrag${stamp}`);
+    const set = await lock(agent.token, AG_KEY, 'exact');
+    assert(set.status === 200 && set.body.data.locked_by === agent.gaii, `the agent's lock: ${set.status} ${JSON.stringify(set.body.error ?? set.body.data)}`);
+    const again = await lock(agent.token, AG_KEY, 'exact', { type: 'object', properties: { title: { type: 'string' }, n: { type: 'number' } } });
+    assert(again.status === 200, `the agent changes its own lock: ${again.status} ${JSON.stringify(again.body.error)}`);
+    const del = await json(`/v1/memory/${encodeURIComponent(AG_KEY)}/schema?apply_to=exact`, { method: 'DELETE', headers: auth(agent.token) });
+    assert(del.status === 200, `the agent removes its own lock: ${del.status} ${JSON.stringify(del.body.error)}`);
+    assert((await rowsOf(AG_KEY)).length === 0, 'the agent\'s lock is still listed');
+});
+
+await test('the owner in person changes and removes a lock one of their agents holds; another owner may not', async () => {
+    const agent = await makeAgent(BASE, { name: aName, token: aToken }, ['memory:write'], `slrag2${stamp}`);
+    const set = await lock(agent.token, AG_KEY, 'exact');
+    assert(set.status === 200, `the agent's lock: ${set.status} ${JSON.stringify(set.body.error)}`);
+    const stranger = await json(`/v1/memory/${encodeURIComponent(AG_KEY)}/schema?apply_to=exact`, { method: 'DELETE', headers: auth(bToken) });
+    assert(stranger.status === 403, `another owner removed A's agent's lock: ${stranger.status}`);
+    const changed = await lock(aToken, AG_KEY, 'exact');
+    assert(changed.status === 200, `the owner changes their agent's lock: ${changed.status} ${JSON.stringify(changed.body.error)}`);
+    const del = await json(`/v1/memory/${encodeURIComponent(AG_KEY)}/schema?apply_to=exact`, { method: 'DELETE', headers: auth(aToken) });
+    assert(del.status === 200, `the owner removes the lock: ${del.status} ${JSON.stringify(del.body.error)}`);
+});
+
+await test('an agent without memory:write is refused both verbs, and the owner\'s lock stays', async () => {
+    const own = await lock(aToken, OWNED_KEY, 'exact');
+    assert(own.status === 200, `the owner's lock: ${own.status} ${JSON.stringify(own.body.error)}`);
+    const agent = await makeAgent(BASE, { name: aName, token: aToken }, ['memory:read'], `slrro${stamp}`);
+    const set = await lock(agent.token, `slrro${stamp}.rec`, 'exact');
+    assert(set.status === 403, `an agent without memory:write set a lock: ${set.status}`);
+    const del = await json(`/v1/memory/${encodeURIComponent(OWNED_KEY)}/schema?apply_to=exact`, { method: 'DELETE', headers: auth(agent.token) });
+    assert(del.status === 403, `an agent without memory:write removed a lock: ${del.status}`);
+    assert((await rowsOf(OWNED_KEY)).length === 1, 'the owner\'s lock is gone');
+});
+
+await test('an app holding memory:write is refused a lock of its own making and the owner\'s lock', async () => {
+    const html = '<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="memory:write"></head><body>slr</body></html>';
+    const app = await appGrantToken({ name: aName, token: aToken }, `slr${stamp}.html`, 'memory:write', html, BASE);
+    const set = await lock(app, `slrapp${stamp}.rec`, 'exact');
+    assert(set.status === 403, `an app set a lock: ${set.status} ${JSON.stringify(set.body.error ?? set.body.data)}`);
+    const change = await lock(app, OWNED_KEY, 'exact');
+    assert(change.status === 403, `an app changed the owner's lock: ${change.status}`);
+    const del = await json(`/v1/memory/${encodeURIComponent(OWNED_KEY)}/schema?apply_to=exact`, { method: 'DELETE', headers: auth(app) });
+    assert(del.status === 403, `an app removed the owner's lock: ${del.status}`);
+    assert((await rowsOf(OWNED_KEY)).length === 1, 'the owner\'s lock is gone');
+    await json(`/v1/memory/${encodeURIComponent(OWNED_KEY)}/schema?apply_to=exact`, { method: 'DELETE', headers: auth(aToken) });
 });
 
 console.log('\nWhat the public list shows');

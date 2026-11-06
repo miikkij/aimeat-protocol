@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-06 — verify-email and the magic link do not raise the login count of a code key's holder
+ *     whose first sign-in is still to come (key-credentials.ts keyCredentialsPending): that sign-in
+ *     replaces the key.
  *   2026-11-05 — A verified address receives the first sign-in's credentials that waited for it
  *     (key-credentials.ts sendHeldKeyCredentials; codebase analysis 2026-11-03, decision 14a of 2026-11-05).
  *   2026-11-05 — On a store place the account's app agent gets the place's default when a mailbox proof makes or
@@ -100,7 +103,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
-import { sendHeldKeyCredentials } from '../../services/key-credentials.js';
+import { sendHeldKeyCredentials, keyCredentialsPending } from '../../services/key-credentials.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
@@ -512,6 +515,10 @@ export function registerWebVerifyRoutes(
             return;
         }
         const ghiiBeforeUpdate = await storage.getGHII(ghii);
+        // A code key's holder on a node that requires a confirmed address confirms it before the first
+        // sign-in. Counted as a login, it made that sign-in look like a later one, and the sign-in that
+        // replaces the key with the holder's own password (key-credentials.ts) never ran.
+        const keyFirstSignInPending = await keyCredentialsPending(storage, record.ownerName);
         await storage.updateGHII(ghii, {
             emailHash: record.emailHash,
             emailVerifiedAt: now,
@@ -519,7 +526,7 @@ export function registerWebVerifyRoutes(
             verificationMethod: 'email',
             magicLinkEnabled: true,
             lastLoginAt: now,
-            loginCount: (ghiiBeforeUpdate?.loginCount ?? 0) + 1,
+            loginCount: (ghiiBeforeUpdate?.loginCount ?? 0) + (keyFirstSignInPending ? 0 : 1),
         });
         // Anyone who wrote this person into their address book before the account existed now has
         // the person, not just the address (TARGET-063). Best-effort: a contact that fails to link
@@ -648,9 +655,12 @@ export function registerWebVerifyRoutes(
         // Update GHII last login (the redeem verified the address: clicking the link proves the mailbox).
         const now = new Date().toISOString();
         const ghii = redeemed.ghii.ghii;
+        // The link gives the agent key, not the owner's sign-in, so for a code key's holder it is not
+        // the first sign-in either (the same rule as verify-email above).
+        const keyFirstSignInPending = await keyCredentialsPending(storage, redeemed.ghii.ownerName);
         await storage.updateGHII(ghii, {
             lastLoginAt: now,
-            loginCount: (redeemed.ghii.loginCount ?? 0) + 1,
+            loginCount: (redeemed.ghii.loginCount ?? 0) + (keyFirstSignInPending ? 0 : 1),
         });
 
         // The owner's signing key is NOT re-keyed here and not returned. A clicked link proves a

@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-11-06 — 48: editing and deleting a schedule take the same words, workflow:write or memory:write
+ *     (decision 13a of 2026-11-05, verb parity).
  *   2026-11-02 — 8d2: a `deliver` scope entry in a task no delivering schedule made does not make the
  *     node deliver its result (secaudit2026nov02d round 13, DELIVERY_SCOPE:client-supplied-task-scope).
  *   2026-10-25 — 47: erasing an account removes the schedules its agents made, and a schedule older
@@ -1244,6 +1246,37 @@ await test('47. Erasure removes the schedules the account\'s agents made, and a 
     const ok = await json(`/v1/schedules/${ownId}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${second.token}` } });
     assert(ok.status === 200 && ok.body.data.outcome === 'created', `the new holder's own schedule did not fire: ${ok.status} ${ok.body?.data?.outcome} ${JSON.stringify(ok.body?.error)}`);
     await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${second.token}` } });
+});
+
+// Decision 13a of 2026-11-05 (verb parity, security/verb-parity-baseline.json): editing and deleting a
+// schedule ask the same words, workflow:write or memory:write. PATCH asked workflow:write and DELETE
+// memory:write, so an agent holding one of them could do only half of managing its own schedule. A
+// substantive edit still asks the word for what the schedule drives (scheduleKindScopeRefusal).
+await test('48. Either word manages an agent\'s schedule on both verbs; an agent holding neither is refused both', async () => {
+    const task = { kind: 'agent_task', cron: '0 3 * * *', target_agent: o1.agentName, task_template: { title: 'VERB_PARITY' } };
+    const as = (t: string) => ({ Authorization: `Bearer ${t}` });
+    for (const [label, word] of [['memory:write', 'memory:write'], ['workflow:write', 'workflow:write']] as const) {
+        const token = await scopedAgent(o1.ownerName, o1.ownerToken, `verb${word.split(':')[0]}`, ['task:write', 'workflow:read', word]);
+        const made = await json('/v1/schedules', { method: 'POST', headers: as(token), body: JSON.stringify({ ...task, display_name: `Made with ${label}` }) });
+        assert(made.status === 201, `${label} agent create: ${made.status} ${JSON.stringify(made.body?.error)}`);
+        const id = made.body.data.schedule.id;
+        const pause = await json(`/v1/schedules/${id}`, { method: 'PATCH', headers: as(token), body: JSON.stringify({ enabled: false }) });
+        assert(pause.status === 200 && pause.body.data.schedule.enabled === false, `an agent holding ${label} cannot pause its own schedule: ${pause.status} ${JSON.stringify(pause.body?.error)}`);
+        const del = await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: as(token) });
+        assert(del.status === 200, `an agent holding ${label} cannot delete its own schedule: ${del.status} ${JSON.stringify(del.body?.error)}`);
+    }
+    // The refusal stays: an agent holding neither word may make a schedule (task:write) and not manage it.
+    const neither = await scopedAgent(o1.ownerName, o1.ownerToken, 'verbneither', ['task:write', 'workflow:read']);
+    const made = await json('/v1/schedules', { method: 'POST', headers: as(neither), body: JSON.stringify({ ...task, display_name: 'Made with neither' }) });
+    assert(made.status === 201, `create: ${made.status} ${JSON.stringify(made.body?.error)}`);
+    const id = made.body.data.schedule.id;
+    const pause = await json(`/v1/schedules/${id}`, { method: 'PATCH', headers: as(neither), body: JSON.stringify({ enabled: false }) });
+    assert(pause.status === 403, `an agent holding neither word paused a schedule: ${pause.status}`);
+    const del = await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: as(neither) });
+    assert(del.status === 403, `an agent holding neither word deleted a schedule: ${del.status}`);
+    const kept = await json(`/v1/schedules/${id}`, { headers: auth1 });
+    assert(kept.status === 200 && kept.body.data.schedule.enabled === true, `the refused agent changed the schedule: ${JSON.stringify(kept.body.data?.schedule?.enabled)}`);
+    await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth1 });
 });
 
 console.log('\nCleanup');

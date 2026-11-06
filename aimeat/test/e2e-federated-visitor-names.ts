@@ -19,6 +19,8 @@
  *   peer door before the visitors sign in.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-visitor-names
  * @version-history
+ *   2026-11-06 — A visitor is refused DELETE /v1/workflows/:id as PUT refuses it (decision 13a of
+ *     2026-11-05, verb parity).
  *   v1.2.1 — 2026-10-12 — The priced extension action carries its pacing amount as the action's own
  *     tollMorsels; node 4.0.0 refuses commercial.payMorsels in a manifest (MORSEL_PRICE_REMOVED), so
  *     the install failed and the test with it. 3.x charges tollMorsels the same way. The peer's visitor
@@ -226,6 +228,20 @@ async function run() {
         // Positive control: the owner in person passes the door, and meets the body check behind it.
         const own = await json(`/v1/workflows/${id}`, as(alice.token, { method: 'PUT', body: JSON.stringify({}) }));
         assert(own.status === 400, `positive control: the owner's empty save is refused for its body, not at the door: ${own.status} ${JSON.stringify(own.body?.error).slice(0, 200)}`);
+    });
+
+    // Decision 13a of 2026-11-05 (verb parity): DELETE takes the same refusal as PUT. A visitor's
+    // owner is not an account here, so the delete named the account `<visitor>@<this node>`.
+    await test('A visitor cannot delete a workflow here either; the owner reaches the delete', async () => {
+        const id = `vn-wf-del-${stamp}`;
+        for (const [who, token] of [['the visitor named like the owner', visitorToken], ['the control visitor', strangerToken]] as const) {
+            const del = await json(`/v1/workflows/${id}`, as(token, { method: 'DELETE' }));
+            assert(del.status === 403 && del.body?.error?.code === 'FORBIDDEN',
+                `${who} reached the workflow delete: ${del.status} ${JSON.stringify(del.body?.error ?? del.body?.data).slice(0, 200)}`);
+        }
+        // Positive control: the owner in person passes, and is told there is no such workflow.
+        const own = await json(`/v1/workflows/${id}`, as(alice.token, { method: 'DELETE' }));
+        assert(own.status === 404, `positive control: the owner's delete of a missing workflow answers 404: ${own.status} ${JSON.stringify(own.body?.error).slice(0, 200)}`);
     });
 
     // ── An identity cut to an account name (secaudit 2026-09, F-1 as a class) ──

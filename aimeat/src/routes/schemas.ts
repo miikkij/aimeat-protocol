@@ -11,6 +11,11 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   2026-11-06 — PUT and DELETE ask one gate, auth/schema-lock-caller.ts (decision 13a of 2026-11-05,
+ *     verb parity): the owner in person, the owner's agent holding memory:write and the operator;
+ *     an app grant or an ecosystem app only on a lock it holds. PUT refused every agent and DELETE
+ *     admitted any holder of memory:write. The owner in person changes and removes a lock their
+ *     own agent holds.
  *   2026-10-20 — PUT and DELETE take a lock as the caller's own when it names the token's `sub` or the
  *     resolved identity (isCallersLock): an owner was refused on a lock their own package installed
  *     under the GHII.
@@ -29,17 +34,18 @@
 import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth } from '../auth/middleware.js';
+import { requireSchemaLockCaller, lockKindRefusal } from '../auth/schema-lock-caller.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateSchemaItself, removeFromCache } from '../services/schema-validator.js';
 import { SchemaSetSchema } from '../models/schemas.js';
 import { semanticContextErrors } from '../utils/onto-context.js';
 import { emitChange } from '../services/event-bus.js';
-import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { operatorOverride } from '../services/operator-override.js';
 import { schemaLockRefusal } from '../services/schema-lock-rule.js';
 import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, parseGAII, isOwnerInPerson } from '../utils/gaii.js';
 
 /**
  * Whether the caller is the principal that set a lock. A lock set on this route stores the token's
@@ -47,22 +53,22 @@ import { resolveIdentity } from '../utils/gaii.js';
  * owner's name stores the GHII (services/component-registrar.ts). Both spellings are the same
  * person, so both are the caller's own. An agent's `sub` and resolved identity are the same GAII, so
  * an agent still matches only its own locks (DATA-15: the exact principal that set it).
+ *
+ * The owner in person also holds what their own agents hold (CLAUDE.md, security: the owner sees
+ * everything their own agents hold), so a lock one of them set is the owner's to change and remove.
+ * One direction: an agent does not take its owner's lock.
  */
 function isCallersLock(lockedBy: string, auth: NonNullable<Request['auth']>, nodeId: string): boolean {
-  return lockedBy === auth.sub || lockedBy === resolveIdentity(auth, nodeId);
+  if (lockedBy === auth.sub || lockedBy === resolveIdentity(auth, nodeId)) return true;
+  const holder = parseGAII(lockedBy);
+  return !!holder && holder.node === nodeId && isOwnerInPerson(auth) && holder.owner === auth.owner;
 }
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // PUT /v1/memory/:key/schema — set a schema for a memory key
-  router.put('/v1/memory/:key/schema', requireAuth(), async (req, res) => {
-    const roles = req.auth!.roles;
-    if (!roles.includes('owner') && !(await isOperatorCaller(storage, req.auth))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Owner or operator role required'));
-      return;
-    }
-
+  router.put('/v1/memory/:key/schema', requireAuth(), requireSchemaLockCaller(storage), async (req, res) => {
     const key = decodeURIComponent(req.params.key as string);
     const parsed = SchemaSetSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -96,6 +102,15 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // An app grant or an ecosystem app changes only a lock it holds and sets no new one
+    // (auth/schema-lock-caller.ts): a lock governs every account's writes to a matching key.
+    const existing = await storage.getSchema(key, apply_to);
+    const kindRefusal = lockKindRefusal(req.auth!, !!existing && isCallersLock(existing.lockedBy, req.auth!, config.nodeId));
+    if (kindRefusal) {
+      res.status(403).json(error(config.nodeId, kindRefusal.code, kindRefusal.message));
+      return;
+    }
+
     // Who may lock this pattern at all, and whether another account's lock is beside it or already
     // governs its key (services/schema-lock-rule.ts). The same pattern under the same apply_to is
     // the DATA-15 check below, which compares the exact principal that set it.
@@ -107,8 +122,6 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(ruled.status).json(error(config.nodeId, ruled.code, ruled.message, ruled.status, ruled.details));
       return;
     }
-
-    const existing = await storage.getSchema(key, apply_to);
 
     if (existing && !isCallersLock(existing.lockedBy, req.auth!, config.nodeId) && !(await operatorOverride(storage, config, req.auth,
       { ownerOf: existing.lockedBy, area: 'schema', action: 'update', subject: key }))) {
@@ -176,7 +189,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // DELETE /v1/memory/:key/schema — delete schema for a memory key
-  router.delete('/v1/memory/:key/schema', requireAuth(), requireScope('memory:write'), async (req, res) => {
+  router.delete('/v1/memory/:key/schema', requireAuth(), requireSchemaLockCaller(storage), async (req, res) => {
     const key = decodeURIComponent(req.params.key as string);
     const asked = req.query.apply_to;
     if (asked !== undefined && asked !== 'exact' && asked !== 'prefix') {

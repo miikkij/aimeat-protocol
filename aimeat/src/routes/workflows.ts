@@ -28,6 +28,7 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   2026-11-06 — DELETE /:id takes requireLocalSession() as PUT does (decision 13a of 2026-11-05, verb parity).
  *   2026-10-20 — GET /:id/preflight passes the caller: it evaluates every signal and, with
  *     llm.approved, asks the node's model about each llm leaf, so it costs the words a signals-only
  *     run costs and the model call goes out as that caller. GET /:id/runs and /:id/runs/:runId
@@ -238,7 +239,8 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // DELETE /v1/workflows/:id — remove the def (and optionally its runs).
-  router.delete('/v1/workflows/:id', requireAuth(), requireScope('workflow:write'), async (req: Request, res: Response) => {
+  // requireLocalSession as on PUT: a visitor has no account here, and its owner named `<visitor>@<this node>`.
+  router.delete('/v1/workflows/:id', requireAuth(), requireLocalSession(), requireScope('workflow:write'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const withRuns = req.query.withRuns === 'true';
     const ok = await deleteWorkflow(storage, ownerGhiiOf(req), id, { withRuns });

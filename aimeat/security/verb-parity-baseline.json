@@ -64,18 +64,6 @@
       },
       "why": "Designed (security invariant 8, docs/coding-guidelines/security-development-dna.md): DELETE moves the record to the deleted-memory bin, where the owner restores it, and asks memory:delete; writing asks memory:write."
     },
-    "/v1/memory/:/schema": {
-      "verbs": {
-        "DELETE": [
-          "requireAuth()",
-          "requireScope('memory:write')"
-        ],
-        "PUT": [
-          "requireAuth()"
-        ]
-      },
-      "why": "UNTRIAGED: PUT (routes/schemas.ts) checks in the handler that the caller has the owner role or is the operator (isOperatorCaller), with an entry in route-scope-exemptions.json; DELETE asks memory:write and admits an agent holding it. Lead, not decided. Decision 13a of 2026-11-05 stopped here: neither side admits all the other does (an operator's agent without memory:write may PUT and not DELETE), and DELETE's memory:write would let an app grant, an ecosystem app or a visitor holding it set a schema lock with PUT, a principal that is not the owner or the owner's agent."
-    },
     "/v1/notifications": {
       "verbs": {
         "DELETE": [
@@ -158,19 +146,6 @@
       },
       "why": "Designed: deleting asks app:manage and changing asks app:write, as for an app (services/scope-vocabulary-migration.ts)."
     },
-    "/v1/schedules/:": {
-      "verbs": {
-        "DELETE": [
-          "requireAuth()",
-          "requireRestScope('memory:write')"
-        ],
-        "PATCH": [
-          "requireAuth()",
-          "requireRestScope('workflow:write')"
-        ]
-      },
-      "why": "UNTRIAGED: PATCH (routes/schedules.ts) asks workflow:write and DELETE asks memory:write; an agent holding memory:write without workflow:write may delete a schedule it may not change. Lead from the codebase analysis 2026-11-03 finding 12, not decided. Decision 13a of 2026-11-05 stopped here: the looser side is either word on both verbs, and that lets an app grant or an ecosystem app holding memory:write (both grantable) change its schedules with PATCH, a principal that is not the owner or the owner's agent. aimeat_schedule_update and aimeat_schedule_delete name the same two words."
-    },
     "/v1/templates/:": {
       "verbs": {
         "DELETE": [
@@ -183,20 +158,6 @@
         ]
       },
       "why": "Designed: app:manage is the word for removing a template (services/scope-vocabulary-migration.ts), app:write for changing one."
-    },
-    "/v1/workflows/:": {
-      "verbs": {
-        "DELETE": [
-          "requireAuth()",
-          "requireScope('workflow:write')"
-        ],
-        "PUT": [
-          "requireAuth()",
-          "requireLocalSession()",
-          "requireScope('workflow:write')"
-        ]
-      },
-      "why": "UNTRIAGED: PUT (routes/workflows.ts) asks a session of this node (requireLocalSession, no visitor from another node) and workflow:write; DELETE asks workflow:write only. Lead from the codebase analysis 2026-11-03 finding 12, not decided. Decision 13a of 2026-11-05 stopped here: the looser side is DELETE's, and without requireLocalSession a visitor from another node holding workflow:write (an operator may grant a peer any word) could save workflows with PUT, a principal that is not the owner or the owner's agent. The owner's agent has the same rights on both verbs today."
     }
   }
 }

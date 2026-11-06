@@ -12,6 +12,10 @@
  *   delivered over SMTP (absent here), so it is covered by the unchanged verify-email path + the wrong-code
  *   assertion below.
  * @version-history
+ *   2026-11-06 — A code key's holder who confirms the address before the first sign-in still gets the
+ *     new password at that sign-in, and the key stops working: POST /v1/ghii/verify-email counted as
+ *     the first sign-in, so the key was never replaced. The same for a holder who enters by a sign-in
+ *     link first (GET /v1/ghii/magic-link/verify).
  *   2026-10-17 — The restart waits for the old node to EXIT and its port to go quiet. It waited on
  *     `child.killed`, which is true once the signal is sent, so on a loaded runner the old node
  *     answered the new one's readiness poll and then left (17/19 "fetch failed" every nightly since
@@ -33,7 +37,8 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { markEmailVerified } from './helpers/verified-email.js';
+import { markEmailVerified, seedEmailVerification } from './helpers/verified-email.js';
+import { seedSignInLink } from './helpers/seed-password.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
@@ -118,6 +123,8 @@ async function main() {
     const keyOwner = `keyholder${Date.now() % 1000000}`;   // made by a code key, address unverified
     const keyEmail = `key-${Date.now()}@example.com`;
     const keyCode = 'KeyCode12345';
+    const linkKeyOwner = `linkkey${Date.now() % 1000000}`;
+    const linkKeyEmail = `linkkey-${Date.now()}@example.com`;
     let verificationId = '';
 
     console.log('\n=== Login → attach-email recovery E2E ===\n');
@@ -156,6 +163,12 @@ async function main() {
                 body: JSON.stringify({ email: keyEmail, username: keyOwner, code: keyCode, display_name: 'Key Holder' }),
             });
             assert(second.status === 201, `second code mint ${second.status}: ${JSON.stringify(second.body.error)}`);
+            // A third key, whose holder enters by a sign-in link before signing in with the key.
+            const third = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ email: linkKeyEmail, username: linkKeyOwner, code: keyCode, display_name: 'Link Key Holder' }),
+            });
+            assert(third.status === 201, `third code mint ${third.status}: ${JSON.stringify(third.body.error)}`);
         });
     } finally {
         await stopServer(server);
@@ -303,6 +316,34 @@ async function main() {
             });
             assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
             assert(typeof body.data.verification_id === 'string' && body.data.verification_id.length > 0, 'verification_id present');
+        });
+        await test('the key holder confirms the address first, and the first sign-in with the key still gives the new password', async () => {
+            // On this node the holder confirms the address before any sign-in, so the confirmation
+            // must not take the place of the first sign-in: that sign-in replaces the key, which the
+            // person who minted it also knows, with a password only the holder gets.
+            const code = '424242';
+            const id = await seedEmailVerification(keyOwner, keyEmail, code, { sqlitePath: db!.dbUrl || db!.sqlitePath });
+            const verified = await json('/v1/ghii/verify-email', { method: 'POST', body: JSON.stringify({ verification_id: id, code }) });
+            assert(verified.status === 200, `verify-email ${verified.status}: ${JSON.stringify(verified.body.error)}`);
+            const first = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: keyOwner, password: keyCode }) });
+            assert(first.status === 200, `first sign-in with the key ${first.status}: ${JSON.stringify(first.body.error)}`);
+            const issued = first.body.data.key_credentials;
+            assert(typeof issued?.password === 'string' && issued.password.length > 0, `the first sign-in gave no new password: ${JSON.stringify(issued)}`);
+            const old = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: keyOwner, password: keyCode }) });
+            assert(old.status === 401, `the key still signs in after it was replaced: ${old.status}`);
+            const fresh = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: keyOwner, password: issued.password }) });
+            assert(fresh.status === 200 && !fresh.body.data.key_credentials, `the new password: ${fresh.status} ${JSON.stringify(fresh.body.error)}`);
+        });
+        await test('a key holder who enters by a sign-in link first still gets the new password at the first sign-in with the key', async () => {
+            const dbArg = { sqlitePath: db!.dbUrl || db!.sqlitePath, nodeId: NODE_ID };
+            await markEmailVerified(linkKeyOwner, linkKeyEmail, dbArg);
+            const link = await seedSignInLink(BASE, linkKeyOwner, linkKeyEmail, dbArg);
+            const token = new URL(link).searchParams.get('token') ?? '';
+            const entered = await json(`/v1/ghii/magic-link/verify?token=${encodeURIComponent(token)}`);
+            assert(entered.status === 200, `the sign-in link ${entered.status}: ${JSON.stringify(entered.body.error)}`);
+            const first = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: linkKeyOwner, password: keyCode }) });
+            assert(first.status === 200, `first sign-in with the key ${first.status}: ${JSON.stringify(first.body.error)}`);
+            assert(typeof first.body.data.key_credentials?.password === 'string', `the first sign-in after a link gave no new password: ${JSON.stringify(first.body.data.key_credentials)}`);
         });
         await test('login still gated until the code is confirmed → 403', async () => {
             const { status } = await json('/v1/ghii/login', {

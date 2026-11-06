@@ -43238,7 +43238,10 @@ paths:
       description: |
         Lock a memory key (or key prefix) to a JSON Schema. All future writes
         to matching keys, by every account, are validated against this schema.
-        An account holder or the operator may set one, within these limits
+        The account holder, an agent of theirs holding memory:write, or the operator
+        may set one (auth/schema-lock-caller.ts; PUT and DELETE ask the same). An app
+        or a connected outside app changes only a lock it holds and sets no new one,
+        and a visitor from another node is refused. Within these limits
         (services/schema-lock-rule.ts):
           - a pattern that starts with a wildcard, or a trailing-star pattern that
             is not a `name:*` key family, reaches every account's keys: operator only
@@ -43345,8 +43348,11 @@ paths:
       operationId: deleteMemorySchema
       summary: Remove schema from a memory key
       description: |
-        Remove one schema lock row: the (key pattern, apply_to) pair. Only the
-        principal that set it, or the operator, may remove it (403 NOT_SCHEMA_OWNER).
+        Remove one schema lock row: the (key pattern, apply_to) pair. The caller is
+        the one PUT admits: the account holder, an agent of theirs holding
+        memory:write, or the operator. Only the principal that set the lock, the
+        account holder for a lock one of their agents set, or the operator, may
+        remove it (403 NOT_SCHEMA_OWNER).
         Without apply_to the exact lock is the row, else the prefix lock; the other
         row of the same pattern, which may be another principal's, is left in place.
       tags: [Schema]
@@ -62503,10 +62509,11 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
-      x-aimeat-scope: { word: 'workflow:write', enforcedIn: '4.0.0' }
+      x-aimeat-scope: { word: 'workflow:write', enforcedIn: '4.0.0', orScope: 'memory:write' }
       operationId: updateSchedule
       summary: Edit a schedule (cron, enabled/pause, timezone, constraints, input)
       description: >
+        Editing and deleting a schedule take the same words: workflow:write or memory:write.
         A caller that is not the owner in person holds the scope for what the schedule
         drives, as on create (`ext:invoke` for an extension schedule, `ai:use` for an ai
         schedule, `task:write` for agent_task, `work:request` for eco-capability,
@@ -62583,7 +62590,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
-      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
+      x-aimeat-scope: { word: 'workflow:write', enforcedIn: '4.0.0', orScope: 'memory:write' }
       operationId: deleteSchedule
       summary: Cancel and remove a schedule (the owner may delete agent-created ones)
       tags: [Schedules]
@@ -62821,6 +62828,9 @@ paths:
     delete:
       operationId: deleteWorkflow
       summary: Delete a workflow definition
+      description: >
+        Asks workflow:write and a session of this node, as saving one does: a visitor
+        from another node is refused 403 FORBIDDEN.
       tags: [Workflows]
       security:
         - BearerAuth: []

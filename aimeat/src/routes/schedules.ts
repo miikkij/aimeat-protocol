@@ -31,6 +31,8 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-11-06 — PATCH and DELETE /v1/schedules/:id both take workflow:write or memory:write (decision
+ *     13a of 2026-11-05, verb parity); PATCH asked only the first and DELETE only the second.
  *   2026-10-27 — PATCH answers `approval_request` when a sibling agent's new instruction waits for the
  *     owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
  *   2026-10-20 — The write caller says when it is an ecosystem app and carries its roles, so PATCH,
@@ -376,7 +378,11 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── PATCH /v1/schedules/:id — edit ──
-  router.patch('/v1/schedules/:id', requireAuth(), requireRestScope('workflow:write'), async (req, res) => {
+  // Editing and deleting take the same words, workflow:write or memory:write (decision 13a of
+  // 2026-11-05): an agent holding one of them managed half of its own schedule. canManageSchedule
+  // still limits an app and an ecosystem app to what they made, and an edit that changes what the
+  // schedule does still asks the word for what it drives (scheduleKindScopeRefusal).
+  router.patch('/v1/schedules/:id', requireAuth(), requireRestScope('workflow:write', { orScope: 'memory:write' }), async (req, res) => {
     const id = req.params.id as string;
     const out = await updateScheduleRecord(
       { storage, config, scheduler }, writeCaller(req), id, (req.body ?? {}) as Record<string, unknown>,
@@ -391,7 +397,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── DELETE /v1/schedules/:id — cancel ──
-  router.delete('/v1/schedules/:id', requireAuth(), requireRestScope('memory:write'), async (req, res) => {
+  router.delete('/v1/schedules/:id', requireAuth(), requireRestScope('workflow:write', { orScope: 'memory:write' }), async (req, res) => {
     const id = req.params.id as string;
     const out = await deleteScheduleRecord({ storage, config, scheduler }, writeCaller(req), id);
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }

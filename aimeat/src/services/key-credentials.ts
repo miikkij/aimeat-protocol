@@ -25,12 +25,15 @@
  *   routes/ghii/recovery.ts), sendHeldKeyCredentials mails it once and deletes the record. A record is
  *   deleted unsent when the account's password changed since it was issued (the mailed password would
  *   no longer sign in), and it lapses after HELD_TTL_HOURS.
- * @structure IssuedKeyCredentials · NS_HELD · HELD_TTL_HOURS · issueFirstLoginKeyCredentials ·
- *   sendHeldKeyCredentials
+ * @structure IssuedKeyCredentials · NS_HELD · HELD_TTL_HOURS · keyCredentialsPending ·
+ *   issueFirstLoginKeyCredentials · sendHeldKeyCredentials
  * @usage
  *   const cred = await issueFirstLoginKeyCredentials(storage, config, ghiiRecord); // null if N/A
  *   await sendHeldKeyCredentials(storage, config, ghii);                           // after the address is proven
  * @version-history
+ *   v1.1.2 — 2026-11-06 — keyCredentialsPending(): POST /v1/ghii/verify-email raised the login count of
+ *     a key holder who confirmed the address before the first sign-in, so that sign-in was not the
+ *     first and the key stayed the password.
  *   v1.1.1 — 2026-11-05 — A held record's key is HELD_KEY_PREFIX and the GHII, so the re-encrypt job of
  *     decision 4a lists and reseals it (codebase analysis 2026-11-03, decisions 4a and 14a of 2026-11-05).
  *   v1.1.0 — 2026-11-05 — The credentials mail goes as an owner mail, to the proven address only; an
@@ -112,6 +115,22 @@ async function holdCredentials(storage: Storage, config: AimeatConfig, inv: Invi
     ttlHours: HELD_TTL_HOURS, version: 1, createdAt: now, updatedAt: now,
   });
   return true;
+}
+
+/**
+ * Whether `username` is a code key's account whose first sign-in has not happened yet: its invitation
+ * is not accepted, so the key is still its password. An address confirmed before that sign-in
+ * (routes/ghii/web-verify.ts) must not count as it, or the key is never replaced. False on a read failure.
+ */
+export async function keyCredentialsPending(storage: Storage, username: string): Promise<boolean> {
+  try {
+    const inv = await storage.getCodeInvitationByProvisionedOwner(username);
+    return !!inv && !inv.acceptedBy;
+  } catch (err) {
+    // The caller counts the entry as a sign-in, as before this check existed.
+    logger.warn('keyCredentialsPending: the code invitation could not be read', { username, error: (err as Error).message });
+    return false;
+  }
 }
 
 /**
