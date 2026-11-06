@@ -159,7 +159,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@node-saml/node-saml](https://github.com/node-saml/node-saml#readme) | 5.2.0 | MIT |
 | [@openrouter/ai-sdk-provider](https://github.com/OpenRouterTeam/ai-sdk-provider) | 3.1.0 | Apache-2.0 |
 | [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.10.0 | Apache-2.0 |
-| [@owf/identity-common](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common) | 0.6.2 | Apache-2.0 |
+| [@owf/identity-common](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common) | 0.7.0 | Apache-2.0 |
 | [@peculiar/asn1-android](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/android#readme) | 2.11.1 | MIT |
 | [@peculiar/asn1-asym-key](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/asym-key#readme) | 2.11.1 | MIT |
 | [@peculiar/asn1-cms](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/cms#readme) | 2.11.1 | MIT |
@@ -183,7 +183,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@peculiar/utils](https://github.com/PeculiarVentures/pvtsutils#readme) | 4.1.0 | MIT |
 | [@peculiar/x509](https://github.com/PeculiarVentures/x509#readme) | 2.2.0 | MIT |
 | [@prometheus-io/client](https://github.com/prometheus/client_js) | 0.16.1 | Apache-2.0 |
-| [@sd-jwt/core](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/sd-jwt-core) | 0.23.2 | Apache-2.0 |
+| [@sd-jwt/core](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/sd-jwt-core) | 0.24.3 | Apache-2.0 |
 | [@simplewebauthn/server](https://github.com/MasterKale/SimpleWebAuthn/tree/master/packages/server#readme) | 14.0.3 | MIT |
 | [@so-ric/colorspace](https://github.com/so-ric/colorspace) | 1.1.6 | MIT |
 | [@standard-schema/spec](https://standardschema.dev) | 1.1.0 | MIT |
@@ -2865,7 +2865,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### Apache Arrow (JS) 17.0.0, Swagger UI (swagger-ui-dist) 5.34.1, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.10.0, @owf/identity-common 0.6.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.23.2, @trustnxt/c2pa-ts 0.14.1, b4a 1.9.0, bare-buffer 3.7.1, bare-events 2.9.2, bare-fs 4.8.4, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.6, events-universal 1.0.1, schema-dts-lib 1.1.0, schema-dts 2.1.0, text-decoder 1.2.7
+### Apache Arrow (JS) 17.0.0, Swagger UI (swagger-ui-dist) 5.34.1, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.10.0, @owf/identity-common 0.7.0, @prometheus-io/client 0.16.1, @sd-jwt/core 0.24.3, @trustnxt/c2pa-ts 0.14.1, b4a 1.9.0, bare-buffer 3.7.1, bare-events 2.9.2, bare-fs 4.8.4, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.6, events-universal 1.0.1, schema-dts-lib 1.1.0, schema-dts 2.1.0, text-decoder 1.2.7
 
 ```text
 Apache License
