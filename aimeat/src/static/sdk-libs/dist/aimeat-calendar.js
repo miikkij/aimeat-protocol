@@ -1374,7 +1374,7 @@
   );
   var iterresult_default = IterResult;
 
-  // node_modules/.pnpm/tslib@2.8.1/node_modules/tslib/tslib.es6.mjs
+  // node_modules/.pnpm/tslib@2.9.1/node_modules/tslib/tslib.es6.mjs
   var extendStatics = function(d2, b2) {
     extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d3, b3) {
       d3.__proto__ = b3;
