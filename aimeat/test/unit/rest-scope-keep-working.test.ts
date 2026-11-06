@@ -21,6 +21,9 @@
  *   - The owner gets one line on the activity feed, the operator one incident on the Security page.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-keep-working.test.ts
  * @version-history
+ *   v1.1.4 — 2026-11-06 — The worker gets every listed word except one whose passedBy word it already
+ *     holds: workflow:write is passedBy memory:write since PATCH /v1/schedules/:id admits either word
+ *     (4f911dee3), and the worker holds memory:write. A new assertion says it gets no workflow:write.
  *   v1.1.3 — 2026-11-01 — INLINE_CONSTANTS names DATAPACKAGE_WITHDRAW_SCOPE (storage:write), which the
  *     data package withdrawal route refuses inline with, and INLINE_NOT_KEPT says why the keep-working
  *     step does not give it: the route asked it from its first day.
@@ -327,9 +330,13 @@ describe('the third step on a node', () => {
 
         const worker = (await scopesOf('worker'))!;
         expect(worker.slice(0, BEFORE_ALL.length)).toEqual(BEFORE_ALL);
-        for (const w of REST_SCOPE_KEEP_WORKING_WORDS.map(x => x.word)) {
-            if (!BEFORE_ALL.includes(w)) expect(worker).toContain(w);
+        for (const w of REST_SCOPE_KEEP_WORKING_WORDS) {
+            // A word whose passedBy word the worker already holds is not missing: it passes that gate now.
+            if ((w.passedBy ?? []).some(p => BEFORE_ALL.includes(p))) continue;
+            if (!BEFORE_ALL.includes(w.word)) expect(worker).toContain(w.word);
         }
+        // memory:write passes PATCH /v1/schedules/:id since 4f911dee3, so the worker gets no workflow:write.
+        expect(worker).not.toContain('workflow:write');
         expect(new Set(worker).size).toBe(worker.length);
         expect(r.agents.map(a => a.id)).toContain(gaii('worker'));
         expect(r.ecosystemApps.map(a => a.id)).toEqual([geai('radio')]);

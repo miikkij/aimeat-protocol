@@ -67,6 +67,8 @@
  *   const before = new Date().toISOString();
  *   migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: before });
  * @version-history
+ *   2026-11-06 — workflow:write is passedBy memory:write: PATCH /v1/schedules/:id, its one gate, admits
+ *     either word since 4f911dee3, so a principal holding memory:write already passes it.
  *   2026-10-27 — secaudit2026oct26: each half's cutoff is never later than the time its rule first
  *     took effect on the node (once-only-step.ts keptBefore), so a late rerun keeps no principal or
  *     app made meanwhile.
@@ -218,6 +220,7 @@ export const REST_SCOPE_KEEP_WORKING_WORDS: ReadonlyArray<KeepWorkingWord> = [
   {
     word: 'workflow:write',
     opens: 'PATCH /v1/schedules/:id (routes/schedules.ts)',
+    passedBy: ['memory:write'],
   },
 ];
 
