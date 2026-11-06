@@ -2052,7 +2052,7 @@
         "failed": "failed",
         "failedSub": "gave up after four attempts",
         "reach": "can be reached",
-        "reachSub": "of {total} accounts have an address"
+        "reachSub": "of {total} accounts have a verified address"
       },
       "test": {
         "title": "Send a test message",
@@ -2085,7 +2085,7 @@
         "colTemplate": "Template",
         "colSent": "Sent",
         "hardCoded": "hard-coded",
-        "note": "A person receives any of these only if they have a notification address on their account. The counts are lifetime totals from this instance's own counters; the messages themselves are not stored.",
+        "note": "A person receives any of these only if they have a notification address on their account. The access key credentials and the group message go only to an address the person has verified. The counts are lifetime totals from this instance's own counters; the messages themselves are not stored.",
         "when": {
           "verification": "Someone signs up, or adds an email address to an account",
           "magic_link": "Someone asks to sign in without a password",
@@ -2098,7 +2098,7 @@
       },
       "group": {
         "title": "Send to a group",
-        "lead": "One message to everyone in the group who has an email address on their account. It goes out as a notification, one message per recipient with no shared To or Cc, and it cannot be recalled.",
+        "lead": "One message to everyone in the group who has a verified email address on their account. It goes out as a notification, one message per recipient with no shared To or Cc, and it cannot be recalled.",
         "group": "Group",
         "operators": "Operators",
         "everyone": "Everyone",
@@ -2107,13 +2107,15 @@
         "body": "Message",
         "bodyPlaceholder": "Plain text. It is wrapped in the notification template.",
         "send": "Send to {n}",
-        "nobody": "Nobody has an address",
+        "nobody": "Nobody has a verified address",
         "sending": "Sending",
         "note": "Sent one at a time. A recipient the server refuses is skipped and the rest still go.",
         "done": "Sent to {sent} of {total}.",
+        "doneSkipped": "Sent to {sent} of {total}. {skipped} skipped because their address is not verified.",
         "whoTitle": "Who receives it",
         "ofN": "{n} of {total}",
-        "whoHint": "The people left out have no email address on their account. They are skipped, and no error is reported."
+        "unverified": "Address not verified, skipped",
+        "whoHint": "The people left out have no email address on their account, or have not verified it. They are skipped, and no error is reported."
       },
       "tpl": {
         "title": "Templates",
@@ -13350,6 +13352,7 @@
     "cfgDesc_node_id": "Unique identifier of this instance",
     "cfgDesc_node_port": "HTTP listen port",
     "cfgDesc_node_bind_host": "The address the server answers on: 127.0.0.1 for this machine only, 0.0.0.0 for the local network and every other network that reaches the machine. Empty answers on every address. A server open beyond this machine gets the public safety defaults unless the security profile says otherwise. Set in the environment; takes effect at the next start.",
+    "cfgDesc_node_processes": "One process (the default) or several on the same database. With one, a process that starts takes all the work at once, also when its container gets a new host name. With several, a process takes another running process's work only after that process has stopped reporting that it runs (30 s). Set the same value on every process. Takes effect at the next start.",
     "cfgDesc_node_type": "Instance type: full, relay, or personal",
     "cfgDesc_storage_type": "Storage backend type",
     "cfgDesc_node_sealed_config_keys": "Settings whoever runs this instance set and nobody here can change. Readable, not writable. Empty when you run it yourself",
@@ -14432,6 +14435,7 @@
     "cfg_node_id": "Node ID",
     "cfg_node_port": "Port",
     "cfg_node_bind_host": "Listen address",
+    "cfg_node_processes": "Server processes",
     "cfg_node_type": "Node Type",
     "cfg_storage_type": "Storage Type",
     "cfg_morsel_policy_welcome_bonus": "Welcome Bonus",
@@ -14705,6 +14709,37 @@
     "cfgDesc_dataspace_max_processes_per_participant": "How many open negotiations and transfers one participant may hold with one account at a time. An account holds 400 in all, so this limit stops one participant from taking them all and locking the others out. Past it the participant is refused until it completes or terminates one. 0: no limit of its own, only the account's 400. The default is 100.",
     "cfgDesc_consent_share_max_days": "How long an owner may share a data product with a named outside party.",
     "cfgDesc_consent_party_purchases_per_hour": "How many purchases of a data package one address may start in an hour without an account or a party key. Past it, the next one is refused until the hour ends. An outside party that buys again with its key is not counted. 0 means no limit.",
+    "keyRing": {
+      "title": "Data keys",
+      "desc": "The key that seals every stored secret, and the job that moves the stored secrets to a new key.",
+      "keys": "Keys this server holds",
+      "keysTwo": "{a} and {b}",
+      "none": "None",
+      "current": "Seals new secrets",
+      "currentSub": "Set in the environment (AIMEAT_ENCRYPTION_KEY_CURRENT).",
+      "lastRun": "Last run of the job",
+      "state": {
+        "running": "Running",
+        "done": "Finished",
+        "failed": "Stopped on an error"
+      },
+      "counts": "What the run found",
+      "countsLine": "{moved} moved, {current} already on the new key, {unreadable} do not open, {changed} changed while it ran",
+      "unreadableAt": "Values that do not open",
+      "noKey": "This server has no data key, so it stores no secret.",
+      "oneKey": "This server has one data key, so there is nothing to move. To replace the key, set AIMEAT_ENCRYPTION_KEY_1 and AIMEAT_ENCRYPTION_KEY_CURRENT=1 on every process of the server, restart them, and start the job here.",
+      "noRun": "New secrets are sealed with key {key}. Start the job to move the stored secrets to it. Keep {other} until the job finishes with no value left under it.",
+      "running": "The job moves the stored secrets to key {key}. Every secret opens while it runs. Keep {other}.",
+      "failed": "The last run stopped on an error. Start it again. Keep {other}.",
+      "stale": "The last run moved the secrets to key {key}, and key {current} seals new secrets now. Start the job again. Keep {other}.",
+      "removable": "Every stored secret is on key {key}. You can now remove {other} from the environment of every process and restart them. Keep a copy of it with the backups made before this run, because they still need it.",
+      "left": "{n} stored values are not on key {key}: they do not open with either key, or they changed while the job ran. Start the job again, and keep {other} until it reports 0.",
+      "start": "Move stored secrets to the new key",
+      "started": "The job started. The figures update while it runs.",
+      "alreadyRunning": "The job is already running.",
+      "startFailed": "The job did not start.",
+      "readFailed": "The data key status could not be read."
+    },
     "dataOut": {
       "dspTitle": "Dataspace Protocol now",
       "dspState": "State",
@@ -15291,6 +15326,8 @@
     "cfgOpt_node_log_level_verbose": "Detailed",
     "cfgOpt_node_log_level_debug": "For debugging",
     "cfgOpt_node_log_level_silly": "Everything",
+    "cfgOpt_node_processes_single": "One process",
+    "cfgOpt_node_processes_multiple": "Several processes",
     "cfg_node_perf_trace": "Storage call timing",
     "cfgDesc_node_perf_trace": "Time every storage call and log the slow ones. For finding why a server is slow; it costs a little on every call. Set in the environment.",
     "cfg_node_key_path": "Server key file",
@@ -15299,6 +15336,10 @@
     "cfgDesc_node_key_passphrase_configured": "Whether the server's key file is encrypted with a passphrase (AIMEAT_KEY_PASSPHRASE). The value is never shown.",
     "cfg_node_encryption_key_configured": "Data key set?",
     "cfgDesc_node_encryption_key_configured": "Whether the key that encrypts the stored secrets is set (AIMEAT_ENCRYPTION_KEY). The value is never shown.",
+    "cfg_node_encryption_key_1_configured": "Second data key set?",
+    "cfgDesc_node_encryption_key_1_configured": "Whether a second data key is set (AIMEAT_ENCRYPTION_KEY_1), for replacing the data key. With it set, a stored secret opens with whichever of the two keys sealed it. The value is never shown.",
+    "cfg_node_encryption_key_current": "Data key for new secrets",
+    "cfgDesc_node_encryption_key_current": "Which data key seals new secrets: 0 is AIMEAT_ENCRYPTION_KEY (the default), 1 is AIMEAT_ENCRYPTION_KEY_1. The secrets already stored keep opening, and the re-encrypt job below moves them to this key. Set in the environment.",
     "cfg_federation_public_key": "Federation public key",
     "cfgDesc_federation_public_key": "The public half of the key pair `aimeat join` made for federation. Empty until this server joins one.",
     "cfg_federation_private_key_configured": "Federation private key set?",
@@ -29483,6 +29524,17 @@
       }
     },
     "config": {
+      "node": {
+        "processes": {
+          "title": "Server processes",
+          "short": "Whether one process serves this server or several on the same database. One is the default.",
+          "what": "A process is one running copy of the server program. With one process, a process that starts takes all the server's work at once: the tasks that run at every start, the AI jobs left waiting and the timed clean-ups. It does so also when it starts in a new container with a new host name, because no other process can be running. With several processes, an active process and a standby, or several active processes behind a load balancer, share one database. Each piece of work then runs once: a process takes another process's work only after that process has stopped reporting that it runs, 30 seconds after its last report. A process that was stopped normally hands its work over at once.",
+          "range": "One of two: One process (the default) or Several processes. The server reads it at start, so a change takes effect at the next start.",
+          "ex1": "One process: a server in one container that is created again at each update.",
+          "ex2": "Several processes: a second process waits on another host as a standby, or two processes share the traffic behind a load balancer.",
+          "tip": "Set the same value on every process. With One process, do not start a second process on the same database: both would run the same work."
+        }
+      },
       "consent": {
         "data_intermediation": {
           "title": "Data intermediation service",

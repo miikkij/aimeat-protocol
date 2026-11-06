@@ -35,10 +35,16 @@
  *   the document and the response. Each needs the session id (128 random bits); the document also
  *   needs its own token, and the response its `state`. A session serves one signature and closes.
  * @structure WalletStatus · walletStatus · startWalletSignature · walletSessionStatus ·
- *   walletRequestObject · walletDocument · receiveWalletResponse · receiveWalletResponseByState ·
- *   walletClient · parseDocumentWithSignature
+ *   WalletSession · WalletProof · walletSessionFor · openWalletSessionByState ·
+ *   walletRequestObject · walletDocument · receiveWalletResponse · answerWalletResponse ·
+ *   receiveWalletResponseByState · walletClient · parseDocumentWithSignature
  * @usage const s = await startWalletSignature(ctx, caller, id, { bytes });
  * @version-history
+ *   2026-11-05 -- What a wallet presents (the session id, the document token, the state) is checked by
+ *     walletSessionFor() and openWalletSessionByState(), which the 'docsign-wallet' credential strategy
+ *     calls (src/auth/credential-strategies.ts); walletRequestObject, walletDocument and
+ *     answerWalletResponse take the verified session. The same checks in the same order with the same
+ *     refusals (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-10-31 -- receiveWalletResponse checks that the request is still open (checkWalletSignature) before any refusal keeps the returned PDF in the signer's files, and again before the signed PDF is stored; an answer for a cancelled or already signed request had its PDF kept as rejected-*.pdf and charged to the quota (secaudit 2026-10-31 inv-17).
  *   2026-10-25 -- The certificate's holder name is compared with the name the account's identity verification recorded, when there is one, not with the editable display name (walletNameBinding); an account without one seals on its display name with the caveat NAME_NOT_VERIFIED (secaudit2026oct22, lead 3924).
  *   2026-10-25 -- A wallet signature whose certificate's revocation status could not be established is sealed with the caveat REVOCATION_UNKNOWN, which the statement and the public lookup carry (walletCaveats; secaudit2026oct22, lead 3895).
@@ -182,7 +188,7 @@ export function walletStatus(ctx: DocsignCtx): WalletStatus {
 
 type SessionStatus = 'waiting' | 'fetched' | 'signed' | 'failed' | 'expired';
 
-interface WalletSession {
+export interface WalletSession {
   id: string;
   requestId: string;
   signer: string;
@@ -303,10 +309,42 @@ export function walletSessionStatus(caller: CallerContext, requestId: string, se
 
 // ── what the wallet calls ──
 
-/** The signed request object the wallet fetches from request_uri. */
-export async function walletRequestObject(ctx: DocsignCtx, sessionId: string): Promise<string> {
+/**
+ * What a wallet presents besides the session id: nothing (the request object), the document token,
+ * or the `state` its answer carries.
+ */
+export type WalletProof = { kind: 'open' } | { kind: 'document'; token: string } | { kind: 'state'; form: Record<string, unknown> };
+
+/**
+ * The open session a wallet's request names, or the DocsignError the wallet is answered with: an
+ * unknown session 404, a session no longer open 409, a document token that is not the session's 404,
+ * a state that is not the session's 400.
+ */
+export function walletSessionFor(sessionId: string, proof: WalletProof): WalletSession {
   const s = openSession(sessionId);
+  if (proof.kind === 'document') {
+    if (!s.bytes || (s.status !== 'waiting' && s.status !== 'fetched') || !sameSecret(proof.token, s.docToken)) {
+      throw new DocsignError('NOT_FOUND', 404, 'No such document.');
+    }
+    return s;
+  }
   if (s.status !== 'waiting' && s.status !== 'fetched') throw new DocsignError('NOT_OPEN', 409, `This wallet session is ${s.status}.`);
+  if (proof.kind === 'state' && (typeof proof.form.state !== 'string' || !sameSecret(proof.form.state, s.state))) {
+    throw new DocsignError('INVALID_STATE', 400, 'state does not match this session.');
+  }
+  return s;
+}
+
+/** The open session whose `state` a wallet's form carries, or null when no open session has it. */
+export function openWalletSessionByState(form: Record<string, unknown>): WalletSession | null {
+  if (typeof form.state !== 'string' || !form.state) return null;
+  sweep();
+  const state = form.state;
+  return [...sessions.values()].find((x) => (x.status === 'waiting' || x.status === 'fetched') && sameSecret(state, x.state)) ?? null;
+}
+
+/** The signed request object the wallet fetches from request_uri, for a session walletSessionFor() opened. */
+export async function walletRequestObject(ctx: DocsignCtx, s: WalletSession): Promise<string> {
   const { cred, client, reason } = credential(ctx);
   if (!cred || !client) throw new DocsignError('WALLET_NOT_READY', 503, reason!);
   const u = urls(ctx, s);
@@ -331,14 +369,10 @@ export async function walletRequestObject(ctx: DocsignCtx, sessionId: string): P
     .sign(cred.key);
 }
 
-/** The PDF the wallet downloads from the address in the request object. */
-export function walletDocument(sessionId: string, token: string): { bytes: Buffer; name: string } {
-  const s = openSession(sessionId);
-  if (!s.bytes || (s.status !== 'waiting' && s.status !== 'fetched') || !sameSecret(token, s.docToken)) {
-    throw new DocsignError('NOT_FOUND', 404, 'No such document.');
-  }
+/** The PDF the wallet downloads, for a session walletSessionFor() opened with its document token. */
+export function walletDocument(s: WalletSession): { bytes: Buffer; name: string } {
   s.status = 'fetched';
-  return { bytes: s.bytes, name: s.name };
+  return { bytes: s.bytes!, name: s.name };
 }
 
 /**
@@ -448,10 +482,7 @@ function sameName(a: string | null | undefined, b: string | null | undefined): b
  * it, so the caller answers as it would have without this route.
  */
 export async function receiveWalletResponseByState(ctx: DocsignCtx, form: Record<string, unknown>): Promise<{ redirect_uri: string } | null> {
-  if (typeof form.state !== 'string' || !form.state) return null;
-  sweep();
-  const state = form.state;
-  const s = [...sessions.values()].find((x) => (x.status === 'waiting' || x.status === 'fetched') && sameSecret(state, x.state));
+  const s = openWalletSessionByState(form);
   return s ? receiveWalletResponse(ctx, s.id, form) : null;
 }
 
@@ -460,9 +491,11 @@ export async function receiveWalletResponseByState(ctx: DocsignCtx, form: Record
  * Returns where the wallet should send the person next.
  */
 export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, form: Record<string, unknown>): Promise<{ redirect_uri: string }> {
-  const s = openSession(sessionId);
-  if (s.status !== 'waiting' && s.status !== 'fetched') throw new DocsignError('NOT_OPEN', 409, `This wallet session is ${s.status}.`);
-  if (typeof form.state !== 'string' || !sameSecret(form.state, s.state)) throw new DocsignError('INVALID_STATE', 400, 'state does not match this session.');
+  return answerWalletResponse(ctx, walletSessionFor(sessionId, { kind: 'state', form }), form);
+}
+
+/** The wallet's answer, for a session walletSessionFor() opened with the state the form carries. */
+export async function answerWalletResponse(ctx: DocsignCtx, s: WalletSession, form: Record<string, unknown>): Promise<{ redirect_uri: string }> {
   const appBase = ctx.config.docsignAppUrl || ctx.config.baseUrl.replace(/\/+$/, '');
   const redirect_uri = `${appBase}/?request=${encodeURIComponent(s.requestId)}`;
   const finish = (status: SessionStatus, error: WalletSession['error']) => { s.status = status; s.error = error; s.bytes = null; };

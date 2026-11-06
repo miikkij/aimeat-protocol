@@ -706,21 +706,45 @@
     "principal-kind": {},
     "payer-resolve": {},
     "scope-widen-at-mint": {
-      "src/routes/agents-v2/enrolment.ts": {
-        "count": 1,
-        "why": "A MINT: the enrolled credential adds the store place's default on the agent's first time (widenAndAnnounce). Moving it to approval changes which agents get the default (B7 report); it stays here until the developer rules."
-      },
-      "src/routes/agents-v2/token.ts": {
-        "count": 1,
-        "why": "A MINT: the crew run's token adds the store place's default on the agent's first time (widenAndAnnounce). Moving it to approval changes which agents get the default (B7 report); it stays here until the developer rules."
-      },
       "src/routes/agents/device-auth-approve.ts": {
         "count": 1,
-        "why": "THE APPROVAL: the owner, or an agent within its own scopes, approves the agent and the place's default is written to its record there (applyPlaceDefault with the approver's bound). This is where the decision belongs."
+        "why": "AN APPROVAL: device authorization. The owner, or an agent within its own scopes, approves the agent and the place's default is written to its record there (applyPlaceDefault with the approver's bound)."
       },
-      "src/routes/auth.ts": {
+      "src/routes/agents/registration.ts": {
+        "count": 1,
+        "why": "AN APPROVAL: POST /v1/agents, the owner registering an agent. The place's default goes into the list the record is created with (decision 8b of 2026-11-05)."
+      },
+      "src/routes/agents/management.ts": {
+        "count": 1,
+        "why": "AN APPROVAL: POST /v1/agents/import, the owner importing an agent with `*`. `*` covers the default, so this only marks the agent as having had it (decision 8b of 2026-11-05)."
+      },
+      "src/routes/agents-v2/agent-proposals.ts": {
+        "count": 1,
+        "why": "AN APPROVAL: the owner approving an agent proposal. The place's default goes into the list the record is created with, which enrolment then copies (decision 8b of 2026-11-05)."
+      },
+      "src/routes/agents-v2/basic-agents.ts": {
+        "count": 1,
+        "why": "AN APPROVAL: the owner's basic agents press. The place's default goes into the list each new record is created with (decision 8b of 2026-11-05)."
+      },
+      "src/routes/ghii/web-verify.ts": {
         "count": 2,
-        "why": "MINTS: POST /v1/auth/token (an agent's signed challenge) and POST /v1/auth/refresh (an agent session) add the store place's default on the agent's first time (widenAndAnnounce). Moving them to approval changes which agents get the default (B7 report); they stay here until the developer rules."
+        "why": "AN APPROVAL: a mailbox proof makes or renews the account's app agent, the person's own act. The place's default goes into its list, once per agent (decision 8b of 2026-11-05)."
+      },
+      "src/server-bootstrap/once-only-keep-steps.ts": {
+        "count": 1,
+        "why": "THE STEP FOR EXISTING AGENTS at start: every agent not yet given the place's default gets it, once per agent, claimed in one write so two processes do not both give it (decision 8b of 2026-11-05)."
+      },
+      "src/services/config-apply.ts": {
+        "count": 1,
+        "why": "THE STEP FOR EXISTING AGENTS when site.purchase_plan is set through PUT /v1/admin/config, aimeat_admin_config_set or the CLI (decision 8b of 2026-11-05)."
+      },
+      "src/routes/admin-config.ts": {
+        "count": 1,
+        "why": "THE STEP FOR EXISTING AGENTS when the Consul import applies site.purchase_plan (decision 8b of 2026-11-05)."
+      },
+      "src/server-bootstrap/config-init.ts": {
+        "count": 1,
+        "why": "THE STEP FOR EXISTING AGENTS when the Consul watch applies site.purchase_plan while the node runs (decision 8b of 2026-11-05)."
       }
     },
     "token-mint": {
@@ -742,11 +766,11 @@
       },
       "src/routes/agents-v2/enrolment.ts": {
         "count": 1,
-        "why": "The enrolled agent's credential: role agent, the scopes on its record (with the store place's default, see scope-widen-at-mint)."
+        "why": "The enrolled agent's credential: role agent, the scopes on its record, copied; nothing added (decision 8b of 2026-11-05)."
       },
       "src/routes/agents-v2/token.ts": {
         "count": 1,
-        "why": "A crew run's token from a signed assertion: role agent, the scopes on its record (with the store place's default, see scope-widen-at-mint)."
+        "why": "A crew run's token from a signed assertion: role agent, the scopes on its record, copied; nothing added (decision 8b of 2026-11-05)."
       },
       "src/routes/agents/device-auth-approve.ts": {
         "count": 1,
@@ -758,7 +782,7 @@
       },
       "src/routes/auth.ts": {
         "count": 5,
-        "why": "Anonymous mode's token (ANONYMOUS_SCOPES); an agent's signed challenge (its record's scopes, with the place default); the deprecated owner-key sign-in (owner record roles); a PAT cookie refresh (the PAT row); POST /v1/auth/refresh (the same roles and the record's scopes again)."
+        "why": "Anonymous mode's token (ANONYMOUS_SCOPES); an agent's signed challenge (its record's scopes, copied); the deprecated owner-key sign-in (owner record roles); a PAT cookie refresh (the PAT row); POST /v1/auth/refresh (the same roles and the record's scopes again)."
       },
       "src/routes/ecosystem-apps.ts": {
         "count": 1,
@@ -785,12 +809,7 @@
         "why": "The owner's access token at sign-in and at the two refresh-cookie steps: the owner's current roles, no scopes."
       }
     },
-    "service-locator": {
-      "src/services/inactivity-nudge.ts": {
-        "count": 1,
-        "why": "runInactivityNudgeJob reads the mail service with getActiveEmailService, which returns nodeContext().email. test/unit/inactivity-nudge.test.ts replaces services/email.js with a mock that provides only this function, so reading nodeContext() here would bypass the test's mail service; tests are the contract, so the call stays until that test's mock is changed."
-      }
-    },
+    "service-locator": {},
     "aes-gcm": {},
     "token-key": {
       "src/cli/connect/agent-key.ts": {

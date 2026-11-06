@@ -10849,14 +10849,16 @@ paths:
                           connector:
                             $ref: '#/components/schemas/AgentConnector'
         '400': { description: An empty name, or one over 60 characters }
-        '403': { description: 'No agent:write, or an app or ecosystem principal' }
+        '403': { description: 'Not the account holder, and no agent:write; or an app or ecosystem principal' }
         '404': { description: No such connector on this account }
         '409': { description: 'Another connector carries that name (NAME_TAKEN), or the name given as address fits more than one (AMBIGUOUS_CONNECTOR)' }
     delete:
       operationId: forgetConnector
       summary: Forget a connector that is not connected
       description: |
-        THE ACCOUNT HOLDER IN PERSON. Removes the connector from the owner's list. Its agents stay:
+        The same callers as the rename: the account holder, or their agent holding `agent:write`
+        (or `account:security`); an app or ecosystem principal is refused. Removes the connector
+        from the owner's list. Its agents stay:
         they are records on the node. An agent that was waiting for this connector is then offered
         to whichever of the owner's connectors connects next. A connected connector is refused
         (CONNECTOR_ONLINE), because it would be listed again at once.
@@ -10871,7 +10873,7 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: Forgotten }
-        '403': { description: Not the account holder in person }
+        '403': { description: 'Not the account holder, and no agent:write; or an app or ecosystem principal' }
         '404': { description: No such connector on this account }
         '409': { description: The connector is connected right now }
 
@@ -40215,6 +40217,42 @@ paths:
       responses:
         '200': { description: '`{ app, registration }`' }
         '409': { description: 'NOT_REQUESTED or PARTY_REGISTRATION_OFF' }
+  /v1/admin/encryption/reencrypt:
+    get:
+      operationId: adminKeyReencryptStatus
+      summary: The data keys this node holds, and the last run of the re-encrypt job
+      description: >
+        Operator-only. `ring.keys` are the data key ids this node holds (0 is AIMEAT_ENCRYPTION_KEY,
+        1 is AIMEAT_ENCRYPTION_KEY_1) and `ring.current` the one new secrets are sealed with. `job` is
+        the last run (state running, done or failed; the key it moves values to; counts of values
+        checked, already current, moved, unreadable and changed while it ran; where the unreadable
+        values are), or null. `old_key_values` is how many values the last finished run left under
+        another key, `old_key_removable` whether the other key may now be removed from the
+        environment, and `says` what the operator can do now. Reads nothing stored on a node with one
+        data key. No key material is answered. Same as aimeat_admin_key_reencrypt.
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ ring: { keys, current }, job, old_key_values, old_key_removable, says }`' }
+        '403': { description: Not the operator }
+    post:
+      operationId: adminKeyReencryptStart
+      summary: Start moving every stored secret to the current data key
+      description: >
+        Operator-only. Starts the re-encrypt job in the background: every stored secret sealed with
+        another data key is sealed again with the current one, a batch at a time, each write made only
+        over the value that was read. Every secret keeps opening while it runs, and a restarted node
+        takes the job up again. A value that opens with neither key is never changed or deleted, only
+        counted. Answers 202 with the status when it started, 200 when a run is already going.
+        The keys are set in the environment only; this route takes no body. Same as
+        aimeat_admin_key_reencrypt with action start.
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: 'A run is already going: `{ started: false, ring, job, old_key_values, old_key_removable, says }`' }
+        '202': { description: 'Started: `{ started: true, ring, job, old_key_values, old_key_removable, says }`' }
+        '403': { description: Not the operator }
+        '409': { description: 'ONE_DATA_KEY: the node holds one data key, so there is nothing to move' }
   /v1/apps/{owner}/{filename}/members:
     get:
       operationId: appMembersList
@@ -40305,6 +40343,12 @@ paths:
         invited role, and they are notified as on approval. An app holds at most 200 open
         invitations (429 TOO_MANY_INVITES); inviting the same address again renews its invitation
         and replaces its link, and cancelling it stops the link.
+
+        An agent or the app's own token is not told whether the address has an account here: it
+        always stores an invitation. On a node that sends mail, each such invitation counts against
+        the account's emailed-invitation allowance, the one organism email invitations use (20 in ten
+        minutes for the owner and all their agents and apps together), before anything is stored;
+        past it the answer is 429 RATE_LIMITED with `retry_after_sec`.
 
 
         MANAGERS. A member whose role the carry plan lists in `manageRoles` may call this too, but
@@ -63702,7 +63746,9 @@ paths:
       operationId: deleteAgentTask
       summary: Delete a task
       description: >
-        Delete a task (owner only). Any task can be deleted EXCEPT one that is
+        Delete a task. The same callers as PATCH: the task's owner, or the
+        task's own agent at readiness `standard`; an app grant is refused.
+        Any task can be deleted EXCEPT one that is
         currently `active` -- a running task must be cancelled or paused first.
         Deletion also removes the task's event log and cleans its operational
         memory traces (the agent's live-status keys `agents.{name}.tasks.{id}.*`
@@ -66445,7 +66491,8 @@ paths:
         linked to. Never touches opt-out, bounce or suppression — that is the recipient's
         delivery state, and a card edit that could clear an opt-out would turn fixing a typo into
         a way to resume mailing someone who asked you to stop. The address is not editable here.
-        Absent and not-yours answer identically (404).
+        Absent and not-yours answer identically (404). The owner in person, or the owner's agent
+        holding messages:send, acts on the owner's address book, as for DELETE.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -72174,7 +72221,10 @@ paths:
     patch:
       operationId: updateSharingGroupMember
       summary: Update a member's role
-      description: Change a member's role in the sharing group. Requires admin role.
+      description: >-
+        Change a member's role in a sharing group the account owns. The owner in person, or their agent
+        holding `consent:groups`, as for removing the member. An app grant and an ecosystem app are
+        refused with 403.
       tags: [Sharing Groups]
       security:
         - BearerAuth: []
@@ -75908,12 +75958,15 @@ paths:
                             description: |
                               How many people a group send would reach, counted the same way the
                               send itself counts them. A person is reachable only through the
-                              notification address on their GHII record.
+                              notification address on their GHII record, and only once they have
+                              verified it.
                             properties:
                               accounts: { type: integer }
-                              with_address: { type: integer }
+                              with_address: { type: integer, description: Accounts with a verified address }
                               operators: { type: integer }
-                              operators_with_address: { type: integer }
+                              operators_with_address: { type: integer, description: Operators with a verified address }
+                              unverified: { type: integer, description: Accounts whose address is not verified; a send to everyone skips them }
+                              operators_unverified: { type: integer, description: Operators whose address is not verified; a send to the operators skips them }
                           sent:
                             type: object
                             description: |
@@ -75987,7 +76040,9 @@ paths:
       description: |
         Sends a notification email with the given subject and body to a recipient group
         ('operators' or 'all'). Requires operator role. Returns 400 if email is disabled
-        or the group is invalid.
+        or the group is invalid. Only verified addresses receive it, as with every mail to an
+        account's own address; `skipped_unverified` says how many accounts in the group were
+        skipped because their address is not verified.
       security:
         - BearerAuth: []
       requestBody:
@@ -76018,6 +76073,7 @@ paths:
                         properties:
                           sent: { type: integer }
                           total: { type: integer }
+                          skipped_unverified: { type: integer, description: Accounts in the group whose address is not verified; nothing was sent to them }
                           group: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -78527,6 +78583,21 @@ paths:
                           expires_at: { type: string }
                           owner_private_key: { type: string, description: Present only when a new key was minted }
                           owner_public_key: { type: string }
+                          key_credentials:
+                            type: object
+                            description: |
+                              Present only on the first sign-in of an account a code key made: the key is
+                              replaced by a new password, shown here once. The same details are emailed to
+                              the account's address when the account has verified it. When it has not,
+                              nothing is mailed now, `email_held` is true and `email_note` says so, and the
+                              mail goes when the address is verified (unless the password has changed by
+                              then).
+                            properties:
+                              username: { type: string, description: The exact sign-in name }
+                              password: { type: string, description: The new password that replaced the key }
+                              email_sent: { type: boolean, description: Whether the email with these details left now }
+                              email_held: { type: boolean, description: 'Present when the address is not verified: true when the email waits for the address to be verified, false when this node cannot keep it to send later (no data key)' }
+                              email_note: { type: string, description: Present with email_held. A sentence for the person about the email. }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

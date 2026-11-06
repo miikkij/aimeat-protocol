@@ -1,0 +1,5864 @@
+[
+  {
+    "id": "POST /v1/federation/replicate :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node, gaii, key, value, and version are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not replicate memory to or from this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature on replication request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on replication request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on replication request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on replication request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: signed ten minutes ago",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "conflict": "boolean",
+        "key": "string",
+        "replicated": "boolean",
+        "source_node": "string",
+        "version": "number"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/replicate :: signed now",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "conflict": "boolean",
+        "key": "string",
+        "replicated": "boolean",
+        "source_node": "string",
+        "version": "number"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node and message{id,senderGhii,recipientGhii} are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not deliver messages to this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature on message"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on message"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on message"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on message"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "The timestamp is missing, invalid, or outside the 5-minute window."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message :: signed now",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "RECIPIENT_NOT_FOUND",
+        "message": "No such recipient: alice@node-cs2"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node and broadcast{senderGhii} are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not broadcast to this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature or peer key"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on broadcast"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on broadcast"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on broadcast"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "The timestamp is missing, invalid, or outside the 5-minute window."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/broadcast :: signed now",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "delivered": "number"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node, message_id, and kind are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not deliver messages to this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature or peer public key"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on receipt"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on receipt"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on receipt"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: signed ten minutes ago",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "ok": "boolean"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/receipt :: signed now",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "ok": "boolean"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node, message_id, storage_key, owner_ghii, recipient_ghii are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not deliver messages to this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature or peer public key"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on storage grant"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on storage grant"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on storage grant"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "The timestamp is missing, invalid, or outside the 5-minute window."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/storage/grant :: signed now",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "No matching message for this grant"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node, gaii and key are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not replicate memory to or from this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature on retraction request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on retraction request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on retraction request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on retraction request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "The timestamp is missing, invalid, or outside the 5-minute window."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/retract :: signed now",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "key": "string",
+        "removed": "number",
+        "removed_keys": [
+          "string"
+        ],
+        "retracted": "boolean",
+        "source_node": "string"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node and signature are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not deliver messages to this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: unsigned",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node and signature are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: signature not text",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node and signature are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on reaction"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on reaction"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "The timestamp is missing, invalid, or outside the 5-minute window."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/message/reaction :: signed now",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "No message here that the reactor is a party of"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "source_node and actions array required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not read or sync the catalogue on this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature on catalogue-sync request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on catalogue-sync request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on catalogue-sync request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on catalogue-sync request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: signed ten minutes ago",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "catalogue_hash": "string",
+        "incremental": "boolean",
+        "source_node": "string",
+        "synced": "number",
+        "total_received": "number",
+        "updated": "number"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/catalogue-sync :: signed now",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "catalogue_hash": "string",
+        "incremental": "boolean",
+        "source_node": "string",
+        "synced": "number",
+        "total_received": "number",
+        "updated": "number"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: missing fields",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "AUTH_REQUIRED",
+        "message": "Authentication required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Authenticate to get a JWT token",
+            "method": "POST",
+            "url": "/v1/auth/token"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: peer of the contact tier",
+    "status": 201,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "@type": "string",
+        "acted": "boolean",
+        "advisory_type": "string",
+        "created_at": "string",
+        "direction": "string",
+        "evidence_hash": "null",
+        "id": "string",
+        "issued_by": "string",
+        "reason": "string",
+        "received_from": "string",
+        "status": "string",
+        "stored": "boolean",
+        "target_node": "string"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "AUTH_REQUIRED",
+        "message": "Authentication required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Authenticate to get a JWT token",
+            "method": "POST",
+            "url": "/v1/auth/token"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "AUTH_REQUIRED",
+        "message": "Authentication required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Authenticate to get a JWT token",
+            "method": "POST",
+            "url": "/v1/auth/token"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The signature on this trust notice does not verify against the sending peer's key."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The signature on this trust notice does not verify against the sending peer's key."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "The timestamp is missing, invalid, or outside the 5-minute window."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/trust-advisory :: signed now",
+    "status": 201,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "@type": "string",
+        "acted": "boolean",
+        "advisory_type": "string",
+        "created_at": "string",
+        "direction": "string",
+        "evidence_hash": "null",
+        "id": "string",
+        "issued_by": "string",
+        "reason": "string",
+        "received_from": "string",
+        "status": "string",
+        "stored": "boolean",
+        "target_node": "string"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "requesting_node and gaii are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not replicate memory to or from this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing signature on memory-list request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on memory-list request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on memory-list request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on memory-list request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: signed ten minutes ago",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing or stale timestamp on memory-list request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/memory/list :: signed now",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "CONSENT_REQUIRED",
+        "message": "alice@node-cs2 has not let peer-a sign them in, so peer-a cannot read or save their records on node-cs2. To allow it, the person adds peer-a under \"Sign-in from other AIMEAT servers\" on the Access tab of their profile on node-cs2.",
+        "details": {
+          "gaii": "alice@node-cs2",
+          "requesting_node": "peer-a"
+        }
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Do that part first and then come back to this.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "username is required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FEDERATION_AUTH_NOT_ALLOWED",
+        "message": "This link does not carry sign-ins"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The request is not signed by the requesting node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The request is not signed by the requesting node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The request is not signed by the requesting node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The request is not signed by the requesting node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_TIMESTAMP",
+        "message": "Request timestamp is too old or invalid"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/auth/verify :: signed now",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FEDERATION_AUTH_FAILED",
+        "message": "Sign-in failed. Check the password, and that your home node lets this node sign you in."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "The two nodes could not agree on who you are. Whoever runs them can fix it.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "from_node, to_node, gaii, amount, tracking_code, and signature are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not settle balances on this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: peer depeering",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "amount": "number",
+        "from_node": "string",
+        "gaii": "string",
+        "relay_distribution": "null",
+        "settled": "boolean",
+        "to_node": "string",
+        "tracking_code": "string"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: unsigned",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "from_node, to_node, gaii, amount, tracking_code, and signature are required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on settlement request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on settlement request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on settlement request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "The settlement's timestamp is missing, invalid, or more than five minutes from this node's clock. The sending node signs it again with the current time."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/settle :: signed now",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "amount": "number",
+        "from_node": "string",
+        "gaii": "string",
+        "relay_distribution": "null",
+        "settled": "boolean",
+        "to_node": "string",
+        "tracking_code": "string"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: missing fields",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "x-source-node header is required"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: unknown peer",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: peer suspended",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: peer of the contact tier",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "POLICY_DENIED",
+        "message": "This peer may not read or sync the catalogue on this node"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "You can change this in your settings, or ask whoever runs this node.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: peer with no key",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Peer has no public key on file for signature verification"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: peer depeering",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "Source node is not an active peer"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: unsigned",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Missing x-signature / x-timestamp on template listing request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: signature not text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on template listing request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on template listing request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: signed over other text",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "Invalid signature on template listing request"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: signed ten minutes ago",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "STALE_TIMESTAMP",
+        "message": "Timestamp is missing, invalid, or outside the 5-minute window"
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/templates :: signed now",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "templates": []
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  }
+]

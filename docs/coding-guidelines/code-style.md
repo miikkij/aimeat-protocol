@@ -87,7 +87,7 @@ The one place the two meet: an **MCP parameter name** is snake_case like every s
 
 ### File Size
 
-No file over 800 lines (`aimeat/max-file-lines`, a lint error). Split a file that grows past it by pure extraction, and never shave comments or version history to fit. See `.claude/rules/code-files.md` and [file-headers.md](./file-headers.md).
+No file over 800 lines after its leading header (`aimeat/max-file-lines`, a lint error; the header comment is not counted). Split a file that grows past it by pure extraction, and never shave comments or version history to fit. See `.claude/rules/code-files.md` and [file-headers.md](./file-headers.md).
 
 ---
 

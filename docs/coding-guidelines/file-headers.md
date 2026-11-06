@@ -156,7 +156,7 @@ v1.0.0 - 2026-03-01 - Initial implementation
 
 ### The 800-Line Limit
 
-No file over 800 lines. The ESLint rule `aimeat/max-file-lines` is an error in `src/` and `public/`, so it blocks the commit (it is off for `test/`). When a file grows past the limit, split it by **pure extraction**: move a coherent group to a sibling file and change nothing else, so the diff is a move and the existing tests still prove it. Give the new file its own header and note the move in both histories. The rule is `.claude/rules/code-files.md`.
+No file over 800 lines after its leading header. The count starts on the line after the header comment closes (only a shebang or blank lines may come before the header), so the description and the version history never count against the limit. The ESLint rule `aimeat/max-file-lines` is an error in `src/` and `public/`, so it blocks the commit (it is off for `test/`). When a file grows past the limit, split it by **pure extraction**: move a coherent group to a sibling file and change nothing else, so the diff is a move and the existing tests still prove it. Give the new file its own header and note the move in both histories. The rule is `.claude/rules/code-files.md`.
 
 ---
 

@@ -1,0 +1,1470 @@
+[
+  {
+    "id": "GET /v1/federation/package-sales/g1/config-needs :: not a repository",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_REPOSITORY",
+        "message": "This node does not serve packages as a repository."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/config-needs :: missing",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "A sale request is signed by the selling node: x-source-node, x-timestamp and x-signature."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/config-needs :: unknown node",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "nobody.example is not an active peer of this repository. Its author names it a seller first (aimeat_package_sellers)."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/config-needs :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/config-needs :: signed for another path",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/config-needs :: signed, a peer that sells nothing here",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_SELLER",
+        "message": "Your node does not sell this package here. The package's author names the nodes that sell it.",
+        "details": {
+          "node_id": "peer-a",
+          "group_id": "g1",
+          "tool": "aimeat_package_sellers"
+        }
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/offer :: not a repository",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_REPOSITORY",
+        "message": "This node does not serve packages as a repository."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/offer :: missing",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "A sale request is signed by the selling node: x-source-node, x-timestamp and x-signature."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/offer :: unknown node",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "nobody.example is not an active peer of this repository. Its author names it a seller first (aimeat_package_sellers)."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/offer :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/offer :: signed for another path",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "GET /v1/federation/package-sales/g1/offer :: signed, a peer that sells nothing here",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_SELLER",
+        "message": "Your node does not sell this package here. The package's author names the nodes that sell it.",
+        "details": {
+          "node_id": "peer-a",
+          "group_id": "g1",
+          "tool": "aimeat_package_sellers"
+        }
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/claims :: not a repository",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_REPOSITORY",
+        "message": "This node does not serve packages as a repository."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/claims :: missing",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "A sale request is signed by the selling node: x-source-node, x-timestamp and x-signature."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/claims :: unknown node",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "nobody.example is not an active peer of this repository. Its author names it a seller first (aimeat_package_sellers)."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/claims :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/claims :: signed for another path",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/claims :: signed, a peer that sells nothing here",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_SELLER",
+        "message": "Your node does not sell this package here. The package's author names the nodes that sell it.",
+        "details": {
+          "node_id": "peer-a",
+          "group_id": "g1",
+          "tool": "aimeat_package_sellers"
+        }
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/entitlements/node-z :: not a repository",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_REPOSITORY",
+        "message": "This node does not serve packages as a repository."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/entitlements/node-z :: missing",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "A sale request is signed by the selling node: x-source-node, x-timestamp and x-signature."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/entitlements/node-z :: unknown node",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "nobody.example is not an active peer of this repository. Its author names it a seller first (aimeat_package_sellers)."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/entitlements/node-z :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/entitlements/node-z :: signed for another path",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "PUT /v1/federation/package-sales/g1/entitlements/node-z :: signed, a peer that sells nothing here",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_SELLER",
+        "message": "Your node does not sell this package here. The package's author names the nodes that sell it.",
+        "details": {
+          "node_id": "peer-a",
+          "group_id": "g1",
+          "tool": "aimeat_package_sellers"
+        }
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "DELETE /v1/federation/package-sales/g1/entitlements/node-z :: not a repository",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_REPOSITORY",
+        "message": "This node does not serve packages as a repository."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "DELETE /v1/federation/package-sales/g1/entitlements/node-z :: missing",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "A sale request is signed by the selling node: x-source-node, x-timestamp and x-signature."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "DELETE /v1/federation/package-sales/g1/entitlements/node-z :: unknown node",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "FORBIDDEN",
+        "message": "nobody.example is not an active peer of this repository. Its author names it a seller first (aimeat_package_sellers)."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "If you need this, ask the person who owns it to share it with you.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "DELETE /v1/federation/package-sales/g1/entitlements/node-z :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "DELETE /v1/federation/package-sales/g1/entitlements/node-z :: signed for another path",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The node signature on this sale request does not check out for this method, path and body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "DELETE /v1/federation/package-sales/g1/entitlements/node-z :: signed, a peer that sells nothing here",
+    "status": 403,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_SELLER",
+        "message": "Your node does not sell this package here. The package's author names the nodes that sell it.",
+        "details": {
+          "node_id": "peer-a",
+          "group_id": "g1",
+          "tool": "aimeat_package_sellers"
+        }
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/package-claims/g1 :: not a repository",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "NOT_A_REPOSITORY",
+        "message": "This node does not serve packages as a repository."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "This one is not available. Whoever owns it can tell you more.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/package-claims/g1 :: missing",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The request is signed by the node it names: x-source-node, x-timestamp and x-signature, with the key in the body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/package-claims/g1 :: no key in the body",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The request is signed by the node it names: x-source-node, x-timestamp and x-signature, with the key in the body."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/package-claims/g1 :: signed by another key",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The signature does not check out with the key this request names."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/package-claims/g1 :: signed as a sale, not a claim",
+    "status": 401,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "UNAUTHORIZED",
+        "message": "The signature does not check out with the key this request names."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "Sign in and try again.",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/package-claims/g1 :: node_id another than the signer",
+    "status": 400,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "node_id is the node that signs the request."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST /v1/federation/package-claims/g1 :: signed with the body key",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "CLAIM_NOT_FOUND",
+        "message": "No claim with that code waits for this package."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  }
+]

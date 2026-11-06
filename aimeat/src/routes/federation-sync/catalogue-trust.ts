@@ -5,6 +5,7 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — The catalogue sync and the signed trust notice declare the 'federation-peer' credential strategy, which verifies the peer and its signature in the same order with the same refusals; an unsigned notice still passes on to the operator's door (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-11-04 — The single use of a signed trust notice is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
@@ -31,7 +32,8 @@ import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { verify } from '../../auth/keypair.js';
+import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
+import { badInput, bodyOf, signedJson } from '../../auth/credential-strategies-node.js';
 import {
     deliveryRefusal, pinnedRefusal, federationPeerProofPin, audienceRefusal, signedMessageRefusalOnNode,
 } from '../../services/signed-node-request.js';
@@ -43,7 +45,6 @@ const MAX_REASON_CHARS = 1000;
 /** How many trust notices one peer may have stored here at a time. */
 const MAX_RECEIVED_PER_PEER = 50;
 import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation-tiers.js';
-import { gatePeer } from '../../services/federation-peer-gate.js';
 import { emitChange } from '../../services/event-bus.js';
 import { actionPricingFromPeer } from '../../services/action-pacing.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
@@ -54,32 +55,20 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
     // Supports incremental sync: if `since_timestamp` is provided, only actions
     // newer than that timestamp are expected. Existing actions are updated rather
     // than duplicated (upsert by federated ID).
-    router.post('/v1/federation/catalogue-sync', async (req, res) => {
-        const { source_node, actions: actionList, since_timestamp, catalogue_hash, signature } = req.body ?? {};
-
-        if (!source_node || !Array.isArray(actionList)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and actions array required'));
-            return;
-        }
-
-        const gate = gatePeer(peers, source_node, 'shareCatalogue');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-
-        // P1-11: Require signed catalogue sync — verify peer signature
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on catalogue-sync request'));
-            return;
-        }
-        const catalogueSyncPayload = JSON.stringify({ source_node, actions: actionList, since_timestamp, catalogue_hash });
-        const catalogueSyncValid = await verify(peer.publicKey, catalogueSyncPayload, signature);
-        if (!catalogueSyncValid) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on catalogue-sync request'));
-            return;
-        }
+    // P1-11: a signed catalogue sync, the peer and its signature verified by the 'federation-peer'
+    // credential strategy (src/auth/credential-strategies-node.ts).
+    router.post('/v1/federation/catalogue-sync', acceptCredential('federation-peer', {
+        config, peers, capability: 'shareCatalogue', node: (req) => bodyOf(req).source_node,
+        before: (req) => {
+            const { source_node, actions } = bodyOf(req);
+            return !source_node || !Array.isArray(actions) ? badInput('source_node and actions array required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature on catalogue-sync request' },
+        signed: signedJson('source_node', 'actions', 'since_timestamp', 'catalogue_hash'),
+        forged: 'Invalid signature on catalogue-sync request',
+    }), async (req, res) => {
+        const { source_node, actions: actionList, since_timestamp, catalogue_hash } = req.body ?? {};
+        const { peer, signed: catalogueSyncPayload } = credentialOf(req, 'federation-peer');
         // No send time is signed above (since_timestamp is the previous sync), so the delivery proof
         // carries it: this node named, inside five minutes, once (secaudit 2026-10 last items, D3). A
         // peer that has once sent it is held to it (secaudit 2026-10-10 I21).
@@ -153,47 +142,44 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
     // POST /v1/federation/trust-advisory, first handler: a signed trust notice from a PEER (the
     // emergency removal of a peer with notify_network, or the other operator's advisory; sender in
     // services/federation-trust-notice.ts). It is taken when the body carries a signature; any other
-    // request goes on to the operator's handler below (next('route')).
+    // request goes on to the operator's handler below (next('route'), the strategy's unsignedPassesOn).
+    // The sending peer and its signature are verified by the 'federation-peer' credential strategy.
     //
     // A peer's notice is STORED for this node's operator to read (GET /v1/admin/federation/trust-
     // advisories) and acts on nothing: a peer's word does not ban or demote a third node here. Until
     // 2026-10-16 the sender posted unsigned to the operator-only handler, which refused it (QA audit S6-06).
-    router.post('/v1/federation/trust-advisory', async (req, res, next) => {
+    router.post('/v1/federation/trust-advisory', acceptCredential('federation-peer', {
+        config, peers, capability: null, node: (req) => bodyOf(req).source_node, unsignedPassesOn: true,
+        before: (req) => {
+            const { source_node, target_node, advisory_type, reason, evidence_hash, timestamp } = bodyOf(req);
+            if (typeof source_node !== 'string' || typeof target_node !== 'string' || typeof advisory_type !== 'string'
+                || typeof reason !== 'string' || !reason || typeof timestamp !== 'string') {
+                return badInput('A signed trust notice needs source_node, target_node, advisory_type, reason and timestamp as text.');
+            }
+            if (!(TRUST_ADVISORY_TYPES as readonly string[]).includes(advisory_type)) {
+                return badInput(`advisory_type must be one of: ${TRUST_ADVISORY_TYPES.join(', ')}`);
+            }
+            if (!NODE_ID_SHAPE.test(target_node) || reason.length > MAX_REASON_CHARS
+                || (evidence_hash !== undefined && evidence_hash !== null && (typeof evidence_hash !== 'string' || evidence_hash.length > 200))) {
+                return badInput(`target_node must be a node id, the reason at most ${MAX_REASON_CHARS} characters and evidence_hash at most 200.`);
+            }
+            return null;
+        },
+        signed: (req) => {
+            const { source_node, target_node, advisory_type, reason, evidence_hash, timestamp } = bodyOf(req) as Record<string, string>;
+            return trustNoticeSignString({
+                source_node, target_node, advisory_type, reason, evidence_hash: (evidence_hash as string | null | undefined) ?? '', timestamp,
+            });
+        },
+        forged: 'The signature on this trust notice does not verify against the sending peer\'s key.',
+    }), async (req, res) => {
         const body = (req.body ?? {}) as Record<string, unknown>;
-        if (typeof body.signature !== 'string') { next('route'); return; }
-        const { source_node, target_node, advisory_type, reason, evidence_hash, timestamp, signature } = body;
-
-        if (typeof source_node !== 'string' || typeof target_node !== 'string' || typeof advisory_type !== 'string'
-            || typeof reason !== 'string' || !reason || typeof timestamp !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A signed trust notice needs source_node, target_node, advisory_type, reason and timestamp as text.'));
-            return;
-        }
-        if (!(TRUST_ADVISORY_TYPES as readonly string[]).includes(advisory_type)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `advisory_type must be one of: ${TRUST_ADVISORY_TYPES.join(', ')}`));
-            return;
-        }
-        if (!NODE_ID_SHAPE.test(target_node) || reason.length > MAX_REASON_CHARS
-            || (evidence_hash !== undefined && evidence_hash !== null && (typeof evidence_hash !== 'string' || evidence_hash.length > 200))) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `target_node must be a node id, the reason at most ${MAX_REASON_CHARS} characters and evidence_hash at most 200.`));
-            return;
-        }
-
-        const gate = gatePeer(peers, source_node, null);
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const signed = trustNoticeSignString({
-            source_node, target_node, advisory_type, reason, evidence_hash: (evidence_hash as string | null | undefined) ?? '', timestamp,
-        });
-        if (!await verify(gate.peer.publicKey, signed, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The signature on this trust notice does not verify against the sending peer\'s key.'));
-            return;
-        }
+        const { source_node, target_node, advisory_type, reason, evidence_hash, timestamp } = body as Record<string, string>;
+        const { peer, signed, signature } = credentialOf(req, 'federation-peer');
         // A new message kind, so no peer sends it in an older format: the audience is always required.
         const refusal = await audienceRefusal({
             signed, audience: body.audience, audienceSignature: body.audience_signature,
-            publicKey: gate.peer.publicKey, thisNodeId: config.nodeId, required: true,
+            publicKey: peer.publicKey, thisNodeId: config.nodeId, required: true,
         }) ?? await signedMessageRefusalOnNode(source_node, timestamp, signature);
         if (refusal) { res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message)); return; }
 

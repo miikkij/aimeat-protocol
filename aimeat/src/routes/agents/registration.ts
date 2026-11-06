@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — On a store place POST /v1/agents gives the agent the place's default at approval, and the answer
+ *     and the record carry it (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   v1.11.0 — 2026-10-27 — POST /v1/agents tells the owner when the new agent takes over schedules or
  *     saved workflows an earlier agent of the same name made (secaudit2026oct26).
  *   v1.10.0 — 2026-10-25 — The pending listing says of an existing agent's request whether it proved it is
@@ -56,6 +58,7 @@ import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
 import { returnProven } from '../../services/device-return-proof.js';
 import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
+import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerRegistrationRoutes(
@@ -114,6 +117,9 @@ export function registerRegistrationRoutes(
 
     const keyPair = await generateKeyPair();
     const now = new Date().toISOString();
+    // The owner approves this agent here, so on a store place it gets the place's default now and its
+    // token mints copy the record (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
+    const grantedScopes = await applyPlaceDefault(storage, config, gaii, requestedScopes);
 
     const agent = await storage.createAgent({
       name,
@@ -122,7 +128,7 @@ export function registerRegistrationRoutes(
       displayName: display_name,
       description,
       capabilities: capabilities ?? [],
-      defaultScopes: requestedScopes,
+      defaultScopes: grantedScopes,
       publicKey: keyPair.publicKey,
       trustScore: 50,
       morselBalance: 0,

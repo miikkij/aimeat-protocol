@@ -1,32 +1,6 @@
 {
   "note": "scripts/check-verb-parity.ts: per route path whose writing verbs name different guards, each verb's guards as the script reads them and why the difference is right. Seeded 2026-11-04 (codebase analysis 2026-11-03, B4); UNTRIAGED is the seeding's placeholder for a difference nobody has decided yet. requireRole('agent') admits an agent, the owner and the operator; requireRole('owner') admits the owner and the operator, not an agent (auth/middleware.ts). The list only shrinks.",
   "paths": {
-    "/v1/agents/:/tasks/:": {
-      "verbs": {
-        "DELETE": [
-          "requireAuth()",
-          "requireRole('owner')"
-        ],
-        "PATCH": [
-          "requireAuth()",
-          "requireReadiness('standard',config,storage)"
-        ]
-      },
-      "why": "UNTRIAGED: PATCH (routes/agent-tasks/lifecycle.ts, the agent updating its task) asks the agent's readiness level and no scope; DELETE (the same file) admits the owner and the operator only. Lead, not decided."
-    },
-    "/v1/agents/v2/connectors/:": {
-      "verbs": {
-        "DELETE": [
-          "requireAuth()",
-          "requireOwnerPrincipal()"
-        ],
-        "PATCH": [
-          "requireAuth()",
-          "requireScope('agent:write')"
-        ]
-      },
-      "why": "UNTRIAGED: PATCH (routes/agents-v2/connectors.ts, rename or settings) admits a principal holding agent:write; DELETE admits the owner in person only (requireOwnerPrincipal). Lead, not decided."
-    },
     "/v1/apps/:": {
       "verbs": {
         "DELETE": [
@@ -53,22 +27,6 @@
       },
       "why": "Designed (routes/apps/roadmap.ts): POST leaves a wish on somebody's app, the same kind of act as a board post, so it asks social:write and no right over the app; PATCH opens or closes the wishes, the owner's own decision, so it asks app:write and the handler checks the owner."
     },
-    "/v1/contacts/:": {
-      "verbs": {
-        "DELETE": [
-          "requireAuth()",
-          "requireLocalSession()",
-          "requireRole('agent')",
-          "requireScope('messages:send')"
-        ],
-        "PATCH": [
-          "requireAuth()",
-          "requireLocalSession()",
-          "requireRole('owner')"
-        ]
-      },
-      "why": "UNTRIAGED: PATCH (routes/contacts.ts) admits the owner and the operator only; DELETE also admits the owner's agent holding messages:send. Lead from the codebase analysis 2026-11-03 finding 12, not decided."
-    },
     "/v1/ghii": {
       "verbs": {
         "DELETE": [
@@ -82,20 +40,6 @@
         ]
       },
       "why": "Three different acts on one path: POST registers a new account, so there is no credential yet (registrationLimit and the registration mode in provisionOwner guard it); PUT changes the profile (memory:write-reserved); DELETE erases the account, the owner in person only."
-    },
-    "/v1/groups/:/members/:": {
-      "verbs": {
-        "DELETE": [
-          "requireAuth()",
-          "requireRole('agent')",
-          "requireScope('consent:groups')"
-        ],
-        "PATCH": [
-          "requireAuth()",
-          "requireRole('owner')"
-        ]
-      },
-      "why": "UNTRIAGED: PATCH (routes/sharing-groups.ts, a member's role) admits the owner and the operator only; DELETE (remove a member) also admits the owner's agent holding consent:groups. Lead, not decided."
     },
     "/v1/memory/:": {
       "verbs": {
@@ -130,7 +74,7 @@
           "requireAuth()"
         ]
       },
-      "why": "UNTRIAGED: PUT (routes/schemas.ts) checks in the handler that the caller has the owner role or is the operator (isOperatorCaller), with an entry in route-scope-exemptions.json; DELETE asks memory:write and admits an agent holding it. Lead, not decided."
+      "why": "UNTRIAGED: PUT (routes/schemas.ts) checks in the handler that the caller has the owner role or is the operator (isOperatorCaller), with an entry in route-scope-exemptions.json; DELETE asks memory:write and admits an agent holding it. Lead, not decided. Decision 13a of 2026-11-05 stopped here: neither side admits all the other does (an operator's agent without memory:write may PUT and not DELETE), and DELETE's memory:write would let an app grant, an ecosystem app or a visitor holding it set a schema lock with PUT, a principal that is not the owner or the owner's agent."
     },
     "/v1/notifications": {
       "verbs": {
@@ -225,7 +169,7 @@
           "requireRestScope('workflow:write')"
         ]
       },
-      "why": "UNTRIAGED: PATCH (routes/schedules.ts) asks workflow:write and DELETE asks memory:write; an agent holding memory:write without workflow:write may delete a schedule it may not change. Lead from the codebase analysis 2026-11-03 finding 12, not decided."
+      "why": "UNTRIAGED: PATCH (routes/schedules.ts) asks workflow:write and DELETE asks memory:write; an agent holding memory:write without workflow:write may delete a schedule it may not change. Lead from the codebase analysis 2026-11-03 finding 12, not decided. Decision 13a of 2026-11-05 stopped here: the looser side is either word on both verbs, and that lets an app grant or an ecosystem app holding memory:write (both grantable) change its schedules with PATCH, a principal that is not the owner or the owner's agent. aimeat_schedule_update and aimeat_schedule_delete name the same two words."
     },
     "/v1/templates/:": {
       "verbs": {
@@ -252,7 +196,7 @@
           "requireScope('workflow:write')"
         ]
       },
-      "why": "UNTRIAGED: PUT (routes/workflows.ts) asks a session of this node (requireLocalSession, no visitor from another node) and workflow:write; DELETE asks workflow:write only. Lead from the codebase analysis 2026-11-03 finding 12, not decided."
+      "why": "UNTRIAGED: PUT (routes/workflows.ts) asks a session of this node (requireLocalSession, no visitor from another node) and workflow:write; DELETE asks workflow:write only. Lead from the codebase analysis 2026-11-03 finding 12, not decided. Decision 13a of 2026-11-05 stopped here: the looser side is DELETE's, and without requireLocalSession a visitor from another node holding workflow:write (an operator may grant a peer any word) could save workflows with PUT, a principal that is not the owner or the owner's agent. The owner's agent has the same rights on both verbs today."
     }
   }
 }

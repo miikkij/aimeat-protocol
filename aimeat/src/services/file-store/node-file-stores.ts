@@ -21,6 +21,8 @@
  *   readNodeStores · updateNodeStores · nodeEntryNamed · sealNodeCredential · nodeStoreView · nodeEntrySpec
  * @usage const rec = await readNodeStores(ctx); const entry = nodeEntryNamed(rec, rec.default);
  * @version-history
+ *   v1.1.1 — 2026-11-05 — credentialContext exported for the data key's re-encrypt job (codebase
+ *     analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.1.0 — 2026-10-31 — An entry keeps its last browser check, and the view answers it with the rule to add.
  *   v1.0.0 — 2026-10-30 — Initial (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
@@ -60,7 +62,8 @@ export interface NodeFileStores {
   stores: NodeStoreEntry[];
 }
 
-const credentialContext = (nodeId: string) => `file-store:node@${nodeId}`;
+/** The context a node store's credential is bound to; the data key's re-encrypt job reseals it with it. */
+export const credentialContext = (nodeId: string) => `file-store:node@${nodeId}`;
 
 export function nodeEntryStoreId(name: string): string {
   return `node:${name}`;

@@ -23,6 +23,8 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   2026-11-05 — On a store place the approval gives the agent the place's default (codebase analysis 2026-11-03,
+ *     decision 8b of 2026-11-05).
  *   2026-10-31 — approval_url is the proposal's own page on the home (v31 K51).
  *   2026-10-18 — The proposal answer's `next_step` says when the proposed agent may invite people (organism:invite).
  *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
@@ -88,6 +90,7 @@ import {
 import { logger } from '../../utils/logger.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
+import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
 const VALID_RUN_MODES = ['resident', 'spawn'];
@@ -245,7 +248,9 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
     // node). A proposal stored before 2026-10-02 can lack them, and an agent approved with
     // memory:write alone could not read its own definition and never ran. Proposing adds them too,
     // so the owner sees them on the proposal; this is the same list again.
-    const scopes = await proposalScopesFor({ config, storage }, owner, proposal.scopes);
+    // The owner approves the agent here, so on a store place it gets the place's default now, and the
+    // credential enrolment mints copies the record (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
+    const scopes = await applyPlaceDefault(storage, config, gaii, await proposalScopesFor({ config, storage }, owner, proposal.scopes));
     // The run mode the connected connector can run, decided again now: the proposal may be older
     // than the connector, and an approved `resident` agent on a spawning connector sits active and
     // never runs (measured 2026-10-02 on a hosted place).

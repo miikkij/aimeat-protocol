@@ -18,6 +18,10 @@
  *   because the place it would otherwise fail is the reader's browser.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-display-prefs
  * @version-history
+ *   v1.1.0 — 2026-11-05 — Two cases added after the existing ones: an app's own session reads the
+ *     person's region and clock (the read the served aimeat-auth makes for the libraries' dates and
+ *     numbers), and cleared settings reach it as null (codebase analysis 2026-11-03, decision 10b of
+ *     2026-11-05).
  *   v1.0.0 — 2026-09-12 — Initial, with the profile's region and timezone fields.
  */
 
@@ -39,6 +43,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { appGrantToken } from './helpers/purpose-kit.js';
 
 console.log('\n=== AIMEAT display preferences E2E ===\n');
 
@@ -176,6 +181,36 @@ await test("A second owner reads and writes their own settings, never the first 
     // And no credential at all reaches either.
     const anon = await json('/v1/ghii/me');
     assert(anon.status === 401 || anon.status === 403, `unauthenticated: got ${anon.status}`);
+});
+
+// Apps follow the settings too (Jouni 2026-11-05, decision 10b): the served aimeat-auth reads them
+// with the app's own session, GET /v1/ghii/me, and every served library's dates and numbers use them.
+const APP_HTML = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Prefs app</title>'
+    + '<meta name="description" content="Reads the person\'s display settings.">'
+    + '<script src="/v1/libs/aimeat-auth.js"></script></head><body><p>prefs</p></body></html>';
+let appToken = '';
+
+await test('An app the person signed into reads their region and clock with its own session', async () => {
+    // The first account is on fi-FI / Europe/Helsinki from the tests above.
+    appToken = await appGrantToken({ name, token }, `prefs${Date.now()}.html`, 'memory:read', APP_HTML);
+    const r = await json('/v1/ghii/me', { headers: { Authorization: `Bearer ${appToken}` } });
+    assert(r.status === 200, `app session reads the profile: ${r.status} ${JSON.stringify(r.body.error ?? '')}`);
+    assert(r.body.data.region === 'fi-FI' && r.body.data.timezone === 'Europe/Helsinki',
+        `the person's own settings: ${JSON.stringify({ region: r.body.data.region, timezone: r.body.data.timezone })}`);
+    // The served library is the one that makes this read and hands it to the formatters.
+    const lib = await fetch(`${BASE}/v1/libs/aimeat-auth.js`);
+    const src = await lib.text();
+    assert(lib.status === 200 && src.includes('displayPrefs') && src.includes('/v1/ghii/me'),
+        'aimeat-auth.js serves AIMEAT.auth.displayPrefs and its profile read');
+});
+
+await test('Cleared settings reach the app as null, so its dates follow the browser again', async () => {
+    const c = await patch({ region: '', timezone: '' });
+    assert(c.status === 200, `clear: ${c.status}`);
+    const r = await json('/v1/ghii/me', { headers: { Authorization: `Bearer ${appToken}` } });
+    assert(r.status === 200, `app session reads the profile: ${r.status}`);
+    assert(r.body.data.region === null && r.body.data.timezone === null,
+        `cleared reads as null: ${JSON.stringify({ region: r.body.data.region, timezone: r.body.data.timezone })}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

@@ -33,6 +33,9 @@
  *   cd aimeat && pnpm check:federation-signatures            # report
  *   cd aimeat && pnpm check:federation-signatures --strict   # the hook/CI gate
  * @version-history
+ *   2026-11-05 — A door whose chain declares acceptCredential('federation-peer' | 'package-seller' |
+ *     'package-claimant') is peer-signed: those strategies verify the signature in the auth layer
+ *     (src/auth/credential-strategies-node.ts; codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-10-16 — The population is every write door whose path starts /v1/federation, in any route
  *     file, plus the src/routes/federation* files as before; the signed-node-request verifiers count,
  *     also when a handler reaches them through a function of its own file. The four package
@@ -67,6 +70,22 @@ const VERIFIERS = [
     'checkNodeRequest', 'verifySaleRequest', 'verifyRequestWithKey', 'verifyPackageNode',
 ];
 
+/**
+ * The credential strategies that verify another node's signature in the auth layer
+ * (src/auth/credential-strategies-node.ts). A door that declares one with
+ * `acceptCredential('<kind>', …)` on its chain is peer-signed as surely as a handler that calls
+ * verify(): the strategy verifies unconditionally, before the handler runs (codebase analysis
+ * 2026-11-03, decision 2 of 2026-11-05). Adding a kind here is a decision, as adding a verifier is.
+ */
+const SIGNATURE_STRATEGIES = ['federation-peer', 'package-seller', 'package-claimant'];
+
+/** Whether a route call declares one of SIGNATURE_STRATEGIES on its chain. */
+function declaresSignatureStrategy(call: ts.CallExpression): boolean {
+    return call.arguments.slice(1, -1).some(arg => ts.isCallExpression(arg) && ts.isIdentifier(arg.expression)
+        && arg.expression.text === 'acceptCredential' && !!arg.arguments[0] && ts.isStringLiteral(arg.arguments[0])
+        && SIGNATURE_STRATEGIES.includes(arg.arguments[0].text));
+}
+
 /** How many calls deep a handler is followed into functions of its own file (sellerAct → verifySaleRequest). */
 const LOCAL_CALL_DEPTH = 3;
 
@@ -94,7 +113,7 @@ interface Door {
     guards: string[];
     /** An authorization middleware on the chain, directly or through a guard-array constant. */
     gated: boolean;
-    /** Does the handler body itself call one of VERIFIERS? */
+    /** Does the handler body call one of VERIFIERS, or the chain declare one of SIGNATURE_STRATEGIES? */
     verifies: boolean;
 }
 
@@ -205,7 +224,7 @@ export function collectFederationWrites(files: ts.SourceFile[]): Door[] {
                         // A guard-array constant authorizes as surely as the calls it holds, which is
                         // why `arrays` is resolved for the whole file before any door is read.
                         gated: guards.some(g => GATES.includes(g) || arrays.has(g)),
-                        verifies: callsVerifier(handler, locals),
+                        verifies: declaresSignatureStrategy(node) || callsVerifier(handler, locals),
                     });
                 }
             }

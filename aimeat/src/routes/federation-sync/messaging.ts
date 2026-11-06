@@ -5,6 +5,10 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — The replicate, message, broadcast, receipt and storage grant doors declare the
+ *     'federation-peer' credential strategy (peerDoor): the body's fields, the peer and its signature
+ *     are verified in the auth layer in the same order with the same refusals (codebase analysis
+ *     2026-11-03, decision 2 of 2026-11-05).
  *   2026-11-04 — The single use of a signed message is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
@@ -96,8 +100,9 @@ import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { gatePeer } from '../../services/federation-peer-gate.js';
-import { verify } from '../../auth/keypair.js';
+import type { PeerCapability } from '../../services/federation-peer-gate.js';
+import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
+import { badInput, bodyOf, signedJson, type FederationPeerOptions } from '../../auth/credential-strategies-node.js';
 import {
     signedMessageRefusalOnNode, audienceRefusal, deliveryRefusal, pinnedRefusal, federationPeerProofPin,
 } from '../../services/signed-node-request.js';
@@ -120,6 +125,14 @@ import { boundInboundConversationId } from '../../services/message-thread-bindin
 import { normalizeInboundAttachments } from './inbound-attachments.js';
 
 export function registerMessagingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
+    /**
+     * The peer credential of one door, verified in the auth layer ('federation-peer',
+     * src/auth/credential-strategies-node.ts): the body's fields (400), an active peer entitled to
+     * `capability` with its key on file, a signature (401), and the signature over the door's text.
+     */
+    const peerDoor = (capability: PeerCapability, o: Pick<FederationPeerOptions, 'before' | 'unsigned' | 'signed' | 'forged'>): FederationPeerOptions =>
+        ({ config, peers, capability, node: req => bodyOf(req).source_node, ...o });
+
     /**
      * After the signature: a message names this node as its audience (or, from a peer on an older
      * version, none while the node allows that), passes inside the five-minute window, and passes
@@ -195,33 +208,19 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
     };
 
     // POST /v1/federation/replicate — Receive replicated memory from a peer node
-    router.post('/v1/federation/replicate', async (req, res) => {
-        const { source_node, gaii, key, value, visibility, version, timestamp, signature } = req.body ?? {};
-
-        if (!source_node || !gaii || !key || value === undefined || !version) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, gaii, key, value, and version are required'));
-            return;
-        }
-
-        // Active peer, entitled to this door, key on file. Refused before anything is read or written.
-        const gate = gatePeer(peers, source_node, 'replicateMemory');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-
-        // P1-11: Require signed replication — verify peer signature
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on replication request'));
-            return;
-        }
-        const replicatePayload = JSON.stringify({ source_node, gaii, key, value, visibility, version, timestamp });
-        const replicateValid = await verify(peer.publicKey, replicatePayload, signature);
-        if (!replicateValid) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on replication request'));
-            return;
-        }
+    // Active peer, entitled to this door, key on file, refused before anything is read or written;
+    // P1-11: signed replication, the peer's signature verified.
+    router.post('/v1/federation/replicate', acceptCredential('federation-peer', peerDoor('replicateMemory', {
+        before: (req) => {
+            const { source_node, gaii, key, value, version } = bodyOf(req);
+            return !source_node || !gaii || !key || value === undefined || !version ? badInput('source_node, gaii, key, value, and version are required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature on replication request' },
+        signed: signedJson('source_node', 'gaii', 'key', 'value', 'visibility', 'version', 'timestamp'),
+        forged: 'Invalid signature on replication request',
+    })), async (req, res) => {
+        const { source_node, gaii, key, value, visibility, version, timestamp } = req.body ?? {};
+        const { peer, signed: replicatePayload } = credentialOf(req, 'federation-peer');
         // The signed timestamp is the record's own update time, so the send time comes in the proof.
         if (await refuseUndelivered(res, source_node, replicatePayload, req.body, peer)) return;
 
@@ -331,28 +330,18 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
 
     // POST /v1/federation/message — Receive a human↔human direct message from a peer node.
     // Mirrors /v1/federation/replicate's signed-peer verification. Recipient must be a local human.
-    router.post('/v1/federation/message', async (req, res) => {
-        const { source_node, message, timestamp, signature } = req.body ?? {};
-        if (!source_node || !message || !message.id || !message.senderGhii || !message.recipientGhii) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and message{id,senderGhii,recipientGhii} are required'));
-            return;
-        }
-
-        const gate = gatePeer(peers, source_node, 'allowMessaging');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on message'));
-            return;
-        }
-        const messagePayload = JSON.stringify({ source_node, message, timestamp });
-        if (!await verify(peer.publicKey, messagePayload, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on message'));
-            return;
-        }
+    router.post('/v1/federation/message', acceptCredential('federation-peer', peerDoor('allowMessaging', {
+        before: (req) => {
+            const { source_node, message } = bodyOf(req) as { source_node?: unknown; message?: { id?: unknown; senderGhii?: unknown; recipientGhii?: unknown } };
+            return !source_node || !message || !message.id || !message.senderGhii || !message.recipientGhii
+                ? badInput('source_node and message{id,senderGhii,recipientGhii} are required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature on message' },
+        signed: signedJson('source_node', 'message', 'timestamp'),
+        forged: 'Invalid signature on message',
+    })), async (req, res) => {
+        const { source_node, message, timestamp } = req.body ?? {};
+        const { peer, signed: messagePayload, signature } = credentialOf(req, 'federation-peer');
         if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: messagePayload, body: req.body ?? {}, peer })) return;
         // The signature proves which node sent this, not who wrote it: `senderGhii` is the sending
         // node's word. A node speaks for its own people only, so a sender on another node is refused.
@@ -582,29 +571,19 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
     // deliver it to THIS node's own owners (the delegated federation broadcast: one frame per peer, the
     // peer fans out locally). Accepted only from active peers; the first-contact gate is auto-accepted so
     // the announcement lands in each owner's inbox.
-    router.post('/v1/federation/broadcast', async (req, res) => {
-        const { source_node, broadcast, timestamp, signature } = req.body ?? {};
-        if (!source_node || !broadcast || typeof broadcast.senderGhii !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and broadcast{senderGhii} are required'));
-            return;
-        }
-        // A broadcast reaches EVERY human on this node and auto-accepts the contact for each of them,
-        // on a link only the operator agreed to. Its own word, refused at the floor.
-        const gate = gatePeer(peers, source_node, 'allowBroadcast');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer key'));
-            return;
-        }
-        const payload = JSON.stringify({ source_node, broadcast, timestamp });
-        if (!await verify(peer.publicKey, payload, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on broadcast'));
-            return;
-        }
+    // A broadcast reaches EVERY human on this node and auto-accepts the contact for each of them,
+    // on a link only the operator agreed to. Its own word, refused at the floor.
+    router.post('/v1/federation/broadcast', acceptCredential('federation-peer', peerDoor('allowBroadcast', {
+        before: (req) => {
+            const { source_node, broadcast } = bodyOf(req) as { source_node?: unknown; broadcast?: { senderGhii?: unknown } };
+            return !source_node || !broadcast || typeof broadcast.senderGhii !== 'string' ? badInput('source_node and broadcast{senderGhii} are required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature or peer key' },
+        signed: signedJson('source_node', 'broadcast', 'timestamp'),
+        forged: 'Invalid signature on broadcast',
+    })), async (req, res) => {
+        const { source_node, broadcast, timestamp } = req.body ?? {};
+        const { peer, signed: payload, signature } = credentialOf(req, 'federation-peer');
         if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: payload, body: req.body ?? {}, peer })) return;
 
         const senderGhii: string = broadcast.senderGhii;
@@ -665,28 +644,18 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
     });
 
     // POST /v1/federation/message/receipt — Receive a delivery/read receipt from the recipient node.
-    router.post('/v1/federation/message/receipt', async (req, res) => {
-        const { source_node, message_id, kind, timestamp, signature } = req.body ?? {};
-        if (!source_node || !message_id || !kind) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, message_id, and kind are required'));
-            return;
-        }
-        // A receipt is part of the message conversation, so it rides the same word.
-        const gate = gatePeer(peers, source_node, 'allowMessaging');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer public key'));
-            return;
-        }
-        const receiptPayload = JSON.stringify({ source_node, message_id, kind, timestamp });
-        if (!await verify(peer.publicKey, receiptPayload, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on receipt'));
-            return;
-        }
+    // A receipt is part of the message conversation, so it rides the same word.
+    router.post('/v1/federation/message/receipt', acceptCredential('federation-peer', peerDoor('allowMessaging', {
+        before: (req) => {
+            const { source_node, message_id, kind } = bodyOf(req);
+            return !source_node || !message_id || !kind ? badInput('source_node, message_id, and kind are required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature or peer public key' },
+        signed: signedJson('source_node', 'message_id', 'kind', 'timestamp'),
+        forged: 'Invalid signature on receipt',
+    })), async (req, res) => {
+        const { source_node, message_id, kind, timestamp } = req.body ?? {};
+        const { peer, signed: receiptPayload } = credentialOf(req, 'federation-peer');
         // The signed timestamp is when the message was read, so the send time comes in the proof.
         if (await refuseUndelivered(res, source_node, receiptPayload, req.body, peer)) return;
 
@@ -701,29 +670,20 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
     // The origin node is the authority over its own storage: it verifies the peer signature AND that
     // the message relationship is real (a message with this id was sent to recipient_ghii and lists
     // this storage_key) before issuing a short-lived, single-file download capability (DECISION #5).
-    router.post('/v1/federation/storage/grant', async (req, res) => {
-        const { source_node, message_id, conversation_id, storage_key, owner_ghii, recipient_ghii, timestamp, signature } = req.body ?? {};
-        if (!source_node || !message_id || !storage_key || !owner_ghii || !recipient_ghii) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, message_id, storage_key, owner_ghii, recipient_ghii are required'));
-            return;
-        }
-        // Refused BEFORE the relationship check below, which reads a stored message and tells the
-        // caller whether it exists. A peer with no message rights must not learn that either.
-        const gate = gatePeer(peers, source_node, 'allowMessaging');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer public key'));
-            return;
-        }
-        const grantPayload = JSON.stringify({ source_node, message_id, conversation_id, storage_key, owner_ghii, recipient_ghii, timestamp });
-        if (!await verify(peer.publicKey, grantPayload, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on storage grant'));
-            return;
-        }
+    // The peer is refused BEFORE the relationship check below, which reads a stored message and tells
+    // the caller whether it exists. A peer with no message rights must not learn that either.
+    router.post('/v1/federation/storage/grant', acceptCredential('federation-peer', peerDoor('allowMessaging', {
+        before: (req) => {
+            const { source_node, message_id, storage_key, owner_ghii, recipient_ghii } = bodyOf(req);
+            return !source_node || !message_id || !storage_key || !owner_ghii || !recipient_ghii
+                ? badInput('source_node, message_id, storage_key, owner_ghii, recipient_ghii are required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature or peer public key' },
+        signed: signedJson('source_node', 'message_id', 'conversation_id', 'storage_key', 'owner_ghii', 'recipient_ghii', 'timestamp'),
+        forged: 'Invalid signature on storage grant',
+    })), async (req, res) => {
+        const { source_node, message_id, storage_key, owner_ghii, recipient_ghii, timestamp } = req.body ?? {};
+        const { peer, signed: grantPayload, signature } = credentialOf(req, 'federation-peer');
         // Each grant hands out a fresh download link, so a grant passes once, inside the window.
         if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: grantPayload, body: req.body ?? {}, peer })) return;
 

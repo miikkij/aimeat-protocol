@@ -33,6 +33,8 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-05 -- The "Node" group shows the data keys and the re-encrypt job under its settings
+ *     (config-key-ring.js; codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-02 -- secaudit2026nov02d round 13: the "Data out" group shows the two settings of app
  *     signups (consent.app_party_signups_per_hour, consent.app_party_pending_hours) after app
  *     registration without an account.
@@ -117,6 +119,7 @@ import { Badge, Empty, ExpandableHelp, ErrorBox } from './shared.js';
 import { saveConfig, deleteConfig } from '/js/services/admin.js';
 import { DecideKeyTest } from './decide-key-test.js';
 import { DataOutStatus } from './config-data-out.js';
+import { KeyRingStatus } from './config-key-ring.js';
 import { SettingsIndex, SettingLine, ChangeList } from '/components/SettingsIndex.js';
 import { Section } from '/components/Section.js';
 import { Action, Loud } from '/components/Action.js';
@@ -188,6 +191,7 @@ function groupOfPath(path) {
 const SECTION_ACTIONS = {
   decide: DecideKeyTest,
   data_out: DataOutStatus,
+  node: KeyRingStatus,
 };
 
 function domainOf(group) {

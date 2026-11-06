@@ -41,6 +41,10 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-11-05 — The first sign-in's credentials mail waits for a verified address: the first sign-in
+ *     sends nothing and says so, and verifying the address sends it (Jouni 2026-11-05, decision 14a).
+ *     The operator's group mail skips an unverified address and says how many, and app invitations an
+ *     agent sends by email count against the account's emailed-invitation allowance (decision 14a).
  *   2026-11-02 — The emailed link's refresh cookie is found on any Set-Cookie line, since aimeat_session_hint
  *     comes before it (fbf5ec149).
  *   2026-10-31 — A notification with email: true is mailed to the owner, at most ten a day (v31 K46),
@@ -577,12 +581,31 @@ async function run(): Promise<void> {
         assert(/AIME/.test(mail.raw) && /machine room/i.test(mail.text), `the key template's brand and footer are missing: ${mail.text.slice(-300)}`);
     });
 
-    await test("the first sign-in mails durable credentials, and the emailed password works", async () => {
+    // Jouni 2026-11-05, decision 14a: the credentials mail is an owner mail and goes to a verified
+    // address only. A key's address starts unverified, so the first sign-in sends nothing and says the
+    // mail waits; verifying the address sends it. The mail and the password are asserted as before.
+    await test("the first sign-in mails durable credentials once the address is verified, and the emailed password works", async () => {
         smtp!.clear();
         const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: keyName, password: KEY_CODE }) });
         assert(login.status === 200, `first login ${login.status}: ${short(login.body)}`);
         const issued = login.body.data?.key_credentials?.password as string;
         assert(typeof issued === 'string' && issued.length > 0, `first sign-in must issue a durable password: ${short(login.body.data?.key_credentials)}`);
+        const kc = login.body.data.key_credentials;
+        assert(kc.email_sent === false && kc.email_held === true && /not verified yet/.test(kc.email_note ?? ''),
+            `an unverified address gets no mail, and the answer says it waits: ${short(kc)}`);
+        await sleep(500);
+        assert(!smtp!.mailTo(keyEmail).some(m => m.text.includes(issued)), 'no credentials mail may reach an unverified address');
+
+        const ask = await json('/v1/ghii/email/verify', {
+            method: 'POST', headers: bearer(login.body.data.token), body: JSON.stringify({ email: keyEmail }),
+        });
+        assert(ask.status === 200, `email/verify ${ask.status}: ${short(ask.body)}`);
+        const code = await smtp!.waitForMail(keyEmail, /\b\d{6}\b/);
+        const confirm = await json('/v1/ghii/email/confirm', {
+            method: 'POST', headers: bearer(login.body.data.token),
+            body: JSON.stringify({ verification_id: ask.body.data.verification_id, code: sixDigits(code) }),
+        });
+        assert(confirm.status === 200 && confirm.body.data.verified === true, `email/confirm ${confirm.status}: ${short(confirm.body)}`);
 
         const mail = await smtp!.waitForMail(keyEmail, new RegExp(issued));
         assert(mail.subject === `Your login to ${ORG_NAME} on AIMEAT`, `subject: ${mail.subject}`);
@@ -708,6 +731,80 @@ async function run(): Promise<void> {
         const mail = await smtp!.waitForMail(opEmail, new RegExp(`Group message ${STAMP}`));
         assert(mail.subject === subject, `subject: ${mail.subject}`);
         assert(mail.text.includes('One line to everybody with an address on file.'), 'the body must arrive intact');
+    });
+
+    // Decision 14a of 2026-11-05: the group mail follows the rule of every mail to an account's own
+    // address, so an address nobody verified gets nothing, and both the page's numbers and the send's
+    // answer say how many were skipped.
+    await test('a group send skips an address nobody verified, and says how many it skipped', async () => {
+        const name = `edunv${STAMP}`;
+        const address = `${name}@aimeat.test`;
+        const reg = await json('/v1/ghii', {
+            method: 'POST', body: JSON.stringify({ username: name, display_name: 'Unverified', password: 'Unverified-Addr9x', email: address }),
+        });
+        assert(reg.status === 201, `register ${reg.status}: ${short(reg.body)}`);
+        const status = await json('/v1/admin/email/status', { headers: bearer(opToken) });
+        assert(status.status === 200 && status.body.data.recipients.unverified >= 1
+            && typeof status.body.data.recipients.operators_unverified === 'number',
+            `the status must count the unverified address: ${short(status.body.data?.recipients)}`);
+        smtp!.clear();
+        const subject = `Verified only ${STAMP}`;
+        const r = await json('/v1/admin/email/send-group', {
+            method: 'POST', headers: bearer(opToken), body: JSON.stringify({ group: 'all', subject, body: 'Only to verified addresses.' }),
+        });
+        assert(r.status === 200 && r.body.data.skipped_unverified === status.body.data.recipients.unverified
+            && r.body.data.total === status.body.data.recipients.with_address,
+            `the send must skip and count what the status counted: ${short(r.body.data)} vs ${short(status.body.data.recipients)}`);
+        await smtp!.waitForMail(opEmail, new RegExp(`Verified only ${STAMP}`));
+        await sleep(500);
+        assert(smtp!.mailTo(address).length === 0, 'an unverified address must get no group mail');
+    });
+
+    // Decision 14a of 2026-11-05: an app invitation an agent or the app sends by email counts against
+    // the account's emailed-invitation allowance, as the organism invitation does; past it, 429 and
+    // nothing stored or sent. The owner in person keeps inviting (counted by the address lookup).
+    await test('app invitations an agent sends by email count against the account allowance', async () => {
+        const name = `edapp${STAMP}`;
+        const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'App Owner', password: 'AppOwner-Mail9x' }) });
+        assert(reg.status === 201, `register ${reg.status}: ${short(reg.body)}`);
+        const signIn = await ownerSignIn(BASE, name, 'AppOwner-Mail9x');
+        const ownerToken = signIn.body?.data?.token as string;
+        assert(typeof ownerToken === 'string', `sign-in ${signIn.status}: ${short(signIn.body)}`);
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: bearer(ownerToken),
+            body: JSON.stringify({ filename: 'club.html', name: 'Club', description: 'invitations', content: Buffer.from('<!doctype html><title>club</title><p>hi', 'utf8').toString('base64') }),
+        });
+        assert(pub.status === 200 || pub.status === 201, `publish ${pub.status}: ${short(pub.body)}`);
+        const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: 'inviter', owner: name }) });
+        const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['exchange:grant'], owner_token: ownerToken }) });
+        assert(v.status === 200, `agent approve ${v.status}: ${short(v.body)}`);
+        const tk = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+        const agentToken = tk.body.token as string;
+        assert(typeof agentToken === 'string', `agent token: ${short(tk.body)}`);
+
+        smtp!.clear();
+        const guest = (i: number) => `edguest${i}.${STAMP}@aimeat.test`;
+        const invite = (token: string, i: number) => json(`/v1/apps/${name}/club.html/members`, {
+            method: 'POST', headers: bearer(token), body: JSON.stringify({ email: guest(i), role: 'member', locale: 'en' }),
+        });
+        const MAX = 20; // services/account-limits.ts INVITE_EMAIL_LIMIT
+        for (let i = 0; i < MAX; i++) {
+            const r = await invite(agentToken, i);
+            assert(r.status === 201 && r.body.data.emailSent === true, `invitation ${i}: ${r.status} ${short(r.body)}`);
+        }
+        await smtp!.waitForMail(guest(MAX - 1), /./);
+        const refused = await invite(agentToken, MAX);
+        assert(refused.status === 429 && refused.body.error?.code === 'RATE_LIMITED'
+            && refused.body.error?.details?.retry_after_sec > 0,
+            `the invitation past the allowance must be refused: ${refused.status} ${short(refused.body)}`);
+        const roster = await json(`/v1/apps/${name}/club.html/members`, { headers: bearer(ownerToken) });
+        assert(roster.status === 200, `roster ${roster.status}: ${short(roster.body)}`);
+        const shown = JSON.stringify(roster.body.data.invites ?? []);
+        assert(shown.includes(guest(MAX - 1)) && !shown.includes(guest(MAX)), `a refused invitation must not be stored: ${shown.slice(0, 300)}`);
+        const own = await invite(ownerToken, MAX + 1);
+        assert(own.status === 201 && own.body.data.emailSent === true, `the owner in person keeps inviting: ${own.status} ${short(own.body)}`);
+        await sleep(500);
+        assert(smtp!.mailTo(guest(MAX)).length === 0, 'a refused invitation must send nothing');
     });
 
     console.log('\nPhase 4 — the outbound door: attachments, Reply-To and the disclosure header');

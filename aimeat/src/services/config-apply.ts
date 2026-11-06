@@ -17,6 +17,8 @@
  *   ConfigResetResult · resetConfigValue(deps, path)
  * @usage const r = await applyConfigChanges({ config, storage, provenance, caller: req.auth }, [{ path, value }]);
  * @version-history
+ *   2026-11-05 — Setting site.purchase_plan gives the store place's default to every agent that has not had it, before
+ *     the answer (services/place-agent-scopes.ts; codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — `deps.caller` and the tighten-only check before anything is written; resetConfigValue,
  *     which DELETE /v1/admin/config/:path calls instead of storage; storeConfigValue, the one writer of
  *     a setting row (codebase analysis 2026-11-03, item B4).
@@ -43,6 +45,7 @@ import { isSecretField } from './config-sealing.js';
 import { sealSettingForStorage } from './config-at-rest-rows.js';
 import { withinStatedRange, RANGE_ENFORCED, rangeKindOf, numericRangeOf, asList } from './config-schema-validators.js';
 import { syncRateLimitTiers } from './config-rate-limit-sync.js';
+import { placeDefaultAfterSettings } from './place-agent-scopes.js';
 import { requestLooseningRefusal, resetRefusal, type TightenRefusal } from './config-strictness.js';
 import type { ReaderCredential } from './classification/reader-kind.js';
 import { logger, setLogLevel } from '../utils/logger.js';
@@ -153,6 +156,9 @@ export async function applyConfigChanges(
     }
     // A saved rate limit reaches the running limiters now, not at the next restart; so does the log level.
     if (applied.length > 0) { syncRateLimitTiers(config); setLogLevel(config.logLevel); }
+    // A purchase plan set now makes this a store place: every agent that has not had the place's default
+    // gets it in this request, before the answer (services/place-agent-scopes.ts; decision 8b of 2026-11-05).
+    await placeDefaultAfterSettings(storage, config, applied.filter(a => !a.applies).map(a => a.path));
     return { applied, errors };
 }
 

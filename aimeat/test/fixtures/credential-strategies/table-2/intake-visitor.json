@@ -1,0 +1,1514 @@
+[
+  {
+    "id": "POST read :: no token",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read :: token null",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read :: token a number",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read :: token malformed",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read :: token unknown",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read :: token of another form's conversation",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read :: token valid",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "closed": "boolean",
+        "handler": "string",
+        "turns": [
+          {
+            "at": "string",
+            "role": "string",
+            "text": "string"
+          }
+        ],
+        "turns_left": "number"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST read :: token valid, extra fields",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "closed": "boolean",
+        "handler": "string",
+        "turns": [
+          {
+            "at": "string",
+            "role": "string",
+            "text": "string"
+          }
+        ],
+        "turns_left": "number"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: no token",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: token null",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: token a number",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: token malformed",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: token unknown",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: token of another form's conversation",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: token valid",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, an ordinary form :: token valid, extra fields",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: no token",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: token null",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: token a number",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: token malformed",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: token unknown",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: token of another form's conversation",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: token valid",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, a form switched off :: token valid, extra fields",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: no token",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: token null",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: token a number",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: token malformed",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: token unknown",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: token of another form's conversation",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: token valid",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST read, no such form :: token valid, extra fields",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST forget :: no token",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST forget :: token null",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST forget :: token a number",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST forget :: token malformed",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST forget :: token unknown",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST forget :: token of another form's conversation",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  },
+  {
+    "id": "POST forget :: token valid",
+    "status": 200,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "data": {
+        "forgotten": "boolean"
+      },
+      "node": "string",
+      "ok": "boolean",
+      "protocol": "string",
+      "request_id": "string",
+      "timestamp": "string",
+      "version": "string"
+    }
+  },
+  {
+    "id": "POST forget :: token valid, extra fields",
+    "status": 404,
+    "cacheControl": null,
+    "wwwAuthenticate": null,
+    "body": {
+      "ok": false,
+      "protocol": "aimeat",
+      "version": "v1",
+      "node": "node-cs2",
+      "timestamp": "<masked>",
+      "request_id": "<masked>",
+      "error": {
+        "code": "THREAD_NOT_FOUND",
+        "message": "No conversation opens with this token."
+      },
+      "hints": {
+        "next_actions": [
+          {
+            "description": "View API documentation",
+            "method": "GET",
+            "url": "/v1/docs"
+          },
+          {
+            "description": "Stuck, or think this is a bug? Message the people who run this node — they answer in Messages",
+            "method": "POST",
+            "url": "/v1/messages",
+            "note": "No identity lookup needed: \"support@operators\" reaches every operator in one thread.",
+            "example_body": {
+              "to": "support@operators",
+              "subject": "What went wrong",
+              "body": "What you were doing, and what happened instead."
+            }
+          }
+        ],
+        "help_url": "/v1/docs"
+      }
+    }
+  }
+]

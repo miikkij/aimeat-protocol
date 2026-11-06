@@ -15,6 +15,8 @@
  *   version recorded here alongside a hash of the pack's bytes. Change the code and the hash moves,
  *   and this fails until the version is bumped with it.
  * @version-history
+ *   v1.1.2 -- 2026-11-05 -- aimeat-i18n 1.4.1 recorded, bumped with its useProfile and withZone fixes
+ *     (codebase analysis 2026-11-03, decision 10b of 2026-11-05).
  *   v1.1.1 -- 2026-09-13 -- aimeat-charts 1.1.3, aimeat-surface 1.2.0 and aimeat-ui-motion 1.0.2
  *     recorded, bumped with their appdev-pitfall fixes.
  *   v1.1.0 -- 2026-09-12 -- Two holes, both found by the defect happening again. The ledger held one
@@ -58,7 +60,7 @@ const KNOWN: Record<string, { version: string; sha256: string }> = {
     'aimeat-charts': { version: '1.1.3', sha256: 'cdc21136313d147f' },
     'aimeat-dag': { version: '1.1.4', sha256: '56fff8df06d77259' },
     'aimeat-flow': { version: '1.0.1', sha256: '1634ee00cbb0099d' },
-    'aimeat-i18n': { version: '1.4.0', sha256: 'dec0c56d811ba96a' },
+    'aimeat-i18n': { version: '1.4.1', sha256: '6e2e000475bd87f4' },
     'aimeat-input': { version: '1.0.0', sha256: '5968dddac74e78aa' },
     'aimeat-surface': { version: '1.2.0', sha256: 'baad6d81ddbc1f3e' },
     'aimeat-ui-dialogs': { version: '1.0.1', sha256: '70a017c3b69a64ce' },

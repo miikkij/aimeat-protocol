@@ -22,12 +22,18 @@
  *   NEVER req.auth. A participant, a party or a platform is not a node session. These paths are left
  *   alone by the global auth middleware (takesDataspaceCredential, takesPartyToken), and a strategy
  *   neither reads nor sets req.auth.
+ *
+ *   THE KINDS OF ANOTHER NODE (a federation peer, a package seller or claimant) are in
+ *   ./credential-strategies-node.ts; the registry below names them like the others.
  * @structure CredentialPrincipals · StrategyOptions · acceptCredential(kind, options) · credentialOf(req, kind)
  * @usage
  *   router.get(path, acceptCredential('dsp-participant', { config, process: 'catalog' }), (req, res) => {
  *     const participant = credentialOf(req, 'dsp-participant');
  *   });
  * @version-history
+ *   v1.4.0 — 2026-11-05 — 'intake-visitor', 'docsign-wallet', 'party-optional', and the kinds of another
+ *     node ('federation-peer', 'package-seller', 'package-claimant'); a strategy may answer 'next-route'
+ *     (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   v1.3.0 — 2026-11-04 — 'ucp-platform' and 'ucp-platform-signed': a UCP platform on the guest
  *     checkout, and ucpRawBody (codebase analysis 2026-11-03, item B8).
  *   v1.2.0 — 2026-11-04 — 'app-party': a person registered to one app (codebase analysis 2026-11-03, item B8).
@@ -45,7 +51,14 @@ import { partyCredentialOf, verifyParty, type PartyContext } from '../services/p
 import { appPartyFromRequest, type AppPartyCtx } from '../services/app-parties/service.js';
 import { parseUcpAgent, platformProfile } from '../services/ucp/platform-profile.js';
 import { verifyMessage } from '../services/ucp/http-signatures.js';
+import { visitorThread, type VisitorThread } from '../services/intake/visitor-thread.js';
+import { walletSessionFor, openWalletSessionByState, type WalletSession } from '../services/docsign/eudi.js';
+import { DocsignError } from '../services/docsign/records.js';
 import { logger } from '../utils/logger.js';
+import {
+    federationPeer, packageSeller, packageClaimant,
+    type FederationPeer, type FederationPeerOptions, type PackageSeller, type PackageClaimant, type Verdict,
+} from './credential-strategies-node.js';
 
 /** The principal each kind puts on the request. */
 export interface CredentialPrincipals {
@@ -54,6 +67,13 @@ export interface CredentialPrincipals {
     'app-party': AppPartyCtx;
     'ucp-platform': UcpPlatform;
     'ucp-platform-signed': UcpPlatform;
+    'intake-visitor': VisitorThread;
+    'docsign-wallet': WalletSession;
+    /** `party` is null for a buyer who presented no party credential. */
+    'party-optional': { party: PartyContext | null };
+    'federation-peer': FederationPeer;
+    'package-seller': PackageSeller;
+    'package-claimant': PackageClaimant;
 }
 
 /** A UCP platform: the profile its UCP-Agent header names, whose keys verified the signature when one was sent. */
@@ -68,6 +88,17 @@ export interface StrategyOptions {
     'app-party': { storage: Storage; config: AimeatConfig };
     'ucp-platform': { config: AimeatConfig };
     'ucp-platform-signed': { config: AimeatConfig };
+    /** The form is the route's :org, :ws and :formId; the token is the body's `token`. */
+    'intake-visitor': { storage: Storage; config: AimeatConfig };
+    /**
+     * What the wallet presents: `session` the :session alone (the request object), `document` the
+     * :session and its :token, `state` the :session and the form's state, `by-state` the form's state alone.
+     */
+    'docsign-wallet': { config: AimeatConfig; proof: 'session' | 'document' | 'state' | 'by-state' };
+    'party-optional': { storage: Storage; config: AimeatConfig };
+    'federation-peer': FederationPeerOptions;
+    'package-seller': { storage: Storage; config: AimeatConfig; peers: FederationPeerOptions['peers'] };
+    'package-claimant': { config: AimeatConfig; purpose: string };
 }
 
 /** A principal on the request, tagged with its kind. */
@@ -83,8 +114,11 @@ declare global {
     }
 }
 
-/** Verifies one request: the principal, or null when the refusal has been sent. */
-type Verify<K extends CredentialKind> = (req: Request, res: Response) => Promise<CredentialPrincipals[K] | null>;
+/**
+ * Verifies one request: the principal, null when the refusal has been sent, or 'next-route' when the
+ * request is for the next route with the same path (a federation door's operator twin).
+ */
+type Verify<K extends CredentialKind> = (req: Request, res: Response) => Promise<Verdict<CredentialPrincipals[K]>>;
 type Strategy<K extends CredentialKind> = (options: StrategyOptions[K]) => Verify<K>;
 
 /** The Dataspace Protocol participant (was participantOf() in routes/dsp/index.ts). */
@@ -161,12 +195,67 @@ const ucpPlatform = (mustSign: boolean) => ({ config }: { config: AimeatConfig }
     };
 };
 
+/**
+ * A visitor's conversation through a public intake form (was the first lines of thread/read and
+ * thread/forget in routes/organisms/intake-thread.ts): one 404 for an unknown form, a form that takes
+ * no conversation, a token that opens nothing and another form's conversation.
+ */
+const intakeVisitor: Strategy<'intake-visitor'> = ({ storage, config }) => async (req, res) => {
+    const at = { org: String(req.params.org ?? ''), ws: String(req.params.ws ?? ''), formId: String(req.params.formId ?? '') };
+    const opened = await visitorThread(storage, config.nodeId, at, ((req.body ?? {}) as Record<string, unknown>).token);
+    if (opened) return opened;
+    res.status(404).json(error(config.nodeId, 'THREAD_NOT_FOUND', 'No conversation opens with this token.', 404));
+    return null;
+};
+
+/**
+ * An EU Digital Identity Wallet in a signing session (was the first lines of walletRequestObject,
+ * walletDocument, receiveWalletResponse and the by-state answer in routes/docsign-wallet.ts). Answered
+ * as the routes answer a DocsignError.
+ */
+const docsignWallet: Strategy<'docsign-wallet'> = ({ config, proof }) => async (req, res) => {
+    const form = (req.body ?? {}) as Record<string, unknown>;
+    if (proof === 'by-state') {
+        const s = openWalletSessionByState(form);
+        if (!s) res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No open wallet session has that state.'));
+        return s;
+    }
+    try {
+        return walletSessionFor(String(req.params.session ?? ''), proof === 'document'
+            ? { kind: 'document', token: String(req.params.token ?? '') }
+            : proof === 'state' ? { kind: 'state', form } : { kind: 'open' });
+    } catch (err) {
+        if (err instanceof DocsignError) res.status(err.status).json(error(config.nodeId, err.code, err.message));
+        else res.status(500).json(error(config.nodeId, 'DOCSIGN_ERROR', err instanceof Error ? err.message : String(err)));
+        return null;
+    }
+};
+
+/**
+ * An outside party buying again, or a buyer with none (was the start of POST
+ * /v1/exchange/offerings/:id/buy): a party credential that names no live party is refused as on the
+ * party's own doors, and a request with none passes with `party: null`.
+ */
+const partyOptional: Strategy<'party-optional'> = (deps) => async (req, res) => {
+    const cred = partyCredentialOf(req);
+    if (!cred) return { party: null };
+    const v = await verifyParty(deps, cred);
+    if (!v.ok) { res.status(v.status).json(error(deps.config.nodeId, v.code, v.message)); return null; }
+    return { party: v.ctx };
+};
+
 const STRATEGIES: { [K in CredentialKind]: Strategy<K> } = {
     'dsp-participant': dspParticipant,
     party: outsideParty,
     'app-party': appParty,
     'ucp-platform': ucpPlatform(false),
     'ucp-platform-signed': ucpPlatform(true),
+    'intake-visitor': intakeVisitor,
+    'docsign-wallet': docsignWallet,
+    'party-optional': partyOptional,
+    'federation-peer': federationPeer,
+    'package-seller': packageSeller,
+    'package-claimant': packageClaimant,
 };
 
 /**
@@ -179,6 +268,7 @@ export function acceptCredential<K extends CredentialKind>(kind: K, options: Str
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         const principal = await verify(req, res);
         if (principal === null) return;
+        if (principal === 'next-route') { next('route'); return; }
         req.credential = { kind, principal } as AcceptedCredential;
         next();
     };

@@ -15,6 +15,8 @@
  *   - sealPlaintextTotpSecrets(): boot step, encrypts a secret stored in plain text
  *
  * @version-history
+ *   v1.4.0 — 2026-11-05 — With AIMEAT_ENCRYPTION_KEY_1 set, a secret is sealed with the ring's current
+ *     data key and opens under either key (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.3.0 — 2026-11-04 — encryptSecret() and decryptSecret() call encrypt() and decrypt() of
  *     services/encryption.ts instead of a copy of AES-GCM of their own: the stored form is the same,
  *     and the secret follows the data key's ring when a key is added (codebase analysis 2026-11-03,
@@ -34,7 +36,7 @@ import { logger } from '../utils/logger.js';
 import { TOTP, Secret } from 'otpauth';
 import { createRequire } from 'node:module';
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
-import { encrypt, decrypt } from './encryption.js';
+import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
 
 // CJS-ESM interop for qrcode
 const require = createRequire(import.meta.url);
@@ -67,7 +69,7 @@ export class TotpEncryptionUnavailableError extends Error {
   }
 }
 
-type TotpKeyConfig = Pick<AimeatConfig, 'totpSecretEncryptionKey' | 'encryptionKey'>;
+type TotpKeyConfig = Pick<AimeatConfig, 'totpSecretEncryptionKey' | 'encryptionKey'> & Partial<Pick<AimeatConfig, 'encryptionKey1' | 'encryptionKeyCurrent'>>;
 
 /** A 64-hex key as a 32-byte buffer, or null for anything else. */
 function keyOf(hex: string | null | undefined): Buffer | null {
@@ -83,14 +85,17 @@ function keyOf(hex: string | null | undefined): Buffer | null {
  * 2026-10-09 only the TOTP key was used here, so both are tried when reading.
  */
 function totpKeysOf(config: TotpKeyConfig): { write: Buffer | undefined; read: Buffer[] } {
-  const general = keyOf(config.encryptionKey);
+  // With a second data key the general key is the ring's current key (services/encryption.ts), which
+  // opens a secret under either key and seals a new one with the current key. Without it, the
+  // general key is AIMEAT_ENCRYPTION_KEY as before.
+  const general = keyOf(config.encryptionKey1) ? getEncryptionKey({ encryptionKey: config.encryptionKey, totpSecretEncryptionKey: config.totpSecretEncryptionKey, encryptionKey1: config.encryptionKey1, encryptionKeyCurrent: config.encryptionKeyCurrent ?? 0 }) : keyOf(config.encryptionKey);
   const totp = keyOf(config.totpSecretEncryptionKey);
   const read = [general, totp].filter((k): k is Buffer => k !== null);
   return { write: read[0], read };
 }
 
 /** The node's TOTP settings, built in one place for the setup routes and every sign-in check. */
-export function totpConfigOf(config: Pick<AimeatConfig, 'totpIssuer' | 'totpPeriod' | 'totpWindow' | 'totpBackupCodeCount' | 'totpSecretEncryptionKey' | 'encryptionKey'>): TotpConfig {
+export function totpConfigOf(config: Pick<AimeatConfig, 'totpIssuer' | 'totpPeriod' | 'totpWindow' | 'totpBackupCodeCount' | 'totpSecretEncryptionKey' | 'encryptionKey'> & Partial<Pick<AimeatConfig, 'encryptionKey1' | 'encryptionKeyCurrent'>>): TotpConfig {
   const keys = totpKeysOf(config);
   return {
     issuer: config.totpIssuer,

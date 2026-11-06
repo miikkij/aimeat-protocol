@@ -21,6 +21,8 @@
  * @structure GeneratedAnnexes · generateAnnexes() · operatorParty() · measuresFromConfig() · subprocessorsFor() · DEFAULT_PROCESSING
  * @usage const g = await generateAnnexes({ storage, config }, input);
  * @version-history
+ *   v1.0.3 — 2026-11-05 — The encryption measure counts AIMEAT_ENCRYPTION_KEY_1 as a data key (codebase
+ *     analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.0.2 — 2026-11-05 — Moved unchanged from src/services/compliance-agreements-generate.ts to src/services/compliance/agreements-generate.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.1 — 2026-11-02 — The security measures name the password lock only when auth.sign_in_lockout is on.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.3).
@@ -122,7 +124,7 @@ export function measuresFromConfig(config: AimeatConfig, lang: Lang): Array<{ ar
       ? L(lang, 'Kaikki liikenne kulkee HTTPS:n yli, ja palvelin lähettää HSTS-otsakkeen (max-age vuosi, alitunnukset mukaan lukien).', 'All traffic is carried over HTTPS, and the server sends an HSTS header (max-age one year, subdomains included).')
       : L(lang, 'Noden osoite ei ole HTTPS. Salaus siirrossa riippuu edessä olevasta välityspalvelimesta.', "The node's address is not HTTPS. Encryption in transit depends on the proxy in front of it."),
   });
-  if (config.encryptionKey) {
+  if (config.encryptionKey || config.encryptionKey1) {
     out.push({ area: 'encryption', text: L(lang, 'Salaisuudet (rajapinta-avaimet, yhteystunnukset) salataan levyllä AES-256-GCM:llä.', 'Secrets (API keys, connection tokens) are encrypted at rest with AES-256-GCM.') });
   }
   const signIn = [

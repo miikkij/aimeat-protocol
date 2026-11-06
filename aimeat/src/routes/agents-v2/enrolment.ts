@@ -34,6 +34,8 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   2026-11-05 — The enrolled credential copies the record and adds nothing: a store place's default is given at
+ *     approval (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.4.0 — 2026-11-02 — The enrolled credential carries a store place's default for agents (services/place-agent-scopes.ts).
@@ -54,7 +56,6 @@ import { buildGAII } from '../../utils/gaii.js';
 import { readCardJws, verifyCardJws } from '../../services/agent-card.js';
 import type { CardDefect } from '../../models/agent-card.js';
 import { issueJWT, generateSessionId, AccountDisabledError } from '../../auth/jwt.js';
-import { widenAndAnnounce } from '../agents/announce-scopes.js';
 import { nodeContext } from '../../services/node-context.js';
 import { emitChange } from '../../services/event-bus.js';
 import { cardUri, jwksUri } from './card.js';
@@ -277,10 +278,11 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
       const sessionId = generateSessionId();
       const ttl = config.agentV2TokenTtlSeconds;
       // Named, not inherited. The requesting daemon's own roles and scopes are irrelevant here: what
-      // this agent may do is what the owner's template said, stored on its record, and on a store place
-      // the place's default the first time (services/place-agent-scopes.ts): this is the token a new
-      // agent's connector attaches with, so it has to carry the words (crew77, 2.11).
-      const scopes = await widenAndAnnounce(storage, config, item.record);
+      // this agent may do is what the owner's template said, stored on its record. On a store place the
+      // record holds the place's default already, given when the agent was approved
+      // (services/place-agent-scopes.ts; decision 8b of 2026-11-05), so this token, the one a new agent's
+      // connector attaches with, carries the words (crew77, 2.11) without adding any.
+      const scopes = item.record.defaultScopes ?? [];
       let token: string;
       try {
         token = await issueJWT({ sub: gaii, owner: item.record.owner, node: config.nodeId, roles: ['agent'], scopes }, ttl, sessionId);

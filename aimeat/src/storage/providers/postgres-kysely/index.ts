@@ -20,6 +20,8 @@
  *     codebase analysis 2026-11-03, item HA stage 3).
  *   2026-11-04 — busWire(): NOTIFY and a LISTEN connection of its own for the event bus between this
  *     node's processes (./bus-wire.ts; codebase analysis 2026-11-03, HA stage 2, e2-bus).
+ *   2026-11-05 — sealedColumnMethods bound (the data key's re-encrypt job; codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 — ephemeralClaimMethods bound (EphemeralClaim, migration 0126; codebase analysis
  *     2026-11-03, high-availability stage 2).
  *   2026-11-04 — The migrations run under the boot lock, and bootLock() takes it for the boot seeding
@@ -130,6 +132,7 @@ import { passkeyMethods } from './methods/passkeys.js';
 import { secretMethods } from './methods/secrets.js';
 import { heldNameMethods } from './methods/held-names.js';
 import { ephemeralClaimMethods } from './methods/ephemeral-claims.js';
+import { sealedColumnMethods } from './methods/sealed-columns.js';
 
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
@@ -288,6 +291,7 @@ Object.assign(
   secretMethods,
   heldNameMethods,
   ephemeralClaimMethods,
+  sealedColumnMethods,
   identityMethods,
   walletMethods,
   sessionMethods,

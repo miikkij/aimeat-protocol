@@ -17,6 +17,7 @@
  *   federation endpoint verifies unconditionally (security DNA invariant 5).
  * @structure registerRetractRoute(router, config, storage, peers)
  * @version-history
+ *   2026-11-05 — The peer and its signature are verified by the 'federation-peer' credential strategy, in the same order with the same refusals (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-11-04 — The single use of a signed retraction is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   2026-10-20 — Initial (secaudit 2026-10, replica retention).
  */
@@ -27,8 +28,8 @@ import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { gatePeer } from '../../services/federation-peer-gate.js';
-import { verify } from '../../auth/keypair.js';
+import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
+import { badInput, bodyOf, signedJson } from '../../auth/credential-strategies-node.js';
 import {
     signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin,
 } from '../../services/signed-node-request.js';
@@ -38,32 +39,21 @@ import { emitChange } from '../../services/event-bus.js';
 const CONFLICT_SCAN_LIMIT = 200;
 
 export function registerRetractRoute(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
-    router.post('/v1/federation/retract', async (req, res) => {
-        const { source_node, gaii, key, reason, timestamp, signature } = req.body ?? {};
-
-        if (!source_node || !gaii || !key) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, gaii and key are required'));
-            return;
-        }
-
-        // Active peer, entitled to the replication door, key on file. The same door the copy came in
-        // through, so a peer that may no longer replicate may still take its copies back.
-        const gate = gatePeer(peers, source_node, 'replicateMemory');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
-
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on retraction request'));
-            return;
-        }
-        const retractPayload = JSON.stringify({ source_node, gaii, key, reason, timestamp });
-        if (!await verify(peer.publicKey, retractPayload, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on retraction request'));
-            return;
-        }
+    // Active peer, entitled to the replication door, key on file. The same door the copy came in
+    // through, so a peer that may no longer replicate may still take its copies back. Verified by the
+    // 'federation-peer' credential strategy (src/auth/credential-strategies-node.ts).
+    router.post('/v1/federation/retract', acceptCredential('federation-peer', {
+        config, peers, capability: 'replicateMemory', node: (req) => bodyOf(req).source_node,
+        before: (req) => {
+            const { source_node, gaii, key } = bodyOf(req);
+            return !source_node || !gaii || !key ? badInput('source_node, gaii and key are required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature on retraction request' },
+        signed: signedJson('source_node', 'gaii', 'key', 'reason', 'timestamp'),
+        forged: 'Invalid signature on retraction request',
+    }), async (req, res) => {
+        const { source_node, gaii, key, reason, timestamp } = req.body ?? {};
+        const { peer, signed: retractPayload, signature } = credentialOf(req, 'federation-peer');
 
         // A retraction signs its own send time, so the five-minute window and the single use apply to
         // it directly; the audience proof names this node, and a peer that has once sent one is held

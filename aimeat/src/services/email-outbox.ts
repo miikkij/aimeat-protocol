@@ -16,6 +16,8 @@
  *   const sendMail = createMailSender(transporter, { config, storage });
  *   const ok = await sendMail({ from, to, subject, html, text, type: 'notification' });
  * @version-history
+ *   v1.0.1 -- 2026-11-05 -- contextOf exported for the data key's re-encrypt job (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, HA stage 1 item 1.5).
  */
 import type { Transporter } from 'nodemailer';
@@ -55,7 +57,8 @@ export interface MailPayload {
 
 interface SealedAttachment { filename: string; contentType: string; content: string }
 
-const contextOf = (id: string) => `outbox:mail:${id}`;
+/** The context a stored mail is bound to; the data key's re-encrypt job reseals it with it. */
+export const contextOf = (id: string) => `outbox:mail:${id}`;
 
 /**
  * The send function of one email service. With `storage`, the retries are kept in the stored outbox;

@@ -14,6 +14,7 @@
  *   through services/password-check.ts, with the same per-account lock as the sign-in route, and an
  *   account with two-step sign-in needs its code here too.
  * @version-history
+ *   2026-11-05 -- The requesting node and its signature are verified by the 'federation-peer' credential strategy after the input checks, in the same order with the same refusals (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-11-04 -- The single use of a signed verify request is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.6.0 -- 2026-11-02 -- The sign-in policy (services/sign-in-policy.ts): with password sign-in off
  *     the verify answers 403 PASSWORD_SIGN_IN_OFF before the consent or the password is read; under
@@ -51,11 +52,12 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
-import { gatePeer } from '../services/federation-peer-gate.js';
+import { acceptCredential, credentialOf } from '../auth/credential-strategies.js';
+import { badInput, bodyOf } from '../auth/credential-strategies-node.js';
 import { hasNodeAuthConsent, linkCarriesSignIn } from '../services/federation-auth-consent.js';
 import { federationAuthPayload } from '../services/federation-auth-payload.js';
 import { checkPassword, checkSecondFactor } from '../services/password-check.js';
-import { sign, verify } from '../auth/keypair.js';
+import { sign } from '../auth/keypair.js';
 import { signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../services/signed-node-request.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
@@ -80,59 +82,45 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
      */
     router.post('/v1/federation/auth/verify',
         rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs })),
+        // --- The requesting node: an active peer whose link may carry a sign-in, signing this ---
+        // Verified by the 'federation-peer' credential strategy after the input checks, before
+        // anything about the person is read, so a caller that is not such a peer learns nothing
+        // about any account here.
+        acceptCredential('federation-peer', {
+            config, peers, capability: null, node: (req) => bodyOf(req).requesting_node,
+            before: (req) => {
+                const { username, password, requesting_node, timestamp } = bodyOf(req);
+                // --- Input validation ---
+                if (!username || typeof username !== 'string') return badInput('username is required');
+                if (!password || typeof password !== 'string') return badInput('password is required');
+                if (!requesting_node || typeof requesting_node !== 'string') return badInput('requesting_node is required');
+                if (!timestamp || typeof timestamp !== 'string') return badInput('timestamp is required');
+                // Reject requests with timestamps too far from now (5 minute window)
+                const requestTime = new Date(timestamp).getTime();
+                if (isNaN(requestTime) || Math.abs(Date.now() - requestTime) > 5 * 60 * 1000) {
+                    return { status: 400, code: 'INVALID_TIMESTAMP', message: 'Request timestamp is too old or invalid' };
+                }
+                return null;
+            },
+            admit: (peer) => linkCarriesSignIn(peer) ? null : { status: 403, code: 'FEDERATION_AUTH_NOT_ALLOWED', message: 'This link does not carry sign-ins' },
+            unsigned: { when: 'not-text', message: 'The request is not signed by the requesting node' },
+            signed: (req) => {
+                const { username, requesting_node, timestamp } = bodyOf(req) as Record<string, string>;
+                return federationAuthPayload({ username, requesting_node, timestamp });
+            },
+            forged: 'The request is not signed by the requesting node',
+        }),
         async (req, res) => {
-            const { username, password, requesting_node, timestamp, signature, totp_code, backup_code } = req.body ?? {};
-
-            // --- Input validation ---
-            if (!username || typeof username !== 'string') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
-                return;
-            }
-            if (!password || typeof password !== 'string') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required'));
-                return;
-            }
-            if (!requesting_node || typeof requesting_node !== 'string') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'requesting_node is required'));
-                return;
-            }
-            if (!timestamp || typeof timestamp !== 'string') {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'timestamp is required'));
-                return;
-            }
-
-            // Reject requests with timestamps too far from now (5 minute window)
-            const requestTime = new Date(timestamp).getTime();
-            if (isNaN(requestTime) || Math.abs(Date.now() - requestTime) > 5 * 60 * 1000) {
-                res.status(400).json(error(config.nodeId, 'INVALID_TIMESTAMP', 'Request timestamp is too old or invalid'));
-                return;
-            }
-
-            // --- The requesting node: an active peer whose link may carry a sign-in, signing this ---
-            // Before anything about the person is read, so a caller that is not such a peer learns
-            // nothing about any account here.
-            const gate = gatePeer(peers, requesting_node, null);
-            if (!gate.ok) {
-                res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-                return;
-            }
-            if (!linkCarriesSignIn(gate.peer)) {
-                res.status(403).json(error(config.nodeId, 'FEDERATION_AUTH_NOT_ALLOWED', 'This link does not carry sign-ins'));
-                return;
-            }
-            const payload = federationAuthPayload({ username, requesting_node, timestamp });
-            if (typeof signature !== 'string' || !signature || !await verify(gate.peer.publicKey, payload, signature)) {
-                res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The request is not signed by the requesting node'));
-                return;
-            }
+            const { username, password, requesting_node, timestamp, totp_code, backup_code } = req.body ?? {};
+            const { peer, signed: payload, signature } = credentialOf(req, 'federation-peer');
             // The password is not part of what is signed, so one captured signature could carry other
             // passwords for this person for five minutes: a signature carries one try (secaudit 2026-10
             // follow-up, A7). The window is checked again here, after the signature.
             // And it names this node as its audience, so a sign-in asked of another node does not pass here (A7).
             // A peer that has once sent the proof is held to it (pinnedRefusal; secaudit 2026-10-10 I21).
-            const replayed = await pinnedRefusal(await federationPeerProofPin(storage, gate.peer), req.body ?? {}, provenSince => audienceRefusal({
+            const replayed = await pinnedRefusal(await federationPeerProofPin(storage, peer), req.body ?? {}, provenSince => audienceRefusal({
                 signed: payload, audience: req.body?.audience, audienceSignature: req.body?.audience_signature,
-                publicKey: gate.peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
+                publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
             })) ?? await signedMessageRefusalOnNode(requesting_node, timestamp, signature);
             if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
 

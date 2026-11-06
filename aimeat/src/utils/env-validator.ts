@@ -5,7 +5,10 @@
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
- * @version-history v1.4.1 -- 2026-11-01 -- The two-step sign-in key is an error only when neither it nor
+ * @version-history v1.5.0 -- 2026-11-05 -- The second data key: AIMEAT_ENCRYPTION_KEY_1 must be 64 hex
+ *   characters, AIMEAT_ENCRYPTION_KEY_CURRENT 0 or 1, and 1 only with the second key set; the second key
+ *   counts as a data key for two-step sign-in (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
+ *   v1.4.1 -- 2026-11-01 -- The two-step sign-in key is an error only when neither it nor
  *   AIMEAT_ENCRYPTION_KEY is set, as the runtime reads them since 2026-10-09; the message no longer says
  *   the secrets are stored unencrypted, which stopped being true that day (IT adoption review).
  *   v1.4.0 — 2026-10-16 — Names every value the start sets aside and runs the default
@@ -301,13 +304,25 @@ export function validateEnv(): ValidationResult[] {
     }
   }
 
+  // ── The second data key (docs/operations/key-rotation.md) ─────────
+  const secondKey = env.AIMEAT_ENCRYPTION_KEY_1;
+  const currentKey = env.AIMEAT_ENCRYPTION_KEY_CURRENT;
+  if (secondKey && !/^[0-9a-fA-F]{64}$/.test(secondKey)) {
+    results.push({ level: 'error', variable: 'AIMEAT_ENCRYPTION_KEY_1', message: 'The second data key must be 64 hexadecimal characters (openssl rand -hex 32). The node ignores it as it is, and keeps one data key.' });
+  }
+  if (currentKey && currentKey !== '0' && currentKey !== '1') {
+    results.push({ level: 'error', variable: 'AIMEAT_ENCRYPTION_KEY_CURRENT', message: 'Must be 0 (AIMEAT_ENCRYPTION_KEY) or 1 (AIMEAT_ENCRYPTION_KEY_1). Any other value seals with AIMEAT_ENCRYPTION_KEY.' });
+  } else if (currentKey === '1' && !secondKey) {
+    results.push({ level: 'error', variable: 'AIMEAT_ENCRYPTION_KEY_CURRENT', message: 'Names the second data key, and AIMEAT_ENCRYPTION_KEY_1 is not set, so new secrets are sealed with AIMEAT_ENCRYPTION_KEY. Set the second key on every process first.' });
+  }
+
   // ── TOTP / 2FA ──────────────────────────────────────────────────
   const totpEnabled = env.AIMEAT_TOTP_ENABLED;
   if (totpEnabled !== 'false') {
     // The secrets are encrypted with AIMEAT_ENCRYPTION_KEY, or with this key when only this one is set
     // (services/encryption.ts getEncryptionKey); with neither, setting up two-step sign-in answers 503.
     const totpKey = env.AIMEAT_TOTP_ENCRYPTION_KEY;
-    if (!totpKey && !env.AIMEAT_ENCRYPTION_KEY) {
+    if (!totpKey && !env.AIMEAT_ENCRYPTION_KEY && !env.AIMEAT_ENCRYPTION_KEY_1) {
       results.push({ level: 'error', variable: 'AIMEAT_TOTP_ENCRYPTION_KEY', message: 'Neither AIMEAT_ENCRYPTION_KEY nor AIMEAT_TOTP_ENCRYPTION_KEY is set, so nobody can set up two-step sign-in (503). Set AIMEAT_ENCRYPTION_KEY (64 hex characters, openssl rand -hex 32), which encrypts every stored secret, or disable TOTP with AIMEAT_TOTP_ENABLED=false.' });
     } else if (totpKey && totpKey.length < 64) {
       results.push({ level: 'warning', variable: 'AIMEAT_TOTP_ENCRYPTION_KEY', message: `Key length ${totpKey.length} hex chars is short. Expected 64 hex chars (32 bytes) for AES-256-GCM.` });

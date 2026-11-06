@@ -25,19 +25,24 @@
  * @structure SEALED_SETTING_PREFIX · AtRestKeyConfig · sealSettingValue · openStoredSetting
  * @usage const raw = openStoredSetting(path, stored, config); if (raw === null) skip(path);
  * @version-history
+ *   v1.1.0 — 2026-11-05 — Reading tries the data key ring first, so a row sealed under the second
+ *     data key opens (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S4b).
  */
-import { encryptBound, decryptBound, getEncryptionKey } from './encryption.js';
+import { encryptBound, decryptBound, getEncryptionKey, dataKeysOf, type DataKeyConfig } from './encryption.js';
 
 export const SEALED_SETTING_PREFIX = 'sealed:';
 
-export type AtRestKeyConfig = { encryptionKey: string | null; totpSecretEncryptionKey: string | null };
+export type AtRestKeyConfig = DataKeyConfig;
 
-const contextOf = (path: string): string => `config-setting:${path}`;
+/** The context a sealed Config row is bound to; the data key's re-encrypt job reseals it with it. */
+export const contextOf = (path: string): string => `config-setting:${path}`;
 
 /** Every key a sealed value may be under, the write key first. */
 function readKeys(config: AtRestKeyConfig): Buffer[] {
-  const out: Buffer[] = [];
+  // The data key ring first (the current key, then the other key when a second one is set), so a row
+  // sealed under either key opens; on a node with one key that is the first key below, as before.
+  const out: Buffer[] = [...dataKeysOf(config)];
   for (const hex of [config.encryptionKey, config.totpSecretEncryptionKey]) {
     const k = getEncryptionKey({ encryptionKey: hex ?? null, totpSecretEncryptionKey: null });
     if (k && !out.some(o => o.equals(k))) out.push(k);

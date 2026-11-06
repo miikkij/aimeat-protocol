@@ -12,6 +12,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-11-05 -- adminKeyReencryptRouter mounted: the data key's re-encrypt job (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 -- The wrong-password count is kept in the node's storage (checkAdminPasswordOnNode), so
  *     every process shares it; admitAdmin is async (codebase analysis 2026-11-03, HA stage 2).
  *   2026-11-04 -- The admin password is checked by checkAdminPassword (services/admin-password.ts) on
@@ -92,6 +94,7 @@ import { fileURLToPath } from 'node:url';
 
 // Sub-routers (domain-split from admin.ts)
 import { adminConfigRouter } from './admin-config.js';
+import { adminKeyReencryptRouter } from './admin-key-reencrypt.js';
 import { adminNodeUpdateRouter } from './admin-node-update.js';
 import { adminMonitoringRouter } from './admin-monitoring.js';
 import { adminAgentsRouter } from './admin-agents.js';
@@ -685,6 +688,7 @@ export function adminRouter(
 
     // ── Mount domain sub-routers ──
     router.use(adminConfigRouter(config, storage, provenance, consulService));
+    router.use(adminKeyReencryptRouter(config, storage));
     router.use(adminNodeUpdateRouter(config, storage));
     router.use(adminMonitoringRouter(config, storage, peers));
     router.use(adminAgentsRouter(config, storage));

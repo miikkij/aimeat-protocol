@@ -5,6 +5,7 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — The template listing and the memory-list request declare the 'federation-peer' credential strategy, which verifies the peer, the time window and the signature in the same order with the same refusals (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   2026-11-04 — The single use of a signed memory-list request is spent in the node's storage (signedMessageRefusalOnNode), so another process refuses a replay too (codebase analysis 2026-11-03, HA stage 2).
  *   v1.6.2 — 2026-10-27 — POST /v1/federation/memory/list refuses a person whose account is
  *     deactivated (403 ACCOUNT_DISABLED, asked after the consent), and a peer under this node's own id
@@ -37,7 +38,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from federation-sync.ts (max-file-lines)
  */
 
-import type { Router } from 'express';
+import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
@@ -45,12 +46,12 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { emitChange } from '../../services/event-bus.js';
-import { verify } from '../../auth/keypair.js';
 import { syncRemoteTemplates } from '../../services/federation-remote-templates.js';
 import {
     signedMessageRefusalOnNode, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal,
 } from '../../services/signed-node-request.js';
-import { gatePeer } from '../../services/federation-peer-gate.js';
+import { acceptCredential, credentialOf } from '../../auth/credential-strategies.js';
+import { badInput, bodyOf, signedJson } from '../../auth/credential-strategies-node.js';
 import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation-auth-consent.js';
 import { parseGaiiLoose, localAccountOf } from '../../utils/gaii.js';
 
@@ -92,56 +93,46 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
     // ── Federation Template Sharing ──
 
     // GET /v1/federation/templates — Serve template listings to peer nodes
-    router.get('/v1/federation/templates', async (req, res) => {
-        if (!config.packageFederationEnabled) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Package federation is not enabled on this node'));
-            return;
-        }
-
-        const sourceNode = req.headers['x-source-node'] as string | undefined;
-        if (!sourceNode) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'x-source-node header is required'));
-            return;
-        }
-
-        // A template listing is catalogue, so it rides the catalogue word.
-        const gate = gatePeer(peers, sourceNode, 'shareCatalogue');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-
-        // SECURITY: the only gate here used to be that `x-source-node` NAMED an active peer, and a
-        // node id is public — GET /v1/federation/directory publishes it. Anyone who could read the
-        // directory could set the header and read this. That is decoration, not a gate, and it is the
-        // same finding as audit H-15 on /v1/federation/memory/list, closed the same way: the caller
-        // signs `{ source_node, timestamp }` and proves it is the node it names.
-        //
-        // BREAKING for a peer running older code, which sends no signature and gets a clean 401. Same
-        // trade the developer took for /memory/list on 2026-08-10: a gate that does not gate is worth
-        // less than version skew. The client half below signs, so a node on this version speaks to a
-        // node on this version.
-        const signature = req.headers['x-signature'] as string | undefined;
-        const timestamp = req.headers['x-timestamp'] as string | undefined;
-        if (!signature || !timestamp) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing x-signature / x-timestamp on template listing request'));
-            return;
-        }
-        const listTs = new Date(timestamp).getTime();
-        if (isNaN(listTs) || Math.abs(Date.now() - listTs) > 300_000) {
-            res.status(400).json(error(config.nodeId, 'STALE_TIMESTAMP', 'Timestamp is missing, invalid, or outside the 5-minute window'));
-            return;
-        }
-        const listSigned = JSON.stringify({ source_node: sourceNode, timestamp });
-        if (!await verify(gate.peer.publicKey, listSigned, signature)) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on template listing request'));
-            return;
-        }
+    // A template listing is catalogue, so it rides the catalogue word.
+    //
+    // SECURITY: the only gate here used to be that `x-source-node` NAMED an active peer, and a
+    // node id is public — GET /v1/federation/directory publishes it. Anyone who could read the
+    // directory could set the header and read this. That is decoration, not a gate, and it is the
+    // same finding as audit H-15 on /v1/federation/memory/list, closed the same way: the caller
+    // signs `{ source_node, timestamp }` and proves it is the node it names, verified by the
+    // 'federation-peer' credential strategy from the headers.
+    //
+    // BREAKING for a peer running older code, which sends no signature and gets a clean 401. Same
+    // trade the developer took for /memory/list on 2026-08-10: a gate that does not gate is worth
+    // less than version skew. The client half below signs, so a node on this version speaks to a
+    // node on this version.
+    const header = (req: Request, name: string) => req.headers[name] as string | undefined;
+    const UNSIGNED_LISTING = 'Missing x-signature / x-timestamp on template listing request';
+    router.get('/v1/federation/templates', acceptCredential('federation-peer', {
+        config, peers, capability: 'shareCatalogue', node: (req) => header(req, 'x-source-node'), signature: (req) => header(req, 'x-signature'),
+        before: (req) => {
+            if (!config.packageFederationEnabled) return { status: 403, code: 'FORBIDDEN', message: 'Package federation is not enabled on this node' };
+            return header(req, 'x-source-node') ? null : badInput('x-source-node header is required');
+        },
+        unsigned: { when: 'absent', message: UNSIGNED_LISTING },
+        fresh: (_peer, req) => {
+            const timestamp = header(req, 'x-timestamp');
+            if (!timestamp) return { status: 401, code: 'UNAUTHORIZED', message: UNSIGNED_LISTING };
+            const listTs = new Date(timestamp).getTime();
+            return isNaN(listTs) || Math.abs(Date.now() - listTs) > 300_000
+                ? { status: 400, code: 'STALE_TIMESTAMP', message: 'Timestamp is missing, invalid, or outside the 5-minute window' } : null;
+        },
+        signed: (req) => JSON.stringify({ source_node: header(req, 'x-source-node'), timestamp: header(req, 'x-timestamp') }),
+        forged: 'Invalid signature on template listing request',
+    }), async (req, res) => {
+        const sourceNode = header(req, 'x-source-node') as string;
+        const timestamp = header(req, 'x-timestamp') as string;
+        const { peer, signed: listSigned, signature } = credentialOf(req, 'federation-peer');
         // The node it is for (x-audience) and one use inside the window, as every other signed
         // federation message (Core 2026-11 FED-08; QA audit S6-09). It had the window only.
         const listRefusal = await signedGetRefusal({
-            pin: await federationPeerProofPin(storage, gate.peer), headers: req.headers, signed: listSigned,
-            sourceNode, timestamp, signature, publicKey: gate.peer.publicKey, thisNodeId: config.nodeId,
+            pin: await federationPeerProofPin(storage, peer), headers: req.headers, signed: listSigned,
+            sourceNode, timestamp, signature, publicKey: peer.publicKey, thisNodeId: config.nodeId,
             required: config.federationAudienceRequired,
         });
         if (listRefusal) { res.status(listRefusal.status).json(error(config.nodeId, listRefusal.code, listRefusal.message)); return; }
@@ -217,55 +208,43 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
     });
 
     // POST /v1/federation/memory/list — List memory entries for a user (peer-to-peer)
-    router.post('/v1/federation/memory/list', async (req, res) => {
-        const { requesting_node, gaii, signature, timestamp } = req.body ?? {};
-
-        if (!requesting_node || !gaii) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'requesting_node and gaii are required'));
-            return;
-        }
-
-        // A memory key inventory is memory, so it rides the replication word. Until now the only
-        // gate was "an active peer with a signature", which let a VISITING peer read any local
-        // person's whole key list — a tier that exists to browse a catalogue, reading the inventory.
-        const gate = gatePeer(peers, requesting_node, 'replicateMemory');
-        if (!gate.ok) {
-            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
-            return;
-        }
-        const peer = gate.peer;
+    // A memory key inventory is memory, so it rides the replication word. Until now the only
+    // gate was "an active peer with a signature", which let a VISITING peer read any local
+    // person's whole key list — a tier that exists to browse a catalogue, reading the inventory.
+    // The peer and its signature are verified by the 'federation-peer' credential strategy.
+    router.post('/v1/federation/memory/list', acceptCredential('federation-peer', {
+        config, peers, capability: 'replicateMemory', node: (req) => bodyOf(req).requesting_node,
+        before: (req) => {
+            const { requesting_node, gaii } = bodyOf(req);
+            return !requesting_node || !gaii ? badInput('requesting_node and gaii are required') : null;
+        },
+        unsigned: { when: 'absent', message: 'Missing signature on memory-list request' },
+        fresh: (peer, req) => {
+            if (!peer.publicKey) return { status: 403, code: 'FORBIDDEN', message: 'Peer has no public key on file for signature verification' };
+            // The timestamp is inside the signed payload, so a captured request cannot be replayed
+            // beyond the window — the inventory changes, and an old answer is not a fresh one.
+            const ts = Date.parse(String(bodyOf(req).timestamp ?? ''));
+            return !Number.isFinite(ts) || Math.abs(Date.now() - ts) > FRESHNESS_MS
+                ? { status: 401, code: 'UNAUTHORIZED', message: 'Missing or stale timestamp on memory-list request' } : null;
+        },
+        signed: signedJson('requesting_node', 'gaii', 'timestamp'),
+        forged: 'Invalid signature on memory-list request',
+    }), async (req, res) => {
+        const { requesting_node, gaii, timestamp } = req.body ?? {};
+        const { peer, signed: listPayload, signature } = credentialOf(req, 'federation-peer');
 
         // SECURITY (audit H-15, the July audit's deferred F2): this route returns a person's whole
         // memory key inventory — every key name, its visibility, tags and version. Its only gate was
         // that the body named an active peer, and a node id is public (GET /v1/federation/directory
         // publishes it), so the gate was not one: anyone could read anyone's inventory.
         //
-        // The peer must now PROVE it is that node, the same way /replicate and /catalogue-sync do.
+        // The peer must now PROVE it is that node (the strategy above: a signature, a key on file, a
+        // timestamp inside the window, which the signature covers, and the signature itself).
         // This is a BREAKING change for any caller that does not sign, which is why it was deferred
         // in July; the developer took that decision on 2026-08-10 (security over version skew), and
         // the client half below signs, so a node on this version speaks to a node on this version.
         // A peer running older code gets a clean 401 and re-federates.
-        if (!signature) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on memory-list request'));
-            return;
-        }
-        if (!peer.publicKey) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Peer has no public key on file for signature verification'));
-            return;
-        }
-        // The timestamp is inside the signed payload, so a captured request cannot be replayed
-        // beyond the window — the inventory changes, and an old answer is not a fresh one.
-        const ts = Date.parse(String(timestamp ?? ''));
-        if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > FRESHNESS_MS) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing or stale timestamp on memory-list request'));
-            return;
-        }
-        const listPayload = JSON.stringify({ requesting_node, gaii, timestamp });
-        const listValid = await verify(peer.publicKey, listPayload, signature);
-        if (!listValid) {
-            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on memory-list request'));
-            return;
-        }
+        //
         // A person's key inventory: one listing per signed request (secaudit 2026-10 follow-up, A7).
         // And it names this node as its audience (A7).
         // A peer that has once sent the proof is held to it (pinnedRefusal; secaudit 2026-10-10 I21).

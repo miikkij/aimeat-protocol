@@ -13,6 +13,8 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-11-05 — aimeat_admin_key_reencrypt registered (mcp/key-reencrypt.ts; codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  *   2026-10-25 — aimeat_admin_config answers the list GET /v1/admin/config answers (services/config-admin-view.ts),
  *     narrowed by `section` and `q`, in place of a flat twelve fields; the sealed settings are in it. New
  *     tool aimeat_admin_config_set changes settings through changeNodeSettings, PUT's function, as the
@@ -58,6 +60,7 @@ import { addOrganismOwner, organismOwners } from '../services/organism-ownership
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
+import { registerKeyReencryptTool } from './key-reencrypt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
@@ -296,4 +299,7 @@ export function registerCoreAdminTools(
             };
         },
     );
+
+    // ── aimeat_admin_key_reencrypt: the data key's re-encrypt job (mcp/key-reencrypt.ts) ──
+    if (caller) registerKeyReencryptTool(mcp, config, storage, caller);
 }

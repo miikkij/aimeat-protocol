@@ -6,6 +6,10 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-05 — A verified address receives the first sign-in's credentials that waited for it
+ *     (key-credentials.ts sendHeldKeyCredentials; codebase analysis 2026-11-03, decision 14a of 2026-11-05).
+ *   2026-11-05 — On a store place the account's app agent gets the place's default when a mailbox proof makes or
+ *     renews it, once (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 — The registration code goes through mail-gate.ts sendMail as sign-in mail (codebase analysis 2026-11-03, item B3).
  *   2026-10-31 — POST /v1/ghii/magic-link takes `lang`, the language of the page the link was asked
  *     from, and the mail is written in it (v27 P1).
@@ -96,6 +100,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
+import { sendHeldKeyCredentials } from '../../services/key-credentials.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
@@ -104,6 +109,7 @@ import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
 import { checkSecondFactor } from '../../services/password-check.js';
 import { recoveryAddressIs, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
+import { applyPlaceDefault } from '../../services/place-agent-scopes.js';
 
 /**
  * The agent credential both mailbox proofs hand out (a verified e-mail code, a clicked sign-in link):
@@ -156,22 +162,26 @@ async function appAgentWithFreshKey(
 ): Promise<{ agent: { gaii: string; defaultScopes?: string[] }; privateKey: string }> {
     const keys = await generateKeyPair();
     const existing = (await storage.getAgentsByOwner(ownerName)).find(a => a.name === 'app');
+    // The person's own proof approves the app agent, so on a store place it gets the place's default here,
+    // once (services/place-agent-scopes.ts; codebase analysis 2026-11-03, decision 8b of 2026-11-05).
     if (existing) {
-        const defaultScopes = Array.isArray(existing.defaultScopes) ? existing.defaultScopes : [...config.defaultAgentScopes];
+        const defaultScopes = await applyPlaceDefault(storage, config, existing.gaii,
+            Array.isArray(existing.defaultScopes) ? existing.defaultScopes : [...config.defaultAgentScopes]);
         await storage.updateAgent(existing.gaii, { publicKey: keys.publicKey, defaultScopes });
         return { agent: { ...existing, defaultScopes }, privateKey: keys.privateKey };
     }
+    const gaii = buildGAII('app', ownerName, config.nodeId);
     const agent = await storage.createAgent({
         name: 'app',
         owner: ownerName,
-        gaii: buildGAII('app', ownerName, config.nodeId),
+        gaii,
         displayName: `${ownerName}'s App Agent`,
         description: 'Default agent for AIMEAT apps',
         capabilities: [],
         publicKey: keys.publicKey,
         trustScore: 50,
         morselBalance: 0,
-        defaultScopes: [...config.defaultAgentScopes],
+        defaultScopes: await applyPlaceDefault(storage, config, gaii, [...config.defaultAgentScopes]),
         createdAt: now,
         lastSeen: now,
         // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
@@ -520,6 +530,8 @@ export function registerWebVerifyRoutes(
         // (services/app-member-invites.ts). Best-effort for the same reason.
         await applyAppInvitesForVerifiedEmail(storage, config.nodeId, record.emailHash, ghii)
             .catch(err => { logger.warn('verify-email: app invitations are best-effort', { error: String(err) }); });
+        // A code key's first sign-in credentials that waited for a proven address go now (never throws).
+        await sendHeldKeyCredentials(storage, config, ghii);
 
         // Create an agent if not exists, then issue JWT
         const { agent, privateKey: agentPrivKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);

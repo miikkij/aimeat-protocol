@@ -55,8 +55,12 @@
     }
   },
   "readers": {
+    "src/auth/credential-strategies-node.ts": {
+      "count": 1,
+      "why": "The 'federation-peer' credential strategy: the peer comes from gatePeer (an active peer, entitled to the door's capability, with a key on file) and its pinned key verifies the Ed25519 signature over the exact text the door signs, unconditionally, before the handler runs. The key is read, never the url. These are the first lines the inbound federation handlers below ran themselves until 2026-11-05 (codebase analysis 2026-11-03, decision 2 of 2026-11-05)."
+    },
     "src/routes/federation-auth.ts": {
-      "count": 2,
+      "count": 1,
       "why": "POST /v1/federation/auth/verify, the home node's answer to a federated sign-in: gatePeer admits only an active peer with a key, the tier ceiling must allow sign-ins, and the request's signature is verified against that peer's pinned key before any account is read. The key is read, never the url (secaudit 2026-10, D1). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/apps/catalogue-admin.ts": {
@@ -88,23 +92,23 @@
       "why": "Reads whether a visiting peer signed its introduction and its address, as promotion criteria shown to the operator. Nothing is sent."
     },
     "src/routes/federation-settlements.ts": {
-      "count": 4,
+      "count": 3,
       "why": "Inbound settlements and relay hops verified with the pinned key after gatePeer('allowSettlement'); the outbound settle is operator-only, to an active peer, with validateOutboundUrl first."
     },
     "src/routes/federation-sync/catalogue-trust.ts": {
-      "count": 4,
+      "count": 2,
       "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue'). The catalogue sync reads the same pinned key again, after its own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3). A peer's trust notice: gatePeer (an active peer with a key), its signature against the pinned key, then the same key for the audience proof naming this node; the notice is stored and acts on nothing (QA audit S6-06, 2026-10-16)."
     },
     "src/routes/federation-sync/message-reactions.ts": {
-      "count": 2,
+      "count": 1,
       "why": "An inbound mark on a message: gatePeer with allowMessaging first, then the signature against the pinned key, then the audience proof verified against the same key; the reactor and by_agent must be the signing node's own, and the reactor a party of a copy held here (services/message-reactions.ts applyRemoteReaction; 2026-10-26)."
     },
     "src/routes/federation-sync/messaging.ts": {
-      "count": 7,
+      "count": 2,
       "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's or a broadcast's sender must be on the signing node (2026-10-01; broadcast QA audit S6-03, 2026-10-16), and a replicate lands only under a principal of the signing node or an existing one of this node (QA audit S6-02). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). Replicate and the receipt read it once more for the delivery proof, which names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-sync/retract.ts": {
-      "count": 2,
+      "count": 1,
       "why": "POST /v1/federation/retract, a peer taking back a record it replicated here: gatePeer with the capability word ('replicateMemory', so an active peer with a key and the replication door), then the retraction's own signature against the pinned key, verified unconditionally before anything is read. The same pinned key is read again for the audience proof that names this node and for the pin, and the signed send time carries a five-minute single-use window, checked after the signature so a forged message cannot use up a real one. The replica key is built from the node id the signature proved, never from a body field, and a row is removed only when it carries a tag naming that node, so a peer reaches its own copies and nothing else (secaudit 2026-10, replica retention)."
     },
     "src/routes/federation-sync/routing.ts": {
@@ -112,7 +116,7 @@
       "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off. The routed call parses the active peer's stored url once more to keep the request on that peer's own origin, refusing a path that would leave it (secaudit2026oct22)."
     },
     "src/routes/federation-sync/templates.ts": {
-      "count": 5,
+      "count": 3,
       "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); the outbound sync moved to services/federation-remote-templates.ts (2026-10-16); the listing GET reads the pinned key for its own signature, its audience check and its pin. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/ghii/register-login.ts": {

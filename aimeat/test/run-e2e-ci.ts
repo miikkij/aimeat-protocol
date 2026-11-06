@@ -13,6 +13,10 @@
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
  *   2026-11-06 -- e2e-search-visibility.ts joins the list (not the guard tier): noindex on scripts and stylesheets on every host family, content tags, the app body and /index.html (TARGET-090, 089, 091).
+ *   2026-11-05 -- e2e-verb-parity-unified.ts joins the list (not the guard tier): a contact's card, a group member's permissions and a task's deletion admit the callers the other verb of the same path admits (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
+ *   2026-11-05 -- e2e-place-agent-default-at-approval.ts joins the list (not the guard tier): a store place's default is given at approval and when the plan is set, and a mint adds nothing (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
+ *   2026-11-05 -- e2e-single-process-lease.ts joins the list (not the guard tier): with one process per node, the default, a process of a new name takes the previous process's @activate run and queued AI jobs at once (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
+ *   2026-11-05 -- e2e-key-reencrypt.ts joins the list (not the guard tier): replacing the data key with a second key and the re-encrypt job, over REST and MCP (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 -- e2e-two-process-leases.ts joins the list (not the guard tier): two processes of one node on one database run an AI job once, a sweep once per round, and take a killed process's jobs over (codebase analysis 2026-11-03, item HA 2.5-2.7).
  *   2026-11-04 -- e2e-two-process-bus.ts joins the list (not the guard tier): two processes of one node on one PostgreSQL database share the event bus (codebase analysis 2026-11-03, HA stage 2, e2-bus).
  *   2026-11-04 -- e2e-app-versions-access.ts joins the list (not the guard tier): an app's version list answers what the app's read answers for that caller, and carries no content (codebase analysis 2026-11-03, item A1).
@@ -1042,6 +1046,14 @@ const ALL_SUITES = [
     // round, and a killed process's jobs are taken over after its lease runs out (codebase analysis
     // 2026-11-03, HA 2.5-2.7). Own nodes on 28861 and 28862, the provider stub on 28863.
     'test/e2e-two-process-leases.ts',
+    // Replacing the data key: one node started with one key, with a second key current, and with the
+    // first key removed, over one database; the re-encrypt job over REST and MCP (codebase analysis
+    // 2026-11-03, decision 4a of 2026-11-05). Own node on 29620.
+    'test/e2e-key-reencrypt.ts',
+    // One process per node, the default: a process of a new name (a container with a new hostname)
+    // takes the previous process's @activate run and queued AI jobs at once (codebase analysis
+    // 2026-11-03, decision 6a of 2026-11-05). Own nodes on 28871 and 28872, the provider stub on 28873.
+    'test/e2e-single-process-lease.ts',
     // What a model may be handed of the owner's data, by whom (secaudit 2026-10, r49, v74, v75). Own node on 28963.
     'test/e2e-ai-input-reach.ts',
     // A scheduled AI job reads what its maker may read, and a schedule stored before that rule keeps
@@ -1159,6 +1171,9 @@ const ALL_SUITES = [
     // through the MCP server they attached (aimeat-commercial-1c, crew54).
     'test/e2e-build-with-you-send.ts',
     'test/e2e-place-agent-scopes.ts',
+    // The store place's default given at approval and when the plan is set; a mint adds nothing
+    // (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
+    'test/e2e-place-agent-default-at-approval.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',
@@ -1792,6 +1807,8 @@ const ALL_SUITES = [
     'test/e2e-mcp-mail-connection-tools.ts',
     'test/e2e-mcp-proxy-tools.ts',
     'test/e2e-mcp-owner-only-parity.ts',
+    // The writing verbs of one path admit the same callers, the looser deciding (decision 13a).
+    'test/e2e-verb-parity-unified.ts',
     'test/e2e-mcp-agent-self-tools.ts',
     'test/e2e-mcp-v2-tools.ts',
     'test/e2e-mcp-crew-schedule-tools.ts',

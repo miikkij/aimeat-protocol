@@ -8,12 +8,17 @@
  *   material). Until 2026-10-25 every one of these was read from the environment with no row, so the
  *   operator could not see them on the Config tab (check:config-coverage, widened to all of src/).
  *
- *   WHICH ARE STORED IN THE DATABASE. The usage meter and the log level are. The deployment rows are
+ *   WHICH ARE STORED IN THE DATABASE. The usage meter, the log level and the process count are. The deployment rows are
  *   immutable, for the reason each says: a value that decides who may reach what, or that the node
  *   needs before its database is open, is set by whoever runs the node, in the environment, and the
  *   Config tab shows it. The secrets show only whether they are set.
  * @structure RUNTIME_CONFIG_FIELDS
  * @version-history
+ *   v1.3.0 -- 2026-11-05 -- node.processes (AIMEAT_NODE_PROCESSES), stored and read at start: one
+ *     process per node by default, or several (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
+ *   v1.2.0 -- 2026-11-05 -- encryptionKey1 (AIMEAT_ENCRYPTION_KEY_1) and encryptionKeyCurrent
+ *     (AIMEAT_ENCRYPTION_KEY_CURRENT), immutable like the first data key (codebase analysis 2026-11-03,
+ *     decision 4a of 2026-11-05).
  *   v1.1.0 -- 2026-10-27 -- bindHost row (AIMEAT_BIND_HOST), immutable like the port (secaudit2026oct26,
  *     local-profile-from-default-baseurl-on-network-reachable-listener).
  *   v1.0.0 — 2026-10-25 — Initial.
@@ -32,9 +37,10 @@ const textOrNull = (v: unknown): boolean => v === null || typeof v === 'string';
 
 type RuntimeKey = 'usageHotDays' | 'usageHourRollupDays' | 'usageArchiveBatch' | 'usageRollupBatch' | 'usageRollupPasses'
   | 'usageBufferMs' | 'tallyBufferMs' | 'logLevel' | 'perfTrace' | 'nodeKeyPath' | 'keyPassphrase' | 'encryptionKey'
+  | 'encryptionKey1' | 'encryptionKeyCurrent'
   | 'federationPublicKey' | 'federationPrivateKey' | 'securityProfile' | 'allowPrivateEgress' | 'trustProxy' | 'appHost'
   | 'appOriginEnabled' | 'portfolioHost' | 'portfolioOriginEnabled' | 'coHost' | 'coOriginEnabled' | 'connectFakeBaseUrl'
-  | 'x402TestFacilitator' | 'bindHost';
+  | 'x402TestFacilitator' | 'bindHost' | 'nodeProcesses';
 
 export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<RuntimeKey>[] = [
   // ── Usage meter (mutable). The windows and batches are read on each run; the flush intervals at start. ──
@@ -51,10 +57,18 @@ export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<RuntimeKey>[] = [
   // Read when storage is created, before the database layer is applied, so it cannot be stored there.
   { key: 'perfTrace', dotPath: 'node.perf_trace', envVar: 'AIMEAT_PERF_TRACE', type: 'boolean', validate: bool, immutable: true, description: 'Time every storage call and log the slow ones. For finding a slow node; costs a little on every call. Set in the environment' },
 
+  // ── Processes (stored, read at start: services/process-lease.ts decides with it from the first claim) ──
+  { key: 'nodeProcesses', dotPath: 'node.processes', envVar: 'AIMEAT_NODE_PROCESSES', type: 'string', ...oneOf('single', 'multiple'), immutable: false, applies: 'restart', description: 'How many processes serve this node on its database. single (the default): one process, which takes all the work at its start at once, also after a restart under a new host name. multiple: an active process and a standby, or several active ones; a process then waits until the lease of another live process runs out (30 s) before it takes that process\'s work. Set the same value on every process. Takes effect at the next start' },
+
   // ── Key material (immutable: the node needs it before its database is open) ──
   { key: 'nodeKeyPath', dotPath: 'node.key_path', envVar: 'AIMEAT_NODE_KEY_PATH', type: 'string', validate: text, immutable: true, description: 'Where the node key file is. Empty uses a file named after the node id under ~/.aimeat' },
   { key: 'keyPassphrase', dotPath: 'node.key_passphrase', envVar: 'AIMEAT_KEY_PASSPHRASE', type: 'string', validate: textOrNull, immutable: true, description: 'Passphrase that encrypts the node key file (secret)', adminDisplay: 'configured' },
   { key: 'encryptionKey', dotPath: 'node.encryption_key', envVar: 'AIMEAT_ENCRYPTION_KEY', type: 'string', validate: textOrNull, immutable: true, description: 'Data key that encrypts the stored secrets, 64 hexadecimal characters (secret)', adminDisplay: 'configured' },
+  // The second data key and the choice between the two (docs/operations/key-rotation.md). Set in the
+  // environment like the first key: every process must hold the same keys before any of them seals
+  // with the new one, and key material is never accepted over a request.
+  { key: 'encryptionKey1', dotPath: 'node.encryption_key_1', envVar: 'AIMEAT_ENCRYPTION_KEY_1', type: 'string', validate: textOrNull, immutable: true, description: 'Second data key, for replacing the data key: 64 hexadecimal characters. With it set, a stored secret opens with whichever of the two keys sealed it (secret)', adminDisplay: 'configured' },
+  { key: 'encryptionKeyCurrent', dotPath: 'node.encryption_key_current', envVar: 'AIMEAT_ENCRYPTION_KEY_CURRENT', type: 'number', validate: v => v === 0 || v === 1, immutable: true, range: '0-1', description: 'Which data key seals new secrets: 0 is AIMEAT_ENCRYPTION_KEY (the default), 1 is AIMEAT_ENCRYPTION_KEY_1. Secrets already stored keep opening, and the re-encrypt job (Config, Node; aimeat_admin_key_reencrypt) moves them to it' },
   { key: 'federationPublicKey', dotPath: 'federation.public_key', envVar: 'AIMEAT_PUBLIC_KEY', type: 'string', validate: text, immutable: true, description: 'Public half of the key pair `aimeat join` made for federation. Empty until the node joins one' },
   { key: 'federationPrivateKey', dotPath: 'federation.private_key', envVar: 'AIMEAT_PRIVATE_KEY', type: 'string', validate: textOrNull, immutable: true, description: 'Private half of that key pair (secret)', adminDisplay: 'configured' },
 

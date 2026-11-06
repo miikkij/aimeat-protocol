@@ -14,6 +14,8 @@
  * @structure RuntimeConfig · runtimeConfigFromEnv(env) · siteKvFromEnv(env)
  * @usage const runtime = runtimeConfigFromEnv(process.env);   // spread into the config in config.ts
  * @version-history
+ *   v1.2.0 -- 2026-11-05 -- nodeProcesses (AIMEAT_NODE_PROCESSES): one process per node by default, or
+ *     several (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   v1.1.0 -- 2026-10-27 -- bindHost (AIMEAT_BIND_HOST): the address the node listens on; empty keeps
  *     every address (secaudit2026oct26, local-profile-from-default-baseurl-on-network-reachable-listener).
  *   v1.0.0 — 2026-10-25 — Initial.
@@ -57,6 +59,14 @@ export interface RuntimeConfig {
    * or `::` for every network. Empty listens on every address, as the node always has. Read at start.
    */
   bindHost: string;
+  /**
+   * How many processes serve this node on its database (AIMEAT_NODE_PROCESSES, node.processes):
+   * `single` (the default) or `multiple`. With `single` no other live process can exist, so a starting
+   * process takes every lease at once (services/process-lease.ts), also under a new hostname. With
+   * `multiple` a process waits for another live process's lease, so an active process and a standby,
+   * or several active ones, run each piece of work once. Read at start.
+   */
+  nodeProcesses: 'single' | 'multiple';
 }
 
 const LOG_LEVELS = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
@@ -90,6 +100,8 @@ export function runtimeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Runt
     rlOpenrouter: Math.max(1, count(env.AIMEAT_RL_OPENROUTER, 30)),
     rlRegistrationInvites: Math.max(1, count(env.AIMEAT_RL_REGISTRATION_INVITES, 5)),
     bindHost: (env.AIMEAT_BIND_HOST ?? '').trim(),
+    // Only the word `multiple` switches several processes on; anything else keeps one process.
+    nodeProcesses: (env.AIMEAT_NODE_PROCESSES ?? '').trim().toLowerCase() === 'multiple' ? 'multiple' : 'single',
   };
 }
 

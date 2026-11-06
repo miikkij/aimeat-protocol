@@ -30,6 +30,8 @@
  *   // Registered as core handler 'inactivity-nudge' in services/core-jobs.ts.
  *   await runInactivityNudgeJob(config, storage);
  * @version-history
+ *   2026-11-05 — The mail service is read from nodeContext(), the last service-locator call in src/
+ *     (codebase analysis 2026-11-03, item D-i; Jouni 2026-11-05, decision 5).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.4 — 2026-11-04 — The nudge goes through mail-gate.ts sendMail as an owner mail (codebase
@@ -45,7 +47,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { GHIIRecord } from '../storage/types/identity.js';
-import { getActiveEmailService } from './email.js';
+import { nodeContext } from './node-context.js';
 import { outboundEmailHtml } from './email-templates.js';
 import { readNotificationSettings, appendMailLog } from './notification-settings.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
@@ -190,7 +192,7 @@ export async function runInactivityNudgeJob(
     opts: { now?: number; epoch?: number } = {},
 ): Promise<{ sent: number; considered: number }> {
     if (!config.inactivityNudge) return { sent: 0, considered: 0 };
-    const email = getActiveEmailService();
+    const email = nodeContext().email;
     if (!email || !email.enabled) return { sent: 0, considered: 0 };
 
     const now = opts.now ?? Date.now();

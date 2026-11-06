@@ -28,6 +28,8 @@
  *   so on a SQLite run the suite is skipped with that reason.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-two-process-bus
  * @version-history
+ *   v1.1.1 — 2026-11-05 — Both processes start with AIMEAT_NODE_PROCESSES=multiple, which several
+ *     processes on one database now need (Jouni 2026-11-05, decision 6a); no assertion changed.
  *   v1.1.0 — 2026-11-04 — Case 6: a dropped listening connection, and the registries read again
  *     after it (codebase analysis 2026-11-03, item HA stage 3).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, HA stage 2, e2-bus).
@@ -87,6 +89,9 @@ async function startProcess(name: 'A' | 'B', db: { args: string[]; env: Record<s
         env: {
             ...process.env, ...db.env,
             AIMEAT_PORT: String(PORTS[name]), AIMEAT_BASE_URL: base(name), AIMEAT_NODE_ID: NODE_ID, AIMEAT_LOG_LEVEL: 'warn',
+            // Several processes on one database are switched on (Jouni 2026-11-05, decision 6a: one
+            // process is the default).
+            AIMEAT_NODE_PROCESSES: 'multiple',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
     });

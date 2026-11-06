@@ -2066,7 +2066,7 @@
         "failed": "epäonnistui",
         "failedSub": "luovutti neljän yrityksen jälkeen",
         "reach": "tavoitettavissa",
-        "reachSub": "{total} tilistä on osoite"
+        "reachSub": "{total} tilistä on vahvistettu osoite"
       },
       "test": {
         "title": "Lähetä testiviesti",
@@ -2099,7 +2099,7 @@
         "colTemplate": "Pohja",
         "colSent": "Lähetetty",
         "hardCoded": "koodissa",
-        "note": "Kukaan ei saa näitä, ellei tilillä ole ilmoitusosoitetta. Luvut ovat laskureiden kokonaissummia; viestejä itseään ei säilytetä.",
+        "note": "Kukaan ei saa näitä, ellei tilillä ole ilmoitusosoitetta. Pääsyavaimen tunnukset ja ryhmäviesti lähtevät vain osoitteeseen, jonka henkilö on vahvistanut. Luvut ovat laskureiden kokonaissummia; viestejä itseään ei säilytetä.",
         "when": {
           "verification": "Joku rekisteröityy tai lisää tililleen sähköpostiosoitteen",
           "magic_link": "Joku pyytää kirjautumista ilman salasanaa",
@@ -2112,7 +2112,7 @@
       },
       "group": {
         "title": "Lähetä ryhmälle",
-        "lead": "Yksi viesti kaikille ryhmän jäsenille, joiden tilillä on sähköpostiosoite. Se lähtee ilmoituksena, yksi viesti vastaanottajaa kohti ilman yhteistä vastaanottajakenttää, eikä sitä saa peruttua.",
+        "lead": "Yksi viesti kaikille ryhmän jäsenille, joiden tilillä on vahvistettu sähköpostiosoite. Se lähtee ilmoituksena, yksi viesti vastaanottajaa kohti ilman yhteistä vastaanottajakenttää, eikä sitä saa peruttua.",
         "group": "Ryhmä",
         "operators": "Ylläpitäjät",
         "everyone": "Kaikki",
@@ -2121,13 +2121,15 @@
         "body": "Viesti",
         "bodyPlaceholder": "Pelkkää tekstiä. Se kääritään ilmoituspohjaan.",
         "send": "Lähetä {n} vastaanottajalle",
-        "nobody": "Kenelläkään ei ole osoitetta",
+        "nobody": "Kenelläkään ei ole vahvistettua osoitetta",
         "sending": "Lähetetään",
         "note": "Lähetetään yksi kerrallaan. Vastaanottaja, jonka palvelin torjuu, ohitetaan ja loput lähtevät silti.",
         "done": "Lähetetty {sent} vastaanottajalle {total}:sta.",
+        "doneSkipped": "Lähetetty {sent} vastaanottajalle {total}:sta. {skipped} ohitettiin, koska heidän osoitettaan ei ole vahvistettu.",
         "whoTitle": "Kuka saa viestin",
         "ofN": "{n}/{total}",
-        "whoHint": "Pois jääneillä ei ole tilillään sähköpostiosoitetta. Heidät ohitetaan, eikä virhettä ilmoiteta."
+        "unverified": "Osoite vahvistamatta, ohitetaan",
+        "whoHint": "Pois jääneillä ei ole tilillään sähköpostiosoitetta, tai he eivät ole vahvistaneet sitä. Heidät ohitetaan, eikä virhettä ilmoiteta."
       },
       "tpl": {
         "title": "Pohjat",
@@ -14087,6 +14089,7 @@
     "cfgDesc_node_id": "Tämän instanssin yksilöivä tunniste.",
     "cfgDesc_node_port": "HTTP-portti, jota kuunnellaan.",
     "cfgDesc_node_bind_host": "Osoite, jossa palvelin vastaa. 127.0.0.1 tarkoittaa vain tätä konetta. 0.0.0.0 avaa palvelimen lähiverkkoon ja muihin verkkoihin, joista kone näkyy. Tyhjä vastaa kaikissa osoitteissa. Kun palvelin on auki tämän koneen ulkopuolelle, se saa julkisen palvelimen turva-asetukset, ellei suojausprofiili sano muuta. Asetetaan ympäristössä, ja muutos tulee voimaan seuraavassa käynnistyksessä.",
+    "cfgDesc_node_processes": "Yksi prosessi (oletus) tai useita samassa tietokannassa. Kun prosessi on yksi, käynnistyvä prosessi ottaa heti kaiken työn, myös silloin kun sen kontti saa uuden konenimen. Kun prosesseja on useita, prosessi ottaa toisen käynnissä olevan prosessin työn vasta, kun se on lakannut ilmoittamasta olevansa käynnissä (30 s). Aseta sama arvo jokaiselle prosessille. Muutos tulee voimaan seuraavassa käynnistyksessä.",
     "cfgDesc_node_type": "Instanssin tyyppi: full, relay tai personal.",
     "cfgDesc_storage_type": "Tallennustaustan tyyppi.",
     "cfgDesc_node_sealed_config_keys": "Asetukset, jotka instanssin pyörittäjä on asettanut ja joita ei voi muuttaa täältä. Luettavissa, ei kirjoitettavissa. Tyhjä, kun pyörität itse omaasi.",
@@ -15169,6 +15172,7 @@
     "cfg_node_id": "Instanssin tunnus",
     "cfg_node_port": "Portti",
     "cfg_node_bind_host": "Kuunteluosoite",
+    "cfg_node_processes": "Palvelimen prosessit",
     "cfg_node_type": "Instanssin tyyppi",
     "cfg_storage_type": "Tallennustyyppi",
     "cfg_morsel_policy_welcome_bonus": "Tervetulobonus",
@@ -15442,6 +15446,37 @@
     "cfgDesc_dataspace_max_processes_per_participant": "Kuinka monta avointa neuvottelua ja siirtoa yhdellä osallistujalla voi olla yhtä aikaa saman tilin kanssa. Tilillä voi olla niitä yhteensä 400. Raja estää yhtä osallistujaa viemästä ne kaikki ja sulkemasta muita ulos. Kun osallistuja on rajalla, palvelin kieltäytyy sen uusista pyynnöistä, kunnes se päättää jonkin. 0: osallistujalla ei ole omaa rajaa, vain tilin 400. Oletus on 100.",
     "cfgDesc_consent_share_max_days": "Kuinka pitkäksi aikaa omistaja voi jakaa datatuotteen nimetylle ulkopuoliselle osapuolelle.",
     "cfgDesc_consent_party_purchases_per_hour": "Kuinka monta datapaketin ostoa yhdestä osoitteesta voi aloittaa tunnissa ilman tiliä tai osapuolen avainta. Kun raja täyttyy, palvelin torjuu seuraavat oston aloitukset tunnin loppuun asti. Ulkopuolinen osapuoli, joka ostaa uudelleen avaimellaan, ei kuluta rajaa. 0 tarkoittaa, ettei rajaa ole.",
+    "keyRing": {
+      "title": "Salausavaimet",
+      "desc": "Avain, jolla palvelin salaa jokaisen tallennetun salaisuuden, ja työ, joka salaa tallennetut salaisuudet uudella avaimella.",
+      "keys": "Palvelimen avaimet",
+      "keysTwo": "{a} ja {b}",
+      "none": "Ei yhtään",
+      "current": "Salaa uudet salaisuudet",
+      "currentSub": "Asetetaan ympäristössä (AIMEAT_ENCRYPTION_KEY_CURRENT).",
+      "lastRun": "Työn viimeisin ajo",
+      "state": {
+        "running": "Käynnissä",
+        "done": "Valmis",
+        "failed": "Pysähtyi virheeseen"
+      },
+      "counts": "Mitä ajo löysi",
+      "countsLine": "{moved} siirretty, {current} jo uudella avaimella, {unreadable} ei aukea, {changed} muuttui ajon aikana",
+      "unreadableAt": "Arvot, jotka eivät aukea",
+      "noKey": "Palvelimella ei ole salausavainta, joten se ei tallenna salaisuuksia.",
+      "oneKey": "Palvelimella on yksi salausavain, joten siirrettävää ei ole. Kun haluat vaihtaa avaimen, aseta jokaiselle palvelimen prosessille AIMEAT_ENCRYPTION_KEY_1 ja AIMEAT_ENCRYPTION_KEY_CURRENT=1, käynnistä prosessit uudelleen ja käynnistä työ tästä.",
+      "noRun": "Uudet salaisuudet salataan avaimella {key}. Käynnistä työ, niin se siirtää tallennetut salaisuudet tälle avaimelle. Pidä {other} paikallaan, kunnes työ on valmis eikä yhtään arvoa ole jäänyt sen alle.",
+      "running": "Työ siirtää tallennettuja salaisuuksia avaimelle {key}. Jokainen salaisuus aukeaa ajon aikana. Pidä {other} paikallaan.",
+      "failed": "Viimeisin ajo pysähtyi virheeseen. Käynnistä se uudelleen. Pidä {other} paikallaan.",
+      "stale": "Viimeisin ajo siirsi salaisuudet avaimelle {key}, mutta nyt uudet salaisuudet salataan avaimella {current}. Käynnistä työ uudelleen. Pidä {other} paikallaan.",
+      "removable": "Jokainen tallennettu salaisuus on avaimella {key}. Voit nyt poistaa muuttujan {other} jokaisen prosessin ympäristöstä ja käynnistää prosessit uudelleen. Säilytä siitä kopio niiden varmuuskopioiden kanssa, jotka on tehty ennen tätä ajoa, koska ne tarvitsevat sitä yhä.",
+      "left": "{n} tallennettua arvoa ei ole avaimella {key}: ne eivät aukea kummallakaan avaimella, tai ne muuttuivat ajon aikana. Käynnistä työ uudelleen ja pidä {other} paikallaan, kunnes työ ilmoittaa 0.",
+      "start": "Siirrä tallennetut salaisuudet uudelle avaimelle",
+      "started": "Työ käynnistyi. Luvut päivittyvät ajon aikana.",
+      "alreadyRunning": "Työ on jo käynnissä.",
+      "startFailed": "Työ ei käynnistynyt.",
+      "readFailed": "Salausavainten tilaa ei saatu luettua."
+    },
     "dataOut": {
       "dspTitle": "Dataspace Protocol nyt",
       "dspState": "Tila",
@@ -16028,6 +16063,8 @@
     "cfgOpt_node_log_level_verbose": "Yksityiskohtainen",
     "cfgOpt_node_log_level_debug": "Vianetsintään",
     "cfgOpt_node_log_level_silly": "Kaikki",
+    "cfgOpt_node_processes_single": "Yksi prosessi",
+    "cfgOpt_node_processes_multiple": "Useita prosesseja",
     "cfg_node_perf_trace": "Tallennuskutsujen ajanotto",
     "cfgDesc_node_perf_trace": "Mittaa jokaisen tallennuskutsun keston ja kirjaa hitaat lokiin. Tällä etsitään syytä hitaaseen palvelimeen; se maksaa hieman jokaisella kutsulla. Asetetaan ympäristössä.",
     "cfg_node_key_path": "Palvelimen avaintiedosto",
@@ -16036,6 +16073,10 @@
     "cfgDesc_node_key_passphrase_configured": "Onko palvelimen avaintiedosto salattu tunnuslauseella (AIMEAT_KEY_PASSPHRASE). Arvoa ei näytetä koskaan.",
     "cfg_node_encryption_key_configured": "Salausavain asetettu?",
     "cfgDesc_node_encryption_key_configured": "Onko asetettu avain, jolla tallennetut salaisuudet salataan (AIMEAT_ENCRYPTION_KEY). Arvoa ei näytetä koskaan.",
+    "cfg_node_encryption_key_1_configured": "Toinen salausavain asetettu?",
+    "cfgDesc_node_encryption_key_1_configured": "Onko asetettu toinen salausavain (AIMEAT_ENCRYPTION_KEY_1). Sitä tarvitaan, kun salausavain vaihdetaan. Kun se on asetettu, tallennettu salaisuus aukeaa sillä avaimella, jolla se on salattu. Arvoa ei näytetä koskaan.",
+    "cfg_node_encryption_key_current": "Uusien salaisuuksien salausavain",
+    "cfgDesc_node_encryption_key_current": "Millä salausavaimella uudet salaisuudet salataan: 0 on AIMEAT_ENCRYPTION_KEY (oletus), 1 on AIMEAT_ENCRYPTION_KEY_1. Jo tallennetut salaisuudet aukeavat edelleen, ja alla oleva työ siirtää ne tälle avaimelle. Asetetaan ympäristössä.",
     "cfg_federation_public_key": "Federaation julkinen avain",
     "cfgDesc_federation_public_key": "Julkinen puoli avainparista, jonka komento `aimeat join` teki federaatiota varten. Tyhjä, kunnes palvelin liittyy federaatioon.",
     "cfg_federation_private_key_configured": "Federaation yksityinen avain asetettu?",
@@ -30205,6 +30246,17 @@
       }
     },
     "config": {
+      "node": {
+        "processes": {
+          "title": "Palvelimen prosessit",
+          "short": "Palveleeko tätä palvelinta yksi prosessi vai useita samassa tietokannassa. Oletus on yksi.",
+          "what": "Prosessi on yksi käynnissä oleva palvelinohjelman kopio. Kun prosessi on yksi, käynnistyvä prosessi ottaa heti kaiken palvelimen työn: jokaisessa käynnistyksessä ajettavat tehtävät, odottamaan jääneet tekoälytyöt ja ajastetut siivoukset. Se tekee niin myös silloin, kun se käynnistyy uudessa kontissa uudella konenimellä, koska muuta prosessia ei voi olla käynnissä. Kun prosesseja on useita, aktiivinen prosessi ja varaprosessi tai useampi aktiivinen prosessi kuormantasaajan takana käyttävät samaa tietokantaa. Silloin jokainen työ ajetaan kerran: prosessi ottaa toisen prosessin työn vasta, kun se on lakannut ilmoittamasta olevansa käynnissä, 30 sekuntia viimeisen ilmoituksen jälkeen. Normaalisti pysäytetty prosessi luovuttaa työnsä heti.",
+          "range": "Toinen kahdesta: Yksi prosessi (oletus) tai Useita prosesseja. Palvelin lukee arvon käynnistyksessä, joten muutos tulee voimaan seuraavassa käynnistyksessä.",
+          "ex1": "Yksi prosessi: palvelin yhdessä kontissa, joka luodaan uudelleen jokaisessa päivityksessä.",
+          "ex2": "Useita prosesseja: toinen prosessi odottaa toisella koneella varaprosessina, tai kaksi prosessia jakaa liikenteen kuormantasaajan takana.",
+          "tip": "Aseta sama arvo jokaiselle prosessille. Kun valinta on Yksi prosessi, älä käynnistä toista prosessia samaan tietokantaan: molemmat ajaisivat saman työn."
+        }
+      },
       "consent": {
         "data_intermediation": {
           "title": "Datan välityspalvelu",

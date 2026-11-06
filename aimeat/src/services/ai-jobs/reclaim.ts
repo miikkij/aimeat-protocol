@@ -17,16 +17,23 @@
  *   (restart.ts restartDecision): a job the stopping node marked is queued again once, a job left
  *   running by a crash is failed with node_restarted (test/e2e-ai-jobs.ts case 15), a queued job runs.
  *   The adoption pass takes only jobs held by another name, so with one process it finds nothing.
+ *
+ *   ONE PROCESS PER NODE, THE DEFAULT (node.processes = single; decision 6a of 2026-11-05). The start
+ *   takes every job, whatever process name holds it (process-lease.ts holderAlive), and the adoption
+ *   pass does not run: no other process can start a job later. A second process left on one database
+ *   with this setting keeps the jobs it runs, as before 2026-11-04.
  * @structure ADOPT_MS · ReclaimDeps · reclaimJobs(deps, mode)
  * @usage const { failed, requeued } = await reclaimJobs(deps, 'boot');
  * @version-history
+ *   v1.1.0 -- 2026-11-05 -- One process per node by default: the start takes every job at once and the
+ *     adoption pass does not run (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   v1.0.0 -- 2026-11-04 -- Initial: the restart pass moved from service.ts, with the holder check, the
  *     claim on the index and the adoption pass (codebase analysis 2026-11-03, item HA 2.5).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
-import { thisProcess, sameProcess, holderAlive, processLeaseReady } from '../process-lease.js';
+import { thisProcess, sameProcess, holderAlive, processLeaseReady, singleProcess } from '../process-lease.js';
 import { restartDecision } from './restart.js';
 import { readJob, writeJob, foldIntoLog, readActiveIndex, removeFromActiveIndex, claimActiveEntry } from './store.js';
 import type { AiJobRecord } from './types.js';
@@ -49,6 +56,10 @@ export interface ReclaimDeps {
  */
 export async function reclaimJobs(deps: ReclaimDeps, mode: 'boot' | 'adopt'): Promise<{ failed: number; requeued: number }> {
     const { storage, config } = deps;
+    // With one process per node the start took every job no live process holds, and no other process
+    // can start one later, so the adoption pass has nothing to take, as before 2026-11-04. A job
+    // another process does hold is then that process's, and it is left to it.
+    if (mode === 'adopt' && singleProcess(config)) return { failed: 0, requeued: 0 };
     const me = thisProcess(config);
     // A job this process takes over names it, so its own lease is written first (another process
     // reading the entry must find this process alive).

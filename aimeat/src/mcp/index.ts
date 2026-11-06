@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-11-05 — createMcpServer registers each tool's schemas through stableToolSchemas
+ *     (mcp/tool-schema-cache.ts), so tools/list builds a tool's JSON Schema once per schema, not on
+ *     every list; the list is byte-identical (codebase analysis 2026-11-03, decision 11b of 2026-11-05).
  *   2026-11-04 — authenticate() takes the sign-in check global optionalAuth made for the same token in
  *     the same request (auth/verified-on-request.ts) instead of verifying it and asking the
  *     revocation questions a second time; the audience, stale-grant and scope steps run as before
@@ -177,6 +180,7 @@ import { answerScopeDeniedTools } from './scope-denied-answer.js';
 import { askableTool, staleGrantRefusal } from './permission-ask-gate.js';
 import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
+import { stableToolSchemas } from './tool-schema-cache.js';
 import { shortenChatTools } from './chat-tool-text.js';
 import { instructionsFor } from './instructions.js';
 import { readBuildInputs } from '../services/mcp-build-inputs.js';
@@ -326,7 +330,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Every tool registers through registerTool, the form the MCP SDK v2 keeps; tool() would skip
         // the gate and the wrapper chain, so while registering it throws instead of registering.
         const originalTool = patchable.tool;
-        const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
+        // Each tool's schemas go to the SDK as the one object every server shares, whose JSON Schema
+        // is built on its first tools/list and copied after that (mcp/tool-schema-cache.ts, decision 11b).
+        const originalRegisterTool = stableToolSchemas(patchable.registerTool.bind(mcp) as ToolFn);
         // Measured INSIDE the gate: a tool this agent's scopes filtered out is never wrapped, so a
         // tool that was never offered is never counted as one that was not called. The wrap sits at
         // registration for the same reason the gate does — one place, every tool, nothing for a new

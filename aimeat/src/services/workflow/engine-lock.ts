@@ -14,6 +14,8 @@
  * @structure RunLock (run)
  * @usage const lock = new RunLock(storage, config); await lock.run(runId, async () => { ... });
  * @version-history
+ *   v1.0.1 -- 2026-11-05 -- The config carries node.processes, which decides whether another process
+ *     can hold the lease (codebase analysis 2026-11-03, decision 6a of 2026-11-05).
  *   v1.0.0 -- 2026-11-04 -- Initial: the in-process chain moved from engine.ts, with the lease across
  *     processes (codebase analysis 2026-11-03, item HA 2.6).
  */
@@ -25,7 +27,7 @@ export class RunLock {
   /** Per-run serialization in this process: advancing the same run from two task completions is a RMW race. */
   readonly locks = new Map<string, Promise<void>>();
 
-  constructor(private readonly storage: Storage, private readonly config: Pick<AimeatConfig, 'nodeId' | 'port'>) {}
+  constructor(private readonly storage: Storage, private readonly config: Pick<AimeatConfig, 'nodeId' | 'port' | 'nodeProcesses'>) {}
 
   /** Run one change of `runId` under its lock in this process and its lease across processes. */
   async run<T>(runId: string, fn: () => Promise<T>): Promise<T> {

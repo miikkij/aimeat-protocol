@@ -27,6 +27,8 @@
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  *   v1.0.1 — 2026-11-04 — A value sealed under a later key of the key ring (`v3:<kid>:`) is read as
  *     sealed too (codebase analysis 2026-11-03, item B9).
+ *   v1.0.2 — 2026-11-05 — contextFor exported for the data key's re-encrypt job (codebase analysis
+ *     2026-11-03, decision 4a of 2026-11-05).
  */
 import { encryptBound, decryptBound, getEncryptionKey } from '../encryption.js';
 import { logger } from '../../utils/logger.js';
@@ -39,7 +41,8 @@ const SEALED_RE = /^(?:v2|v3:\d{1,6}):[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/;
 
 type KeyConfig = Pick<AimeatConfig, 'encryptionKey' | 'totpSecretEncryptionKey'>;
 
-const contextFor = (serverId: string, where: 'env' | 'header', name: string): string =>
+/** The context one transport value is bound to; the data key's re-encrypt job reseals it with it. */
+export const contextFor = (serverId: string, where: 'env' | 'header', name: string): string =>
   `mcp-transport:${serverId}:${where}:${name}`;
 
 /** The map of secret values this transport carries, and which kind they are. */

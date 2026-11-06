@@ -10,6 +10,8 @@
  *   as signed. These cases prove both halves, and that a door losing its verification is "neither".
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-federation-signatures.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-05 — A door that declares a signature strategy (acceptCredential('federation-peer'),
+ *     'package-seller', 'package-claimant') counts as signed (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit S10-02).
  */
 import { describe, it, expect } from 'vitest';
@@ -46,6 +48,20 @@ describe('the federation signature gate', () => {
             }`)]);
         expect(doors).toHaveLength(1);
         expect(doors[0]).toMatchObject({ gated: false, verifies: false });
+    });
+
+    it('counts a door that declares a signature strategy as signed, and one that declares another kind as "neither"', () => {
+        const doors = federationDoors([routeFile('federation-z.ts', `
+            export function r(router) {
+                router.post('/v1/federation/z', acceptCredential('federation-peer', { node: (req) => req.body.source_node }), async (req, res) => {});
+                router.put('/v1/federation/z/:id', acceptCredential('package-seller', deps), async (req, res) => {});
+                router.post('/v1/federation/z/party', acceptCredential('party', deps), async (req, res) => {});
+            }`)]);
+        expect(doors.map(d => [d.id, d.verifies])).toEqual([
+            ['POST /v1/federation/z', true],
+            ['PUT /v1/federation/z/:id', true],
+            ['POST /v1/federation/z/party', false],
+        ]);
     });
 
     it('counts every writing /v1/federation route of the real tree, the package repository doors included, as signed or gated', () => {

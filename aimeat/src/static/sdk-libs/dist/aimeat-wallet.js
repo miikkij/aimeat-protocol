@@ -38,13 +38,36 @@
     const ns = typeof window !== "undefined" ? window.AIMEAT : null;
     return ns && ns.fmt ? ns.fmt : null;
   }
+  function person() {
+    const ns = typeof window !== "undefined" ? window.AIMEAT : null;
+    const auth = ns && ns.auth;
+    const p = auth && typeof auth.displayPrefs === "function" ? auth.displayPrefs() : null;
+    return { region: p && p.region || null, timezone: p && p.timezone || null };
+  }
+  var refusedReported = "";
+  function asPerson(call, opts, clock) {
+    const p = person();
+    const zone = clock && p.timezone && !(opts && opts.timeZone) ? p.timezone : null;
+    if (!p.region && !zone) return call(void 0, opts);
+    try {
+      return call(p.region || void 0, zone ? Object.assign({}, opts, { timeZone: zone }) : opts);
+    } catch (e) {
+      const which = (p.region || "") + "|" + (zone || "");
+      if (refusedReported !== which) {
+        refusedReported = which;
+        console.warn('[aimeat] This browser cannot write dates with the region "' + (p.region || "") + '" and the time zone "' + (zone || "") + `" of the person's settings; the browser's own format is used:`, e && /** @type {Error} */
+        e.message);
+      }
+      return call(void 0, opts);
+    }
+  }
   function dateTime(v, opts) {
     const f = fmt();
     if (f && typeof f.dateTime === "function") return f.dateTime(v, opts);
     const d = new Date(v);
     if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
     try {
-      return d.toLocaleString(void 0, opts);
+      return asPerson((tag, o) => d.toLocaleString(tag, o), opts, true);
     } catch {
       return String(v);
     }

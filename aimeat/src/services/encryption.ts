@@ -20,6 +20,8 @@
  *   - isBoundCiphertext(data) — true for the v2 and v3 forms
  *   - getEncryptionKey(config) — resolves key from config with fallback
  *   - KeyRing / configureKeyRing(ring) — the keys by id, and the one new values are sealed with
+ *   - keyRingOf(key) / sealedKeyIdOf(value) — the ring a key is in; the key id a stored value names
+ *   - DataKeyConfig / dataKeysOf(config) — the two ring settings; every key of the ring, current first
  *
  *   ADDING THE DATA KEY LATER. A node installed with `aimeat init` runs on AIMEAT_TOTP_ENCRYPTION_KEY
  *   alone. When AIMEAT_ENCRYPTION_KEY is added, getEncryptionKey() returns it, and nothing re-encrypts
@@ -40,6 +42,11 @@
  *   docs/operations/key-rotation.md. The AES-GCM itself is utils/aes-gcm.ts, shared with the other
  *   four places the node encrypts.
  * @version-history
+ *   v1.4.0 -- 2026-11-05 -- The second data key: AIMEAT_ENCRYPTION_KEY_1 is key 1 of the ring and
+ *     AIMEAT_ENCRYPTION_KEY_CURRENT chooses the key new values are sealed with; the ring is filed under
+ *     each of its keys; keyRingOf, sealedKeyIdOf and dataKeysOf for the re-encrypt job
+ *     (services/key-reencrypt/). Without the second key nothing changes (codebase analysis 2026-11-03,
+ *     decision 4a of 2026-11-05; test/unit/key-reencrypt.test.ts).
  *   v1.3.0 -- 2026-11-04 -- The key ring, the `v3:`/`v3u:` forms with a key id, configureKeyRing(),
  *     and AES-GCM through utils/aes-gcm.ts (codebase analysis 2026-11-03, item B9;
  *     test/unit/key-ring.test.ts, test/unit/legacy-keys-still-open.test.ts).
@@ -71,9 +78,12 @@ export interface KeyRing {
 const rings = new Map<string, KeyRing>();
 
 /**
- * Make `ring` the ring of its current key, and answer that key. The rotation step calls it with the
- * keys from the node's configuration (docs/operations/key-rotation.md); nothing calls it on a node
- * with one key. Throws when the ring does not hold its current key or a key is not 32 bytes.
+ * Make `ring` the ring of every key it holds, and answer its current key. getEncryptionKey() calls it
+ * when the node's configuration names a second data key (AIMEAT_ENCRYPTION_KEY_1); nothing calls it
+ * on a node with one key. The ring is filed under each of its keys, so a caller that holds any key
+ * of the ring (the TOTP code reads AIMEAT_ENCRYPTION_KEY itself, a Config row tries each configured
+ * key) opens a value of any key id and seals with the current key. Throws when the ring does not
+ * hold its current key or a key is not 32 bytes.
  */
 export function configureKeyRing(ring: KeyRing): Buffer {
   const current = ring.keys.get(ring.current);
@@ -81,8 +91,27 @@ export function configureKeyRing(ring: KeyRing): Buffer {
   for (const [kid, k] of ring.keys) {
     if (!Number.isInteger(kid) || kid < 0 || k.length !== 32) throw new Error(`Key ${kid} of the key ring is not a 256-bit key with a whole-number id.`);
   }
-  rings.set(current.toString('hex'), { current: ring.current, keys: new Map(ring.keys) });
+  const filed: KeyRing = { current: ring.current, keys: new Map(ring.keys) };
+  for (const k of ring.keys.values()) rings.set(k.toString('hex'), filed);
   return current;
+}
+
+/** The ring the key `key` belongs to: the configured one, or the ring of one (key 0). */
+export function keyRingOf(key: Buffer): KeyRing {
+  return ringOf(key);
+}
+
+/**
+ * The key id a stored value names: the number after `v3:`/`v3u:`, 0 for the forms written before
+ * key ids existed (`iv:tag:ct` and `v2:iv:tag:ct`), and null for anything that is not a sealed value
+ * of this module (a plain string, an empty one, another module's form).
+ */
+export function sealedKeyIdOf(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  const v3 = /^v3u?:(\d{1,6}):[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/.exec(value);
+  if (v3) return Number(v3[1]);
+  if (/^(v2:)?[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]*$/.test(value)) return 0;
+  return null;
 }
 
 /** The ring a caller's key is the current key of: a configured one, or the ring of one. */
@@ -210,16 +239,56 @@ function keyOf(keyHex: string | null): Buffer | null {
 }
 
 /**
+ * The configuration getEncryptionKey() reads. The two ring settings are optional, so a caller that
+ * passes only the first two (a CLI command, a test) gets the ring of one it always got.
+ */
+export interface DataKeyConfig {
+  encryptionKey: string | null;
+  totpSecretEncryptionKey: string | null;
+  /** AIMEAT_ENCRYPTION_KEY_1: the second data key, key 1 of the ring. */
+  encryptionKey1?: string | null;
+  /** AIMEAT_ENCRYPTION_KEY_CURRENT: the key new values are sealed with, 0 (default) or 1. */
+  encryptionKeyCurrent?: number | null;
+}
+
+/**
  * Resolve the encryption key from config. Returns null if not configured.
  * Checks AIMEAT_ENCRYPTION_KEY first, falls back to AIMEAT_TOTP_ENCRYPTION_KEY. When both are set and
  * differ, the TOTP key is remembered as the data key's fallback, so decrypt() and decryptBound() still
  * open what was written under it before the data key was set; new values are written under the data key.
+ *
+ * THE SECOND KEY (codebase analysis 2026-11-03, decision 4a of 2026-11-05). With AIMEAT_ENCRYPTION_KEY_1
+ * set, the key above is key 0 and that one key 1 of the ring, and the answer is the key
+ * AIMEAT_ENCRYPTION_KEY_CURRENT names (key 0 unless it says 1). Every value opens with the key its id
+ * names, and a value with no id as key 0. Without AIMEAT_ENCRYPTION_KEY_1 nothing below the first
+ * return runs, so a node with one key resolves, seals and opens exactly as before. Key 0 may be
+ * removed once the re-encrypt job says no value is under it (services/key-reencrypt/); key 1 is
+ * then the only key, whatever the current setting says.
  */
-export function getEncryptionKey(config: { encryptionKey: string | null; totpSecretEncryptionKey: string | null }): Buffer | null {
+export function getEncryptionKey(config: DataKeyConfig): Buffer | null {
   // A data key that is set but malformed is no key, as before: the TOTP key never stands in for it.
   const primary = config.encryptionKey ? keyOf(config.encryptionKey) : keyOf(config.totpSecretEncryptionKey);
-  if (!primary) return null;
-  const older = config.encryptionKey ? keyOf(config.totpSecretEncryptionKey) : null;
-  if (older && !older.equals(primary)) fallbackKeys.set(primary.toString('hex'), older);
-  return primary;
+  const second = keyOf(config.encryptionKey1 ?? null);
+  if (!second) {
+    if (!primary) return null;
+    const older = config.encryptionKey ? keyOf(config.totpSecretEncryptionKey) : null;
+    if (older && !older.equals(primary)) fallbackKeys.set(primary.toString('hex'), older);
+    return primary;
+  }
+  const keys = new Map<number, Buffer>([[1, second]]);
+  if (primary) {
+    keys.set(0, primary);
+    const older = config.encryptionKey ? keyOf(config.totpSecretEncryptionKey) : null;
+    if (older && !older.equals(primary)) fallbackKeys.set(primary.toString('hex'), older);
+  }
+  const current = config.encryptionKeyCurrent === 1 || !primary ? 1 : 0;
+  return configureKeyRing({ current, keys });
+}
+
+/** Every key of the ring the configuration describes, current first; empty when it has none. */
+export function dataKeysOf(config: DataKeyConfig): Buffer[] {
+  const current = getEncryptionKey(config);
+  if (!current) return [];
+  const ring = ringOf(current);
+  return [current, ...[...ring.keys.values()].filter(k => !k.equals(current))];
 }
