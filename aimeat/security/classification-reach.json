@@ -1085,6 +1085,12 @@
       },
       "why": "Reviewed 2026-10-02 (package sale design, phase 4), the node's own read: the record of which organism and workspace ids an install made for an installed app's declared contracts. Ids only, served to the app beside its public config; no content of the workspace."
     },
+    "src/services/appdev/microservices.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-07 (written with the feature): the owner's microservices.central record reaches the caller only through ownerScopeView and then presentMemory with the caller's reader."
+    },
     "src/services/appdev-kb.ts": {
       "reads": {
         "listMemory": 1,

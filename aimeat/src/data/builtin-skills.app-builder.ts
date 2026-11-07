@@ -24,6 +24,8 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   2026-11-07 — The extension section says when server-side work outgrows an extension and points at
+ *     aimeat_appdev_overview's `microservices` and aimeat-extension-builder section 11.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.12.0 — 2026-10-30 — The structure page's first write carries two or three layouts drawn for the app (proposals).
  *   v1.11.0 — 2026-10-29 — A new app's first message carries its structure page (services/app-structure.ts):
@@ -345,6 +347,12 @@ per agent; \`aimeat_secret_list\` shows names, addresses and who used them, neve
 extension declares the same name and host in its manifest's \`uses_secrets\`, so its first use binds
 by itself; a first use the node refuses names a page where the owner allows it with one press.
 Show a missing key by its name in the UI; never draw a field for it.
+
+**When the server-side work outgrows an extension** (it runs longer than one run, stays up all day,
+needs Python or a library the sandbox cannot load, or a database of its own), it belongs in a service
+on a Microservices Central, which the extension calls. \`aimeat_appdev_overview\` answers
+\`microservices\`: which Central this person may use, if any, and the criteria. Skill
+\`aimeat-extension-builder\`, section 11, has the steps; suggest it to the person first.
 
 ## Dates, times and numbers: never from the language
 
