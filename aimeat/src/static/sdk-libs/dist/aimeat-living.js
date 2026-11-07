@@ -3396,7 +3396,10 @@
       "inward.key": "Muistiavain",
       "inward.expected": "Näin vastauksen pitää näyttää",
       "inward.testRead": "Kokeile lukemista",
-      "inward.write": "Kirjoita arvo muistiin",
+      "inward.write": "Kirjoita arvo omalla tunnuksellasi",
+      "inward.receiverWhy": "Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon vastaanottimen kautta. Vastaanottimen avain kirjoittaa vain tähän avaimeen.",
+      "inward.receiverMake": "Tee vastaanotin tälle arvolle",
+      "inward.receiverCall": "Ohjelman kutsu vastaanottimeen",
       "inward.agent": "Sano tämä omalle tekoälyllesi",
       "inward.range": "Sallittu väli",
       "outward.title": "Kun tämä muuttuu, kerro jollekin",
@@ -3459,7 +3462,10 @@
       "inward.key": "Memory key",
       "inward.expected": "This is the shape the answer must have",
       "inward.testRead": "Test read",
-      "inward.write": "Write the value into memory",
+      "inward.write": "Write the value with your own sign-in",
+      "inward.receiverWhy": "A program, such as a sensor or a cloud function, writes the value through a receiver. The receiver's key writes into this key only.",
+      "inward.receiverMake": "Make a receiver for this value",
+      "inward.receiverCall": "The program's call to the receiver",
       "inward.agent": "Say this to your own AI",
       "inward.range": "The range it accepts",
       "outward.title": "When this changes, tell someone",
@@ -5348,6 +5354,22 @@
   function memoryKeyFor(doc, id) {
     return String(doc && doc.key || "living") + ".in." + String(id);
   }
+  function receiverNameFor(doc, id) {
+    const raw = (String(doc && doc.key || "living").split(".").pop() + "-" + String(id)).toLowerCase();
+    const slug = raw.replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    return (slug || "living-value").slice(0, 40).replace(/-$/, "");
+  }
+  function receiverRoad(base, key, doc, id, sample) {
+    const name = receiverNameFor(doc, id);
+    const address = base + "/v1/receive/<owner>/" + name;
+    return {
+      name,
+      key,
+      settings: base + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
+      address,
+      curl: "curl -X POST " + address + ` -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>" -d '` + JSON.stringify({ value: sample }) + "'"
+    };
+  }
   function inwardShape(ctx) {
     const doc = ctx.doc || {};
     const nodes = (doc.model || {}).nodes || {};
@@ -5390,6 +5412,14 @@
         },
         curl: "curl -X POST " + base + `/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d '` + JSON.stringify(body) + "'"
       },
+      /**
+       * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through
+       * a receiver of the owner, an address and a key that reach exactly this key and nothing else
+       * (/v1/receive). The memory road above needs a session of the owner, which a program must not
+       * hold: a personal access token writes into its own test identity, and an agent token reaches
+       * all of the owner's memory. `settings` opens the owner's Receivers page with this key filled in.
+       */
+      receiver: receiverRoad(base, key, doc, subjectId, sample),
       /** The agent road: the same thing said out loud, in the language the page is reading. */
       sentence: fill(say("sentence.write", wanted), {
         key,
@@ -5859,6 +5889,21 @@
           label: words2("inward.key"),
           value: draft.key || shape.write.key
         }], draft);
+        const receiverLine = document.createElement("p");
+        receiverLine.className = "ak-living__dialog-range";
+        receiverLine.textContent = words2("inward.receiverWhy") + " ";
+        const receiverLink = document.createElement("a");
+        receiverLink.href = shape.receiver.settings;
+        receiverLink.target = "_blank";
+        receiverLink.rel = "noopener";
+        receiverLink.textContent = words2("inward.receiverMake");
+        receiverLine.appendChild(receiverLink);
+        keyRoad.body.appendChild(receiverLine);
+        copyBlock(keyRoad.body, {
+          label: words2("inward.receiverCall"),
+          text: shape.receiver.curl,
+          langs
+        });
         copyBlock(keyRoad.body, {
           label: words2("inward.write"),
           text: shape.write.curl,

@@ -16,6 +16,7 @@
  * @structure CustomerWelcome({ session, initialized })
  * @usage html`<${CustomerWelcome} session=${session} initialized=${state.initialized} />`
  * @version-history
+ *   v1.3.1 — 2026-11-07 — The lead's fallback follows the new story (docs/AIMEAT-Story.md): connecting multiplies what the AI can do.
  *   v1.3.0 — 2026-11-01 — While the place's own chat answers (ai-credit.js chatWorks), step 2 is open
  *     with a link to the chat, not greyed as waiting for the outside AI.
  *   v1.2.0 — 2026-10-31 — Jouni's review of v31 (K26): "Tervetuloa omaan AIMEATiisi, <nimi>" with a
@@ -85,7 +86,7 @@ export function CustomerWelcome({ session, initialized }) {
       <${NamedRow} stack label=${tr('home.buyerWelcome.stepsLabel', 'Two steps')}>
         <${IndexList} steps>
           <${IndexStep}>
-            ${tr('homeConnect.lead', 'Connect ChatGPT, Claude or Grok here, and it becomes your right hand.')}
+            ${tr('homeConnect.lead', 'Connect ChatGPT, Claude or Grok here, and what it can do multiplies.')}
             <${Actions}>
               ${CONNECT_TOOLS.map(([id, label]) => html`
                 <${Loud} key=${id} href="/v1/profile?tab=mcp" onClick=${() => rememberTool(id)}>${tr('homeConnect.button', 'Connect {ai}').replace('{ai}', label)}<//>`)}

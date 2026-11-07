@@ -27,6 +27,9 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-07 — Section 11: when an extension is not enough, a service on a Microservices Central
+ *     (services/appdev/microservices.ts names which): the criteria, the access request, the keys per
+ *     scope, the extension that calls the service, and the data map row. Section 5 points to it.
  *   2026-11-01 — Section 4: an extension that gates an app answers the people registered to it
  *     without an account, with ctx.caller.party (WP9d).
  *   2026-11-01 — Section 8: `commercial.deliversData`, and the node's proposal from the output schema (plan D5.5).
@@ -89,7 +92,7 @@ export const EXTENSION_BUILDER_SKILL_ENTRY: BuiltinSkillEntry = {
   visibility: 'public',
   skillMd: `---
 name: aimeat-extension-builder
-description: Build, install, price and verify a sandboxed server extension on an AIMEAT node over MCP (the aimeat_extension_* tools) or REST. The path for any "make an extension", "call an outside API from the node", "run this on the node on a schedule" or "sell this capability" request. Covers fetching the canonical build spec, the manifest essentials, the script rules builders get wrong, what an extension cannot do, instances, schedules, secrets, the money price and the pacing amount, who may install, and how to prove it works. Use whenever a capability must run server-side, hold a secret, or be sold.
+description: Build, install, price and verify a sandboxed server extension on an AIMEAT node over MCP (the aimeat_extension_* tools) or REST. The path for any "make an extension", "call an outside API from the node", "run this on the node on a schedule" or "sell this capability" request. Covers fetching the canonical build spec, the manifest essentials, the script rules builders get wrong, what an extension cannot do, instances, schedules, secrets, the money price and the pacing amount, who may install, how to prove it works, and when the work belongs in a service on a Microservices Central instead. Use whenever a capability must run server-side, hold a secret, or be sold.
 license: MIT
 metadata:
   audience: agent
@@ -228,6 +231,9 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
 - **Read another namespace's private data.** \`ctx.memory.getPublic(namespace, key)\` reads only
   public keys. Translations and settings are the person's data: the cortex reads them from the
   owner namespace, and nothing copies them into \`ext:\`.
+- **Run long, stay up, or load what the sandbox cannot.** One run has a CPU time and a memory limit,
+  nothing stays running between runs, and only JavaScript loads. Work that needs more belongs in a
+  service of its own: section 11.
 
 ## 6. Instances
 
@@ -375,6 +381,77 @@ under an app grant cannot: \`ext:write\` is outside the grantable scopes, becaus
 persistent code that outlives the grant and can charge in the owner's name. An app may write a
 manifest and hand it over; the person or an authorised agent installs it. The node caps code at
 \`AIMEAT_EXT_MAX_CODE_SIZE_KB\` (256) per script and \`AIMEAT_EXT_MAX_INSTALLED\` (20) extensions.
+
+## 11. When an extension is not enough: a service on Microservices Central
+
+A **Microservices Central** runs small services of the person's own in containers on a server, each
+with its own PostgreSQL database when it needs one, behind one address and a key per caller. The app
+still calls the cortex, the cortex the extension, and the extension calls the service. Suggest one
+when the work needs something an extension does not give:
+
+- longer than one run (\`AIMEAT_EXT_TIMEOUT_MS\`, 5 s of CPU by default, and \`AIMEAT_EXT_MAX_MEMORY_MB\`,
+  64 MB), or many runs chained for one answer;
+- a process or a connection that stays open: a websocket, a queue consumer, a feed followed all day;
+- a language or a library the sandbox cannot load: Python, a native binary, a model;
+- a relational database of its own, or more data than memory records hold;
+- data kept apart from the node, for performance or separation;
+- a service that already runs elsewhere, to be adopted.
+
+When an extension and memory records cover it, stay with them: a service is one more thing that runs,
+costs and needs looking after. Say in one sentence why a service fits, and build it only on the
+person's yes.
+
+**Which Central.** \`aimeat_appdev_overview\` answers \`microservices.central\`: the person's own (their
+memory record \`microservices.central\`, \`{ url, project }\`), the one the node's operator offers
+(\`AIMEAT_MSC_CENTRAL_URL\`), or null. With null, tell the person a service would fit and that they
+need a Central; never build the service somewhere else.
+
+**The person's key.** The person connects the Central to their AI with a key of their own:
+\`claude mcp add --transport http msc <url>/mcp --header "Authorization: Bearer <key>"\`. A person
+without a key asks for one; the request takes no key:
+
+\`\`\`
+POST <url>/v1/access-requests  { "person": "<their GHII, alice@node-id>", "node": "<this node's address>", "purpose": "<what the service is for>" }
+  → { "id", "token" }    the token is shown once: the person keeps it, never an app or a record
+POST <url>/v1/access-requests/<id>/claim  { "token": "..." }
+  → 409 pending until the Central's admin decides; then the key, once, on a project of their own
+\`\`\`
+
+Then write the record, so the next build finds it: \`aimeat_memory_write { key: "microservices.central",
+value: { url, project }, visibility: "owner" }\`. Never a key in it.
+
+**Building the service.** In the Central's MCP, call \`msc_guide\` and \`msc_whoami\` first and follow
+them. Make the service in the person's project (\`msc_service_create { name, mode, project }\`), and
+give this build session a key of its own at the developer level on that project
+(\`msc_principal_create { role: "member", members: [{ project, level: "developer" }] }\`): it uploads,
+deploys and reads logs, and cannot change secrets, callers or data. Every key made this way names the
+same person, so the Central's registry traces it back to them. \`msc_guide\` lists what keeps a service
+working: the call limits, the idle stop, restarts, and each person's data kept apart.
+
+**Calling it from the extension.** Make a consumer key with a grant to the service
+(\`msc_principal_create { role: "consumer", grants: [service] }\`). The extension takes the Central's
+host as a network host field and the key as a secret setting, and the person or their AI sets both
+(\`aimeat_extension_config_set\`):
+
+\`\`\`yaml
+capabilities: [network]
+network:
+  host_fields:
+    MSC_HOST: required
+config:
+  MSC_HOST: { type: string, description: "The Central's host" }
+  MSC_KEY:  { type: secret, description: "The consumer key the Central gave this app" }
+\`\`\`
+
+The script calls \`ctx.fetch('https://' + ctx.config.MSC_HOST + '/s/<service>/<path>', { headers: {
+authorization: 'Bearer ' + ctx.config.MSC_KEY, 'x-person': ctx.caller.owner } })\`. The service sees
+the app, not the person: \`x-person\` is the app's word, so the service keeps each person's data apart
+and has a route that answers one person's data and one that deletes it.
+
+**The person's data stays theirs.** Add the service to the app's data map (\`aimeat_datamap_set\`): a
+row with \`where: "external-service"\` and \`whereExactly: "<url>/s/<service>"\` for each family of data
+it keeps. When the app is retired, read the data map, offer the person an export, and on their yes
+delete the service with its data (\`msc_service_delete { name, confirm, drop_data: true }\`).
 
 ## Checklist
 

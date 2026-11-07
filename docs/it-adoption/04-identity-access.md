@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit 008bd5045) on 2026-11-05. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 4bc3cc631) on 2026-11-07. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -14,6 +14,7 @@ This page answers how people, AI agents and apps sign in to a node, who may get 
 | Hosted app | an app on `<app>.apps.<host>` | A scoped app grant the owner approves (PKCE code flow) | `aimeat/src/routes/app-grants.ts` |
 | Visitor from another node | `alice@home-node`, role `federated` | Signed in on its home node; off by default (`AIMEAT_FEDERATION_AUTH_POLICY=disabled`) | `.claude/rules/security.md` |
 | Outside party | `party:alice/name@node-id` | A key or short party token; reads only the data packages shared with it by name | [Identity model](../coding-guidelines/identity-model.md) |
+| Receiver (an outside program writing in) | `receiver:alice/name@node-id` | Its own key (a random value with the receiver-key prefix) on `/v1/receive/alice/name` only; writes into exactly one key, key prefix or row space of its owner; refused 401 on every other route | `aimeat/src/services/receivers/verify.ts`, `aimeat/src/auth/middleware.ts` |
 
 ## Sign-in methods
 
@@ -240,11 +241,13 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 | Personal access token | None unless `expires_in` is given | per token | `DELETE /v1/access/tokens/:id`; revoking it ends its exchanged JWT at the next request | `aimeat/src/routes/access-tokens.ts` |
 | MCP OAuth access and refresh tokens | per MCP client | per client | `POST /v1/mcp/token/revoke`, agent removal | `aimeat/src/mcp/oauth.ts` |
 | SCIM token | Until replaced | per connection | `aimeat_admin_sso_scim_token` issues a new one | `aimeat/src/routes/scim.ts` |
+| Receiver key | 365 days by default, at most 730 | `expires_days` per receiver | `POST /v1/receivers/:name/rotate` (the old key works for 15 minutes unless `overlap_minutes` is 0), pause, delete; the operator's stop `POST /v1/admin/receivers/:owner/:name/stop` | `aimeat/src/services/receivers/manage.ts` |
 
 - Every access JWT the node issues is EdDSA. Each kind of token (a session, a download address, a share link, an app grant and the others) is signed with its own key, derived from the node's Ed25519 key for that kind alone and named in the token's header, so a token of one kind does not verify as another (`aimeat/src/auth/node-signer.ts`). A token issued before 2026-11-04 was signed with the node key itself and keeps working until it expires. Personal access tokens, SCIM tokens and refresh tokens are opaque random values stored as SHA-256 hashes (`aimeat/src/routes/access-tokens.ts`, `aimeat/src/routes/scim.ts`).
 - Token revocations persist in the database. Each process caches the answer for 60 seconds and marks a token it revokes itself at once (`aimeat/src/auth/jwt.ts`).
 - A password reset ends every sign-in session of the person; a password change ends every one but the current session; the person's agents keep theirs (`aimeat/src/routes/ghii/recovery.ts`).
 - Personal access tokens are created by the owner only, may carry full owner or operator access when the owner chooses it, and are stored as hashes (`aimeat/src/routes/access-tokens.ts`).
+- A receiver key is made when the owner creates or approves a receiver, shown once and stored as its SHA-256. It is never a session: the auth middleware recognises the receiver-key prefix (`RECEIVER_KEY_PREFIX` in `aimeat/src/services/receivers/contract.ts`) and refuses it on every route but the receiver's own address, and the key is refused in a query string. An agent makes one only with `receivers:manage`, which no wildcard carries; without it the agent proposes and the owner approves in person. Who may make receivers is `AIMEAT_RECEIVERS_MODE` (`auto`, `off`, `operator`, `self`); `auto` asks the operator on a node with `AIMEAT_CONTENT_ACCESS=signed-in` and lets the owner decide elsewhere. Five wrong keys for one receiver within an hour open a security incident (`aimeat/src/services/receivers/verify.ts`, `aimeat/src/services/receivers/policy.ts`).
 
 ## Admin credentials
 

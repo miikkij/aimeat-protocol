@@ -34,6 +34,9 @@
  *   import { AiProvenanceSchema, asKnownProvenance } from '../models/ai-provenance-schemas.js';
  *   const parsed = AiProvenanceSchema.safeParse(req.body.provenance);
  * @version-history
+ *   v1.6.0 — 2026-11-07 — Level `machine`: a program wrote the content with no model and no person
+ *     (a sensor, another system's export), for receivers. levelInvolvesModel() is the one question
+ *     "did a model take part". Additive within v1 (PROV-05).
  *   v1.5.0 — 2026-10-31 — Optional `rules` (AI_GEN_RULE_STATES): which generation rules were in force
  *     for an image or a video and what each did. Additive within v1 (wish
  *     wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
@@ -75,9 +78,25 @@ export const AI_PROVENANCE_SPEC_V1 = 'aimeat.provenance/v1';
  * - `assisted`      a human wrote it; a model edited, refined or filled in
  * - `synthesized`   a model combined real sources into new content, at someone's direction
  * - `ai-generated`  a model produced it
+ * - `machine`       a program produced it with no model and no person writing it: a sensor reading,
+ *                   an export from another system, a computed view a scheduled job wrote. Added
+ *                   2026-11-07 with receivers (the outside program writing through one), additive
+ *                   within v1 (PROV-05). A reader that does not know the value reads the record as
+ *                   unstated, which is the safe reading.
  */
-export const AI_PROVENANCE_LEVELS = ['original', 'assisted', 'synthesized', 'ai-generated'] as const;
+export const AI_PROVENANCE_LEVELS = ['original', 'assisted', 'synthesized', 'ai-generated', 'machine'] as const;
 export type AiProvenanceLevel = (typeof AI_PROVENANCE_LEVELS)[number];
+
+/**
+ * Whether a model took part in content at this level. `original` (a person) and `machine` (a program
+ * with no model) are the two levels no model touched: no AI label is owed, no generation rule applies
+ * and no model has to be named. Every code path that used to ask `level !== 'original'` asks this
+ * instead, so a new level without a model cannot be read as AI by one path and not by another.
+ * An absent level is not answered here: the caller decides what its own default means.
+ */
+export function levelInvolvesModel(level: AiProvenanceLevel): boolean {
+  return level !== 'original' && level !== 'machine';
+}
 
 /**
  * Optional detail under `level`. Frozen so adapters and validators can rely on it; values are only

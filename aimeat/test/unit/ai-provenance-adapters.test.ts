@@ -11,6 +11,7 @@
  *   - separate describes for the emitted IETF header form and the C2PA projection
  * @usage pnpm exec vitest run test/unit/ai-provenance-adapters.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-07 — Rows for level `machine`: IETF mode none, nothing else asserted.
  *   v1.1.0 — 2026-10-25 — The w3c column holds the final W3C report's values: human-only,
  *     ai-assisted (also generated content a person reviewed), ai-autonomous.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
@@ -75,6 +76,12 @@ const ROWS: Row[] = [
     level: 'ai-generated', human,
     iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'ai-assisted',
     ietfMode: 'ai-originated', icon: 'ai-basic',
+  })),
+  // A program with no model (2026-11-07): no AI is asserted anywhere, and no vocabulary that has no
+  // word for it is given a false one (`human-only` would say a person wrote it).
+  ...ANY_INVOLVEMENT.map((human): Row => ({
+    level: 'machine', human,
+    iptc: undefined, w3c: undefined, ietfMode: 'none', icon: undefined,
   })),
 ];
 

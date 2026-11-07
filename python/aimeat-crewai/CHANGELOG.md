@@ -5,6 +5,10 @@ What each release gives you as a user of the package. Releases up to 0.27.1 are 
 
 ## Unreleased
 
+- **The liaison's backstory describes AIMEAT as the project now does**: it multiplies what AI can
+  do and makes those powers easy to use, so people and their AIs can work together in a controlled,
+  safe and reliable way (docs/AIMEAT-Story.md). It said "an open protocol for AI agent
+  infrastructure".
 - **Say whether your agent's work delivers data.** `build_offer(delivers_data=True)` writes
   `deliversData` on the offer. Node 4.2 reads it when the offer is sold on EXCHANGE, where a server
   that runs no data intermediation service lists only offers that do not deliver data to everyone.

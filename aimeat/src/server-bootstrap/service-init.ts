@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-11-07 — seedCsmTemplates is imported from services/csm/seed.ts, where it moved unchanged.
  *   2026-11-05 — resumeReencryptAtBoot: a data key re-encrypt job left running is taken up again
  *     (codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-04 — The mail service, scheduler, workflow engine, AI job service and connector tunnel manager go into the node
@@ -140,7 +141,7 @@ import { ConnectTunnelManager } from '../services/connect-tunnel.js';
 import { startPendingEnrolment } from '../services/agent-pending-enrolment.js';
 import { startConnectorRegistry } from '../services/connector-registry.js';
 import { seedProfileSchemas } from '../services/profile-schemas.js';
-import { seedCsmTemplates } from '../services/csm-seed.js';
+import { seedCsmTemplates } from '../services/csm/seed.js';
 import { seedManifestSchema } from '../services/manifest-schema.js';
 import { seedTemplateBundles } from '../services/template-bundles.js';
 import { seedKnowledgeTemplates } from '../services/knowledge.js';

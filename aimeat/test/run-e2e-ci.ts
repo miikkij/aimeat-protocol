@@ -12,6 +12,9 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-07 -- e2e-csm.ts joins the list (not the guard tier): a new CSM's name gets the owner's prefix, its visibility filters every read, PUT keeps versions and refuses a stale one, the draft stores nothing, an agent needs csm:write (developer ruling 2026-11-07).
+ *   2026-11-07 -- e2e-receivers.ts joins the list (not the guard tier): receivers, the address and key an outside program writes into one place of an owner's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
+ *   2026-11-07 -- e2e-rows-schema.ts joins the list (not the guard tier): a row space's JSON Schema binds every writer, and only the creator or an admin changes it (developer ruling 2026-11-07).
  *   2026-11-06 -- e2e-search-visibility.ts joins the list (not the guard tier): noindex on scripts and stylesheets on every host family, content tags, the app body and /index.html (TARGET-090, 089, 091).
  *   2026-11-05 -- e2e-verb-parity-unified.ts joins the list (not the guard tier): a contact's card, a group member's permissions and a task's deletion admit the callers the other verb of the same path admits (codebase analysis 2026-11-03, decision 13a of 2026-11-05).
  *   2026-11-05 -- e2e-place-agent-default-at-approval.ts joins the list (not the guard tier): a store place's default is given at approval and when the plan is set, and a mint adds nothing (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
@@ -1326,6 +1329,8 @@ const ALL_SUITES = [
     'test/e2e-dataproduct-records-audience.ts',
     // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
     'test/e2e-party.ts',
+    // Receivers: an outside program writes into exactly one place of an owner's data with its own key; the shape, the target, the key, the lifecycle, the verbs, the permissions and the node setting.
+    'test/e2e-receivers.ts',
     // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
     'test/e2e-data-share.ts',
     // A named share to a person on another AIMEAT node: exactly that visitor reads, a namesake never (WP9c).
@@ -1342,6 +1347,8 @@ const ALL_SUITES = [
     'test/e2e-app-parties.ts',
     // A person registered to an app as a member AIMEAT.iam reads: members/me and the app's IAM extension with the app's sign-in, every refusal, stop and resume (WP9d). Runs its own node with mail on (28572).
     'test/e2e-iam-parties.ts',
+    // CSMs: the owner prefix, visibility on every read, versions with a stale-version refusal, the draft, csm:write (developer ruling 2026-11-07).
+    'test/e2e-csm.ts',
     // The one-time share link: the mail, preview, redeem once with a new key, the refusals, and DuckDB and pandas reading as a party (WP9b). Runs its own node with mail on (28566).
     'test/e2e-party-invite.ts',
     // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
@@ -1495,6 +1502,8 @@ const ALL_SUITES = [
     // A record id with a dot lists under its whole id and no longer makes the index unreadable (secaudit2026oct31w2).
     'test/e2e-workspace-dotted-id.ts',
     'test/e2e-workspace-rows.ts',
+    // A row space's JSON Schema binds every writer: owner, member, agent over REST and MCP, app (ruling 2026-11-07).
+    'test/e2e-rows-schema.ts',
     // A row replaced by another writer family is kept as a revision the delete authority restores (secaudit 2026-10, v80).
     'test/e2e-workspace-row-revisions.ts',
     'test/e2e-workspace-doc-edit.ts',

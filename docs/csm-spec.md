@@ -24,6 +24,46 @@ and has no effect.
 
 The seven templates in `aimeat/docs/csm-examples` are the ones the node loads at boot.
 
+## Registering a CSM on a node: name, visibility, versions
+
+The node keeps these beside the YAML; none of them is a key of the YAML itself
+([routes](../aimeat/src/routes/csm.ts), [service](../aimeat/src/services/csm-service.ts)).
+
+- **Who may register.** The account holder, or an agent or app holding the
+  permission `csm:write` (inside the wildcard: `*` and `csm:*` carry it). An
+  agent registers in its owner's account and changes only that account's CSMs.
+- **The name starts with the account.** CSM names are node-global. A new CSM
+  whose `service.name` does not already start with `<account>.` gets it in
+  front: `ruuvi-nakyma` registered by `jussil` is `jussil.ruuvi-nakyma`. The
+  answer carries the final name. CSMs registered before 2026-11-07 keep theirs.
+- **Visibility.** `public` (anyone, without signing in, so the author of a
+  program reads the shape it must send), `members` (any account of this node),
+  `organism:<id>` (the active members of that organism) or `private` (the
+  registering account and its own agents and apps). It is set at registration
+  (default: the node setting `csm.default_visibility`, `public` unless the
+  operator changed it) and changed with `PATCH /v1/csm/{name} { visibility }`.
+  A CSM the caller may not read answers 404, as a missing one does.
+- **Versions.** A CSM is version 1 when registered. `PUT /v1/csm/{name}` takes
+  the whole new definition and the version it was made on (`expected_version`,
+  or an `If-Match` header); it validates and compiles the definition, moves the
+  schema lock `csm.<name>` to the new JSON Schema, keeps the replaced version and
+  raises the version by one. A stale version answers 409 `VERSION_CONFLICT`. The
+  `service.name` stays the CSM's name. `GET /v1/csm/{name}/versions` lists them
+  and `GET /v1/csm/{name}/versions/{n}` returns one with its compiled schema.
+- **The schema hash.** `GET /v1/csm/{name}` answers the compiled JSON Schema and
+  `schema_hash`, the sha256 of its stable JSON (object keys sorted), so a program
+  can tell whether the shape changed.
+- **In use.** While a module of the node uses a CSM, `DELETE` answers 409
+  `IN_USE` and names the users.
+- **A draft from a sample.** `POST /v1/csm/draft { name, sample }` answers a CSM
+  inferred from one sample object and stores nothing: integers, numbers,
+  booleans, strings, ISO 8601 date-times with a zone as `format: date-time`,
+  `YYYY-MM-DD` as `format: date`, nested objects and arrays by their first
+  element; every key with a value is required, a null one optional, and no
+  limits are guessed.
+
+The MCP tool `aimeat_csm` does the same with one `action` per operation.
+
 ## 1. Overview
 
 A **Community Service Manifest** (CSM) is a declarative YAML document that defines a community service on an AIMEAT node. Each CSM describes the data schema, consent rules, moderation policy, and UI rendering hints for a single service instance. Nodes use the parsed CSM to generate JSON Schema for input validation (via Schema Locking), enforce consent and moderation at runtime, and provide layout guidance to rendering agents.
@@ -68,7 +108,7 @@ All YAML keys use **snake_case**. The parser converts to camelCase internally (e
 
 | Field | Required | Type | Default | Description |
 |-------|----------|------|---------|-------------|
-| `name` | yes | string | -- | Human-readable service name. Any language. Must be non-empty. |
+| `name` | yes | string | -- | Service name. Must be non-empty. On registration the node puts `<account>.` in front unless the name already starts with it (see "Registering a CSM on a node"). |
 | `type` | yes | string | `"directory"` | Non-empty service type; Section 5 lists common examples. |
 | `description` | yes | string | -- | One-line summary. Must be non-empty. |
 | `version` | no | string | `"1.0"` | Version of this service definition (not the CSM format). |

@@ -18,6 +18,7 @@
  * @structure AiProvenanceBlockSchema · AiProvenanceBodyFields
  * @usage import { AiProvenanceBlockSchema } from '../ai-provenance-schema.js';
  * @version-history
+ *   v1.4.0 — 2026-11-07 — `level` names `machine` (a program, no model) in its description.
  *   v1.3.0 — 2026-10-31 — Optional `rules_followed`: the generation rules a declarer followed for an
  *     image or a video it made elsewhere (services/ai/gen-rules.ts).
  *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -51,7 +52,8 @@ export const AiProvenanceBlockSchema = z.object({
     "How much of this a model made. 'original' = a person wrote it, no model involved. "
     + "'assisted' = a person wrote it and a model edited or refined it. 'synthesized' = a model "
     + "combined real sources into new content at someone's direction. 'ai-generated' = a model "
-    + 'produced it.'),
+    + "produced it. 'machine' = a program produced it with no model and no person writing it "
+    + '(a sensor reading, an export from another system).'),
   method: z.enum(AI_PROVENANCE_METHODS).optional().describe(
     'Optional detail under level: how the content was produced.'),
   human_involvement: z.enum(AI_HUMAN_INVOLVEMENT).optional().describe(

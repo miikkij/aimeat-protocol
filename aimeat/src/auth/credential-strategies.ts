@@ -31,6 +31,8 @@
  *     const participant = credentialOf(req, 'dsp-participant');
  *   });
  * @version-history
+ *   v1.5.0 — 2026-11-07 — 'receiver' (services/receivers/verify.ts): the route's :owner and :name and
+ *     the key in the Authorization header.
  *   v1.4.0 — 2026-11-05 — 'intake-visitor', 'docsign-wallet', 'party-optional', and the kinds of another
  *     node ('federation-peer', 'package-seller', 'package-claimant'); a strategy may answer 'next-route'
  *     (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
@@ -54,6 +56,7 @@ import { verifyMessage } from '../services/ucp/http-signatures.js';
 import { visitorThread, type VisitorThread } from '../services/intake/visitor-thread.js';
 import { walletSessionFor, openWalletSessionByState, type WalletSession } from '../services/docsign/eudi.js';
 import { DocsignError } from '../services/docsign/records.js';
+import { verifyReceiverRequest, type ReceiverContext } from '../services/receivers/verify.js';
 import { logger } from '../utils/logger.js';
 import {
     federationPeer, packageSeller, packageClaimant,
@@ -74,6 +77,7 @@ export interface CredentialPrincipals {
     'federation-peer': FederationPeer;
     'package-seller': PackageSeller;
     'package-claimant': PackageClaimant;
+    receiver: ReceiverContext;
 }
 
 /** A UCP platform: the profile its UCP-Agent header names, whose keys verified the signature when one was sent. */
@@ -99,6 +103,8 @@ export interface StrategyOptions {
     'federation-peer': FederationPeerOptions;
     'package-seller': { storage: Storage; config: AimeatConfig; peers: FederationPeerOptions['peers'] };
     'package-claimant': { config: AimeatConfig; purpose: string };
+    /** The receiver is the route's :owner and :name; the key is the Authorization header's. */
+    receiver: { storage: Storage; config: AimeatConfig };
 }
 
 /** A principal on the request, tagged with its kind. */
@@ -244,7 +250,23 @@ const partyOptional: Strategy<'party-optional'> = (deps) => async (req, res) => 
     return { party: v.ctx };
 };
 
+/** An outside program's key for one receiver (services/receivers/verify.ts, the one verifier). */
+const receiverKey: Strategy<'receiver'> = deps => async (req, res) => {
+    const v = await verifyReceiverRequest(deps, {
+        authorization: req.headers.authorization,
+        owner: String(req.params.owner ?? ''),
+        name: String(req.params.name ?? ''),
+        keyInAddress: typeof req.query?.key === 'string' || typeof req.query?.token === 'string',
+        method: req.method,
+    });
+    if (v.ok) return v.ctx;
+    if (v.status === 401) res.set('WWW-Authenticate', 'Bearer realm="receiver"');
+    res.status(v.status).json(error(deps.config.nodeId, v.code, v.message));
+    return null;
+};
+
 const STRATEGIES: { [K in CredentialKind]: Strategy<K> } = {
+    receiver: receiverKey,
     'dsp-participant': dspParticipant,
     party: outsideParty,
     'app-party': appParty,

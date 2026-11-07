@@ -20,6 +20,7 @@
  *   const ctx = servedContext(record, { visibility: 'public' });
  *   const d = disclosureFor(record, ctx, config.aiLabelPublic);
  * @version-history
+ *   v1.1.0 — 2026-11-07 — Level `machine` has its own words (aiLabel.machine, aiLabel.machineLong).
  *   v1.0.2 — 2026-11-05 — Moved unchanged from src/services/ai-disclosure-served.ts to src/services/ai/disclosure-served.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.0.1 — 2026-10-08 — A reviewed app (code) keeps "AI-drafted, reviewed by X" (Jouni, 2026-09-26).
  *   v1.0.0 — 2026-10-08 — Wording by medium (image, audio, video, app, data, transcript), and the
@@ -109,6 +110,9 @@ export function disclosureWording(
     return { shortKey, longKey: 'aiLabel.policyLong' };
   }
 
+  // A program wrote it with no model and no person: say that, on every medium. It is neither
+  // "a person wrote this" nor any of the AI sentences below.
+  if (record.level === 'machine') return { shortKey: 'aiLabel.machine', longKey: 'aiLabel.machineLong' };
   if (record.level === 'original') {
     return text ? { shortKey: 'aiLabel.original', longKey: 'aiLabel.originalLong' }
       : { shortKey: 'aiLabel.originalMedia', longKey: 'aiLabel.originalMediaLong' };

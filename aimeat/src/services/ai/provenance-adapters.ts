@@ -30,6 +30,8 @@
  *   import { toIptc, toEuIcon } from './provenance-adapters.js';
  *   const uri = toIptc(record);              // undefined = emit nothing
  * @version-history
+ *   v1.4.0 — 2026-11-07 — Level `machine` (a program, no model): IETF `mode=none`, no IPTC term, no
+ *     W3C value, no EU icon. Each function names the case, so none answers it by falling through.
  *   v1.3.1 — 2026-11-05 — Moved unchanged from src/services/ai-provenance-adapters.ts to src/services/ai/provenance-adapters.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.3.0 — 2026-10-25 — toW3cHtml() speaks the final W3C report: human-only | ai-assisted |
  *     ai-autonomous. The draft words it used ('none', 'ai-generated', 'autonomous') are not values
@@ -98,6 +100,9 @@ export function toIptc(input: MaybeAiProvenance): string | undefined {
   if (!p) return undefined;
   switch (p.level) {
     case 'original': return undefined;
+    // A program with no model: IPTC's terms describe how MEDIA was made, and a sensor reading or an
+    // export is not media, so nothing is asserted rather than a term that would mislead.
+    case 'machine': return undefined;
     case 'assisted': return `${IPTC_DIGITAL_SOURCE_TYPE}compositeWithTrainedAlgorithmicMedia`;
     case 'synthesized':
     case 'ai-generated': return `${IPTC_DIGITAL_SOURCE_TYPE}trainedAlgorithmicMedia`;
@@ -156,6 +161,9 @@ export function toW3cHtml(input: MaybeAiProvenance): W3cAiDisclosure | undefined
   if (!p) return undefined;
   switch (p.level) {
     case 'original': return 'human-only';
+    // The report has no value for "a program, no model and no person": `human-only` would be false,
+    // and an omitted attribute declares nothing, which is the honest answer here.
+    case 'machine': return undefined;
     case 'assisted': return 'ai-assisted';
     case 'synthesized':
     case 'ai-generated': return reviewed(p) ? 'ai-assisted' : 'ai-autonomous';
@@ -168,6 +176,8 @@ export function toW3cHtml(input: MaybeAiProvenance): W3cAiDisclosure | undefined
 function ietfMode(p: AiProvenance): string {
   switch (p.level) {
     case 'original': return 'none';
+    // The draft's `none` means no AI involvement, which is exactly what a program with no model is.
+    case 'machine': return 'none';
     case 'assisted': return 'ai-modified';
     case 'synthesized':
     case 'ai-generated': return reviewed(p) ? 'ai-originated' : 'machine-generated';
@@ -225,6 +235,7 @@ export function toEuIcon(input: MaybeAiProvenance): EuIconRef | undefined {
   if (!p) return { file: 'ai-basic', alt: 'aiLabel.iconAlt.unstated' };
   switch (p.level) {
     case 'original': return undefined;
+    case 'machine': return undefined;
     case 'assisted': return { file: 'ai-modified', alt: 'aiLabel.iconAlt.aiModified' };
     case 'synthesized':
     case 'ai-generated': return reviewed(p)

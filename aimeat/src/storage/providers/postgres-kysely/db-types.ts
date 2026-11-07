@@ -1244,6 +1244,17 @@ export interface Csm {
   semantic: Json | null;
   serviceType: string;
   updatedAt: Timestamp;
+  version: Generated<number>;
+  visibility: Generated<string>;
+}
+
+export interface CsmVersion {
+  createdAt: Timestamp;
+  definition: Json;
+  jsonSchema: Json;
+  name: string;
+  registeredBy: string;
+  version: number;
 }
 
 export interface DeviceAuth {
@@ -2478,6 +2489,7 @@ export interface DB {
   CortexExtension: CortexExtension;
   CortexLibFile: CortexLibFile;
   Csm: Csm;
+  CsmVersion: CsmVersion;
   DeviceAuth: DeviceAuth;
   DirectMessage: DirectMessage;
   DirectMessageReaction: DirectMessageReaction;

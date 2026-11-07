@@ -11,6 +11,7 @@
  *   - one describe per rule from 06-platform-design.md §4
  * @usage pnpm exec vitest run test/unit/ai-disclosure.test.ts
  * @version-history
+ *   v1.2.0 — 2026-11-07 — Level `machine` owes no label under either policy.
  *   v1.1.0 — 2026-10-08 — The deep-fake reason needs `resemblesReal: yes`; otherwise synthetic media
  *     is labelled as a precaution. The record's own mediaKind engages the rule; code and data do not.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
@@ -340,6 +341,13 @@ describe('the node label policy: `strict` labels what the law exempts', () => {
   it('`strict` invents nothing where a model was not involved', () => {
     expect(disclosureFor(rec('original', 'full-human'), publicPage, 'strict').required).toBe(false);
     expect(disclosureFor(undefined, publicPage, 'strict').required).toBe(false);
+  });
+
+  it('a program with no model (`machine`) owes no AI label on any surface or policy', () => {
+    for (const policy of ['light', 'strict'] as const) {
+      expect(disclosureFor(rec('machine', 'none'), publicPage, policy).required).toBe(false);
+      expect(disclosureFor(rec('machine', 'none'), { ...publicPage, mediaKind: 'data' }, policy).required).toBe(false);
+    }
   });
 
   it('`strict` stops at the door of a non-public surface — nobody is being informed there', () => {

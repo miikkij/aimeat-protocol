@@ -12,6 +12,8 @@
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
  *   2026-11-07 -- diagnose-a-workflow: a step's model set aside by the operator's lock, and AI_MODEL_NOT_ALLOWED from the operator's list.
+ *   (2026-11-07) The node skill's first sentence follows the story (docs/AIMEAT-Story.md).
+ *   (2026-11-07) aimeat-receivers joins from its own file: an outside program writing in through a receiver.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-02 -- aimeat-node-guide: the operator's sign-in policy (two-step required, password sign-in off).
  *   2026-11-01 -- aimeat-node-guide: an agent keeps the node id and the node's address with its key and
@@ -253,6 +255,7 @@ import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js
 import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
 import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
 import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
+import { RECEIVERS_SKILL_ENTRY } from './builtin-skills.receivers.js';
 import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
 import { WORKFLOW_DECISIONS_SKILL_ENTRY } from './builtin-skills.workflow-decisions.js';
 import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
@@ -295,8 +298,8 @@ metadata:
 
 # Working with this AIMEAT node
 
-AIMEAT (AI Memory Exchange and Action Transfer) is an open protocol for AI-agent
-infrastructure. A node gives humans and their AI agents persistent memory, identity,
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and
+their AIs can work together in a controlled, safe and reliable way. A node gives humans and their AI agents persistent memory, identity,
 shared workspaces (organisms), skills, tasks/workflows, app hosting, and morsel
 pacing — over plain REST and MCP.
 
@@ -483,6 +486,7 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
   WORKSPACE_CONTRACTS_SKILL_ENTRY,
   EXTENSION_BUILDER_SKILL_ENTRY,
   DATA_OWNERSHIP_SKILL_ENTRY,
+  RECEIVERS_SKILL_ENTRY,
   MCP_SERVERS_SKILL_ENTRY,
   WORKFLOW_DECISIONS_SKILL_ENTRY,
   BOOKKEEPING_SKILL_ENTRY,

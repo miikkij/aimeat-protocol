@@ -765,7 +765,7 @@ The record is a JSON document with `spec` set to `aimeat.provenance/v1`.
 | Field | Status | Values |
 |---|---|---|
 | `spec` | required | `aimeat.provenance/v1` |
-| `level` | required | `original`, `assisted`, `synthesized`, `ai-generated` |
+| `level` | required | `original`, `assisted`, `synthesized`, `ai-generated`, `machine` (a program wrote it with no model and no person, such as a sensor reading or an export from another system; added 2026-11-07 under PROV-05) |
 | `humanInvolvement` | required | `none`, `light-review`, `editorial-control`, `full-human` |
 | `generatedAt` | required | RFC 3339 time in UTC |
 | `method` | optional | `human`, `rewritten`, `summarized`, `translated`, `transcribed`, `synthesized`, `fully-generated`, `multi-agent` |

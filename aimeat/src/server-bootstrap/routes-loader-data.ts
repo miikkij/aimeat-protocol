@@ -8,6 +8,7 @@
  *   stood, so what matches first is unchanged.
  * @structure mountDataRouters(app, config, storage)
  * @version-history
+ *   v1.4.0 — 2026-11-07 — receiveRouter and receiversRouter: receivers (services/receivers/).
  *   v1.3.0 — 2026-11-01 — dspRouter and dataspaceRouter: the Dataspace Protocol provider (plan D8).
  *   v1.2.0 — 2026-11-01 — exchangePartyBuyRouter: a buyer with no account buys a data package (plan D5.4).
  *   v1.1.0 — 2026-11-01 — partiesRouter: outside parties and named shares (plan doc-mvwxcas3dom3, D2, D3).
@@ -21,6 +22,8 @@ import { dataPackagesRouter } from '../routes/datapackages.js';
 import { dataProductsRouter } from '../routes/dataproducts.js';
 import { odataRouter } from '../routes/odata.js';
 import { partiesRouter } from '../routes/parties.js';
+import { receiveRouter } from '../routes/receivers-receive.js';
+import { receiversRouter } from '../routes/receivers.js';
 import { exchangePartyBuyRouter } from '../routes/exchange-party-buy.js';
 import { dspRouter } from '../routes/dsp/index.js';
 import { dataspaceRouter } from '../routes/dataspace.js';
@@ -46,4 +49,8 @@ export function mountDataRouters(app: express.Express, config: AimeatConfig, sto
   // answer 404 while AIMEAT_DATASPACE_ENABLED is off, and the owner's and the operator's reads.
   app.use(dspRouter(config, storage));
   app.use(dataspaceRouter(config, storage));
+  // Receivers: the address and key an outside program writes into one place of an owner's data with
+  // (/v1/receive), and the owner's and the operator's management (/v1/receivers, /v1/admin/receivers).
+  app.use(receiveRouter(config, storage));
+  app.use(receiversRouter(config, storage));
 }

@@ -2,6 +2,7 @@
  * @file page-head-site.test.ts
  * @description Verify node identity, page overrides and truthful software metadata.
  * @version-history
+ *   2026-11-07 - /v1/portal's approved description follows the story (docs/AIMEAT-Story.md).
  *   2026-11-06 - TARGET-091: /v1/portal has its own approved description; the root's own promise is still checked.
  *   2026-09-17 - TARGET-078: reject the generic free-hosting price claim.
  */
@@ -69,9 +70,10 @@ describe('injectSiteHead', () => {
     const root = findPublicPage('/')!;
     expect(buildLandingMarkdown(cfg())).toContain(root.description);
     // /v1/portal carried the root's description until 2026-11-06. Jouni then approved a search
-    // result of its own for it (TARGET-091), so the two pages no longer share one sentence.
+    // result of its own for it (TARGET-091), so the two pages no longer share one sentence. On
+    // 2026-11-07 he approved the wording that follows the story (docs/AIMEAT-Story.md).
     expect(findPublicPage('/v1/portal')!.description).toBe(
-      'Connect Claude, ChatGPT or another AI. It remembers what you teach it, works in apps you describe, and what it stores stays yours.');
+      'Connect Claude, ChatGPT or another AI. It remembers your work, builds the apps you describe and works with the people you choose, and the data stays yours.');
   });
 
   it('describes productivity software without claiming every deployment is free', () => {

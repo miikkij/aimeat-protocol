@@ -22,6 +22,7 @@
  * @structure ShowroomHero · WallIntro · ShowroomClose · AgentDoor (private)
  * @usage import { ShowroomHero, WallIntro, ShowroomClose } from '/views/landing-showroom.js';
  * @version-history
+ *   2026-11-07 -- The hero's position line is the story's one line (aimeatStory.oneLine; docs/AIMEAT-Story.md), not "the Linux of AI".
  *   2026-10-06 -- "Get your own" and "Into the store" are StoreDoors: "Opens soon" while the store
  *     does not take orders (site.store_status "soon").
  *   2026-09-13 -- V2ag: compose the agent registration prompt aside from poster.css.
@@ -107,7 +108,7 @@ export function ShowroomHero({ navigate, picture = true }) {
         <span>${tr('landing.showTitle1', 'Try it all.')}</span>
         <span>${tr('landing.showTitle2', 'Then own it.')}</span>
       </h1>
-      <p class="ld-sh-position">${tr('landing.showPosition', 'AIMEAT, the Linux of AI. Open, self-hosted, yours.')}</p>
+      <p class="ld-sh-position">${tr('aimeatStory.oneLine', 'AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.')}</p>
       <div class="ld-sh-hero-cols">
         <p class="ld-sh-sub">
           ${tr('landing.showSub', 'This is a fully working AIMEAT you can drive today, free. Build a whole system in an hour, bring every AI you already use under one roof, and let agents carry the repeat work. When you like what you see, take one home on an address with your name on it.')}

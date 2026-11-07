@@ -24,6 +24,8 @@
  *   tunnel and the realtime rooms, each reached through a real WebSocket.
  * @usage cd aimeat && pnpm exec vitest run test/unit/two-node-process.test.ts
  * @version-history
+ *   v1.1.1 — 2026-11-07 — answersOf waits up to ten seconds: under pnpm gate the cron probe was first
+ *     heard after three (a loaded machine, not a wrong answer).
  *   v1.1.0 — 2026-10-13 — The realtime peer joins with ?token= below WS_QUERY_TOKEN_REMOVED_IN, as
  *     before; from it that form is asserted refused (401) and the peer joins with the Authorization
  *     header. What the test asks (which node the frames run as) is unchanged.
@@ -331,9 +333,14 @@ async function until(done: () => boolean, ms = 3_000): Promise<void> {
     while (!done() && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
 }
 
-/** The latest answer of each probe, waiting up to three seconds for the ones not yet heard. */
+/**
+ * The latest answer of each probe, waiting up to ten seconds for the ones not yet heard. Three was
+ * enough alone, but under `pnpm gate` (141 test files at once, 2026-11-07) the once-a-second cron
+ * probe was first heard after the three-second deadline twice in a row: a test-setup mismatch with
+ * a loaded machine, not a node answering for the wrong node.
+ */
 async function answersOf(keys: string[]): Promise<Record<string, string | undefined>> {
-    await until(() => keys.every((k) => h.answers.has(k)));
+    await until(() => keys.every((k) => h.answers.has(k)), 10_000);
     return Object.fromEntries(keys.map((k) => [k, h.answers.get(k)]));
 }
 

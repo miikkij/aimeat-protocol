@@ -23,6 +23,7 @@
  * @usage
  *   const ai = aiMarksOf({ digitalSourceType: facts.digitalSourceType, c2pa, software: facts.software });
  * @version-history
+ *   v1.0.2 — 2026-11-07 — The node level `machine` reads as no AI involvement.
  *   v1.0.1 — 2026-10-20 — The IPTC term table moves to ai-provenance-adapters.ts fromIptc(), the one
  *     file the external vocabulary may be spelled in (check:ai-disclosure, assertion 4).
  *   v1.0.0 — 2026-10-20 — Initial.
@@ -52,6 +53,8 @@ export function verdictOfNodeLevel(level: string | undefined): Verdict {
     case 'synthesized':
     case 'assisted': return 'ai-assisted';
     case 'original': return 'human';
+    // A program with no model. The verdict answers "how much AI", and the answer is none.
+    case 'machine': return 'human';
     default: return 'unknown';
   }
 }

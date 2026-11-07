@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-07 — CsmRecord gains `visibility` (public | members | private | organism:<id>) and `version`;
+ *     CsmVersionRecord is one replaced version of a CSM. Postgres 0127, SQLite schema-csm-versions.ts.
  *   2026-11-06 — AppManifest.about (AppAbout): the owner's longer text about the app, shown on the app
  *     page (TARGET-093). In the manifest JSON, so no column on either backend.
  *   2026-11-04 — AppVersionSummary: one version as the version list shows it, without the content
@@ -676,6 +678,27 @@ export interface CsmRecord {
   updatedAt: string;             // ISO timestamp
   semantic?: SemanticAnnotation;  // Phase 0.7 — JSON-LD-compatible semantic annotation from CSM service.semantic
   federate?: boolean;            // Phase 3.4 — auto-distribute to federation peers
+  /**
+   * Who may read the CSM on GET /v1/csm: 'public' (anyone), 'members' (any account of this node),
+   * 'organism:<id>' (that organism's members) or 'private' (the registering account and its agents
+   * and apps). A row stored before 2026-11-07 has none and reads as 'public'.
+   */
+  visibility?: string;
+  /** The definition's version: 1 at create, one up on every PUT /v1/csm/{name}. Absent reads as 1. */
+  version?: number;
+}
+
+/** One replaced version of a CSM, kept when PUT /v1/csm/{name} writes the next one. */
+export interface CsmVersionRecord {
+  name: string;
+  version: number;
+  definition: Record<string, unknown>;
+  /** The JSON Schema this version compiled to, as its schema lock held it. */
+  jsonSchema: Record<string, unknown>;
+  /** The account that registered the CSM. */
+  registeredBy: string;
+  /** When this version came into force (the CSM's updatedAt while it was current). */
+  createdAt: string;
 }
 
 // MSM — Machine Service Manifest (external API integrations)

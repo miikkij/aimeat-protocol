@@ -11,6 +11,9 @@
  *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
  *
  * @version-history
+ *   2026-11-07 — The receiver addresses (/v1/receive/) are left to their own idempotency: cached here
+ *     before the key check, a keyless request got the program's answer back and a refusal was replayed
+ *     to the program's correct retry (found by test/e2e-receivers.ts).
  *   2026-10-25 — secaudit2026oct22: a full store evicts the oldest finished entry, 'unavailable' as
  *     well as 'complete', so finished requests whose body was not kept no longer hold every slot.
  *   2026-10-15 — The 400, 409 and 503 refusals are built with the shared error() envelope, so they
@@ -110,6 +113,18 @@ export function idempotency(nodeId: string) {
         // seller, in storage for 48 hours, and a key reused with another body is 409, as UCP asks.
         // Its callers have no account, so here every one of them would be 'anon' in one cache.
         if (req.path.startsWith('/ucp/2026-08-25/')) {
+            next();
+            return;
+        }
+
+        // A RECEIVER ADDRESS (/v1/receive/...) is idempotent by itself and must not be cached here
+        // (services/receivers/receive.ts): its caller holds no session, so this cache ran before the
+        // receiver's key was checked and keyed every program as 'anon'. A request with no key and the
+        // same Idempotency-Key was then answered the program's cached 201, and a refusal (paused, rate
+        // limited, switched off) was replayed to the program's correct retry for 24 hours. There a
+        // memory write replaces the record with the same value, and the key names the row a retry
+        // replaces, so a retry never writes twice and every answer comes from the key check.
+        if (req.path.startsWith('/v1/receive/')) {
             next();
             return;
         }

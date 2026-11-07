@@ -30,6 +30,8 @@
  *   import { disclosureFor } from './disclosure.js';
  *   const d = disclosureFor(record, { visibility: 'public', humanAudience: true }, config.aiLabelPublic);
  * @version-history
+ *   v1.5.0 — 2026-11-07 — Level `machine` owes nothing, as `original` does: the test is
+ *     levelInvolvesModel(), not a comparison with 'original'.
  *   v1.4.2 — 2026-11-05 — Moved unchanged from src/services/ai-disclosure.ts to src/services/ai/disclosure.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.4.1 — 2026-10-17 — SurfaceContext.visibility is StoredVisibility, so an 'organism:<id>' item
  *     is described as not anonymously readable (plan doc-mvcn6c7e4e5q, V3.2).
@@ -55,7 +57,7 @@
  *     §4 and decision D4 (over-labelling) in 21-decisions-2026-08-01.md.
  */
 import {
-  asKnownProvenance, isSyntheticMedia,
+  asKnownProvenance, isSyntheticMedia, levelInvolvesModel,
   type MaybeAiProvenance, type AiDisclosureReason, type AiMediaKind,
 } from '../../models/ai-provenance-schemas.js';
 import type { StoredVisibility } from '../../storage/interface.js';
@@ -178,7 +180,8 @@ export function disclosureFor(
 
   // 3 — we know nothing, so we can owe nothing.
   if (!p) return NOTHING_OWED;
-  if (p.level === 'original') return NOTHING_OWED;
+  // A person wrote it, or a program with no model did: no AI took part, so no AI label is owed.
+  if (!levelInvolvesModel(p.level)) return NOTHING_OWED;
 
   const publiclyReadable = ctx.visibility === 'public';
 

@@ -19,6 +19,9 @@
  * @structure registerOrganismWorkspaceRowRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceRowRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   2026-11-07 — A refusal carries the service's `details`: an append or a restore refused by the
+ *     space's JSON Schema answers 422 SCHEMA_VALIDATION_FAILED with the violations of each row
+ *     (services/workspace-rows/row-schema.ts; developer ruling 2026-11-07).
  *   v1.5.0 — 2026-10-22 — GET .../rows/:space/:rowId/revisions and POST .../revisions/:revisionId/restore,
  *     on the row delete's two words, and `revisions_kept` in the append answer: a replacement by
  *     another writer family keeps the old content (secaudit 2026-10, v80; developer ruling 2026-10-22).
@@ -76,7 +79,8 @@ export function registerOrganismWorkspaceRowRoutes(
    */
   const fail = (res: Response, err: unknown): void => {
     if (err instanceof WorkspaceRowError) {
-      res.status(err.statusCode).json(error(config.nodeId, err.code, err.message));
+      // `details` is set on a schema refusal: the violations of each failing row (row-schema.ts).
+      res.status(err.statusCode).json(error(config.nodeId, err.code, err.message, err.statusCode, err.details));
       return;
     }
     throw err;

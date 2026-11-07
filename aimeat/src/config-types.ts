@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.33.0 — 2026-11-07 — microservicesCentralUrl.
  *   v1.32.0 — 2026-11-06 — extensionZipMaxFiles.
  *   v1.31.0 — 2026-11-04 — The SMTP fields moved to config-types-smtp.ts (SmtpConfig, mixed in) unchanged
  *     (max-file-lines), with smtpConnectTimeoutMs and smtpSocketTimeoutMs (codebase analysis 2026-11-03, HA stage 1).
@@ -725,6 +726,12 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   extensionMaxCodeSizeKb: number;
   /** Files one extension or cortex ZIP may hold, manifest included. AIMEAT_EXT_ZIP_MAX_FILES, default 1000. */
   extensionZipMaxFiles: number;
+  /**
+   * A Microservices Central this node offers its people, named to app builders when server-side work
+   * outgrows an extension (services/appdev/microservices.ts); '' for none. The node never connects to
+   * it. AIMEAT_MSC_CENTRAL_URL.
+   */
+  microservicesCentralUrl: string;
   extensionMaxInstalled: number;
   maxExtensionsPerOwner: number;
 

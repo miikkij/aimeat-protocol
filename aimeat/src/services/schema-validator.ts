@@ -8,6 +8,9 @@
  *   also checked against the workspace manifest's write guards (services/write-guards.ts)
  *   here, so one call site covers the REST, MCP and publish surfaces alike.
  * @version-history
+ *   2026-11-07 — effectiveSchemaOf(): the schema a lock enforces, with its strict mode applied, taken
+ *     out of validateMemoryWrite unchanged so the workspace row path validates a row body against
+ *     the same compiled schema (services/workspace-rows/row-schema.ts; developer ruling 2026-11-07).
  *   v1.5.0 — 2026-10-05 — Both validators know the AIMEAT formats (fi-business-id, fi-personal-id,
  *     iban, fi-postal-code, phone) and the keywords x-hint, x-messages and x-same-as
  *     (input-formats.ts), so a schema an app's form checks with aimeat-validate can lock a space.
@@ -233,6 +236,18 @@ export function removeFromCache(schema: Record<string, unknown>): void {
   firstErrorCache.delete(key);
 }
 
+/**
+ * The schema a lock enforces: its JSON Schema with the lock's mode applied. A 'strict' lock on an
+ * object schema adds `additionalProperties: false`, so a field the schema does not declare is a
+ * violation. The memory write path and the workspace row path (services/workspace-rows/row-schema.ts)
+ * both validate against this, so one lock means the same thing on both.
+ */
+export function effectiveSchemaOf(lock: { schemaJson: Record<string, unknown>; schemaMode?: string }): Record<string, unknown> {
+  const schema: Record<string, unknown> = { ...lock.schemaJson };
+  if (lock.schemaMode === 'strict' && schema.type === 'object') schema.additionalProperties = false;
+  return schema;
+}
+
 export interface ValidationResult {
   valid: boolean;
   errors?: SchemaViolation[];
@@ -257,11 +272,7 @@ export async function validateMemoryWrite(
     return { valid: true }; // No schema = no validation
   }
 
-  // Apply schema_mode: 'strict' → add additionalProperties: false
-  const schemaToValidate = { ...schemaRecord.schemaJson };
-  if (schemaRecord.schemaMode === 'strict' && schemaToValidate.type === 'object') {
-    (schemaToValidate as Record<string, unknown>).additionalProperties = false;
-  }
+  const schemaToValidate = effectiveSchemaOf(schemaRecord);
 
   // A schema lock is registered by the principal, and a self-referential `$ref` compiled against a
   // deeply-nested value can recurse the validator to a stack overflow (CodeQL

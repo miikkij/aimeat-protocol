@@ -15,6 +15,8 @@
  * @structure CREDENTIAL_KINDS · CredentialKind
  * @usage import { CREDENTIAL_KINDS, type CredentialKind } from './credential-kinds.js';
  * @version-history
+ *   v1.2.0 — 2026-11-07 — 'receiver': an outside program's key for one receiver of an owner
+ *     (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.1.0 — 2026-11-05 — 'intake-visitor', 'docsign-wallet', 'party-optional', 'federation-peer',
  *     'package-seller', 'package-claimant' (codebase analysis 2026-11-03, decision 2 of 2026-11-05).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B8).
@@ -83,6 +85,13 @@ export const CREDENTIAL_KINDS = {
         credential: 'A seller node of a package on this repository: a request signed by an active peer over its method, '
             + 'path and body (services/packages/sale/package-sale-auth.ts), from a node the package\'s author names a '
             + 'seller. Unsigned is 401, a node that sells nothing here 403.',
+        admitsNoCredential: false,
+    },
+    receiver: {
+        credential: 'An outside program writing through a receiver of an owner: Authorization: Bearer aimeat_rcv_… for the '
+            + 'route\'s :owner and :name, compared with the receiver\'s stored SHA-256 in constant time '
+            + '(services/receivers/verify.ts). No key, a wrong key and no such receiver are the same 401; a key in the '
+            + 'address is 400; a paused, stopped, expired or unapproved receiver 403; receivers switched off 503.',
         admitsNoCredential: false,
     },
     'package-claimant': {

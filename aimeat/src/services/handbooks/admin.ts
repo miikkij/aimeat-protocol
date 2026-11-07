@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.34.0 -- 2026-11-07 -- aimeat_admin_receivers and visibility.receivers_mode: every receiver, the stop and the decision.
  *   v1.33.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt: replacing the data key (codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.32.0 -- 2026-11-02 -- consent.app_party_signups_per_hour and consent.app_party_pending_hours (secaudit2026nov02d round 13).
@@ -194,6 +195,16 @@ version at opening and now), what waits for a decision, and the owners who open 
 owner); \`aimeat_app_internet_close\` with \`owner\` closes any opening; \`aimeat_admin_internet_opener_set\`
 lets an owner open on their own or takes that back. Decide only as the operator says. How apps are
 opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
+
+Receivers are the addresses outside programs (a Lambda, a sensor, a CRM export) write into owners' data
+through, each with its own key and exactly one target. \`aimeat_admin_receivers\` \`list\` answers the
+setting, the counts (active, waiting, writes and refusals today, wrong keys) and every receiver with its
+owner; no key and no content. \`stop\` { owner, name, reason } stops one for everybody, and the owner reads
+the reason and cannot start it again; \`start\` lets it work; \`decide\` { owner, name, decision } answers
+one waiting for the operator. Who may make receivers is \`visibility.receivers_mode\`: auto (operator on
+a node with signed-in content access, self elsewhere), off, operator or self; change it with
+\`aimeat_admin_config_set\` only on the operator's word. Five wrong keys in an hour for one receiver open
+a security incident. The page is the admin Receivers page.
 
 When \`consent.party_self_registration\` is apps-ask, an app's owner asks to let people register to it
 without an account here. \`aimeat_admin_app_party_registrations\` lists the apps that asked (state

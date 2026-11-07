@@ -1145,6 +1145,18 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/receivers/deliveries.ts :: map :: pending": {
+      "count": 1,
+      "reason": "Delivery log entries waiting to be written, at most FLUSH_MS; a second process keeps its own batch and both write into the same record on its version, so nothing is lost but the last seconds of a process that stops."
+    },
+    "src/services/receivers/deliveries.ts :: map :: dayCounts": {
+      "count": 1,
+      "reason": "The per-day message count of each receiver; a second process counts its own day, so the day limit is a ceiling per process (said in the setting's description and IT adoption page 13)."
+    },
+    "src/services/receivers/verify.ts :: map :: wrongKeys": {
+      "count": 1,
+      "reason": "Wrong keys per receiver in the last hour, for the one security incident; a second process counts its own, so the incident may wait for more wrong keys in total. The owner's count on the receiver is written to storage (deliveries.ts noteWrongKey)."
+    },
     "src/services/parties/activity.ts :: map :: pending": {
       "count": 1,
       "reason": "DEBT"

@@ -11,6 +11,7 @@
  * @usage Rendered by views/profile.js when there is no session; tabLabel is the asked tab's
  *   translated name, or null when the URL names no tab the registry knows.
  * @version-history
+ *   v1.6.0 -- 2026-11-07 -- "What this is" says the story's one line (aimeatStory.oneLine, the one source; docs/AIMEAT-Story.md) and then that an account is free.
  *   v1.5.0 -- 2026-09-26 -- The door is the SignedOutDoor component (components/SignedOutDoor.js, same markup and sheet): this file passes the words and what each way on does, and writes no class (page group G8).
  *   v1.4.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.3.0 -- 2026-09-25 -- Sign in is the dark block (.poster-slab); its coral showroom slab goes, on a phone it keeps the full width (Jouni's decision "Loud action", a unification).
@@ -60,7 +61,7 @@ export default function SignedOutDoor({ navigate, tabLabel }) {
     aside=${{
       label: t('profile.door.whatLabel'),
       title: t('profile.door.whatTitle'),
-      text: t('profile.door.whatText'),
+      text: `${t('aimeatStory.oneLine')} ${t('profile.door.freeAccount')}`,
       link: { label: t('profile.door.howItWorks'), href: '/v1/how-it-works', onClick: goHowItWorks },
     }} />`;
 }

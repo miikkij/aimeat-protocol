@@ -3,7 +3,7 @@
   "url": "https://context7.com/miikkij/aimeat-protocol",
   "public_key": "pk_3NQYAMkNG4423mPQKpu0K",
   "projectTitle": "AIMEAT",
-  "description": "AIMEAT is an open platform for AI. It keeps a person's data and apps on a node they own, and lets them work with it from the AI they already use. Humans, agents and apps read and write the same state through the same access guard, over MCP and REST. MIT licensed: what you build on it is yours.",
+  "description": "AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way. It keeps a person's data and apps on a node they own, and lets them work with it from the AI they already use. Humans, agents and apps read and write the same state through the same access guard, over MCP and REST. MIT licensed: what you build on it is yours.",
   "folders": [
     "docs"
   ],

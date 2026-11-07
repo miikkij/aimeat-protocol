@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Existing-install fixtures for create-only schema/template/job seeds.
  * @version-history
+ *   2026-11-07 — seedCsmTemplates is imported from services/csm/seed.ts, where it moved unchanged.
  *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   1.0.0 2026-09-27 Preserve edits and add missing defaults on both providers.
  */
@@ -12,7 +13,7 @@ import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { seedProfileSchemas } from '../../src/services/profile-schemas.js';
-import { seedCsmTemplates } from '../../src/services/csm-seed.js';
+import { seedCsmTemplates } from '../../src/services/csm/seed.js';
 import { seedTemplateBundles } from '../../src/services/template-bundles.js';
 import { seedCoreScheduledJobs } from '../../src/services/job-seeding.js';
 import { loadConfig } from '../../src/config.js';

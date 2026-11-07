@@ -6,6 +6,9 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.16.0 — 2026-11-07 — The page "Receivers" (receivers) after Open to the internet: every address an
+ *     outside program writes into an owner's data with, the setting that decides who may make one, and
+ *     the operator's stop, start and decision (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.15.0 — 2026-10-29 — The page "File storage" (file-stores) after Database: where stored files
  *     keep their bytes, moving older files out of the database, and people's own storage
  *     (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -60,6 +63,7 @@ import EconomyTab      from './admin/economy-tab.js';
 import ConfigTab, { configLabel, configGroupLabel } from './admin/config-tab.js';
 import SecurityTab     from './admin/security-tab.js';
 import InternetOpeningsTab from './admin/internet-openings-tab.js';
+import ReceiversAdminTab from './admin/receivers-tab.js';
 import ComplianceTab   from './admin/compliance-tab.js';
 import CorsTab         from './admin/cors-tab.js';
 import MaintenanceTab  from './admin/maintenance-tab.js';
@@ -119,6 +123,7 @@ const NAV_GROUPS = [
     { id: 'config',       key: 'dashboard.config',     component: ConfigTab },
     { id: 'security',     key: 'admin.security.title',  component: SecurityTab },
     { id: 'internet-openings', key: 'admin.internetOpenings.title', component: InternetOpeningsTab },
+    { id: 'receivers',    key: 'receivers.admin.title', component: ReceiversAdminTab },
     { id: 'compliance',   key: 'admin.compliance.title', component: ComplianceTab },
     { id: 'cors',         key: 'dashboard.cors',       component: CorsTab },
     { id: 'maintenance',  key: 'dashboard.maintenance',component: MaintenanceTab },

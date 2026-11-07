@@ -11,6 +11,7 @@
  * @version-history
  *   2026-11-07 — configure-routing: an agent's own text model (the chat's is agent "chat") and the operator's
  *     two model settings; aimeat-ai-model-policy: the operator's allowed models and lock (Jouni, 2026-11-07).
+ *   2026-11-07 — ai-transparency: the level `machine`, a program with no model (what a receiver writes).
  *   2026-11-02 — aimeat-gen-rules: an exception may name an ecosystem app, eco:<name>; configure-routing:
  *     an ecosystem app's spend is the owner's, under eco:<name> (secaudit2026nov02d round 13).
  *   2026-11-01 — configure-routing: the node's AI region choice (`openrouter_region.mode`).
@@ -114,6 +115,7 @@ gated — only asserting is.
 | \`assisted\` | A person wrote it; a model edited, refined or filled in. |
 | \`synthesized\` | A model combined real sources into new content, at someone's direction. |
 | \`ai-generated\` | A model produced it. |
+| \`machine\` | A program produced it with no model and no person writing it: a sensor reading, another system's export. The node stamps it itself on what a receiver writes; declare it only for data a program of yours produced without a model. |
 
 ## \`human_involvement\` — whether anyone checked
 

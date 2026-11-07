@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-07 — this_node.description is the story's one line, read from aimeatStory.oneLine in
+ *     the English locale (one source; docs/AIMEAT-Story.md), and this_node.story names that file.
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -122,6 +124,10 @@ import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';
 import { coreDiscoveryFields } from '../services/core-discovery.js';
 import { signedInOnly } from '../config-visibility.js';
+import { createT } from '../i18n.js';
+
+/** The story's one line, from the one place it is written (locales, aimeatStory.oneLine). */
+const STORY_ONE_LINE = createT('en')('aimeatStory.oneLine');
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -338,7 +344,8 @@ export function bootstrapRouter(
         // The same protocol_version, profiles and payment bindings as /.well-known/aimeat (DISC-01).
         ...coreDiscoveryFields(config),
         portal: `${base}/v1/portal`,
-        description: 'AIMEAT (AI Memory Exchange and Action Transfer): a place a person owns, where every AI they use keeps what it learns, works under permissions they grant and can withdraw, and shares with the people and AIs they choose',
+        description: STORY_ONE_LINE,
+        story: 'https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Story.md',
         welcome: 'Welcome to AIMEAT ♥ Love what you build, share what you know. The network starts here.',
         anonymous_mode: config.anonymousMode,
         // 'signed-in': this node shows its content to its own accounts only; sign in or connect first.

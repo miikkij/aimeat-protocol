@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.22.0 -- 2026-11-07 -- csmCliTools: aimeat_csm, the account's data descriptions (CSM).
+ *   v1.22.0 -- 2026-11-07 -- receiverCliTools: aimeat_receiver and aimeat_admin_receivers.
  *   v1.21.0 -- 2026-11-02 -- connectionFileCliTools: aimeat_files_browse, _get, _write (SharePoint and OneDrive).
  *   v1.20.0 -- 2026-11-01 -- dataspaceCliTools: aimeat_dataspace (plan doc-mvwxcas3dom3, D8.3).
  *   v1.19.0 -- 2026-11-01 -- datapackageSellCliTools: aimeat_datapackage_sell (plan doc-mvwxcas3dom3, D5.1).
@@ -86,8 +88,10 @@ import { dmGroupCliTools } from './tool-call-defs-dm-groups.js';
 import { dmReactionCliTools } from './tool-call-defs-dm-reactions.js';
 import { dataProductCliTools } from './tool-call-defs-dataproduct.js';
 import { partyCliTools } from './tool-call-defs-party.js';
+import { receiverCliTools } from './tool-call-defs-receivers.js';
 import { datapackageSellCliTools } from './tool-call-defs-datapackage-sell.js';
 import { dataspaceCliTools } from './tool-call-defs-dataspace.js';
+import { csmCliTools } from './tool-call-defs-csm.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -145,8 +149,10 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...dmReactionCliTools,
     ...dataProductCliTools,
     ...partyCliTools,
+    ...receiverCliTools,
     ...datapackageSellCliTools,
     ...dataspaceCliTools,
+    ...csmCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**
