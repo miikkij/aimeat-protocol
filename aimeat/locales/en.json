@@ -5979,6 +5979,8 @@
     "assistedLong": "A person wrote this. AI helped edit or refine it.",
     "reviewedGeneric": "AI drafted this, and a person reviewed the substance.",
     "originalLong": "A person wrote this. No AI was involved.",
+    "machine": "Written by a program",
+    "machineLong": "A program wrote this data automatically. No AI and no person wrote it.",
     "unstatedLong": "We do not know whether AI was involved in making this.",
     "reviewed": "AI-drafted, reviewed by {{name}}.",
     "reviewedShort": "AI-drafted, reviewed by a person.",
@@ -6046,6 +6048,7 @@
       "goneBody": "There is no provenance record at this address, or it is not public. If you arrived from a label, the content it described may have been unpublished.",
       "levels": {
         "original": "A person made it. No model was involved.",
+        "machine": "A program made it. No model and no person was involved.",
         "assisted": "A person made it. A model changed part of it.",
         "synthesized": "A model combined sources into it.",
         "aiGenerated": "A model made it."
@@ -17909,7 +17912,8 @@
       "original": "Original",
       "assisted": "AI Assisted",
       "synthesized": "AI Synthesized",
-      "ai-generated": "AI Generated"
+      "ai-generated": "AI Generated",
+      "machine": "Written by a program"
     },
     "maturity": {
       "draft": "Draft",

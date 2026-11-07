@@ -44,6 +44,8 @@
  *   import { mintProvenance, contentHashOf } from './provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.6.0 — 2026-11-07 — Level `machine` names no model and carries no generation rules, as
+ *     `original` does (levelInvolvesModel).
  *   v1.5.1 — 2026-11-05 — Moved unchanged from src/services/ai-provenance.ts to src/services/ai/provenance.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.5.0 — 2026-10-31 — The record lists the generation rules in force for an image or a video
  *     (`rules`): what the node gave the model (`genRules`, from services/ai-image.ts), or on arrival
@@ -91,7 +93,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Storage, AiProvenanceRecordRow } from '../../storage/interface.js';
 import {
-  AI_PROVENANCE_SPEC_V1, AiProvenanceSchema,
+  AI_PROVENANCE_SPEC_V1, AiProvenanceSchema, levelInvolvesModel,
   type AiProvenance, type AiProvenanceLevel, type AiProvenanceMethod, type AiHumanInvolvement,
   type AiStampedBy, type AiProvenanceGenerator, type AiProvenanceSource, type AiDisclosureBlock,
   type LocalizedText, type AiMediaKind, type AiResemblesReal, type AiGenRuleMark as GenRuleMark,
@@ -281,7 +283,7 @@ export async function mintProvenance(
   if (mediaType) draft.mediaType = mediaType;
   if (input.resemblesReal) draft.resemblesReal = input.resemblesReal;
   // A record about content no model made says nothing about rules given to a model.
-  const rules = input.genRules ?? (input.level === 'original' ? undefined : await arrivalGenRuleMarks(storage, {
+  const rules = input.genRules ?? (input.level && !levelInvolvesModel(input.level) ? undefined : await arrivalGenRuleMarks(storage, {
     ownerGhii: input.ownerGhii, principal: input.principal, mediaKind: draft.mediaKind, rulesFollowed: input.rulesFollowed,
   }));
   if (rules?.length) draft.rules = rules;
@@ -445,10 +447,10 @@ export interface DeclaredProvenance extends MediaStatement {
  * Does this declaration say a model made the content without saying which model? The node cannot
  * fill the gap: on a declaration it witnessed nothing, and an owner token has no agent record to
  * read a registered model from. So the declarer is told, and the next declaration can name it.
- * `original` is left alone, because no model was involved.
+ * `original` and `machine` are left alone, because no model was involved.
  */
 export function declarationLacksModel(declared: DeclaredProvenance | undefined): boolean {
-  return !!declared && declared.level !== 'original' && !declared.model?.trim();
+  return !!declared && levelInvolvesModel(declared.level) && !declared.model?.trim();
 }
 
 /**

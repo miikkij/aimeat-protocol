@@ -6716,6 +6716,8 @@
     "assistedLong": "Tekstin on kirjoittanut ihminen. Tekoäly on ollut mukana sen muokkaamisessa.",
     "reviewedGeneric": "Tekoäly on luonnostellut tämän, ja ihminen on tarkistanut sisällön.",
     "originalLong": "Tämän on kirjoittanut ihminen. Tekoäly ei ole ollut mukana.",
+    "machine": "Ohjelman kirjoittama",
+    "machineLong": "Ohjelma kirjoitti tämän datan automaattisesti. Sitä ei kirjoittanut tekoäly eikä ihminen.",
     "unstatedLong": "Emme tiedä, onko tekoäly ollut mukana tämän tekemisessä.",
     "reviewed": "Tekoälyn luonnostelema, tarkistanut {{name}}.",
     "reviewedShort": "Tekoälyn luonnostelema, ihmisen tarkistama.",
@@ -6783,6 +6785,7 @@
       "goneBody": "Tässä osoitteessa ei ole alkuperätietuetta, tai se ei ole julkinen. Jos tulit merkinnästä, sen kuvaama sisältö on ehkä poistettu julkaisusta.",
       "levels": {
         "original": "Ihminen teki sen. Tekoäly ei ollut mukana.",
+        "machine": "Ohjelma teki sen. Tekoäly ja ihminen eivät olleet mukana.",
         "assisted": "Ihminen teki sen. Tekoäly muokkasi osaa siitä.",
         "synthesized": "Tekoäly kokosi sen lähteistä.",
         "aiGenerated": "Tekoäly teki sen."
@@ -18646,7 +18649,8 @@
       "original": "Alkuperäinen",
       "assisted": "Tekoälyavusteinen",
       "synthesized": "Tekoälyllä syntetisoitu",
-      "ai-generated": "Tekoälyn luoma"
+      "ai-generated": "Tekoälyn luoma",
+      "machine": "Ohjelman kirjoittama"
     },
     "maturity": {
       "draft": "Luonnos",

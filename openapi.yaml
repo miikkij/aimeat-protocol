@@ -1331,12 +1331,14 @@ components:
       properties:
         level:
           type: string
-          enum: [original, assisted, synthesized, ai-generated]
+          enum: [original, assisted, synthesized, ai-generated, machine]
           description: >
             How much of this a model made. `original` = a person wrote it, no model involved.
             `assisted` = a person wrote it and a model edited or refined it. `synthesized` = a model
             combined real sources into new content at someone's direction. `ai-generated` = a model
-            produced it.
+            produced it. `machine` = a program produced it with no model and no person writing it
+            (a sensor reading, an export from another system); a write through a receiver is recorded
+            at this level.
         method:
           type: string
           enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent, transcribed]
@@ -1444,7 +1446,7 @@ components:
           const: aimeat.provenance/v1
         level:
           type: string
-          enum: [original, assisted, synthesized, ai-generated]
+          enum: [original, assisted, synthesized, ai-generated, machine]
         method:
           type: string
           enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent, transcribed]
@@ -23141,7 +23143,7 @@ paths:
               properties:
                 level:
                   type: string
-                  enum: [original, assisted, synthesized, ai-generated]
+                  enum: [original, assisted, synthesized, ai-generated, machine]
                   description: What the content is. Independent of `humanInvolvement`, on purpose.
                 humanInvolvement:
                   type: string

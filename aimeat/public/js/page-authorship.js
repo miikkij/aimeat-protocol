@@ -11,6 +11,7 @@
  * @structure writerName · AI_MADE_DECLARATION · recordedAsAiMade · aiDeclarationFor
  * @usage import { writerName, aiDeclarationFor } from '/js/page-authorship.js';
  * @version-history
+ *   v1.0.1 — 2026-11-07 — A page recorded at level `machine` is not AI-made.
  *   v1.0.0 — 2026-10-16 — Initial (the AI label on every public page).
  */
 
@@ -28,7 +29,8 @@ export const AI_MADE_DECLARATION = Object.freeze({ level: 'ai-generated', media_
 /** Was this page, as stored, recorded as made with an AI? The editor's starting answer. */
 export function recordedAsAiMade(page) {
   const level = page?._aiProvenance?.level;
-  return !!level && level !== 'original';
+  // `machine` is a program with no model, so it is not "made with an AI" either.
+  return !!level && level !== 'original' && level !== 'machine';
 }
 
 /** The `ai_provenance` a save sends: the declaration when the box is ticked, nothing otherwise. */

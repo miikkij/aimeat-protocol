@@ -582,6 +582,8 @@
     assistedLong: "A person wrote this. AI helped edit or refine it.",
     reviewedGeneric: "AI drafted this, and a person reviewed the substance.",
     originalLong: "A person wrote this. No AI was involved.",
+    machine: "Written by a program",
+    machineLong: "A program wrote this data automatically. No AI and no person wrote it.",
     unstatedLong: "We do not know whether AI was involved in making this.",
     reviewed: "AI-drafted, reviewed by {{name}}.",
     reviewedShort: "AI-drafted, reviewed by a person.",
@@ -649,6 +651,7 @@
       goneBody: "There is no provenance record at this address, or it is not public. If you arrived from a label, the content it described may have been unpublished.",
       levels: {
         original: "A person made it. No model was involved.",
+        machine: "A program made it. No model and no person was involved.",
         assisted: "A person made it. A model changed part of it.",
         synthesized: "A model combined sources into it.",
         aiGenerated: "A model made it."
@@ -691,6 +694,8 @@
     assistedLong: "Tekstin on kirjoittanut ihminen. Tekoäly on ollut mukana sen muokkaamisessa.",
     reviewedGeneric: "Tekoäly on luonnostellut tämän, ja ihminen on tarkistanut sisällön.",
     originalLong: "Tämän on kirjoittanut ihminen. Tekoäly ei ole ollut mukana.",
+    machine: "Ohjelman kirjoittama",
+    machineLong: "Ohjelma kirjoitti tämän datan automaattisesti. Sitä ei kirjoittanut tekoäly eikä ihminen.",
     unstatedLong: "Emme tiedä, onko tekoäly ollut mukana tämän tekemisessä.",
     reviewed: "Tekoälyn luonnostelema, tarkistanut {{name}}.",
     reviewedShort: "Tekoälyn luonnostelema, ihmisen tarkistama.",
@@ -758,6 +763,7 @@
       goneBody: "Tässä osoitteessa ei ole alkuperätietuetta, tai se ei ole julkinen. Jos tulit merkinnästä, sen kuvaama sisältö on ehkä poistettu julkaisusta.",
       levels: {
         original: "Ihminen teki sen. Tekoäly ei ollut mukana.",
+        machine: "Ohjelma teki sen. Tekoäly ja ihminen eivät olleet mukana.",
         assisted: "Ihminen teki sen. Tekoäly muokkasi osaa siitä.",
         synthesized: "Tekoäly kokosi sen lähteistä.",
         aiGenerated: "Tekoäly teki sen."
@@ -800,6 +806,8 @@
     assistedLong: "Lo escribió una persona. La IA ayudó a editarlo o a pulirlo.",
     reviewedGeneric: "La IA escribió el borrador y una persona revisó el contenido.",
     originalLong: "Lo escribió una persona. No intervino ninguna IA.",
+    machine: "Escrito por un programa",
+    machineLong: "Un programa escribió estos datos automáticamente. No los escribió ninguna IA ni ninguna persona.",
     unstatedLong: "No sabemos si intervino una IA en esto.",
     reviewed: "Borrador de IA, revisado por {{name}}.",
     reviewedShort: "Borrador de IA, revisado por una persona.",
@@ -867,6 +875,7 @@
       goneBody: "En esta dirección no hay ningún registro de procedencia, o no es público. Si llegaste desde una etiqueta, es posible que el contenido que describía ya no esté publicado.",
       levels: {
         original: "Lo hizo una persona. No intervino ningún modelo.",
+        machine: "Lo hizo un programa. No intervino ningún modelo ni ninguna persona.",
         assisted: "Lo hizo una persona. Un modelo modificó una parte.",
         synthesized: "Un modelo lo compuso a partir de fuentes.",
         aiGenerated: "Lo hizo un modelo."
