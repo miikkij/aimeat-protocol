@@ -26,6 +26,27 @@
     {
       "date": "2026-11-07",
       "kind": "feature",
+      "id": "2026-11-07-reply-with-ai-right-under-the-message",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Reply with AI, right under the message",
+        "fi": "Vastaa älyllä suoraan viestin alta"
+      },
+      "summary": {
+        "en": "Messages from others now show a Reply with AI button. Your own AI writes the reply, and you approve it.",
+        "fi": "Muiden viestien alla on nyt Vastaa älyllä -painike. Oma tekoälysi kirjoittaa vastauksen, ja sinä hyväksyt sen."
+      },
+      "body": {
+        "en": "Messages from others now show a Reply with AI button. You get a prompt for your own AI, and the AI writes a reply that you approve before it is sent.",
+        "fi": "Muiden viestien alla on nyt Vastaa älyllä -painike. Saat kehotteen omalle tekoälyllesi, ja tekoäly kirjoittaa vastauksen, jonka sinä hyväksyt ennen lähetystä."
+      }
+    },
+    {
+      "date": "2026-11-07",
+      "kind": "feature",
       "id": "2026-11-07-a-program-writes-into-your-data",
       "highlight": true,
       "audience": [

@@ -17,6 +17,8 @@
  * @usage pnpm exec vitest run test/unit/pg-read-retry.test.ts
  *        DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/pg-read-retry.test.ts
  * @version-history
+ *   v1.0.2 — 2026-11-07 — A lost client given back with release(false), as Kysely 0.29.8 does, is
+ *            destroyed (the PostgreSQL pool-of-one case failed in CI about three runs in four).
  *   v1.0.1 — 2026-11-05 — The sleep marker's last digit is never 0, so the SQL literal keeps it
  *            whole and the search in pg_stat_activity finds the statement (it missed about one run
  *            in ten).
@@ -176,6 +178,14 @@ describe('dropLostConnections', () => {
     const c = await pool.connect();
     await expect(c.query('fail')).rejects.toMatchObject({ code: '57P01' });
     c.release();
+    expect(releases[0]).toBeInstanceOf(Error);
+  });
+
+  it('a lost client given back with release(false), as Kysely 0.29.8 does, is destroyed too', async () => {
+    const { pool, releases } = fakePool('57P01');
+    const c = await pool.connect();
+    await expect(c.query('fail')).rejects.toMatchObject({ code: '57P01' });
+    c.release(false);
     expect(releases[0]).toBeInstanceOf(Error);
   });
 

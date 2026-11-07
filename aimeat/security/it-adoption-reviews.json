@@ -123,7 +123,7 @@
       "digest": "sha256:a3eec7b960928ad6b1577e84"
     },
     "11-backup-recovery.md": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-07",
       "watches": [
         "docs/operations/backup-and-restore.md",
         "aimeat/src/auth/node-keys.ts",
@@ -132,7 +132,7 @@
         "aimeat/src/storage/providers/postgres-kysely/read-retry.ts",
         "aimeat/src/server-bootstrap/bus-relay-start.ts"
       ],
-      "digest": "sha256:892c2d9d97137cce7130dd5b"
+      "digest": "sha256:ee98d11b515071ff990b5ff7"
     },
     "12-updates-releases.md": {
       "reviewedOn": "2026-11-04",
@@ -354,7 +354,7 @@
       "aimeat/src/auth/node-keys.ts": "5d991a21ccfa602e",
       "aimeat/src/services/encryption.ts": "b0a16df9e1d5c2cb",
       "docs/operations/database-high-availability.md": "fb3b82782584e700",
-      "aimeat/src/storage/providers/postgres-kysely/read-retry.ts": "2ae23e7a2d98bbad",
+      "aimeat/src/storage/providers/postgres-kysely/read-retry.ts": "9c1d34ab26d00182",
       "aimeat/src/server-bootstrap/bus-relay-start.ts": "4ea49009017ba3bc"
     },
     "12-updates-releases.md": {
