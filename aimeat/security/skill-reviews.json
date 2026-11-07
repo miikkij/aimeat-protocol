@@ -144,14 +144,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-11-04",
+      "reviewedOn": "2026-11-07",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:10fe6c4c17ad74688657b803"
+      "digest": "sha256:439f826efce94a865f5e3114"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -579,8 +579,8 @@
       "aimeat/src/services/app-spec-gate.ts": "1c415a82078c0a0f"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "949507014329b508",
-      "aimeat/src/services/build-atelier-layers.ts": "2f6550518b79a0df",
+      "aimeat/src/services/build-atelier-prompt.ts": "0a4fbdf8c422e9c3",
+      "aimeat/src/services/build-atelier-layers.ts": "68ca1a87cc214d3f",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "eb3ec036ab55c7ac",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
