@@ -27,6 +27,7 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.36.0 -- 2026-11-07 -- Section 02 ends with the line to the Receivers page and how many receivers the account has: a receiver key is a credential an outside program writes into the person's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.35.0 -- 2026-11-01 -- On a node the store sold with a build queue (site.build_queue_url), the MCP servers section, with its "Connect to aimeat.io", is section 02 before the "Lisätiedot" fold, so the build code card's link reaches it (commercial's crew52 walk).
  *   v1.34.0 -- 2026-11-01 -- On a node the store sold (Jouni's review of v33): "kuka pääsee tiliisi ja miten"; one button at the top, the fingerprint or face sign-in while there is none; no tags and no counters up front; the sign-in rows are the link, the fingerprint or face, two-step and "Olet kirjautuneena N laitteella" with "Kirjaudu ulos muilta laitteilta", without the other servers' row; everything else, counters included, is in one fold, "Lisätiedot".
  *   v1.33.0 -- 2026-11-01 -- On a node the store sold (Jouni's review of the Access page): the sign-in row is the emailed sign-in link, in use; no "set by the store" password, no coral two-step chip, no warning that anyone with the password gets in; the recovery key and the public key rows are left out, and the words come from the `Place` variants (frame.js x), which say permission where the page said key.
@@ -97,10 +98,10 @@ import { customerNode, siteLink } from '/js/site.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
-import { scrollToSection } from '/components/Rail.js';
+import { scrollToSection, openTab } from '/components/Rail.js';
 import { Tabs } from '/components/Tabs.js';
 import { Space } from '/components/Layout.js';
-import { List, Row, Name, Doors, More } from '/components/List.js';
+import { List, Row, Name, Desc, Doors, More } from '/components/List.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -329,7 +330,29 @@ function secKeys(ctx) {
           <//>` : null}
         ${ctx.baseHolders ? html`<${Box}><b>${x('whyBaseTitle')}</b> ${x('whyBase', { n: ctx.baseHolders, total: ov.appGrants.total })} ${ov.base_package.map(scopeSentence).join('; ')}.<//>` : null}`
       : html`<${Note} kind="quiet"><b>${x('keysEmptyTitle')}</b> ${x('keysEmptyBody')}<//>`}
+      ${receiversLine(ctx)}
       <${Space} above="large">${tokenFold(ctx)}<//>
+    <//>`;
+}
+
+/**
+ * The line that leads to the Receivers page: a receiver key is a credential an outside program
+ * writes into the person's data with, so it belongs with what acts in their name. Left out when the
+ * count could not be read.
+ */
+function receiversLine(ctx) {
+  const r = ctx.receivers;
+  if (!r) return null;
+  const go = () => openTab('receivers');
+  return html`
+    <${Space} above="large">
+      <${List} cols="name-desc-doors" dense>
+        <${Row}>
+          <${Name} onOpen=${go} meta=${t('receivers.access.meta')}>${t('profile.tabs.receivers')}<//>
+          <${Desc}>${r.total ? t('receivers.access.count', { n: n(r.total), active: n(r.active), waiting: n(r.waiting) }) : t('receivers.access.none')}<//>
+          <${Doors}><${Action} small row onClick=${go}>${t('receivers.access.open')}<//><//>
+        <//>
+      <//>
     <//>`;
 }
 

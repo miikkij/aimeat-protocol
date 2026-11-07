@@ -247,12 +247,12 @@
       "digest": "sha256:e5bb7af9f5f88e3f4098b88f"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-07",
       "watches": [
         "aimeat/src/services/ai/provenance-input.ts",
         "aimeat/src/services/ai/provenance.ts"
       ],
-      "digest": "sha256:90ba9fd383db15e33c09c9c6"
+      "digest": "sha256:aa019797a3decc91a21ee743"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-11-05",
@@ -360,8 +360,18 @@
       "digest": "sha256:11a9377edaf227298d4e425c",
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
+    "node:aimeat-receivers": {
+      "reviewedOn": "2026-11-07",
+      "watches": [
+        "aimeat/src/services/receivers/contract.ts",
+        "aimeat/src/services/receivers/receive.ts",
+        "aimeat/src/services/receivers/manage.ts",
+        "aimeat/src/tool-catalog/definitions/receivers.ts"
+      ],
+      "digest": "sha256:7a3d71160e4685916faf4949"
+    },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-07",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -371,7 +381,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:0b00a97eadd81e34e5dbee5f"
+      "digest": "sha256:4fc6b7208d5efd69a09a02d3"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-05",
@@ -635,7 +645,7 @@
     },
     "node:ai-transparency": {
       "aimeat/src/services/ai/provenance-input.ts": "16c4870673b47869",
-      "aimeat/src/services/ai/provenance.ts": "7ff25502514239e6"
+      "aimeat/src/services/ai/provenance.ts": "0061b362330ed1d0"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "3b5d6c7e20799118"
@@ -800,7 +810,7 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "c2ddc40235643464",
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
-      "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",
+      "aimeat/src/services/workspace-rows/row-service.ts": "78c57e3d5f2025be",
       "aimeat/src/services/refinery/pipeline.ts": "361927b326eedd14",
       "aimeat/src/routes/outbound.ts": "d5e03c7e8dcc48ef"
     },
@@ -830,6 +840,12 @@
       "aimeat/src/services/ai/gen-rules-store.ts": "b3c9ca52af9b9198",
       "aimeat/src/routes/ai-gen-rules.ts": "b3339d944f0ee1fc",
       "aimeat/src/services/ai/image.ts": "6d50752cd6532f76"
+    },
+    "node:aimeat-receivers": {
+      "aimeat/src/services/receivers/contract.ts": "337d964b23dbafbf",
+      "aimeat/src/services/receivers/receive.ts": "eb48bc222c34b250",
+      "aimeat/src/services/receivers/manage.ts": "af4cba285f0918ce",
+      "aimeat/src/tool-catalog/definitions/receivers.ts": "4e4b7bbb567c7c72"
     }
   }
 }

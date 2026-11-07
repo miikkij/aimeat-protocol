@@ -7,6 +7,7 @@
  *   build seeded, and every YAML example in the CSM documentation.
  *
  * @version-history
+ *   v1.0.1 — 2026-11-07 — seedCsmTemplates is imported from services/csm/seed.ts, where it moved unchanged.
  *   v1.0.0 — 2026-10-11 — The runtime templates wrote minLength, maxLength, minimum, maxItems and
  *     default, the parser read only min/max, and every seeded schema enforced no limit at all.
  */
@@ -16,7 +17,7 @@ import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
-import { seedCsmTemplates } from '../../src/services/csm-seed.js';
+import { seedCsmTemplates } from '../../src/services/csm/seed.js';
 import { CSM_FIELD_KEYS, csmToJsonSchema, parseCsm, validateCsm } from '../../src/services/csm-parser.js';
 import { validateValueAgainstSchema } from '../../src/services/schema-validator.js';
 

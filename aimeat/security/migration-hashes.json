@@ -127,6 +127,7 @@
     "0123_mcp_user_credentials.sql": "fed3971af336ebe584ae22740db1e9bccdb57180e071029be8c49d707aa60676",
     "0124_memory_query_indexes.sql": "01d94887b5ba6ef505261e0589275072e55069dc9376e32ea923cc552fc6b283",
     "0125_memory_totals.sql": "f191e757a2996423558045f0df552b7d904ffd5c49ca692a7cad399076b9e0ed",
-    "0126_ephemeral_claim.sql": "64a46075bd26fafda9758cfb8dabe20ee956976926df294706b3e0bcb25a8f15"
+    "0126_ephemeral_claim.sql": "64a46075bd26fafda9758cfb8dabe20ee956976926df294706b3e0bcb25a8f15",
+    "0127_csm_versions.sql": "8c950ddcc8f560a6bcbab58e6a3f7ebd724423b4fad888ed324b6877166b4db1"
   }
 }

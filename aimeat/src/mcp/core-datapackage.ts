@@ -32,6 +32,7 @@
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-11-07 — Registers aimeat_receiver and aimeat_admin_receivers (mcp/receivers.ts).
  *   2026-11-01 — Registers aimeat_dataspace (mcp/dataspace.ts; plan doc-mvwxcas3dom3, D8.3).
  *   2026-11-01 — aimeat_datapackage_sell: a data package on EXCHANGE (plan doc-mvwxcas3dom3, D5.1, D5.2).
  *   2026-11-01 — Registers aimeat_party (mcp/party.ts; plan doc-mvwxcas3dom3, D2, D3.4).
@@ -87,6 +88,7 @@ import { toolError } from './tool-error.js';
 import { registerDatapackageResource } from './datapackage-resource.js';
 import { registerDataProductTool } from './dataproduct.js';
 import { registerPartyTool } from './party.js';
+import { registerReceiverTools } from './receivers.js';
 import { registerDataspaceTool } from './dataspace.js';
 
 /** What one tool call may carry as rows. Same number as the sandbox bridge, for one reason a person
@@ -130,6 +132,9 @@ export function registerCoreDataPackageTools(
     registerDataProductTool(mcp, config, storage, caller);
     // aimeat_party: outside parties and the named shares of packages to them (mcp/party.ts).
     registerPartyTool(mcp, config, storage, caller);
+    // aimeat_receiver and aimeat_admin_receivers: the address and key an outside program writes into one
+    // place of the owner's data with (mcp/receivers.ts).
+    registerReceiverTools(mcp, config, storage, caller);
     // The owner's side of the Dataspace Protocol (plan D8.3).
     registerDataspaceTool(mcp, config, storage, caller);
 

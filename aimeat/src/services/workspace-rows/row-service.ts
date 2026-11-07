@@ -14,6 +14,7 @@
  *        records loader makes, because membership alone is discovery-only
  *     3. the space's writeRole
  *     4. every row is well-formed and inside the per-row size ceiling
+ *     4b. every row's body matches the space's JSON Schema, when one is set (row-schema.ts)
  *     5. the workspace's row count and the organism's byte quota, measured against what this call
  *        would ADD
  *     6. only then the insert, and only then the retention sweep
@@ -29,8 +30,20 @@
  *   - RowCaller / RowServiceDeps
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  *   - sweepRevisions / listRowRevisions / restoreRowRevision
+ *   - rowSpaceSchema
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-11-07 — A row space's JSON Schema binds every writer: appendRows checks every body of a
+ *     batch against it after the shape and size checks and before the quota and any write, and a
+ *     restore checks the revision it puts back; a refusal is SCHEMA_VALIDATION_FAILED (422) naming
+ *     each row index and field path (row-schema.ts). The schema is the lock the workspace update
+ *     sets in `schemas`, as on a records space; changing it rewrites no stored row. rowSpaceSchema
+ *     reads it for a caller that checks before it appends (developer ruling 2026-11-07).
+ *   2026-11-07 — authorizeReceiver + gate(): a receiver caller (RowCaller.receiver) decides as its
+ *     owner signed in as themselves (membership, the namespace rule, the workspace read decision and
+ *     the writeRole, all for the owner), is refused a fenced space as every non-person caller is, and
+ *     never takes the app or extension path; its own principal is what is stored
+ *     (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-10-27 — The page read, the revisions list and the restore check a row's classification label
  *     at the caller-visible rowId, where every row label is set and the single read looks; they looked
  *     at the surrogate id, where no label is ever written (secaudit2026oct26,
@@ -84,7 +97,7 @@ import { readWorkspaceManifest, isRowBackedSpace } from '../workspace-meta.js';
 import { emitChange, emitRowsAppended } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { rowTarget } from '../classification/labels.js';
-import { extensionMarker } from '../fenced-space.js';
+import { extensionMarker, fencedSpaceRefusal } from '../fenced-space.js';
 import type { ContentReader } from '../classification/reader.js';
 import {
   WorkspaceRowError, resolveRowSpace, columnsForBody, columnsForWhere, retentionOf,
@@ -93,8 +106,10 @@ import {
 import {
   settleReplacements, lastWriterOf, revisionOf, revisionKeepDays, REVISIONS_PER_ROW,
 } from './row-revisions.js';
+import { lockedRowSchema, checkRowBodies } from './row-schema.js';
 
 export { WorkspaceRowError } from './row-space.js';
+export { ROW_SCHEMA_REFUSAL } from './row-schema.js';
 
 /** How many rows one call may append. Past this the caller batches, the way every bulk door here does. */
 export const MAX_APPEND_BATCH = 500;
@@ -127,6 +142,14 @@ export interface RowCaller {
    * space that names extensions. Absent for an extension's row call, which holds no session.
    */
   scopes?: readonly string[];
+  /**
+   * True for a RECEIVER: an outside program that writes through an address and a key of an owner
+   * (services/receivers/). `principal` and `identity` are then its own principal,
+   * `receiver:<owner>/<name>@<node>`, which is what gets stored, and `owner` is the owner it acts
+   * for. Set only by the receivers code path, never from a request. Read the rule in
+   * authorizeReceiver below.
+   */
+  receiver?: boolean;
 }
 
 export interface RowServiceDeps {
@@ -260,6 +283,42 @@ async function authorizeExtension(
 }
 
 /**
+ * The RECEIVER path: the owner's own membership, never more.
+ *
+ * A receiver holds no session and no membership of its own. Its owner made it and gave it a key, so
+ * it decides as its owner signed in as themselves would: the owner is an active member, the member
+ * path's namespace rule and, on a read, the workspace read decision are asked for the owner's GHII,
+ * and gate() then asks the space's writeRole for the owner. On top of that a receiver is not a
+ * person: a write under the namespace of a record space that names extensions (services/fenced-space.ts)
+ * is refused to it, as to every caller that is not the account holder in person and holds no
+ * `organism:direct`, which a receiver never does. The app and extension paths are never taken, and
+ * a caller that claims to be a receiver and one of those as well is refused. What is stored is the
+ * receiver's own principal, so its rows are its own writer family (row-revisions.ts writerFamily).
+ */
+async function authorizeReceiver(
+  deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, space: RowSpace, mode: 'read' | 'write',
+): Promise<void> {
+  const owner = (caller.owner ?? '').trim();
+  const prefix = `receiver:${owner}/`;
+  if (!owner || caller.app !== undefined || caller.extension !== undefined || caller.roles.includes('app')
+    || !caller.principal.startsWith(prefix) || !caller.principal.endsWith(`@${deps.config.nodeId}`)
+    || caller.identity !== caller.principal) {
+    throw new WorkspaceRowError('ACCESS_DENIED', 403, 'This receiver call does not name its owner consistently, so it is refused.');
+  }
+  const ownerGhii = `${owner}@${deps.config.nodeId}`;
+  const asOwner: RowCaller = { principal: ownerGhii, identity: ownerGhii, owner, roles: ['owner'], scopes: [] };
+  await authorize(deps, asOwner, organismId, wsId, space.namespace, mode);
+  if (mode === 'read') {
+    await requireWorkspaceRead(deps, asOwner, organismId, wsId);
+    return;
+  }
+  const fenced = await fencedSpaceRefusal(deps,
+    { principal: caller.principal, roles: caller.roles, scopes: [] },
+    organismId, wsId, { key: gateKey(organismId, wsId, space.namespace) });
+  if (fenced) throw new WorkspaceRowError(fenced.code, fenced.status, fenced.message);
+}
+
+/**
  * A READ meets the workspace read decision, the same one the records loader makes.
  *
  * Membership opens the organism, not the workspace: the records path (services/workspace-access.ts
@@ -302,7 +361,10 @@ async function requireWorkspaceRead(
 async function gate(
   deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, space: RowSpace, mode: 'read' | 'write',
 ): Promise<void> {
-  if (caller.extension !== undefined) {
+  // A receiver first, and only its own path: it never reaches the extension or the app branch.
+  if (caller.receiver === true) {
+    await authorizeReceiver(deps, caller, organismId, wsId, space, mode);
+  } else if (caller.extension !== undefined) {
     await authorizeExtension(deps, caller, organismId, space);
   } else if (caller.roles.includes('app')) {
     await authorizeApp(deps, caller, organismId, space);
@@ -425,6 +487,11 @@ export async function appendRows(
       bytes,
     };
   });
+
+  // 4b. The space's schema, when one is set, against EVERY row of the batch, before the quota and
+  // before any write: one bad row writes nothing (row-schema.ts; developer ruling 2026-11-07).
+  const schema = await lockedRowSchema(storage, organismId, wsId, space.namespace);
+  if (schema) checkRowBodies(schema, space.name, records.map(r => r.body));
 
   // A repeated rowId inside ONE call would make the added-count a guess, and on Postgres a single
   // statement cannot update the same row twice. Last one wins, which matches what the store does
@@ -664,6 +731,10 @@ export async function restoreRowRevision(
   if (!rev) {
     throw new WorkspaceRowError('NOT_FOUND', 404, `No kept revision "${revisionId}" of row "${rowId}" in ${space.name}.`);
   }
+  // A restore is a write, so the space's schema in force now binds it too: a revision kept before
+  // the schema changed is refused rather than put back past it (row-schema.ts).
+  const schema = await lockedRowSchema(storage, organismId, wsId, space.namespace);
+  if (schema) checkRowBodies(schema, space.name, [rev.body]);
   const [current] = await storage.getWorkspaceRowsByIds(organismId, wsId, space.namespace, [rowId]);
   const now = new Date().toISOString();
   const record: WorkspaceRowRecord = {
@@ -722,6 +793,20 @@ export async function workspaceRowIndex(
     };
   }
   return out;
+}
+
+/**
+ * The compiled JSON Schema of a row space, or null when the space has none, for a code path that
+ * wants to check or show the shape before it calls appendRows (the receivers). `space` is the
+ * objectType name or its namespace, as on every row call. It throws WorkspaceRowError when the
+ * workspace has no manifest or `space` is not a row space there. It reads no row and asks no
+ * access rule: appendRows still decides who may write, and still checks every body itself.
+ */
+export async function rowSpaceSchema(
+  deps: RowServiceDeps, organismId: string, wsId: string, space: string,
+): Promise<object | null> {
+  const resolved = await loadSpace(deps, organismId, wsId, space);
+  return lockedRowSchema(deps.storage, organismId, wsId, resolved.namespace);
 }
 
 /** Re-exported so a caller can normalise a manifest's retention without importing two modules. */

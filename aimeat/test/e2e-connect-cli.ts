@@ -1023,7 +1023,7 @@ await test('an unknown top-level subcommand prints the help and exits 1', async 
   const r = await runCli(['not-a-subcommand'], { home: emptyHome, timeoutMs: 45_000 });
   exited(r, 1);
   said(r, 'Unknown command: not-a-subcommand', 'stderr');
-  said(r, 'AI Memory Exchange and Action Transfer');
+  said(r, 'it multiplies what AI can do');
   said(r, 'aimeat connect [opts]');
 });
 

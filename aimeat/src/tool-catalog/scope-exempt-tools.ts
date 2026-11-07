@@ -7,6 +7,7 @@
  *   reading it from there.
  * @structure SCOPE_EXEMPT_TOOLS
  * @version-history
+ *   2026-11-07 — aimeat_csm: reads with no word, writes with csm:write per action, checked in the handler.
  *   2026-10-16 — aimeat_capabilities_vouch leaves: it asks capability:write, the word the scope model gives
  *     a vouch and POST /v1/capabilities/:id/vouch now asks an agent too. Its reason here named an operator
  *     check the handler never had (QA audit D2-02).
@@ -40,6 +41,10 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // the action's word on every call. Its reads need none, so one word for the tool would take
     // versions and lineage away from agents that hold only a read word.
     'aimeat_app_manage',
+    // The same shape: the CSM reads need no word (a public CSM is read without signing in), and its
+    // writes ask csm:write per action (definitions/csm.ts CSM_ACTIONS), in the handler and again in
+    // services/csm-service.ts.
+    'aimeat_csm',
     // The node administration block (mint, SSO, account lifecycle, the second-factor reset, the
     // Security, CORS, Hooks, Statistics, Usage, Knowledge and Federation pages, the MCP registry, and
     // the layout read) stood here until 2026-09-24 with the reason "gated in the handler on the

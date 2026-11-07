@@ -25,6 +25,8 @@
  *   import { contentDefaults } from './config-content-defaults.js';
  *   const config = { ...contentDefaults(), ... };
  * @version-history
+ *   v1.2.0 — 2026-11-07 — csmDefaultVisibility (csm.default_visibility): who may read a CSM registered
+ *     without a visibility. Code default public, what GET /v1/csm answered for every CSM before.
  *   v1.1.0 — 2026-10-18 — defaultAppUploadVisibility answers only `visibility: 'default'`; an upload with no visibility keeps the file default for every caller.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V5.1-V5.6, V5.8).
  */
@@ -38,6 +40,7 @@ export const CONTENT_DEFAULT_VALUES = {
   organism: ['public', 'listed', 'private'],
   share: ['open', 'account', 'organism'],
   datapackage: ['public', 'members', 'private'],
+  csm: ['public', 'members', 'private'],
 } as const;
 
 export type DefaultMemoryVisibility = typeof CONTENT_DEFAULT_VALUES.memory[number];
@@ -47,6 +50,7 @@ export type DefaultBoardVisibility = typeof CONTENT_DEFAULT_VALUES.board[number]
 export type DefaultOrganismVisibility = typeof CONTENT_DEFAULT_VALUES.organism[number];
 export type DefaultShareAccess = typeof CONTENT_DEFAULT_VALUES.share[number];
 export type DefaultDatapackageVisibility = typeof CONTENT_DEFAULT_VALUES.datapackage[number];
+export type DefaultCsmVisibility = typeof CONTENT_DEFAULT_VALUES.csm[number];
 
 export interface ContentDefaultsConfig {
   /** A memory record written without a visibility (POST/PATCH /v1/memory, bulk, aimeat_memory_write). Code default private. */
@@ -72,6 +76,11 @@ export interface ContentDefaultsConfig {
   defaultDatapackageVisibility: DefaultDatapackageVisibility;
   /** A new agent appears in the public agent directory (no `unlisted` tag). Code default true. */
   defaultAgentListed: boolean;
+  /**
+   * A CSM registered with POST /v1/csm without a visibility. Code default public: a writer reads the
+   * shape it must send without signing in, which is what every CSM answered before 2026-11-07.
+   */
+  csmDefaultVisibility: DefaultCsmVisibility;
 }
 
 function pick<T extends string>(values: readonly T[], raw: string | undefined, fallback: T): T {
@@ -89,5 +98,6 @@ export function contentDefaults(env: NodeJS.ProcessEnv = process.env): ContentDe
     defaultShareAccess: pick(v.share, env.AIMEAT_DEFAULT_SHARE_ACCESS, 'open'),
     defaultDatapackageVisibility: pick(v.datapackage, env.AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY, 'public'),
     defaultAgentListed: env.AIMEAT_DEFAULT_AGENT_LISTED !== 'false',
+    csmDefaultVisibility: pick(v.csm, env.AIMEAT_CSM_DEFAULT_VISIBILITY, 'public'),
   };
 }

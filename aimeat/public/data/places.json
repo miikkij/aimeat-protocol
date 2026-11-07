@@ -72,6 +72,11 @@
           { "id": "wp-new", "num": "03", "labelKey": "profile.workflows.cover.secNew" },
           { "id": "wp-how", "num": "04", "labelKey": "profile.workflows.cover.howTitle" }
         ] },
+        { "id": "receivers", "labelKey": "profile.tabs.receivers", "sections": [
+          { "id": "rc-list", "num": "01", "labelKey": "receivers.secList" },
+          { "id": "rc-new", "num": "02", "labelKey": "receivers.secNew" },
+          { "id": "rc-how", "num": "03", "labelKey": "receivers.secHow" }
+        ] },
         { "id": "actions", "labelKey": "profile.tabs.services" },
         { "id": "mcp", "labelKey": "profile.tabs.mcp", "sections": [
           { "id": "mcp-rows", "num": "01", "labelKey": "mcppage.secRows" },
@@ -247,6 +252,7 @@
         { "id": "config", "labelKey": "dashboard.config" },
         { "id": "security", "labelKey": "admin.security.title" },
         { "id": "internet-openings", "labelKey": "admin.internetOpenings.title" },
+        { "id": "receivers", "labelKey": "receivers.admin.title" },
         { "id": "compliance", "labelKey": "admin.compliance.title" },
         { "id": "cors", "labelKey": "dashboard.cors" },
         { "id": "maintenance", "labelKey": "dashboard.maintenance" },

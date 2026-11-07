@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.10.0 — 2026-11-07 — receiversMode (AIMEAT_RECEIVERS_MODE): who may make a receiver.
  *   v1.9.0 — 2026-10-25 — appInternetOpening and appInternetOpeningMaxDays: how one app is opened to
  *     the internet on a closed node (services/internet-opening/).
  *   v1.8.1 — 2026-10-18 — Comment: contentAccess 'signed-in' stores a new public write at the signed-in level (V1.6).
@@ -96,6 +97,13 @@ export interface VisibilityConfig extends ContentDefaultsConfig {
   appInternetOpening: AppInternetOpening;
   /** The longest an opening lasts before it closes itself, in days (default 90). */
   appInternetOpeningMaxDays: number;
+  /**
+   * Who may make a receiver (services/receivers/policy.ts): 'off' (nobody, and every receiver answers
+   * 503), 'operator' (a new receiver waits for an operator) or 'self' (the owner decides). 'auto', the
+   * default, follows the node's content access as it is now: a node with signed-in content access asks
+   * the operator, any other node lets the owner decide.
+   */
+  receiversMode: 'auto' | 'off' | 'operator' | 'self';
 }
 
 /** How an app is opened to the internet on a closed node. */
@@ -138,6 +146,8 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
     appInternetOpening: env.AIMEAT_APP_INTERNET_OPENING === 'off' || env.AIMEAT_APP_INTERNET_OPENING === 'self'
       ? env.AIMEAT_APP_INTERNET_OPENING : 'operator',
     appInternetOpeningMaxDays: internetOpeningMaxDays(env.AIMEAT_APP_INTERNET_OPENING_MAX_DAYS),
+    receiversMode: env.AIMEAT_RECEIVERS_MODE === 'off' || env.AIMEAT_RECEIVERS_MODE === 'operator' || env.AIMEAT_RECEIVERS_MODE === 'self'
+      ? env.AIMEAT_RECEIVERS_MODE : 'auto',
     ...contentDefaults(env),
   };
 }

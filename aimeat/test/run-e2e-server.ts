@@ -7,6 +7,12 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   2026-11-07 -- e2e-csm joins ANONYMOUS_OFF_SUITES (a private or members CSM refused to a caller with no
+ *            sign-in; developer ruling 2026-11-07).
+ *   2026-11-07 -- e2e-receivers joins ANONYMOUS_OFF_SUITES (receiver keys refused off their address, and
+ *            other credentials refused on it; wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
+ *   2026-11-07 -- e2e-rows-schema joins ANONYMOUS_OFF_SUITES (a row space's schema binds every writer;
+ *            developer ruling 2026-11-07).
  *   v1.11.0 -- 2026-10-16 -- The shared server runs the page host at pages.localhost (AIMEAT_PAGE_HOST).
  *   v1.10.0 -- 2026-10-16 -- The production-settings lane (run-e2e-production-lane.ts): with
  *            --production-settings every suite's node runs test mode, dev mode and anonymous mode off,
@@ -239,6 +245,15 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     // A DSP credential refused on a path the anonymous reader would otherwise reach, and the transfer
     // token on a session route, are provable only with the setting off (plan D8). Not yet measured three times.
     'e2e-dsp',
+    // A row space's schema refused to a non-member and a plain member who try to change it: with the
+    // setting on, a refused credential would read as the anonymous identity (developer ruling 2026-11-07).
+    'e2e-rows-schema',
+    // A receiver key, a PAT and an agent JWT refused on the receive address, and a receiver key refused
+    // on every other route: with the setting on, a refused credential would read as the anonymous identity.
+    'e2e-receivers',
+    // A private or members CSM answers 404 to a caller with no sign-in: with the setting on, that caller
+    // would be the anonymous identity, and the members refusal could not be proved (developer ruling 2026-11-07).
+    'e2e-csm',
 ];
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */

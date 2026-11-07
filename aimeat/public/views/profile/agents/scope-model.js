@@ -18,7 +18,11 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-11-07 — csm:write, inside the wildcard: make, change and delete the account's data
+ *     descriptions (CSM) and choose who reads each one.
  *   2026-11-02 — exchange:invoke, split out of exchange:write: calling an app tool.
+ *   2026-11-07 — receivers:read and receivers:manage; the second outside every wildcard: a receiver key
+ *     an outside program writes into the owner's data with.
  *   2026-11-01 — party:manage, outside every wildcard: outside parties and the named shares to them
  *     (plan doc-mvwxcas3dom3, D2.7).
  *   2026-10-29 — agent:permissions-add, outside every wildcard: adding permissions it holds to another
@@ -207,6 +211,10 @@ export const NOT_IN_WILDCARD = [
   // (src/services/parties/). A key handed to a stranger reads from outside the node, so it costs its
   // own tick (plan doc-mvwxcas3dom3, D2.7).
   'party:manage',
+  // ── Added 2026-11-07 ─────────────────────────────────────────────────────────────────────────
+  // Giving an outside program a receiver key that writes into the owner's data (src/services/receivers/).
+  // Without it an agent proposes a receiver and the owner approves it in person.
+  'receivers:manage',
 ];
 
 /**
@@ -336,6 +344,12 @@ export const SCOPE_DOMAINS = [
   // party:manage — make outside parties (people and programs with no account here), give them keys,
   //   and share a data package with one (plan doc-mvwxcas3dom3, D2.7). Outside every wildcard.
   { key: 'party',    permissions: ['manage'] },
+  // csm:write — make, change and delete the account's data descriptions (CSM, services/csm-service.ts)
+  //   and choose who reads each one. Inside the wildcard: "Full access" carries it (Jouni, 2026-11-07).
+  { key: 'csm',      permissions: ['write'] },
+  // receivers:read — see the owner's receivers and their deliveries, and propose one the owner
+  //   approves. receivers:manage — make, change, pause, rotate and delete them; outside every wildcard.
+  { key: 'receivers', permissions: ['read', 'manage'] },
 
   // ── Added 2026-08-10 (August 2026 audit, step 3a) ────────────────────────────────────────────
   // These name things an agent could already do with no permission at all, because the MCP surface

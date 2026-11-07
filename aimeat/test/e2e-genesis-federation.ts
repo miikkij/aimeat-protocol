@@ -31,6 +31,8 @@
  *   the 404s and the denials
  * @usage cd aimeat && node --import tsx test/e2e-genesis-federation.ts
  * @version-history
+ *   2026-11-07 — The federable CSM is looked up by the name the node stored, which now starts with its
+ *     owner's account.
  *   2026-10-31 — Phase 9b: the subscribed push sends only keys the owner's federation consent names, a
  *     peer's catalogue or ingest entry named "subscriptions" leaves the operator's subscription alone,
  *     the public cross-catalogue does not list cached answers, and a catalogue entry is never served
@@ -237,6 +239,11 @@ async function run(): Promise<void> {
         });
         assert(reg.status === 201, `csm: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
         assert(reg.body.data.csm.federate === true, `the CSM must be federable: ${JSON.stringify(reg.body.data.csm)}`);
+        // A new CSM's name starts with its owner's account (2026-11-07), so the listing carries the
+        // name the node gave it, not the one sent.
+        assert(typeof reg.body.data.csm.name === 'string' && reg.body.data.csm.name.endsWith(csmName),
+            `the stored name ends with the name sent: ${JSON.stringify(reg.body.data.csm.name)}`);
+        csmName = reg.body.data.csm.name;
 
         // An action is published by an external principal, never by the owner session, so this one
         // comes from the agent minted above.

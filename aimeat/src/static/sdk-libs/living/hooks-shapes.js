@@ -23,6 +23,9 @@
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.0 — 2026-11-07 — The inward shape carries `receiver`: the owner's Receivers page with this key
+ *     filled in, and the call a program sends through a receiver. The memory road's own call needs a
+ *     session of the owner, which a program must not hold.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
 import { NODES } from './describe-data.js';
@@ -48,6 +51,32 @@ function vocabularyOf(type) {
  */
 export function memoryKeyFor(doc, id) {
   return String((doc && doc.key) || 'living') + '.in.' + String(id);
+}
+
+/**
+ * A receiver name for one value of a document: lowercase letters, digits and dashes, at most 40, as
+ * services/receivers/contract.ts RECEIVER_NAME_RE takes it.
+ */
+export function receiverNameFor(doc, id) {
+  const raw = (String((doc && doc.key) || 'living').split('.').pop() + '-' + String(id)).toLowerCase();
+  const slug = raw.replace(/[^a-z0-9-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return (slug || 'living-value').slice(0, 40).replace(/-$/, '');
+}
+
+/** The program road of the inward dialog: where the owner makes the receiver, and the call a program sends. */
+function receiverRoad(base, key, doc, id, sample) {
+  const name = receiverNameFor(doc, id);
+  const address = base + '/v1/receive/<owner>/' + name;
+  return {
+    name: name,
+    key: key,
+    settings: base + '/v1/profile?tab=receivers&new=key&key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name),
+    address: address,
+    curl: 'curl -X POST ' + address
+      + ' -H "Content-Type: application/json"'
+      + ' -H "Authorization: Bearer <the receiver key>"'
+      + " -d '" + JSON.stringify({ value: sample }) + "'",
+  };
 }
 
 /**
@@ -108,6 +137,14 @@ export function inwardShape(ctx) {
         + ' -H "Authorization: Bearer <your token>"'
         + " -d '" + JSON.stringify(body) + "'",
     },
+    /**
+     * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through
+     * a receiver of the owner, an address and a key that reach exactly this key and nothing else
+     * (/v1/receive). The memory road above needs a session of the owner, which a program must not
+     * hold: a personal access token writes into its own test identity, and an agent token reaches
+     * all of the owner's memory. `settings` opens the owner's Receivers page with this key filled in.
+     */
+    receiver: receiverRoad(base, key, doc, subjectId, sample),
     /** The agent road: the same thing said out loud, in the language the page is reading. */
     sentence: fill(say('sentence.write', wanted), {
       key: key,

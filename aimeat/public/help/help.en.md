@@ -1,8 +1,8 @@
 ## Getting started {#start}
 
-ChatGPT, Claude or Grok is your right hand: it remembers your things and takes care of them. Agents do the agreed work all the time, also while you are away.
+AIMEAT multiplies what your AI can do and makes it easy to use. ChatGPT, Claude or Grok remembers your work here, builds what you need and works with the people you choose. Agents do the agreed work all the time, also while you are away.
 
-AIMEAT is your own place where all this happens. Everything in it is yours.
+You decide who sees what and what an AI may do, and you see what it has done. Everything here is yours.
 
 <!--store-->
 Your [Home](/v1/home) has four first steps. Do them in order, because each step opens the next:

@@ -9,6 +9,7 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-07 — ai-transparency: the level `machine`, a program with no model (what a receiver writes).
  *   2026-11-02 — aimeat-gen-rules: an exception may name an ecosystem app, eco:<name>; configure-routing:
  *     an ecosystem app's spend is the owner's, under eco:<name> (secaudit2026nov02d round 13).
  *   2026-11-01 — configure-routing: the node's AI region choice (`openrouter_region.mode`).
@@ -112,6 +113,7 @@ gated — only asserting is.
 | \`assisted\` | A person wrote it; a model edited, refined or filled in. |
 | \`synthesized\` | A model combined real sources into new content, at someone's direction. |
 | \`ai-generated\` | A model produced it. |
+| \`machine\` | A program produced it with no model and no person writing it: a sensor reading, another system's export. The node stamps it itself on what a receiver writes; declare it only for data a program of yours produced without a model. |
 
 ## \`human_involvement\` — whether anyone checked
 

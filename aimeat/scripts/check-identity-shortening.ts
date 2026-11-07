@@ -45,6 +45,7 @@
  *   v1.0.1 — 2026-10-25 — ALLOWED: component-address.ts takes a version pin off an extension name (secaudit2026oct22).
  *   v1.0.2 — 2026-11-01 — ALLOWED: parties/contract.ts parses a party identity (plan doc-mvwxcas3dom3, D2).
  *   v1.0.3 — 2026-11-01 — ALLOWED: app-parties/service.ts takes an e-mail address's local part as a display name (plan D4).
+ *   v1.0.4 — 2026-11-07 — ALLOWED: receivers/contract.ts parses a receiver identity, as the party identity is parsed.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -292,6 +293,9 @@ export function compareWithAllowed(found: Map<string, Finding[]>, allowed: Recor
 export const ALLOWED: Record<string, Record<string, string>> = {
   'src/services/parties/contract.ts': {
     "rest.slice(0, at) ← rest.lastIndexOf('@')": 'Parses an outside party\'s identity `party:<owner>/<name>@<node>` into its three parts, each checked against its own pattern; the owner part decides nothing until the caller compares it with its own account and this node, and no principal of this node carries the `party:` form.',
+  },
+  'src/services/receivers/contract.ts': {
+    "rest.slice(0, at) ← rest.lastIndexOf('@')": 'Parses a receiver\'s identity `receiver:<owner>/<name>@<node>` into its three parts, each checked against its own pattern, as the party identity is parsed; the owner part decides nothing until the caller compares it with an account of this node, and no principal of this node carries the `receiver:` form.',
   },
   'src/services/app-parties/service.ts': {
     "email.slice(0, email.indexOf('@'))": 'The default display name of a person who signs up to an app with an e-mail address is the address\'s local part; it is shown on the owner\'s list and decides nothing, and the party\'s identity is its generated `ap-` name.',
