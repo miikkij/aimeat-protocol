@@ -30,6 +30,9 @@
  *   dropLostConnections(pool);
  *   new Kysely({ dialect: withReadRetry(new PostgresDialect({ pool }), info => logger.warn(...)) });
  * @version-history
+ *   v1.0.1 — 2026-11-07 — release(false) destroys a lost client too. Kysely 0.29.8 gives every
+ *            connection back with release(false), and `??` passed that `false` on, so a client lost
+ *            to 57P01 went back to the pool and the retry met the same dead socket.
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item HA stage 3).
  */
 import type {
@@ -94,9 +97,10 @@ export function dropLostConnections(pool: pg.Pool): void {
           return out;
         };
       }
-      // pg-pool gives the client a new release() at each checkout.
+      // pg-pool gives the client a new release() at each checkout. Kysely's driver gives it back with
+      // release(false) when it did not discard it, so `false` counts as "no error" here, not as an answer.
       const release = client.release.bind(client);
-      client.release = (err?: Error | boolean) => release(err ?? (lost.has(client) ? new Error('postgres: the connection was lost') : undefined));
+      client.release = (err?: Error | boolean) => release(err || (lost.has(client) ? new Error('postgres: the connection was lost') : undefined));
       return client;
     });
   };

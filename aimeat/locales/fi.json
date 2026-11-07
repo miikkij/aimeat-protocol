@@ -18288,6 +18288,8 @@
   "inbox.ai.hintMcp": "Tekoälylle, johon on yhdistetty AIMEATin MCP: se tutkii asiaa AIMEATisi sisällä ja lähettää hyväksyntäsi jälkeen vastauksen SINUN nimissäsi. Siihen agentti tarvitsee \"vastaa minuna\" -luvan; muuten se antaa vastauksen sinulle lähetettäväksi.",
   "inbox.ai.noMcp": "Et ole vielä yhdistänyt tekoälyä AIMEATiisi. Yhdistä ensin oma tekoälysi, esimerkiksi Claude, Codex tai Cursor. Sen jälkeen tekoälysi lukee keskustelun, etsii tarvitsemansa tiedot AIMEATistasi ja lähettää vastauksen sinun nimissäsi, kun hyväksyt sen.",
   "inbox.ai.replyTo": "Vastaa käyttäjälle",
+  "inbox.ai.replyShort": "Vastaa älyllä",
+  "inbox.ai.replyShortTitle": "Saat kehotteen omalle tekoälyllesi. Tekoälysi lukee tämän viestin ja kirjoittaa vastauksen. Sinä hyväksyt vastauksen ennen kuin se lähtee.",
   "inbox.ai.replyToMessage": "Vastaa tähän viestiin tekoälyllä",
   "inbox.ai.replyWithAi": "Vastaa tekoälyllä",
   "inbox.aiAssisted": "tekoäly avusti",

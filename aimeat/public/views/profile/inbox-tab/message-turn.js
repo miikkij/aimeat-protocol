@@ -11,6 +11,8 @@
  * @structure MessageBubble({ msg, mine, who, … })
  * @usage import { MessageBubble } from './message-turn.js'; (components.js re-exports it)
  * @version-history
+ *   2026-11-07 — "Reply with AI" also in the line under the other side's message, before ⋯, with a
+ *     tooltip (Jouni: people did not find it behind ⋯). It stays in the ⋯ menu too.
  *   2026-10-26 — `reactions` (./reactions.js): the marks on the message and "React", drawn by the Message component.
  *   2026-10-17 — A message an agent sent in its owner's name carries a mark naming the agent, for the
  *     owner ("your agent X, for you") and for the recipient ("their agent X").
@@ -90,6 +92,7 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
     receipt=${status ? { mark: statusTick(status), tone: status === 'read' ? 'read' : (status === 'failed' || status === 'undeliverable') ? 'error' : null } : null}
     copy=${String(msg.body || '')} copyLabel=${t('inbox.copyMessage')}
     listen=${{ id: `msg:${msg.id}`, text: msg.body }}
+    aiReply=${!mine && onReplyAi ? { label: t('inbox.ai.replyShort'), title: t('inbox.ai.replyShortTitle'), run: () => onReplyAi(msg) } : null}
     menu=${menu} menuLabel=${t('inbox.cover.more') || 'More'}
     reactions=${reactions ? {
       items: reactionItems(msg, reactions.me, nameOf || ((g) => g)),
