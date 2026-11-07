@@ -2,6 +2,52 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-11-07",
+      "kind": "feature",
+      "id": "2026-11-07-a-program-writes-into-your-data",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "operator",
+        "developer"
+      ],
+      "title": {
+        "en": "A program writes into your data",
+        "fi": "Ohjelma kirjoittaa tietoihisi"
+      },
+      "summary": {
+        "en": "Give one outside program its own address and key, and it writes into one place you choose.",
+        "fi": "Anna ulkopuoliselle ohjelmalle oma osoite ja avain, niin se kirjoittaa yhteen paikkaan, jonka valitset."
+      },
+      "body": {
+        "en": "Make a receiver: its own address and key for one outside program, such as a sensor or an AWS Lambda. It writes into one place you choose, and what it sends is checked against the description you gave.",
+        "fi": "Tee vastaanotin: oma osoite ja avain yhdelle ulkopuoliselle ohjelmalle, kuten anturille tai AWS Lambdalle. Se kirjoittaa yhteen paikkaan, jonka sinä valitset, ja sen lähettämä tieto tarkistetaan antamaasi kuvausta vasten."
+      }
+    },
+    {
+      "date": "2026-11-07",
+      "kind": "feature",
+      "id": "2026-11-07-describe-the-data-a-program-sends-you",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "Describe the data a program sends you",
+        "fi": "Kuvaa tieto, jota ohjelma lähettää sinulle"
+      },
+      "summary": {
+        "en": "Your AI drafts a data description from one example, and you choose who can read it.",
+        "fi": "Tekoälysi laatii tietokuvauksen yhdestä esimerkistä, ja sinä valitset, kuka sen näkee."
+      },
+      "body": {
+        "en": "Your AI drafts a data description from one example message. You choose who can read it, and a receiver uses it to refuse data that does not fit.",
+        "fi": "Tekoälysi laatii tietokuvauksen yhdestä esimerkkiviestistä. Sinä valitset, kuka sen näkee, ja vastaanotin hylkää sen avulla tiedon, joka ei sovi kuvaukseen."
+      }
+    },
+    {
       "date": "2026-11-04",
       "kind": "feature",
       "id": "2026-11-04-your-name-opens-home-settings",
