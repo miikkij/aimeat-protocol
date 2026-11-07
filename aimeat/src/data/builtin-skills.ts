@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-07 -- diagnose-a-workflow: a step's model set aside by the operator's lock, and AI_MODEL_NOT_ALLOWED from the operator's list.
  *   (2026-11-07) The node skill's first sentence follows the story (docs/AIMEAT-Story.md).
  *   (2026-11-07) aimeat-receivers joins from its own file: an outside program writing in through a receiver.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -695,6 +696,10 @@ metadata:
    node allow offers it; the message names models the region does offer. The fix is one of those
    models, or the owner's own word on \`openrouterRegionFallback\` (\`openrouter_region\` on
    \`GET /v1/ai/routing\` says what applies); never move the owner's data to another region for them.
+   When the operator chooses the model for everybody (\`operator.locked\` on \`GET /v1/ai/policy\`),
+   the model a step names is set aside and the operator's model answers: a step that seems to ignore
+   its \`model\` is that rule, not a fault. A 403 \`AI_MODEL_NOT_ALLOWED\` naming the \`node\` layer is
+   the operator's allowed list (\`operator.allowed\`), which only the operator changes.
    The run's ai steps ask the model as the run's \`aiCaller\`: the agent or app that started it, the
    saver for a trigger's run, or the owner for "Run as me". So the owner's model rules and daily cap
    for that agent or app apply, and they can refuse a step that the owner's own call would pass.

@@ -8,6 +8,7 @@
  *   description and input from here.
  * @version-history
  *   2026-11-02 — aimeat_ai_gen_rules_set: an exception may name an ecosystem app, eco:<name> (secaudit2026nov02d round 13).
+ *   2026-11-07 — aimeat_ai_routing_set names routing.model, an agent's own text model (the chat's is agent "chat").
  *   2026-10-31 — aimeat_ai_routing_set names rules.openrouterRegion and rules.openrouterRegionFallback, and
  *     aimeat_ai_providers its openrouter_region (Jouni, 2026-10-31).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -158,9 +159,11 @@ export const aiModelTools = [
       + 'openrouterRegionFallback (off, us, any, or null for the node\'s default: what happens to a model the region '
       + 'does not offer; off refuses it) }; the read\'s openrouter_region says what the node allows and what applies '
       + 'now, agent?: "<agent name>" to set that agent\'s '
-      + 'own defaults instead (an agent\'s record has no rules). A named capability\'s list replaces the old one.',
+      + 'own defaults instead (an agent\'s record has no rules), model?: with agent only, that agent\'s own text model '
+      + '(e.g. mistralai/mistral-small-2603) or null to follow the owner\'s again; the built-in chat\'s model is agent "chat". '
+      + 'A model is refused (AI_MODELS_LOCKED) when the operator locks the models. A named capability\'s list replaces the old one.',
     input: {
-      routing: { type: 'object', description: '{ defaults?: {capability: [provider ids]}, rules?: {...}, agent?: name }. Omit to read.' },
+      routing: { type: 'object', description: '{ defaults?: {capability: [provider ids]}, rules?: {...}, agent?: name, model?: model id or null (with agent) }. Omit to read.' },
       confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
     },
   },

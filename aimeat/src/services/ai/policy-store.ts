@@ -21,6 +21,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
  *   v1.1.0 — 2026-09-28 — appAiMetaOf(): the app's prefer.* and local.* beside its models (V5).
+ *   v1.3.0 — 2026-11-07 — policyView(): `operator`, the operator's allowed models and lock (Jouni, 2026-11-07).
  *   v1.2.0 — 2026-09-28 — appAiMetaOf(): the app's address and its declared AI roles (roles.ts).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -32,6 +33,7 @@ import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../operator-confirm.js';
 import { AiCompletionError } from './errors.js';
+import { allowedModelsOf, modelsLocked } from './node-model-rules.js';
 import {
   normaliseOwnerPolicy, readOwnerPolicy, parseRecommendedModels, isModelRef,
   type OwnerAiPolicy, type RecommendedModels,
@@ -202,9 +204,13 @@ export async function setOwnerAiPolicy(
   return { mode: 'applied', policy: await writeOwnerAiPolicy(storage, gaii, input) };
 }
 
-/** What GET /v1/ai/policy and aimeat_ai_policy_set show: the owner's record and the node's list. */
+/** What GET /v1/ai/policy and aimeat_ai_policy_set show: the owner's record, the node's list, and the
+ *  operator's rules that bind everybody (node-model-rules.ts). */
 export async function policyView(storage: Storage, config: AimeatConfig, gaii: string): Promise<{
-  policy: OwnerAiPolicy; recommended: RecommendedModels;
+  policy: OwnerAiPolicy; recommended: RecommendedModels; operator: { allowed: string[]; locked: boolean };
 }> {
-  return { policy: await readOwnerAiPolicy(storage, gaii), recommended: recommendedModelsOf(config) };
+  return {
+    policy: await readOwnerAiPolicy(storage, gaii), recommended: recommendedModelsOf(config),
+    operator: { allowed: allowedModelsOf(config), locked: modelsLocked(config) },
+  };
 }

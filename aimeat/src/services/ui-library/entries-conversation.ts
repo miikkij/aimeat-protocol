@@ -77,6 +77,22 @@ export const CONVERSATION_ENTRIES: UiEntryWritten[] = [
         example: { status: { agent_name: 'chat#alice@aimeat-fi-001-genesis', pays: 'node', has_own_key: false, allowance_remaining_usd: 1.5, model: 'claude-sonnet-5' } },
     },
     {
+        id: 'chat-ai', name: 'ChatAi', kind: 'component', status: 'active',
+        summary: 'The chat\'s AI: why the chat cannot answer and who can change it, or the model, region and key it answers with and what may change here.',
+        module: '/components/ChatAi.js', sheet: '/css/components/conversation-frame.css',
+        data: {
+            shape: 'ChatUnavailable({ status }) · ChatAiSettings({ status, onChanged })',
+            fields: {
+                status: 'the data of GET /v1/chat/status: state (ready, no_agent, agent_down, no_ai), fix, technical, operator_contact, ai { key, model, region }',
+                onChanged: 'reads the status again after a change',
+            },
+        },
+        useFor: ['ChatUnavailable in place of the chat\'s message box when the chat cannot answer (a ConversationCap).', 'ChatAiSettings in the chat rail, under AgentStatus: the model (its list in a dialog), the region and the chat\'s own key.'],
+        variants: [],
+        example: { status: { state: 'no_agent', technical: 'No chat agent is configured on this node.', operator_contact: 'support@operators', ai: { key: { source: null }, model: {}, region: null } } },
+        note: 'Built from the library\'s parts only (ConversationCap, Field, Select, ModelPicker, Modal, Action), so it has no sheet of its own; its look is ConversationCap\'s sheet and theirs.',
+    },
+    {
         id: 'rail-action', name: 'RailAction', kind: 'component', status: 'active',
         summary: 'A small ink-underlined action in a side column.',
         module: null, sheet: '/css/components/rail-action.css', classes: ['poster-rail-action'],

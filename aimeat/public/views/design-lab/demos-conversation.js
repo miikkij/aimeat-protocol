@@ -9,6 +9,7 @@
  * @structure CONVERSATION_DEMOS — { [id]: { variants: [{ name, render(ex) }], height? } }
  * @usage import { CONVERSATION_DEMOS } from './demos-conversation.js';
  * @version-history
+ *   v1.9.0 — 2026-11-07 — chat-ai: the chat that cannot answer (no agent, no AI) and its AI settings (the person chooses; the operator chose, EU only).
  *   v1.8.0 — 2026-10-31 — work-log: a variant for a saved turn with a call whose last word never came.
  *   v1.7.0 — 2026-10-02 — agent-status: a variant for a saved own key on the shared chat key.
  *   v1.6.0 — 2026-09-27 — The cap's ways (no hand-written button), ConversationCopy, AiNotice main, Panes framed and a
@@ -29,6 +30,7 @@ import { ThreadList, ThreadPerson } from '/components/ThreadList.js';
 import { Turn, LiveTurn, TurnError } from '/components/Turn.js';
 import { Composer } from '/components/Composer.js';
 import { StatusBar } from '/components/AgentStatus.js';
+import { ChatUnavailable, ChatAiSettings } from '/components/ChatAi.js';
 import { GooseCredit } from '/components/Credit.js';
 import { Suggestions, Suggestion, Choices } from '/components/Suggestion.js';
 import { AiNotice } from '/components/AiNotice.js';
@@ -130,6 +132,19 @@ export const CONVERSATION_DEMOS = {
       <div class="poster-thread-list"><div class="poster-thread poster-thread--active"><button type="button" class="poster-thread-open">
         <span class="poster-thread-title">Brand colours</span><span class="poster-thread-sub">10:42 · The client wants the coral a little warmer.</span></button>
         <span class="poster-count poster-count--waiting">1</span></div></div></div>` },
+  ] },
+  'chat-ai': { variants: [
+    { name: 'no chat agent', render: (ex) => html`<${ChatUnavailable} status=${ex.status} />` },
+    { name: 'the agent does not start', render: () => html`<${ChatUnavailable} status=${{ state: 'agent_down', technical: 'The chat agent did not start: goose exited (code 1, signal null)', operator_contact: 'support@operators' }} />` },
+    { name: 'no AI to answer', render: () => html`<${ChatUnavailable} status=${{ state: 'no_ai', fix: { code: 'AI_NO_KEY' }, technical: 'AI_NO_KEY: no key may pay.', operator_contact: 'support@operators' }} />` },
+    { name: 'ready: the person chooses', render: () => html`<${ChatAiSettings} onChanged=${noop} status=${{ state: 'ready', ai: {
+      key: { source: 'node', chat_key_set: false, can_set_chat_key: true },
+      model: { current: 'mistralai/mistral-small-2603', chosen: null, locked: false, can_choose: true, choices: [{ id: 'mistralai/mistral-small-2603', name: 'Mistral Small' }], operator_allowed: [] },
+      region: { current: 'eu', choices: ['eu', 'us', 'any'], can_choose: true, eu_only: false, applies_to: 'all' } } }} />` },
+    { name: 'ready: the operator chose, EU only', render: () => html`<${ChatAiSettings} onChanged=${noop} status=${{ state: 'ready', ai: {
+      key: { source: 'chat', chat_key_set: true, can_set_chat_key: true },
+      model: { current: 'mistralai/mistral-small-2603', chosen: null, locked: true, can_choose: false, choices: [], operator_allowed: ['openrouter:mistralai/mistral-small-2603'] },
+      region: { current: 'eu', choices: ['eu'], can_choose: false, eu_only: true, applies_to: 'all' } } }} />` },
   ] },
   'agent-status': { variants: [
     { name: 'the house pays', render: (ex) => html`<${StatusBar} status=${ex.status} onReset=${noop} />` },

@@ -11,6 +11,7 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   2026-11-07 — aiAllowedModels and aiModelsLocked: the operator's model rules (Jouni, 2026-11-07).
  *   2026-11-01 — aiRegionMode: the buyer's AI region choice (Jouni, 2026-11-01).
  *   2026-10-31 — aiGenRules: the operator's level per generation rule (services/ai/gen-rules.ts).
  *   2026-10-31 — aiOpenrouterRegion, aiOpenrouterRegionFallback, aiOpenrouterRegions,
@@ -170,6 +171,20 @@ export interface AiCapabilityConfig extends DecideConfig {
    * an owner chooses it as their model policy (`ai.policy.models` mode `recommended`).
    */
   aiRecommendedModels: string;
+  /**
+   * The models any AI call on this node may use, whoever pays and whoever calls, as `<type>:<model id>`
+   * references separated by commas (services/ai/node-model-rules.ts). The operator's layer of the
+   * model policy: it binds every person, agent, app and the chat, and nobody can loosen it. Empty (the
+   * default) limits nobody. AIMEAT_AI_ALLOWED_MODELS (Jouni, 2026-11-07).
+   */
+  aiAllowedModels: string;
+  /**
+   * The operator decides the model, and nobody else does: a person's own model choices (their roles,
+   * the chat's model) and a model a call names are set aside, and the node uses the first model of
+   * aiAllowedModels the provider reaches, or its own default for the role. AIMEAT_AI_MODELS_LOCKED,
+   * default false (Jouni, 2026-11-07).
+   */
+  aiModelsLocked: boolean;
   /**
    * The operator's level for each generation rule (services/ai/gen-rules.ts), as
    * `<rule>=off|on|required` pairs separated by commas. A rule not named is `off`: an owner may

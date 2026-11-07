@@ -9,6 +9,8 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-07 — configure-routing: an agent's own text model (the chat's is agent "chat") and the operator's
+ *     two model settings; aimeat-ai-model-policy: the operator's allowed models and lock (Jouni, 2026-11-07).
  *   2026-11-07 — ai-transparency: the level `machine`, a program with no model (what a receiver writes).
  *   2026-11-02 — aimeat-gen-rules: an exception may name an ecosystem app, eco:<name>; configure-routing:
  *     an ecosystem app's spend is the owner's, under eco:<name> (secaudit2026nov02d round 13).
@@ -205,7 +207,11 @@ Three separate "routing" layers — identify which one the owner means:
    many attempts, only tested providers, never away from this machine when the first was local, and
    \`freeModelLastResort\`: whether a call on the node's key that named no model gets the free model
    when the allowance cannot pay, true, false, or null for the operator's default; \`free_model\` on
-   the read says what applies now).
+   the read says what applies now). With \`agent\`, the routing names that agent's own providers and
+   may name its own text model: \`{ agent: "<name>", model: "<model id>" }\`, or \`model: null\` to
+   follow the owner's again. The built-in chat's model is agent \`chat\`, and the chat page sets it
+   the same way; \`routing.agent_model\` on the read says which one is set. While the operator locks
+   the models, setting one is refused with 403 \`AI_MODELS_LOCKED\`.
    **Where OpenRouter processes a call** is the owner's to choose when the operator allows it:
    \`openrouterRegion\` eu (eu.openrouter.ai: servers in the EU or the EEA, the UK or Switzerland), us
    (us.openrouter.ai) or any (openrouter.ai, any country), and \`openrouterRegionFallback\`: what
@@ -249,7 +255,9 @@ Three separate "routing" layers — identify which one the owner means:
 **Which models are allowed at all** is a fourth thing, the owner's model policy: \`GET /v1/ai/policy\`
 or \`aimeat_ai_policy_set\` with no policy. The skill \`aimeat-ai-model-policy\` covers it. The
 node's recommended models are the operator's setting \`AIMEAT_AI_RECOMMENDED_MODELS\` (Config tab,
-AI group); \`GET /v1/ai/recommended\` shows them.
+AI group); \`GET /v1/ai/recommended\` shows them. Two operator settings bind everybody on the node:
+\`ai.allowed_models\` (the only models any call may use) and \`ai.models_locked\` (the operator
+chooses the model and nobody else does); \`operator\` on \`GET /v1/ai/policy\` shows both.
 
 ## Principles
 - Model routing and the daily budget go through \`aimeat_operator_ai_config\`: call it without
@@ -280,8 +288,16 @@ which models their AI calls may use, and it can only tighten, never loosen, what
 
 ## What decides
 
-Three lists, and a call may use only a model that every list with something in it allows:
+Four lists, and a call may use only a model that every list with something in it allows:
 
+0. **The operator's allowed models** (\`ai.allowed_models\`; \`operator.allowed\` on
+   \`GET /v1/ai/policy\`): the only models any call on this node may use, whoever pays and whoever
+   calls, the chat and every agent and app included. Nobody but the operator changes it, so a
+   refusal it causes is the operator's to lift: say so, and offer to write to \`support@operators\`.
+   When \`operator.locked\` is true the operator also chooses the model: the owner's own choices (their
+   roles, an agent's or the chat's model) and a model a call names are set aside, and the node uses
+   the first allowed model its provider reaches, or its default model for the role. Setting an
+   agent's or the chat's model is then refused with 403 \`AI_MODELS_LOCKED\`.
 1. **The owner's policy** (\`GET /v1/ai/policy\`): \`open\` (no list), \`recommended\` (the node's
    recommended models per capability, which follow the operator's updates), or \`custom\` (the
    owner's own list). Four switches say whose calls it covers: the owner's own, the node's chat,

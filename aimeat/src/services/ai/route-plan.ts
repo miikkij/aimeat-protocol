@@ -31,6 +31,8 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.13.0 — 2026-11-07 — `modelsLocked`: under the operator's lock a model the owner set on a provider
+ *     of their own is set aside, and the policy picks (Jouni, 2026-11-07).
  *   v1.12.0 — 2026-11-01 — `requires.tools`: a call that sends tools does not go to a region whose
  *     endpoint for the model has no tool calling; in eu-only (ai.region_mode) a model the node chose
  *     that the EU does not offer becomes EU_ONLY_TEXT_MODEL before it is priced, and the free model
@@ -170,6 +172,9 @@ export interface RoutePlanInput {
    * what every call used before providers existed (ai-model-defaults.ts).
    */
   legacyModel: (capability: AiCapability) => string | undefined;
+  /** The operator's lock (ai.models_locked, node-model-rules.ts): a model the owner set on one of their
+   *  own providers is set aside, and the policy's first allowed model for that provider is used. */
+  modelsLocked?: boolean;
   /** Whether the node's key may pay for this owner (ai-allowance.ts nodeKeyStanding), read at most once.
    *  The shape is written out here: importing it would close a cycle through ai/completion.ts. */
   nodeAllowance: () => Promise<NodeKeyAnswer>;
@@ -228,8 +233,8 @@ function inPool(p: AiProvider, cap: AiCapability): boolean {
 
 /** The model a provider uses for a capability when the call names none. */
 function modelOf(p: AiProvider, cap: AiCapability, input: RoutePlanInput): string | undefined {
-  if (p.legacy || p.id === NODE_OPENROUTER_ID) return input.legacyModel(cap) ?? p.capabilities[cap]?.model;
-  return p.capabilities[cap]?.model;
+  if (p.legacy || p.id === NODE_OPENROUTER_ID) return input.legacyModel(cap) ?? (input.modelsLocked ? undefined : p.capabilities[cap]?.model);
+  return input.modelsLocked ? undefined : p.capabilities[cap]?.model;
 }
 
 /** One entry of the raw order: the provider, who chose it, and for a same-model fallback on another
@@ -368,7 +373,9 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
 
     // ── the model, under the owner's policy ──
     const fallbackModel = requested ? undefined : modelOf(p, capability, input);
-    if (!requested && !fallbackModel) {
+    // Under the operator's lock with an allowed list, the policy picks the model (chooseModel).
+    const policyPicks = !!input.modelsLocked && input.policy.decision.allowed !== 'any';
+    if (!requested && !fallbackModel && !policyPicks) {
       reject(p, 'no-model', `${p.title} has no model set for ${capability}.`);
       continue;
     }

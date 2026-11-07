@@ -10,6 +10,10 @@
  *   written down, the turn ends with a reason rather than a hang, and the node stays up.
  * @usage cd aimeat && pnpm vitest run test/unit/chat-session.test.ts
  * @version-history
+ *   v1.3.0 — 2026-11-07 — An agent that will not start ends the turn with CHAT_AGENT_DOWN and a
+ *     sentence that says the operator can fix it, no longer with the process's own message and no
+ *     code (Jouni, 2026-11-07). The test's expectation matched the old behaviour; the source was
+ *     not wrong.
  *   v1.2.0 — 2026-10-29 — A turn when the node's key is at its limit ends with the notice and its
  *     three ways on (UX review A1).
  *   v1.1.0 — 2026-10-29 — A turn with no AI to pay for it ends before the agent starts, in the
@@ -186,8 +190,10 @@ describe('a turn on a node whose agent will not start', () => {
     const last = events.at(-1);
     expect(last?.kind).toBe('error');
     expect(String(last?.message).length).toBeGreaterThan(0);
-    // The process failed, not the AI gate: a refusal carries a code, a spawn failure does not.
-    expect(last?.code).toBeUndefined();
+    // The process failed, not the AI gate: the turn names the agent, in words a person can act on,
+    // and the process's own message stays in the server log.
+    expect(last?.code).toBe('CHAT_AGENT_DOWN');
+    expect(String(last?.message)).not.toMatch(/ENOENT|spawn|exited/);
 
     const read = await readThread(storage, GAII, t.id);
     expect(read?.turns[0]?.role).toBe('user');

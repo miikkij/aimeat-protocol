@@ -27,6 +27,8 @@
  *     GET    /v1/ai/routing
  *     PUT    /v1/ai/routing
  * @version-history
+ *   v1.4.0 — 2026-11-07 — PUT /v1/ai/routing takes `model` with `agent` (an agent's own text model, the
+ *     chat's is agent "chat") and refuses it while the operator locks the models (Jouni, 2026-11-07).
  *   v1.3.1 — 2026-11-04 — The payer is the request's caller's (`callerOf(req).payer`), the answer
  *     aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.3.0 — 2026-10-31 — GET /v1/ai/routing carries openrouter_region: where the account's OpenRouter
@@ -55,6 +57,7 @@ import {
 import { providerView } from '../services/ai/providers.js';
 import { testProvider } from '../services/ai/provider-test.js';
 import { setRouting } from '../services/ai/routing.js';
+import { modelsLocked } from '../services/ai/node-model-rules.js';
 import type { AiCapability } from '../services/ai/types.js';
 import { aiCallerOf } from './ai-policy.js';
 
@@ -169,7 +172,7 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
     try {
       if (isOwnerPrincipal(auth)) {
         const gaii = owner(req);
-        return res.json(success(config.nodeId, await setRouting(storage, gaii, input, await knownProviderIds(storage, config, gaii), { kind: 'owner' })));
+        return res.json(success(config.nodeId, await setRouting(storage, gaii, input, await knownProviderIds(storage, config, gaii), { kind: 'owner' }, { modelsLocked: modelsLocked(config) })));
       }
       const caller = callerOf(req, config.nodeId, storage);
       const principal = caller.principal;
@@ -185,7 +188,7 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
       const token = typeof body.confirm_token === 'string' && body.confirm_token ? body.confirm_token : undefined;
       res.json(success(config.nodeId, await setRouting(storage, payer, input, await knownProviderIds(storage, config, payer), {
         kind: 'agent', principal, ...(token ? { confirmToken: token } : {}),
-      })));
+      }, { modelsLocked: modelsLocked(config) })));
     } catch (e) { fail(res, e); }
   });
 

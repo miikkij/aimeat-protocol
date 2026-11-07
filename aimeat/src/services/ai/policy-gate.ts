@@ -19,6 +19,7 @@
  *   - chooseModel() — the model under that decision
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
+ *   v1.2.0 — 2026-11-07 — The operator's list (ai.allowed_models) is the first layer of every decision.
  *   v1.1.0 — 2026-09-28 — The node's pick reads the model catalogue for what a custom list's model serves (V4).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -30,6 +31,7 @@ import {
   type CallerClass, type PolicyDecision, type RecommendedModels,
 } from './policy.js';
 import { readOwnerAiPolicy, appModelsOf, recommendedModelsOf } from './policy-store.js';
+import { allowedModelsOf } from './node-model-rules.js';
 import { catalogModel } from './catalog/store.js';
 import { servesCapability } from './catalog/price.js';
 
@@ -67,11 +69,11 @@ export async function loadPolicyDecision(
     ...(ctx.agent ? { agent: ctx.agent } : {}),
     ...(ctx.verifiedApp ? { verifiedApp: ctx.verifiedApp } : {}),
     ...(appModels ? { appModels } : {}),
-  });
+  }, allowedModelsOf(config));
   if (decision.allowed !== 'any' && decision.allowed.length === 0) {
     throw new AiCompletionError('AI_MODEL_POLICY_EMPTY', 403,
       `The model rules for this call have no model in common: ${decision.layers.map(l => `${l.source} allows ${l.allow.join(', ') || 'nothing'}`).join('; ')}. `
-      + 'A person has to widen one of them: the owner\'s policy, or the app\'s own list in its aimeat-ai meta.',
+      + 'A person has to widen one of them: the owner\'s policy, or the app\'s own list in its aimeat-ai meta. The operator\'s list (ai.allowed_models) binds everybody and only the operator changes it.',
       { capability: ctx.capability, layers: decision.layers, next: POLICY_NEXT });
   }
   return { decision, recommended };

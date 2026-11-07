@@ -36,6 +36,7 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   2026-11-07 -- An agent that dies mid-turn ends it with CHAT_AGENT_STOPPED in the person's words. The broken-binary turn asserts CHAT_AGENT_DOWN in the person's words and the reason under the status's `technical`; it asserted the process's English line, which the change takes out of the conversation (Jouni, 2026-11-07: the setup matched the old behaviour, not a defect).
  *   2026-11-02 -- A SILENT turn (no words, no tool call) is told and saved as chatTurn.noAnswer (crew60).
  *     The streamed and saved answer of the app turn carries the node's "Your app is ready" line: the
  *     two assertions predated chat-session.ts v1.16.0 (2026-10-31) and were red on main.
@@ -699,7 +700,9 @@ async function run(): Promise<void> {
         const events = await turn(threadId, { text: 'DIENOW: fall over please' });
         const last = events.at(-1)!;
         assert(last.kind === 'error', `the turn ends as an error, got ${last.kind}`);
-        assert(/exited/.test(String(last.message)), `and says the agent exited, got ${JSON.stringify(last.message)}`);
+        // Said in the person's words, with a code a client can act on; "goose exited (…)" is the log's.
+        assert(last.code === 'CHAT_AGENT_STOPPED', `and says the agent stopped, got ${JSON.stringify(last)}`);
+        assert(!/exited/.test(String(last.message)), `the process's own words stay out, got ${JSON.stringify(last.message)}`);
     });
 
     await test('after that death the next turn starts another agent', async () => {
@@ -921,10 +924,16 @@ async function run(): Promise<void> {
         const events = await turn(brokenThread, { text: 'hello' });
         const last = events.at(-1)!;
         assert(last.kind === 'error', `the person is told, got ${last.kind}`);
-        assert(/could not be started|ENOENT|timed out/.test(String(last.message)),
-            `and told why, got ${JSON.stringify(last.message)}`);
+        // The person reads that the chat is out of use and who fixes it, never the process's own
+        // words (Jouni, 2026-11-07); the reason is the status's `technical`, for whoever runs the node.
+        assert(last.code === 'CHAT_AGENT_DOWN', `the turn names CHAT_AGENT_DOWN, got ${JSON.stringify(last)}`);
+        assert(!/could not be started|ENOENT|goose exited/.test(String(last.message)),
+            `the process's own words stay out of the conversation, got ${JSON.stringify(last.message)}`);
         const after = await json('/v1/chat/status', authed());
         assert(after.status === 200, `the node is still answering afterwards, got ${after.status}`);
+        assert(after.body.data.state === 'agent_down', `the chat says it is out of use, got ${after.body.data.state}`);
+        assert(/could not be started|ENOENT|timed out/.test(String(after.body.data.technical)),
+            `and the reason is kept for the operator, got ${JSON.stringify(after.body.data.technical)}`);
     });
 
     await stopNode(broken);

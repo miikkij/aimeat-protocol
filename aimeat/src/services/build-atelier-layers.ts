@@ -22,6 +22,10 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.5.0 — 2026-11-07 — "A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED" moved from
+ *     `start` to `book`, and "An introduction, when the owner asked for one" is served in
+ *     `libraries`: the interview's introduction question and the three-to-five designs line
+ *     (build-introduction-step.ts) took `start` past the 24 000 a result holds. Text unchanged.
  *   v1.4.0 — 2026-11-04 — The motion section is a part of its own: the look table grew past one tool
  *     result when the office and corporate looks arrived.
  *   v1.3.0 — 2026-10-29 — "The structure page: the person follows the build" (build-structure-step.ts)
@@ -40,10 +44,10 @@ export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns
 
 /** In reading order. `what` is the line the first part shows for each of the others. */
 export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
-  { id: 'start', what: 'The interview and its data map questions, what the Atelier track is, the component kit, how a component is customised, how to finish and publish, and what is never done.' },
+  { id: 'start', what: 'The interview with its data map and introduction questions, the proposal, what the Atelier track is, the component kit, how to finish and publish, and what is never done.' },
   { id: 'genre', what: 'REQUIRED before any code: an app starts from a genre, a complete page in a committed register, and the publish refuses an app without a register. Also the pattern shelf, the Design Book and the signature.' },
-  { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, AI inside the app, data (personal, team and public) and what the review always catches. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist. It also says how to start the app\'s structure page, the link you give the person first.' },
-  { id: 'book', what: 'REQUIRED before any code: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
+  { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, AI inside the app, data (personal, team and public) and what the review always catches. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist. It also says how to start the app\'s structure page, the link you give the person first, and how an introduction is built when the owner asked for one.' },
+  { id: 'book', what: 'REQUIRED before any code: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, how a kit component that is nearly right is customised instead of copied, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
   { id: 'look', what: 'The look presets, the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
   { id: 'motion', what: 'What already moves, the attention gesture, and the controls that answer the hand. Read it before you make anything move.' },
@@ -60,7 +64,10 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   'Then propose, and wait for the answer': 'start',
   'The Atelier track': 'start',
   'The components (`AIMEAT.atelier`)': 'start',
-  'A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED': 'start',
+  // Moved to `book` on 2026-11-07, when the introduction question and the designs line took
+  // `start` past the limit: it is about customising a component instead of making a copy, which
+  // is what `book` says about the components other apps made.
+  'A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED': 'book',
   'Finishing': 'start',
   'Never': 'start',
 
@@ -79,6 +86,9 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   // Since 2026-10-29: part `start` has no room for it (build-structure-step.ts).
   'The structure page: the person follows the build': 'libraries',
   'What the review always catches': 'libraries',
+  // Since 2026-11-07 (build-introduction-step.ts): what an introduction holds and the libraries
+  // that draw it (the kit's doc block over aimeat-markdown, promptPanel, copy).
+  'An introduction, when the owner asked for one': 'libraries',
 
   // The Design Book has a part of its own since 2026-09-20: the mosaic inside a genre, the
   // components, the build notes and the one-page map outgrew what `patterns` and `libraries`

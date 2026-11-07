@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.41.0 — 2026-11-07 — The interview asks about an introduction (scope, diagrams or pictures,
+ *     prompts for the person's AI), and the proposal offers three to five designs, one always the
+ *     clean look (build-introduction-step.ts).
  *   v1.40.0 — 2026-11-02 — Kit 0.69.0: fingerprint (the node's profile of a document) named beside the
  *     handbook, with the facts route the app reads it from. Read against describe-data.js after it joined.
  *   v1.39.0 — 2026-10-30 — A new app asks for its style kit (aimeat_designbook_kit) before it picks a genre, and a look the person wants again is saved as a kit.
@@ -240,6 +243,12 @@ moved under you says so.
    data goes to ONE organism workspace (\`workspacePicker\`, \`AIMEAT.organism\`), never into each
    person's \`AIMEAT.data\`: that gives every person an empty copy. Who opens it is the app's
    \`open_to\` setting (\`aimeat_app_manage\` action \`settings\`).
+   **THEN THE INTRODUCTION.** Ask whether the app opens with an introduction for a new user (what
+   it is, who it is for, how it is used, how to start with their own AI through prompts they copy,
+   and what it is good for), at which scope (none, short, or a view of its own), and whether it has
+   diagrams or pictures. Recommend a full one for a tool others will learn, none for a page that
+   sells or announces, such as a landing page. The specification's part \`libraries\` says how it
+   is built.
    **PROPOSE, THEN WAIT.** Before any code, show the owner what you are about to build and let
    them choose. FIRST THE LEVEL, which is theirs to choose and never yours: **a quick prototype**
    (a working draft to try one idea, the kit as it comes, no styling), **an ordinary page** (a
@@ -248,13 +257,17 @@ moved under you says so.
    languages, with the data on their node, so a prototype is raised later without starting over.
    The page states it: \`<meta name="aimeat-level" content="proto|plain|fine">\`; a page that
    states none is held to the finest. On proto and plain no genre is forked and nothing is styled
-   by hand; never pick a lower level silently because it is less work. On the finest, the rest of
-   this step applies: two or three GENRES by name, each with a sentence on why it fits this app and
-   what the first screen looks like in it (look at their own Atelier apps first, \`aimeat_app_list\`);
-   the languages, which are English and Finnish unless they say otherwise; who signs in; the
-   first screen in a sentence. Say which genre you would take. The language you are talking in
-   is not the app's language list, and one language is the owner's decision. If they said "just
-   build it", still name the genre and the languages in one line so they can stop you.
+   by hand; never pick a lower level silently because it is less work. On plain and the finest,
+   offer THREE TO FIVE DESIGNS by name, each with a sentence on why it fits this app and what the
+   first screen looks like in it, and ONE OF THEM IS ALWAYS THE CLEAN LOOK (\`app({ look: 'clean' })\`:
+   grey surfaces, system fonts, thin hairlines, one accent; the style kit \`kit-clean\` gives it one
+   blue where the node has it; on the finest it names \`custom:clean\` as its register). The others
+   are genres on the finest and looks on plain (look at their own Atelier apps first,
+   \`aimeat_app_list\`). Then the languages, which are English and Finnish unless they say
+   otherwise; who signs in; the introduction or none; the first screen in a sentence. Say which
+   design you would take. The language you are talking in is not the app's language list, and one
+   language is the owner's decision. If they said "just build it", still name the design and the
+   languages in one line so they can stop you.
    **Fixed colours or following their theme** is part of that choice, and both are right: a
    fixed genre is a finished object that looks the same at noon and at night, a following page
    changes with the person's light/dark and palette. The specification's part \`genre\` says which

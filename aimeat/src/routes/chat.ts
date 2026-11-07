@@ -15,6 +15,10 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.15.0 — 2026-11-07 — GET /v1/chat/status answers `state` (ready, no_agent, no_ai), `fix`, `technical`,
+ *     `operator_contact` and `ai` (the key, the model and the region, and what the person may change
+ *     here), from services/chat/chat-status.ts; takes `?lang=` for the fix sentence; provisions the chat agent
+ *     where the chat can run, so the chat's own key can be set before the first conversation (Jouni, 2026-11-07).
  *   v1.14.0 — 2026-11-02 — POST /v1/chat/threads/:id/turn takes `timezone`, the browser's zone, for the
  *     person's local time in the turn note (services/chat-turn-guard.ts clockLine).
  *   v1.13.0 — 2026-11-02 — A closed stream no longer ends the turn: it runs to its end and is saved, so a
@@ -67,7 +71,8 @@ import {
     createThread, readThread, showThread, showThreads, deleteThread, chatToolCopy, CHAT_TOOL_COPY_NOTE,
 } from '../services/chat-threads.js';
 import { readerFor } from '../services/classification/reader.js';
-import { chatEnabled, chatPayer, runChatTurn, resetChatSession, endChatSession } from '../services/chat-session.js';
+import { chatEnabled, runChatTurn, resetChatSession, endChatSession } from '../services/chat-session.js';
+import { chatAiStatus } from '../services/chat/chat-status.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
 import { readAllowance, remainingOf } from '../services/ai/allowance.js';
 import { allowanceShown } from '../services/ai/node-key-balance.js';
@@ -97,7 +102,15 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/chat/status', requireAuth(), requireRole('owner'), async (req, res) => {
         const gaii = identity(req);
         const enabled = chatEnabled(config);
-        const [allowance, ownKey, pushDevices] = await Promise.all([
+        // The chat agent exists from the moment the person opens the chat, as POST /v1/chat/threads
+        // has always made it: its own key (PUT /v1/agents/chat/ai-keys) can then be set before the
+        // first conversation. Idempotent, and only where a chat agent can run.
+        if (enabled) await ensureChatAgent(storage, config, owner(req));
+        const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
+        const locale = LOCALES.includes(lang as Locale)
+            ? toLocale(lang)
+            : detectLocale(req.headers['accept-language'] as string | undefined);
+        const [allowance, ownKey, pushDevices, ai] = await Promise.all([
             readAllowance(storage, config, gaii),
             ownKeyCoverage(storage, config, gaii),
             // How many of this person's DEVICES can be reached when something finishes. Zero is the
@@ -115,6 +128,9 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
                     logger.warn(`[chat] push device count unavailable: ${err.message}`);
                     return 1;
                 }),
+            // Whether the chat can answer, why not and who can change it, and the key, model and
+            // region it runs on, from the one plan a turn would make (services/chat/chat-status.ts).
+            chatAiStatus({ storage, config }, gaii, locale),
         ]);
         // What is left as the person is told it: the node's key's own limit when that is smaller
         // (a customer node's balance, ai/node-key-balance.ts), and whether it is low.
@@ -134,16 +150,24 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             //
             // The page used to derive it: an owner with a key stored was told "running on your own
             // OpenRouter key" while the node's key paid for every turn. Since 2026-09-28 (System 2
-            // plan, V5) the answer depends on the route (services/chat-session.ts chatPayer):
+            // plan, V5) the answer depends on the route (services/chat/chat-status.ts chatAiStatus):
             // - the node route, the default: each person's agent calls this node's /v1/llm with
             //   their own chat token, and prepareAiCall picks the payer per call. The answer is
             //   that same decision: 'own' when their own key pays, 'allowance' when the node's key
             //   pays from their allowance, null when the gate would refuse the call.
             // - the shared key (AIMEAT_GOOSE_PROVIDER_API_KEY set): the operator's key pays for
             //   every turn and nothing is metered per person: 'node'.
-            ...(await chatPayer({ storage, config }, gaii)),
-            note: enabled ? undefined
-                : 'No chat agent is configured on this node. An operator sets AIMEAT_GOOSE_BIN.',
+            pays: ai.pays,
+            ...(ai.model ? { model: ai.model } : {}),
+            // `state` says whether the chat can answer: ready, no_agent (only an operator turns the
+            // chat agent on) or no_ai (no key may pay; `fix` says what to change, in the person's
+            // language). `technical` is the developer's sentence, and `note` the same for a page that
+            // has not reloaded. `ai` is the key, the model and the region, with what may change here.
+            state: ai.state,
+            ...(ai.technical ? { technical: ai.technical, note: ai.technical } : {}),
+            ...(ai.fix ? { fix: ai.fix } : {}),
+            operator_contact: 'support@operators',
+            ai: ai.ai,
         }));
     });
 
