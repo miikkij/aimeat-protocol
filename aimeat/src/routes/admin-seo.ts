@@ -27,6 +27,8 @@
  *                                       POST /v1/admin/apps/:owner/:filename/seo-approve
  * @usage registerAdminSeoRoutes(router, config, storage, canonicalOwner);
  * @version-history
+ *   v1.5.1 — 2026-11-07 — apps.without_description asks for the description itself again: since the
+ *     150-word rule it also caught thin apps that have one.
  *   v1.5.0 — 2026-11-06 — apps.thin_text: the search-visible apps whose page carries fewer than 150
  *     words of their own text, with the count and whether a text about the app is set (TARGET-093).
  *   v1.4.0 — 2026-11-06 — The status lists the search-visible apps with no description of their own
@@ -49,7 +51,7 @@ import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { sitemapPages } from '../data/public-pages.js';
-import { appSeoIndexable, appSeoListable, appSeoState, appOwnWords, APP_OWN_WORDS_MIN, type AppSeoState } from '../services/app-seo.js';
+import { appSeoIndexable, appSeoListable, appSeoState, appOwnDescription, appOwnWords, APP_OWN_WORDS_MIN, type AppSeoState } from '../services/app-seo.js';
 import { readIndexNowRuns } from '../services/indexnow-log.js';
 import { planAnnouncement, announceEverything, type AnnounceScope } from '../services/indexnow-site.js';
 import { safeFetch } from '../utils/url-validator.js';
@@ -95,8 +97,10 @@ export async function buildSeoStatus(config: AimeatConfig, storage: Storage) {
   for (const app of apps) byState[appSeoState(app, config)] += 1;
   // The search-visible apps with no description of their own: indexable at their address, never
   // announced (appSeoListable, TARGET-089 Y2). Listed by name so the operator can ask the owner.
+  // Asks for the description itself: appSeoListable also needs 150 words since TARGET-093, and a thin
+  // app with a description is in thin_text, not here.
   const withoutDescription = apps
-    .filter((app) => appSeoIndexable(app, config) && !appSeoListable(app, config))
+    .filter((app) => appSeoIndexable(app, config) && appOwnDescription(app) === '')
     .map((app) => ({ owner: localAccountName(app.ownerGaii), filename: app.filename, name: app.manifest?.name ?? app.filename }));
   const listable = apps.filter((app) => appSeoListable(app, config)).length;
   // The search-visible apps whose page carries fewer than APP_OWN_WORDS_MIN words of their own text

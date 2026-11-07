@@ -21,6 +21,7 @@
  *       API no longer lets anyone make one.
  *   TARGET-091: /index.html on the apex answers 301 to `/`.
  * @version-history
+ *   v1.3.1 — 2026-11-07 — A thin app that has a description is not in the status's without_description.
  *   v1.3.0 — 2026-11-06 — Jouni's rule of 2026-11-06: switching search on below 150 words of the app's
  *     own text is refused before anything is written (REST and MCP), the seo answer says the count,
  *     and an app in search whose text goes stays in search but leaves the sitemap index.
@@ -226,6 +227,9 @@ async function main() {
             const thin = (r.body.data ?? r.body).apps.thin_text as Array<{ filename: string; words: number; has_about: boolean }>;
             const row = thin.find((a) => a.filename === FINDABLE.filename);
             assert(!!row && row.words < 150 && row.has_about === false, `thin_text ${JSON.stringify(thin)}`);
+            // It still has its description, so the status does not call it an app without one.
+            const without = (r.body.data ?? r.body).apps.without_description as Array<{ filename: string }>;
+            assert(!without.some((a) => a.filename === FINDABLE.filename), `a thin app with a description is listed as without one: ${JSON.stringify(without)}`);
         });
 
         await test('an agent sets the text about the app with aimeat_app_manage settings', async () => {
