@@ -33,6 +33,9 @@
  *        html`<${Message} tone="comment" reply who=${author} whoNote=${['reply']} time=${when} body=${text} plain
  *          actions=${html`<${Action} small onClick=${…}>Reply<//>`} />`
  * @version-history
+ *   v1.3.0 — 2026-11-07 — `aiReply` ({ label, title, run }): "Reply with AI" in the line under a
+ *     message, before ⋯, with a spark icon and a tooltip that says what it does (Jouni: people did not
+ *     find it behind ⋯). Additive; a page that passes no `aiReply` draws what it drew.
  *   v1.2.0 — 2026-10-26 — `reactions` ({ items, palette, onToggle }): the marks under a message as Tags
  *     (the person's own in ink, a press gives the same or takes one's own back), and "React" in the line
  *     under it opening the palette and a field for any other symbol. Additive; a page that passes no
@@ -100,6 +103,10 @@ export function flashMessage(domId) {
   setTimeout(() => el.classList.remove('message--flash'), 1400);
 }
 
+/** The spark beside "Reply with AI": a four-pointed star, inline SVG (no emoji in the interface). */
+const SPARK = html`<svg class="message-ai-reply-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+  <path d="M8 0.5 L9.6 6.4 L15.5 8 L9.6 9.6 L8 15.5 L6.4 9.6 L0.5 8 L6.4 6.4 Z" /></svg>`;
+
 const STATUS_TONES = new Set(['fine', 'attention', 'danger', 'off']);
 
 /** One mark beside the time: that a model wrote it (the coral Tag), which model (the plain Tag), or
@@ -163,7 +170,7 @@ function Head({ who, whoNote, time, timeTitle, board }) {
 export function Message({
   id, mine, tone, reply, who, whoNote, label, quote, body, plain, time, timeTitle, receipt, marks,
   questions, files, onOpenText, onTranscribe, canTranscribe, copy, copyLabel, listen, menu, menuLabel, actions,
-  reactions, children,
+  reactions, aiReply, children,
 }) {
   const [picking, setPicking] = useState(false);
   if (tone === 'comment') {
@@ -193,7 +200,7 @@ export function Message({
 
   // The message: the chat's turn, with who and when inside it.
   const hasMeta = (marks && marks.length) || time || receipt?.mark;
-  const hasActions = (copy !== undefined && copy !== null) || listen || reactions || (menu && menu.length);
+  const hasActions = (copy !== undefined && copy !== null) || listen || reactions || aiReply || (menu && menu.length);
   return html`
     <div id=${id} class=${cx('poster-turn', mine ? 'poster-turn--user' : 'poster-turn--agent', 'message')}>
       <div class="poster-turn-body message-body">
@@ -218,6 +225,8 @@ export function Message({
         ${listen ? html`<${Listen} id=${listen.id} text=${listen.text} />` : null}
         ${reactions ? html`<${Action} tone="text" pressed=${picking} title=${t('inbox.react.add')} ariaLabel=${t('inbox.react.add')}
           onClick=${() => setPicking((p) => !p)}>${t('inbox.react.add')}<//>` : null}
+        ${aiReply ? html`<${Action} tone="text" title=${aiReply.title} ariaLabel=${aiReply.title} onClick=${aiReply.run}>
+          <span class="message-ai-reply">${SPARK}<span>${aiReply.label}</span></span><//>` : null}
         ${menu && menu.length ? html`<${CardMenu} inline=${mine ? 'end' : 'start'} actions=${menu} label=${menuLabel} />` : null}
       </div>` : null}
     </div>`;
