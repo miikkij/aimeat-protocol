@@ -3,319 +3,193 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Routes for CSM (Community Service Manifest) definitions — the YAML/JSON
- *   schemas that describe a service's data shape and rules. Registers/validates CSMs,
- *   converts them to JSON Schema, and serves built-in CSM templates loaded from
- *   docs/csm-examples at startup.
+ *   schemas that describe a service's data shape and rules. Registers, versions and deletes CSMs,
+ *   answers each one and its versions to the callers its visibility admits, drafts one from a sample,
+ *   and serves the built-in CSM templates. Every decision is services/csm-service.ts, which the MCP
+ *   tool aimeat_csm calls too; this file reads the request and writes the answer.
  *
  * @structure
- *   - loadCsmTemplates(): read + parse docs/csm-examples/*.csm.yaml into template metadata
  *   - csmRouter(config, storage): Router mounting the /v1/csm endpoints
- *   - POST /v1/csm: parse (YAML or JSON), validate, and register a CSM service
+ *   - writeInputOf(req): the definition and settings a POST or PUT carries (YAML text or JSON)
+ *   - POST /v1/csm · GET /v1/csm · GET /v1/csm/templates(/:type) · POST /v1/csm/draft ·
+ *     GET/PUT/PATCH/DELETE /v1/csm/:name · GET /v1/csm/:name/versions(/:version)
  *
  * @version-history
+ *   v2.0.0 — 2026-11-07 — The developer's CSM ruling of 2026-11-07: a new name carries the owner's
+ *     prefix, a CSM has a visibility (GET answers 404 for one the caller may not read), versions with
+ *     PUT /v1/csm/{name} (expected version in the body or If-Match, 409 VERSION_CONFLICT) and the
+ *     version list, PATCH sets the visibility, POST /v1/csm/draft infers one from a sample. POST, PUT,
+ *     PATCH, DELETE and the draft take the owner or a principal holding csm:write, so an agent can make
+ *     a CSM; DELETE answers 409 IN_USE while a module uses the CSM. The logic moved to
+ *     services/csm-service.ts, the templates loader with it.
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { Router } from 'express';
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRoleOrScope } from '../auth/middleware.js';
+import { validateBody } from '../models/schemas.js';
+import { CsmWriteBodySchema, CsmVisibilityBodySchema, CsmDraftBodySchema } from '../models/csm-schemas.js';
 import { success, error } from '../middleware/envelope.js';
-import { parseCsm, validateCsm, csmToJsonSchema } from '../services/csm-parser.js';
-import { emitChange } from '../services/event-bus.js';
-import type { CsmDefinition } from '../services/csm-parser.js';
-import { logger } from '../utils/logger.js';
-import { operatorOverride } from '../services/operator-override.js';
+import { callerOf } from '../middleware/caller.js';
+import type { CallerContext } from '../services/caller-context.js';
+import {
+  CSM_WRITE_SCOPE, csmLinks, csmTemplates, listCsmsFor, getCsmFor, listCsmVersionsFor, getCsmVersionFor,
+  createCsmAs, updateCsmAs, setCsmVisibilityAs, deleteCsmAs, draftCsmFromSample,
+  type CsmAnswer, type CsmWriteInput,
+} from '../services/csm-service.js';
 
-// Load CSM templates at startup
-interface CsmTemplateMeta {
-  type: string;         // filename stem (e.g. "marketplace")
-  name: string;         // service.name from YAML
-  description: string;  // service.description from YAML
-  schemaMode: string;   // schema_mode from YAML
-  yaml: string;         // raw YAML content
-}
+/** The fields of a JSON body that are settings beside the definition, never part of it. */
+const SETTING_FIELDS = ['visibility', 'federate', 'expected_version'] as const;
 
-function loadCsmTemplates(): CsmTemplateMeta[] {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  const templatesDir = join(__dirname, '..', '..', 'docs', 'csm-examples');
-  const templates: CsmTemplateMeta[] = [];
-
-  if (!existsSync(templatesDir)) return templates;
-
-  const files = readdirSync(templatesDir).filter(f => f.endsWith('.csm.yaml'));
-  for (const file of files) {
-    try {
-      const yaml = readFileSync(join(templatesDir, file), 'utf-8');
-      const parsed = parseCsm(yaml);
-      const type = file.replace('.csm.yaml', '');
-      templates.push({
-        type,
-        name: parsed.service.name,
-        description: parsed.service.description ?? '',
-        schemaMode: parsed.schemaMode,
-        yaml,
-      });
-    } catch (err) {
-      // Skip templates that fail to parse
-      logger.warn('loadCsmTemplates: continuing after a suppressed failure', { error: String(err) });
-    }
+/** The definition and settings a POST or PUT carries, or the refusal text. */
+function writeInputOf(req: Request): (CsmWriteInput & { expected_version?: unknown }) | { refusal: string } {
+  const contentType = req.headers['content-type'] ?? '';
+  const query = req.query as Record<string, unknown>;
+  const fromQuery = {
+    ...(typeof query.visibility === 'string' ? { visibility: query.visibility } : {}),
+    ...(typeof query.expected_version === 'string' ? { expected_version: query.expected_version } : {}),
+  };
+  if (typeof req.body === 'string') return { yaml: req.body, ...fromQuery };
+  if (Buffer.isBuffer(req.body)) return { yaml: req.body.toString('utf-8'), ...fromQuery };
+  if (contentType.includes('text/yaml') || contentType.includes('application/x-yaml')) {
+    return { refusal: 'For YAML content, send raw text with Content-Type: text/yaml' };
   }
-
-  return templates;
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) return { refusal: 'Request body is required' };
+  const body = req.body as Record<string, unknown>;
+  const settings = Object.fromEntries(SETTING_FIELDS.filter(f => body[f] !== undefined).map(f => [f, body[f]]));
+  if (typeof body.yaml === 'string') return { yaml: body.yaml, ...settings };
+  if (body.definition && typeof body.definition === 'object') return { definition: body.definition, ...settings };
+  // The body is the definition itself, as POST /v1/csm has always taken it.
+  const definition = Object.fromEntries(Object.entries(body).filter(([k]) => !(SETTING_FIELDS as readonly string[]).includes(k)));
+  return { definition, ...settings };
 }
 
-const csmTemplates = loadCsmTemplates();
+/** The version an If-Match header names (`3`, `"3"` or `W/"3"`), or undefined. */
+function ifMatchVersion(req: Request): number | undefined {
+  const raw = req.headers['if-match'];
+  const m = typeof raw === 'string' ? /^\s*(?:W\/)?"?(\d+)"?\s*$/.exec(raw) : null;
+  return m ? Number(m[1]) : undefined;
+}
+
+/** The caller of a read: null when nobody (or the anonymous identity) is signed in. */
+function viewerOf(req: Request, config: AimeatConfig, storage: Storage): CallerContext | null {
+  return req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null;
+}
 
 export function csmRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const deps = { storage, config };
+  const write = [requireAuth(), requireRoleOrScope('owner', CSM_WRITE_SCOPE)];
 
-  // POST /v1/csm — Register a new CSM service
-  // Accepts text/yaml or application/json
-  router.post('/v1/csm', requireAuth(), requireRole('owner'), async (req, res) => {
-    const ownerName = req.auth!.owner;
-
-    let definition: CsmDefinition;
-
-    const contentType = req.headers['content-type'] ?? '';
-    if (contentType.includes('text/yaml') || contentType.includes('application/x-yaml')) {
-      // YAML body — Express won't parse this by default, so req.body may be a string or buffer
-      let yamlStr: string;
-      if (typeof req.body === 'string') {
-        yamlStr = req.body;
-      } else if (Buffer.isBuffer(req.body)) {
-        yamlStr = req.body.toString('utf-8');
-      } else {
-        // Express already parsed it as JSON — try to get raw
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-          'For YAML content, send raw text with Content-Type: text/yaml'));
-        return;
-      }
-      try {
-        definition = parseCsm(yamlStr);
-      } catch (err: unknown) {
-        res.status(400).json(error(config.nodeId, 'PARSE_ERROR',
-          `Failed to parse YAML: ${(err as Error).message}`));
-        return;
-      }
-    } else {
-      // JSON body — expect CSM definition directly
-      if (!req.body || typeof req.body !== 'object') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Request body is required'));
-        return;
-      }
-
-      // If JSON contains 'yaml' field, parse it
-      if (typeof req.body.yaml === 'string') {
-        try {
-          definition = parseCsm(req.body.yaml as string);
-        } catch (err: unknown) {
-          res.status(400).json(error(config.nodeId, 'PARSE_ERROR',
-            `Failed to parse YAML: ${(err as Error).message}`));
-          return;
-        }
-      } else {
-        // Assume the JSON body is a pre-parsed CSM definition
-        definition = req.body as CsmDefinition;
-      }
-    }
-
-    // Validate
-    const validationErrors = validateCsm(definition);
-    if (validationErrors.length > 0) {
-      res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR',
-        `CSM validation failed: ${validationErrors.join('; ')}`));
+  const send = <T>(res: Response, out: CsmAnswer<T>, links?: Array<{ description: string; method: string; url: string }>) => {
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message, out.status, out.details));
       return;
     }
+    res.status(out.status).json(success(config.nodeId, out.data, links));
+  };
 
-    // Check if CSM name is already taken
-    const existing = await storage.getCsm(definition.service.name);
-    if (existing) {
-      res.status(409).json(error(config.nodeId, 'CSM_NAME_TAKEN',
-        `CSM service "${definition.service.name}" is already registered`));
-      return;
-    }
-
-    // Generate JSON Schema from CSM data_schema
-    const jsonSchema = csmToJsonSchema(definition);
-    const schemaKey = `csm.${definition.service.name}`;
-
-    // Extract semantic annotation from CSM service.semantic (Phase 0.7)
-    const serviceSemantic = definition.service.semantic && typeof definition.service.semantic === 'object'
-      ? definition.service.semantic as Record<string, unknown>
-      : undefined;
-
-    // Build semanticContext for Schema Locking from CSM semantic
-    const semanticContext = serviceSemantic
-      ? {
-          '@context': serviceSemantic['@context'] as Record<string, string> | undefined,
-          '@type': serviceSemantic['@type'] as string | undefined,
-        }
-      : undefined;
-
-    // Register schema in Schema Locking system
-    const now = new Date().toISOString();
-    await storage.setSchema({
-      keyPattern: schemaKey,
-      applyTo: 'prefix',
-      schemaJson: jsonSchema,
-      schemaMode: definition.schemaMode,
-      lockedBy: ownerName,
-      setAt: now,
-      updatedAt: now,
-      ...(semanticContext ? { semanticContext } : {}),
-    });
-
-    // Extract federate flag (Phase 3.4 — auto-distribute to federation peers)
-    const federate = !!(req.body.federate ?? (definition as { federate?: boolean }).federate);
-
-    // Store CSM record
-    const record = await storage.createCsm({
-      name: definition.service.name,
-      definition: definition as unknown as Record<string, unknown>,
-      jsonSchemaKey: schemaKey,
-      serviceType: definition.service.type,
-      registeredBy: ownerName,
-      registeredAt: now,
-      updatedAt: now,
-      ...(serviceSemantic ? { semantic: serviceSemantic } : {}),
-      ...(federate ? { federate: true } : {}),
-    });
-
-    res.status(201).json(success(config.nodeId, {
-      csm: {
-        name: record.name,
-        service_type: record.serviceType,
-        json_schema_key: record.jsonSchemaKey,
-        registered_by: record.registeredBy,
-        registered_at: record.registeredAt,
-        definition: record.definition,
-        semantic: record.semantic ?? null,
-        federate: record.federate ?? false,
-      },
-    }, [
+  // POST /v1/csm — Register a new CSM service in the caller's account (text/yaml or application/json)
+  router.post('/v1/csm', ...write, validateBody(CsmWriteBodySchema, config.nodeId), async (req, res) => {
+    const input = writeInputOf(req);
+    if ('refusal' in input) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', input.refusal)); return; }
+    const out = await createCsmAs(deps, callerOf(req, config.nodeId, storage), input);
+    send(res, out, out.ok ? [
       { description: 'List all CSM services', method: 'GET', url: '/v1/csm' },
-      { description: 'View this CSM service', method: 'GET', url: `/v1/csm/${encodeURIComponent(record.name)}` },
+      ...csmLinks(out.data.csm.name),
       { description: 'Write data matching this schema', method: 'POST', url: '/v1/memory' },
-    ]));
-    emitChange('csm');
+    ] : undefined);
   });
 
-  // GET /v1/csm — List registered CSM services
+  // GET /v1/csm — The CSM services this caller may read; no sign-in needed for the public ones
   router.get('/v1/csm', async (req, res) => {
-    const serviceType = typeof req.query.type === 'string' ? req.query.type : undefined;
-    const csms = await storage.listCsms({ serviceType });
-
-    res.json(success(config.nodeId, {
-      services: csms.map(c => ({
-        name: c.name,
-        service_type: c.serviceType,
-        json_schema_key: c.jsonSchemaKey,
-        registered_by: c.registeredBy,
-        registered_at: c.registeredAt,
-        updated_at: c.updatedAt,
-        has_semantic: !!c.semantic,
-      })),
-      total: csms.length,
-    }));
+    const serviceType = typeof req.query.type === 'string' ? req.query.type
+      : typeof req.query.service_type === 'string' ? req.query.service_type : undefined;
+    send(res, await listCsmsFor(deps, viewerOf(req, config, storage), serviceType ? { serviceType } : {}));
   });
 
   // GET /v1/csm/templates — List available CSM templates (public, Tier 0)
   router.get('/v1/csm/templates', (_req, res) => {
+    const templates = csmTemplates();
     res.json(success(config.nodeId, {
-      templates: csmTemplates.map(t => ({
-        type: t.type,
-        name: t.name,
-        description: t.description,
-        schema_mode: t.schemaMode,
-      })),
-      total: csmTemplates.length,
-    }, [
-      ...csmTemplates.map(t => ({
-        description: `View ${t.type} template`,
-        method: 'GET',
-        url: `/v1/csm/templates/${t.type}`,
-      })),
-    ]));
+      templates: templates.map(t => ({ type: t.type, name: t.name, description: t.description, schema_mode: t.schemaMode })),
+      total: templates.length,
+    }, templates.map(t => ({ description: `View ${t.type} template`, method: 'GET', url: `/v1/csm/templates/${t.type}` }))));
   });
 
   // GET /v1/csm/templates/:type — Get a specific CSM template as YAML
   router.get('/v1/csm/templates/:type', (req, res) => {
     const type = req.params.type as string;
-    const template = csmTemplates.find(t => t.type === type);
+    const template = csmTemplates().find(t => t.type === type);
     if (!template) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND',
         `CSM template "${type}" not found. Use GET /v1/csm/templates to list available templates.`));
       return;
     }
-
+    // ?format=json answers the YAML inside the envelope, for a client that reads JSON only (the CLI dispatch).
+    if (req.query.format === 'json') {
+      res.json(success(config.nodeId, { type: template.type, name: template.name, description: template.description, schema_mode: template.schemaMode, yaml: template.yaml }));
+      return;
+    }
     res.status(200).type('application/x-yaml').send(template.yaml);
   });
 
-  // GET /v1/csm/:name — Get a single CSM service
-  router.get('/v1/csm/:name', async (req, res) => {
-    const name = req.params.name as string;
-    const csm = await storage.getCsm(name);
-    if (!csm) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `CSM service "${name}" not found`));
-      return;
-    }
-
-    res.json(success(config.nodeId, {
-      csm: {
-        name: csm.name,
-        service_type: csm.serviceType,
-        json_schema_key: csm.jsonSchemaKey,
-        registered_by: csm.registeredBy,
-        registered_at: csm.registeredAt,
-        updated_at: csm.updatedAt,
-        definition: csm.definition,
-        semantic: csm.semantic ?? null,
-      },
-    }, [
-      { description: 'View the generated JSON Schema', method: 'GET', url: `/v1/memory/${encodeURIComponent(csm.jsonSchemaKey)}/schema` },
-      { description: 'Delete this CSM service', method: 'DELETE', url: `/v1/csm/${encodeURIComponent(csm.name)}` },
-    ]));
+  // POST /v1/csm/draft — A CSM definition inferred from one sample object; stores nothing
+  router.post('/v1/csm/draft', ...write, validateBody(CsmDraftBodySchema, config.nodeId), async (req, res) => {
+    const body = (req as typeof req & { validated: Record<string, unknown> }).validated;
+    const out = await draftCsmFromSample(deps, callerOf(req, config.nodeId, storage), body);
+    send(res, out, out.ok ? [{ description: 'Register it', method: 'POST', url: '/v1/csm' }] : undefined);
   });
 
-  // DELETE /v1/csm/:name — Delete a CSM service and its schema
-  router.delete('/v1/csm/:name', requireAuth(), requireRole('owner'), async (req, res) => {
+  // GET /v1/csm/:name — One CSM service, its compiled JSON Schema and the schema's hash
+  router.get('/v1/csm/:name', async (req, res) => {
     const name = req.params.name as string;
-    const ownerName = req.auth!.owner;
+    const out = await getCsmFor(deps, viewerOf(req, config, storage), name);
+    send(res, out, out.ok ? [
+      ...csmLinks(name).slice(1),
+      { description: 'Replace the definition (the next version)', method: 'PUT', url: `/v1/csm/${encodeURIComponent(name)}` },
+      { description: 'Delete this CSM service', method: 'DELETE', url: `/v1/csm/${encodeURIComponent(name)}` },
+    ] : undefined);
+  });
 
-    const csm = await storage.getCsm(name);
-    if (!csm) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `CSM service "${name}" not found`));
-      return;
-    }
+  // GET /v1/csm/:name/versions — Every version, oldest first, the current one last
+  router.get('/v1/csm/:name/versions', async (req, res) => {
+    send(res, await listCsmVersionsFor(deps, viewerOf(req, config, storage), req.params.name as string));
+  });
 
-    // Only the registerer or an operator can delete; the operator deleting another person's CSM
-    // service writes the operator trail.
-    if (csm.registeredBy !== ownerName
-      && !(await operatorOverride(storage, config, req.auth, { ownerOf: csm.registeredBy, area: 'csm', action: 'delete', subject: name }))) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only delete CSM services you registered'));
-      return;
-    }
+  // GET /v1/csm/:name/versions/:version — One version's definition and compiled schema
+  router.get('/v1/csm/:name/versions/:version', async (req, res) => {
+    const version = Number(req.params.version as string);
+    send(res, await getCsmVersionFor(deps, viewerOf(req, config, storage), req.params.name as string, version));
+  });
 
-    // Delete the associated schema
-    await storage.deleteSchema(csm.jsonSchemaKey);
+  // PUT /v1/csm/:name — Replace the definition; the expected version in the body or If-Match
+  router.put('/v1/csm/:name', ...write, validateBody(CsmWriteBodySchema, config.nodeId), async (req, res) => {
+    const input = writeInputOf(req);
+    if ('refusal' in input) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', input.refusal)); return; }
+    const expected = input.expected_version ?? ifMatchVersion(req);
+    const name = req.params.name as string;
+    const out = await updateCsmAs(deps, callerOf(req, config.nodeId, storage), name, { ...input, expected_version: expected });
+    send(res, out, out.ok ? csmLinks(name) : undefined);
+  });
 
-    // Delete the CSM record
-    await storage.deleteCsm(name);
+  // PATCH /v1/csm/:name — { visibility }: who may read the CSM
+  router.patch('/v1/csm/:name', ...write, validateBody(CsmVisibilityBodySchema, config.nodeId), async (req, res) => {
+    const { visibility } = (req as typeof req & { validated: { visibility: string } }).validated;
+    const name = req.params.name as string;
+    const out = await setCsmVisibilityAs(deps, callerOf(req, config.nodeId, storage), name, visibility);
+    send(res, out, out.ok ? csmLinks(name) : undefined);
+  });
 
-    res.json(success(config.nodeId, {
-      deleted: true,
-      name,
-      schema_deleted: csm.jsonSchemaKey,
-    }, [
+  // DELETE /v1/csm/:name — Delete a CSM service and its schema; refused while a module uses it
+  router.delete('/v1/csm/:name', ...write, async (req, res) => {
+    const out = await deleteCsmAs(deps, callerOf(req, config.nodeId, storage), req.params.name as string);
+    send(res, out, out.ok ? [
       { description: 'Register a new CSM service', method: 'POST', url: '/v1/csm' },
       { description: 'List remaining CSM services', method: 'GET', url: '/v1/csm' },
-    ]));
-    emitChange('csm');
+    ] : undefined);
   });
 
   return router;

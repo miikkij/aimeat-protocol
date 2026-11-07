@@ -22,6 +22,8 @@
  *   - retentionOf                 -- the declared window, normalised
  * @usage const space = resolveRowSpace(manifest, 'mailmessage');
  * @version-history
+ *   2026-11-07 — WorkspaceRowError carries optional `details`, which the REST route returns as the
+ *     error's details: a schema refusal lists the violations of each row (row-schema.ts).
  *   v1.2.0 — 2026-10-08 — `extensions`: the installed extensions the organism opened the space to,
  *     as `installer/name`, for an ingest that runs on a schedule (row-service.ts authorizeExtension).
  *   v1.1.0 — 2026-08-29 — `apps`: the apps the organism opened the space to, normalised to
@@ -36,6 +38,8 @@ export class WorkspaceRowError extends Error {
     public readonly code: string,
     public readonly statusCode: number,
     message: string,
+    /** Machine-readable detail beside the sentence, such as the schema violations of each row. */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'WorkspaceRowError';

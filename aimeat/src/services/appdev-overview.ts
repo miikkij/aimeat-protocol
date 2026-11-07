@@ -14,6 +14,8 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-11-07 — `microservices` (appdev/microservices.ts): the Microservices Central of the person or
+ *     the node, and when an app's server-side work belongs in a service there instead of an extension.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-10-21 — secrets_note: a key is stored for the host the extension calls, which the extension declares in uses_secrets.
  *   2026-10-20 — SECURITY: opts.view (the caller's principal and readsAsOwner). The learned-pitfall
@@ -65,6 +67,7 @@ import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
 import { decideAvailableFor } from './decide/settings.js';
 import { rulesRunnableBy } from './decide/rules.js';
 import { decideSetupOrderText } from './decide/setup-order.js';
+import { microservicesFor } from './appdev/microservices.js';
 import { logger } from '../utils/logger.js';
 
 const CAP = 25;
@@ -136,6 +139,10 @@ export async function buildAppdevOverview(
     out.decision_model = decide.available
         ? { available: true, library: 'aimeat-decide', skill: 'node:aimeat-decide', rules: appRules, setup_order: decideSetupOrderText(), note: 'Classify, screen, route, gate: typed questions, answers with probabilities, no text. Read skill node:aimeat-decide for when it fits and the recipes before designing a feature on it. When one of `rules` decides what the app needs decided, run it with AIMEAT.decide.rule(id) and send only the fields it lists under `sends`; otherwise tell the owner which rule to write.' }
         : { available: false, reason: decide.reason, setup_order: decideSetupOrderText(), note: 'Do not build a feature on the decision model for this owner. Tell them what to set up, in the order under setup_order, or design the feature without it.' };
+
+    // ── Where server-side work goes when it outgrows an extension: a Microservices Central of the
+    //    person's own or the node's, and when to suggest one. Always included: one read.
+    out.microservices = await microservicesFor(storage, config, ownerGhii, view, reader);
 
     // ── The owner's existing apps — often the best starting template ──
     if (wanted.has('apps')) {

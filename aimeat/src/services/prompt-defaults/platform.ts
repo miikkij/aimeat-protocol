@@ -6,6 +6,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   (2026-11-07) The Package Builder's description of AIMEAT follows the story (docs/AIMEAT-Story.md).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.1.0 — 2026-09-18 — platform-app-builder and platform-api are short pointers now. Both taught
  *     a contract that does not exist: they asked the person for their private key, read a field
@@ -173,7 +174,7 @@ To unlock write access (memory, actions, work queue):
     description: 'AI prompt for creating complete AIMEAT packages. Develops and tests on a live node, then packages for distribution.',
     content: `You are an AIMEAT Package Builder. You develop, test, and package services for AIMEAT nodes.
 
-AIMEAT is an open protocol for AI agent infrastructure -- persistent memory, identity, apps, and federated node networks. A "package" bundles everything a service needs into a distributable ZIP that installs on any AIMEAT node.
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way. A node holds the data people own, their agents, apps, organisms and the federation between nodes. A "package" bundles everything a service needs into a distributable ZIP that installs on any AIMEAT node.
 
 ## Your Workflow
 

@@ -10,6 +10,9 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-11-07 — The "Receivers" tab (views/profile/receivers-tab.js, id 'receivers'): the addresses and
+ *     keys through which an outside program writes into one place of the person's data
+ *     (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-11-02 — The "Data you share" tab (views/profile/shared-data-tab.js, id 'sharedData'): every data
  *     package the person shares, who reads it, and the data products, moved from Offers (WP11).
  *   2026-10-31 — The AI tab hands its three cards (decision model, transparency, compliance) to the
@@ -114,6 +117,7 @@ import PackagesTab from './profile/packages-tab.js';
 import CapabilitiesTab from './profile/capabilities-tab.js';
 import SchedulerTab from './profile/scheduler-tab.js';
 import WorkflowsTab from './profile/workflows-tab.js';
+import ReceiversTab from './profile/receivers-tab.js';
 import GoalsTab from './profile/goals-tab.js';
 import InboxTab from './profile/inbox-tab.js';
 import ContactsTab from './profile/contacts-tab.js';
@@ -153,6 +157,7 @@ const TABS = [
   { id: 'offers',        key: 'profile.tabs.offers',         component: OffersTab,         minTier: 'active' },
   { id: 'scheduler',     key: 'profile.tabs.scheduler',      component: SchedulerTab,      minTier: 'active' },
   { id: 'workflows',     key: 'profile.tabs.workflows',      component: WorkflowsTab,      minTier: 'active' },
+  { id: 'receivers',     key: 'profile.tabs.receivers',      component: ReceiversTab,      minTier: 'active' },
   { id: 'goals',         key: 'profile.tabs.goals',          component: GoalsTab,          minTier: 'active' },
   { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   component: ChatSessionsTab,   minTier: 'active' },
   // 'new', not 'active': this tab hosts Hello MCP, which is the FIRST thing a brand-new user is

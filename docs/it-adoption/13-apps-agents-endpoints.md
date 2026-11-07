@@ -1,6 +1,6 @@
 # 13 Apps, agents and endpoints
 
-> Checked against AIMEAT node 4.2.0 (commit ddec0f144) on 2026-11-04. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 4bc3cc631) on 2026-11-07. Maintained with the code: see the README for how.
 
 This page covers the code that runs on behalf of people: apps published on the node, extensions and packages installed into it, the connector on a person's own computer, AI chats that connect over MCP, outside MCP servers the node calls, and the `aimeat-crewai` agent runtime. It is for the security officer and the workstation and network owners. Each section says what runs where, who approves it, and how to remove it.
 
@@ -160,6 +160,18 @@ Outbound calls to remote servers go through the SSRF guard (`aimeat/src/services
 - **What it reports.** The model name and token counts of each LLM call the crew makes, to the node's usage ledger, attributed to the agent (`python/aimeat-crewai/README.md`).
 - **Keys for outside services.** The owner's vault on the node holds them, not the crew's environment (`python/aimeat-crewai/README.md`).
 - **The node wins.** When the package and the node schema disagree, the node schema is the reference (`.claude/rules/tool-surfaces.md`).
+
+## Receivers: outside programs writing in
+
+A receiver is an address and a key an owner gives an outside program (an AWS Lambda, a home sensor, a CRM or ERP export, a scheduled script) so that it writes into exactly one place of the owner's data over plain REST: `POST`, `PUT`, `PATCH`, `GET` and `DELETE` on `/v1/receive/<owner>/<name>[/<sub>]` with the receiver's own key as a bearer token (`aimeat/src/routes/receivers-receive.ts`).
+
+- **Inbound only.** The node makes no outbound call for a receiver. The program needs no agent, no MCP and no session; the key is refused on every other route (`aimeat/src/auth/middleware.ts`).
+- **One target.** One memory key, keys under one prefix (at most `max_keys`, 50 by default), or one row space of an organism workspace the owner belongs to, fixed when the receiver is made. Server-trusted keys (AI settings, the public profile, service records) are refused as targets (`aimeat/src/services/receivers/manage.ts`).
+- **What is written.** A memory record goes through the node's one write path, with its quotas, schema locks, organism rules and audit, under the owner's identity; a row goes through the row space's own gate and schema. Each memory record carries provenance level `machine` naming the receiver (`aimeat/src/services/ai/provenance.ts`). A receiver never writes a public record.
+- **Shape.** With a CSM every message is checked before it is stored (422 with each field named); without one any JSON is taken (`aimeat/src/services/receivers/receive.ts`).
+- **Who decides.** `AIMEAT_RECEIVERS_MODE`: `auto` (the default: the operator approves on a node with signed-in content access, the owner decides elsewhere), `operator`, `self` or `off`. An agent needs `receivers:manage`, which no wildcard carries, to make one; without it the agent proposes and the owner approves in person (`aimeat/src/services/receivers/policy.ts`).
+- **What the operator sees.** The admin Receivers page and `aimeat_admin_receivers`: every receiver with its owner, target, state and counts, never a key or content; the operator stops any receiver with a reason. Five wrong keys for one receiver within an hour open a security incident (`aimeat/src/services/receivers/verify.ts`).
+- **Limits per receiver.** Calls a minute (60) and a day (5000), message size (64 kB), validity (365 days); the owner sets them within the node's maxima. The day limit is counted per server process (`aimeat/src/services/receivers/deliveries.ts`).
 
 ## Limits
 

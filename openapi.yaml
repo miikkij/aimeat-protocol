@@ -252,6 +252,8 @@ tags:
     description: Frictionless Data Packages with AIMEAT provenance — publish, validate, read
   - name: Parties
     description: Outside parties (people and programs with no account here) and the named shares of data packages to them
+  - name: Receivers
+    description: An address and a key an outside program writes into exactly one place of an owner's data with, over plain REST
   - name: Dataspace
     description: The Eclipse Dataspace Protocol 2025-1 provider (catalog, contract negotiation, pull transfer) and the owner's and operator's reads of it
   - name: Workflows
@@ -327,6 +329,14 @@ components:
         about 15 minutes. Accepted on the same endpoints as PartyBasicAuth; on every other endpoint it
         answers 401. Every request re-checks the party, its key and its share, so a deleted party,
         a deleted key or an ended share refuses the next read with an earlier token.
+    ReceiverKey:
+      type: http
+      scheme: bearer
+      bearerFormat: aimeat_rcv_<key>
+      description: >
+        A receiver's own key, made when the owner creates or approves the receiver and shown once.
+        Accepted only on /v1/receive/{owner}/{name}[/{sub}]; on every other endpoint it answers 401.
+        It is never accepted in the address. The node keeps only its SHA-256.
     DataspaceAuth:
       type: http
       scheme: bearer
@@ -1331,12 +1341,14 @@ components:
       properties:
         level:
           type: string
-          enum: [original, assisted, synthesized, ai-generated]
+          enum: [original, assisted, synthesized, ai-generated, machine]
           description: >
             How much of this a model made. `original` = a person wrote it, no model involved.
             `assisted` = a person wrote it and a model edited or refined it. `synthesized` = a model
             combined real sources into new content at someone's direction. `ai-generated` = a model
-            produced it.
+            produced it. `machine` = a program produced it with no model and no person writing it
+            (a sensor reading, an export from another system); a write through a receiver is recorded
+            at this level.
         method:
           type: string
           enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent, transcribed]
@@ -1444,7 +1456,7 @@ components:
           const: aimeat.provenance/v1
         level:
           type: string
-          enum: [original, assisted, synthesized, ai-generated]
+          enum: [original, assisted, synthesized, ai-generated, machine]
         method:
           type: string
           enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent, transcribed]
@@ -3557,6 +3569,64 @@ components:
         has_semantic:
           type: boolean
           description: Present in list responses — true if CSM has semantic annotations
+        version:
+          type: integer
+          minimum: 1
+          description: The definition's version, 1 at create and one up on every PUT.
+        visibility:
+          type: string
+          description: |
+            Who may read the CSM: public, members, private or organism:<id>. A
+            reader other than the owner sees `organism` without the id.
+        federate:
+          type: boolean
+        json_schema:
+          type: object
+          nullable: true
+          description: The JSON Schema data written under the CSM is checked against (the schema lock csm.<name>). Single-CSM answers only.
+        schema_hash:
+          type: string
+          nullable: true
+          description: sha256 (hex) of the stable JSON of json_schema. Single-CSM answers only.
+
+    CsmWriteRequest:
+      type: object
+      description: |
+        A CSM to register (POST /v1/csm) or the next version of one (PUT
+        /v1/csm/{name}). Send `yaml` (the YAML text), or `definition` (an
+        object in the YAML's own shape, or the parsed shape GET answers),
+        or the definition object itself as the whole body. The settings
+        beside it are read from the same body.
+      properties:
+        yaml:
+          type: string
+        definition:
+          type: object
+        visibility:
+          type: string
+          description: POST only. public, members, private or organism:<id>. Default csm.default_visibility.
+        federate:
+          type: boolean
+          description: POST only.
+        expected_version:
+          type: integer
+          minimum: 1
+          description: PUT only. The version the change was made on; an If-Match header may carry it instead.
+
+    CsmVersionSummary:
+      type: object
+      properties:
+        version:
+          type: integer
+        current:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        registered_by:
+          type: string
+        schema_hash:
+          type: string
 
     # === Phase 1.3: GHII Web Registration ===
     WebRegistrationRequest:
@@ -23141,7 +23211,7 @@ paths:
               properties:
                 level:
                   type: string
-                  enum: [original, assisted, synthesized, ai-generated]
+                  enum: [original, assisted, synthesized, ai-generated, machine]
                   description: What the content is. Independent of `humanInvolvement`, on purpose.
                 humanInvolvement:
                   type: string
@@ -29888,6 +29958,300 @@ paths:
       responses:
         '200': { description: '`{ name, uid, reads, total, not_kept_this_period }`' }
         '404': { description: NOT_FOUND }
+  /v1/receive/{owner}/{name}:
+    parameters:
+      - { name: owner, in: path, required: true, schema: { type: string }, description: The account the receiver belongs to. }
+      - { name: name, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,39}$' } }
+    post:
+      operationId: receiverWrite
+      summary: A program writes through a receiver
+      description: |
+        The credential is the receiver's own key, `Authorization: Bearer aimeat_rcv_…`, never a session and never in the address (400 KEY_IN_ADDRESS).
+        A missing key, a wrong key and a receiver that does not exist all answer the same 401. A key target writes its one memory key; a row
+        space target appends one row, or `{ "rows": [...] }` (1 to 500). When the receiver has a CSM, the value (each row's body) is checked
+        against the compiled schema first and a mismatch is 422 SCHEMA_VALIDATION_FAILED with `details.fields` naming each path; without one any JSON is
+        taken and the node's own write checks still apply. `?dry_run=true` checks and answers what would be written without storing anything.
+        `Idempotency-Key` names the row a retry replaces. A memory record written here carries provenance level `machine`.
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      parameters:
+        - { name: dry_run, in: query, required: false, schema: { type: boolean } }
+        - { name: Idempotency-Key, in: header, required: false, schema: { type: string, maxLength: 200 } }
+        - { name: If-Match, in: header, required: false, schema: { type: string }, description: The version a memory record must still be at. }
+      requestBody: { required: true, content: { application/json: { schema: {} } } }
+      responses:
+        '200': { description: 'Replaced an existing record, or a dry run: `{ key, version }` or `{ dry_run, would_write }`' }
+        '201': { description: 'Written: `{ key, version }` for memory, `{ space, written, row_ids }` for a row space' }
+        '400': { description: 'KEY_IN_ADDRESS, SUB_REQUIRED, INVALID_SUB, INVALID_INPUT' }
+        '401': { description: 'UNAUTHORIZED (no key, a wrong key, or no such receiver)' }
+        '403': { description: 'VERB_NOT_ALLOWED, PAUSED, STOPPED, EXPIRED, NOT_APPROVED, RESERVED_KEY' }
+        '409': { description: 'VERSION_CONFLICT, PREFIX_FULL' }
+        '413': { description: TOO_LARGE }
+        '415': { description: UNSUPPORTED_MEDIA_TYPE }
+        '422': { description: 'SCHEMA_VALIDATION_FAILED, with `details.fields`' }
+        '429': { description: 'RATE_LIMITED or DAILY_LIMIT, with Retry-After' }
+        '503': { description: RECEIVERS_OFF }
+    put:
+      operationId: receiverReplace
+      summary: Replace the record (or a named row) through a receiver
+      description: The same as POST. With If-Match the write is refused when the record moved on (409 VERSION_CONFLICT).
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      requestBody: { required: true, content: { application/json: { schema: {} } } }
+      responses:
+        '200': { description: '`{ key, version }`' }
+        '201': { description: '`{ key, version }` or `{ space, written, row_ids }`' }
+        '401': { description: UNAUTHORIZED }
+    patch:
+      operationId: receiverMerge
+      summary: Merge fields into the record through a receiver
+      description: JSON Merge Patch (RFC 7396) into the receiver's record, written on the version read; the whole result is checked against the CSM. Needs the verb `merge`; a row space answers 405.
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      requestBody: { required: true, content: { application/json: { schema: {} } } }
+      responses:
+        '200': { description: '`{ key, version }`' }
+        '403': { description: VERB_NOT_ALLOWED }
+    get:
+      operationId: receiverRead
+      summary: Read back the receiver's own target
+      description: Needs the verb `read`. A key target answers its value; a prefix target lists its keys; a row space answers only the rows this receiver wrote.
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      responses:
+        '200': { description: '`{ key, value, version }`, `{ prefix, keys }` or `{ space, rows }`' }
+        '403': { description: VERB_NOT_ALLOWED }
+        '404': { description: NOT_FOUND }
+    delete:
+      operationId: receiverDelete
+      summary: Delete the receiver's own key through a receiver
+      description: Needs the verb `delete`. The record goes to the bin for the grace period, as the owner's own delete does.
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      responses:
+        '200': { description: '`{ key, deleted, restorable_until }`' }
+        '403': { description: VERB_NOT_ALLOWED }
+  /v1/receive/{owner}/{name}/{sub}:
+    parameters:
+      - { name: owner, in: path, required: true, schema: { type: string } }
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: sub, in: path, required: true, schema: { type: string }, description: 'For a prefix target the key''s last part (`[a-z0-9][a-z0-9_-]{0,63}`, the key is `<prefix>.<sub>`); for a row space a row id; `_self` answers what the receiver takes (GET).' }
+    post:
+      operationId: receiverWriteSub
+      summary: A program writes one key under the receiver's prefix, or one named row
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      requestBody: { required: true, content: { application/json: { schema: {} } } }
+      responses:
+        '201': { description: '`{ key, version }` or `{ space, written, row_ids }`' }
+        '409': { description: 'PREFIX_FULL (the prefix holds the most keys this receiver may make)' }
+        '422': { description: SCHEMA_VALIDATION_FAILED }
+    put:
+      operationId: receiverReplaceSub
+      summary: Replace one key under the prefix, or one named row
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      requestBody: { required: true, content: { application/json: { schema: {} } } }
+      responses:
+        '200': { description: '`{ key, version }`' }
+    patch:
+      operationId: receiverMergeSub
+      summary: Merge fields into one key under the prefix
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      requestBody: { required: true, content: { application/json: { schema: {} } } }
+      responses:
+        '200': { description: '`{ key, version }`' }
+    get:
+      operationId: receiverReadSub
+      summary: Read one key under the prefix or one row this receiver wrote, or `_self`
+      description: '`/_self` answers the receiver''s target, verbs, limits and the JSON schema it checks against; it needs no verb.'
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      responses:
+        '200': { description: '`{ key, value, version }`, `{ space, rows }` or the `_self` description' }
+    delete:
+      operationId: receiverDeleteSub
+      summary: Delete one key under the prefix, or one row this receiver wrote
+      tags: [Receivers]
+      security: [{ ReceiverKey: [] }]
+      responses:
+        '200': { description: '`{ key, deleted }` or `{ row_id, deleted }`' }
+  /v1/receivers:
+    get:
+      operationId: listReceivers
+      summary: The owner's receivers
+      description: The owner, or a principal holding receivers:read or receivers:manage. Each with its address, target, CSM, verbs, limits, state and today's counts; never a key.
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ receivers, mode, total }`' }
+        '403': { description: SCOPE_DENIED }
+    post:
+      operationId: createReceiver
+      summary: Make a receiver
+      description: |
+        The owner, or a principal holding receivers:manage (outside every wildcard). Body `{ name, target, csm?, csm_version?, verbs?, limits?,
+        visibility?, display_name?, description?, expires_days? }`; `target` is exactly one of `{ key }`, `{ prefix, max_keys? }` or
+        `{ organism_id, ws, space }`. The answer carries `key` ONCE (Cache-Control no-store). With visibility.receivers_mode `operator`
+        the receiver waits for an operator; with `off` it is refused (403 RECEIVERS_OFF).
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: '`{ receiver, key, say }`' }
+        '400': { description: INVALID_INPUT }
+        '403': { description: 'SCOPE_DENIED, NOT_A_MEMBER, RECEIVERS_OFF' }
+        '404': { description: CSM_NOT_FOUND }
+        '409': { description: 'NAME_TAKEN, TOO_MANY' }
+        '422': { description: RESERVED_TARGET }
+  /v1/receivers/proposals:
+    post:
+      operationId: proposeReceiver
+      summary: Propose a receiver the owner approves
+      description: A principal holding receivers:read stores a receiver WITHOUT a key. The owner approves it in person (POST /v1/receivers/{name}/decide); the key is answered to the owner then.
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: '`{ receiver, approve_url, say }`' }
+  /v1/receivers/{name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getReceiver
+      summary: One receiver and its newest deliveries
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ receiver, recent }`' }
+        '404': { description: NOT_FOUND }
+    patch:
+      operationId: updateReceiver
+      summary: Change a receiver's limits, verbs, end date, names, visibility or CSM version
+      description: receivers:manage. The name, the target and the CSM never change (400); `csm_version` moves to another version of the same CSM.
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: '`{ receiver }`' }
+    delete:
+      operationId: deleteReceiver
+      summary: Delete a receiver
+      description: receivers:manage. The key stops at once; what it wrote stays the owner's.
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ deleted, say }`' }
+        '404': { description: NOT_FOUND }
+  /v1/receivers/{name}/deliveries:
+    get:
+      operationId: receiverDeliveries
+      summary: A receiver's deliveries
+      description: The 200 newest, newest first; `?refused=true` for the refused ones. Time, verb, status, code and reason, size and the key or rows reached; never the content.
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: refused, in: query, required: false, schema: { type: boolean } }
+      responses:
+        '200': { description: '`{ deliveries, total, failed_attempts, days }`' }
+  /v1/receivers/{name}/decide:
+    post:
+      operationId: decideReceiverProposal
+      summary: The owner approves or refuses a proposed receiver
+      description: 'The owner in person only (403 OWNER_ONLY). `{ decision: approve | refuse }`. Approving answers the key once.'
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: '`{ receiver, key, say }` or `{ refused, say }`' }
+        '409': { description: NOT_PROPOSED }
+  /v1/receivers/{name}/pause:
+    post:
+      operationId: pauseReceiver
+      summary: Pause a receiver
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ receiver }`' }
+        '403': { description: STOPPED_BY_OPERATOR }
+  /v1/receivers/{name}/resume:
+    post:
+      operationId: resumeReceiver
+      summary: Resume a paused receiver
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ receiver }`' }
+        '403': { description: STOPPED_BY_OPERATOR }
+  /v1/receivers/{name}/rotate:
+    post:
+      operationId: rotateReceiverKey
+      summary: A new key for a receiver
+      description: '`{ overlap_minutes? }` (default 15, 0 ends the old key now). The answer carries the new key once.'
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody: { required: false, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: '`{ receiver, key, say }`' }
+  /v1/admin/receivers:
+    get:
+      operationId: adminListReceivers
+      summary: Every receiver on the node (operator)
+      description: The mode, the counts and every receiver with its owner; no key and no content. `?owner=` filters.
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: query, required: false, schema: { type: string } }
+      responses:
+        '200': { description: '`{ mode, counts, receivers }`' }
+        '403': { description: OPERATOR_ONLY }
+  /v1/admin/receivers/{owner}/{name}/stop:
+    post:
+      operationId: adminStopReceiver
+      summary: Stop any account's receiver (operator)
+      description: '`{ reason }` (required), which the owner reads. Only the operator starts it again.'
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: '`{ receiver }`' }
+  /v1/admin/receivers/{owner}/{name}/start:
+    post:
+      operationId: adminStartReceiver
+      summary: Start a receiver the operator stopped
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ receiver }`' }
+  /v1/admin/receivers/{owner}/{name}/decide:
+    post:
+      operationId: adminDecideReceiver
+      summary: Approve or refuse a receiver waiting for the operator
+      tags: [Receivers]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: '`{ receiver }`' }
+        '409': { description: NOT_WAITING }
   /v1/admin/parties/{owner}/{name}/stop:
     post:
       operationId: adminStopParty
@@ -43470,17 +43834,37 @@ paths:
       operationId: registerCsm
       summary: Register a Community Service Manifest
       description: |
-        Register a new CSM service definition. Accepts either YAML (text/yaml)
-        or JSON (application/json) request body. Requires operator role.
+        Register a new CSM service definition in the caller's account. Accepts
+        either YAML (text/yaml, with `?visibility=` for the setting) or JSON
+        (application/json, CsmWriteRequest). Requires the owner, or a
+        principal holding `csm:write` (inside the wildcard: `*` and `csm:*`
+        carry it); an agent registers in its owner's account.
+
+        THE NAME STARTS WITH THE ACCOUNT. When `service.name` does not already
+        start with `<account>.`, the node puts it in front
+        (`ruuvi-nakyma` from alice becomes `alice.ruuvi-nakyma`); the answer
+        carries the final name. CSM names are node-global.
+
+        `visibility` (public, members, private or organism:<id>; the caller
+        must be an active member of that organism) defaults to the node setting
+        csm.default_visibility, public unless the operator changed it. The
+        version starts at 1. The compiled JSON Schema is locked on the memory
+        key prefix csm.<name>.
       tags: [CSM]
       security:
         - BearerAuth: []
+      parameters:
+        - name: visibility
+          in: query
+          schema:
+            type: string
+          description: For a text/yaml body, the visibility; a JSON body carries it in the body.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CsmDefinition'
+              $ref: '#/components/schemas/CsmWriteRequest'
           text/yaml:
             schema:
               type: string
@@ -43496,13 +43880,22 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/CsmDefinition'
+                        type: object
+                        properties:
+                          csm:
+                            $ref: '#/components/schemas/CsmDefinition'
+        '400':
+          description: PARSE_ERROR, VALIDATION_ERROR or INVALID_INPUT (a bad visibility, an organism the caller is not in)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: CSM with this name already exists
+          description: CSM_NAME_TAKEN, a CSM with this name already exists
           content:
             application/json:
               schema:
@@ -43514,38 +43907,27 @@ paths:
                         type: object
                         properties:
                           code:
-                            example: NAME_TAKEN
-        '422':
-          description: Invalid CSM definition
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      error:
-                        type: object
-                        properties:
-                          code:
-                            example: VALIDATION_ERROR
+                            example: CSM_NAME_TAKEN
 
     get:
       operationId: listCsm
       summary: List CSM services
-      description: List all registered Community Service Manifests. No authentication required.
+      description: |
+        The CSMs the caller may read. No sign-in is needed for the public ones,
+        because a writer reads the shape it must send. A signed-in caller also
+        sees the members ones, the organism:<id> ones of organisms it is an
+        active member of, and the private ones of its own account (an agent or
+        app sees its owner's).
       tags: [CSM]
       parameters:
-        - $ref: '#/components/parameters/Pagination'
-        - $ref: '#/components/parameters/PerPage'
         - name: service_type
           in: query
           schema:
             type: string
-          description: Filter by service type
+          description: Filter by service type (`type` is read too)
       responses:
         '200':
-          description: List of CSM services
+          description: The CSM services this caller may read
           content:
             application/json:
               schema:
@@ -43554,23 +43936,98 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/CsmDefinition'
+                        type: object
+                        properties:
+                          services:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/CsmDefinition'
+                          total:
+                            type: integer
+
+  /v1/csm/draft:
+    post:
+      operationId: draftCsmFromSample
+      summary: Draft a CSM from one sample object
+      description: |
+        A CSM definition inferred from one sample JSON object, as YAML text and
+        as the parsed definition, and the JSON Schema it compiles to. Stores
+        nothing: register it with POST /v1/csm. Numbers with no fraction are
+        integers, ISO 8601 date-times with a zone are format date-time,
+        YYYY-MM-DD is format date, nested objects keep their properties, an
+        array takes its type from its first element, every key with a value is
+        required and a null one is optional; no limits are guessed. The name
+        gets the caller's `<account>.` in front, as POST would. Same permission
+        as POST.
+      tags: [CSM]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, sample]
+              properties:
+                name:
+                  type: string
+                  maxLength: 200
+                sample:
+                  type: object
+                service_type:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: The draft
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          yaml:
+                            type: string
+                          definition:
+                            type: object
+                          json_schema:
+                            type: object
+                          schema_hash:
+                            type: string
+                          stored:
+                            type: boolean
+                            enum: [false]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/csm/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+        description: CSM service name
     get:
       operationId: getCsm
       summary: Get a single CSM
-      description: Retrieve a Community Service Manifest by name. No authentication required.
+      description: |
+        One Community Service Manifest with the JSON Schema data is checked
+        against and the schema's hash. A CSM the caller may not read answers
+        404, as a missing one does. No sign-in is needed for a public one.
       tags: [CSM]
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-          description: CSM service name
       responses:
         '200':
           description: CSM definition
@@ -43582,24 +44039,140 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/CsmDefinition'
+                        type: object
+                        properties:
+                          csm:
+                            $ref: '#/components/schemas/CsmDefinition'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateCsm
+      summary: Replace a CSM's definition (the next version)
+      description: |
+        Validate the new definition (YAML or JSON, as POST), recompile its JSON
+        Schema, move the schema lock csm.<name> to it, keep the replaced version
+        in the version history and raise the version by one. The expected
+        version is required, as `expected_version` in the body (or the query
+        for a text/yaml body) or as an If-Match header; a stale one answers 409
+        VERSION_CONFLICT with `details.current_version`. `service.name` must
+        stay the CSM's name (the name without the account prefix is accepted).
+        Only the registering account, as the owner or a principal holding
+        `csm:write`; another account's CSM answers 403, or 404 when it may not
+        read it.
+      tags: [CSM]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: If-Match
+          in: header
+          schema:
+            type: string
+          description: The expected version (`3` or `"3"`), when the body does not carry it.
+        - name: expected_version
+          in: query
+          schema:
+            type: integer
+          description: For a text/yaml body, the expected version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CsmWriteRequest'
+          text/yaml:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: The new version
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          csm:
+                            $ref: '#/components/schemas/CsmDefinition'
+                          previous_version:
+                            type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+    patch:
+      operationId: setCsmVisibility
+      summary: Set who may read a CSM
+      description: |
+        `{ visibility }`: public, members, private or organism:<id> (the caller
+        must be an active member). Same permission and ownership rule as PUT.
+      tags: [CSM]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [visibility]
+              properties:
+                visibility:
+                  type: string
+      responses:
+        '200':
+          description: The visibility now in force
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          visibility:
+                            type: string
+                          previous_visibility:
+                            type: string
+                          updated_at:
+                            type: string
+                            format: date-time
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
     delete:
       operationId: deleteCsm
       summary: Delete a CSM
-      description: Remove a Community Service Manifest by name. Requires operator role.
+      description: |
+        Remove a Community Service Manifest, its schema lock and its kept
+        versions. Requires the owner or a principal holding `csm:write`, on the
+        CSMs of its own account; the node's operator may delete another
+        account's CSM, which writes the operator trail. While a module of the
+        node uses the CSM the answer is 409 IN_USE with `details.users`.
       tags: [CSM]
       security:
         - BearerAuth: []
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-          description: CSM service name
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -43607,6 +44180,99 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/csm/{name}/versions:
+    get:
+      operationId: listCsmVersions
+      summary: List a CSM's versions
+      description: Every version, oldest first, the current one last. Same visibility rule as GET /v1/csm/{name}.
+      tags: [CSM]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The versions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          current_version:
+                            type: integer
+                          versions:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/CsmVersionSummary'
+                          total:
+                            type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/csm/{name}/versions/{version}:
+    get:
+      operationId: getCsmVersion
+      summary: Get one version of a CSM
+      description: That version's definition, its compiled JSON Schema and the schema's hash. Same visibility rule as GET /v1/csm/{name}.
+      tags: [CSM]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: The version
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          version:
+                            type: integer
+                          current:
+                            type: boolean
+                          created_at:
+                            type: string
+                            format: date-time
+                          registered_by:
+                            type: string
+                          definition:
+                            type: object
+                          json_schema:
+                            type: object
+                          schema_hash:
+                            type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -47663,7 +48329,13 @@ paths:
                 schemas:
                   type: object
                   additionalProperties: { type: object }
-                  description: Map of namespace → JSON Schema, locked (strict) for that space's records.
+                  description: >
+                    Map of namespace → JSON Schema, locked (strict) for that space: a records space's
+                    records, or a row space's row `body`. On a row space it binds every writer, and an
+                    append whose row does not match answers 422 SCHEMA_VALIDATION_FAILED
+                    (POST /v1/organisms/{id}/workspace/rows/{space}). A new or changed schema applies
+                    to writes from then on; stored rows and records are not rewritten. The workspace
+                    read returns the current map as `schemas`.
                 apps:
                   type: array
                   items:
@@ -49591,10 +50263,22 @@ paths:
         manifest declares `workspace: { rows: true }`, and its installer is an active member. That
         works on a schedule and a workflow step as well, where nobody is present.
 
+        A row space may carry a JSON Schema for each row's `body`. It is set and read the way a
+        records space's schema is: `schemas` (namespace → JSON Schema) on PUT
+        /v1/organisms/{id}/workspace (the workspace creator or an organism admin), on a workspace
+        create and on an added space, and read back in `schemas` of GET
+        /v1/organisms/{id}/workspace. The schema belongs to the space and binds every writer: the
+        owner, an agent, an app, an extension. Every row of the call is checked first, and one row
+        that does not match refuses the whole call with 422 `SCHEMA_VALIDATION_FAILED`, which names
+        each failing row index and field path in the message and lists them in `error.details.rows`;
+        nothing is written. A new or changed schema applies to writes from then on: rows already
+        stored are not rewritten or removed. A space with no schema accepts any `body` object.
+
         Refuses before writing: the space must exist and be a row space, the caller must pass the
         organism namespace rule and the space's `writeRole`, every row must be inside
-        `quota.ws_rows_max_row_kb`, and the workspace row count and organism byte quota are measured
-        against what this call would add. The space's declared retention is applied afterwards.
+        `quota.ws_rows_max_row_kb` and match the space's schema when it has one, and the workspace
+        row count and organism byte quota are measured against what this call would add. The
+        space's declared retention is applied afterwards.
       tags: [Organisms]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -49628,6 +50312,37 @@ paths:
         '403': { description: Not a member, no consent, or the space's writeRole refuses this caller }
         '404': { description: No such workspace or space }
         '413': { description: A row over quota.ws_rows_max_row_kb, or the workspace/organism quota reached }
+        '422':
+          description: SCHEMA_VALIDATION_FAILED — one or more rows do not match the space's JSON Schema, and none was written
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    properties:
+                      code: { type: string, enum: [SCHEMA_VALIDATION_FAILED] }
+                      message: { type: string, description: 'Names each failing row index and field path' }
+                      details:
+                        type: object
+                        properties:
+                          space: { type: string }
+                          rows:
+                            type: array
+                            description: The failing rows (at most 50), each with the violations of its body
+                            items:
+                              type: object
+                              properties:
+                                row: { type: integer, description: Index of the row in the call }
+                                violations:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      field: { type: string, description: 'Path inside the row body, e.g. /amount' }
+                                      message: { type: string }
+                                      rule: { type: string, description: The JSON Schema keyword that failed }
     get:
       operationId: readWorkspaceRows
       summary: Read one page of a workspace row space
@@ -49778,7 +50493,8 @@ paths:
       description: |
         The content the restore replaces is kept as a revision in turn, so a restore can be undone
         the same way. The row keeps its first author in `createdBy`, and `updatedBy` names the
-        restorer. Same permission as listing the revisions.
+        restorer. Same permission as listing the revisions. A restore is a write, so the space's
+        JSON Schema in force now binds it: a revision that does not match it answers 422.
       tags: [Organisms]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -49793,6 +50509,7 @@ paths:
         '403': { description: Not a member, the space's writeRole refuses this caller, or memory:purge or organism:write is missing }
         '404': { description: No such workspace, space or revision of this row }
         '413': { description: The workspace or organism row quota is reached }
+        '422': { description: 'SCHEMA_VALIDATION_FAILED — the revision does not match the space''s JSON Schema in force now; error.details.rows names the field paths' }
 
   /v1/organisms/{id}/workspace/documents/{space}/{docId}/append:
     post:
@@ -50983,7 +51700,9 @@ paths:
       description: |
         Get the full YAML definition for a specific CSM template. Returns
         the template as a downloadable YAML document. No authentication
-        required (Tier 0).
+        required (Tier 0). With `?format=json` the YAML comes inside the
+        JSON envelope as `yaml`, beside type, name, description and
+        schema_mode (the CLI dispatch of aimeat_csm reads it so).
       tags: [CSM-Templates]
       parameters:
         - name: type
@@ -50993,6 +51712,12 @@ paths:
             type: string
           description: Template type identifier
           example: hobby-club
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json]
+          description: json answers the template inside the JSON envelope.
       responses:
         '200':
           description: CSM template YAML

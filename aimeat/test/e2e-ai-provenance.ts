@@ -30,6 +30,7 @@
  * @structure stub AI provider · owner/agent setup · one describe-ish block per acceptance item
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance
  * @version-history
+ *   v1.6.0 — 2026-11-07 — The schema's level enum carries `machine`, a program with no model.
  *   v1.5.0 — 2026-09-26 — Erasure: a name registered again after its owner deleted the account
  *     holds none of the previous person's records, in the owner's list, the owner view or the hash
  *     lookup (secaudit 2026-09: A8-4).
@@ -397,7 +398,7 @@ async function startStub(): Promise<void> {
         // A v2 must be able to ADD fields without breaking a v1-pinned validator.
         assert(doc.additionalProperties !== false,
             'additionalProperties:false would make every future field addition a breaking change');
-        assert(JSON.stringify(doc.properties.level.enum) === JSON.stringify(['original', 'assisted', 'synthesized', 'ai-generated']),
+        assert(JSON.stringify(doc.properties.level.enum) === JSON.stringify(['original', 'assisted', 'synthesized', 'ai-generated', 'machine']),
             `level enum drifted: ${JSON.stringify(doc.properties.level.enum)}`);
     });
 

@@ -12,6 +12,9 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.7.0 — 2026-11-07 — GET /v1/admin/csm carries each CSM's visibility and version (the operator sees
+ *     every CSM whatever its visibility), and DELETE /v1/admin/csm/:name goes through
+ *     services/csm-service.ts deleteCsmAs: 409 IN_USE while a module uses the CSM, its kept versions go too.
  *   v1.6.0 — 2026-11-05 — The group mail goes to verified addresses only: GET /v1/admin/email/status
  *     adds recipients.unverified and recipients.operators_unverified, and POST
  *     /v1/admin/email/send-group answers skipped_unverified (codebase analysis 2026-11-03, decision 14a
@@ -55,6 +58,8 @@ import { LOCALES } from '../i18n.js';
 import { msmHosts, msmActionIds } from '../services/msm-parser.js';
 import { recordOperatorAction } from '../services/operator-access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { deleteCsmAs } from '../services/csm-service.js';
+import { callerOf } from '../middleware/caller.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -587,6 +592,8 @@ export function adminFeaturesRouter(
                     registered_at: c.registeredAt,
                     updated_at: c.updatedAt,
                     federate: c.federate ?? false,
+                    visibility: c.visibility ?? 'public',
+                    version: c.version ?? 1,
                     description: def?.service?.description ?? '',
                     schema_mode: def?.schemaMode ?? 'open',
                     json_schema_key: c.jsonSchemaKey,
@@ -616,19 +623,20 @@ export function adminFeaturesRouter(
             definition: csm.definition,
             semantic: csm.semantic ?? null,
             federate: csm.federate ?? false,
+            visibility: csm.visibility ?? 'public',
+            version: csm.version ?? 1,
         }));
     }));
 
-    // DELETE /v1/admin/csm/:name — Delete CSM from admin dashboard
+    // DELETE /v1/admin/csm/:name — Delete CSM from admin dashboard. The operator gate above is the
+    // ownership answer; a CSM a module uses is still refused (409 IN_USE).
     router.delete('/v1/admin/csm/:name', ...auth, handle(async (req, res) => {
         const name = req.params.name as string;
-        const csm = await storage.getCsm(name);
-        if (!csm) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `CSM "${name}" not found`));
+        const out = await deleteCsmAs({ storage, config }, callerOf(req, config.nodeId, storage), name, { asOperator: true });
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.status === 404 ? `CSM "${name}" not found` : out.message, out.status, out.details));
             return;
         }
-        await storage.deleteSchema(csm.jsonSchemaKey);
-        await storage.deleteCsm(name);
         res.json(success(config.nodeId, { deleted: true, name }));
         emitChange('features');
     }));

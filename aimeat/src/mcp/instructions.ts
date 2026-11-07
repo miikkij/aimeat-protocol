@@ -15,6 +15,9 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.8.1 — 2026-11-07 — CORE's first sentence follows the story (docs/AIMEAT-Story.md): the node
+ *     multiplies what AI can do for its person, where it said "the personal knowledge and action
+ *     store". Seven characters shorter, so the cut budget is unchanged.
  *   v1.8.0 — 2026-10-17 — PERMISSION_ASK, for an agent session: some tools need the person's yes
  *     first, and such a call answers with the address where they give it in one press. After the
  *     surface line and the new-agent paragraph, so no measured cut moves
@@ -100,7 +103,9 @@ const PERMISSION_ASK = 'Some tools here need the person to allow them first. Suc
  * how to speak. Nothing here is new: each sentence is the short form of something DETAIL says at
  * length, so a client that shows everything reads the point twice and one that cuts reads it once.
  */
-const CORE = `You are connected to an AIMEAT node, the personal knowledge and action store of the person who authorised this connection. They own everything here, and your work lands under their identity in surfaces they can see.
+// The opening clause is the story's one line in the space CORE has (docs/AIMEAT-Story.md): AIMEAT
+// multiplies what AI can do, for a person who owns what is here.
+const CORE = `You are connected to an AIMEAT node, which multiplies what AI can do for the person who authorised this connection. They own everything here, and your work lands under their identity in surfaces they can see.
 
 Call aimeat_handbook_get first, with no arguments. It is this node's operating guide: it names the tools that matter for the job in front of you, and it lists this node's skills by the situation each one covers.
 

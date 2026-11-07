@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-11-07 — extensions.microservices_central_url (AIMEAT_MSC_CENTRAL_URL), mutable, empty by default:
+ *     the Microservices Central aimeat_appdev_overview names (services/appdev/microservices.ts).
  *   2026-11-06 — extensions.zip_max_files (AIMEAT_EXT_ZIP_MAX_FILES, 1-10000), the ZIP file cap 5e367ec01
  *     added to config.ts, so the Config tab shows it.
  *   2026-10-29 — The file_store rows (config-schema-file-store.ts) after the storage quota; the marketplace
@@ -327,6 +329,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'extensionMaxCodeSizeKb', dotPath: 'extensions.max_code_size_kb', envVar: 'AIMEAT_EXT_MAX_CODE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 16 && (v as number) <= 2048, immutable: false, description: 'Max code size per extension (KB)', range: '16-2048' },
   // upload-zip.ts reads it on every upload, so a change applies to the next ZIP without a restart.
   { key: 'extensionZipMaxFiles', dotPath: 'extensions.zip_max_files', envVar: 'AIMEAT_EXT_ZIP_MAX_FILES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max files in one extension or cortex ZIP, manifest included', range: '1-10000' },
+  // Read on every aimeat_appdev_overview call, so a change applies at once; '' names none.
+  { key: 'microservicesCentralUrl', dotPath: 'extensions.microservices_central_url', envVar: 'AIMEAT_MSC_CENTRAL_URL', type: 'string', validate: v => v === '' || (typeof v === 'string' && v.length <= 300 && /^https?:\/\/[^\s/@]+(\/\S*)?$/.test(v)), immutable: false, description: 'A Microservices Central this node offers its people, named to app builders when an app outgrows an extension; empty for none. The node never connects to it' },
   { key: 'extensionMaxInstalled', dotPath: 'extensions.max_installed', envVar: 'AIMEAT_EXT_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max installed extensions', range: '1-100' },
   { key: 'extInstallRole', dotPath: 'extensions.install_role', envVar: 'AIMEAT_EXT_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Who installs extensions and changes their code: operator (only the operator\'s account, its agents included) or owner (every account holder, and an agent holding ext:write)' },
   { key: 'maxExtensionsPerOwner', dotPath: 'extensions.max_per_owner', envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max extensions per owner', range: '1-100' },

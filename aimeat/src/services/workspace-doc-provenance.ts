@@ -22,12 +22,14 @@
  *   const id = await provenanceForDocEdit(storage, config, {
  *     principal: caller.principal, previousId: source.aiProvenanceId, content, pipeline, held });
  * @version-history
+ *   v1.0.1 — 2026-11-07 — A previous record at level `machine` is not a model's text (levelInvolvesModel).
  *   v1.0.0 — 2026-10-08 — Initial (aiprov E11).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import { mintProvenance, provenanceForWrite } from './ai/provenance.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
+import { levelInvolvesModel } from '../models/ai-provenance-schemas.js';
 
 /** A person (a GHII), as opposed to an agent (GAII) or an ecosystem app (GEAI). */
 function isHumanPrincipal(principal: string): boolean {
@@ -50,7 +52,8 @@ export async function provenanceForDocEdit(
   // never stamped); `assisted` holds both a person's text and a model's.
   const level = previous?.record.level;
   const hadHumanText = !previous || level === 'original' || level === 'assisted';
-  const hadModelText = !!previous && level !== 'original';
+  // A program's text (`machine`) is not a model's: it does not make a person's edit "mixed".
+  const hadModelText = !!previous && !!level && levelInvolvesModel(level);
   const mixed = writerIsHuman ? hadModelText : hadHumanText;
   const surface = { visibility: 'private' as const, humanAudience: true };
 

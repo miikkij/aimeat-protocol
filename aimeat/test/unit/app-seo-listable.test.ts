@@ -7,11 +7,12 @@
  *   app now, so the case exists only as older data (one search-visible app on aimeat.io on
  *   2026-11-06), and this is where the rule is proven.
  * @version-history
+ *   v1.2.0 — 2026-11-07 — seoNote names the sitemap only for an app the node announces.
  *   v1.1.0 — 2026-11-06 — Listing also needs 150 words of the app's own text (Jouni, TARGET-093).
  *   v1.0.0 — 2026-11-06 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { appOwnDescription, appSeoIndexable, appSeoListable } from '../../src/services/app-seo.js';
+import { appOwnDescription, appSeoIndexable, appSeoListable, seoNote } from '../../src/services/app-seo.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { AppSummaryRecord } from '../../src/storage/types/apps.js';
 
@@ -58,5 +59,13 @@ describe('appSeoListable', () => {
   it('leaves out an app that is not search-visible, whatever its text says', () => {
     expect(appSeoListable(app({ description: 'Words.', about: LONG_ABOUT, seo: { index: false } }), cfg)).toBe(false);
     expect(appSeoListable(app({ description: 'Words.', about: LONG_ABOUT }), { ...cfg, seoIndexing: 'off' } as AimeatConfig)).toBe(false);
+  });
+});
+
+describe('seoNote', () => {
+  it('names the sitemap only when the node announces the app', () => {
+    expect(seoNote('on')).toMatch(/sitemap; engines/);
+    expect(seoNote('on', false)).not.toMatch(/added to this node's sitemap/);
+    expect(seoNote('on', false)).toMatch(/does not yet list it/);
   });
 });

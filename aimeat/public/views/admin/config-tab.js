@@ -33,6 +33,8 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-07 -- The `csm` section (csm.default_visibility, who reads a new data description) stands
+ *     under Integrations, beside the outbound connections.
  *   2026-11-05 -- The "Node" group shows the data keys and the re-encrypt job under its settings
  *     (config-key-ring.js; codebase analysis 2026-11-03, decision 4a of 2026-11-05).
  *   2026-11-02 -- secaudit2026nov02d round 13: the "Data out" group shows the two settings of app
@@ -160,7 +162,7 @@ const DOMAINS = [
   { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'usage', 'features', 'packages'] },
   { id: 'limits', groups: ['quota', 'file_store', 'rate_limits', 'boards', 'extensions', 'realtime', 'schedules'] },
   { id: 'federation', groups: ['federation', 'federation_sync', 'cross_federation', 'personal_nodes', 'connect_tunnel', 'msm'] },
-  { id: 'integrations', groups: ['email', 'push', 'indexing', 'seo', 'cors', 'site', 'themes', 'apps', 'cookies', 'connections', 'visibility', 'geo'] },
+  { id: 'integrations', groups: ['email', 'push', 'indexing', 'seo', 'cors', 'site', 'themes', 'apps', 'cookies', 'connections', 'csm', 'visibility', 'geo'] },
 ];
 
 /**

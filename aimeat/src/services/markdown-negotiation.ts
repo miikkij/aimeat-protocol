@@ -21,6 +21,8 @@
  *   import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
  *   if (prefersMarkdown(req)) { sendMarkdown(res, htmlToMarkdown(html), html); return; }
  * @version-history
+ *   2026-11-07 - The landing markdown's introduction is the front page's description from
+ *     data/public-pages.ts, which follows the story (docs/AIMEAT-Story.md), not a copy of its own.
  *   2026-10-05 - decodeEntities decodes in one pass, with the same answers, and is exported for its
  *     test (secaudit 2026-10, C8).
  *   2026-09-24 - sendMarkdown sets X-Content-Type-Options: nosniff, like sendPlainText (A7-3).
@@ -35,6 +37,7 @@
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { firstStepsMarkdown } from './first-steps.js';
+import { findPublicPage } from '../data/public-pages.js';
 
 /**
  * True when the request prefers text/markdown over text/html. req.accepts() honors
@@ -158,9 +161,11 @@ export function htmlToMarkdown(html: string): string {
  */
 export function buildLandingMarkdown(config: AimeatConfig): string {
   const b = config.baseUrl;
+  // The front page's own description (data/public-pages.ts), so the two cannot drift apart.
+  const intro = findPublicPage('/')?.description ?? '';
   return `# AIMEAT node \`${config.nodeId}\`
 
-You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.
+${intro}
 
 ## For humans
 

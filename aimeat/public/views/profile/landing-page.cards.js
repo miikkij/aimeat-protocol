@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.32.0 -- 2026-11-07 -- "Receivers" under Automation, after Workflows: the addresses and keys outside programs write into one place of the person's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   v1.31.0 -- 2026-11-02 -- "Data you share" under Account, before the Data Wallet, and in the basic menu (WP11).
  *   v1.30.0 -- 2026-10-31 -- On a node the store sold, the usage card's AI line is the AI credit left in euros with no bar (js/ai-credit.js), the number the Home, the chat and the AI page show (v28 finding 9).
  *   v1.29.0 -- 2026-10-29 -- "Your own storage" under Account, after Data Wallet: a person keeps their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -642,6 +643,9 @@ export const SIDEBAR_GROUPS = [
     { id: 'offers', labelKey: 'profile.tabs.offers' },
     { id: 'scheduler', labelKey: 'profile.tabs.scheduler' },
     { id: 'workflows', labelKey: 'profile.tabs.workflows' },
+    /* An address and a key an outside program writes into one place of the person's data with
+     * (design canvas "Vastaanottimet", 2026-11-07). */
+    { id: 'receivers', labelKey: 'profile.tabs.receivers' },
     { id: 'actions', labelKey: 'profile.tabs.services' },
     { id: 'mcp', labelKey: 'profile.tabs.mcp' },
   ] },

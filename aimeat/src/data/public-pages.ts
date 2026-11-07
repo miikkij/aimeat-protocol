@@ -34,6 +34,7 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-11-07 - The front page's title, description and first line follow the story (docs/AIMEAT-Story.md), not "AI Memory Exchange and Action Transfer"; /v1/portal's title and description follow it too, approved by Jouni on 2026-11-07 in place of the 2026-11-06 wording (TARGET-091).
  *   2026-11-06 - /v1/portal, /v1/business and /v1/how-it-works: new titles and descriptions, approved by
  *     Jouni on 2026-11-06. The three ranked at 3.8 to 4.3 in Google with a click rate of 0.8 to 1.4 %
  *     (Search Console 2026-08-04 to 2026-11-03); the result now says what the reader gets (TARGET-091).
@@ -129,11 +130,11 @@ export interface PublicPage {
 export const PUBLIC_PAGES: PublicPage[] = [
   {
     path: '/',
-    title: 'AIMEAT — AI Memory Exchange and Action Transfer',
-    description: 'You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.',
+    title: 'AIMEAT: multiply what your AI can do',
+    description: 'AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.',
     changefreq: 'weekly',
     priority: '1.0',
-    markdown: `You own your data and what you build. Give your AI a lasting memory, apps and tasks with AIMEAT, then run your own server.
+    markdown: `AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way. You own your data and what you build, and you decide who sees it.
 
 ## For people
 
@@ -153,8 +154,8 @@ jargon; [For your business]({{BASE_URL}}/v1/business) covers the organisational 
   },
   {
     path: '/v1/portal',
-    title: 'AIMEAT: give the AI you already use a memory you own',
-    description: 'Connect Claude, ChatGPT or another AI. It remembers what you teach it, works in apps you describe, and what it stores stays yours.',
+    title: 'AIMEAT: multiply what the AI you already use can do',
+    description: 'Connect Claude, ChatGPT or another AI. It remembers your work, builds the apps you describe and works with the people you choose, and the data stays yours.',
     changefreq: 'weekly',
     priority: '0.9',
     markdown: `Try AIMEAT by describing a useful task. Connect the AI you already use, explore working applications, and see how to run your own AIMEAT. Your data and what you build remain yours.

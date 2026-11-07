@@ -30,9 +30,11 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
- *   v1.2.3 -- 2026-11-07 -- Reads build-introduction-step.ts, the Atelier interview's introduction
+ *   v1.2.4 -- 2026-11-07 -- Reads build-introduction-step.ts, the Atelier interview's introduction
  *     question and its build section (it names aimeat_skill_get, aimeat_image_generate and
  *     aimeat_app_list).
+ *   v1.2.3 -- 2026-11-07 -- ALLOWED: /v1/access-requests in the extension-builder skill, a route of a
+ *     Microservices Central and not of this node.
  *   v1.2.2 -- 2026-10-17 -- Reads build-data-map-step.ts, the data map step both build interviews
  *     include (it names aimeat_app_manage and PATCH /v1/apps/:filename).
  *   v1.2.1 -- 2026-10-12 -- Reads the four skills of docs audit phase 5a (data ownership, attached MCP
@@ -163,7 +165,8 @@ const ALLOWED: Record<string, string> = {
     'route|aimeat/src/data/bootstrap-endpoints.ts|/v1/profile': 'A page of the SPA, served by the static handler and not by a router declaration; the bootstrap lists it as where a person manages their data.',
     'contract-gap|aimeat/src/routes/bootstrap.ts|/v1/portal': 'A page a person opens in a browser. The contract describes the API, and an HTML page is not part of it.',
     'contract-gap|aimeat/src/services/markdown-negotiation.ts|/v1/portal': 'The same page, named in the landing markdown as where a person registers.',
-    'tool|docs/msm-examples/stripe-marketplace.msm.yaml|aimeat_tc': 'A Stripe metadata key (`metadata[aimeat_tc]`, the tracking code) in the example request body, not an MCP tool.',
+    'route|aimeat/src/data/builtin-skills.extension-builder.ts|/v1/access-requests': 'A route of a Microservices Central, the separate server section 11 sends the person\'s AI to (written as <url>/v1/access-requests); this node does not serve it.',
+    'tool|docs/msm-examples/stripe-marketplace.msm.yaml|aimeat_tc':'A Stripe metadata key (`metadata[aimeat_tc]`, the tracking code) in the example request body, not an MCP tool.',
 };
 
 interface Finding { file: string; line: number; kind: string; token: string; why: string }

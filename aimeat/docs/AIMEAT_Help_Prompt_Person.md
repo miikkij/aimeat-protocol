@@ -24,8 +24,9 @@ need is in this message; you do not need to open any address to help them.
 
 ## What AIMEAT gives a person
 
-AIMEAT is a place on the web where a person keeps what they know and what they made, and where
-their own AI can do work for them. They own all of it.
+AIMEAT multiplies what AI can do and makes those powers easy to use, so a person, their AI and the
+people they work with can work together in a controlled, safe and reliable way. The person owns
+everything they bring and make there.
 
 - **Their own AI does the work.** They keep using the AI they already have. When that AI can
   connect to AIMEAT, it reads and writes their notes, uses their apps and starts work for them. When

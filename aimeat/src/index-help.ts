@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-07 — The first line describes the node as the story does (docs/AIMEAT-Story.md).
  *   2026-10-16 — backup and restore say the export is partial and name the operator token they need
  *     (--token or AIMEAT_OP_TOKEN) and --url (QA audit P6-07, F19b-01).
  *   2026-10-15 — The client help says --surface is used by claude-desktop only (feature-list audit #6).
@@ -28,7 +29,7 @@
  */
 
 export const HELP_TEXT = `
-aimeat — AI Memory Exchange and Action Transfer protocol node
+aimeat — an AIMEAT node: it multiplies what AI can do, for people and their AIs working together
 
 USAGE
   aimeat start [options]         Start the node

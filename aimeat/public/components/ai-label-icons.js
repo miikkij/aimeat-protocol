@@ -21,6 +21,7 @@
  * @usage
  *   import { euIconFor } from './ai-label-icons.js';
  * @version-history
+ *   v1.1.0 — 2026-11-07 — Level `machine` (a program, no model) shows no icon.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 3. Table from docs/internal/EUAct/22-frozen-vocabulary.md §C2.
  */
 
@@ -65,6 +66,8 @@ export function euIconFor(record) {
   }
   switch (record.level) {
     case 'original': return null;
+    // A program with no model: no AI icon, as the server's toEuIcon() answers.
+    case 'machine': return null;
     case 'assisted': return { file: 'ai-modified', alt: 'aiLabel.iconAlt.aiModified' };
     case 'synthesized':
     case 'ai-generated':

@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.18.0 — 2026-11-07 — Ends with applyCsmVersionSchema: csms.visibility, csms.version and the
+ *     csm_versions table (CSM visibility and versions). Mirrors Postgres 0127.
  *   v1.17.0 — 2026-11-04 — Ends with applyEphemeralClaimSchema: ephemeral_claim, short-lived values every
  *     process sees (codebase analysis 2026-11-03, high-availability stage 2). Mirrors Postgres 0126.
  *   v1.16.0 — 2026-11-02 — Ends with applyMcpUserCredentialSchema: mcp_user_credentials, a person's own
@@ -41,6 +43,7 @@ import type Database from 'better-sqlite3';
 import { applyWorkspaceRowRevisionSchema } from './schema-workspace-row-revisions.js';
 import { applyMcpUserCredentialSchema } from './schema-mcp-user-credentials.js';
 import { applyEphemeralClaimSchema } from './schema-ephemeral-claim.js';
+import { applyCsmVersionSchema } from './schema-csm-versions.js';
 
 export function applySchemaTables4(db: Database.Database): void {
   db.exec(`
@@ -787,4 +790,6 @@ export function applySchemaTables4(db: Database.Database): void {
   applyMcpUserCredentialSchema(db);
   // Short-lived values every process sees (Postgres 0126).
   applyEphemeralClaimSchema(db);
+  // CSM visibility, version and the replaced versions, after csms exists in part 1 (Postgres 0127).
+  applyCsmVersionSchema(db);
 }

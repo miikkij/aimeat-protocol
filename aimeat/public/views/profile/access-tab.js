@@ -23,6 +23,8 @@
  * @structure AccessTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'access'
  * @version-history
+ *   v2.6.0 — 2026-11-07 — `receivers`: how many receivers the account has (GET /v1/receivers), for the
+ *     line in "Who acts in your name" that leads to the Receivers page; a receiver key is a credential.
  *   v2.5.0 — 2026-11-01 — `moreOpen`: on a node the store sold, the "Lisätiedot" fold under the sign-in
  *     (Jouni's review of v33, the Access page).
  *   v2.4.0 — 2026-10-25 — The switch "Ask me before my secret is sent to a new address for the first
@@ -179,7 +181,22 @@ export default function AccessTab({ session, showToast }) {
     setBusy(false);
   };
 
-  const loadAll = useCallback(async () => { await Promise.all([load(), loadSecrets(), loadMcp(), loadHostAsk()]); }, [load, loadSecrets, loadMcp, loadHostAsk]);
+  /**
+   * How many receivers this account has, for the line in section 02 that leads to the Receivers
+   * page: a receiver key is a credential an outside program writes into the person's data with. A
+   * failed read leaves the line out; the Receivers page is where they are listed.
+   */
+  const [receivers, setReceivers] = useState(null);
+  const loadReceivers = useCallback(async () => {
+    try {
+      const r = await apiGet('/v1/receivers');
+      const list = r?.data?.receivers;
+      if (!Array.isArray(list)) throw new Error('no receivers');
+      setReceivers({ total: list.length, active: list.filter((x0) => x0.state === 'active').length, waiting: list.filter((x0) => x0.state === 'proposed').length });
+    } catch (e) { swallowed('access-tab: receivers', e); setReceivers(null); }
+  }, []);
+
+  const loadAll = useCallback(async () => { await Promise.all([load(), loadSecrets(), loadMcp(), loadHostAsk(), loadReceivers()]); }, [load, loadSecrets, loadMcp, loadHostAsk, loadReceivers]);
   useEffect(() => { loadAll(); }, [loadAll]);
   const loadRef = useRef(loadAll);
   loadRef.current = loadAll;
@@ -463,7 +480,7 @@ export default function AccessTab({ session, showToast }) {
 
   const ctx = {
     session, ov, failed, rows, basePackage, baseHolders, fed, filter, openKey, shownKeys, form, created, formMsg, spendDraft, fedInput, keyShown, busy,
-    secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, hostDraft, mcpCount,
+    secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, hostDraft, mcpCount, receivers,
     setSecretForm, toggleSecretForm, openReplace, setReplaceValue, setHostDraft, writeSecret, deleteSecret, saveSecretHost, withdrawApproval,
     hostAsk, setHostAsk, moreOpen, setMoreOpen,
     isOperator, nodeUrl, nodeId, ghii, ownerKey, tokenScopes: TOKEN_SCOPES, passkeysSupported: passkeySupported(), showToast: toast, ConfirmUI,

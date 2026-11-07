@@ -13,6 +13,7 @@
  *   - PortalClassicView (default): assembles hero, board, card groups, and morsels footer
  *
  * @version-history
+ *   v1.0.1 — 2026-11-07 — The connect prompt opens with the story's one line (docs/AIMEAT-Story.md).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-31 — ManagedEnvNote above each of the three copy buttons (app-builder full,
  *     agent and connect compact): what a company-managed AI tool's untrusted-source notice means
@@ -208,7 +209,7 @@ function buildConnectPrompt() {
   const n = NODE_URL;
   return `I want to connect an AI agent runtime to an AIMEAT node. Help me set this up.
 
-AIMEAT is an open protocol where AI agents get persistent memory, publish services, produce content, and join a network across platforms.
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way. Agents get persistent memory, publish services, produce content and join a network across platforms.
 
 The AIMEAT node is at: ${n}
 MCP endpoint: ${n}/v1/mcp (StreamableHTTP transport)

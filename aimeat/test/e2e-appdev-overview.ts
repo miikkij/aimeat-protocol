@@ -7,6 +7,10 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
+ *   v1.4.0 — 2026-11-07 — +`microservices`: none named for an owner without a Central; the owner's own
+ *     `microservices.central` named over REST and MCP and never to another owner; an address with a
+ *     password in it ignored without being repeated; a private record hidden from an agent without
+ *     memory:read-as-owner and read by one holding it.
  *   v1.3.1 — 2026-10-21 — An agent of the owner without memory:read gets 403 on the overview (the
  *     suite's first second-principal refusal; its denial-coverage exemption is removed).
  *   v1.3.0 — 2026-10-20 — +the owner-scope sections read as the caller may: over REST and MCP an
@@ -534,6 +538,52 @@ await test('REST and MCP: an agent holding memory:read-as-owner, and the owner i
         const keys = overviewKeys(d);
         for (const k of all) assert(keys.includes(k), `${who} lost ${k}: ${JSON.stringify(keys)}`);
     }
+});
+
+// ── The Microservices Central the overview names when an app outgrows an extension ──
+const MSC_KEY = 'microservices.central';
+const writeCentral = async (value: unknown, visibility: string) => {
+    const { status, body } = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${tokenA}` },
+        body: JSON.stringify({ key: MSC_KEY, value, visibility }),
+    });
+    assert(status === 200 || status === 201, `write ${MSC_KEY}: ${status} ${JSON.stringify(body?.error)}`);
+};
+const centralFor = async (token: string) => {
+    const { status, body } = await json('/v1/appdev/overview?sections=apps', { headers: { Authorization: `Bearer ${token}` } });
+    assert(status === 200, `overview ${status}: ${JSON.stringify(body?.error)}`);
+    return body.data.microservices;
+};
+
+await test('microservices: with no Central named, the overview says so and gives the criteria', async () => {
+    const m = await centralFor(tokenB);
+    assert(m && m.central === null, `central: ${JSON.stringify(m?.central)}`);
+    assert(Array.isArray(m.suggest_when) && m.suggest_when.some((s: string) => /extension run/.test(s)), `suggest_when: ${JSON.stringify(m.suggest_when)}`);
+    assert(/Never build the service somewhere else/.test(m.next), `next: ${m.next}`);
+    assert(/aimeat-extension-builder, section 11/.test(m.skill), `skill: ${m.skill}`);
+});
+
+await test('microservices: the owner\'s own Central is named over REST and MCP; another owner does not get it', async () => {
+    await writeCentral({ url: 'https://msc.example.test/', project: 'ovproj' }, 'owner');
+    const m = await centralFor(tokenA);
+    assert(m.central?.url === 'https://msc.example.test' && m.central.from === 'owner' && m.central.project === 'ovproj', `central: ${JSON.stringify(m.central)}`);
+    assert(m.central.mcp === 'https://msc.example.test/mcp' && m.next.includes('https://msc.example.test/mcp'), `mcp: ${JSON.stringify(m)}`);
+    const s = await openSession(BASE, ovPlain.token, 'ov-msc');
+    const r = await callTool(s, 'aimeat_appdev_overview', { sections: ['apps'] });
+    assert(!r.isError && r.data.microservices?.central?.url === 'https://msc.example.test', `an agent of the owner over MCP: ${r.text.slice(0, 300)}`);
+    assert((await centralFor(tokenB)).central === null, 'another owner got this owner\'s Central');
+});
+
+await test('microservices: an address with a password in it is ignored and named; a private record stays hidden from a plain agent', async () => {
+    await writeCentral({ url: 'https://user:secret@msc.example.test', project: 'ovproj' }, 'owner');
+    const bad = await centralFor(tokenA);
+    assert(bad.central === null && /no usable url/.test(bad.record_problem ?? ''), `a credential in the address: ${JSON.stringify(bad)}`);
+    assert(!JSON.stringify(bad).includes('secret@'), 'the overview repeated the credential');
+    await writeCentral({ url: 'https://msc.example.test' }, 'private');
+    assert((await centralFor(tokenA)).central?.url === 'https://msc.example.test', 'the owner lost their own private record');
+    const plain = await centralFor(ovPlain.token);
+    assert(plain.central === null && plain.record_problem === undefined, `a plain agent read the owner's private record: ${JSON.stringify(plain)}`);
+    assert((await centralFor(ovAsOwner.token)).central?.url === 'https://msc.example.test', 'an agent holding memory:read-as-owner lost it');
 });
 
 console.log('\n' + '─'.repeat(40));

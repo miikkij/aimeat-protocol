@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-11-07 — receivers:manage (RECEIVERS_MANAGE_SCOPE) joins the own-tick family: a receiver key
+ *     an outside program writes into the owner's data with.
  *   2026-11-02 — exchange:invoke is covered by exchange:write (COVERED_BY_WIDER_WORD), the split of the app tool call.
  *   2026-11-01 — party:manage (PARTY_MANAGE_SCOPE) joins the own-tick family: outside parties and the
  *     named shares to them (plan doc-mvwxcas3dom3, D2.7).
@@ -288,6 +290,15 @@ export const PERMISSIONS_ADD_SCOPE = 'agent:permissions-add';
 export const PARTY_MANAGE_SCOPE = 'party:manage';
 
 /**
+ * Make, change, pause, rotate and delete the owner's receivers (services/receivers/): an address and a
+ * key through which an outside program writes into one place of the owner's data. Handing a program
+ * such a key is the owner's decision, so "Full access" does not carry it; without it an agent proposes
+ * a receiver and the owner approves it in person. Outside every wildcard and not grandfathered: the
+ * capability did not exist before (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
+ */
+export const RECEIVERS_MANAGE_SCOPE = 'receivers:manage';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -360,6 +371,8 @@ const OWN_TICK_SCOPES = [
     PERMISSIONS_ADD_SCOPE,
     // Give an outside party a key and share data with it (PARTY_MANAGE_SCOPE above).
     PARTY_MANAGE_SCOPE,
+    // Give an outside program a receiver key that writes into the owner's data (RECEIVERS_MANAGE_SCOPE above).
+    RECEIVERS_MANAGE_SCOPE,
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
@@ -382,6 +395,8 @@ export function isOutsideWildcard(scope: string): boolean {
  */
 const COVERED_BY_WIDER_WORD: Readonly<Record<string, readonly string[]>> = {
     'exchange:invoke': ['exchange:write'],
+    // Managing receivers includes seeing them: an agent ticked only receivers:manage reads the list too.
+    'receivers:read': ['receivers:manage'],
 };
 
 /**

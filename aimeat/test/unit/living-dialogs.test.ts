@@ -14,6 +14,7 @@
  *   dialog change with them or this test goes red.
  * @usage cd aimeat && pnpm vitest run test/unit/living-dialogs.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-07 — The inward shape's program road: a receiver for exactly this key.
  *   v1.0.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
 import { describe, it, expect } from 'vitest';
@@ -101,6 +102,16 @@ describe('the inward dialog: this value can come from outside', () => {
     });
     expect(shape.write.curl).toContain('living.solar.in.spot');
     expect(shape.write.curl).toContain('/v1/memory');
+  });
+
+  it('offers a program a receiver for exactly this key, never the owner\'s token', () => {
+    const shape = inwardShape(shaped('spot').ctx);
+    expect(shape.receiver.key).toBe('living.solar.in.spot');
+    expect(shape.receiver.name).toMatch(/^[a-z0-9][a-z0-9-]{0,39}$/);
+    expect(shape.receiver.settings).toContain('/v1/profile?tab=receivers&new=key&key=living.solar.in.spot');
+    expect(shape.receiver.curl).toContain('/v1/receive/<owner>/' + shape.receiver.name);
+    expect(shape.receiver.curl).toContain('Bearer <the receiver key>');
+    expect(shape.receiver.curl).not.toContain('/v1/memory');
   });
 
   it('writes the agent road as a sentence a person says, in the page\'s language', () => {

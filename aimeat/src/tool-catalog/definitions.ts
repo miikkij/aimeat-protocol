@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-07 -- definitions/receivers.ts: aimeat_receiver and aimeat_admin_receivers.
+ *   v1.x -- 2026-11-07 -- definitions/csm.ts: aimeat_csm, the account's data descriptions (CSM) in one tool.
  *   v1.x -- 2026-11-05 -- definitions/key-reencrypt.ts: aimeat_admin_key_reencrypt (codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.x -- 2026-11-02 -- definitions/connection-files.ts: aimeat_files_browse, _get and _write (SharePoint and OneDrive).
@@ -119,10 +121,12 @@ import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
 import { dataProductTools } from './definitions/dataproduct.js';
 import { partyTools } from './definitions/party.js';
+import { receiverTools } from './definitions/receivers.js';
 import { buildWithYouTools } from './definitions/build-with-you.js';
 import { dataspaceTools } from './definitions/dataspace.js';
 import { datapackageSellTools } from './definitions/datapackage-sell.js';
 import { keyReencryptTools } from './definitions/key-reencrypt.js';
+import { csmTools } from './definitions/csm.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -174,10 +178,12 @@ const CATALOG = [
     ...secretAddressTools,
     ...dataProductTools,
     ...partyTools,
+    ...receiverTools,
     ...buildWithYouTools,
     ...datapackageSellTools,
     ...dataspaceTools,
     ...keyReencryptTools,
+    ...csmTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;
