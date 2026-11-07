@@ -1548,12 +1548,15 @@
         if (open && pop) clampPopover(pop);
       });
     }
+    function redrawIfMounted() {
+      if (container.isConnected) render();
+    }
     function render() {
       i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
       const stored = auth2.getSession() || load("session");
       if (stored) {
         var live = auth2.getSession();
-        var ai = live ? readAiState(live, render) : null;
+        var ai = live ? readAiState(live, redrawIfMounted) : null;
         var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
         var pillHtml = '<div class="aimeat-auth-pill">' + aiStatusHtml(ai, i, "led") + (opts.nameHref ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || "Home settings") + '">' + nameText + "</a>" : '<span class="aimeat-auth-ghii">' + nameText + "</span>") + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + aiStatusHtml(ai, i, "bolt") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + '</span><button type="button" id="aimeat-logout-btn" class="aimeat-icon-btn aimeat-auth-logout" aria-label="' + escHtml(i.logoutBtn || "Log out") + '" title="' + escHtml(i.logoutBtn || "Log out") + '">' + LOGOUT_ICON + "</button></div>";
         ensureAuthPillStyles();

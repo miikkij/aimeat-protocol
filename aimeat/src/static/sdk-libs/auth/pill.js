@@ -144,6 +144,13 @@ export function mountPill(auth, selector, opts = {}) {
     });
   }
 
+  // The AI state arrives after a fetch. By then the page may have taken the pill's container out
+  // (an app re-rendering its header, a test tearing down), and render() on a detached container
+  // finds none of its own buttons in the document.
+  function redrawIfMounted() {
+    if (container.isConnected) render();
+  }
+
   function render() {
     i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
     // Prefer the live session (carries the H-2 _app/_own grant metadata) over the persisted copy.
@@ -156,7 +163,7 @@ export function mountPill(auth, selector, opts = {}) {
       // written beside it (Jouni, 2026-11-07). The state is read once and kept; render() runs again
       // when it arrives.
       var live = auth.getSession();
-      var ai = live ? readAiState(live, render) : null;
+      var ai = live ? readAiState(live, redrawIfMounted) : null;
       var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
       var pillHtml = '<div class="aimeat-auth-pill">'
         + aiStatusHtml(ai, i, 'led')
