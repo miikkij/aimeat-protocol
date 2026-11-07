@@ -1,5 +1,5 @@
 /**
- * @file src/services/build-introduction-step.ts
+ * @file src/services/app-build/build-introduction-step.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Two additions to the Atelier build specification that Jouni asked for on 2026-11-07,
@@ -20,14 +20,15 @@
  *   vaihtoehtoa ja 1 niistä olisi aina tämä default clean vaihtoehto".
  *
  *   ITS OWN FILE because build-atelier-prompt.ts is at the 800-line limit, the same reason
- *   build-data-map-step.ts has one. Atelier only: a new app is built on Atelier, and the Classic
+ *   build-data-map-step.ts has one. In app-build/ because no new flat file goes into src/services/
+ *   (check:services-flat); the build specification's other files are older than that rule. Atelier only: a new app is built on Atelier, and the Classic
  *   interview runs for an app the owner asked to build on Classic by name.
  * @structure INTRODUCTION_QUESTION (the interview) · ATELIER_INTRODUCTION_PROPOSAL_LINE and
  *   ATELIER_DESIGNS_PROPOSAL_LINE (the proposal, build-atelier-people.ts) ·
  *   ATELIER_INTRODUCTION_HEADING and ATELIER_INTRODUCTION_SECTION (the body, served in part
  *   `libraries`) · CLEAN_LOOK_ID
  * @usage
- *   import { INTRODUCTION_QUESTION, ATELIER_INTRODUCTION_SECTION } from './build-introduction-step.js';
+ *   import { INTRODUCTION_QUESTION, ATELIER_INTRODUCTION_SECTION } from './app-build/build-introduction-step.js';
  *   full += buildDataMapStep('atelier') + INTRODUCTION_QUESTION + ATELIER_STRUCTURE_STEP;
  * @version-history
  *   v1.0.0 — 2026-11-07 — Initial: the introduction question and section, and the clean design in

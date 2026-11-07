@@ -87,7 +87,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/build-app-prompt-driven.ts',
     'aimeat/src/services/build-atelier-prompt.ts',
     'aimeat/src/services/build-data-map-step.ts',
-    'aimeat/src/services/build-introduction-step.ts',
+    'aimeat/src/services/app-build/build-introduction-step.ts',
     'aimeat/src/services/build-extension-prompt.ts',
     'aimeat/src/services/build-cortex-prompt.ts',
     'aimeat/src/services/appdev-flow-prompt.ts',

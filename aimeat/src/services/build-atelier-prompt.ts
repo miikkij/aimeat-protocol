@@ -162,7 +162,7 @@ import { buildAtelierLibrarySection } from '../data/library-packs.js';
 import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
 import { atelierMotionParts } from './build-atelier-motion-parts.js';
 import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.js';
-import { INTRODUCTION_QUESTION, ATELIER_INTRODUCTION_SECTION } from './build-introduction-step.js';
+import { INTRODUCTION_QUESTION, ATELIER_INTRODUCTION_SECTION } from './app-build/build-introduction-step.js';
 import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
 import { ornamentsPromptPart } from '../data/atelier-ornaments.js';

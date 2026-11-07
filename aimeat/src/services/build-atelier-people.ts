@@ -47,7 +47,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { ATELIER_DATA_MAP_PROPOSAL_LINE } from './build-data-map-step.js';
-import { ATELIER_DESIGNS_PROPOSAL_LINE, ATELIER_INTRODUCTION_PROPOSAL_LINE } from './build-introduction-step.js';
+import { ATELIER_DESIGNS_PROPOSAL_LINE, ATELIER_INTRODUCTION_PROPOSAL_LINE } from './app-build/build-introduction-step.js';
 
 /**
  * The end of the mosaic section. WHY IT EXISTS: until 2026-09-20 the specification asked for two

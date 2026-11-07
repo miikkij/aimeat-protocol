@@ -17,7 +17,7 @@ import type { AimeatConfig } from '../../src/config.js';
 import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
 import { atelierPiece, atelierPieceIds, MAX_PART_CHARS, splitAtelierSpec } from '../../src/services/build-atelier-layers.js';
 import { lookById } from '../../src/data/atelier-looks.js';
-import { CLEAN_LOOK_ID, INTRODUCTION_QUESTION } from '../../src/services/build-introduction-step.js';
+import { CLEAN_LOOK_ID, INTRODUCTION_QUESTION } from '../../src/services/app-build/build-introduction-step.js';
 
 const config = { baseUrl: 'https://node.example', nodeId: 'node-test' } as unknown as AimeatConfig;
 const full = buildAtelierPrompt(config, { mode: 'new', lang: 'en' }).full;
