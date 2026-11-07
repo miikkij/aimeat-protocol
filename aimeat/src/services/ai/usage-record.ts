@@ -11,6 +11,7 @@
  * @structure UsageRecord · todayKey · getTodayUsage · recordAiUsage
  * @usage import { getTodayUsage, recordAiUsage, type UsageRecord } from './completion.js';
  * @version-history
+ *   v1.5.0 — 2026-11-07 — The write emits the `ai-usage` change, so the sign-in pill's bolt follows today's spend live.
  *   v1.4.1 — 2026-11-05 — Moved unchanged from src/services/ai-usage-record.ts to src/services/ai/usage-record.ts (codebase analysis 2026-11-03, item D-h).
  *   v1.4.0 — 2026-11-02 — `verifiedApp` on a call: the ledger names an ecosystem app as who asked
  *     beside its owner who paid (aiAskerOf; secaudit2026nov02d round 13).
@@ -29,6 +30,7 @@ import { recordUsageEvent } from '../usage-metering.js';
 import { recordAccountEvent } from '../account-events.js';
 import { canonicalAiAppId, mergePerApp } from './app-id.js';
 import { addAgentSpend, aiAskerOf } from '../agent-ai-keys.js';
+import { emitChange } from '../event-bus.js';
 
 export interface UsageRecord {
   /** ISO date key (YYYY-MM-DD). */
@@ -79,6 +81,9 @@ async function upsertUsage(storage: Storage, gaii: string, value: UsageRecord): 
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   });
+  // The sign-in pill's bolt reads today's spend: tell the owner's open pages, through the live
+  // stream, so it turns red when the budget runs out without anyone asking again.
+  emitChange('ai-usage', gaii);
 }
 
 /**

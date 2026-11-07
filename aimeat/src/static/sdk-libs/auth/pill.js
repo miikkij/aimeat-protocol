@@ -14,6 +14,12 @@
  *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v2.0.0 — 2026-11-07 — The pill shows the person's AI (wish-resurssipalkki-teko-lybudjetti-
+ *     tallennus-ja-nelj-ovea, design C): the light before the name is green when their own AI is
+ *     connected, the bolt after it is yellow, red or grey for the AI power here, an app's needs show
+ *     beside it, and a hover or a press opens the detail (ai-state.js). "logged in" is no longer
+ *     written, light/dark is one button, the look picker wears a palette icon, and sign-out is a door
+ *     icon. The compact button carries the light and the bolt.
  *   v1.8.0 — 2026-11-04 — opts.nameHref makes the name a link: the node's own pages pass the Home
  *     settings address (Jouni, 2026-11-04). An app passes nothing, and its name stays plain text.
  *   v1.7.3 — 2026-11-01 — The signed-in pill carries a title ("kirjautuneena"), so its green dot is
@@ -58,7 +64,8 @@
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
  */
 import { isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
-import { escHtml, modeSwitchHtml, wireModeSwitch, ensureAuthPillStyles, pillInitials } from './theme.js';
+import { escHtml, modeSwitchHtml, wireModeSwitch, wireAutoMode, aimeatAutoChosen, aimeatFixedLight, ensureAuthPillStyles, pillInitials } from './theme.js';
+import { readAiState, forgetAiState, aiStatusHtml, aiCompactHtml, aiDotClass, wireAiState, ensureAiStateStyles } from './ai-state.js';
 import { readLocales, langSwitchHtml, wireLangSwitch, aimeatReadLang, aimeatRestoreLang } from './locale.js';
 import { pillStrings } from './pill-strings.js';
 import { MODAL_LANGS } from './i18n.js';
@@ -73,6 +80,18 @@ import { loginWatcher } from './on-login.js';
 var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" '
   + 'stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/>'
   + '<path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
+
+// Sign out: a door with an arrow leaving it, the mark people know for "log out" (it was the word
+// LOG OUT, Jouni 2026-11-07). The button carries the words as its label and title.
+var LOGOUT_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+  + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>';
+
+/** The look picker's "Automatic: follows your device" row, now that light/dark is one button. */
+function autoRowHtml(i) {
+  if (aimeatFixedLight()) return '';
+  var w = i.autoMode || 'Automatic: follows your device';
+  return '<button type="button" class="aimeat-pop-wide" data-mode-auto aria-pressed="' + aimeatAutoChosen() + '">' + escHtml(w) + '</button>';
+}
 
 export function mountPill(auth, selector, opts = {}) {
   // Resolve the mount container. Tolerate three call shapes so a common misuse doesn't crash:
@@ -132,16 +151,20 @@ export function mountPill(auth, selector, opts = {}) {
     if (stored) {
       // The pill is class-styled (ensureAuthPillStyles) and reads the page's own tokens, so it is
       // ink on paper here, light on a dark page, and whatever a palette says elsewhere.
-      // The pill says in words what its green dot means, also where a page hides the label beside
-      // it (Jouni's review of v33: an unexplained green square in the top bar).
+      // The light before the name is the person's own AI (green: connected), the bolt after it the
+      // AI power here (ai-state.js); the name says who is signed in, so "logged in" is no longer
+      // written beside it (Jouni, 2026-11-07). The state is read once and kept; render() runs again
+      // when it arrives.
+      var live = auth.getSession();
+      var ai = live ? readAiState(live, render) : null;
       var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
-      var pillHtml = '<div class="aimeat-auth-pill" title="' + escHtml(i.loggedIn || 'logged in') + '">'
-        + '<span class="aimeat-auth-dot" aria-hidden="true"></span>'
-        + '<span class="aimeat-auth-label">' + escHtml(i.loggedIn || 'logged in') + '</span>'
+      var pillHtml = '<div class="aimeat-auth-pill">'
+        + aiStatusHtml(ai, i, 'led')
         + (opts.nameHref
           ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || 'Home settings') + '">' + nameText + '</a>'
           : '<span class="aimeat-auth-ghii">' + nameText + '</span>')
         + (stored.federated ? '<span class="aimeat-auth-fed">\u{1F310} ' + escHtml(i.federated || 'Federated') + '</span>' : '')
+        + aiStatusHtml(ai, i, 'bolt')
         // Permissions gear — only for an EXTERNAL app (a grant the user gave, not their own app).
         + ((stored._appOrigin && stored._app && !stored._own)
           ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || 'Manage permissions') + '" '
@@ -149,17 +172,20 @@ export function mountPill(auth, selector, opts = {}) {
           : '')
         // The control cluster — language, light/dark mode, palette — inside the pill so every
         // embedding app inherits the SAME three controls for free.
-        + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span>'
-        + '<button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || 'Logout') + '</button>'
+        + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + '</span>'
+        + '<button type="button" id="aimeat-logout-btn" class="aimeat-icon-btn aimeat-auth-logout" '
+        + 'aria-label="' + escHtml(i.logoutBtn || 'Log out') + '" title="' + escHtml(i.logoutBtn || 'Log out') + '">' + LOGOUT_ICON + '</button>'
         + '</div>';
       ensureAuthPillStyles();
+      ensureAiStateStyles();
       // Compact mode (default ON on app origins): wrap the full pill behind a small "account" button.
       if (useCompact) {
         var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
         container.innerHTML = '<div class="aimeat-auth-wrap">'
           + '<button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" '
           + 'aria-label="' + escHtml(i.account || 'Account') + '">'
-          + '<span class="cdot" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + '</span>'
+          + '<span class="cdot' + aiDotClass(ai) + '" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + '</span>'
+          + aiCompactHtml(ai)
           + '<span class="ccar" aria-hidden="true">▾</span></button>'
           + pillHtml + '</div>';
       } else {
@@ -173,11 +199,12 @@ export function mountPill(auth, selector, opts = {}) {
         // A revoke routes through auth.logout() → the 'logout' event handles render + onLogout.
         auth.manageGrant().then(() => { render(); }).catch(() => {});
       });
+      wireAiState(container);
       wireCompactTrigger();
     } else {
       ensureAuthPillStyles();
       // Keep the whole cluster (language + mode + palette) reachable even when signed out.
-      var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span>';
+      var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + '</span>';
       container.innerHTML = ''
         + '<span class="aimeat-auth-out">'
         // Compact: on a phone the cluster folds behind one settings button and Sign In stays in the
@@ -206,7 +233,8 @@ export function mountPill(auth, selector, opts = {}) {
       });
       wireCompactTrigger();
     }
-    wireModeSwitch(container); // the cluster is present in both signed-in and signed-out markup
+    wireModeSwitch(container, i); // the cluster is present in both signed-in and signed-out markup
+    wireAutoMode(container);
     wireLangSwitch(container, i, locales);
     wirePaletteControl(container, clampPopover);
   }
@@ -224,21 +252,22 @@ export function mountPill(auth, selector, opts = {}) {
   // The node's own pages change their look on a route or a choice (Themes & Styles): the picker's
   // themes and styles, and whether light/dark stands down, follow it.
   window.addEventListener('aimeat-look-change', render);
-  // Close any open cluster popover (palette / language list) on an outside click or Escape.
+  // Close any open cluster popover (palette / language list) and the AI popup (ai-state.js) on an
+  // outside click or Escape.
   document.addEventListener('click', (ev) => {
-    container.querySelectorAll('.aimeat-pop-wrap.aimeat-open').forEach((w) => {
+    container.querySelectorAll('.aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open').forEach((w) => {
       if (!w.contains(/** @type {Node} */ (ev.target))) {
         w.classList.remove('aimeat-open');
-        var b = w.querySelector('.aimeat-pop-btn');
+        var b = w.querySelector('.aimeat-pop-btn, .aimeat-ai-bolt');
         if (b) b.setAttribute('aria-expanded', 'false');
       }
     });
   });
   document.addEventListener('keydown', (ev) => {
     if (ev.key !== 'Escape') return;
-    container.querySelectorAll('.aimeat-pop-wrap.aimeat-open').forEach((w) => {
+    container.querySelectorAll('.aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open').forEach((w) => {
       w.classList.remove('aimeat-open');
-      var b = w.querySelector('.aimeat-pop-btn');
+      var b = w.querySelector('.aimeat-pop-btn, .aimeat-ai-bolt');
       if (b) b.setAttribute('aria-expanded', 'false');
     });
   });
@@ -270,7 +299,7 @@ export function mountPill(auth, selector, opts = {}) {
   // (the SPA header's bell + "Me" menu) rendering a signed-in state next to a "Sign In" button.
   // Routing it through the event also covers the paths the button never touches: a grant revoke
   // via manageGrant(), and the stale-cache drop below.
-  const onLogoutEvent = () => { watcher.logout(); render(); if (opts.onLogout) opts.onLogout(); };
+  const onLogoutEvent = () => { watcher.logout(); forgetAiState(); render(); if (opts.onLogout) opts.onLogout(); };
   auth.on('login', onLoginEvent);
   auth.on('logout', onLogoutEvent);
   auth.on('session-updated', render); // live display-name (etc.) edits

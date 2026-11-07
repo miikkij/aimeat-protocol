@@ -20,6 +20,8 @@
  *   the routing tries it (route-plan.ts), so the capability is on and a call finds out.
  * @structure CAPABILITY_ORDER · CapabilityState · aiCapabilitiesView()
  * @version-history
+ *   v1.5.0 — 2026-11-07 — `main`, `power` and, for an app that declares AI roles, `needs`: what the
+ *     sign-in pill shows (ai-status.ts), from the text state planned here.
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — The embed howTo says embeddings are rare and the person's decision.
  *   v1.1.0 — 2026-09-28 — `roles`: an app's declared AI roles, each bound or not with the fix; the
@@ -50,6 +52,7 @@ import type { Locale } from '../../i18n.js';
 import {
   reasonOf, agentFixFor, personFixFor, personLocale, aiSettingsUrl, type CapabilityReason, type RequestLanguage,
 } from './ai-fix-words.js';
+import { mainAiOf, powerOf, appNeedsOf } from './ai-status.js';
 
 export const CAPABILITY_ORDER: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];
 
@@ -223,15 +226,29 @@ export async function aiCapabilitiesView(
   const meta = catalogMeta();
   const textState = states[0];
   const roles = await rolesOf(storage, gaii, ctx, prefs, { node, owner });
+  const capabilities = Object.fromEntries(CAPABILITY_ORDER.map((cap, i) => [cap, states[i]])) as Record<AiCapability, CapabilityState>;
+  const dailyBudgetUsd = getDailyBudgetUsd(prefs);
+  const forApp = ctx.caller === 'app';
   // TARGET-082 V3: the Content Classifier runs on the decision model or on `text`, so its state is theirs.
-  const contentClassifier = await classifierState(storage, config, gaii, textState);
+  // The sign-in pill's two answers (ai-status.ts) read the same planned text state.
+  const [contentClassifier, main, power] = await Promise.all([
+    classifierState(storage, config, gaii, textState),
+    mainAiOf(storage, gaii, textState.on, forApp),
+    powerOf(storage, config, gaii, textState, { dailyBudgetUsd, spentTodayUsd: usage.total_cost_usd }),
+  ]);
+  // rolesOf answers an app's declared roles (each with `bound`) or the owner's roles (without it).
+  const declared = roles as Array<{ capabilities?: unknown; bound?: unknown }> | undefined;
+  const needs = appNeedsOf(declared?.some(r => 'bound' in r) ? declared : undefined, capabilities, aiSettingsUrl(config));
   return {
-    capabilities: Object.fromEntries(CAPABILITY_ORDER.map((cap, i) => [cap, states[i]])),
+    capabilities,
     content_classifier: contentClassifier,
     ...(roles ? { roles } : {}),
+    main,
+    power,
+    ...(needs.length ? { needs } : {}),
     policy: { mode: policy.mode, appliesToCaller: policy.mode !== 'open' && !!policy.appliesTo[switchOf[ctx.caller]] },
     budget: {
-      dailyBudgetUsd: getDailyBudgetUsd(prefs), spentTodayUsd: usage.total_cost_usd,
+      dailyBudgetUsd, spentTodayUsd: usage.total_cost_usd,
       ...(textState.keySource ? { keySource: textState.keySource } : {}),
     },
     ...(ownKey ? { own_key: ownKey } : {}),

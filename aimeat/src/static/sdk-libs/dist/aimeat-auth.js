@@ -291,48 +291,48 @@
       return false;
     }
   }
+  var SUN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  var MOON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  function modeButtonParts(i) {
+    var shown = aimeatReadTheme();
+    var target = shown === "dark" ? "light" : "dark";
+    var label = target === "dark" ? i.toDark || "Switch to dark" : i.toLight || "Switch to light";
+    return { shown, target, label, icon: shown === "dark" ? MOON_SVG : SUN_SVG };
+  }
   function modeSwitchHtml(i) {
-    var cur = aimeatThemeChoice() === "auto" ? "auto" : aimeatReadTheme();
-    var light = i.lightMode || "Light mode";
-    var dark = i.darkMode || "Dark mode";
-    var auto = i.autoMode || "Automatic: follows your device";
+    var p = modeButtonParts(i);
     var fixed = aimeatFixedLight();
     var why = i.fixedRegister || "This register keeps its own light";
     var only = styleOnlyMode();
     if (only) {
-      cur = only;
       why = only === "light" ? i.styleLightOnly || "This style has a light mode only" : i.styleDarkOnly || "This style has a dark mode only";
+      p.icon = only === "dark" ? MOON_SVG : SUN_SVG;
     }
-    var seg = fixed ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"' : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || "Theme") + '"';
-    var off2 = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : "";
-    var onlyWord = function(m) {
-      return only === m ? '<span aria-hidden="true">' + escHtml(i.modeOnly || "only") + "</span>" : "";
-    };
-    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord("light") + '</button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord("dark") + "</button>" + (fixed || only ? "" : '<button type="button" data-mode="auto" aria-pressed="' + (cur === "auto") + '" title="' + escHtml(auto) + '" aria-label="' + escHtml(auto) + '"><span class="seg-ico" aria-hidden="true">' + escHtml(i.autoShort || "Auto") + "</span></button>") + "</span>";
+    var stood = fixed || !!only;
+    return '<span id="aimeat-mode-switch" class="aimeat-mode-one' + (stood ? " aimeat-seg--fixed" : "") + '"' + (stood ? ' title="' + escHtml(why) + '"' : "") + '><button type="button" class="aimeat-icon-btn" data-mode="' + p.target + '"' + (stood ? ' disabled aria-disabled="true" aria-label="' + escHtml(why) + '"' : ' title="' + escHtml(p.label) + '" aria-label="' + escHtml(p.label) + '"') + ">" + p.icon + "</button></span>";
   }
-  function wireModeSwitch(container) {
+  function wireModeSwitch(container, i) {
     var root = container.querySelector("#aimeat-mode-switch");
     if (!root) return;
-    if (aimeatFixedLight()) return;
-    function sync(cur) {
-      root.querySelectorAll("button[data-mode]").forEach(function(b) {
-        b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === cur));
-      });
+    if (aimeatFixedLight() || styleOnlyMode()) return;
+    var btn = (
+      /** @type {HTMLElement|null} */
+      root.querySelector("button[data-mode]")
+    );
+    if (!btn) return;
+    var words2 = i || {};
+    function sync() {
+      var p = modeButtonParts(words2);
+      btn.setAttribute("data-mode", p.target);
+      btn.setAttribute("title", p.label);
+      btn.setAttribute("aria-label", p.label);
+      btn.innerHTML = p.icon;
     }
-    root.querySelectorAll("button[data-mode]").forEach(function(b) {
-      b.addEventListener("click", function() {
-        var m = b.getAttribute("data-mode");
-        aimeatApplyTheme(m);
-        sync(m);
-      });
+    btn.addEventListener("click", function() {
+      aimeatApplyTheme(btn.getAttribute("data-mode"));
+      sync();
     });
-    window.addEventListener("aimeat-theme-change", function(ev) {
-      var e = (
-        /** @type {CustomEvent} */
-        ev
-      );
-      if (e && e.detail && e.detail.theme) sync(aimeatThemeChoice() === "auto" ? "auto" : e.detail.theme);
-    });
+    window.addEventListener("aimeat-theme-change", sync);
     if (window.matchMedia) {
       var mq = window.matchMedia("(prefers-color-scheme: dark)");
       var onOs = function() {
@@ -340,6 +340,21 @@
       };
       if (mq.addEventListener) mq.addEventListener("change", onOs);
     }
+  }
+  function wireAutoMode(container) {
+    var b = container.querySelector("button[data-mode-auto]");
+    if (!b || aimeatFixedLight() || styleOnlyMode()) return;
+    var sync = function() {
+      b.setAttribute("aria-pressed", String(aimeatThemeChoice() === "auto"));
+    };
+    b.addEventListener("click", function() {
+      aimeatApplyTheme(aimeatThemeChoice() === "auto" ? aimeatReadTheme() : "auto");
+      sync();
+    });
+    window.addEventListener("aimeat-theme-change", sync);
+  }
+  function aimeatAutoChosen() {
+    return aimeatThemeChoice() === "auto";
   }
   function ensureAuthPillStyles() {
     if (document.getElementById("aimeat-auth-pill-css")) return;
@@ -369,10 +384,15 @@
       "padding:1px 6px;border:" + frame + frameCur + "}",
       ".aimeat-auth-gear{appearance:none;background:none;border:" + frame + frameCur + ";color:inherit;border-radius:0;",
       "padding:2px 7px;cursor:pointer;font-size:13px;line-height:1}",
-      ".aimeat-auth-logout{appearance:none;background:none;border:0;border-bottom:" + frame + frameCur + ";border-radius:0;",
-      "padding:0 0 1px;margin:0;cursor:pointer;color:inherit;font-family:inherit;font-size:11px;font-weight:800;",
-      actionCase + ";line-height:1.4}",
-      ".aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:" + hot + ";border-color:" + hot + "}",
+      /* An icon button in the pill's row: the light/dark switch and sign-out, the size of the cluster's
+         segments (cluster.js), framed like them. */
+      ".aimeat-icon-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;",
+      "width:26px;height:26px;padding:0;margin:0;background:transparent;color:inherit;cursor:pointer;",
+      "border:" + frame + frameCur + ";border-radius:var(--aimeat-pill-radius,0);line-height:0}",
+      ".aimeat-icon-btn:focus-visible{outline:2px solid currentColor;outline-offset:2px}",
+      ".aimeat-icon-btn[disabled]{cursor:default;opacity:.55}",
+      ".aimeat-mode-one{display:inline-flex}",
+      ".aimeat-icon-btn:hover:not([disabled]),.aimeat-auth-gear:hover{color:" + hot + ";border-color:" + hot + "}",
       /* Signed out: the cluster beside one ink slab with the sun's offset shadow. */
       ".aimeat-auth-out{display:inline-flex;align-items:center;gap:10px;color:" + ink2 + "}",
       ".aimeat-sign-btn{appearance:none;padding:8px 16px;background:var(--aimeat-pill-cta-bg," + ink2 + ");",
@@ -417,6 +437,35 @@
     var parts = s.split(/\s+/).filter(Boolean);
     if (parts.length >= 2) return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
     return s.slice(0, 2).toUpperCase();
+  }
+
+  // src/static/sdk-libs/auth/http.js
+  async function api(path, opts = {}) {
+    const url = NODE_URL + path;
+    const headers = { "Content-Type": "application/json", ...opts.headers };
+    const resp = await fetch(url, { ...opts, headers });
+    const data = await resp.json();
+    if (!data.ok) {
+      const err = (
+        /** @type {Error & { code?: string, details?: unknown }} */
+        new Error(data.error?.message || "API error")
+      );
+      err.code = data.error?.code;
+      err.details = data.error?.details;
+      throw err;
+    }
+    return data;
+  }
+  async function authApi(path, jwt, opts = {}) {
+    return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
+  }
+  function sessionHeaders(given, jwt, body) {
+    const headers = new Headers(given || void 0);
+    if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + jwt);
+    if (!headers.has("Content-Type") && (body == null || typeof body === "string")) {
+      headers.set("Content-Type", "application/json");
+    }
+    return headers;
   }
 
   // src/static/sdk-libs/auth/cluster.js
@@ -484,9 +533,10 @@
       "border:1px solid color-mix(in oklab,currentColor 25%,transparent);overflow:hidden}",
       ".aimeat-pal-chip .pc-card{position:absolute;inset:5px 5px 3px 5px;border-radius:3px}",
       ".aimeat-pal-chip .pc-acc{position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%}",
-      /* The trigger's miniature: the active palette's accent as a dot. */
-      ".aimeat-pal-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;",
-      "border:1px solid color-mix(in oklab,currentColor 30%,transparent)}"
+      /* The trigger's icon: a painter's palette whose first blob is the active accent (palette.js). */
+      ".aimeat-pal-ico{display:block;flex:0 0 auto}",
+      /* A row across the whole popover: "Automatic: follows your device", above the looks. */
+      ".aimeat-pop .aimeat-pop-wide{grid-column:1/-1}"
     ].join("");
     (document.head || document.documentElement).appendChild(st);
   }
@@ -498,6 +548,303 @@
     if (r.left < pad) shift = pad - r.left;
     else if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
     if (shift) pop.style.transform = "translateX(" + Math.round(shift) + "px)";
+  }
+
+  // src/static/sdk-libs/_core/format.js
+  function fmt() {
+    const ns2 = typeof window !== "undefined" ? window.AIMEAT : null;
+    return ns2 && ns2.fmt ? ns2.fmt : null;
+  }
+  function person() {
+    const ns2 = typeof window !== "undefined" ? window.AIMEAT : null;
+    const auth2 = ns2 && ns2.auth;
+    const p = auth2 && typeof auth2.displayPrefs === "function" ? auth2.displayPrefs() : null;
+    return { region: p && p.region || null, timezone: p && p.timezone || null };
+  }
+  var refusedReported = "";
+  function asPerson(call, opts, clock) {
+    const p = person();
+    const zone = clock && p.timezone && !(opts && opts.timeZone) ? p.timezone : null;
+    if (!p.region && !zone) return call(void 0, opts);
+    try {
+      return call(p.region || void 0, zone ? Object.assign({}, opts, { timeZone: zone }) : opts);
+    } catch (e) {
+      const which = (p.region || "") + "|" + (zone || "");
+      if (refusedReported !== which) {
+        refusedReported = which;
+        console.warn('[aimeat] This browser cannot write dates with the region "' + (p.region || "") + '" and the time zone "' + (zone || "") + `" of the person's settings; the browser's own format is used:`, e && /** @type {Error} */
+        e.message);
+      }
+      return call(void 0, opts);
+    }
+  }
+  function num(n, opts) {
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const f = fmt();
+    if (f && typeof f.num === "function") return f.num(n, opts);
+    try {
+      return asPerson((tag, o) => n.toLocaleString(tag, o), opts, false);
+    } catch {
+      return String(n);
+    }
+  }
+  function money(n, currency, opts) {
+    const f = fmt();
+    if (f && typeof f.money === "function") return f.money(n, currency, opts);
+    if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
+    const code = String(currency || "USD").toUpperCase();
+    const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
+    const o = Object.assign(
+      { style: "currency", currency: code, minimumFractionDigits: digits, maximumFractionDigits: digits },
+      opts
+    );
+    try {
+      return asPerson((tag, oo) => n.toLocaleString(tag, oo), o, false);
+    } catch {
+      return num(n) + " " + code;
+    }
+  }
+
+  // src/static/sdk-libs/auth/ai-state.js
+  var cache = { key: null, data: null, pending: null, session: null, listeners: /* @__PURE__ */ new Set() };
+  var DOMAINS = ["ai-usage", "ai-providers", "agents"];
+  function keyOf(session) {
+    return session && session.jwt ? session.jwt + "|" + (session._app || "") : null;
+  }
+  function fetchState(session) {
+    var key = keyOf(session);
+    var path = "/v1/ai/capabilities" + (session._app ? "?app_id=" + encodeURIComponent(session._app) : "");
+    cache.pending = authApi(path, session.jwt).then(function(r) {
+      if (cache.key === key) cache.data = r.data || { unavailable: true, reason: "empty answer" };
+    }).catch(function(err) {
+      console.debug("[aimeat-auth] the AI state was not read:", err);
+      if (cache.key === key) cache.data = { unavailable: true, reason: String(err && err.code || err) };
+    }).then(function() {
+      if (cache.key !== key) return;
+      cache.pending = null;
+      cache.listeners.forEach(function(fn) {
+        fn();
+      });
+    });
+    return cache.pending;
+  }
+  var invalidate = null;
+  function listenOnce() {
+    if (invalidate || typeof window === "undefined") return;
+    invalidate = function(ev) {
+      var d = ev && ev.detail && ev.detail.domains;
+      if (Array.isArray(d) && !d.some(function(x) {
+        return DOMAINS.indexOf(x) >= 0;
+      })) return;
+      var s = cache.session;
+      if (s && keyOf(s) === cache.key && !cache.pending) fetchState(s);
+    };
+    window.addEventListener("aimeat-live-update", invalidate);
+    window.addEventListener("aimeat-ai-used", invalidate);
+  }
+  function readAiState(session, onChange) {
+    var key = keyOf(session);
+    if (!key) return null;
+    if (onChange) cache.listeners.add(onChange);
+    listenOnce();
+    if (cache.key !== key) {
+      cache.key = key;
+      cache.data = null;
+      cache.session = session;
+      fetchState(session);
+    }
+    return cache.data;
+  }
+  function forgetAiState() {
+    cache.key = null;
+    cache.data = null;
+    cache.pending = null;
+    cache.session = null;
+  }
+  var BOLT = "M13 2 3 14h9l-1 8 10-12h-9l1-8z";
+  var GLYPH = {
+    picture: '<rect x="2" y="4" width="13" height="11"/><path d="M5 15l-2 6M12 15l2 6M22 2l-7.5 7.5"/><path d="M14.5 9.5c-1.6 0-2.8 1.1-3 3 1.9-.2 3-1.4 3-3z" fill="currentColor"/>',
+    sound: '<rect x="3" y="2" width="6" height="11" rx="3"/><path d="M1 10a5 5 0 0 0 10 0M6 15v5M3.5 20h5"/><path d="M14 9h3l5-4v14l-5-4h-3zM25 9a4.5 4.5 0 0 1 0 6"/>'
+  };
+  var GLYPH_OF = { vision: "picture", image: "picture", transcription: "sound", speech: "sound" };
+  var WORD_OF = { vision: "capVision", image: "capImage", transcription: "capTranscription", speech: "capSpeech" };
+  function glyphSvg(cap, missing) {
+    var g = GLYPH_OF[cap];
+    var w = g === "sound" ? 23 : 19;
+    return '<svg class="aimeat-ai-need-ico" width="' + w + '" height="19" viewBox="0 0 ' + (g === "sound" ? 28 : 24) + ' 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + GLYPH[g] + (missing ? '<path d="M2 2l' + (g === "sound" ? 24 : 20) + ' 20" stroke-width="2.4"/>' : "") + "</svg>";
+  }
+  function boltSvg(size) {
+    return '<svg class="aimeat-ai-bolt-ico" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true"><path d="' + BOLT + '" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  }
+  function fill(s, vars) {
+    return String(s).replace(/\{(\w+)\}/g, function(_, k) {
+      return vars[k] != null ? vars[k] : "";
+    });
+  }
+  function words(st, i) {
+    var main = st && st.main || {};
+    var power = st && st.power || { state: "none" };
+    return {
+      led: main.connected ? i.aiOn || "Your AI is connected" : i.aiOff || "No AI connected yet",
+      bolt: power.state === "ok" ? i.powerOk || "AI power available" : power.state === "over" ? i.powerOver || "Today's limit is reached" : i.powerNone || "No AI power here"
+    };
+  }
+  function popupHtml(st, i) {
+    var main = st.main || {};
+    var power = st.power || { state: "none" };
+    var caps = st.capabilities || {};
+    var w = words(st, i);
+    var out = '<div class="aimeat-ai-pop" role="dialog" aria-label="' + escHtml(i.powerName || "AI power") + '">';
+    out += '<p class="aimeat-ai-line"><span class="aimeat-ai-led-mini' + (main.connected ? "" : " is-off") + '" aria-hidden="true"></span><strong>' + escHtml(w.led) + "</strong></p>";
+    if (main.latest && main.latest.name) out += '<p class="aimeat-ai-sub">' + escHtml(fill(i.aiLatest || "Last active: {name}", { name: main.latest.name })) + "</p>";
+    if (main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(fill(i.aiAgents || "Agents: {n}", { n: main.agents })) + "</p>";
+    if (main.chat && !main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(i.aiChat || "The chat here is ready") + "</p>";
+    if (main.agents != null) {
+      out += main.connected ? '<a class="aimeat-ai-link" href="' + escHtml(NODE_URL + "/v1/home?agents=1") + '">' + escHtml(i.aiShow || "Show connections") + "</a>" : '<a class="aimeat-ai-link" href="' + escHtml(NODE_URL + "/v1/connect-your-ai") + '">' + escHtml(i.aiConnect || "Connect your AI") + "</a>";
+    }
+    out += '<hr class="aimeat-ai-rule"><p class="aimeat-ai-line"><span class="aimeat-ai-bolt is-' + escHtml(power.state) + '">' + boltSvg(18) + "</span><strong>" + escHtml(power.state === "ok" ? i.powerOk || "AI power available" : power.state === "over" ? i.powerOver || "Today's limit is reached" : i.powerNone || "No AI power here") + "</strong></p>";
+    if (power.state === "ok" && power.remainingUsd != null) {
+      out += '<p class="aimeat-ai-text">' + escHtml(power.payer === "node" ? fill(i.powerLeftNode || "{left} of your allowance left.", { left: money(power.remainingUsd, "USD") }) : fill(i.powerLeft || "{left} left today. Daily limit {limit}.", { left: money(power.remainingUsd, "USD"), limit: money(power.limitUsd, "USD") })) + (power.low ? " <strong>" + escHtml(i.powerLow || "Running low.") + "</strong>" : "") + "</p>";
+    }
+    if (power.payer) {
+      out += '<p class="aimeat-ai-sub">' + escHtml(power.payer === "node" ? i.payerNode || "This node pays." : power.payer === "agent" ? i.payerAgent || "The agent's own key pays." : i.payerOwn || "You pay with your own key.") + "</p>";
+    }
+    if (power.state !== "ok" && power.fix) out += '<p class="aimeat-ai-text">' + escHtml(power.fix) + "</p>";
+    if (power.state !== "ok" && main.agents) out += '<p class="aimeat-ai-sub">' + escHtml(i.aiOwnStill || "Your connected AI still works on its own subscription.") + "</p>";
+    var rows = function(list) {
+      return list.map(function(r) {
+        return "<li><span>" + escHtml(i[WORD_OF[r.cap]] || r.cap) + '</span><strong class="' + (r.on ? "is-on" : "is-off") + '">' + escHtml(r.on ? i.capOn || "On" : i.capOff || "Off") + "</strong></li>";
+      }).join("");
+    };
+    if (Array.isArray(st.needs) && st.needs.length) {
+      out += '<p class="aimeat-ai-head">' + escHtml(i.needHead || "This app uses") + '</p><ul class="aimeat-ai-list">' + rows(st.needs.map(function(n) {
+        return { cap: n.capability, on: !!n.on };
+      })) + "</ul>";
+      var missing = st.needs.filter(function(n) {
+        return !n.on;
+      });
+      var said = missing.map(function(n) {
+        return n.fix;
+      }).filter(Boolean);
+      said.filter(function(s, k) {
+        return said.indexOf(s) === k;
+      }).forEach(function(s) {
+        out += '<p class="aimeat-ai-text">' + escHtml(s) + "</p>";
+      });
+      if (missing.some(function(n) {
+        return !n.fix;
+      })) out += '<p class="aimeat-ai-text">' + escHtml(i.needRole || "Connect this app's AI roles in your AI settings.") + "</p>";
+    } else if (power.state === "ok") {
+      out += '<p class="aimeat-ai-head">' + escHtml(i.canHead || "What you can do now") + '</p><ul class="aimeat-ai-list">' + rows(["vision", "image", "transcription", "speech"].map(function(c) {
+        return { cap: c, on: !!(caps[c] && caps[c].on) };
+      })) + "</ul>";
+    }
+    var settings = power.settingsUrl || (st.needs || []).map(function(n) {
+      return n.settingsUrl;
+    }).filter(Boolean)[0] || NODE_URL + "/v1/profile?tab=ai";
+    if (/^https?:\/\//.test(settings) || settings.charAt(0) === "/") {
+      out += '<a class="aimeat-ai-link" href="' + escHtml(settings) + '">' + escHtml(i.aiSettings || "AI settings") + "</a>";
+    }
+    return out + "</div>";
+  }
+  function aiStatusHtml(st, i, place) {
+    var w = words(st, i);
+    if (st && st.unavailable) return "";
+    if (place === "led") {
+      var cls = !st ? "" : st.main && st.main.connected ? " is-on" : " is-off";
+      return '<button type="button" class="aimeat-auth-dot aimeat-ai-led' + cls + '" data-ai-open' + (st ? ' aria-label="' + escHtml(w.led) + '" title="' + escHtml(w.led) + '"' : ' aria-hidden="true" tabindex="-1"') + "></button>";
+    }
+    if (!st || !st.power) return "";
+    var needs = Array.isArray(st.needs) ? st.needs : [];
+    return '<span class="aimeat-ai"><button type="button" class="aimeat-ai-bolt is-' + escHtml(st.power.state) + '" data-ai-open aria-haspopup="dialog" aria-expanded="false" aria-label="' + escHtml(w.bolt) + '" title="' + escHtml(w.bolt) + '">' + boltSvg(17) + "</button>" + needs.map(function(n) {
+      var label = (i[WORD_OF[n.capability]] || n.capability) + ": " + (n.on ? i.capOn || "On" : i.capOff || "Off");
+      return '<span class="aimeat-ai-need ' + (n.on ? "is-on" : "is-off") + '" role="img" aria-label="' + escHtml(label) + '" title="' + escHtml(label) + '">' + glyphSvg(n.capability, !n.on) + "</span>";
+    }).join("") + popupHtml(st, i) + "</span>";
+  }
+  function aiCompactHtml(st) {
+    if (!st || !st.power) return "";
+    return '<span class="aimeat-ai-bolt is-' + escHtml(st.power.state) + '" aria-hidden="true">' + boltSvg(14) + "</span>";
+  }
+  function aiDotClass(st) {
+    return !st || st.unavailable ? "" : st.main && st.main.connected ? " is-on" : " is-off";
+  }
+  function wireAiState(container) {
+    var group = (
+      /** @type {HTMLElement|null} */
+      container.querySelector(".aimeat-ai")
+    );
+    if (!group) return;
+    var bolt = group.querySelector(".aimeat-ai-bolt");
+    var pop = (
+      /** @type {HTMLElement|null} */
+      group.querySelector(".aimeat-ai-pop")
+    );
+    container.querySelectorAll("[data-ai-open]").forEach(function(b) {
+      b.addEventListener("click", function(ev) {
+        ev.stopPropagation();
+        var open = group.classList.toggle("aimeat-open");
+        if (bolt) bolt.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open && pop) clampPopover(pop);
+      });
+    });
+    group.addEventListener("mouseenter", function() {
+      if (pop) clampPopover(pop);
+    });
+  }
+  function ensureAiStateStyles() {
+    if (document.getElementById("aimeat-ai-state-css")) return;
+    var st = document.createElement("style");
+    st.id = "aimeat-ai-state-css";
+    st.textContent = aiStateCss("var(--aimeat-ink)", "var(--aimeat-paper)", "var(--shape-frame,2px) solid ");
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function aiStateCss(ink2, paper2, frame) {
+    var on2 = "var(--aimeat-pill-ok,var(--success-fg,#047857))";
+    var off2 = "var(--aimeat-pill-bad,var(--danger-fg,#C8322A))";
+    return [
+      ".aimeat-ai-led{appearance:none;border:0;padding:0;margin:0;cursor:pointer}",
+      /* Before the answer arrives the light says nothing: neither green nor off. */
+      ".aimeat-ai-led:not(.is-on):not(.is-off){background:color-mix(in oklab," + ink2 + " 18%,transparent);cursor:default}",
+      ".aimeat-ai-led.is-off,.aimeat-auth-compact .cdot.is-off{background:color-mix(in oklab," + ink2 + " 38%,transparent)}",
+      ".aimeat-ai-led:focus-visible,.aimeat-ai-bolt:focus-visible{outline:2px solid " + ink2 + ";outline-offset:2px}",
+      ".aimeat-ai{position:relative;display:inline-flex;align-items:center;gap:6px}",
+      ".aimeat-ai-bolt{appearance:none;display:inline-flex;align-items:center;justify-content:center;background:none;border:0;",
+      "padding:2px;margin:0;color:" + ink2 + ";cursor:pointer;line-height:0}",
+      ".aimeat-ai-bolt.is-ok path{fill:var(--aimeat-pill-power,var(--sun,#FFB52E))}",
+      ".aimeat-ai-bolt.is-over path{fill:var(--aimeat-pill-over,var(--danger,#E0453A))}",
+      ".aimeat-ai-bolt.is-none{opacity:.5}.aimeat-ai-bolt.is-none path{fill:none}",
+      ".aimeat-ai-need{display:inline-flex;line-height:0}.aimeat-ai-need.is-on{color:" + on2 + "}.aimeat-ai-need.is-off{color:" + off2 + "}",
+      ".aimeat-ai-pop{position:absolute;top:100%;right:0;z-index:1100;display:none;box-sizing:border-box;width:280px;",
+      "max-width:calc(100vw - 24px);margin-top:8px;padding:12px 14px;text-align:left;white-space:normal;",
+      "background:" + paper2 + ";color:" + ink2 + ";border:" + frame + ink2 + ";",
+      "box-shadow:0 8px 24px rgb(15 18 25 / .16);font-size:13px;line-height:1.45;font-weight:400}",
+      /* The hover bridge: the gap above the popup belongs to it, so the pointer can move in. */
+      '.aimeat-ai-pop::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px}',
+      ".aimeat-ai.aimeat-open .aimeat-ai-pop{display:block}",
+      "@media (hover:hover){.aimeat-ai:hover .aimeat-ai-pop{display:block}}",
+      ".aimeat-ai-pop p{margin:0 0 6px}",
+      ".aimeat-ai-line{display:flex;align-items:center;gap:8px;font-size:14px}",
+      ".aimeat-ai-line .aimeat-ai-bolt{padding:0;cursor:default}",
+      ".aimeat-ai-led-mini{display:inline-block;width:10px;height:10px;flex:0 0 auto;background:var(--aimeat-pill-live,var(--success,#10B981))}",
+      ".aimeat-ai-led-mini.is-off{background:color-mix(in oklab," + ink2 + " 38%,transparent)}",
+      ".aimeat-ai-sub{opacity:.78;font-size:12.5px}",
+      ".aimeat-ai-rule{border:0;border-top:1px solid color-mix(in oklab," + ink2 + " 18%,transparent);margin:10px 0}",
+      ".aimeat-ai-head{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;opacity:.75;margin-top:10px!important}",
+      ".aimeat-ai-list{list-style:none;margin:0 0 8px;padding:0}",
+      ".aimeat-ai-list li{display:flex;justify-content:space-between;gap:12px;padding:2px 0}",
+      ".aimeat-ai-list .is-on{color:" + on2 + "}.aimeat-ai-list .is-off{color:" + off2 + "}",
+      /* Specific enough to win over a host header's own link rules (the SPA's `.topnav-right a`). */
+      ".aimeat-ai-pop a.aimeat-ai-link{display:inline-block;margin:2px 0 4px;padding:0;background:none;font-size:13px;font-weight:800;",
+      "color:" + ink2 + ";text-decoration:underline;text-underline-offset:3px}",
+      ".aimeat-ai-pop a.aimeat-ai-link:hover{color:var(--aimeat-pill-name,var(--accent,#E8564A))}",
+      ".aimeat-auth-compact .aimeat-ai-bolt{padding:0}",
+      /* In the compact popover (a phone) the detail is part of the panel: shown, not hovered. */
+      "@media (max-width:600px){",
+      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai{flex:1 1 100%;flex-wrap:wrap}",
+      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai-pop{position:static;display:block;width:100%;margin:8px 0 0;box-shadow:none;border-width:1px}",
+      ".aimeat-auth-wrap>.aimeat-auth-pill .aimeat-ai-pop::before{display:none}",
+      "}"
+    ].join("");
   }
 
   // src/static/sdk-libs/_core/lang.js
@@ -666,7 +1013,37 @@
       chooseLook: "Choose look",
       switchLanguage: "Language",
       pageSettings: "Settings",
-      homeSettings: "Home settings"
+      homeSettings: "Home settings",
+      toDark: "Switch to dark",
+      toLight: "Switch to light",
+      aiOn: "Your AI is connected",
+      aiOff: "No AI connected yet",
+      aiAgents: "Agents: {n}",
+      aiLatest: "Last active: {name}",
+      aiChat: "The chat here is ready",
+      aiConnect: "Connect your AI",
+      aiShow: "Show connections",
+      aiOwnStill: "Your connected AI still works on its own subscription.",
+      powerName: "AI power",
+      powerOk: "AI power available",
+      powerOver: "Today's limit is reached",
+      powerNone: "No AI power here",
+      powerLeft: "{left} left today. Daily limit {limit}.",
+      powerLeftNode: "{left} of your allowance left.",
+      powerLow: "Running low.",
+      payerOwn: "You pay with your own key.",
+      payerNode: "This node pays.",
+      payerAgent: "The agent's own key pays.",
+      canHead: "What you can do now",
+      needHead: "This app uses",
+      capVision: "Read pictures",
+      capImage: "Make pictures",
+      capTranscription: "Speech to text",
+      capSpeech: "Text to speech",
+      capOn: "On",
+      capOff: "Off",
+      aiSettings: "AI settings",
+      needRole: "Connect this app's AI roles in your AI settings."
     },
     fi: {
       loggedIn: "kirjautuneena",
@@ -689,7 +1066,37 @@
       chooseLook: "Valitse tyyli",
       switchLanguage: "Kieli",
       pageSettings: "Asetukset",
-      homeSettings: "Kodin asetukset"
+      homeSettings: "Kodin asetukset",
+      toDark: "Vaihda tummaan",
+      toLight: "Vaihda vaaleaan",
+      aiOn: "Tekoälysi on yhdistetty",
+      aiOff: "Tekoälyä ei ole vielä yhdistetty",
+      aiAgents: "Agentteja: {n}",
+      aiLatest: "Viimeksi käytössä: {name}",
+      aiChat: "Tämän noden chat on valmis",
+      aiConnect: "Yhdistä tekoäly",
+      aiShow: "Näytä yhteydet",
+      aiOwnStill: "Yhdistetty tekoälysi toimii silti omalla tilauksellaan.",
+      powerName: "Tekoälyvirta",
+      powerOk: "Tekoälyvirtaa on",
+      powerOver: "Päivän raja on täynnä",
+      powerNone: "Tekoälyvirtaa ei ole",
+      powerLeft: "{left} jäljellä tänään. Päivän raja on {limit}.",
+      powerLeftNode: "Osuuttasi on jäljellä {left}.",
+      powerLow: "Virta on vähissä.",
+      payerOwn: "Maksat omalla avaimellasi.",
+      payerNode: "Node maksaa.",
+      payerAgent: "Agentin oma avain maksaa.",
+      canHead: "Mitä voit tehdä nyt",
+      needHead: "Tämä sovellus käyttää",
+      capVision: "Kuvan tulkinta",
+      capImage: "Kuvien teko",
+      capTranscription: "Kuuntelu (puhe tekstiksi)",
+      capSpeech: "Puhe (teksti ääneksi)",
+      capOn: "Käytössä",
+      capOff: "Ei käytössä",
+      aiSettings: "Tekoälyn asetukset",
+      needRole: "Yhdistä tämän sovelluksen tekoälyroolit tekoälyn asetuksissa."
     },
     es: {
       loggedIn: "sesión iniciada",
@@ -712,7 +1119,37 @@
       chooseLook: "Elige el aspecto",
       switchLanguage: "Idioma",
       pageSettings: "Ajustes",
-      homeSettings: "Configuración del hogar"
+      homeSettings: "Configuración del hogar",
+      toDark: "Cambiar a oscuro",
+      toLight: "Cambiar a claro",
+      aiOn: "Tu IA está conectada",
+      aiOff: "Aún no hay ninguna IA conectada",
+      aiAgents: "Agentes: {n}",
+      aiLatest: "Activa por última vez: {name}",
+      aiChat: "El chat de este nodo está listo",
+      aiConnect: "Conecta tu IA",
+      aiShow: "Ver conexiones",
+      aiOwnStill: "Tu IA conectada sigue funcionando con su propia suscripción.",
+      powerName: "Energía de IA",
+      powerOk: "Hay energía de IA",
+      powerOver: "Se alcanzó el límite de hoy",
+      powerNone: "No hay energía de IA aquí",
+      powerLeft: "Quedan {left} hoy. Límite diario: {limit}.",
+      powerLeftNode: "Te quedan {left} de tu asignación.",
+      powerLow: "Queda poca.",
+      payerOwn: "Pagas con tu propia clave.",
+      payerNode: "Paga este nodo.",
+      payerAgent: "Paga la clave propia del agente.",
+      canHead: "Qué puedes hacer ahora",
+      needHead: "Esta aplicación usa",
+      capVision: "Leer imágenes",
+      capImage: "Crear imágenes",
+      capTranscription: "Escuchar (voz a texto)",
+      capSpeech: "Hablar (texto a voz)",
+      capOn: "Activo",
+      capOff: "Inactivo",
+      aiSettings: "Ajustes de IA",
+      needRole: "Conecta los roles de IA de esta aplicación en tus ajustes de IA."
     }
   };
   function pillStrings(lang) {
@@ -882,7 +1319,10 @@
     return '<span class="aimeat-pal-chip" style="background:' + esc(sw.bg) + '"><span class="pc-card" style="background:' + esc(sw.card) + '"></span><span class="pc-acc" style="background:' + esc(sw.accent) + '"></span></span>';
   }
   var reopen = null;
-  function paletteControlHtml(i) {
+  function paletteIconHtml(accent2) {
+    return '<svg class="aimeat-pal-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z"/><circle class="aimeat-pal-cur" cx="7.5" cy="10.5" r="1.8" stroke="none" fill="' + esc(accent2) + '"/><circle cx="10.5" cy="6.5" r="1.8" stroke="none" fill="#FFB52E"/><circle cx="15.5" cy="6.5" r="1.8" stroke="none" fill="#10B981"/><circle cx="18" cy="10.5" r="1.8" stroke="none" fill="#3B82F6"/></svg>';
+  }
+  function paletteControlHtml(i, autoRow) {
     var s = innerState();
     if (s && !s.personalChoice) return "";
     var list = paletteRegistry();
@@ -896,7 +1336,7 @@
     var head = function(text) {
       return '<span class="aimeat-pop-head">' + esc(text) + "</span>";
     };
-    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox" aria-label="' + esc(label) + '">' + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === "light" ? i && i.styleLightOnly || "This style has a light mode only" : i && i.styleDarkOnly || "This style has a dark mode only") + "</span>" : "") + (themes ? head(i && i.lookThemes || "Themes") + themes.map(function(t) {
+    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '">' + paletteIconHtml(curAcc) + '</button><span class="aimeat-pop" role="listbox" aria-label="' + esc(label) + '">' + (autoRow || "") + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === "light" ? i && i.styleLightOnly || "This style has a light mode only" : i && i.styleDarkOnly || "This style has a dark mode only") + "</span>" : "") + (themes ? head(i && i.lookThemes || "Themes") + themes.map(function(t) {
       var def = t.styles.find(function(x) {
         return x.id === t.defaultStyle;
       }) || t.styles[0];
@@ -927,11 +1367,8 @@
       var p = list.find(function(x) {
         return x.id === cur;
       }) || list[0];
-      var dot = (
-        /** @type {HTMLElement|null} */
-        root.querySelector(".aimeat-pal-dot")
-      );
-      if (dot) dot.style.background = p.swatch[mode].accent;
+      var dot = root.querySelector(".aimeat-pal-cur");
+      if (dot) dot.setAttribute("fill", p.swatch[mode].accent);
       root.querySelectorAll("button[data-palette]").forEach(function(b) {
         b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
         b.setAttribute("aria-selected", String(b.getAttribute("data-palette") === cur));
@@ -1066,6 +1503,12 @@
 
   // src/static/sdk-libs/auth/pill.js
   var SETTINGS_ICON = '<svg class="cico" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12"/><path d="M5 2.5v3M11 6.5v3M7 10.5v3"/></svg>';
+  var LOGOUT_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>';
+  function autoRowHtml(i) {
+    if (aimeatFixedLight()) return "";
+    var w = i.autoMode || "Automatic: follows your device";
+    return '<button type="button" class="aimeat-pop-wide" data-mode-auto aria-pressed="' + aimeatAutoChosen() + '">' + escHtml(w) + "</button>";
+  }
   function mountPill(auth2, selector, opts = {}) {
     let container;
     if (selector && typeof selector === "object" && selector.nodeType === 1) {
@@ -1109,12 +1552,15 @@
       i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
       const stored = auth2.getSession() || load("session");
       if (stored) {
+        var live = auth2.getSession();
+        var ai = live ? readAiState(live, render) : null;
         var nameText = escHtml(stored.displayName || stored.ghii || stored.owner);
-        var pillHtml = '<div class="aimeat-auth-pill" title="' + escHtml(i.loggedIn || "logged in") + '"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + "</span>" + (opts.nameHref ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || "Home settings") + '">' + nameText + "</a>" : '<span class="aimeat-auth-ghii">' + nameText + "</span>") + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
+        var pillHtml = '<div class="aimeat-auth-pill">' + aiStatusHtml(ai, i, "led") + (opts.nameHref ? '<a class="aimeat-auth-ghii" href="' + escHtml(opts.nameHref) + '" title="' + escHtml(i.homeSettings || "Home settings") + '">' + nameText + "</a>" : '<span class="aimeat-auth-ghii">' + nameText + "</span>") + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + aiStatusHtml(ai, i, "bolt") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + '</span><button type="button" id="aimeat-logout-btn" class="aimeat-icon-btn aimeat-auth-logout" aria-label="' + escHtml(i.logoutBtn || "Log out") + '" title="' + escHtml(i.logoutBtn || "Log out") + '">' + LOGOUT_ICON + "</button></div>";
         ensureAuthPillStyles();
+        ensureAiStateStyles();
         if (useCompact) {
           var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
-          container.innerHTML = '<div class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.account || "Account") + '"><span class="cdot" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + '</span><span class="ccar" aria-hidden="true">▾</span></button>' + pillHtml + "</div>";
+          container.innerHTML = '<div class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.account || "Account") + '"><span class="cdot' + aiDotClass(ai) + '" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + "</span>" + aiCompactHtml(ai) + '<span class="ccar" aria-hidden="true">▾</span></button>' + pillHtml + "</div>";
         } else {
           container.innerHTML = pillHtml;
         }
@@ -1128,10 +1574,11 @@
           }).catch(() => {
           });
         });
+        wireAiState(container);
         wireCompactTrigger();
       } else {
         ensureAuthPillStyles();
-        var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + "</span>";
+        var clusterHtml = '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i, autoRowHtml(i)) + "</span>";
         container.innerHTML = '<span class="aimeat-auth-out">' + (useCompact ? '<span class="aimeat-auth-wrap"><button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" aria-label="' + escHtml(i.pageSettings || "Settings") + '" title="' + escHtml(i.pageSettings || "Settings") + '">' + SETTINGS_ICON + '<span class="ccar" aria-hidden="true">▾</span></button>' + clusterHtml + "</span>" : clusterHtml) + '<button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
         document.getElementById("aimeat-login-btn").addEventListener("click", () => {
           var signInOpts = {};
@@ -1143,7 +1590,8 @@
         });
         wireCompactTrigger();
       }
-      wireModeSwitch(container);
+      wireModeSwitch(container, i);
+      wireAutoMode(container);
       wireLangSwitch(container, i, locales);
       wirePaletteControl(container, clampPopover);
     }
@@ -1157,22 +1605,22 @@
     window.addEventListener("aimeat-lang-change", render);
     window.addEventListener("aimeat-look-change", render);
     document.addEventListener("click", (ev) => {
-      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open").forEach((w) => {
         if (!w.contains(
           /** @type {Node} */
           ev.target
         )) {
           w.classList.remove("aimeat-open");
-          var b = w.querySelector(".aimeat-pop-btn");
+          var b = w.querySelector(".aimeat-pop-btn, .aimeat-ai-bolt");
           if (b) b.setAttribute("aria-expanded", "false");
         }
       });
     });
     document.addEventListener("keydown", (ev) => {
       if (ev.key !== "Escape") return;
-      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open, .aimeat-ai.aimeat-open").forEach((w) => {
         w.classList.remove("aimeat-open");
-        var b = w.querySelector(".aimeat-pop-btn");
+        var b = w.querySelector(".aimeat-pop-btn, .aimeat-ai-bolt");
         if (b) b.setAttribute("aria-expanded", "false");
       });
     });
@@ -1199,6 +1647,7 @@
     };
     const onLogoutEvent = () => {
       watcher.logout();
+      forgetAiState();
       render();
       if (opts.onLogout) opts.onLogout();
     };
@@ -1354,35 +1803,6 @@
     ".aimeat-ts-codes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin:0 0 16px;padding:0;list-style:none;",
     "font:400 14px/1.45 " + mono + ";color:" + ink + "}"
   ].join("");
-
-  // src/static/sdk-libs/auth/http.js
-  async function api(path, opts = {}) {
-    const url = NODE_URL + path;
-    const headers = { "Content-Type": "application/json", ...opts.headers };
-    const resp = await fetch(url, { ...opts, headers });
-    const data = await resp.json();
-    if (!data.ok) {
-      const err = (
-        /** @type {Error & { code?: string, details?: unknown }} */
-        new Error(data.error?.message || "API error")
-      );
-      err.code = data.error?.code;
-      err.details = data.error?.details;
-      throw err;
-    }
-    return data;
-  }
-  async function authApi(path, jwt, opts = {}) {
-    return api(path, { ...opts, headers: { ...opts.headers, "Authorization": "Bearer " + jwt } });
-  }
-  function sessionHeaders(given, jwt, body) {
-    const headers = new Headers(given || void 0);
-    if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + jwt);
-    if (!headers.has("Content-Type") && (body == null || typeof body === "string")) {
-      headers.set("Content-Type", "application/json");
-    }
-    return headers;
-  }
 
   // src/static/sdk-libs/auth/auth-error.js
   function takeParam(name) {

@@ -11,6 +11,7 @@
  * @usage const r = await AIMEAT.ai.stream({ app_id, prompt, onText: (d, all) => (el.textContent = all) });
  *   const s = await AIMEAT.ai.speak({ app_id, input: 'Hello' }); new Audio(URL.createObjectURL(s.blob)).play();
  * @version-history
+ *   v1.3.0 - 2026-11-07 - A finished stream notes its budget through noteSpent, so the sign-in pill's bolt follows it.
  *   v1.2.0 - 2026-10-08 - speak() returns `audio` (mime, sample_rate, channels, sample_format) from the
  *     node's start and done frames, takes onStart, and types the blob by the provider's real mime.
  *   v1.1.0 - 2026-09-28 - stream() and speak() send `role`, the AI role the call runs as.
@@ -18,8 +19,7 @@
  */
 import { getSession } from '../_core/session.js';
 import { NODE_URL } from '../_core/config.js';
-import { noteBudget } from '../_core/spend.js';
-import { aiError, paid, postJson } from './call.js';
+import { aiError, paid, postJson, noteSpent } from './call.js';
 import { capabilities, priceEstimate } from './capabilities.js';
 
 /**
@@ -74,7 +74,7 @@ async function* ndjson(response) {
         if (!line.trim()) continue;
         const event = JSON.parse(line);
         if (event.type === 'error') throw aiError({ error: { code: event.code, message: event.message, details: event.details } }, 'The AI stream failed');
-        if (event.type === 'done') { done = true; if (event.budget) noteBudget(event.budget); }
+        if (event.type === 'done') { done = true; if (event.budget) noteSpent(event.budget); }
         yield event;
       }
       if (chunk.done) break;

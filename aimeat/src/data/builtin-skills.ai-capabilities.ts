@@ -18,6 +18,8 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.6.0 — 2026-11-07 — Section 1 names `main`, `power` and `needs`, what the sign-in pill shows, so an
+ *     AI answers "is my AI working" from the same answer.
  *   v1.5.2 — 2026-10-22 — The extension paragraph: ctx.ai.start also answers SCOPE_DENIED for a private
  *     input the run may not read (services/ai-jobs/ext-capability.ts readAs; secaudit 2026-10, v75).
  *   v1.5.1 — 2026-10-18 — The extension paragraph: the on_done input carries the answer, and
@@ -109,6 +111,17 @@ each capability it answers \`on\`, the \`model\` and \`provider\` a call would u
 
 Tell the person \`fix\` and give them \`settingsUrl\`. Do not build around a capability that is off,
 and do not promise a feature the node cannot run for them.
+
+The same answer carries what the person sees in their sign-in pill, so when they ask "is my AI
+working" or "how much AI do I have left", answer from it in their words:
+
+- \`main.connected\`: their own AI is connected (an agent, or the node's chat with a model that runs).
+  The pill's light is green. It means connected and allowed, not that a client is open right now.
+- \`power.state\`: \`ok\` (the bolt is yellow: there is AI power), \`over\` (red: today's budget or the
+  node's allowance is spent; \`fix\` says what to do), \`none\` (grey: no key and nothing the node
+  offers). \`remainingUsd\` and \`limitUsd\` are in US dollars; \`payer\` says whose money it is.
+- \`needs\` (an app that declares AI roles): one entry per capability the app uses, \`on\` or off with
+  the place to fix it. An app's pill shows these beside the bolt.
 
 ## 2. Five rules for code
 

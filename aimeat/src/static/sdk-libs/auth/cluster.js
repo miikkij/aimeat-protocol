@@ -11,6 +11,8 @@
  * @structure ensureClusterStyles() — idempotent <style> injector.
  * @usage import { ensureClusterStyles } from './cluster.js';   (pill.js calls it once per render)
  * @version-history
+ *   v1.5.0 — 2026-11-07 — The palette trigger's dot becomes a palette icon (`.aimeat-pal-ico`), and
+ *     `.aimeat-pop-wide` lets a row span the popover (the "Automatic" row, palette.js v1.4.0).
  *   v1.4.0 — 2026-09-26 — The segments' and the popover trigger's frame, and the popover group name's
  *     letter case and spacing, read the page theme's shape values (--shape-frame, --shape-frame-colour,
  *     --shape-case-label, --shape-tracking-label), falling back to the values they replace (a move).
@@ -95,9 +97,10 @@ export function ensureClusterStyles() {
       'border:1px solid color-mix(in oklab,currentColor 25%,transparent);overflow:hidden}',
     '.aimeat-pal-chip .pc-card{position:absolute;inset:5px 5px 3px 5px;border-radius:3px}',
     '.aimeat-pal-chip .pc-acc{position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%}',
-    /* The trigger's miniature: the active palette's accent as a dot. */
-    '.aimeat-pal-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;',
-      'border:1px solid color-mix(in oklab,currentColor 30%,transparent)}',
+    /* The trigger's icon: a painter's palette whose first blob is the active accent (palette.js). */
+    '.aimeat-pal-ico{display:block;flex:0 0 auto}',
+    /* A row across the whole popover: "Automatic: follows your device", above the looks. */
+    '.aimeat-pop .aimeat-pop-wide{grid-column:1/-1}',
 
   ].join('');
   (document.head || document.documentElement).appendChild(st);

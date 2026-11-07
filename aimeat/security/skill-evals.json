@@ -2,16 +2,16 @@
   "about": "For each skill with an eval suite under .claude/evals/<skill>/: the digest of the skill and its suite at the last decision, and whether the eval ran (with scores) or was skipped (with the reason and who decided). pnpm check:skill-evals fails when the digest changes. The eval costs money, so the developer decides: run it, or record a skip. Reasoning: aimeat/scripts/check-skill-evals.ts.",
   "skills": {
     "aimeat-writing": {
-      "digest": "sha256:26ac60375612c00e3b92d73f",
+      "digest": "sha256:4e668442b07c5930528fcb78",
       "decision": "skipped",
-      "on": "2026-11-06",
-      "note": "three language-context rows that name terms wave 6 introduced; vocabulary only, no change to the skill's instructions; Jouni 2026-11-06"
+      "on": "2026-11-07",
+      "note": "two rows added to the language context table (AI power, the connected light), no instruction changed; Jouni 2026-11-07"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:cd5753fef8b4cb9592d229b8",
+      "digest": "sha256:2beca58b3805dc59376c99f4",
       "decision": "skipped",
-      "on": "2026-10-22",
-      "note": "one added refusal code (SCOPE_DENIED for a private input the run may not read), no change to the skill's guidance; Jouni skipped evals for the secaudit wave 3 round, 2026-10-22"
+      "on": "2026-11-07",
+      "note": "additive: section 1 describes the new main, power and needs fields, the existing instructions are unchanged; Jouni 2026-11-07"
     }
   }
 }

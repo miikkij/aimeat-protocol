@@ -1199,8 +1199,13 @@
   async function postJson(path, body, fallback) {
     const r = await authFetch3(path, { method: "POST", body: JSON.stringify(body) });
     if (!r || !r.ok) throw aiError(r, fallback);
-    if (r.data) noteBudget(r.data.budget);
+    if (r.data) noteSpent(r.data.budget);
     return withProvenance(r);
+  }
+  function noteSpent(budget) {
+    if (!budget) return;
+    noteBudget(budget);
+    if (typeof window !== "undefined" && typeof CustomEvent === "function") window.dispatchEvent(new CustomEvent("aimeat-ai-used"));
   }
   function paid(opts, how, call) {
     const run = async () => {
@@ -1347,7 +1352,7 @@
           if (event.type === "error") throw aiError({ error: { code: event.code, message: event.message, details: event.details } }, "The AI stream failed");
           if (event.type === "done") {
             done = true;
-            if (event.budget) noteBudget(event.budget);
+            if (event.budget) noteSpent(event.budget);
           }
           yield event;
         }

@@ -20642,6 +20642,15 @@ paths:
         to read next (node:aimeat-ai-capabilities). For an owner or an agent, `own_key`: what the
         owner's own key reaches on this node, `{ set, covers, not_covered: [{ part, reason }] }`, the
         same answer as GET /v1/chat/status.
+
+        What the sign-in pill shows, from the same planned text state: `main` { connected, agents?,
+        latest? { name, platform?, lastSeen }, chat? }, whether the person's own AI is connected (at
+        least one agent, or the node's chat with a model that would run; an app reads `connected`
+        alone); `power` { state: ok | over | none, low, payer?: own | node | agent, spentTodayUsd,
+        limitUsd?, remainingUsd?, reason?, fix?, settingsUrl? }, whether a text call would run now,
+        is refused because the budget or the node's allowance is spent (`over`), or cannot run at all
+        (`none`), in US dollars; and, for an app that declares AI roles, `needs` [{ capability: vision
+        | image | transcription | speech, on, fix?, settingsUrl? }].
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -20654,7 +20663,7 @@ paths:
             type: string
       responses:
         '200':
-          description: data.capabilities, data.policy { mode, appliesToCaller }, data.budget { dailyBudgetUsd, spentTodayUsd, keySource? }, data.own_key? { set, covers, not_covered }, data.catalog { refreshedAt, snapshot }, data.guide.
+          description: data.capabilities, data.main { connected, agents?, latest?, chat? }, data.power { state, low, payer?, spentTodayUsd, limitUsd?, remainingUsd?, reason?, fix?, settingsUrl? }, data.needs? [{ capability, on, fix?, settingsUrl? }], data.policy { mode, appliesToCaller }, data.budget { dailyBudgetUsd, spentTodayUsd, keySource? }, data.own_key? { set, covers, not_covered }, data.catalog { refreshedAt, snapshot }, data.guide.
           content:
             application/json:
               schema:

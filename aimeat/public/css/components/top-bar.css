@@ -7,6 +7,9 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.9.0 — 2026-11-07 — The name stays in the folded bar (Jouni: the name is always visible somewhere,
+ *     and it leads home). It is the item that gives way: it shrinks to the width left and ends in an
+ *     ellipsis, at most 9rem. Before this the folded bar hid it with the "logged in" label.
  *   v1.8.0 — 2026-11-04 — The name in the login pill may be a link: the bar's link rules leave it looking
  *     like the plain name.
  *   v1.7.1 — 2026-11-01 — The short sign-in form and the phone rule now reach every node's signed-out
@@ -295,10 +298,19 @@
   .topnav-menu.open { display: flex; }
   .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
   .topnav-menu .topnav-center { width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
-  /* Compact gold pill: keep the green dot + Logout, drop the wordy label + GHII. */
-  .aimeat-auth-pill .aimeat-auth-label,
-  .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
+  /* Compact pill: the name stays, shorter. It is the one place on every width where the person
+     sees who is signed in and reaches their home (Jouni, 2026-11-07); the old "logged in" label
+     that used to make the pill too wide here is gone. */
+  .aimeat-auth-pill .aimeat-auth-label { display: none !important; }
   .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
+  /* The name is the one item in the folded bar that gives way: every box from the bar down to it
+     may shrink, and the name ends in an ellipsis in whatever width is left. Measured 2026-11-07 at
+     390px: a 25-character name takes the 57px left beside the bell, with no horizontal scroll.
+     Only in the folded bar: on the full row the name must not shrink, or the bar's own overflow
+     measurement (.topnav--compact) never sees an overflow and the bar never folds. Three classes
+     deep, so a phone bar without .topnav--compact beats the full row's `flex: none` above. */
+  .topnav .topnav-right, .topnav .topnav-right .header-auth-slot, .topnav .topnav-right .aimeat-auth-pill { min-width: 0; flex-shrink: 1; }
+  .topnav .topnav-right .aimeat-auth-ghii { max-width: 9rem; min-width: 3ch; flex-shrink: 1; }
 }
 .topnav--compact .topnav-right > .tooltip-anchor:has(> .topnav-home),
 .topnav--compact .topnav-right > .tooltip-anchor:has(> .topnav-burger) { display: inline-flex; }
@@ -319,8 +331,11 @@
 .topnav--compact .topnav-menu.open { display: flex; }
 .topnav--compact .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: var(--text-body); border-radius: var(--radius-xs); }
 .topnav--compact .topnav-menu .topnav-center { width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
-.topnav--compact .aimeat-auth-pill .aimeat-auth-label,
-.topnav--compact .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
+.topnav--compact .aimeat-auth-pill .aimeat-auth-label { display: none !important; }
+.topnav--compact .topnav-right,
+.topnav--compact .topnav-right .header-auth-slot,
+.topnav--compact .topnav-right .aimeat-auth-pill { min-width: 0; flex-shrink: 1; }
+.topnav--compact .topnav-right .aimeat-auth-ghii { max-width: 9rem; min-width: 3ch; flex-shrink: 1; }
 .topnav--compact .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
 
 /* Room for the open-items count in the compact bar. Measured 2026-08-09 at 390px: brand 82 +
@@ -343,6 +358,8 @@
   .topnav:not(.topnav--compact) { column-gap: 0.5rem; }
   .topnav .topnav-right { gap: 0.4rem; }
   .topnav .topnav-right a.topnav-home, .topnav .topnav-burger { width: 34px; }
+  /* The pill gives its padding to the name (2026-11-07, 390px: "sandbox" whole instead of "sandb…"). */
+  .topnav .aimeat-auth-pill { padding: 5px 7px !important; gap: 5px !important; }
 }
 /* Under 380px with the open-items count the row is still about 20px too wide (measured at 360px).
    The home and the burger give the rest, so every control stays on the bar. */

@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.12.0 — 2026-11-07 — `ai-usage` passes for a principal holding ai:use: today's AI spend changed,
+ *     so the sign-in pill's bolt reads it again.
  *   v1.11.0 — 2026-11-04 — isOwnerPrincipal reads isOwnerInPerson (utils/gaii.ts) of the roles instead
  *     of a copy of that test; the same answer for every role list (codebase analysis 2026-11-03, B1).
  *   v1.10.0 — 2026-11-01 — `app-parties` passes for a principal holding app:write: the people registered
@@ -124,6 +126,8 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   'agent-usage': 'task:read',
   // What the decision model decided (TARGET-080): the word every decide door already asks.
   'ai-decisions': 'ai:use',
+  // Today's AI spend changed (services/ai/usage-record.ts): the sign-in pill's bolt reads it again.
+  'ai-usage': 'ai:use',
   'agent-capabilities': 'task:read',
   'agent-directives': 'task:read',
   'agent-onboarding': 'task:read',

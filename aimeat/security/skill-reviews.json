@@ -421,7 +421,7 @@
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-07",
       "watches": [
         "aimeat/src/services/ai/capabilities.ts",
         "aimeat/src/services/ai/embed.ts",
@@ -429,7 +429,7 @@
         "aimeat/src/static/sdk-libs/ai/index.js",
         "aimeat/src/services/ai-jobs/ext-capability.ts"
       ],
-      "digest": "sha256:5ceb4504118f2ba14e7cb7c4"
+      "digest": "sha256:9b57f74d797305058cbcc962"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-11-05",
@@ -727,7 +727,7 @@
       "aimeat/src/routes/ai-policy.ts": "d70db16573f26c4b"
     },
     "node:aimeat-ai-capabilities": {
-      "aimeat/src/services/ai/capabilities.ts": "c2bd2ada0b90307e",
+      "aimeat/src/services/ai/capabilities.ts": "5d18ac7bea68a6da",
       "aimeat/src/services/ai/embed.ts": "0e692c5c58372a1a",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
       "aimeat/src/static/sdk-libs/ai/index.js": "230e6a57c0cd20e3",

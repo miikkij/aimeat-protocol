@@ -17,6 +17,8 @@
  *   calls aimeat_ai_capabilities and gets a fix for a capability that is off.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-capabilities.ts
  * @version-history
+ *   v1.4.0 — 2026-11-07 — 12b: the sign-in pill's `main` and `power` in every state (yellow, red, grey;
+ *     the light on and off), and an app's `needs`, where an app reads `connected` alone.
  *   v1.3.0 — 2026-10-27 — 7b: an agent of the same owner without ai:use is refused with a 403 naming
  *     the word, on GET /v1/ai/capabilities and on the provider test. Its own node moved to 28441 with
  *     every suite's fixed ports.
@@ -436,6 +438,38 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
       const hints: string[] = publish.ai_hints ?? [];
       assert(hints.some(h => h.includes('AIMEAT.ai.capabilities()')), `check-first hint: ${JSON.stringify(hints)}`);
       assert(hints.some(h => h.includes('declares no models')), `declare-models hint: ${JSON.stringify(hints)}`);
+    });
+
+    await test('12b. the sign-in pill: the light (main) and the bolt (power) in every state, and an app\'s needs without the owner\'s agents', async () => {
+      // Yellow: a's own key pays, the daily budget and what is left are in dollars.
+      const ok = (await caps(a.token)).body.data;
+      assert(ok.power?.state === 'ok' && ok.power.payer === 'own' && ok.power.limitUsd === 5 && ok.power.remainingUsd <= 5 && ok.power.low === false, `power ok: ${JSON.stringify(ok.power)}`);
+      assert(ok.main?.connected === true && ok.main.agents >= 2 && typeof ok.main.latest?.name === 'string' && ok.main.chat === true, `main for a: ${JSON.stringify(ok.main)}`);
+      // Red: the daily budget is spent, and the refusal's sentence comes with it.
+      assert((await settings(a, { daily_budget_usd: 0 })).status === 200, 'budget 0');
+      try {
+        const over = (await caps(a.token)).body.data.power;
+        assert(over.state === 'over' && over.reason === 'BUDGET_EXHAUSTED' && typeof over.fix === 'string' && over.fix.length > 10, `power over: ${JSON.stringify(over)}`);
+      } finally { await settings(a, { daily_budget_usd: 5 }); }
+      // Grey, and the light off: c has a provider with no key and no agent at all.
+      const none = (await caps(c.token)).body.data;
+      assert(none.power.state === 'none' && none.power.reason === 'NO_KEY' && typeof none.power.settingsUrl === 'string', `power none: ${JSON.stringify(none.power)}`);
+      assert(none.main.connected === false && none.main.agents === 0 && none.main.chat === false, `main for c: ${JSON.stringify(none.main)}`);
+      // b has an agent (test 2) and no provider: the light is on, the bolt grey.
+      const bOnly = (await caps(b.token)).body.data;
+      assert(bOnly.main.connected === true && bOnly.main.latest?.name === 'capbot' && bOnly.power.state === 'none', `b: ${JSON.stringify({ main: bOnly.main, power: bOnly.power })}`);
+      // An app that declares two roles sees one need per capability, off until the owner connects
+      // the roles, and of the light only whether it is on: never which agents the owner has.
+      const html = '<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="ai:use">'
+        + '<meta name="aimeat-ai" content="generates=text,image; role.drawer=text+image; role.listener=transcription"></head><body></body></html>';
+      const { token: appToken } = await publishApp(a, 'cap-needs.html', html);
+      const app = (await caps(appToken, `?app_id=${encodeURIComponent(`${a.name}/cap-needs.html`)}`)).body.data;
+      const needs: Array<{ capability: string; on: boolean; settingsUrl?: string }> = app.needs ?? [];
+      assert(needs.map(n => n.capability).join(',') === 'image,transcription', `needs: ${JSON.stringify(needs)}`);
+      assert(needs.every(n => n.on === false && typeof n.settingsUrl === 'string'), `unconnected roles are off with a place to fix: ${JSON.stringify(needs)}`);
+      assert(JSON.stringify(Object.keys(app.main ?? {})) === '["connected"]' && app.main.connected === true, `an app reads connected alone: ${JSON.stringify(app.main)}`);
+      // The owner's own answer names no needs: they belong to an app.
+      assert(ok.needs === undefined, `owner answer has no needs: ${JSON.stringify(ok.needs)}`);
     });
 
     await test('13. RETIRED_MODEL: the model a provider uses retires in the catalogue', async () => {

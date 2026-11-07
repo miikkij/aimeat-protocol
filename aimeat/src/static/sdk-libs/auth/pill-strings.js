@@ -18,6 +18,8 @@
  * @usage import { pillStrings } from './pill-strings.js';
  *   const i = Object.assign({}, pillStrings(lang), opts.i18n);   // a caller's strings always win
  * @version-history
+ *   v1.5.0 — 2026-11-07 — The words of the pill's AI state (ai-state.js): the light, the bolt and its
+ *     popup, and of the one-button light/dark switch (`toDark`, `toLight`).
  *   v1.4.0 — 2026-11-04 — `homeSettings`: where the name goes on a page that makes it a link, with the
  *     words of `home.settings.open` in locales/.
  *   v1.3.0 — 2026-09-24 — Themes & Styles: `lookThemes` and `lookStyles` name the picker's two groups,
@@ -44,6 +46,19 @@ export var PILL_STRINGS = {
     lookThemes: 'Themes', lookStyles: 'Styles in this theme', modeOnly: 'only',
     chooseLook: 'Choose look', switchLanguage: 'Language', pageSettings: 'Settings',
     homeSettings: 'Home settings',
+    toDark: 'Switch to dark', toLight: 'Switch to light',
+    aiOn: 'Your AI is connected', aiOff: 'No AI connected yet', aiAgents: 'Agents: {n}',
+    aiLatest: 'Last active: {name}', aiChat: 'The chat here is ready', aiConnect: 'Connect your AI',
+    aiShow: 'Show connections', aiOwnStill: 'Your connected AI still works on its own subscription.',
+    powerName: 'AI power', powerOk: 'AI power available', powerOver: "Today's limit is reached",
+    powerNone: 'No AI power here', powerLeft: '{left} left today. Daily limit {limit}.',
+    powerLeftNode: '{left} of your allowance left.', powerLow: 'Running low.',
+    payerOwn: 'You pay with your own key.', payerNode: 'This node pays.', payerAgent: "The agent's own key pays.",
+    canHead: 'What you can do now', needHead: 'This app uses',
+    capVision: 'Read pictures', capImage: 'Make pictures',
+    capTranscription: 'Speech to text', capSpeech: 'Text to speech',
+    capOn: 'On', capOff: 'Off', aiSettings: 'AI settings',
+    needRole: "Connect this app's AI roles in your AI settings.",
   },
   fi: {
     loggedIn: 'kirjautuneena', logoutBtn: 'Kirjaudu ulos', signInBtn: '❤️ Kirjaudu', account: 'Tili',
@@ -55,6 +70,19 @@ export var PILL_STRINGS = {
     lookThemes: 'Teemat', lookStyles: 'Tämän teeman tyylit', modeOnly: 'vain',
     chooseLook: 'Valitse tyyli', switchLanguage: 'Kieli', pageSettings: 'Asetukset',
     homeSettings: 'Kodin asetukset',
+    toDark: 'Vaihda tummaan', toLight: 'Vaihda vaaleaan',
+    aiOn: 'Tekoälysi on yhdistetty', aiOff: 'Tekoälyä ei ole vielä yhdistetty', aiAgents: 'Agentteja: {n}',
+    aiLatest: 'Viimeksi käytössä: {name}', aiChat: 'Tämän noden chat on valmis', aiConnect: 'Yhdistä tekoäly',
+    aiShow: 'Näytä yhteydet', aiOwnStill: 'Yhdistetty tekoälysi toimii silti omalla tilauksellaan.',
+    powerName: 'Tekoälyvirta', powerOk: 'Tekoälyvirtaa on', powerOver: 'Päivän raja on täynnä',
+    powerNone: 'Tekoälyvirtaa ei ole', powerLeft: '{left} jäljellä tänään. Päivän raja on {limit}.',
+    powerLeftNode: 'Osuuttasi on jäljellä {left}.', powerLow: 'Virta on vähissä.',
+    payerOwn: 'Maksat omalla avaimellasi.', payerNode: 'Node maksaa.', payerAgent: 'Agentin oma avain maksaa.',
+    canHead: 'Mitä voit tehdä nyt', needHead: 'Tämä sovellus käyttää',
+    capVision: 'Kuvan tulkinta', capImage: 'Kuvien teko',
+    capTranscription: 'Kuuntelu (puhe tekstiksi)', capSpeech: 'Puhe (teksti ääneksi)',
+    capOn: 'Käytössä', capOff: 'Ei käytössä', aiSettings: 'Tekoälyn asetukset',
+    needRole: 'Yhdistä tämän sovelluksen tekoälyroolit tekoälyn asetuksissa.',
   },
   es: {
     loggedIn: 'sesión iniciada', logoutBtn: 'Cerrar sesión', signInBtn: '❤️ Entrar', account: 'Cuenta',
@@ -66,6 +94,19 @@ export var PILL_STRINGS = {
     lookThemes: 'Temas', lookStyles: 'Estilos de este tema', modeOnly: 'solo',
     chooseLook: 'Elige el aspecto', switchLanguage: 'Idioma', pageSettings: 'Ajustes',
     homeSettings: 'Configuración del hogar',
+    toDark: 'Cambiar a oscuro', toLight: 'Cambiar a claro',
+    aiOn: 'Tu IA está conectada', aiOff: 'Aún no hay ninguna IA conectada', aiAgents: 'Agentes: {n}',
+    aiLatest: 'Activa por última vez: {name}', aiChat: 'El chat de este nodo está listo', aiConnect: 'Conecta tu IA',
+    aiShow: 'Ver conexiones', aiOwnStill: 'Tu IA conectada sigue funcionando con su propia suscripción.',
+    powerName: 'Energía de IA', powerOk: 'Hay energía de IA', powerOver: 'Se alcanzó el límite de hoy',
+    powerNone: 'No hay energía de IA aquí', powerLeft: 'Quedan {left} hoy. Límite diario: {limit}.',
+    powerLeftNode: 'Te quedan {left} de tu asignación.', powerLow: 'Queda poca.',
+    payerOwn: 'Pagas con tu propia clave.', payerNode: 'Paga este nodo.', payerAgent: 'Paga la clave propia del agente.',
+    canHead: 'Qué puedes hacer ahora', needHead: 'Esta aplicación usa',
+    capVision: 'Leer imágenes', capImage: 'Crear imágenes',
+    capTranscription: 'Escuchar (voz a texto)', capSpeech: 'Hablar (texto a voz)',
+    capOn: 'Activo', capOff: 'Inactivo', aiSettings: 'Ajustes de IA',
+    needRole: 'Conecta los roles de IA de esta aplicación en tus ajustes de IA.',
   },
 };
 

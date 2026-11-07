@@ -5,11 +5,13 @@
  *   refusal's details), the provenance record carried from the envelope's meta, the spend guard every
  *   paid call runs through (the optional confirm dialog and the in-flight collapse of identical
  *   calls), and the Blob conversions for a file or a recording an app holds in memory.
- * @structure aiError · withProvenance · postJson · paid · isBlob · blobToBase64 · blobToDataUrl
+ * @structure aiError · withProvenance · postJson · noteSpent · paid · isBlob · blobToBase64 · blobToDataUrl
  * @usage import { postJson, paid } from './call.js';
  *   return paid(opts, { key: ['ai-embed', opts.app_id, text], what: 'Make embeddings' },
  *     () => postJson('/v1/ai/embed', body, 'Embedding failed'));
  * @version-history
+ *   v1.2.0 - 2026-11-07 - noteSpent(): the budget is remembered and `aimeat-ai-used` fires, so the
+ *     sign-in pill's bolt follows the app's AI calls.
  *   v1.1.0 - 2026-10-02 - aiError lifts the refusal's `fix` (the person's sentence), `settingsUrl` and
  *     `reason` onto the error, so an app shows the sentence and a link to where the fix is.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: extracted from complete() so image, speak,
@@ -65,8 +67,20 @@ export function withProvenance(r) {
 export async function postJson(path, body, fallback) {
   const r = await authFetch(path, { method: 'POST', body: JSON.stringify(body) });
   if (!r || !r.ok) throw aiError(r, fallback);
-  if (r.data) noteBudget(r.data.budget);
+  if (r.data) noteSpent(r.data.budget);
   return withProvenance(r);
+}
+
+/**
+ * Remember the budget block an AI call returned (the spend guard's noteBudget) and tell the page that
+ * AI power was spent: the `aimeat-ai-used` window event, on which the sign-in pill reads its bolt
+ * again (auth/ai-state.js). An event the page hears, never a timer.
+ * @param {any} budget
+ */
+export function noteSpent(budget) {
+  if (!budget) return;
+  noteBudget(budget);
+  if (typeof window !== 'undefined' && typeof CustomEvent === 'function') window.dispatchEvent(new CustomEvent('aimeat-ai-used'));
 }
 
 /**

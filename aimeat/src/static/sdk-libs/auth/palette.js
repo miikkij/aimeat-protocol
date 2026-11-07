@@ -21,6 +21,9 @@
  * @usage import { PALETTES, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
  *   In the app: nothing — the login pill renders the picker and the CSS follows.
  * @version-history
+ *   v1.4.0 — 2026-11-07 — The trigger is a painter's palette icon, its first blob the active accent (the
+ *     red dot it replaces read as the flag of Japan). paletteControlHtml takes the pill's "Automatic"
+ *     row and puts it first in the popover, now that light/dark is one button (theme.js v2.0.0).
  *   v1.3.0 — 2026-09-24 — On the node's own pages the picker reads the shell's look
  *     (window.__aimeatLook): the styles of the person's theme, the available themes when there are
  *     more than one, and no picker when the operator decides. Everywhere else PALETTES as before.
@@ -172,7 +175,27 @@ var reopen = null;
  * with more than one theme available, the themes come first and the theme's styles under them.
  * @param {{ chooseLook?: string, lookThemes?: string, lookStyles?: string, styleLightOnly?: string, styleDarkOnly?: string }} [i]
  */
-export function paletteControlHtml(i) {
+/**
+ * The trigger's icon: a painter's palette, the mark people know for "choose colours". Its first
+ * blob wears the active palette's accent (syncDot keeps it), the other three are fixed. The red dot
+ * it replaces read as the flag of Japan (Jouni, 2026-11-07).
+ * @param {string} accent
+ */
+function paletteIconHtml(accent) {
+  return '<svg class="aimeat-pal-ico" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.6-.7 1.6-1.7 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7h2c3 0 5.5-2.5 5.5-5.5C22 6 17.5 2 12 2z"/>'
+    + '<circle class="aimeat-pal-cur" cx="7.5" cy="10.5" r="1.8" stroke="none" fill="' + esc(accent) + '"/>'
+    + '<circle cx="10.5" cy="6.5" r="1.8" stroke="none" fill="#FFB52E"/>'
+    + '<circle cx="15.5" cy="6.5" r="1.8" stroke="none" fill="#10B981"/>'
+    + '<circle cx="18" cy="10.5" r="1.8" stroke="none" fill="#3B82F6"/></svg>';
+}
+
+/**
+ * @param {Record<string, string>} i  the pill's words
+ * @param {string} [autoRow]  the "Automatic: follows your device" row the pill builds (theme.js
+ *   wireAutoMode binds it); placed first in the popover, because it is part of how the page looks.
+ */
+export function paletteControlHtml(i, autoRow) {
   var s = innerState();
   // The operator decides the look for everybody: there is nothing to choose, so there is no picker.
   if (s && !s.personalChoice) return '';
@@ -186,9 +209,10 @@ export function paletteControlHtml(i) {
   return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap">'
     + '<button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" '
     + 'title="' + esc(label) + '" aria-label="' + esc(label) + '">'
-    + '<span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button>'
+    + paletteIconHtml(curAcc) + '</button>'
     // An option's chosen state is aria-selected for a screen reader; aria-pressed stays as the CSS hook.
     + '<span class="aimeat-pop" role="listbox" aria-label="' + esc(label) + '">'
+    + (autoRow || '')
     // A style with one mode says so here too: the light/dark switch beside the picker is off.
     + (s && s.only ? '<span class="aimeat-pop-note">' + esc(s.only === 'light' ? ((i && i.styleLightOnly) || 'This style has a light mode only')
       : ((i && i.styleDarkOnly) || 'This style has a dark mode only')) + '</span>' : '')
@@ -227,8 +251,8 @@ export function wirePaletteControl(container, clampPopover) {
     var cur = aimeatReadPalette();
     var mode = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
     var p = list.find(function (x) { return x.id === cur; }) || list[0];
-    var dot = /** @type {HTMLElement|null} */ (root.querySelector('.aimeat-pal-dot'));
-    if (dot) dot.style.background = p.swatch[mode].accent;
+    var dot = root.querySelector('.aimeat-pal-cur');
+    if (dot) dot.setAttribute('fill', p.swatch[mode].accent);
     root.querySelectorAll('button[data-palette]').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-palette') === cur));
       b.setAttribute('aria-selected', String(b.getAttribute('data-palette') === cur));

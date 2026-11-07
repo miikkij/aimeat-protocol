@@ -9,6 +9,9 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v2.0.0 — 2026-11-07 — The light/dark switch is ONE button that shows the mode in effect and turns to
+ *     the other (Jouni's review of the sign-in pill); "Automatic" moves to the look picker's first row
+ *     (wireAutoMode). Sign-out is an icon button (`.aimeat-icon-btn`), no longer an underlined word.
  *   v1.9.1 — 2026-11-04 — The name as a link (pill.js opts.nameHref) looks like the plain name, and
  *     underlines on hover and on keyboard focus.
  *   v1.9.0 — 2026-10-31 — aimeatReadTheme() is light when nothing is chosen; the OS preference
@@ -161,71 +164,70 @@ export function aimeatFixedLight() {
   } catch { return false; }
 }
 
+// The two icons of the one-button switch: the button shows the mode the page is in (sun in the
+// light, moon in the dark), the most common convention, and a press turns to the other.
+var SUN_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">'
+  + '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+var MOON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+
+/** The button's inner markup and words for the mode shown now. */
+function modeButtonParts(i) {
+  var shown = aimeatReadTheme();
+  var target = shown === 'dark' ? 'light' : 'dark';
+  var label = target === 'dark' ? (i.toDark || 'Switch to dark') : (i.toLight || 'Switch to light');
+  return { shown: shown, target: target, label: label, icon: shown === 'dark' ? MOON_SVG : SUN_SVG };
+}
+
 /**
- * The MODE control: a segmented ☀ | ☾ where both options are visible and the active one is
- * marked — the same pattern as the language switch, so the cluster reads as one instrument.
- * Cluster classes come from cluster.js (ensureClusterStyles).
+ * The MODE control: ONE button (Jouni, 2026-11-07: "toi light dark voisi olla yksi nappi jota
+ * painaa niin se vaihtaa tilaa"). It shows the mode the page is in and a press turns to the other.
+ * "Automatic" (follow the device) is no longer a third segment: it is the first row of the look
+ * picker (palette.js autoRow), where the rest of the look is chosen.
  *
- * On a fixed-light page both buttons are `disabled` and the group carries the reason as its
- * title, because a native tooltip on a disabled button is not shown — the group is what a hover
- * lands on. The buttons keep their `#aimeat-mode-switch button[data-mode]` shape so the Atelier
- * shell's iris interceptor still recognises (and harmlessly ignores) them.
+ * On a fixed-light page, and under a style with one mode, the button is `disabled` and its wrapper
+ * carries the reason as its title, because a native tooltip on a disabled button is not shown. The
+ * button keeps the `#aimeat-mode-switch button[data-mode]` shape so the Atelier shell's iris
+ * interceptor still recognises (and harmlessly ignores) it; `data-mode` is the mode a press gives.
  */
 export function modeSwitchHtml(i) {
-  // The pressed button is the person's choice: "Auto" when they chose automatic, else the mode shown.
-  var cur = aimeatThemeChoice() === 'auto' ? 'auto' : aimeatReadTheme();
-  var light = i.lightMode || 'Light mode';
-  var dark = i.darkMode || 'Dark mode';
-  var auto = i.autoMode || 'Automatic: follows your device';
+  var p = modeButtonParts(i);
   var fixed = aimeatFixedLight();
   var why = i.fixedRegister || 'This register keeps its own light';
   // A style with one mode only (Themes & Styles): the node's look script says which mode it keeps.
   var only = styleOnlyMode();
   if (only) {
-    cur = only;
     why = only === 'light' ? (i.styleLightOnly || 'This style has a light mode only') : (i.styleDarkOnly || 'This style has a dark mode only');
+    p.icon = only === 'dark' ? MOON_SVG : SUN_SVG;
   }
-  var seg = fixed
-    ? ' class="aimeat-seg aimeat-seg--fixed" title="' + escHtml(why) + '" aria-label="' + escHtml(why) + '"'
-    : ' class="aimeat-seg" aria-label="' + escHtml(i.themeLabel || 'Theme') + '"';
-  var off = fixed ? ' disabled aria-disabled="true" title="' + escHtml(why) + '"' : '';
-  // A one-mode style says so where the switch is seen, not only on hover: "☾ only" on the kept mode.
-  var onlyWord = function (m) { return only === m ? '<span aria-hidden="true">' + escHtml(i.modeOnly || 'only') + '</span>' : ''; };
-  return '<span id="aimeat-mode-switch" role="group"' + seg + '>'
-    + '<button type="button" data-mode="light" aria-pressed="' + (cur === 'light') + '"' + (fixed ? off : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '">'
-    + '<span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord('light') + '</button>'
-    + '<button type="button" data-mode="dark" aria-pressed="' + (cur === 'dark') + '"' + (fixed ? off : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '">'
-    + '<span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord('dark') + '</button>'
-    // "Automatic": the device decides. The only way the OS setting is followed (v31 K65).
-    + (fixed || only ? '' : '<button type="button" data-mode="auto" aria-pressed="' + (cur === 'auto') + '" title="' + escHtml(auto) + '" aria-label="' + escHtml(auto) + '">'
-      + '<span class="seg-ico" aria-hidden="true">' + escHtml(i.autoShort || 'Auto') + '</span></button>')
-    + '</span>';
+  var stood = fixed || !!only;
+  return '<span id="aimeat-mode-switch" class="aimeat-mode-one' + (stood ? ' aimeat-seg--fixed' : '') + '"'
+    + (stood ? ' title="' + escHtml(why) + '"' : '') + '>'
+    + '<button type="button" class="aimeat-icon-btn" data-mode="' + p.target + '"'
+    + (stood ? ' disabled aria-disabled="true" aria-label="' + escHtml(why) + '"' : ' title="' + escHtml(p.label) + '" aria-label="' + escHtml(p.label) + '"')
+    + '>' + p.icon + '</button></span>';
 }
 
-export function wireModeSwitch(container) {
+export function wireModeSwitch(container, i) {
   var root = container.querySelector('#aimeat-mode-switch');
   if (!root) return;
   // A fixed-light page binds nothing: no click handler, no follower. The stored preference and the
   // operating system's setting are left exactly as they were — standing down means standing down.
-  if (aimeatFixedLight()) return;
-  function sync(cur) {
-    root.querySelectorAll('button[data-mode]').forEach(function (b) {
-      b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === cur));
-    });
+  if (aimeatFixedLight() || styleOnlyMode()) return;
+  var btn = /** @type {HTMLElement|null} */ (root.querySelector('button[data-mode]'));
+  if (!btn) return;
+  var words = i || {};
+  function sync() {
+    var p = modeButtonParts(words);
+    btn.setAttribute('data-mode', p.target);
+    btn.setAttribute('title', p.label);
+    btn.setAttribute('aria-label', p.label);
+    btn.innerHTML = p.icon;
   }
-  root.querySelectorAll('button[data-mode]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var m = b.getAttribute('data-mode');
-      aimeatApplyTheme(m);
-      sync(m);
-    });
-  });
-  // Follow out-of-band changes (the app's own logic, another control instance, the SPA). The choice
-  // decides which button is pressed: "Auto" stays pressed while the device flips the mode.
-  window.addEventListener('aimeat-theme-change', function (ev) {
-    var e = /** @type {CustomEvent} */ (ev);
-    if (e && e.detail && e.detail.theme) sync(aimeatThemeChoice() === 'auto' ? 'auto' : e.detail.theme);
-  });
+  btn.addEventListener('click', function () { aimeatApplyTheme(btn.getAttribute('data-mode')); sync(); });
+  // Follow out-of-band changes (the app's own logic, another control instance, the SPA, the device
+  // while "automatic" is on).
+  window.addEventListener('aimeat-theme-change', sync);
   // On "automatic", a change of the device's setting changes the page at once.
   if (window.matchMedia) {
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -233,6 +235,26 @@ export function wireModeSwitch(container) {
     if (mq.addEventListener) mq.addEventListener('change', onOs);
   }
 }
+
+/**
+ * The look picker's "Automatic: follows your device" row (palette.js autoRowHtml): a press turns
+ * automatic on, a second press turns it off and keeps the mode shown now. Bound here because
+ * palette.js must not import from this file.
+ * @param {Element} container
+ */
+export function wireAutoMode(container) {
+  var b = container.querySelector('button[data-mode-auto]');
+  if (!b || aimeatFixedLight() || styleOnlyMode()) return;
+  var sync = function () { b.setAttribute('aria-pressed', String(aimeatThemeChoice() === 'auto')); };
+  b.addEventListener('click', function () {
+    aimeatApplyTheme(aimeatThemeChoice() === 'auto' ? aimeatReadTheme() : 'auto');
+    sync();
+  });
+  window.addEventListener('aimeat-theme-change', sync);
+}
+
+/** Whether "automatic" is the person's choice, for the picker's row. */
+export function aimeatAutoChosen() { return aimeatThemeChoice() === 'auto'; }
 
 // ── The pill's stylesheet (signed in, signed out, and the compact form) ──
 // One injected sheet, class-based. Every colour is a page token with a fallback, so the pill is ink
@@ -277,10 +299,15 @@ export function ensureAuthPillStyles() {
       'padding:1px 6px;border:' + frame + frameCur + '}',
     '.aimeat-auth-gear{appearance:none;background:none;border:' + frame + frameCur + ';color:inherit;border-radius:0;',
       'padding:2px 7px;cursor:pointer;font-size:13px;line-height:1}',
-    '.aimeat-auth-logout{appearance:none;background:none;border:0;border-bottom:' + frame + frameCur + ';border-radius:0;',
-      'padding:0 0 1px;margin:0;cursor:pointer;color:inherit;font-family:inherit;font-size:11px;font-weight:800;',
-      actionCase + ';line-height:1.4}',
-    '.aimeat-auth-logout:hover,.aimeat-auth-gear:hover{color:' + hot + ';border-color:' + hot + '}',
+    /* An icon button in the pill's row: the light/dark switch and sign-out, the size of the cluster's
+       segments (cluster.js), framed like them. */
+    '.aimeat-icon-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;',
+      'width:26px;height:26px;padding:0;margin:0;background:transparent;color:inherit;cursor:pointer;',
+      'border:' + frame + frameCur + ';border-radius:var(--aimeat-pill-radius,0);line-height:0}',
+    '.aimeat-icon-btn:focus-visible{outline:2px solid currentColor;outline-offset:2px}',
+    '.aimeat-icon-btn[disabled]{cursor:default;opacity:.55}',
+    '.aimeat-mode-one{display:inline-flex}',
+    '.aimeat-icon-btn:hover:not([disabled]),.aimeat-auth-gear:hover{color:' + hot + ';border-color:' + hot + '}',
     /* Signed out: the cluster beside one ink slab with the sun's offset shadow. */
     '.aimeat-auth-out{display:inline-flex;align-items:center;gap:10px;color:' + ink + '}',
     '.aimeat-sign-btn{appearance:none;padding:8px 16px;background:var(--aimeat-pill-cta-bg,' + ink + ');',
