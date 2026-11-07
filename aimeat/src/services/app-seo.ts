@@ -36,6 +36,8 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.5.1 — 2026-11-07 — seoNote(state, announced): an app switched on that the node does not announce
+ *     (seo.announce_apps off, or a thin page) is no longer told it was added to the sitemap.
  *   v1.5.0 — 2026-11-06 — Switching search on is refused below APP_OWN_WORDS_MIN words of the app's own
  *     text (thinPageRefusal), and appSeoListable asks the same floor, so an app already on is kept out
  *     of the sitemaps and IndexNow until its text is written. The seo answer carries own_words and
@@ -306,7 +308,8 @@ export async function applyOwnerSeoUpdate(
 
   const ownWords = appOwnWords(after);
   const short = state === 'on' && ownWords < APP_OWN_WORDS_MIN ? ` ${thinPageNote(ownWords)}` : '';
-  return { state, note: seoNote(state) + short, seo: after.manifest?.seo ?? {}, own_words: ownWords, own_words_min: APP_OWN_WORDS_MIN };
+  const announced = config.seoAnnounceApps && appSeoListable(after, config);
+  return { state, note: seoNote(state, announced) + short, seo: after.manifest?.seo ?? {}, own_words: ownWords, own_words_min: APP_OWN_WORDS_MIN };
 }
 
 /**
@@ -380,11 +383,17 @@ export async function ownerAppSeo(
     { ownerGaii: scope.ownerGhii, ownerName: scope.ownerName, filename: args.filename }, args.seo);
 }
 
-/** What to tell the owner, given where their app actually ended up. */
-export function seoNote(state: AppSeoState): string {
+/**
+ * What to tell the owner, given where their app actually ended up. `announced` is false when the node
+ * does not point search engines at the app (seo.announce_apps off, or the page is thin): the app is
+ * then readable at its address but in no sitemap and no notice, and the note must not say otherwise.
+ */
+export function seoNote(state: AppSeoState, announced = true): string {
   switch (state) {
     case 'on':
-      return 'This app can now be found in search engines. It has been added to this node\'s sitemap; engines usually take a few days to pick it up.';
+      return announced
+        ? 'This app can now be found in search engines. It has been added to this node\'s sitemap; engines usually take a few days to pick it up.'
+        : 'Search engines may now read this app at its address. This node does not yet list it in its sitemap or notify the engines about it.';
     case 'pending':
       return 'Search visibility requested. Whoever runs this node reviews it before the app appears in search engines.';
     case 'blocked':
