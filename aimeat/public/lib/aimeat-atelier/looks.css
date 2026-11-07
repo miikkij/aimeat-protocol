@@ -2077,3 +2077,55 @@
 [data-ak-look='konserni'] .ak-btn--primary:hover, [data-ak-look='konserni'] .ak-btn--primary:active { filter: brightness(0.94); }
 [data-ak-look='konserni'] .ak-input:not(.ak-input--range) { background: var(--ak-surface); }
 [data-ak-look='konserni'] .ak-input:focus { border-color: var(--ak-accent-text); }
+
+/* @preset-block clean — a clean working tool: neutral greys, the system's own fonts, 1 px hairlines, 6-8 px corners, shadow only on what floats, one accent for what is chosen, and nothing moving at idle.
+   The clean look, taken from PANEELI's design-tool look on 2026-11-07 and offered in every proposal beside the coloured ones. The grounds are PANEELI's values; like every look it takes its accent from the viewer's palette, and the clean style kit makes it one blue. */
+[data-ak-look='clean'] {
+  --ak-page-image:        none;
+  --ak-surface-image:     none;
+  --ak-hero-image:        none;
+  --ak-grain:             none;
+  --ak-blur:              0px;
+  --ak-display-shadow:    none;
+  --ak-display-stroke:    0;
+  --ak-tilt:              0deg;
+  --ak-kinetic:           none;
+  --ak-ambient:           none;
+  --ak-glass:             var(--ak-surface);
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 86%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 86%, var(--ak-ink)));
+  --ak-radius:            8px;
+  --ak-radius-sm:         6px;
+  --ak-radius-pill:       999px;
+  --ak-line-w:            1px;
+  --ak-elev-1:            none;
+  --ak-elev-2:            0 8px 24px color-mix(in oklab, var(--ak-ink) 10%, transparent), 0 1px 2px color-mix(in oklab, var(--ak-ink) 6%, transparent);
+  --ak-font-display:      system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, 'Helvetica Neue', Arial, sans-serif;
+  --ak-font:              system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, 'Helvetica Neue', Arial, sans-serif;
+  --ak-font-mono:         ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --ak-weight-display:    650;
+  --ak-gap:               16px;
+  --ak-enter-distance:    4px;
+  --ak-enter-stagger:     16ms;
+  --ak-motion:            140ms;
+  --ak-spring-stiffness:  300;
+  --ak-spring-damping:    32;
+  --ak-spring-mass:       1;
+  --ak-bg:                #eff0f2;
+  --ak-surface:           #ffffff;
+  --ak-surface-2:         #f4f5f7;
+  --ak-ink:               #111827;
+  --ak-ink-dim:           #5f6673;
+  --ak-line:              #d8dbe0;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+}
+/* @preset-block clean@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='clean'], [data-ak-look='clean'][data-theme='dark'] {
+  --ak-bg:         #0b0c0e;
+  --ak-surface:    #18191d;
+  --ak-surface-2:  #1f2125;
+  --ak-ink:        #e7e9ec;
+  --ak-ink-dim:    #9aa1ad;
+  --ak-line:       #30333a;
+}

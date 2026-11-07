@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.43.0 — 2026-11-07 — ADDITIVE: the interview's introduction question after the data map, and the section "An introduction, when the owner asked for one" after "Data, in short" (build-introduction-step.ts); the spec token moves with the body.
  *   v1.42.0 — 2026-10-30 — ADDITIVE: THE STYLE KIT COMES BEFORE THE GENRE, first in "The Design Book first" (KIT_PROMPT_PARAGRAPH in design-book/kit.ts).
  *   v1.41.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew
  *     (proposals.layout), and the steps stay off the chat (cold runs drew the whole step table there).
@@ -161,6 +162,7 @@ import { buildAtelierLibrarySection } from '../data/library-packs.js';
 import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
 import { atelierMotionParts } from './build-atelier-motion-parts.js';
 import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.js';
+import { INTRODUCTION_QUESTION, ATELIER_INTRODUCTION_SECTION } from './build-introduction-step.js';
 import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
 import { ornamentsPromptPart } from '../data/atelier-ornaments.js';
@@ -728,7 +730,7 @@ function composeBody(config: AimeatConfig): string {
     + '`AIMEAT.data.set/get` with a `<app-name>.`-prefixed key; one key holds one record a user '
     + 'opens as a unit, never one key per field; read back after writing. Declare the scopes the '
     + 'app uses in `<meta name="aimeat-scopes">`.\n\n';
-  body += ATELIER_DATA_MAP_STEER;
+  body += ATELIER_DATA_MAP_STEER + ATELIER_INTRODUCTION_SECTION;
 
   body += '## Finishing\n\n';
   body += 'Before you call it done: open the app at 390×844, 1280×900 and 1280×460 in BOTH '
@@ -769,7 +771,7 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '4. Which languages should it speak?\n'
     + '5. Anything it must NOT do?\n\n'
     + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n\n';
-  full += buildDataMapStep('atelier') + ATELIER_STRUCTURE_STEP;
+  full += buildDataMapStep('atelier') + INTRODUCTION_QUESTION + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.
   full += ATELIER_PROPOSAL_SECTION;

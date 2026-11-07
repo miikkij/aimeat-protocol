@@ -24,6 +24,10 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.7.0 — 2026-11-07 — The proposal offers three to five designs and one is always the clean look
+ *     (it replaced "Two or three genres"), states the introduction the interview agreed, and on
+ *     `plain` keeps the designs as looks and the introduction (build-introduction-step.ts). Jouni:
+ *     "olisi hyvä antaa 3-5 vaihtoehtoa ja 1 niistä olisi aina tämä default clean vaihtoehto".
  *   v1.6.0 — 2026-10-17 — ADDITIVE: the proposal states the data map and repeats the confirmed
  *     scenario, one bullet after "Who signs in" (build-data-map-step.ts, plan V7).
  *   v1.5.0 — 2026-09-20 — Components: how to take one another app made, and how to make a
@@ -43,6 +47,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { ATELIER_DATA_MAP_PROPOSAL_LINE } from './build-data-map-step.js';
+import { ATELIER_DESIGNS_PROPOSAL_LINE, ATELIER_INTRODUCTION_PROPOSAL_LINE } from './build-introduction-step.js';
 
 /**
  * The end of the mosaic section. WHY IT EXISTS: until 2026-09-20 the specification asked for two
@@ -107,15 +112,16 @@ export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answe
   + '(3) **The finest**: a committed look forked from a genre, proven parts from the Design Book, components of its own where the book has none. It takes the longest and is the one worth showing. '
   + 'All three are built the same way underneath, in two languages, with the data kept on their node, so a prototype can be raised to the finest later without starting over: say that, because it is what makes the quick one a safe choice. '
   + 'If they do not answer, recommend one and say why; never pick a lower one silently because it is less work. '
-  + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` and `plain` the rest of this list shrinks to the languages, who signs in and the first screen: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does writing down why you took, passed over and made each thing (the build notes, part `book`). A page that states no level is held to `fine`.\n'
-  + '- **Two or three genres, named, each with one sentence on why it fits THIS app** and what the first screen would look like in it. Get them from the genre list (part `genre`, or `aimeat_designbook_search { kind: "genre" }`), and look at the owner\'s own apps first (`aimeat_app_list`): the ones already on Atelier show what they like. Say which one you would take. A look preset with components stacked in it is not on this list: that is the default page every app looks like, and it is what gets sent back.\n'
+  + 'The page states the level: `<meta name="aimeat-level" content="proto">`, `"plain"` or `"fine"`. On `proto` the rest of this list shrinks to the languages, who signs in and the first screen, and on `plain` to those, the designs as looks and the introduction: no genre is forked, the page starts from the Atelier shell (`aimeat_app_template_get { id: "shell-atelier" }`), the publish asks for no register, and nothing is styled by hand (a publish warns when such a page carries a sheet of styles of its own). On `fine`, everything below applies, and so does writing down why you took, passed over and made each thing (the build notes, part `book`). A page that states no level is held to `fine`.\n'
+  + ATELIER_DESIGNS_PROPOSAL_LINE
   + '- **Fixed colours or following their theme?** Ask it, or recommend one and say why. A fixed genre keeps its own colours in light and dark; a following page changes with the person\'s theme and palette. Part `genre` says which each genre is and gives an address for each (`See it`), and the whole shelf is one link: send the owner the links so they choose by looking. If they want a genre that is fixed and want it to follow the theme, say that it means moving its colours to the theme\'s tokens, and that you will show it in both modes before they decide.\n'
   + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `book`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. The working screen of the app is a mosaic inside the genre, and its arrangement is where a fill from the book lands (part `book` shows how). THIS LINE IS OWED IN EVERY PROPOSAL, word for word in its shape: "From the Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take nothing, because <what you looked at and why none of it fits>". Taking nothing is allowed; taking nothing in silence is not. What you have to make because the book lacks it is written down with its reason in the page\'s build notes; it is offered to the book when the owner is satisfied with the app, and not because the build is finished.\n'
   + '- **The languages: English and Finnish, unless they say otherwise.** Two languages is the default on this node. The language you are talking in is not the app\'s language list. Building for one language is the owner\'s decision, so ask it as a question if you think one is right, and do not decide it.\n'
   + '- **Who signs in**, and what is kept for them. An app nobody signs in to says so here.\n'
   + ATELIER_DATA_MAP_PROPOSAL_LINE
+  + ATELIER_INTRODUCTION_PROPOSAL_LINE
   + '- **The first screen in one or two sentences**: what the person sees and does first. If that sentence is "a header and some cards", you have not designed it yet.\n\n'
-  + 'Offer it as choices the owner can answer with a word. If they said "just build it", still say in one line which genre and which languages you are taking, so they can stop you. Then build on the Atelier track:\n\n';
+  + 'Offer it as choices the owner can answer with a word. If they said "just build it", still say in one line which design and which languages you are taking, so they can stop you. Then build on the Atelier track:\n\n';
 
 /** In the body, right after the genre section, so it travels in part `genre`. */
 export const ATELIER_FORK_PEOPLE_SECTION = '## A fork people sign in to, in two languages\n\n'

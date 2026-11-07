@@ -30,6 +30,9 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
+ *   v1.2.3 -- 2026-11-07 -- Reads build-introduction-step.ts, the Atelier interview's introduction
+ *     question and its build section (it names aimeat_skill_get, aimeat_image_generate and
+ *     aimeat_app_list).
  *   v1.2.2 -- 2026-10-17 -- Reads build-data-map-step.ts, the data map step both build interviews
  *     include (it names aimeat_app_manage and PATCH /v1/apps/:filename).
  *   v1.2.1 -- 2026-10-12 -- Reads the four skills of docs audit phase 5a (data ownership, attached MCP
@@ -84,6 +87,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/build-app-prompt-driven.ts',
     'aimeat/src/services/build-atelier-prompt.ts',
     'aimeat/src/services/build-data-map-step.ts',
+    'aimeat/src/services/build-introduction-step.ts',
     'aimeat/src/services/build-extension-prompt.ts',
     'aimeat/src/services/build-cortex-prompt.ts',
     'aimeat/src/services/appdev-flow-prompt.ts',
