@@ -1,8 +1,8 @@
 ## Alkuun pääsy {#start}
 
-ChatGPT, Claude tai Grok on oikea kätesi: se muistaa ja hoitaa asiasi. Agentit tekevät sovitut työt jatkuvasti, myös kun olet poissa.
+AIMEAT moninkertaistaa tekoälysi kyvyt ja tekee niistä helppoja käyttää. Täällä ChatGPT, Claude tai Grok muistaa työsi, rakentaa sen, mitä tarvitset, ja tekee työtä valitsemiesi ihmisten kanssa. Agentit tekevät sovitut työt jatkuvasti, myös kun olet poissa.
 
-AIMEAT on sinun oma paikkasi, jossa tämä kaikki tapahtuu. Kaikki tieto täällä on sinun.
+Sinä päätät, kuka näkee mitä ja mitä tekoäly saa tehdä, ja näet, mitä se on tehnyt. Kaikki tieto täällä on sinun.
 
 <!--store-->
 [Kodissa](/v1/home) on neljä alkuaskelta. Tee ne järjestyksessä, sillä jokainen askel avaa seuraavan:

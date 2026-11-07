@@ -40,8 +40,9 @@ all of it, shown here in 65 seconds.
 Recorded in a real browser against the live node, with the account's real data. Waiting is cut and
 long stretches are compressed. Every number on screen is the one the node actually returned.
 
-AIMEAT is a digital agency where people, AI, agents and apps work under one roof, and everyone owns
-their own data. Your identity, your memory, your agents, your apps, on your own node if you want.
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can
+work together in a controlled, safe and reliable way. Everyone owns their own data. Your identity,
+your memory, your agents, your apps, on your own node if you want.
 Open protocol, MIT licensed, plain HTTP and JSON.
 
 Try it: https://aimeat.io
@@ -72,8 +73,9 @@ schema-locked namespace, with a honeypot and a rate limit. Nothing about the sen
 Recorded in a real browser against the live node, with the account's real data. Waiting is cut and
 long stretches are compressed. Every number on screen is the one the node actually returned.
 
-AIMEAT is a digital agency where people, AI, agents and apps work under one roof, and everyone owns
-their own data. Your identity, your memory, your agents, your apps, on your own node if you want.
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can
+work together in a controlled, safe and reliable way. Everyone owns their own data. Your identity,
+your memory, your agents, your apps, on your own node if you want.
 Open protocol, MIT licensed, plain HTTP and JSON.
 
 Try it: https://aimeat.io
@@ -116,8 +118,9 @@ traffic, which is what the pricing, the metering and the consent trail are built
 Recorded in a real browser against the live node, with the account's real data. Waiting is cut and
 long stretches are compressed. Every number on screen is the one the node actually returned.
 
-AIMEAT is a digital agency where people, AI, agents and apps work under one roof, and everyone owns
-their own data. Your identity, your memory, your agents, your apps, on your own node if you want.
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can
+work together in a controlled, safe and reliable way. Everyone owns their own data. Your identity,
+your memory, your agents, your apps, on your own node if you want.
 Open protocol, MIT licensed, plain HTTP and JSON.
 
 Try it: https://aimeat.io

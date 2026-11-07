@@ -16464,8 +16464,12 @@
     "install": "Install",
     "notNow": "Not now"
   },
+  "aimeatStory": {
+    "oneLine": "AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.",
+    "paragraph": "Data is at the centre, above all the refined knowledge people bring and own. People, their AIs, agents and apps work on the same data: each person decides who sees it and what an AI may do with it, and sees what was done. The whole system can be used through AI from start to finish, because every part carries instructions an AI understands at once. And everyone can build their own view of shared data, with their own tools and agents: the same knowledge, seen at the angle each person needs."
+  },
   "homeConnect": {
-    "lead": "Connect ChatGPT, Claude or Grok here, and it becomes your right hand: it remembers your things and takes care of them for you.",
+    "lead": "Connect ChatGPT, Claude or Grok here, and what it can do multiplies: it remembers your work, builds what you need and works with the people you choose, under your control.",
     "button": "Connect {ai}",
     "other": "Another AI",
     "mcpQ": "What is this?",
@@ -18488,7 +18492,6 @@
     "loopConnect1": "Connect your AI",
     "loopConnect2": "Describe your app and give your AI the prompt",
     "loopConnect3": "Your AI builds and publishes the app. Share the link.",
-    "pitch": "AIMEAT — the Linux of AI. An open, federated, self-hosted AI operating system, and everything in it is yours.",
     "wishPh": "What do you want built?",
     "wishGo": "GO",
     "wishLead": "Type it, hit GO. A chat opens and starts building it with you on the spot. New here? You get an account on the way, and nothing you typed is lost.",
@@ -18530,7 +18533,6 @@
     "showKicker": "This is the demo. It runs for real, every day.",
     "showTitle1": "Try it all.",
     "showTitle2": "Then own it.",
-    "showPosition": "AIMEAT is the Linux of AI. Open source, your server, your rules.",
     "showSub": "A fully working AIMEAT, yours to use today, free. Build a whole system in an hour, CRM and all. Put every AI you use under one roof. Hand the grind to agents and let them run. Like it? Get your own: this whole site, at an address with your name on it.",
     "showGetOwn": "Get your own AIMEAT →",
     "showConnect": "Plug in the AI you already use →",
@@ -20198,7 +20200,7 @@
       "after": "Signing in takes a moment, and then you continue straight to where the address points.",
       "whatLabel": "What this is",
       "whatTitle": "New here?",
-      "whatText": "AIMEAT is a place where what you know stays yours, and the AI you already use works with it. Your messages, agents, memory and apps are all in the same place. Making an account is free.",
+      "freeAccount": "Making an account is free.",
       "howItWorks": "How it works →"
     },
     "loading": "Loading...",

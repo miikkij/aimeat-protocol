@@ -6,7 +6,7 @@ This page tells an evaluating IT or security team what AIMEAT is, what it is not
 
 ## What AIMEAT is
 
-AIMEAT is a self-hosted server ("node") that keeps the knowledge, apps and agents of people and groups, and lets each person reach it from the AI they already use. AI chat over MCP (Model Context Protocol) is the primary interface; the web UI is the control room for status and settings ([Feature list](../AIMEAT-Feature-List.md)).
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way ([the AIMEAT story](../AIMEAT-Story.md)). Technically, it is a self-hosted server ("node") that keeps the knowledge, apps and agents of people and groups, and lets each person reach it from the AI they already use. AI chat over MCP (Model Context Protocol) is the primary interface; the web UI is the control room for status and settings ([Feature list](../AIMEAT-Feature-List.md)).
 
 | Part | What it is | Source |
 |---|---|---|

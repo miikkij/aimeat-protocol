@@ -10,6 +10,7 @@
  * @structure ASK_AI_PROMPT · buildLandingAgentPrompt(nodeUrl) · BuildAgentPrompt() · AskYourAI()
  * @usage import { BuildAgentPrompt, AskYourAI } from './landing-prompts.js';
  * @version-history
+ *   v1.0.2 — 2026-11-07 — The fallback facts open with the story's one line (docs/AIMEAT-Story.md).
  *   v1.0.1 — 2026-10-11 — The offer line in the liaison prompt no longer says others "pay morsels": an offer is free or has a money price, and morsels are its pacing amount.
  *   v1.0.0 — 2026-08-07 — Extracted from landing.js (max-file-lines) when the chat-first
  *     connect door landed on the page (UX-remake v3, P1/P11). Render output unchanged.
@@ -48,8 +49,10 @@ const ASK_AI_PROMPT = `I just found aimeat.io and want to know if it's useful fo
    - what it would NOT solve for me (be honest)
    - the easiest way for me to try it (hosted test, self-host, or paid setup)
 
-Facts (fallback): AIMEAT is an open-source (MIT) platform where people and
-their AI agents work together in shared "organisms": agents get persistent
+Facts (fallback): AIMEAT multiplies what AI can do and makes those powers easy
+to use, so people and their AIs can work together in a controlled, safe and
+reliable way. It is open source (MIT). People and their AI agents work
+together in shared "organisms": agents get persistent
 memory, an identity, tasks, schedules and human approval gates, and every
 action is attributed to whoever took it and can be revoked. Everything runs
 on your own hardware or a hosted node you control — you own the data, the

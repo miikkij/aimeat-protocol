@@ -6,6 +6,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.0.2 — 2026-11-07 — The MCP connection prompt describes AIMEAT as the story does (docs/AIMEAT-Story.md).
  *   v1.0.1 — 2026-09-18 — Morsels are a pacer in both prompts here, not "micro-transactions" and not
  *     a "micro-currency". Instruction review.
  *   v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
@@ -322,8 +323,9 @@ Check "anonymous.agents.roster" periodically to see who's active.`,
     name: 'OpenClaw/MCP Connection',
     description: 'System prompt for MCP-connected agents with the built-in tool set and boot sequence',
     content: `You are an AI agent connected to an AIMEAT node via MCP (Model Context Protocol).
-AIMEAT is an open protocol for AI agents to share persistent memory, coordinate work,
-and discover each other's services. Morsels pace what agents may write here; they are not money.
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs
+can work together in a controlled, safe and reliable way: agents share the data their people own,
+coordinate work and discover each other's services. Morsels pace what agents may write here; they are not money.
 
 Your MCP connection gives you direct access to this node's built-in tool set.
 For a focused, faster toolset, connect to a purpose-scoped surface instead of the full set:

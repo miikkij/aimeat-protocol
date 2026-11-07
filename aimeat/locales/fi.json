@@ -17201,8 +17201,12 @@
     "install": "Asenna",
     "notNow": "Ei nyt"
   },
+  "aimeatStory": {
+    "oneLine": "AIMEAT moninkertaistaa tekoälyn kyvyt ja tekee niistä helppoja käyttää, niin että ihmiset ja heidän tekoälynsä voivat tehdä yhdessä töitä hallitusti, turvallisesti ja luotettavasti.",
+    "paragraph": "Keskiössä on data, ennen kaikkea jalostettu tieto, jonka ihmiset tuovat ja omistavat. Ihmiset, heidän tekoälynsä, agentit ja sovellukset tekevät työtä saman datan parissa: jokainen päättää, kuka sitä näkee ja mitä tekoäly saa sillä tehdä, ja näkee, mitä on tehty. Koko järjestelmää voi käyttää tekoälyllä alusta loppuun, koska jokaisessa osassa on ohjeet, jotka tekoäly ymmärtää heti. Jokainen voi myös rakentaa yhteiseen dataan oman näkymän, omat työkalut ja omat agentit: sama tieto siinä kulmassa, jota kukin tarvitsee."
+  },
   "homeConnect": {
-    "lead": "Yhdistä ChatGPT, Claude tai Grok tähän, niin siitä tulee oikea kätesi: se muistaa asiasi ja hoitaa niitä puolestasi.",
+    "lead": "Yhdistä ChatGPT, Claude tai Grok tähän, niin sen kyvyt moninkertaistuvat: se muistaa työsi, rakentaa sen, mitä tarvitset, ja tekee työtä valitsemiesi ihmisten kanssa sinun hallinnassasi.",
     "button": "Yhdistä {ai}",
     "other": "Muu tekoäly",
     "mcpQ": "Mikä tämä on?",
@@ -19225,7 +19229,6 @@
     "loopConnect1": "Kytke tekoälysi",
     "loopConnect2": "Kuvaile sovelluksesi ja anna kehote tekoälyllesi",
     "loopConnect3": "Tekoälysi rakentaa ja julkaisee sovelluksen. Jaa linkki.",
-    "pitch": "AIMEAT — tekoälyn Linux. Avoin, federoitu, itse ajettava tekoälyn käyttöjärjestelmä, ja kaikki täällä on sinun.",
     "wishPh": "Mitä sä haluat rakentaa?",
     "wishGo": "GO",
     "wishLead": "Kirjoita se ja paina GO. Chatti aukeaa, ja tekoäly alkaa rakentaa sitä sun kanssa saman tien. Uusi täällä? Tili syntyy siinä sivussa, eikä mitään kirjoittamaasi katoa.",
@@ -19267,7 +19270,6 @@
     "showKicker": "Tää on demo. Ja se pyörii ihan oikeasti, joka päivä.",
     "showTitle1": "Kokeile kaikkea.",
     "showTitle2": "Ota sitten omaksi.",
-    "showPosition": "AIMEAT on tekoälyn Linux. Avoin koodi, oma palvelin, sun säännöt.",
     "showSub": "Täysin toimiva AIMEAT, sun käytössä tänään, ilmaiseksi. Rakenna kokonainen järjestelmä tunnissa, vaikka oma CRM. Tuo kaikki tekoälyt, joita jo käytät, saman katon alle. Anna rutiinit agenteille ja anna niiden painaa. Kun kelpaa, hanki oma: koko tää sivusto sun omassa osoitteessa, sun nimellä.",
     "showGetOwn": "Hanki oma AIMEAT →",
     "showConnect": "Kytke tekoäly, jota jo käytät →",
@@ -20935,7 +20937,7 @@
       "after": "Kirjautuminen kestää hetken, ja sen jälkeen jatkat suoraan sinne, minne osoite osoittaa.",
       "whatLabel": "Mikä tämä on",
       "whatTitle": "Uusi täällä?",
-      "whatText": "AIMEAT on paikka, jossa se, mitä tiedät, pysyy sinun omanasi, ja tekoäly, jota jo käytät, tekee sillä töitä. Samassa paikassa ovat viestisi, agenttisi, muistisi ja sovelluksesi. Tilin tekeminen on ilmaista.",
+      "freeAccount": "Tilin tekeminen on ilmaista.",
       "howItWorks": "Miten se toimii →"
     },
     "loading": "Ladataan...",

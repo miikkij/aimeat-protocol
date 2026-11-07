@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   (2026-11-07) The node skill's first sentence follows the story (docs/AIMEAT-Story.md).
  *   (2026-11-07) aimeat-receivers joins from its own file: an outside program writing in through a receiver.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-02 -- aimeat-node-guide: the operator's sign-in policy (two-step required, password sign-in off).
@@ -296,8 +297,8 @@ metadata:
 
 # Working with this AIMEAT node
 
-AIMEAT (AI Memory Exchange and Action Transfer) is an open protocol for AI-agent
-infrastructure. A node gives humans and their AI agents persistent memory, identity,
+AIMEAT multiplies what AI can do and makes those powers easy to use, so people and
+their AIs can work together in a controlled, safe and reliable way. A node gives humans and their AI agents persistent memory, identity,
 shared workspaces (organisms), skills, tasks/workflows, app hosting, and morsel
 pacing — over plain REST and MCP.
 

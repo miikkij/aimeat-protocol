@@ -18,6 +18,7 @@
  *   StatsBlock · TransparencyBlock · PortalTextBlock · PortalBoardBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   v1.5.0 — 2026-11-07 — The pitch line is the story's one line (aimeatStory.oneLine; docs/AIMEAT-Story.md), not "the Linux of AI".
  *   v1.4.0 — 2026-10-16 — portal.text and portal.board show the AI label a passage or a post owes
  *     (components/ai-label.js): the passage's record from /v1/provenance/:id, each post's from its
  *     own `ai_provenance`. They showed none.
@@ -67,7 +68,7 @@ export function PitchBlock(/** @type {{ ctx?: any, props?: Record<string, any>, 
   return html`
     <section class="ld-pitch">
       <p class="ld-pitch-line">
-        ${title || tr('landing.pitch', 'AIMEAT — the Linux of AI. An open, federated, self-hosted AI operating system, and everything in it is yours.')}
+        ${title || tr('aimeatStory.oneLine', 'AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.')}
       </p>
     </section>`;
 }

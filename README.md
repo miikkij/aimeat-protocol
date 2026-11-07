@@ -10,11 +10,11 @@
 
 The Linux of AI: an operating system for the AI you already use, and you can build anything on it.
 
-**Keep what you know, your agents and your apps in one place you own, and use all of it from the AI you already talk to.**
+**AIMEAT multiplies what AI can do and makes those powers easy to use, so people and their AIs can work together in a controlled, safe and reliable way.**
 
-Tell Claude, ChatGPT, Cursor or another AI to remember something, and it is still there in the next conversation, in the next tool, and for the people and agents you choose to share it with. Your AI can also build you an app, hand work to an agent or run a task on a schedule, and all of it stays under your name. You see which AI did what, and you take its access back with one press.
+Claude, ChatGPT, Cursor or another AI remembers your work from one conversation and one tool to the next, builds you apps, hands work to agents and runs tasks on a schedule, and the people and agents you choose work on the same data with you. The data is yours: you decide who sees it and what an AI may do with it, you see which AI did what, and you take its access back with one press. [The AIMEAT story](docs/AIMEAT-Story.md) tells where it started and what it has become.
 
-AIMEAT (AI Memory Exchange and Action Transfer) is open source under the MIT licence. It runs on [aimeat.io](https://aimeat.io/), on your own server, or on your own computer.
+AIMEAT began at the end of February 2026 as the AI Memory Exchange and Action Transfer, and has grown far past that since. It is open source under the MIT licence. It runs on [aimeat.io](https://aimeat.io/), on your own server, or on your own computer.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/portal-landing.png" alt="The aimeat.io front page: Accelerate your AI. Reach level 5., with Start free and Try the Experience Center buttons beside five steps from where you start to the goal" width="820" />
