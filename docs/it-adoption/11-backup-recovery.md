@@ -1,6 +1,6 @@
 # 11 Backup and recovery
 
-> Checked against AIMEAT node 4.2.0 (commit f36018fcd) on 2026-11-05. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 7bc5742c4) on 2026-11-07. Maintained with the code: see the README for how.
 
 This page is for the sysadmin who owns backups and the continuity planner who sets recovery targets. It lists what must be backed up for a node to come back as the same node, gives the procedure in short, proposes RTO and RPO values for the organisation to decide, and describes the restore test. The commands for each storage backend are in [Backup and restore](../operations/backup-and-restore.md), which stays the single home for them.
 
