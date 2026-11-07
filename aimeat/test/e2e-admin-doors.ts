@@ -16,6 +16,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-doors
  * @version-history
+ *   v1.2.2 — 2026-11-07 — The CSM setup expects the owner's prefix on the registered name: a new CSM's
+ *     name starts with its owner's account (developer ruling 2026-11-07). The setup no longer matched the
+ *     designed behaviour; the code changed by ruling, not by defect.
  *   v1.2.1 — 2026-10-11 — membership-behaviors ships six actions: `create` makes the group record the
  *     other five read, which nothing could write before (docs audit phase 2).
  *   v1.2.0 — 2026-10-09 — A reinstall from disk stores the manifest's capabilities and network hosts
@@ -753,7 +756,8 @@ await test('Setup: register a CSM of my own from the hobby-directory template', 
     const { status, body } = await json('/v1/csm', op({ method: 'POST', body: JSON.stringify({ yaml }) }));
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     csmName = body.data.csm.name;
-    assert(csmName === wanted, `the service registered under the name given, got ${csmName}`);
+    // A new CSM's name starts with its owner's account (developer ruling 2026-11-07).
+    assert(csmName === `${operatorName}.${wanted}`, `the service registered under the name given with the owner's prefix, got ${csmName}`);
 });
 
 await test('GET /v1/admin/csm and /v1/admin/csm/:name answer about the registered service', async () => {

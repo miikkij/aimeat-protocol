@@ -16,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-11-07 — optionalAuth recognises a receiver key by its prefix (aimeat_rcv_) and never turns it
+ *     into req.auth: on /v1/receive/<owner>/<name> it is left to acceptCredential('receiver'), and on
+ *     any other route it is refused 401. The receiver address skips the session check altogether.
  *   2026-11-04 — optionalAuth notes the JWT it verified and found not revoked on the request
  *     (./verified-on-request.ts), so the MCP endpoint takes that check instead of repeating it
  *     (codebase analysis 2026-11-03, item C2).
@@ -159,6 +162,7 @@ import { noteVerifiedJwt } from './verified-on-request.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
 import { PARTY_TOKEN_PREFIX, takesPartyToken } from '../services/parties/contract.js';
+import { RECEIVER_KEY_PREFIX, takesReceiverKey } from '../services/receivers/contract.js';
 import { takesDataspaceCredential } from '../services/dataspace/contract.js';
 
 export { enableAnonymousAuth, isAnonymousMode, getAnonymousCredentials } from './node-auth.js';
@@ -336,6 +340,17 @@ export function optionalAuth(opts: OptionalAuthOptions = {}) {
       refuse(req, res, 'A party access token reads only the data shared with the party: the data package, OData and file reads and /v1/parties/me. It is not a sign-in to this server.');
       return;
     }
+    // A RECEIVER KEY IS NEVER A SESSION either (services/receivers/contract.ts). On /v1/receive/... it
+    // is left to the route's own verifier (acceptCredential('receiver')), with no req.auth and no
+    // anonymous identity; on every other route it is a credential this node refuses, 401.
+    if (token && token.startsWith(RECEIVER_KEY_PREFIX)) {
+      if (takesReceiverKey(req.method, req.path)) { next(); return; }
+      refuse(req, res, 'A receiver key writes only through its own receiver address, /v1/receive/<owner>/<name>. It is not a sign-in to this server.');
+      return;
+    }
+    // The receiver address takes nothing but a receiver key, so a request there with a session or
+    // none at all goes to the route's verifier untouched, which answers it 401.
+    if (takesReceiverKey(req.method, req.path)) { next(); return; }
     if (token) {
       // A CREDENTIAL THAT WAS PRESENTED AND REFUSED IS ANSWERED 401 ON EVERY ROUTE (QA audit F1-01).
       // It used to leave req.auth unset and let the request go on, so a route without requireAuth()

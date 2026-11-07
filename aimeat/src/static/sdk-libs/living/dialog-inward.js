@@ -31,6 +31,9 @@
  *   import { openInward } from './dialog-inward.js';
  *   openInward({ id, node, doc, graph, hooks, langs, base, onSave });
  * @version-history
+ *   v0.8.0 — 2026-11-07 — The memory road leads with the program road: a receiver made for this key
+ *     on the owner's Receivers page, and the call a program sends through it. The call with the
+ *     owner's own token stays below it, for the owner's own tools.
  *   v0.7.0 — 2026-09-06 — The URL road sends headers, and a header's value takes a secret's NAME
  *     from the owner's vault rather than a key typed into the document.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
@@ -155,6 +158,22 @@ export function openInward(spec) {
         name: 'key', id: 'ak-living-key', type: 'text', label: words('inward.key'),
         value: draft.key || shape.write.key,
       }], draft);
+      // A PROGRAM WRITES THROUGH A RECEIVER, never with a session of the owner (services/receivers/):
+      // the call above is for the owner's own tools, and the receiver's address and key reach this
+      // one key only. The link opens the owner's Receivers page with the key filled in.
+      const receiverLine = document.createElement('p');
+      receiverLine.className = 'ak-living__dialog-range';
+      receiverLine.textContent = words('inward.receiverWhy') + ' ';
+      const receiverLink = document.createElement('a');
+      receiverLink.href = shape.receiver.settings;
+      receiverLink.target = '_blank';
+      receiverLink.rel = 'noopener';
+      receiverLink.textContent = words('inward.receiverMake');
+      receiverLine.appendChild(receiverLink);
+      keyRoad.body.appendChild(receiverLine);
+      copyBlock(keyRoad.body, {
+        label: words('inward.receiverCall'), text: shape.receiver.curl, langs: langs,
+      });
       copyBlock(keyRoad.body, {
         label: words('inward.write'), text: shape.write.curl, langs: langs,
       });

@@ -2654,6 +2654,26 @@
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3), the node's own read: a data package's pointer and descriptor (metadata the package service wrote) to check a share names a package and version that exist, and to build the connection file's table list for the owner or the party the owner shared it with. The rows themselves are read through openPackage and readRows, which pass the classification reader."
     },
+    "src/services/receivers/deliveries.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-07 (receivers), the node's own read: a receiver's delivery log in the owner's service namespace (time, status, size, reason; never a message's content), answered to the owner and the operator."
+    },
+    "src/services/receivers/receive.ts": {
+      "reads": {
+        "listMemory": 2,
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-11-07 (receivers). A program reads back only its receiver's own target, and only when the owner gave it the verb read: one key, or the key names and versions under its prefix. The other reads are the write path's own: the current record before a merge or an If-Match write, and the count of keys under a prefix before a new one. The target is the owner's choice when the receiver is made, so the read reaches nothing the owner did not point it at."
+    },
+    "src/services/receivers/store.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-07 (receivers), the node's own read: the receiver records in the owners' service namespaces (svc:), for the operator's list. No content."
+    },
     "src/services/parties/store.ts": {
       "reads": {
         "getMemory": 1

@@ -44,6 +44,8 @@
  *   import { mintProvenance, contentHashOf } from './provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.7.0 — 2026-11-07 — stampAgentWrite stamps a receiver's write (receiver:<owner>/<name>@<node>)
+ *     at level `machine`, stamped by the node and not observed (RECEIVER_WRITE_NOTE).
  *   v1.6.0 — 2026-11-07 — Level `machine` names no model and carries no generation rules, as
  *     `original` does (levelInvolvesModel).
  *   v1.5.1 — 2026-11-05 — Moved unchanged from src/services/ai-provenance.ts to src/services/ai/provenance.ts (codebase analysis 2026-11-03, item D-h).
@@ -102,6 +104,7 @@ import { arrivalGenRuleMarks } from './gen-rules-store.js';
 import { disclosureFor, type SurfaceContext, type DisclosureLabelPolicy } from './disclosure.js';
 import { disclosureWording } from './disclosure-served.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../../utils/gaii.js';
+import { parseReceiverPrincipal } from '../receivers/contract.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { noteScopeUse } from '../scope-use.js';
 import { createT, LOCALES } from '../../i18n.js';
@@ -364,6 +367,31 @@ export async function stampAgentWrite(
   },
 ): Promise<string | undefined> {
   if (input.enabled === false) return undefined;
+
+  // A RECEIVER (services/receivers/): an outside program writing through an address and key of the
+  // owner. It is neither the owner nor a model the node knows of, so silence must not read as "a person
+  // wrote it" and must not be stamped as AI either: the level is `machine`. `observed` stays false,
+  // because the node saw the bytes arrive and not how the program made them.
+  const receiver = parseReceiverPrincipal(input.principal);
+  if (receiver) {
+    const row = await mintProvenance(storage, {
+      stampedBy: 'node',
+      ownerGhii: `${receiver.owner}@${receiver.node}`,
+      principal: input.principal,
+      level: 'machine',
+      humanInvolvement: 'none',
+      observed: false,
+      content: input.content,
+      ...mediaOf(input.content, input),
+      generator: { pipeline: input.pipeline ?? `receiver:${receiver.owner}/${receiver.name}` },
+      notes: RECEIVER_WRITE_NOTE,
+      surface: input.surface,
+      labelPolicy: input.labelPolicy,
+      nodeId: input.nodeId,
+      baseUrl: input.baseUrl,
+    }, input.held);
+    return row.id;
+  }
   if (!isNonHumanPrincipal(input.principal)) return undefined;
 
   // WHICH model wrote this, when the agent has said. It reported one at identify_platform and the
@@ -713,6 +741,11 @@ export const INFERRED_FROM_PRINCIPAL_NOTE =
   'Inferred from the principal type: a non-human principal wrote this and declared no provenance. '
   + 'The node did not witness the generation. Silence from an agent is recorded as model-written '
   + 'rather than as human-written; an agent relaying text a person wrote can say so explicitly.';
+
+/** The note on a record a receiver's write was stamped with. */
+export const RECEIVER_WRITE_NOTE =
+  'Written by an outside program through a receiver of the owner. The node recorded which receiver '
+  + 'wrote it and when; it cannot see how the program made the data.';
 
 /** A GAII (`agent#owner@node`) or a GEAI (`eco:app#owner@node`) — anything that is not a person. */
 export function isNonHumanPrincipal(principal: string): boolean {

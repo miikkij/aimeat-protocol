@@ -19,6 +19,8 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.8.0 — 2026-11-07 — The words of the program road (inward.receiverWhy, inward.receiverMake,
+ *     inward.receiverCall); the memory road's own call says it writes with one's own sign-in.
  *   v0.7.0 — 2026-09-06 — The words the header editor, the secret picker and the agent pick say,
  *     including the two sentences a person reads when the list they are picking from is empty:
  *     an account with no secrets and an account with no agents are ordinary, and a pick with
@@ -44,7 +46,10 @@ export const WORDS = {
     'inward.key': 'Muistiavain',
     'inward.expected': 'Näin vastauksen pitää näyttää',
     'inward.testRead': 'Kokeile lukemista',
-    'inward.write': 'Kirjoita arvo muistiin',
+    'inward.write': 'Kirjoita arvo omalla tunnuksellasi',
+    'inward.receiverWhy': 'Ohjelma, kuten anturi tai pilvifunktio, kirjoittaa arvon vastaanottimen kautta. Vastaanottimen avain kirjoittaa vain tähän avaimeen.',
+    'inward.receiverMake': 'Tee vastaanotin tälle arvolle',
+    'inward.receiverCall': 'Ohjelman kutsu vastaanottimeen',
     'inward.agent': 'Sano tämä omalle tekoälyllesi',
     'inward.range': 'Sallittu väli',
     'outward.title': 'Kun tämä muuttuu, kerro jollekin',
@@ -107,7 +112,10 @@ export const WORDS = {
     'inward.key': 'Memory key',
     'inward.expected': 'This is the shape the answer must have',
     'inward.testRead': 'Test read',
-    'inward.write': 'Write the value into memory',
+    'inward.write': 'Write the value with your own sign-in',
+    'inward.receiverWhy': 'A program, such as a sensor or a cloud function, writes the value through a receiver. The receiver\'s key writes into this key only.',
+    'inward.receiverMake': 'Make a receiver for this value',
+    'inward.receiverCall': 'The program\'s call to the receiver',
     'inward.agent': 'Say this to your own AI',
     'inward.range': 'The range it accepts',
     'outward.title': 'When this changes, tell someone',

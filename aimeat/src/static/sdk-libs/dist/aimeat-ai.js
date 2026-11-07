@@ -364,6 +364,9 @@
     switch (record.level) {
       case "original":
         return null;
+      // A program with no model: no AI icon, as the server's toEuIcon() answers.
+      case "machine":
+        return null;
       case "assisted":
         return { file: "ai-modified", alt: "aiLabel.iconAlt.aiModified" };
       case "synthesized":

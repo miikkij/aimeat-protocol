@@ -13,22 +13,29 @@
  *   ORDER: a door computes the default BEFORE it asks the publish gate (services/publish-gate.ts),
  *   so a default of public is a raise to public and asks the owner like an explicit public does.
  * @structure memoryVisibilityDefault · NODE_DEFAULT_LEVEL · fileVisibilityDefault · uploadVisibilityOf · isAppGrantRoles · boardVisibilityDefault ·
- *   organismVisibilityDefault · shareAccessDefault · datapackageVisibilityDefault · agentListingTags
+ *   organismVisibilityDefault · shareAccessDefault · datapackageVisibilityDefault · agentListingTags ·
+ *   csmVisibilityDefault
  * @usage
  *   const vis = visibility ?? memoryVisibilityDefault(config);
  *   const fileVis = uploadVisibilityOf(config, given, isAppGrantRoles(req.auth!.roles));
  *   await storage.createAgent({ ..., ...agentListingTags(config) });
  * @version-history
+ *   v1.2.0 — 2026-11-07 — csmVisibilityDefault: a CSM registered without a visibility (csm.default_visibility).
  *   v1.1.0 — 2026-10-18 — uploadVisibilityOf and NODE_DEFAULT_LEVEL: the app-upload default answers only
  *     `visibility: 'default'`; an upload with no visibility keeps the file default for every caller.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V5.1-V5.6, V5.8).
  */
 import type {
-  ContentDefaultsConfig, DefaultAppUploadVisibility, DefaultBoardVisibility, DefaultDatapackageVisibility,
-  DefaultMemoryVisibility, DefaultOrganismVisibility, DefaultShareAccess,
+  ContentDefaultsConfig, DefaultAppUploadVisibility, DefaultBoardVisibility, DefaultCsmVisibility,
+  DefaultDatapackageVisibility, DefaultMemoryVisibility, DefaultOrganismVisibility, DefaultShareAccess,
 } from '../config-content-defaults.js';
 
 type Defaults = Partial<ContentDefaultsConfig>;
+
+/** A CSM registered with POST /v1/csm without a visibility. */
+export function csmVisibilityDefault(config: Defaults): DefaultCsmVisibility {
+  return config.csmDefaultVisibility ?? 'public';
+}
 
 /** A memory record written without a visibility (V5.1). */
 export function memoryVisibilityDefault(config: Defaults): DefaultMemoryVisibility {

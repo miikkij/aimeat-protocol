@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-11-07 — registerCsmTool (aimeat_csm: the account's data descriptions, mcp/csm.ts).
  *   2026-11-02 — registerConnectionFileTools (aimeat_files_browse, aimeat_files_get, aimeat_files_write).
  *   2026-10-31 — registerAiGenRulesTools (aimeat_ai_gen_rules, aimeat_ai_gen_rules_set).
  *   2026-10-27 — registerAppsTools receives the app a role-'app' bearer names, so a publish through an app's grant names that app (secaudit2026oct26).
@@ -199,6 +200,7 @@ import { registerBuildWithYouTools } from './build-with-you.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
+import { registerCsmTool } from './csm.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { publishingAppOfVerifiedToken } from '../services/app-published-by-app.js';
@@ -302,6 +304,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerHomeFeedTools(mcp, storage, config, caller);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
     registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller);
+    registerCsmTool(mcp, config, storage, caller);
     registerAiImageTool(mcp, storage, config, agentGaii, caller);
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);

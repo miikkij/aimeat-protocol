@@ -22,6 +22,7 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.12.0 — 2026-11-07 — `receivers` passes for a principal holding receivers:read (or receivers:manage).
  *   v1.11.0 — 2026-11-04 — isOwnerPrincipal reads isOwnerInPerson (utils/gaii.ts) of the roles instead
  *     of a copy of that test; the same answer for every role list (codebase analysis 2026-11-03, B1).
  *   v1.10.0 — 2026-11-01 — `app-parties` passes for a principal holding app:write: the people registered
@@ -88,6 +89,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // The people registered to an app without an account changed (services/app-parties/store.ts).
   // The word the list's own read asks (GET /v1/apps/{owner}/{filename}/parties).
   'app-parties': 'app:write',
+  // The owner's receivers changed: made, approved, paused, rotated, stopped or deleted
+  // (services/receivers/manage.ts). The word GET /v1/receivers asks; receivers:manage covers it.
+  receivers: 'receivers:read',
   'app-store': 'catalogue:read',
   site: 'catalogue:read',
 

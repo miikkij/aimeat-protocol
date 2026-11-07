@@ -15,14 +15,21 @@
  * @usage
  *   const word = requiredScopeForAction('aimeat_app_manage', 'settings'); // 'app:write'
  * @version-history
+ *   2026-11-07 — aimeat_receiver: its reads and propose need receivers:read, the rest receivers:manage
+ *     (definitions/receivers.ts RECEIVER_ACTIONS).
+ *   2026-11-07 — aimeat_csm: its reads need none, its writes csm:write (definitions/csm.ts CSM_ACTIONS).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 — 2026-09-27 — Initial, for aimeat_app_manage.
  */
 import { APP_MANAGE_ACTIONS } from './definitions/app-manage.js';
+import { CSM_ACTIONS } from './definitions/csm.js';
+import { RECEIVER_ACTIONS } from './definitions/receivers.js';
 
 /** tool → action → permission word (null: the action needs none). Built from each tool's own table. */
 export const TOOL_ACTION_SCOPES: Record<string, Record<string, string | null>> = {
     aimeat_app_manage: Object.fromEntries(Object.entries(APP_MANAGE_ACTIONS).map(([a, spec]) => [a, spec.scope])),
+    aimeat_csm: Object.fromEntries(Object.entries(CSM_ACTIONS).map(([a, spec]) => [a, spec.scope])),
+    aimeat_receiver: Object.fromEntries(Object.entries(RECEIVER_ACTIONS).map(([a, spec]) => [a, spec.scope])),
 };
 
 /** The word an action needs; null when it needs none or the tool/action is not in the table. */

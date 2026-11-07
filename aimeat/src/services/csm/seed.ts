@@ -1,5 +1,5 @@
 /**
- * @file src/services/csm-seed.ts
+ * @file src/services/csm/seed.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Startup seeder for CSM (Content Structure Model) templates — reads `.csm.yaml` files
@@ -12,6 +12,8 @@
  *   - uses parseCsm/validateCsm/csmToJsonSchema from csm-parser for parsing and schema generation
  *
  * @version-history
+ *   v1.1.1 — 2026-11-07 — Moved unchanged from src/services/csm-seed.ts into the csm domain folder
+ *     (check:services-flat); the imports and the templates path gain one `..` for the deeper folder.
  *   v1.1.0 — 2026-10-11 — An existing template's `system@` schema lock is refreshed when this build
  *     compiles it differently. The parser learned the JSON Schema keyword names the templates use,
  *     and without the refresh every node seeded before that would keep the limitless schemas.
@@ -20,11 +22,11 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Storage } from '../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { isDeepStrictEqual } from 'node:util';
-import { parseCsm, validateCsm, csmToJsonSchema } from './csm-parser.js';
-import { isSystemSeeded } from './manifest-schema.js';
-import { logger } from '../utils/logger.js';
+import { parseCsm, validateCsm, csmToJsonSchema } from '../csm-parser.js';
+import { isSystemSeeded } from '../manifest-schema.js';
+import { logger } from '../../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -42,7 +44,7 @@ const __dirname = dirname(__filename);
  * @returns Number of newly seeded CSM templates
  */
 export async function seedCsmTemplates(storage: Storage, systemGaii: string): Promise<number> {
-  const templatesDir = join(__dirname, '..', '..', 'docs', 'csm-examples');
+  const templatesDir = join(__dirname, '..', '..', '..', 'docs', 'csm-examples');
 
   if (!existsSync(templatesDir)) {
     logger.debug('CSM templates directory not found, skipping seed', { path: templatesDir });

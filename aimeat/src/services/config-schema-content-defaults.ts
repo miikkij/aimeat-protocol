@@ -9,6 +9,8 @@
  * @structure CONTENT_DEFAULT_CONFIG_FIELDS
  * @usage import { CONTENT_DEFAULT_CONFIG_FIELDS } from './config-schema-content-defaults.js';
  * @version-history
+ *   v1.2.0 — 2026-11-07 — csm.default_visibility: who may read a CSM registered without a visibility.
+ *     Its own section, csm, on the Config tab (public/views/admin/config-tab.js DOMAINS).
  *   v1.1.0 — 2026-10-18 — visibility.app_upload_default says it is the level an asset-library upload asks for with 'default'.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V5.1-V5.6, V5.8).
  */
@@ -29,4 +31,5 @@ export const CONTENT_DEFAULT_CONFIG_FIELDS: ConfigFieldShape<keyof ContentDefaul
   { key: 'defaultShareAccess', dotPath: 'visibility.share_access_default', envVar: 'AIMEAT_DEFAULT_SHARE_ACCESS', type: 'string', ...choice(V.share), immutable: false, description: `Who may open a workspace the first time it is shared without saying who may. open: anyone with the link. account: anyone signed in here. organism: only the members of the workspace's organism. ${WINS}` },
   { key: 'defaultDatapackageVisibility', dotPath: 'visibility.datapackage_default', envVar: 'AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY', type: 'string', ...choice(V.datapackage), immutable: false, description: `Who may read a data package that is published without saying who may. public: anyone, and it is in the catalogue. members: everyone signed in here. private: only the account it belongs to. ${WINS}` },
   { key: 'defaultAgentListed', dotPath: 'visibility.agent_listed_default', envVar: 'AIMEAT_DEFAULT_AGENT_LISTED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'A new agent is shown in the public list of agents. Off: a new agent is in no public list, and its owner still sees it. Agents that already exist keep what they have' },
+  { key: 'csmDefaultVisibility', dotPath: 'csm.default_visibility', envVar: 'AIMEAT_CSM_DEFAULT_VISIBILITY', type: 'string', ...choice(V.csm), immutable: false, description: `Who may read a new data description (CSM): the shape and rules of the data an outside program sends here. public: anyone, without signing in, so the program's author can read what to send. members: everyone signed in here. private: only the account that made it, and its agents and apps. The owner changes it per description, also to the members of one organism. Descriptions that already exist keep what they have. ${WINS}` },
 ];
