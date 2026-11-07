@@ -25,6 +25,8 @@
  *   - effectivePolicy() / blockingLayer() / isAllowed() / firstAllowed() — the decision
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V2 of the System 2 plan).
+ *   v1.2.0 — 2026-11-07 — effectivePolicy() takes the operator's list (ai.allowed_models) as the first
+ *     layer, `node`, binding every caller (Jouni, 2026-11-07).
  *   v1.1.0 — 2026-09-28 — firstAllowed() takes `serves`: a custom list's model is a source for the
  *     capability the model catalogue says it serves, not only for text (V4).
  */
@@ -224,13 +226,14 @@ export interface PolicyContext {
   appModels?: string[];
 }
 
-/** Which layer set a list. `owner` covers both `recommended` and `custom`; `source` tells them apart. */
-export type PolicyLayerName = 'owner' | 'agent' | 'app';
+/** Which layer set a list. `owner` covers both `recommended` and `custom`; `source` tells them apart.
+ *  `node` is the operator's list for every call (ai.allowed_models, node-model-rules.ts). */
+export type PolicyLayerName = 'node' | 'owner' | 'agent' | 'app';
 
 export interface PolicyLayer {
   layer: PolicyLayerName;
   /** Where the list came from, for the message a person reads. */
-  source: 'recommended' | 'custom' | 'owner-agent' | 'owner-app' | 'app-meta';
+  source: 'operator' | 'recommended' | 'custom' | 'owner-agent' | 'owner-app' | 'app-meta';
   allow: string[];
 }
 
@@ -243,9 +246,11 @@ export interface PolicyDecision {
 const APPLIES_KEY: Record<CallerClass, keyof PolicyAppliesTo> = { owner: 'owner', chat: 'chat', agent: 'agents', app: 'apps' };
 
 export function effectivePolicy(
-  recommended: RecommendedModels, owner: OwnerAiPolicy | undefined, ctx: PolicyContext,
+  recommended: RecommendedModels, owner: OwnerAiPolicy | undefined, ctx: PolicyContext, nodeAllow: readonly string[] = [],
 ): PolicyDecision {
   const layers: PolicyLayer[] = [];
+  // The operator's list binds every caller and every payer, first, so a refusal names it.
+  if (nodeAllow.length) layers.push({ layer: 'node', source: 'operator', allow: [...nodeAllow] });
   if (owner && owner.mode !== 'open' && owner.appliesTo[APPLIES_KEY[ctx.caller]] !== false) {
     if (owner.mode === 'recommended') {
       // A capability the operator recommended nothing for is not restricted by this layer: an

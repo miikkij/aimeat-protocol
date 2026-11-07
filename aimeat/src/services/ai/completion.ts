@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.19.0 -- 2026-11-07 -- An agent's own text model (the chat's model) comes first; under the operator's lock (ai.models_locked) the owner's model choices, roles and a named model are set aside (Jouni, 2026-11-07).
  *   v3.18.0 -- 2026-11-02 -- An ecosystem app's call: the record names the app as who asked (aiAskerOf), and its modelRole is not an app role it never declared (secaudit2026nov02d round 13).
  *   v3.17.0 -- 2026-11-01 -- `requires.tools` reaches the route plan, so a region whose endpoint has no tool calling is passed over (ai.region_mode).
  *   v3.16.0 -- 2026-10-31 -- settleAiCall passes media.genRules to the record; a call with none states none, so a node-observed record never reads as an arrival.
@@ -158,6 +159,7 @@ import { appAiMetaOf } from './policy-store.js';
 import { text as gatewayText, type TextFile } from './gateway.js';
 import type { AiCapability, AiOp } from './types.js';
 import { loadPolicyDecision, freeModelAllowed } from './policy-gate.js';
+import { modelsLocked } from './node-model-rules.js';
 import type { CallerClass } from './policy.js';
 import { AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, providerFailureOf } from './errors.js';
 import { providersForOwner } from './provider-store.js';
@@ -394,7 +396,10 @@ async function planAiCall(
   ]);
   const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
   const op: AiOp = opts.op ?? 'text';
-  const roleModel = (role: ModelRole) => resolveModelFor(config, prefs, role);
+  // The operator's lock (node-model-rules.ts): the owner's own model choices are set aside, and each
+  // role gets the node's default. The rest of prefs (budget, allowlist of apps) still applies.
+  const locked = modelsLocked(config);
+  const roleModel = (role: ModelRole) => resolveModelFor(config, locked ? {} : prefs, role);
   // An app grant's call is the app the grant names, never a name in the body: the owner's allowlist,
   // per-app cap and usage row key on it (the voiceAppId rule; secaudit2026oct22).
   const appId = opts.verifiedApp ?? opts.appId;
@@ -404,7 +409,8 @@ async function planAiCall(
 
   const capability: AiCapability = opts.capability
     ?? OP_CAPABILITY[op] ?? (opts.hasImages ? 'vision' : 'text');
-  const requested = typeof opts.model === 'string' && opts.model ? opts.model : undefined;
+  // Under the operator's lock a model the call names is set aside: the node chooses.
+  const requested = !locked && typeof opts.model === 'string' && opts.model ? opts.model : undefined;
   const policyCtx = {
     capability, caller: opts.caller ?? (opts.agent ? 'agent' : 'owner') as CallerClass,
     ...(opts.agent ? { agent: opts.agent } : {}),
@@ -418,7 +424,7 @@ async function planAiCall(
     readRouting(storage, gaii, opts.agent),
     loadPolicyDecision(storage, config, gaii, policyCtx),
     appAiMetaOf(storage, gaii, appId),
-    opts.role || opts.modelRole ? readRoles(storage, gaii) : Promise.resolve(null),
+    (opts.role || opts.modelRole) && !locked ? readRoles(storage, gaii) : Promise.resolve(null),
   ]);
   // The app's meta orders the owner's candidates (prefer.*) and may ask for this machine only
   // (local.*); neither adds a provider or loosens a rule (plan 11, section 9).
@@ -461,7 +467,10 @@ async function planAiCall(
   // (services/ai/model-defaults.ts), and for text, with nothing chosen anywhere, OpenRouter's
   // free-models router. It is what the migrated provider and the node's own provider use when a call
   // names no model, so an owner who set nothing new sees nothing change.
-  const textModel = (opts.modelRole === 'reasoning' && roleModel('reasoning'))
+  // An agent's own text model (routing.ts, the agent's record; the chat's model is the chat agent's)
+  // comes first, unless the operator locked the models.
+  const textModel = (!locked && routing.agentModel)
+    || (opts.modelRole === 'reasoning' && roleModel('reasoning'))
     || (opts.modelRole === 'execution' && roleModel('execution'))
     || roleModel('chat') || roleModel('execution') || roleModel('reasoning')
     || 'openrouter/free';
@@ -489,6 +498,7 @@ async function planAiCall(
     ...(role?.declared?.context ? { minContext: role.declared.context } : {}),
     ...(opts.estimate ? { estimate: opts.estimate } : {}),
     legacyModel,
+    ...(locked ? { modelsLocked: true } : {}),
     nodeAllowance: () => nodeKeyStanding(storage, config, gaii),
   });
   const opRole = OP_ROLE[op];

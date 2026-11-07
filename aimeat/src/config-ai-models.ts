@@ -15,6 +15,8 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   2026-11-07 — aiAllowedModels (AIMEAT_AI_ALLOWED_MODELS) and aiModelsLocked (AIMEAT_AI_MODELS_LOCKED):
+ *     the operator's model rules for every AI call on the node (Jouni, 2026-11-07).
  *   2026-11-01 — The buyer's AI region choice (AIMEAT_AI_REGION_MODE: eu, eu-only, own; Jouni, 2026-11-01).
  *   2026-10-31 — aiGenRules (AIMEAT_AI_GEN_RULES, default empty: every rule off).
  *   2026-10-31 — The OpenRouter region (AIMEAT_AI_OPENROUTER_REGION, _REGION_FALLBACK, _REGIONS,
@@ -64,7 +66,7 @@ type AiModelSettings = Pick<AiCapabilityConfig,
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
   | 'modelDefaultTts' | 'modelDefaultEmbed' | 'ttsVoiceDefault'
-  | 'aiRecommendedModels' | 'aiGenRules' | 'aiProviders' | 'aiBuiltinProviders' | 'aiProviderEgress'
+  | 'aiRecommendedModels' | 'aiAllowedModels' | 'aiModelsLocked' | 'aiGenRules' | 'aiProviders' | 'aiBuiltinProviders' | 'aiProviderEgress'
   | 'aiProviderTypes' | 'aiFixedBaseUrlOverrides' | 'aiLegacySettingsRoutes'
   | 'aiCatalogRefresh' | 'aiPriceOverrides' | 'aiCatalogSources'>;
 
@@ -103,6 +105,8 @@ export function aiModelDefaults(): AiModelSettings {
     modelDefaultEmbed: process.env.AIMEAT_MODEL_DEFAULT_EMBED ?? '',
     ttsVoiceDefault: process.env.AIMEAT_TTS_VOICE_DEFAULT ?? '',
     aiRecommendedModels: process.env.AIMEAT_AI_RECOMMENDED_MODELS ?? '',
+    aiAllowedModels: process.env.AIMEAT_AI_ALLOWED_MODELS ?? '',
+    aiModelsLocked: process.env.AIMEAT_AI_MODELS_LOCKED === 'true',
     aiGenRules: process.env.AIMEAT_AI_GEN_RULES ?? '',
     aiProviders: process.env.AIMEAT_AI_PROVIDERS ?? '',
     aiBuiltinProviders: process.env.AIMEAT_AI_BUILTIN_PROVIDERS ?? '',

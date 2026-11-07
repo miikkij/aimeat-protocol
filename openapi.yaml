@@ -14253,11 +14253,40 @@ paths:
         agent is called, how much of their AI allowance is left, and whether they have their own
         OpenRouter key. A node with no agent says so plainly rather than offering a box that will
         never answer. Owner sessions only.
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          schema: { type: string, enum: [en, fi, es] }
+          description: The language of `fix.message`; Accept-Language otherwise.
       responses:
         '200':
           description: |
-            `{ enabled, agent_name, allowance_remaining_usd, allowance_low, has_own_key, own_key, pays, model, push_devices, note? }`.
-            `note` is present only when `enabled` is false, and names what an operator has to set.
+            `{ enabled, state, agent_name, allowance_remaining_usd, allowance_low, has_own_key, own_key, pays, model, push_devices, technical?, note?, fix?, operator_contact, ai }`.
+            `state` says whether the chat can answer: `ready`; `no_agent`, the operator has not set up
+            the chat agent (only an operator changes that); `agent_down`, a chat agent is set up and does
+            not start (the node starts it once to find out, keeps a good answer for 30 minutes and a
+            failure for one, and a turn whose agent fails marks it; only an operator changes that); or
+            `no_ai`, no key may pay for a turn. A turn on an agent that does not start, or whose process
+            ends mid-turn, ends with the error code `CHAT_AGENT_DOWN` and a sentence in the person's
+            language.
+            `technical` is the developer's sentence, in English: what an operator sets for `no_agent`
+            (also in `note`, for older clients), why the agent did not start for `agent_down`, and the
+            refusal's code and message for `no_ai`.
+            `fix` is present for `no_ai`: `{ code, message?, settings_url? }`, with `message` the
+            gate's own sentence in the person's language when it has one, and where to change it.
+            `operator_contact` is the address that reaches this node's operators (`support@operators`).
+            `ai` is the chat's AI: `key { source: chat | own | node | shared | null, chat_key_set,
+            can_set_chat_key }` (`chat` is the chat agent's own OpenRouter key, set with
+            PUT /v1/agents/chat/ai-keys, which pays for the chat alone); `model { current, chosen,
+            locked, can_choose, choices: [{ id, name }], operator_allowed }` (`chosen` is the chat's
+            own model, set with PUT /v1/ai/routing `{ routing: { agent: "chat", model } }`; `locked`
+            when the operator chooses the model, ai.models_locked or the shared chat key; `choices`
+            are the models the chat's policy allows, in the region in use, at most 2000;
+            `operator_allowed` is ai.allowed_models); `region { current, choices, can_choose, eu_only,
+            applies_to: all } | null` (where OpenRouter processes the chat's calls, null when the chat
+            does not run on OpenRouter; the person's region rule covers all of their AI, and is set
+            with PUT /v1/ai/routing `rules.openrouterRegion`).
             `allowance_remaining_usd` is the node's own OpenRouter key's remaining limit when that is
             smaller than the person's allowance (a customer node keeps the balance its owner bought as
             that limit), and `allowance_low` is true below a tenth of the limit.
@@ -20364,7 +20393,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: data.policy (mode open | recommended | custom, allow, appliesTo, apps, agents), data.recommended, data.applies_to_caller.
+          description: data.policy (mode open | recommended | custom, allow, appliesTo, apps, agents), data.recommended, data.operator (allowed, the operator's list from ai.allowed_models that binds every call on the node, empty when none; locked, true when ai.models_locked lets only the operator choose the model), data.applies_to_caller.
           content:
             application/json:
               schema:
@@ -20988,7 +21017,7 @@ paths:
       responses:
         '200':
           description: >
-            data.routing { defaults, rules, agent_defaults? }, data.providers (id, type, capabilities),
+            data.routing { defaults, rules, agent_defaults?, agent_model? (the asked agent's own text model) }, data.providers (id, type, capabilities),
             data.free_model { available, model, node_default, in_effect }: whether the node's key has a
             free model, the operator's default for it as the last resort (ai.free_model_last_resort),
             and what applies to this account now. data.openrouter_region: where OpenRouter calls are
@@ -21039,6 +21068,15 @@ paths:
                     defaults: { type: object, additionalProperties: { type: array, items: { type: string } } }
                     rules: { type: object, additionalProperties: true }
                     agent: { type: string }
+                    model:
+                      type: string
+                      nullable: true
+                      description: >
+                        With `agent` only: that agent's own text model (an OpenRouter id or a
+                        `<type>:<model id>` reference), which comes before the owner's role models for
+                        that agent's calls; null follows the owner's model again. The chat's model is
+                        agent `chat`. Refused with 403 AI_MODELS_LOCKED while the operator locks the
+                        models (ai.models_locked).
                 confirm_token: { type: string }
       responses:
         '200':

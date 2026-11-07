@@ -1093,6 +1093,10 @@ const ALL_SUITES = [
     // Where an OpenRouter call on the node's key is processed (eu, us, any): its own node on 28494 with
     // the stub standing in for the three addresses at three paths. Follows the runner's backend.
     'test/e2e-ai-openrouter-region.ts',
+    // The chat's AI (Jouni, 2026-11-07): its own node on 28501 with a chat agent path and a node key,
+    // the operator made through the admin setup route: the chat's states, its own model and key, and
+    // the operator's allowed models and lock. Follows the runner's backend.
+    'test/e2e-chat-ai-settings.ts',
     // The model catalogue (System 2, V4): its own node on 28440 whose catalogue sources point at a
     // local stub serving the sample files, so a refresh, a source that fails, a retirement and a
     // catalogue price are read from what the node wrote. Follows the runner's backend.

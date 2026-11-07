@@ -29,6 +29,7 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   2026-11-07 — aiProvidersView: routing.agent_model, the asked agent's own text model.
  *   2026-11-04 — The provider count reads at most MAX_OWNER_PROVIDERS rows (codebase analysis 2026-11-03, item C1).
  *   v1.4.1 — 2026-11-01 — free_model reads freeModelOf/freeLastResortOf: none in eu-only (ai.region_mode); openrouter_region carries the mode.
  *   v1.4.0 — 2026-10-31 — aiProvidersView carries openrouter_region: the operator's region, what the
@@ -465,7 +466,7 @@ export async function agentProviderKeys(storage: Storage, ownerGhii: string, age
  */
 export async function aiProvidersView(storage: Storage, config: AimeatConfig, ownerGhii: string, agent?: string): Promise<{
   providers: Record<string, unknown>[];
-  routing: { defaults: RoutingDefaults; rules: RoutingRules; agent_defaults?: RoutingDefaults };
+  routing: { defaults: RoutingDefaults; rules: RoutingRules; agent_defaults?: RoutingDefaults; agent_model?: string };
   limits: { max_owner_providers: number };
   free_model: { available: boolean; model: string | null; node_default: boolean; in_effect: boolean };
   openrouter_region: Record<string, unknown>;
@@ -501,7 +502,11 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
   }));
   return {
     providers: views,
-    routing: { defaults: routing.owner.defaults, rules: routing.owner.rules, ...(routing.agent ? { agent_defaults: routing.agent } : {}) },
+    routing: {
+      defaults: routing.owner.defaults, rules: routing.owner.rules,
+      ...(routing.agent ? { agent_defaults: routing.agent } : {}),
+      ...(routing.agentModel ? { agent_model: routing.agentModel } : {}),
+    },
     limits: { max_owner_providers: MAX_OWNER_PROVIDERS },
     // The free model as the last resort on the node's key (route-plan.ts): whether this node has a
     // key and a free model for it, the operator's default, and what applies to this account now.

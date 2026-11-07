@@ -120,7 +120,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     'open-items': ['list', 'act'], chooser: ['pick', 'act'], 'settings-account': ['view', 'edit'], 'free-text': ['edit'],
     specimen: ['view', 'compare'],
     // The conversation
-    'conversation-frame': ['layout', 'converse'], 'thread-list': ['list', 'navigate'], 'agent-status': ['status'],
+    'conversation-frame': ['layout', 'converse'], 'thread-list': ['list', 'navigate'], 'agent-status': ['status'], 'chat-ai': ['status', 'edit', 'explain'],
     'rail-action': ['act'], suggestion: ['converse', 'act'], turn: ['converse', 'view'], 'result-card': ['view', 'open'],
     'work-log': ['list', 'status'], 'ai-notice': ['explain'], nudge: ['notify', 'act'], credit: ['explain'], composer: ['converse', 'edit'],
     // The older shared parts

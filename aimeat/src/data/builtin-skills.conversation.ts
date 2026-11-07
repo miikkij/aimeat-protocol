@@ -33,6 +33,7 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-11-07 -- aimeat-paying-for-the-ai: the chat's own key pays for the chat alone; the operator's model lock sets the person's model aside.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   2026-11-02 -- aimeat-paying-for-the-ai: an ecosystem app's AI is paid from its owner's account (secaudit2026nov02d round 13).
  *   2026-11-01 -- aimeat-paying-for-the-ai: no free model on a node set up for the EU only (ai.region_mode eu-only).
@@ -508,7 +509,10 @@ not you:
    xAI account, or a model on their own machine (\`aimeat_ai_providers\` lists them). It thinks with
    the model they chose, and with the node's default model until they choose one; a free model
    answers on their key only when they chose it, or once when the key has no credit left (see
-   below).
+   below). For the built-in chat alone a person can also give the chat its own OpenRouter key on the
+   chat page; it comes first for the chat and pays for nothing else, and \`ai.key.source\` on
+   \`GET /v1/chat/status\` says \`chat\` while it pays. When the operator chooses the model for
+   everybody (\`ai.models_locked\`), the person's own model choice is set aside whoever pays.
 2. **The node's key**, while their allowance has something left, and only when the person has no
    provider of their own for what the call asks for. A person whose own provider cannot answer is
    told why; the node's key does not quietly step in.

@@ -521,6 +521,14 @@
       "count": 1,
       "reason": "DEBT"
     },
+    "src/services/chat/agent-health.ts :: let :: reading": {
+      "count": 1,
+      "reason": "Each process starts its own chat agent; a second process does not see this reading and probes its own agent once on its first look, which is the right answer for it."
+    },
+    "src/services/chat/agent-health.ts :: let :: probing": {
+      "count": 1,
+      "reason": "One probe at a time within this process; a second process runs its own probe, which costs one extra agent start and decides nothing for anybody else."
+    },
     "src/services/chat-session.ts :: map :: earlierRunsEnded": {
       "count": 1,
       "reason": "DEBT"

@@ -16,6 +16,9 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-11-07: A chat that cannot answer says why and who can change it (ChatUnavailable) in place of
+ *     the developer's English note; the rail shows the model, region and key with what may change
+ *     here (ChatAiSettings), read from GET /v1/chat/status `state` and `ai` (Jouni, 2026-11-07).
  *   2026-11-02: Stop tells the node to end the turn (chat.stopTurn) before it lets go of the stream; a
  *     reload or another page mid-thought no longer costs the answer (routes/chat.ts v1.13.0).
  *   2026-11-01: The page opens the live stream, and a conversation whose turn still runs elsewhere shows
@@ -119,6 +122,7 @@ import { ThreadList, threadTitle } from '/components/ThreadList.js';
 import { Turn, LiveTurn, TurnError } from '/components/Turn.js';
 import { Composer } from '/components/Composer.js';
 import { StatusBar } from '/components/AgentStatus.js';
+import { ChatUnavailable, ChatAiSettings } from '/components/ChatAi.js';
 import { GooseCredit } from '/components/Credit.js';
 import { Suggestions, Suggestion, Choices, choicesIn } from '/components/Suggestion.js';
 import { AiNotice } from '/components/AiNotice.js';
@@ -208,15 +212,27 @@ export default function ChatView() {
         setLive({ text: '', thought: '', progress: '', tools: [], cards: [] });
     }, []);
 
+    // What this node offers the chat: whether it can answer, and the key, model and region it answers
+    // with. Read on the first load and again after a change on the chat's AI settings (ChatAi.js).
+    const reloadStatus = useCallback(() => chat.status()
+        .then((st) => setStatus(st?.data ?? null))
+        .catch((err) => console.warn('[chat] the status line was not loaded:', err.message)), []);
+
     // First load: what this node offers, and where the person left off. The conversations draw as
     // soon as they arrive; the status line and the suggestions fill in when theirs do. GET
     // /v1/chat/status can wait up to 5 s on the AI provider's balance on a fresh place, and the
     // whole page used to wait with it (v27 P7).
+    // Read again when the person signs in on this page: without it a sign-in here left the page with
+    // no status, so it neither said the chat was out of use nor showed the chat's AI settings.
+    const [signIns, setSignIns] = useState(0);
+    useEffect(() => {
+        const onAuth = () => setSignIns((n) => n + 1);
+        window.addEventListener('aimeat-auth-change', onAuth);
+        return () => window.removeEventListener('aimeat-auth-change', onAuth);
+    }, []);
     useEffect(() => {
         if (!hasSession()) { setLoading(false); return; }
-        chat.status()
-            .then((st) => setStatus(st?.data ?? null))
-            .catch((err) => console.warn('[chat] the status line was not loaded:', err.message));
+        reloadStatus();
         chat.readNudges()
             .then((nudges) => setNudgeDismissed(!!nudges?.mobile))
             .catch((err) => console.warn('[chat] the dismissals were not loaded:', err.message));
@@ -232,7 +248,7 @@ export default function ChatView() {
                 setLoading(false);
             }
         })();
-    }, [openThread]);
+    }, [openThread, reloadStatus, signIns]);
 
     // Keep the newest turn in view — UNLESS the person has scrolled up to read something.
     //
@@ -410,6 +426,9 @@ export default function ChatView() {
                         setLive((l) => ({ ...l, cards: [...cards.values()] }));
                     }
                 } else if (update.kind === 'error') {
+                    // The chat agent did not start or stopped mid-turn: the status says the chat is out
+                    // of use, and the message box gives way to the explanation (ChatAi.js).
+                    if (update.code === 'CHAT_AGENT_DOWN') reloadStatus();
                     const message = update.message || tr('chat.turnFailed', 'The turn could not be completed.');
                     setFailure(update.settingsUrl || update.choices
                         ? { message, href: update.settingsUrl || '', choices: update.choices || null } : message);
@@ -443,7 +462,7 @@ export default function ChatView() {
                 }
             }
         }
-    }, [draft, busy, thread, startThread, loadThreads, attachments, status]);
+    }, [draft, busy, thread, startThread, loadThreads, attachments, status, reloadStatus]);
 
     // The free model is the person's own choice once the AI allowance is spent (A1, 2026-10-29): it
     // is turned on in their routing rules, the same rule the AI page sets, and the question is sent again.
@@ -628,7 +647,8 @@ export default function ChatView() {
     // named three answers ago has been overtaken by everything said since.
     const lastAgentTurn = [...turns].reverse().find((t) => t.role !== 'user');
     const openChoices = busy || runningElsewhere ? [] : choicesIn(lastAgentTurn?.text);
-    const disabled = status ? !status.enabled : false;
+    // The chat answers only in state `ready`; a server from before `state` answers `enabled` alone.
+    const disabled = status ? (status.state ? status.state !== 'ready' : !status.enabled) : false;
 
     return html`
         <${ConversationFrame} list=${listOpen}>
@@ -646,6 +666,7 @@ export default function ChatView() {
                 <${ConversationAbout} label=${tr('chat.thisConversation', 'This conversation')}
                     name=${thread ? threadTitle(thread) : tr('chat.title', 'Chat')}>
                     <${StatusBar} status=${status} onReset=${thread && turns.length > 0 ? resetSession : null} />
+                    <${ChatAiSettings} status=${status} onChanged=${reloadStatus} />
                     <${ResetConfirm} />
                     ${turns.length > 0 && html`<${ConversationCopy}
                         text=${conversationAsText(thread ? threadTitle(thread) : '', turns)}
@@ -689,7 +710,7 @@ export default function ChatView() {
                 ${hasTalked && !showMobileNudge && html`<${InstallCta} compact=${true} />`}
 
                 <${ConversationScroll} onScroll=${onScrollArea}>
-                    ${turns.length === 0 && !busy ? html`
+                    ${turns.length === 0 && !busy && !(disabled && status?.state) ? html`
                         <${ConversationWelcome}
                             title=${customerNode() ? tr('chat.buyerTitle', 'Say what you want – your AI does it.') : t('chat.welcomeTitle')}
                             body=${customerNode() ? tr('chat.buyerBody', 'You see every step on the screen, and everything stays in your own account.') : `${t('chat.welcomeBody')} ${tr('chat.welcomeAtelier', '')}`.trim()}
@@ -725,7 +746,7 @@ export default function ChatView() {
                         ${tr('chat.jumpLatest', 'Jump to the latest')}
                     <//>`}
 
-                ${capped ? html`
+                ${disabled && status?.state ? html`<${ChatUnavailable} status=${status} />` : capped ? html`
                     <${ConversationCap}
                         title=${tr('chat.capTitle', 'This conversation has used up its free ride.')}
                         body=${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}
@@ -749,7 +770,7 @@ export default function ChatView() {
                     listening=${listening}
                     busy=${busy}
                     disabled=${disabled}
-                    note=${disabled ? (status?.note ?? '') : ''} />`}
+                    note=${disabled && !status?.state ? (status?.note ?? '') : ''} />`}
             <//>
         <//>
     `;

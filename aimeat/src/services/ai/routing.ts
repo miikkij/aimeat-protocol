@@ -20,6 +20,8 @@
  *   ROUTING_KEY · agentRoutingKey · RoutingRules · DEFAULT_RULES · RoutingRecord · readRouting ·
  *   rulesFor · defaultsFor · normaliseRoutingInput · setRouting
  * @version-history
+ *   v1.3.0 — 2026-11-07 — An agent's record may name the agent's own text model (`model`; the chat's
+ *     model is the chat agent's), refused while the operator locks the models (Jouni, 2026-11-07).
  *   v1.2.0 — 2026-10-31 — rules.openrouterRegion and rules.openrouterRegionFallback: where the person's
  *     OpenRouter calls are processed, eu, us or any (Jouni, 2026-10-31).
  *   v1.1.0 — 2026-10-25 — rules.freeModelLastResort: the account's own word on the free model as the
@@ -112,7 +114,13 @@ export interface LoadedRouting {
   owner: RoutingRecord;
   /** The asking agent's own defaults, when it has a record. */
   agent?: RoutingDefaults;
+  /** The asking agent's own text model, when its record names one (the chat's model is the chat
+   *  agent's). It comes before the owner's role models; the operator's lock sets it aside. */
+  agentModel?: string;
 }
+
+/** A model id as an agent's record keeps it: an OpenRouter id or a `<type>:<id>` reference. */
+const MODEL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,199}$/;
 
 function readDefaults(v: unknown): RoutingDefaults {
   const out: RoutingDefaults = {};
@@ -154,6 +162,8 @@ export async function readRouting(storage: Storage, gaii: string, agent?: string
   return {
     owner: { version: 1, defaults: readDefaults(o.defaults), rules: readRules(o.rules), ...(typeof o.updatedAt === 'string' ? { updatedAt: o.updatedAt } : {}) },
     ...(agentRec && isObj(agentRec.value) ? { agent: readDefaults(agentRec.value.defaults) } : {}),
+    ...(agentRec && isObj(agentRec.value) && typeof agentRec.value.model === 'string' && MODEL_ID_RE.test(agentRec.value.model)
+      ? { agentModel: agentRec.value.model } : {}),
   };
 }
 
@@ -173,7 +183,11 @@ export function defaultsFor(capability: AiCapability, routing: LoadedRouting): {
   return { agent: routing.agent?.[capability] ?? [], owner: routing.owner.defaults[capability] ?? [] };
 }
 
-export interface RoutingInput { defaults?: RoutingDefaults; rules?: Partial<RoutingRules>; agent?: string }
+export interface RoutingInput {
+  defaults?: RoutingDefaults; rules?: Partial<RoutingRules>; agent?: string;
+  /** With `agent` only: that agent's own text model, or null to follow the owner's again. */
+  model?: string | null;
+}
 
 /**
  * Check what a caller asks to change, against the providers this owner can use. Every problem at
@@ -249,7 +263,13 @@ export function normaliseRoutingInput(input: unknown, knownIds: ReadonlySet<stri
       out.rules = rules;
     }
   }
-  if (out.defaults === undefined && out.rules === undefined) problems.push('routing: give defaults, rules or both.');
+  if (input.model !== undefined) {
+    if (!out.agent) problems.push('model: an agent\'s own text model, so it needs agent (the chat\'s is agent "chat"). The owner\'s models are their roles.');
+    else if (input.model !== null && (typeof input.model !== 'string' || !MODEL_ID_RE.test(input.model))) {
+      problems.push('model: a model id such as mistralai/mistral-small-2603 or openrouter:mistralai/mistral-small-2603, or null to follow the owner\'s model again.');
+    } else out.model = input.model as string | null;
+  }
+  if (out.defaults === undefined && out.rules === undefined && out.model === undefined) problems.push('routing: give defaults, rules, model (with agent) or a mix.');
   return problems.length ? { problems } : { value: out };
 }
 
@@ -259,7 +279,8 @@ async function writeRouting(storage: Storage, gaii: string, change: RoutingInput
   const at = new Date().toISOString();
   if (change.agent) {
     const defaults = { ...(current.agent ?? {}), ...(change.defaults ?? {}) };
-    await upsertPrivateRecord(storage, gaii, agentRoutingKey(change.agent), { version: 1, defaults, updatedAt: at }, ['ai', 'routing']);
+    const model = change.model === undefined ? current.agentModel : change.model ?? undefined;
+    await upsertPrivateRecord(storage, gaii, agentRoutingKey(change.agent), { version: 1, defaults, ...(model ? { model } : {}), updatedAt: at }, ['ai', 'routing']);
   } else {
     const record: RoutingRecord = {
       version: 1,
@@ -287,10 +308,18 @@ const ROUTING_ACTION = 'ai_routing';
  */
 export async function setRouting(
   storage: Storage, gaii: string, input: unknown, knownIds: ReadonlySet<string>, actor: RoutingActor,
+  opts: { modelsLocked?: boolean } = {},
 ): Promise<RoutingSetResult> {
   const r = normaliseRoutingInput(input, knownIds);
   if ('problems' in r) {
     throw new AiCompletionError('AI_ROUTING_INVALID', 400, `The routing was not saved: ${r.problems.join(' ')}`, { problems: r.problems });
+  }
+  // The operator chooses the model on this node (ai.models_locked): an agent's own model would be set
+  // aside at every call, so it is refused here rather than stored and ignored. Clearing one is fine.
+  if (opts.modelsLocked && typeof r.value.model === 'string') {
+    throw new AiCompletionError('AI_MODELS_LOCKED', 403,
+      'The operator of this node chooses the model, so an agent\'s own model cannot be set. Ask the operator to change it.',
+      { next: { description: 'Read the model rules', method: 'GET', url: '/v1/ai/policy' } });
   }
   if (actor.kind === 'owner') return { mode: 'applied', routing: await writeRouting(storage, gaii, r.value) };
   if (!actor.confirmToken) {

@@ -17,6 +17,7 @@
  *   change to the roles or a binding of an app's role is a proposal the owner confirms, as the routing is.
  * @structure registerAiProviderTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-11-07 — aimeat_ai_routing_set passes the operator's model lock, so an agent's own model is refused while it holds.
  *   2026-11-04 — The payer is the session principal's caller facts (`principalCaller(gaii).payer`), the
  *     answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-31 — aimeat_ai_routing_set's read carries openrouter_region, as GET /v1/ai/routing does.
@@ -38,6 +39,7 @@ import { AiCompletionError } from '../services/ai/errors.js';
 import { aiProvidersView, knownProviderIds } from '../services/ai/provider-store.js';
 import { testProvider } from '../services/ai/provider-test.js';
 import { setRouting } from '../services/ai/routing.js';
+import { modelsLocked } from '../services/ai/node-model-rules.js';
 import { setRoles } from '../services/ai/roles.js';
 import { aiRolesView, knownRoleProviders } from '../services/ai/roles-view.js';
 import type { AiCapability } from '../services/ai/types.js';
@@ -96,7 +98,7 @@ export function registerAiProviderTools(
         }
         return text(await setRouting(storage, payer, routing, await knownProviderIds(storage, config, payer), {
           kind: 'agent', principal, ...(confirm_token ? { confirmToken: confirm_token } : {}),
-        }));
+        }, { modelsLocked: modelsLocked(config) }));
       } catch (e) { return refusal(e); }
     },
   );

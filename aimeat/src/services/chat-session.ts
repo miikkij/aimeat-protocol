@@ -23,7 +23,7 @@
  *   person's memory, and goose's own store is a cache.
  * @structure
  *   - chatEnabled() — whether this node has an agent at all
- *   - chatPayer() — who pays for this person's turns, and on which model, as the node decides it
+ *   - (who pays and on which model: services/chat/chat-status.ts chatAiStatus, since v1.20.0)
  *   - chatRefusal() — the refusal /v1/llm would give this person's chat, as they read it
  *   - runChatTurn() — the whole turn, yielding updates as they happen and persisting both sides
  *   - withoutToolMarkers() — the answer without the "[Calling: …]" lines a model writes as text
@@ -32,6 +32,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.21.0 -- 2026-11-07 -- A chat agent that does not start answers CHAT_AGENT_DOWN in the person's language and marks the agent down (chat/agent-health.ts); one whose process ends mid-turn answers CHAT_AGENT_STOPPED, and the next turn starts a fresh one; "goose exited (…)" stays in the log (Jouni, 2026-11-07).
+ *   v1.20.0 -- 2026-11-07 -- chatPayer() moved into services/chat/chat-status.ts chatAiStatus(), which asks the same plan once for the payer, the model and the refusal.
  *   v1.19.0 -- 2026-11-02 -- The turn note carries the person's local date and time (clockLine): their
  *     own time zone, else `opts.timezone`, the one their browser sent with the turn (crew68), which is
  *     also remembered for the home feed's local times (services/person-zone.ts).
@@ -126,6 +128,7 @@ import { systemReader } from './classification/reader.js';
 import { displayPrefsFor } from './display-prefs.js';
 import { notePersonZone } from './person-zone.js';
 import { logger } from '../utils/logger.js';
+import { chatAgentHealth, noteChatAgentDown, noteChatAgentUp } from './chat/agent-health.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
 
@@ -314,32 +317,9 @@ function unstamp(stamped: string | undefined, generation: number): string | null
 }
 
 /**
- * Who pays for this person's chat turns, and on which model, as the node decides it.
- *
- * On the shared key the operator's key pays for every turn: 'node'. On the node route each model
- * call is decided by prepareAiCall in /v1/llm, so the same decision is asked here with the same
- * inputs: 'own' when the person's own key (or their chat agent's) pays, 'allowance' when the node's
- * key pays from their allowance. A call the gate would refuse has no payer, and the answer is null:
- * the turn itself then says why.
- */
-export async function chatPayer(
-    deps: ChatDeps, gaii: string,
-): Promise<{ pays: 'node' | 'own' | 'allowance' | null; model?: string }> {
-    const { storage, config } = deps;
-    if (chatUsesSharedKey(config)) return { pays: 'node', ...(config.gooseModel ? { model: config.gooseModel } : {}) };
-    try {
-        const plan = await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', agent: CHAT_AGENT_NAME, caller: 'chat' });
-        return { pays: plan.keyScope === 'node' ? 'allowance' : 'own', model: plan.model };
-    } catch (err) {
-        logger.info(`[chat] no payer for ${gaii}'s chat: ${(err as Error).message}`);
-        return { pays: null };
-    }
-}
-
-/**
  * The refusal /v1/llm would give this person's chat, in the words they read: the gate's own `fix`
  * sentence in their language and the AI settings address, or null when a call would run. The same
- * question chatPayer() asks, asked before the agent starts, because an agent that meets the refusal
+ * question chatAiStatus() asks (services/chat/chat-status.ts), asked before the agent starts, because an agent that meets the refusal
  * relays the gate's English message, which is written for a developer. Only a refusal that names
  * something to fix in settings ends the turn here; anything else is left for the turn to meet.
  */
@@ -468,14 +448,26 @@ export async function* runChatTurn(
         return;
     }
 
+    // A chat agent that does not start is out of use (chat/agent-health.ts): the person reads that in
+    // their language, and the page shows the chat as out of use at its next look. The process's own
+    // message is for the log and the status's `technical`, never the conversation.
+    const agentDown = (): ChatRefusedUpdate => ({ kind: 'error', code: 'CHAT_AGENT_DOWN', message: createT(locale)('chatTurn.agentDown') });
+    const health = await chatAgentHealth(config);
+    if (!health.ok) {
+        logger.warn(`[chat] ${gaii}'s turn refused: the chat agent does not start: ${health.error}`);
+        yield agentDown();
+        return;
+    }
     let lease: AgentLease<GooseAcpClient>;
     let sessionId: string;
     try {
         lease = await agentFor(deps, ownerName);
+        noteChatAgentUp(config);
     } catch (err) {
         const message = (err as Error).message;
         logger.warn(`[chat] could not start an agent for ${ownerName}: ${message}`);
-        yield { kind: 'error', message };
+        noteChatAgentDown(config, message);
+        yield agentDown();
         return;
     }
     try {
@@ -644,6 +636,13 @@ export async function* runChatTurn(
                 return null;
             });
             if (refused) end = refused;
+            // The agent's process ended mid-turn. The next turn starts a fresh one (the pool), so the
+            // chat is not out of use: the person is told in their words, and the process's own line
+            // ("goose exited (…)") stays in the log.
+            else if (acp.isClosed) {
+                logger.warn(`[chat] ${gaii}: the chat agent stopped mid-turn: ${end.message}`);
+                end = { kind: 'error', code: 'CHAT_AGENT_STOPPED', message: createT(locale)('chatTurn.agentStopped') };
+            }
         }
         // A published app's address is in the words whatever else happened, written once.
         if (publishedApp && end?.kind !== 'error' && !signal?.aborted && !answer.includes(publishedApp)) {

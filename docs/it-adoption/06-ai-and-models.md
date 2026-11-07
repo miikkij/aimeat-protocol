@@ -1,6 +1,6 @@
 # 06 AI and models
 
-> Checked against AIMEAT node 4.2.0 (commit 20a29b0f0) on 2026-11-05. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit dafff7a75) on 2026-11-07. Maintained with the code: see the README for how.
 
 This page is for the architect and the security officer who decide which AI model sources the node may use, and for the administrator who connects them. It answers: which provider types exist and what each can do, who holds the keys, how the node limits where a key and a prompt may go, what data reaches a model and when, how data is kept to a local model, how spend is limited and measured, what the node does for EU AI Act transparency, and what IT prepares for each model source.
 
@@ -63,12 +63,14 @@ Which key pays for a call: the person's (or agent's) own key first, then the nod
 |---|---|---|---|
 | Capability | what a model does: text, vision, files, image, speech, transcription, embed | fixed vocabulary | `aimeat_ai_capabilities` |
 | Role | what a model is used for, with an ordered list of providers and models per capability; an app declares the roles it needs and the person binds them to one of theirs. Built-in roles `reasoning` and `execution` | the person | `aimeat_ai_roles`, `aimeat_ai_role_set` |
-| Routing rules | order of providers, fallback, OpenRouter region choice | the person | `aimeat_ai_routing_set`, `aimeat_ai_providers` |
+| Routing rules | order of providers, fallback, OpenRouter region choice; an agent's own record may name that agent's text model (`model`, the built-in chat's is agent `chat`) | the person | `aimeat_ai_routing_set`, `aimeat_ai_providers` |
 | Model policy | which models a call may use: `open`, `recommended` (the node's list, `AIMEAT_AI_RECOMMENDED_MODELS`) or `custom`, applied to the person's own calls, the node's chat, their agents and apps. Every layer can only tighten | the person; the operator supplies the recommended list | `aimeat_ai_policy_set` |
+| Operator's allowed models | `AIMEAT_AI_ALLOWED_MODELS` (`ai.allowed_models`), default empty: the only models any call on the node may use, as `<type>:<model id>` references, whoever pays and whoever calls (people, agents, apps, the chat). The first layer of the model policy; no person's setting loosens it. A call naming another model is refused with `AI_MODEL_NOT_ALLOWED` | operator | `aimeat_admin_config_set` |
+| Operator's model lock | `AIMEAT_AI_MODELS_LOCKED` (`ai.models_locked`), default `false`. On: a person's own model choices (roles, an agent's or the chat's model, a model on their own provider) and a model a call names are set aside; the node uses the first allowed model the provider reaches, or the node default model for the role. Setting an agent's or the chat's model is refused with `AI_MODELS_LOCKED` | operator | `aimeat_admin_config_set` |
 | Node default models | the model per role when the person set none: `AIMEAT_MODEL_DEFAULT_CHAT`, `_REASONING`, `_EXECUTION`, `_VISION`, `_STT`, `_IMAGE`, `_TTS`, `_EMBED` | operator | `aimeat_admin_config_set` |
 | Daily budget and model settings | the person's daily spend limit in USD, per-app caps, legacy model choices, by propose-then-confirm | the person | `aimeat_operator_ai_config` |
 
-Sources: `aimeat/src/services/ai/roles.ts`, `aimeat/src/services/ai/policy.ts`, `aimeat/src/services/ai/routing.ts`, `aimeat/src/services/ai/model-defaults.ts`. The node picks providers per call from these records (`aimeat/src/services/ai/route-plan.ts`).
+Sources: `aimeat/src/services/ai/roles.ts`, `aimeat/src/services/ai/policy.ts`, `aimeat/src/services/ai/routing.ts`, `aimeat/src/services/ai/model-defaults.ts`, `aimeat/src/services/ai/node-model-rules.ts`. The node picks providers per call from these records (`aimeat/src/services/ai/route-plan.ts`).
 
 ### Which model roles a node needs
 
