@@ -19,6 +19,8 @@
  * @structure requireSchemaLockCaller(storage) · lockKindRefusal(auth, holdsIt)
  * @usage router.put('/v1/memory/:key/schema', requireAuth(), requireSchemaLockCaller(storage), handler)
  * @version-history
+ *   v1.0.1 — 2026-11-07 — The 401 also refuses the shared anonymous identity (code scanning alert
+ *     1782, invariant 6), as requireAuth() ahead of it does.
  *   v1.0.0 — 2026-11-06 — Initial (decision 13a of 2026-11-05).
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -35,7 +37,11 @@ const REFUSAL = 'Setting or removing a structure lock needs the account holder, 
 export function requireSchemaLockCaller(storage: Storage) {
   const byScope = requireScope('memory:write');
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth) {
+    // `!req.auth` alone is not the test: optionalAuth runs globally and, in anonymous mode, injects
+    // a shared identity, so an unauthenticated caller arrives here truthy. requireAuth() ahead of
+    // this gate refuses that identity with the same 401, and this line does not depend on it having
+    // run (invariant 6). The other anonymous forms and a foreign visitor get the 403 below.
+    if (!req.auth || req.auth.anonymous) {
       deny401(req, res, 'Authentication required');
       return;
     }
