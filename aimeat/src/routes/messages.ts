@@ -21,6 +21,8 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-11-08 — GET /requests answers from MessagesInboxService.pendingRequests, the read the overview
+ *     already made, and each request carries `body`, its first message with line breaks.
  *   2026-11-04 — No per-id read for a storage without getDirectMessagesByIds: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-10-27 -- A named 1:1 conversation_id is bound to the sender; agent-thread merges the owner's other rows only with messages:read-as-owner (secaudit2026oct26).
@@ -106,12 +108,12 @@
 
 import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, DirectMessageRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
+import { conversationIdFor, deliveryTargetFor, isAddressableRecipient } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
 import { dismissConversationNotifications } from '../services/notify.js';
@@ -133,6 +135,7 @@ import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/me
 import { isOperatorCaller } from '../services/operator-override.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { mailboxReaderOf, readOwnerInbox, readOwnerConversations, readOwnerThread, readOwnerOverview } from '../services/owner-mailbox-reads.js';
+import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';
 import { requireOwnerMailboxRead } from '../auth/owner-mailbox-gate.js';
 import { transcribeForOwner } from '../services/ai/transcription.js';
 import { nodeFailureOf } from '../services/ai/errors.js';
@@ -724,25 +727,9 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
 
   /* ── GET /v1/messages/requests — pending first-contact requests ── */
   router.get('/v1/messages/requests', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
-    const ghii = resolve(req);
-    const pending = await storage.listContacts(ghii, { state: 'pending' });
-    // Each request's preview comes from its first message — fetch them all in ONE batched read (was
-    // getDirectMessage per pending contact), indexed by message id.
-    const firstIds = pending.map(c => c.firstMessageId).filter((x): x is string => !!x);
-    const firstById = new Map<string, DirectMessageRecord>();
-    if (firstIds.length) {
-      const msgs = await storage.getDirectMessagesByIds(firstIds, ghii);
-      for (const m of msgs) firstById.set(m.id, m);
-    }
-    const requests = pending.map(c => {
-      const first = c.firstMessageId ? firstById.get(c.firstMessageId) ?? null : null;
-      return {
-        contactId: c.contactId,
-        conversationId: first?.conversationId ?? conversationIdFor(ghii, c.contactId),
-        preview: messagePreview(first?.body ?? ''),
-        createdAt: c.createdAt,
-      };
-    });
+    // The same read the inbox overview makes: each request with its first message, as a preview line
+    // and as the whole body (services/db/messages-inbox-db-service.ts).
+    const requests = await createMessagesInboxService(storage).pendingRequests(resolve(req));
     res.json(success(config.nodeId, { requests }));
   });
 

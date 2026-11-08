@@ -16,7 +16,7 @@
  *   css/components/conversation-list.css over thread-list.css.
  * @structure ConversationList({ selecting, empty, children }) · ConversationTools({ count, children }) ·
  *   ConversationRequests({ label, count, children }) · ConversationRequest({ picture, name, presence,
- *   address, preview, children }) · ConversationSection({ kind, label, count, unread, open, onToggle,
+ *   address, preview, body, more, less, children }) · ConversationSection({ kind, label, count, unread, open, onToggle,
  *   children }) · ConversationGroup({ open, onToggle, picture, name, presence, countLabel, unreadLabel,
  *   pick, archive, children }) · ConversationRow({ title, presence, mark, date, dateTitle, chips,
  *   subject, preview, why, unread, active, nested, selecting, selected, onOpen, openLabel, archive }) ·
@@ -30,6 +30,9 @@
  *   box with the arrow out of it. `pick` on a group: the "select all" word while selecting.
  *   `openLabel` on a row: its tooltip, the whole name where the row cuts it short (an agent's threads).
  * @version-history
+ *   v1.4.0 — 2026-11-08 — A request opens: `body` (the whole first message), `more` and `less` (the
+ *     page's words for the toggle under it). The name and the address wrap instead of cutting. On a
+ *     phone a request showed two lines of its message and a cut name, and nothing opened them.
  *   v1.3.0 — 2026-10-19 — An agent peer's own avatar (mark.avatar on a row, avatar on a group)
  *     draws in place of the identicon (components/AgentAvatar.js).
  *   v1.2.0 — 2026-09-27 — A row's archive square no longer wears the chat's delete class, whose rule
@@ -46,6 +49,7 @@
  *     (main's 40px and 36px), its small size beside a group's heading (the lead's ruling: one avatar).
  */
 import { h } from 'preact';
+import { useState, useRef, useLayoutEffect } from 'preact/hooks';
 import htm from 'htm';
 import { Avatar } from '/components/Avatar.js';
 import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
@@ -100,10 +104,27 @@ export function ConversationRequests({ label, count, children }) {
     ${children}`;
 }
 
-/** One contact request: who, their address, what they wrote, and the page's answers (children). */
-export function ConversationRequest({ picture, name, presence, address, preview, children }) {
+/**
+ * One contact request: who, their address, what they wrote, and the page's answers (children). The
+ * name and the address wrap rather than cut. The message shows two lines; `body` is the whole of it,
+ * and the word `more` (closed) or `less` (open) under it, or a press on the lines, shows all of it.
+ * The word shows only when there is more than the two lines show.
+ */
+export function ConversationRequest({ picture, name, presence, address, preview, body, more, less, children }) {
+  const [open, setOpen] = useState(false);
+  const [cut, setCut] = useState(false);
+  const textRef = useRef(null);
+  const whole = body || preview || '';
+  // Whether the closed message hides anything: the clamp cut it, or the preview line is not the
+  // whole body (a line break flattened, or the 140-character cut).
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el || open) return;
+    setCut(el.scrollHeight > el.clientHeight + 1 || (!!body && body !== preview));
+  }, [whole, preview, body, open]);
+  const toggle = () => setOpen(o => !o);
   return html`
-    <div class="conversation-request">
+    <div class=${cx('conversation-request', open && 'conversation-request--open')}>
       <div class="conversation-request-top">
         <${Avatar} seed=${picture} />
         <div class="conversation-request-id">
@@ -111,7 +132,10 @@ export function ConversationRequest({ picture, name, presence, address, preview,
           <div class="conversation-request-address">${address}</div>
         </div>
       </div>
-      <div class="conversation-request-preview">${preview || ''}</div>
+      <div ref=${textRef} class="conversation-request-preview" onClick=${cut || open ? toggle : undefined}>${open ? whole : (preview || whole)}</div>
+      ${(cut || open) && more ? html`<div class="conversation-request-more">
+        <${Action} small tone="more" expanded=${open} onClick=${toggle}>${open ? less : more}<//>
+      </div>` : null}
       <div class="conversation-request-actions">${children}</div>
     </div>`;
 }

@@ -8,6 +8,8 @@
 //   a support thread, with classification on (secaudit 2026-10-10 I9).
 // v1.3.0 -- 2026-10-25 -- 20c: GET /v1/messages/overview?compact=true cuts the last message to a preview
 //   and each agent to its names; without it both are whole.
+// v1.4.0 -- 2026-11-08 -- 2b: a request carries `body`, its whole first message with line breaks (cut at
+//   4000), equal in /requests and the overview; another owner and the recipient's agent do not read it.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -130,6 +132,41 @@ await test('2. Bob sees it as a pending request (NOT in inbox yet)', async () =>
     const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
     const inInbox = inbox.body.data.messages.find((m: any) => m.id === msg1Id);
     assert(inInbox === undefined, 'pending request not shown in normal inbox');
+});
+
+await test('2b. A request carries its whole first message with line breaks; only its recipient reads it', async () => {
+    // On a phone the request showed two lines of a 140-character preview and nothing opened the rest,
+    // so a person had to accept or block a message they could not read (fixed 2026-11-08).
+    const dave = await registerOwner(`dmdave${stamp}`);
+    const head = 'Hi Bob,\n\nthis is the first line.\nAnd the second.\n\n';
+    const long = head + 'x'.repeat(5000);
+    const sent = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${dave.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: long }),
+    });
+    assert(sent.status === 201, `dave send: ${sent.status} ${JSON.stringify(sent.body)}`);
+
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const r = reqs.body.data.requests.find((x: any) => x.contactId === dave.ghii);
+    assert(r !== undefined, 'dave appears in Bob requests');
+    assert(r.preview.length === 140 && !r.preview.includes('\n'), `preview stays one line of 140, got ${r.preview.length}`);
+    assert(typeof r.body === 'string' && r.body.startsWith(head), 'body keeps the line breaks');
+    assert(r.body.length === 4000 && r.body.endsWith('…'), `body is cut at 4000 with an ellipsis, got ${r.body?.length}`);
+
+    const ov = await json('/v1/messages/overview', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const o = ov.body.data.requests.find((x: any) => x.contactId === dave.ghii);
+    assert(o?.body === r.body, 'the overview carries the same body as /requests');
+
+    // Failure mode: another owner and Bob's own agent do not read Bob's requests.
+    const other = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${mal.token}` } });
+    assert(other.status === 200 && !other.body.data.requests.some((x: any) => x.contactId === dave.ghii), 'Mallory does not see Bob\'s request');
+    const bot = await createAgent(bobName, bob.token, `reqreader${stamp}`, ['messages:read']);
+    const byAgent = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${bot.token}` } });
+    assert(byAgent.status === 403, `an agent is refused the owner's requests, got ${byAgent.status}`);
+
+    // Leave Bob's requests as the later tests expect them.
+    const block = await json(`/v1/messages/contacts/${encodeURIComponent(dave.ghii)}/block`, { method: 'POST', headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(block.status === 200, `block dave: ${block.status}`);
 });
 
 await test('3. Cannot read accepted-only conversations until accepted', async () => {

@@ -11,6 +11,9 @@
  *   from outside.
  * @usage Linked from public/spa.html in the component block, after thread-list.css.
  * @version-history
+ *   v1.1.0 — 2026-11-08 — A contact request's name and address wrap instead of cutting with an
+ *     ellipsis; .conversation-request--open shows the whole first message with its line breaks, and
+ *     .conversation-request-more holds the toggle under it.
  *   v1.0.2 — 2026-09-27 — The archive square no longer shows on the open row: only under the pointer and
  *     on keyboard focus, as main had it, so the open row's date stays readable. The open row's subject,
  *     date, marks and tags take the row's own words' colour (inherit), readable in Pebble's dark mode.
@@ -44,8 +47,9 @@
 }
 .conversation-request-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .conversation-request-id { min-width: 0; }
-.conversation-request-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.conversation-request-address { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The name and the address wrap: a request is read before it is answered, and a cut sender cannot be. */
+.conversation-request-name { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.conversation-request-address { font-size: 11px; color: var(--text-dim); overflow-wrap: anywhere; }
 .conversation-request-preview {
   color: var(--text-dim);
   font-size: 13px;
@@ -53,7 +57,12 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
+/* Open (ConversationRequest `body`): the whole first message, its line breaks kept. */
+.conversation-request--open .conversation-request-preview { display: block; white-space: pre-wrap; color: var(--text); }
+.conversation-request-preview:has(+ .conversation-request-more) { cursor: pointer; }
+.conversation-request-more { margin-top: -4px; }
 .conversation-request-actions { display: flex; gap: 8px; }
 
 /* ── The selection line ── */

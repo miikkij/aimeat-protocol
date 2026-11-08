@@ -12,6 +12,8 @@
  * @structure ListPanel · rowIds
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.11.0 — 2026-11-08 — A request opens to its whole first message (`body` from the server) with
+ *     "Read the whole message" under its two lines.
  *   v1.10.0 — 2026-10-21 — Group chat: the group invitations (`groupInvitations`) over the requests, and
  *     a Groups section whose rows carry the group's name, its member count and who wrote last.
  *   v1.9.0 — 2026-10-19 — A row's mark and a group's heading carry the agent peer's own avatar (`peerAvatar`):
@@ -239,7 +241,8 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
       ${requests.length > 0 ? html`
         <${ConversationRequests} label=${t('inbox.requests')} count=${requests.length}>
           ${requests.map(r => html`<${ConversationRequest} key=${r.contactId} picture=${r.contactId}
-            name=${peerDisplay(r.contactId)} presence=${r.contactId} address=${r.contactId} preview=${r.preview || ''}>
+            name=${peerDisplay(r.contactId)} presence=${r.contactId} address=${r.contactId} preview=${r.preview || ''}
+            body=${r.body || ''} more=${t('inbox.requestReadAll')} less=${t('inbox.requestShowLess')}>
             <${Action} onClick=${() => accept(r.contactId)}>${t('inbox.accept')}<//>
             <${Action} onClick=${() => block(r.contactId)}>${t('inbox.block')}<//>
           <//>`)}

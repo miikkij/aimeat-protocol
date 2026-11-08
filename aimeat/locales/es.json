@@ -16632,6 +16632,8 @@
   "inbox.reply": "Responder",
   "inbox.replyingTo": "Respondiendo a",
   "inbox.requests": "Solicitudes",
+  "inbox.requestReadAll": "Leer el mensaje completo",
+  "inbox.requestShowLess": "Mostrar menos",
   "inbox.results": "Resultados",
   "inbox.resultsAnswered": "Respondieron",
   "inbox.resultsDelivered": "Entregados",

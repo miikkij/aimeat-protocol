@@ -18488,6 +18488,8 @@
   "inbox.reply": "Vastaa",
   "inbox.replyingTo": "Vastataan:",
   "inbox.requests": "Pyynnöt",
+  "inbox.requestReadAll": "Lue koko viesti",
+  "inbox.requestShowLess": "Näytä vähemmän",
   "inbox.results": "Tulokset",
   "inbox.resultsAnswered": "Vastattu",
   "inbox.resultsDelivered": "Toimitettu",

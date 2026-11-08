@@ -9,6 +9,8 @@
  *   an ink rule, and the pages (broadcast, tracked, results) with the head the mast already carries
  *   removed. Tokens only. NOTE: this file must be linked in spa.html after inbox.css.
  * @version-history
+ *   v1.18.0 -- 2026-11-08 -- The mast's action row stays on one line only above 1100px; below, it wraps,
+ *     where on a phone it ran off the left edge with its first actions out of reach.
  *   v1.17.0 -- 2026-09-26 -- The page is SettingsPage (name "ib") and the panes ConversationPane: what stays
  *     is the page's own place for the head, the rail pages' column, and on a phone a rail page over the
  *     whole screen (the open panes cover it by themselves). The broadcast choices are the Choice now:
@@ -47,7 +49,12 @@
 .og-ib { gap: 0; }
 .og-ib .og-mast--page { margin-top: .6rem; }
 .og-ib .og-title small { align-items: center; }
-.og-ib .og-mast-actions .og-doors { flex-wrap: nowrap; }
+/* One row of actions beside the title on a wide screen. Below 1101px the mast is a column (page-head.css)
+   and the row wraps, as every page's does: unwrapped it was 551px wide on a 390px phone, and the
+   right-aligned page mast pushed its first actions off the left edge. */
+@media (min-width: 1101px) {
+  .og-ib .og-mast-actions .og-doors { flex-wrap: nowrap; }
+}
 
 /* ── The pages under the same crumb: broadcast, tracked responses, results, list rules ── */
 .og-ib .og-grid { margin-top: 1.1rem; }

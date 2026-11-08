@@ -10,8 +10,13 @@
  *   individual list endpoints stay for interactive re-fetches (filter/live-update).
  *
  * @structure MessagesInboxService.overview(ownerGhii, ownerName, { inPerson }) → { requests, conversations, important, tracked, agents, groups, peerNames, peerAvatars }
+ *   · MessagesInboxService.pendingRequests(ownerGhii) → InboxRequest[] · requestBody(body) · REQUEST_BODY_MAX
  * @usage const inbox = await createMessagesInboxService(storage).overview(ghii, owner);
  * @version-history
+ *   v1.6.0 — 2026-11-08 — A request carries `body`, its first message with line breaks (cut at
+ *     REQUEST_BODY_MAX), so the person reads all of it before accepting; a phone showed two lines of a
+ *     140-character preview and no way to open the rest. pendingRequests is public and also serves
+ *     GET /v1/messages/requests, which had its own copy of the same read.
  *   2026-11-04 — No per-id read for a storage without getDirectMessagesByIds: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   v1.5.0 — 2026-10-19 — peerAvatars: the picture of every on-screen agent (services/agent-avatar.ts).
@@ -39,7 +44,20 @@ import { readAvatarsOrEmpty, type AvatarView } from '../agent-avatar.js';
  *  flagged; un-flag deletes it). Mirrors public/js/services/tracked-responses.js FLAG_PREFIX. */
 const FLAG_PREFIX = 'message-flag.';
 
-export interface InboxRequest { contactId: string; conversationId: string; preview: string; createdAt: string }
+/** The most of a request's first message that goes out with the request list. A message body may
+ *  be 50 000 characters; the list carries every pending request, so one is cut here, with a mark. */
+export const REQUEST_BODY_MAX = 4000;
+
+/** The first message as the person reads it before accepting: line breaks kept, cut at
+ *  REQUEST_BODY_MAX with an ellipsis. */
+export function requestBody(body: string): string {
+  const text = body.trim();
+  return text.length > REQUEST_BODY_MAX ? `${text.slice(0, REQUEST_BODY_MAX - 1)}…` : text;
+}
+
+/** One pending first-contact request. `preview` is one flattened line for a row; `body` is the first
+ *  message with its line breaks, so the person can read all of it before accepting or blocking. */
+export interface InboxRequest { contactId: string; conversationId: string; preview: string; body: string; createdAt: string }
 export interface InboxOverview {
   requests: InboxRequest[];
   conversations: OwnerConversation[];
@@ -146,9 +164,10 @@ export class MessagesInboxService {
     return peerNames;
   }
 
-  /** Pending first-contact requests with their first-message preview — mirrors GET /v1/messages/requests
-   *  (one batched getDirectMessagesByIds read, not getDirectMessage per pending contact). */
-  private async pendingRequests(ownerGhii: string): Promise<InboxRequest[]> {
+  /** Pending first-contact requests with their first message, as a preview line and as the whole body
+   *  (one batched getDirectMessagesByIds read, not getDirectMessage per pending contact). Serves both
+   *  GET /v1/messages/overview and GET /v1/messages/requests. */
+  async pendingRequests(ownerGhii: string): Promise<InboxRequest[]> {
     const pending = await this.storage.listContacts(ownerGhii, { state: 'pending' });
     const firstIds = pending.map(c => c.firstMessageId).filter((x): x is string => !!x);
     const firstById = new Map<string, DirectMessageRecord>();
@@ -162,6 +181,7 @@ export class MessagesInboxService {
         contactId: c.contactId,
         conversationId: first?.conversationId ?? conversationIdFor(ownerGhii, c.contactId),
         preview: messagePreview(first?.body ?? ''),
+        body: requestBody(first?.body ?? ''),
         createdAt: c.createdAt,
       };
     });

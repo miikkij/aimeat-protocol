@@ -66449,7 +66449,8 @@ paths:
                               properties:
                                 contactId: { type: string }
                                 conversationId: { type: string }
-                                preview: { type: string }
+                                preview: { type: string, description: 'The first message as one line, cut at 140 characters.' }
+                                body: { type: string, description: 'The first message with its line breaks, cut at 4000 characters, so the owner can read it before accepting or blocking.' }
                                 createdAt: { type: string, format: date-time }
                           conversations:
                             type: array
@@ -66978,7 +66979,8 @@ paths:
                               properties:
                                 contactId: { type: string }
                                 conversationId: { type: string }
-                                preview: { type: string }
+                                preview: { type: string, description: 'The first message as one line, cut at 140 characters.' }
+                                body: { type: string, description: 'The first message with its line breaks, cut at 4000 characters, so the owner can read it before accepting or blocking.' }
                                 createdAt: { type: string, format: date-time }
         '401':
           $ref: '#/components/responses/Unauthorized'

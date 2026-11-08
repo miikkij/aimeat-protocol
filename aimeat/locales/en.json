@@ -17751,6 +17751,8 @@
   "inbox.reply": "Reply",
   "inbox.replyingTo": "Replying to",
   "inbox.requests": "Requests",
+  "inbox.requestReadAll": "Read the whole message",
+  "inbox.requestShowLess": "Show less",
   "inbox.results": "Results",
   "inbox.resultsAnswered": "Answered",
   "inbox.resultsDelivered": "Delivered",
