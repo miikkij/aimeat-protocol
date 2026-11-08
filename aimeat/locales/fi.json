@@ -29,7 +29,7 @@
   "explain.receivers.maxKeys.high": "Ohjelmalla, jolla on monta lähdettä, kuten yksi avain anturia kohden, on tilaa kasvaa.",
   "explain.receivers.maxKeys.tip": "Laske lähteet, joista ohjelma kirjoittaa, ja lisää muutama. Kymmenelle anturille riittää noin 15.",
   "receivers": {
-    "lede": "Osoitteet, joihin omat ohjelmasi kirjoittavat: Lambda, kodin anturi tai CRM-vienti. Jokainen kirjoittaa omalla avaimellaan yhteen paikkaan tiedoissasi. Kun vastaanottimella on muoto, jokainen viesti tarkistetaan sitä vasten ennen tallennusta.",
+    "lede": "Osoitteet, joihin oma ohjelmasi kirjoittaa, jotta tietosi pysyvät ajan tasalla ilman, että kirjoitat mitään. Jokainen vastaanotin kirjoittaa omalla avaimellaan yhteen paikkaan, jonka valitsit.",
     "new": "Uusi vastaanotin",
     "chipCount": "Vastaanottimia {n}",
     "chipWaiting": "Odottaa sinua: {n}",
@@ -39,17 +39,18 @@
     "railTitle": "Tällä sivulla",
     "pages": "Liittyvät sivut",
     "ai": {
-      "title": "Helpoin tapa:",
-      "body": "sano omalle tekoälyllesi ”{sentence}” Se ehdottaa vastaanotinta, ja sinä hyväksyt sen täällä.",
-      "sentence": "Tee vastaanotin, johon Lambda kirjoittaa anturien näkymät.",
-      "copy": "Kopioi lause",
       "copyShort": "Kopioi"
     },
     "secList": "Vastaanottimesi",
     "secListSub": "Yhteensä {n}",
     "loadFailed": "Vastaanottimiasi ei voitu lukea.",
     "retry": "Yritä uudelleen",
-    "col": { "name": "Nimi", "writes": "Kirjoittaa", "today": "Tänään", "last": "Viimeisin toimitus" },
+    "col": {
+      "name": "Nimi",
+      "writes": "Kirjoittaa",
+      "today": "Tänään",
+      "last": "Viimeisin toimitus"
+    },
     "emptyTitle": "Ei vielä vastaanottimia.",
     "emptyBody": "Tee vastaanotin painikkeella Uusi vastaanotin tai pyydä tekoälyäsi ehdottamaan sellaista.",
     "listHint": "Vastaanotin kirjoittaa vain siihen paikkaan, jota varten se tehtiin. Kun avaat vastaanottimen, näet jokaisen toimituksen ja voit vaihtaa avaimen tai poistaa vastaanottimen.",
@@ -67,9 +68,9 @@
       "off": "Palvelun ylläpitäjä on kytkenyt vastaanottimet pois päältä. Uutta vastaanotinta ei voi tehdä, eivätkä olemassa olevat kirjoita mitään."
     },
     "newAiK": "Pyydä tekoälyltäsi",
-    "newAiV": "Tekoälysi ehdottaa vastaanotinta, jolla on paikka, muoto ja rajat. Tekoäly ei saa avainta: sinä hyväksyt ehdotuksen täällä, ja avain näytetään sinulle kerran.",
+    "newAiV": "Tekoälysi ehdottaa vastaanotinta, jolla on paikka, tietokuvaus ja rajat. Tekoäly ei saa avainta: sinä hyväksyt ehdotuksen täällä, ja avain näytetään sinulle kerran.",
     "newHereK": "Tee se täällä",
-    "newHereV": "Valitse, mihin vastaanotin kirjoittaa, minkä muodon se tarkistaa ja mitkä ovat sen rajat. Avain näytetään kerran, kun teet vastaanottimen.",
+    "newHereV": "Valitse, mihin vastaanotin kirjoittaa, minkä tietokuvauksen mukaan se tarkistaa viestit ja mitkä ovat sen rajat. Avain näytetään kerran, kun teet vastaanottimen.",
     "newAgentK": "Anna agentin tehdä niitä",
     "newAgentV": "Agentti tekee vastaanottimia itse vain, jos sillä on oikeus tehdä, muuttaa ja poistaa vastaanottimia. Annat oikeuden agentin sivulla. Täysi pääsy ei sisällä sitä.",
     "secHow": "Mitä vastaanotin saa tehdä",
@@ -77,7 +78,7 @@
       "mayK": "Mitä se saa tehdä",
       "mayV": "Kirjoittaa siihen yhteen paikkaan, jonka valitsit: yhteen muistiavaimeen, yhden etuliitteen avaimiin tai yhteen rivitilaan. Takaisin lukeminen, kenttien täydentäminen ja poistaminen ovat erillisiä valintoja, ja jokainen koskee vain samaa paikkaa.",
       "notK": "Mitä se ei voi tehdä",
-      "notV": "Kirjoittaa tekoälyasetuksiisi, profiiliisi tai muihin avaimiin, joita palvelin itse pitää. Tallentaa viestiä, joka ei vastaa valittua muotoa. Toimia ilman avainta. Lukea muita tietojasi.",
+      "notV": "Kirjoittaa tekoälyasetuksiisi, profiiliisi tai muihin avaimiin, joita palvelin itse pitää. Tallentaa viestiä, joka ei vastaa sen tietokuvausta, jos sillä on sellainen. Toimia ilman avainta. Lukea muita tietojasi.",
       "staleK": "Kun et enää tarvitse sitä",
       "staleV": "Vastaanotin lakkaa toimimasta päättymispäivänään, vuoden kuluttua tekemisestä, jos et valinnut muuta. Sitä ennen voit jatkaa voimassaoloa, keskeyttää vastaanottimen tai poistaa sen sen omalla sivulla. Poisto pysäyttää avaimen heti. Se, mitä vastaanotin kirjoitti, jää tietoihisi.",
       "keyK": "Sen avain",
@@ -88,7 +89,10 @@
       "prefixLine": "Etuliitteen {prefix}. avaimet (enintään {n})",
       "spaceLine": "Rivitila {space} työtilassa {ws}"
     },
-    "shape": { "line": "{csm} v{v}", "none": "Ei muotoa" },
+    "shape": {
+      "line": "{csm} v{v}",
+      "none": "Ei tietokuvausta"
+    },
     "state": {
       "active": "Toimii",
       "paused": "Keskeytetty",
@@ -97,7 +101,10 @@
       "awaiting_operator": "Odottaa ylläpitäjää",
       "expired": "Vanhentunut"
     },
-    "by": { "you": "Sinä", "agent": "Agenttisi {agent}" },
+    "by": {
+      "you": "Sinä",
+      "agent": "Agenttisi {agent}"
+    },
     "maker": {
       "kept": "{maker} teki {n} vastaanotinta. Ne toimivat edelleen, kun {maker} on poistettu.",
       "kept_one": "{maker} teki yhden vastaanottimen. Se toimii edelleen, kun {maker} on poistettu.",
@@ -135,7 +142,7 @@
       "done": "Valmis"
     },
     "code": {
-      "SCHEMA_INVALID": "Viesti ei vastannut muotoa. Mitään ei tallennettu.",
+      "SCHEMA_INVALID": "Viesti ei vastannut tietokuvausta. Mitään ei tallennettu.",
       "TOO_LARGE": "Viesti oli suurempi kuin vastaanotin ottaa.",
       "RATE_LIMITED": "Liian monta kutsua minuutissa.",
       "DAILY_LIMIT": "Päivän raja tuli täyteen.",
@@ -180,7 +187,7 @@
     "secFacts": "Mihin se kirjoittaa",
     "f": {
       "target": "Paikka",
-      "shape": "Muoto",
+      "shape": "Tietokuvaus",
       "shapeSub": "Jokainen viesti tarkistetaan tätä versiota vasten ennen tallennusta.",
       "noShapeSub": "Se ottaa mitä tahansa JSONia. Koko, syvyys ja palvelimen omat avaimet tarkistetaan silti.",
       "verbs": "Metodit",
@@ -253,14 +260,14 @@
       "noOrganisms": "Et kuulu yhteenkään yhteiseen paikkaan, joten rivitilaa, johon kirjoittaa, ei ole.",
       "noRowSpaces": "Tässä työtilassa ei ole rivitiloja.",
       "shapeLabel": "Mitä se ottaa vastaan",
-      "shapeCsm": "Tarkista CSM:n mukaan (suositus)",
-      "shapeCsmHint": "Viesti, joka ei vastaa muotoa, hylätään, ja vastaus nimeää kentän. Sovellus, joka lukee tiedot, voi luottaa niiden muotoon.",
+      "shapeCsm": "Tarkista tietokuvauksen mukaan (suositus)",
+      "shapeCsmHint": "Viesti, joka ei vastaa tietokuvausta, hylätään, ja vastaus nimeää kentän. Sovellus, joka lukee tiedot, voi luottaa niiden kenttiin.",
       "shapeAny": "Ota vastaan sellaisenaan",
       "shapeAnyHint": "Mikä tahansa JSON kelpaa. Koko, syvyys ja palvelimen omat avaimet tarkistetaan silti.",
-      "csm": "CSM",
+      "csm": "Tietokuvaus (CSM)",
       "csmOption": "{name} (versio {v})",
-      "csmBad": "Valitse CSM.",
-      "noCsms": "Sinulla ei ole vielä CSM:ää, jonka voisit valita. Pyydä tekoälyäsi tekemään sellainen esimerkkiviestistä tai ota viestit vastaan sellaisinaan.",
+      "csmBad": "Valitse tietokuvaus.",
+      "noCsms": "Sinulla ei ole vielä tietokuvausta, jonka voisit valita. Pyydä tekoälyäsi tekemään sellainen esimerkkiviestistä tai ota viestit vastaan sellaisinaan.",
       "verbsLabel": "Mitä ohjelma saa tehdä",
       "verbsHint": "Takaisin lukeminen ja poisto koskevat vain tämän vastaanottimen omaa paikkaa.",
       "perMinute": "Viestejä minuutissa",
@@ -313,7 +320,7 @@
         "writes": "Kirjoituksia tänään",
         "writesSub": "tallennettu UTC-keskiyön jälkeen",
         "refused": "Hylätty tänään",
-        "refusedSub": "muoto, raja tai metodi",
+        "refusedSub": "tietokuvaus, raja tai metodi",
         "wrongKeys": "Vääriä avaimia",
         "wrongKeysSub": "kutsuja avaimella, joka ei täsmännyt",
         "waiting": "Odottaa",
@@ -350,9 +357,25 @@
       "refuse": "Hylkää",
       "refuseReason": "Hylkäyksen syy",
       "refuseReasonHint": "Omistaja näkee sen. Jätä tyhjäksi, kun hyväksyt.",
-      "f": { "target": "Paikka", "shape": "Muoto", "verbs": "Metodit", "limits": "Rajat", "asked": "Pyydetty", "until": "Voimassa" },
-      "all": { "title": "Kaikki vastaanottimet", "none": "Tällä palvelimella ei ole vielä vastaanottimia." },
-      "col": { "name": "Nimi", "owner": "Omistaja", "state": "Tila", "today": "Tänään", "last": "Viimeisin toimitus" },
+      "f": {
+        "target": "Paikka",
+        "shape": "Tietokuvaus",
+        "verbs": "Metodit",
+        "limits": "Rajat",
+        "asked": "Pyydetty",
+        "until": "Voimassa"
+      },
+      "all": {
+        "title": "Kaikki vastaanottimet",
+        "none": "Tällä palvelimella ei ole vielä vastaanottimia."
+      },
+      "col": {
+        "name": "Nimi",
+        "owner": "Omistaja",
+        "state": "Tila",
+        "today": "Tänään",
+        "last": "Viimeisin toimitus"
+      },
       "todayLine": "{n} · {refused} hylätty",
       "refusedToday": "Hylättyjä tänään: {n}",
       "never": "Ei toimituksia vielä",
@@ -371,7 +394,10 @@
       "started": "Omistajan {owner} vastaanotin {name} toimii taas.",
       "stopNoteTitle": "Kun pysäytät vastaanottimen,",
       "stopNote": "omistaja näkee vastaanottimen sivulla, että pysäytit sen, ja syysi. Omistaja ei voi käynnistää sitä uudelleen, vain sinä voit.",
-      "ai": { "title": "Tekoälysi lukee saman listan.", "text": "Se listaa, pysäyttää, käynnistää ja hyväksyy vastaanottimia yhdellä työkalulla:" },
+      "ai": {
+        "title": "Tekoälysi lukee saman listan.",
+        "text": "Se listaa, pysäyttää, käynnistää ja hyväksyy vastaanottimia yhdellä työkalulla:"
+      },
       "loadFailed": "Vastaanottimia ei voitu lukea."
     }
   },
@@ -28105,9 +28131,9 @@
     "structure.look.lounge.line": "Konsoli levossa: syvä yönsininen, kaikki hieman hitaammin.",
     "structure.look.dawn.line": "Aamun valo: lämmin vaalea paperi ja pehmeät reunat.",
     "structure.look.workbench.line": "Työkalu joka päivälle: harmaa pöytä, valkoiset kortit ja yksi korostusväri.",
-    "structure.look.clean.line": "Selkeä ja siisti: harmaat pinnat, ohuet viivat ja yksi korostusväri. Tarjolla jokaiseen sovellukseen.",
     "structure.look.kirjapaino.line": "Painettu kirje: mustaa mustetta lämpimällä paperilla.",
     "structure.look.tdr.line": "Konehuoneen konsoli: oranssi signaali mustalla.",
+    "structure.look.clean.line": "Selkeä ja siisti: harmaat pinnat, ohuet viivat ja yksi korostusväri. Tarjolla jokaiseen sovellukseen.",
     "structure.block.hero": "kaista",
     "structure.block.list": "lista",
     "structure.block.cardGrid": "kortit",
@@ -31411,6 +31437,22 @@
     "concept.memory.ex2": "Yhtä markkinaa koskeva tutkimuksesi yhtenä merkintänä, jota tekoälysi päivittää.",
     "concept.memory.ex3": "Asetukset, jotka sovellus säilyttää puolestasi, kuten kielesi ja tallennetut suodattimesi.",
     "concept.memory.tip": "Pyydä tekoälyäsi tallentamaan tänne se, minkä haluat säilyvän keskustelusta toiseen. Kun haluat jakaa jotain muiden kanssa, vie se yhteisen paikan työtilaan.",
+    "concept.receiver.title": "Vastaanotin",
+    "concept.receiver.short": "Osoite ja avain, joiden kautta oma ohjelmasi kirjoittaa yhteen paikkaan tiedoissasi ilman, että kukaan kirjoittaa käsin. Anturi, skripti tai toinen järjestelmä pitää tietosi ajan tasalla, ja tekoälysi vastaa niiden pohjalta.",
+    "concept.receiver.what": "Jokainen vastaanotin kirjoittaa siihen yhteen paikkaan, jonka valitsit, kun teit sen. Yksi muistiavain säilyttää vain uusimman viestin. Etuliitteen avaimet säilyttävät uusimman viestin jokaisesta lähteestä, esimerkiksi yhden avaimen huonetta kohden. Rivitila säilyttää jokaisen viestin rivinä, ja yhteisen paikan jäsenet näkevät rivit. Ohjelma lähettää vastaanottimen osoitteeseen verkkokutsun (POST), jossa on JSONia, ja laittaa avaimen Authorization-otsakkeeseen. Useimmat ohjelmointikielet, automaatiopalvelut ja kodin järjestelmät osaavat tämän. Kun vastaanottimella on tietokuvaus, viesti, jonka kentät ovat väärin, hylätään ennen kuin mitään tallennetaan. Vastaanotin ei voi lukea eikä muuttaa muita tietojasi, ja se lakkaa toimimasta päättymispäivänään.",
+    "concept.receiver.ex1": "Mökin lämpömittari lähettää lukemansa kymmenen minuutin välein yhteen muistiavaimeen. Kysyt tekoälyltäsi: paljonko mökillä on nyt lämmintä? Jos haluat myös historian, lukemat menevät rivitilaan, kukin omaksi rivikseen.",
+    "concept.receiver.ex2": "Sinun tai tekoälysi kirjoittama skripti käy joka yö, kerää päivän myynnin ja lähettää yhteenvedon. Aamulla tekoälysi tietää jo eilisen luvut.",
+    "concept.receiver.ex3": "Verkkokauppa lähettää jokaisen uuden tilauksen rivinä tiimisi yhteisen paikan rivitilaan. Tiimi ja heidän tekoälynsä näkevät samat rivit, ja tietokuvaus hylkää tilauksen, jonka kentät ovat väärin.",
+    "concept.receiver.ex4": "Zapier, Make, n8n tai Home Assistant lähettää verkkokutsun, kun jotain tapahtuu: joku täytti lomakkeen, maksu tuli tai ovi aukesi. Tapahtuma on silloin tiedoissasi.",
+    "concept.receiver.tipLabel": "Milloin käytät jotain muuta",
+    "concept.receiver.tip": "Jos tuot tiedoston kerran, anna se tekoälyllesi tai lataa se. Jos ohjelman pitää lukea paljon tietojasi tai toimia monessa paikassa, liitä se agenttina. Vastaanotin kirjoittaa vain yhteen paikkaan.",
+    "concept.data_description.title": "Tietokuvaus (CSM)",
+    "concept.data_description.short": "Kuvaus siitä, mitä kenttiä viestissä on ja mitä sääntöjä kukin kenttä noudattaa. Vastaanotin, jolla on tietokuvaus, hylkää viestin, joka ei vastaa sitä. Siksi tietoja lukeva voi luottaa niihin.",
+    "concept.data_description.what": "Tekoälysi tekee tietokuvauksesta luonnoksen yhdestä esimerkkiviestistä, ja voit muuttaa sitä myöhemmin. Jokainen muutos on uusi versio, ja vastaanotin tarkistaa jokaisen viestin sitä versiota vasten, jota se käyttää. Viesti, joka ei vastaa kuvausta, hylätään. Vastaus nimeää väärän kentän, eikä mitään tallenneta.",
+    "concept.data_description.ex1": "Lämpömittarin lukema: lämpötilan pitää olla luku ja ajan päivämäärä. Lukema, jossa lukee ”lämmin”, hylätään, ja ohjelma saa tietää, mikä kenttä oli väärin.",
+    "concept.data_description.ex2": "Verkkokaupan tilaus: tilausnumero, summa ja asiakkaan sähköpostiosoite ovat pakollisia. Tilaus ilman summaa ei koskaan päädy tiimisi riveihin.",
+    "concept.data_description.tipLabel": "Milloin valitset tietokuvauksen",
+    "concept.data_description.tip": "Valitse tietokuvaus aina, kun sovellus, raportti tai toinen ihminen lukee tietoja. Ota viestit vastaan sellaisinaan vain lyhyessä kokeilussa.",
     "concept.morsel.title": "Muruset",
     "concept.morsel.short": "Murunen tahdistaa sitä, kuinka paljon agenttisi saavat kirjoittaa ja käyttää täällä. Murunen ei ole rahaa, sillä ei voi ostaa mitään, eikä sitä voi vaihtaa rahaksi.",
     "concept.morsel.what": "Sinulla on yksi murusten saldo, ja agenttisi ja sovelluksesi käyttävät samaa saldoa. Saat murusia, kun tilisi luodaan, ja saldo karttuu joka päivä hieman lisää palvelimen asettamaan rajaan asti. Osa toiminnoista vie murusia: ilmoitus julkiselle taululle, toisen ihmisen työkalun kutsu tai muisti, joka ylittää maksuttoman määrän. Jos saldo ei riitä, palvelin hylkää toiminnon, kunnes saldo on taas karttunut. Murusia ei ole pakko käyttää. Iso saldo kertoo, että olet antanut jotain, mitä muut käyttävät.",
@@ -31545,6 +31587,10 @@
   "pageStart.ai.prompt": "Katso, mitä tekoälymalleja AIMEATini voi käyttää. Mitä mallia sovellusteni ja agenttieni kannattaa käyttää arkityöhön pienellä budjetilla, ja paljonko tavallinen käyttö suunnilleen maksaa kuukaudessa? Vastaa selkeästi.",
   "pageStart.ai.action": "Lisää oma avaimesi",
   "pageStart.ai.next": "Omalla avaimellasi sovelluksesi ja agenttisi käyttävät valitsemaasi mallia omalla budjetillasi. Siihen asti ne käyttävät palvelimen aloitussaldoa.",
+  "pageStart.receivers.purpose": "Vastaanottimen avulla oma ohjelmasi, kuten kodin anturi, joka yö ajettava skripti tai työpaikan järjestelmä, pitää tietosi ajan tasalla itse. Silloin tekoälysi vastaa uusimpien lukujen pohjalta.",
+  "pageStart.receivers.prompt": "Tee AIMEATiini vastaanotin, johon [kotini lämpömittari] voi lähettää lukemansa. Kerro yhdellä virkkeellä, mihin lukemat tallentuvat, ja anna osoite, jossa hyväksyn vastaanottimen.",
+  "pageStart.receivers.action": "Tee vastaanotin itse",
+  "pageStart.receivers.next": "Hyväksyt vastaanottimen täällä ja kopioit sen avaimen, joka näytetään vain kerran. Laitat avaimen ja osoitteen ohjelmaan, ja sen jälkeen jokainen toimitus näkyy vastaanottimen omalla sivulla.",
   "glossary.technical": "Tekninen määritelmä",
   "glossary.area.identity": "Ihmiset, agentit ja oikeudet",
   "glossary.area.data": "Tietosi ja yhteiset paikat",

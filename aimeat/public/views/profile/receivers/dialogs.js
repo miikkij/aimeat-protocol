@@ -13,6 +13,8 @@
  *   keyDialog · keyOnce · dryRunBlock · extendDialog
  * @usage ${renderDialogs(ctx)} after the page
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The form's "What it takes" choice has the question mark that explains a
+ *     data description (concept.data_description).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { h } from 'preact';
@@ -150,7 +152,7 @@ function shapeFields(ctx, f, shown) {
   const csms = ctx.csms;
   return html`
     <${Stack}>
-      <${Choice} boxed dot cols=${2} name="rc-shape" label=${x('form.shapeLabel')} value=${f.shape}
+      <${Choice} boxed dot cols=${2} name="rc-shape" label=${x('form.shapeLabel')} help="concept.data_description" value=${f.shape}
         onChange=${(v) => ctx.setForm({ shape: v })}
         options=${[
           { value: 'csm', label: x('form.shapeCsm'), hint: x('form.shapeCsmHint') },

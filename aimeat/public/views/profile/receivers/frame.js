@@ -6,7 +6,8 @@
  *   (the /v1/receivers routes of src/routes/receivers.ts, the same service functions the MCP tool
  *   aimeat_receiver calls), and the helpers that turn a receiver view (receiverView in
  *   src/services/receivers/contract.ts) into the reader's words: where it writes, its state and its
- *   tone, who made it, a delivery's line, the curl example and the sentence for one's own AI.
+ *   tone, who made it, a delivery's line and the curl example. (The sentence for one's own AI is the
+ *   page start's prompt, `pageStart.receivers.prompt`.)
  *   A receiver is an address and a key through which an outside program (a Lambda, a home sensor, a
  *   CRM export) writes into exactly one place of the owner's data over plain REST.
  * @structure x · api (list, get, deliveries, create, decide, patch, pause, resume, rotate, remove,
@@ -15,6 +16,8 @@
  *   crumb · pageLinks · LIMITS
  * @usage import { x, api, targetWords, curlFor } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-11-08 — sayToAi removed: the page start (components/PageStart.js) carries the
+ *     prompt for one's own AI.
  *   v1.1.0 — 2026-11-08 — refusalWords knows ACCOUNT_DISABLED, a write refused while the account is
  *     deactivated (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht;
@@ -181,9 +184,6 @@ export async function dryRun(r, key, body) {
     return { ok: false, status: 0, code: 'NETWORK_ERROR', message: e?.message || '', fields: [] };
   }
 }
-
-/** The sentence a person says to their own AI to have it propose a receiver. */
-export const sayToAi = () => x('ai.sentence');
 
 /** The crumb's steps: Settings / Automation / Receivers, and the receiver's name on its own page. */
 export function crumb(ctx, name) {
