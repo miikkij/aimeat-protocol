@@ -498,8 +498,8 @@ await test('Install + activate wallet-guard extension', async () => {
 });
 
 // The REST consume wrapper rejects bad amounts by throwing INVALID_AMOUNT (matching its
-// existing DEBIT_LIMIT throw). Since 2026-11-08 a named refusal keeps its code, so the action
-// answers 400 INVALID_AMOUNT where it answered 500 EXTENSION_ERROR
+// existing DEBIT_LIMIT throw). Since 2026-11-08 a named refusal keeps its code as the reason, so the
+// action answers 400 EXTENSION_REFUSED with reason INVALID_AMOUNT where it answered 500 EXTENSION_ERROR
 // (services/extension-access/script-refusal.ts). The security invariant we assert is unchanged: the
 // balance is NOT minted.
 await test('Negative consume amount does NOT mint morsels (CR-1)', async () => {
@@ -509,7 +509,7 @@ await test('Negative consume amount does NOT mint morsels (CR-1)', async () => {
         headers: { Authorization: `Bearer ${agentToken}` },
         body: JSON.stringify({ amount: -1000000 }),
     });
-    assert(status === 400 && body.error?.code === 'INVALID_AMOUNT', `expected 400 INVALID_AMOUNT (rejected), got ${status}: ${JSON.stringify(body)}`);
+    assert(status === 400 && body.error?.code === 'EXTENSION_REFUSED' && body.error?.details?.reason === 'INVALID_AMOUNT', `expected 400 EXTENSION_REFUSED/INVALID_AMOUNT (rejected), got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === false && /INVALID_AMOUNT/.test(body.error?.message ?? ''),
         `expected INVALID_AMOUNT rejection, got: ${JSON.stringify(body.error)}`);
     const after = await ownerBalance();
@@ -523,7 +523,7 @@ await test('Zero consume amount is rejected (CR-1)', async () => {
         headers: { Authorization: `Bearer ${agentToken}` },
         body: JSON.stringify({ amount: 0 }),
     });
-    assert(status === 400 && body.error?.code === 'INVALID_AMOUNT', `expected 400 INVALID_AMOUNT (rejected), got ${status}: ${JSON.stringify(body)}`);
+    assert(status === 400 && body.error?.code === 'EXTENSION_REFUSED' && body.error?.details?.reason === 'INVALID_AMOUNT', `expected 400 EXTENSION_REFUSED/INVALID_AMOUNT (rejected), got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === false && /INVALID_AMOUNT/.test(body.error?.message ?? ''),
         `expected INVALID_AMOUNT rejection, got: ${JSON.stringify(body.error)}`);
     const after = await ownerBalance();

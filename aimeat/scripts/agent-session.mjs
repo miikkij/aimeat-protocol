@@ -17,14 +17,16 @@
  *     pnpm agent:worktree <name>       .worktrees/<name> at origin/main with its own install and
  *                                      test environment, as the WorktreeCreate hook makes it
  *     pnpm rules:for <path> [<path>…]  the rule files that cover these paths, to read before the edit
- * @structure ruleFiles() · rulesFor(paths) · main
+ * @structure ruleFiles() · rulesFor(paths) · findBash() · main
  * @usage cd aimeat && pnpm rules:for src/routes/apps/read.ts public/views/home.js
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The hooks run in Git Bash on Windows, found from `git --exec-path`, never the
+ *     first `bash` on PATH, which is the WSL launcher in System32 (instruction audit re-check, round 2).
  *   v1.0.0 — 2026-11-08 — Initial.
  */
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, matchesGlob, relative, resolve } from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, matchesGlob, relative, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -49,10 +51,41 @@ export function rulesFor(repoPaths) {
     return ruleFiles().filter(r => r.paths.some(g => norm.some(p => matchesGlob(p, g))));
 }
 
+/**
+ * The bash that runs the hooks. On Windows this is Git Bash, found from git itself, never the first
+ * `bash` on PATH: that is C:\Windows\System32\bash.exe, the WSL launcher, which runs the hook in a
+ * Linux distribution (or fails when none is installed) with a different git and different paths.
+ * The re-check of the instruction audit (2026-11-08) found exactly that order on this machine.
+ * AIMEAT_BASH names another bash. Returns null when no Git Bash is found.
+ */
+export function findBash(platform = process.platform, env = process.env, exists = existsSync, gitExecPath = () => {
+    const r = spawnSync('git', ['--exec-path'], { encoding: 'utf8' });
+    return r.status === 0 ? r.stdout.trim() : '';
+}) {
+    if (env.AIMEAT_BASH) return env.AIMEAT_BASH;
+    if (platform !== 'win32') return 'bash';
+    const candidates = [];
+    // `<git>/mingw64/libexec/git-core` (or `<git>/libexec/git-core`): Git's root is above `mingw64`.
+    const execPath = gitExecPath();
+    if (execPath) {
+        const root = execPath.replace(/[\\/]+$/, '').replace(/[\\/](?:mingw64|mingw32|clangarm64)?[\\/]?libexec[\\/]git-core$/i, '');
+        candidates.push(win32.join(root, 'bin', 'bash.exe'), win32.join(root, 'usr', 'bin', 'bash.exe'));
+    }
+    for (const base of [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA && win32.join(env.LOCALAPPDATA, 'Programs')]) {
+        if (base) candidates.push(win32.join(base, 'Git', 'bin', 'bash.exe'));
+    }
+    return candidates.find(p => exists(p)) ?? null;
+}
+
 function runHook(script, input) {
-    const r = spawnSync('bash', [join(HOOKS, script)], { cwd: ROOT, input, stdio: ['pipe', 'inherit', 'inherit'] });
+    const bash = findBash();
+    if (!bash) {
+        console.error(`Could not find Git Bash to run ${script}. Install Git for Windows (it ships bin\\bash.exe), or set AIMEAT_BASH to a bash.exe. The bash in C:\\Windows\\System32 is WSL and is not used.`);
+        process.exit(1);
+    }
+    const r = spawnSync(bash, [join(HOOKS, script)], { cwd: ROOT, input, stdio: ['pipe', 'inherit', 'inherit'] });
     if (r.error) {
-        console.error(`Could not run bash for ${script} (${r.error.message}). Git for Windows ships it; on Windows put its bin folder on PATH.`);
+        console.error(`Could not run ${bash} for ${script} (${r.error.message}). Set AIMEAT_BASH to a working bash.`);
         process.exit(1);
     }
     process.exit(r.status ?? 1);

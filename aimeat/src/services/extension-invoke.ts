@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   2026-11-08 — A named refusal answers EXTENSION_REFUSED with the script's code as `reason`, never
+ *     the script's code as the response code (instruction audit re-check, round 2).
  *   2026-11-08 — A refusal the script names (`CODE: …`, not a platform code) keeps its code and a 4xx
  *     status instead of EXTENSION_ERROR 500 (extension-access/script-refusal.ts; Lifecycle Central's
  *     CLAIM_CONFLICT read as a node fault in the instruction audit).
@@ -92,7 +94,7 @@ import { resolveExtensionForCall } from './component-versions.js';
 import { readAdult, NOT_VERIFIED } from './adult-assurance.js';
 import { activeSubscriptions } from '../commerce/subscriptions.js';
 import { takeExtensionRunSlot, createRunQueue, SELLER_RUNS_PER_RUN } from './extension-run-slots.js';
-import { scriptRefusal } from './extension-access/script-refusal.js';
+import { scriptRefusal, EXTENSION_REFUSED } from './extension-access/script-refusal.js';
 
 /**
  * What kind of principal runs the action: the caller object's kind (services/caller-context.ts), or
@@ -123,6 +125,8 @@ export type ExtensionInvokeOutcome =
   /** Refused or failed before or during the run. `keepMessage`: the text is the extension author's
    *  answer and passes the 500 text filter (middleware/internal-error-text.ts). */
   | { kind: 'refused'; status: number; code: string; message: string; keepMessage?: boolean;
+      /** With EXTENSION_REFUSED: the code the script named, which the caller reads as details.reason. */
+      reason?: string;
       /** A retryable refusal (the run slots are full): the seconds a Retry-After carries. */
       retryAfterSec?: number }
   /** The paywall refused and has written its answer into the surface's responder. */
@@ -437,8 +441,9 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
     if (isSandboxTimeout(message)) return { kind: 'refused', status: 500, code: 'EXTENSION_TIMEOUT', message: `Action "${actionId}" timed out`, keepMessage: true };
     if (message.includes('API call limit exceeded')) return { kind: 'refused', status: 500, code: 'API_LIMIT_EXCEEDED', message: `Action "${actionId}" exceeded API call limit` };
     // A refusal the script named (`CLAIM_CONFLICT: …`) is the caller's to act on, not a node fault.
+    // The code stays the node's own; the script's code is the reason.
     const named = scriptRefusal(message);
-    if (named) return { kind: 'refused', status: named.status, code: named.code, message: `Action "${actionId}" refused: ${redactCredentialText(message)}`, keepMessage: true };
+    if (named) return { kind: 'refused', status: named.status, code: EXTENSION_REFUSED, reason: named.reason, message: `Action "${actionId}" refused: ${redactCredentialText(message)}`, keepMessage: true };
     // The script's own error is the extension author's answer to the caller, so it passes the 500
     // text filter; credential-shaped text is redacted first.
     return { kind: 'refused', status: 500, code: 'EXTENSION_ERROR', message: `Action "${actionId}" failed: ${redactCredentialText(message)}`, keepMessage: true };

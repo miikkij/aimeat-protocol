@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-11-08 — Step 0 says the genre fork is for the level `fine`, and a `proto` or `plain` app
+ *     starts from `shell-atelier` (instruction audit re-check, round 2).
  *   2026-11-06 — Search engines: the switch needs 150 words of the app's own text, written first as
  *     settings `about` + `about_lang` (TARGET-093).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -240,7 +242,8 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
 \`_list\`/\`_get\` (distill a reusable template after a publish; the next build starts from it).
 
 ## Research-first build flow (research → frame → propose → build → finish)
-0. THE TRACK: a NEW app is built on the **Atelier track**, forked from a genre, with the served
+0. THE TRACK: a NEW app is built on the **Atelier track**, on the finest level (\`fine\`) forked from
+   a genre and on \`proto\` or \`plain\` started from the shell \`shell-atelier\`, with the served
    component kit carrying the header, the sign-in and the states. Load
    \`node:aimeat-app-builder-atelier\` and read its specification, \`aimeat_handbook_get { tier:
    "build-app-atelier" }\` (in parts; over HTTP \`GET /v1/prompts/build-app-atelier\`). The Classic
