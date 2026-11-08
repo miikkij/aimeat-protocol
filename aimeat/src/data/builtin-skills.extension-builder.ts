@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-08 — "Name a refusal" says EXTENSION_REFUSED with the script's code as `reason`
+ *     (instruction audit re-check, round 2).
  *   2026-11-08 — "Name a refusal": a script's `CODE: …` error reaches the caller with its code and a
  *     4xx where the code is the caller's doing (services/extension-access/script-refusal.ts).
  *   2026-11-07 — Section 11: when an extension is not enough, a service on a Microservices Central
@@ -176,11 +178,12 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
 - **The node does not check \`input\` against the action's schema.** Check every field you read and
   throw when it is wrong.
 - **Name a refusal, so the caller can act on it:** \`throw new Error('ORDER_NOT_FOUND: no order
-  1234')\`. An error that starts with an UPPER_SNAKE code and a colon reaches the caller with that
-  code: a code ending in CONFLICT answers 409, NOT_FOUND 404, FORBIDDEN, DENIED or READ_ONLY 403,
-  INVALID or _REQUIRED 400, and any other code 500. Any other error is EXTENSION_ERROR 500, the
-  shape of a fault. The node's own codes (AUTH_…, SCOPE_…, TOKEN_…, PAYMENT_…, CONSENT_…,
-  EXTENSION_… and the like) are never passed on from a script.
+  1234')\`. An error that starts with an UPPER_SNAKE code and a colon reaches the caller as the
+  node's code EXTENSION_REFUSED, with your code in \`error.details.reason\` and in the message. Your
+  code sets the status: one ending in CONFLICT answers 409, NOT_FOUND 404, FORBIDDEN, DENIED or
+  READ_ONLY 403, INVALID or _REQUIRED 400, and any other code 500. Any other error is
+  EXTENSION_ERROR 500, the shape of a fault. The response code is always the node's, so a caller
+  who reads it knows the node answered, and a caller who reads \`reason\` knows your script did.
 - **On a schedule, a workflow step or an \`on_done\` callback, a normal return is a success** whatever
   it contains, so a failed precondition must \`throw\`.
 - \`ctx.ai.start\` writes its answer into the owner's namespace, which \`ctx.memory.get\` does not reach.

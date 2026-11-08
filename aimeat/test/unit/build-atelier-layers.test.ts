@@ -7,6 +7,8 @@
  *   that lands in `start` by default can push it over the limit without anybody deciding so.
  * @usage cd aimeat && pnpm vitest run test/unit/build-atelier-layers.test.ts
  * @version-history
+ *   v1.5.0 — 2026-11-08 — The genre index line and the parts index in `start` say the fork and the
+ *     register refusal hold on `fine`.
  *   v1.4.0 — 2026-11-05 — The first part also names `motion`, the seventh part.
  *   v1.3.0 — 2026-10-01 — The interview tells the person, before its questions, that Claude Opus or Fable builds the better app.
  *   v1.2.0 — 2026-09-28 — The rules name the workbench pieces, and every piece is in the catalogue and exported by the kit.
@@ -84,5 +86,17 @@ describe('the Atelier specification in parts', () => {
 
   it('answers null for an id it does not have', () => {
     expect(atelierPiece(full, 'no-such-part', config.baseUrl)).toBeNull();
+  });
+
+  // The publish asks for a register only on `fine` (app-artifact-lint.ts, registerIsOwed). Both lines
+  // read as a rule for every level until the instruction audit's second re-check (2026-11-08).
+  it('scopes the genre fork and the register refusal to `fine` in the index line and in `start`', () => {
+    const genre = ATELIER_PARTS.find(p => p.id === 'genre')!.what;
+    expect(genre).toMatch(/`fine`/);
+    expect(genre).toMatch(/`proto` or `plain`[^.]*shell-atelier/);
+    const start = atelierPiece(full, 'start', config.baseUrl)!.text;
+    const index = start.slice(start.indexOf('### This specification comes in parts'));
+    expect(index).toMatch(/on `fine` an Atelier app is forked from a genre/);
+    expect(index).toMatch(/`proto` or `plain` app starts from `shell-atelier`/);
   });
 });

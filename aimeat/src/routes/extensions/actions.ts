@@ -7,6 +7,8 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — A refusal the script named (EXTENSION_REFUSED) carries the script's code as
+ *     error.details.reason (services/extension-access/script-refusal.ts).
  *   2026-11-01 — POST /v1/ext/:extName/:actionId takes a person registered to an app (an app party
  *     token) before the visitor path, for the extension that gates that app only
  *     (services/app-parties/iam-gate.ts; WP9d).
@@ -146,7 +148,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     if (out.kind === 'paywall') return;   // the paywall has answered
     if (out.kind === 'refused') {
       if (out.retryAfterSec) res.setHeader('Retry-After', String(out.retryAfterSec));
-      const body = error(config.nodeId, out.code, out.message);
+      const body = error(config.nodeId, out.code, out.message, undefined, out.reason ? { reason: out.reason } : undefined);
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;
     }
@@ -198,7 +200,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     if (out.kind === 'paywall') return;
     if (out.kind === 'refused') {
       if (out.retryAfterSec) res.setHeader('Retry-After', String(out.retryAfterSec));
-      const body = error(config.nodeId, out.code, out.message);
+      const body = error(config.nodeId, out.code, out.message, undefined, out.reason ? { reason: out.reason } : undefined);
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;
     }
@@ -233,7 +235,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     if (out.kind === 'paywall') return;
     if (out.kind === 'refused') {
       if (out.retryAfterSec) res.setHeader('Retry-After', String(out.retryAfterSec));
-      const body = error(config.nodeId, out.code, out.message);
+      const body = error(config.nodeId, out.code, out.message, undefined, out.reason ? { reason: out.reason } : undefined);
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;
     }

@@ -5,10 +5,11 @@
  *   same rules (instruction audit, 2026-11-08).
  * @usage cd aimeat && pnpm exec vitest run test/unit/agent-session-rules.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-08 — findBash: Git Bash on Windows, never the WSL launcher in System32.
  *   v1.0.0 — 2026-11-08 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { ruleFiles, rulesFor } from '../../scripts/agent-session.mjs';
+import { findBash, ruleFiles, rulesFor } from '../../scripts/agent-session.mjs';
 
 const names = (paths: string[]) => rulesFor(paths).map((r: { file: string }) => r.file).sort();
 
@@ -32,5 +33,26 @@ describe('rules:for', () => {
 
     it('names nothing for a file no rule covers', () => {
         expect(names(['README.md'])).toEqual([]);
+    });
+});
+
+describe('the bash that runs the hooks', () => {
+    const git = 'C:\\Program Files\\Git';
+    const gitBash = `${git}\\bin\\bash.exe`;
+    const onDisk = (paths: string[]) => (p: string) => paths.includes(p);
+
+    it('is Git Bash on Windows, found from git --exec-path, never System32 (the WSL launcher)', () => {
+        const found = findBash('win32', {}, onDisk([gitBash, 'C:\\Windows\\System32\\bash.exe']), () => 'C:/Program Files/Git/mingw64/libexec/git-core');
+        expect(found).toBe(gitBash);
+    });
+
+    it('falls back to Program Files when git does not answer, and says null when there is no Git Bash', () => {
+        expect(findBash('win32', { ProgramFiles: 'C:\\Program Files' }, onDisk([gitBash]), () => '')).toBe(gitBash);
+        expect(findBash('win32', { ProgramFiles: 'C:\\Program Files' }, onDisk(['C:\\Windows\\System32\\bash.exe']), () => '')).toBeNull();
+    });
+
+    it('is plain bash elsewhere, and AIMEAT_BASH wins everywhere', () => {
+        expect(findBash('linux', {}, () => false, () => '')).toBe('bash');
+        expect(findBash('win32', { AIMEAT_BASH: 'D:\\tools\\bash.exe' }, () => false, () => '')).toBe('D:\\tools\\bash.exe');
     });
 });

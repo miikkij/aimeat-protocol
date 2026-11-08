@@ -111,10 +111,13 @@ try {
     actions: [{ id: 'echo', method: 'POST', path: '/echo', script: 'echo' },
       // Sold only by a free tool with a pacing amount: the shape of Kehitysputki's own tools.
       { id: 'paced', method: 'POST', path: '/paced', script: 'echo' },
-      { id: 'paid', method: 'POST', path: '/paid', script: 'echo', commercial: { payMoney: { amount: 1000, currency: 'EUR' } } }],
+      { id: 'paid', method: 'POST', path: '/paid', script: 'echo', commercial: { payMoney: { amount: 1000, currency: 'EUR' } } },
+      // A refusal the script names, for the code an app tool's caller reads (2026-11-08).
+      { id: 'refuse', method: 'POST', path: '/refuse', script: 'refuse' }],
     config: { public_access: { default: true } }, limits: { timeout_ms: 5000, max_api_calls: 1 } });
   const install = await json('/v1/extensions', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ manifest,
-    scripts: { echo: 'export default async function(ctx,input){return {input,caller:ctx.caller.gaii,owner:ctx.caller.owner,roles:ctx.caller.roles,scopes:ctx.caller.scopes};}' } }) });
+    scripts: { echo: 'export default async function(ctx,input){return {input,caller:ctx.caller.gaii,owner:ctx.caller.owner,roles:ctx.caller.roles,scopes:ctx.caller.scopes};}',
+      refuse: 'export default async function(ctx,input){throw new Error("ITEM_NOT_FOUND: no item " + input.query);}' } }) });
   assert(install.status === 201, 'fresh extension install ' + install.status + ' ' + JSON.stringify(install.body.error));
   assert((await json('/v1/extensions/' + EXT + '/activate', { method: 'POST', headers: auth(seller.token) })).status === 200, 'activate');
   assert((await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(seller.token) })).status === 200, 'aggregate');
@@ -127,6 +130,7 @@ try {
     { ...baseTool, name: 'priced', ...(legacyPrice ? { price: { morsels: 5 } } : { tollMorsels: 5 }) },
     { ...baseTool, name: 'usd', pricesMoney: [{ amount: 1000, currency: 'USD' }] },
     { ...baseTool, name: 'action-paid', action_id: 'ext:' + EXT + ':paid' },
+    { ...baseTool, name: 'refuse', action_id: 'ext:' + EXT + ':refuse' },
     { ...baseTool, name: 'paced-only', action_id: 'ext:' + EXT + ':paced', ...(legacyPrice ? { price: { morsels: 5 } } : { tollMorsels: 5 }) }];
   for (const [filename, visibility] of [[FILE, 'public'], [PRIVATE_FILE, 'private']]) {
     const saved = await json('/v1/memory', { method: 'POST', headers: auth(seller.token),
@@ -193,7 +197,17 @@ try {
   await test('a free tool cannot remove the backing action money price', async () => {
     const http = await rest('action-paid', { query: 'paid' }), mcp = await invoke(agentSession, seller!, 'action-paid', { query: 'paid' });
     assert(http.status === 402 && !http.body.data?.result, 'REST action price survives');
-    assert(mcp.isError && mcp.text.startsWith('EXTENSION_ERROR:') && !mcp.data?.result, 'MCP action price survives: ' + mcp.text);
+    // PAYMENT_REQUIRED since 2026-11-08 (the route's code reaches the caller); EXTENSION_ERROR before.
+    assert(mcp.isError && mcp.text.startsWith('PAYMENT_REQUIRED:') && !mcp.data?.result, 'MCP action price survives: ' + mcp.text);
+  });
+  // HOLE (2026-11-08): the app tool path wrote EXTENSION_ERROR over every failure, so Lifecycle
+  // Central's CLAIM_CONFLICT read as a node fault. The script's named refusal now reaches the caller
+  // as the node's EXTENSION_REFUSED, with the script's code as the reason and its status.
+  await test('a refusal the script names reaches the app tool caller with its reason, on both surfaces', async () => {
+    const http = await rest('refuse', { query: 'x1' }), mcp = await invoke(agentSession, seller!, 'refuse', { query: 'x1' });
+    assert(http.status === 404 && http.body?.error?.code === 'EXTENSION_REFUSED' && http.body?.error?.details?.reason === 'ITEM_NOT_FOUND',
+      'REST ' + http.status + ' ' + JSON.stringify(http.body?.error));
+    assert(mcp.isError && mcp.text.startsWith('EXTENSION_REFUSED:') && mcp.text.includes('ITEM_NOT_FOUND: no item x1'), 'MCP: ' + mcp.text);
   });
   await test('deactivated extension is not reached through the free path', async () => {
     assert((await json('/v1/extensions/' + EXT + '/deactivate', { method: 'POST', headers: auth(seller!.token) })).status === 200, 'deactivate');

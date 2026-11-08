@@ -1832,6 +1832,7 @@ components:
             - PASSWORD_SIGN_IN_OFF: The operator's password sign-in policy (auth.password_sign_in) refuses this password sign-in or this new password
             - SETUP_TOKEN_EXPIRED: The two-step setup token is unknown, spent or older than ten minutes
             - CSM_NOT_FOUND: CSM service not found
+            - EXTENSION_REFUSED: An extension's script refused the call and named why. `details.reason` is the code the script wrote (CLAIM_CONFLICT, ORDER_NOT_FOUND), which the extension chose and the node did not; the status follows it (…CONFLICT 409, …NOT_FOUND 404, …FORBIDDEN/DENIED/READ_ONLY 403, INVALID…/…_REQUIRED 400, any other 500). An unnamed script error is EXTENSION_ERROR 500
             - VALIDATION_ERROR: A field of the request is not valid. `details` lists each field (FieldError): its path, a code, the limit and a sentence in the caller's language. A NUL character or a broken (lone surrogate) character anywhere in the body, the query or the path gets this answer on every route.
             - ALREADY_FLAGGED: User has already flagged this target
             - EMAIL_UNAVAILABLE: Email service not configured

@@ -11,6 +11,8 @@
  * @usage
  *   import { renderReport, compareReports } from './report.js';
  * @version-history
+ *   2026-11-08 — A run the check could not decide (`unverified`) is counted apart from the passes and
+ *     labelled UNVERIFIED (instruction audit re-check, round 2: the house-rules check).
  *   2026-09-19 — The note of a FAILING run is printed too: what a build made instead is the thing
  *     worth reading.
  *   v1.0.0 — 2026-09-18 — Initial.
@@ -26,6 +28,8 @@ export interface RunRecord {
     marker: string;
     ok: boolean;
     detail: string;
+    /** The check could not decide (ok is false): a person reads the run. Never counted as a pass. */
+    unverified?: boolean;
     /** What a passing run is worth knowing about, e.g. what the published app is like. */
     note?: string;
     /** Tools the run used that the task's `goodTools` does not name. A detour, not a failure. */
@@ -68,12 +72,14 @@ function summarise(records: RunRecord[]): TaskSummary[] {
 export function renderReport(meta: RunMeta, records: RunRecord[], tasks: Task[]): string {
     const sums = summarise(records);
     const passed = records.filter(r => r.ok).length;
+    const undecided = records.filter(r => r.unverified).length;
     const lines: string[] = [
         `# Cold agent run ${meta.stamp}`,
         '',
         `Arm **${meta.arm}** · driver ${meta.driver} · model ${meta.model} · ${meta.runs} run(s) per task · $${meta.spentUsd.toFixed(2)} spent`,
         '',
-        `**${passed} of ${records.length} runs got the person what they asked for.**`,
+        `**${passed} of ${records.length} runs got the person what they asked for.**`
+            + (undecided ? ` ${undecided} more the check could not decide; they are listed as UNVERIFIED below, for a person to read.` : ''),
         '',
         '| Task | Passed | Calls | Errors | Tokens | Cost | First tool |',
         '|---|---|---|---|---|---|---|',
@@ -105,13 +111,13 @@ export function renderReport(meta: RunMeta, records: RunRecord[], tasks: Task[])
     }
     const failures = records.filter(r => !r.ok);
     if (!failures.length) lines.push('Nowhere.', '');
-    for (const f of failures) lines.push(`- **${f.task}** #${f.run}: ${f.detail}. It said: "${f.metrics.finalText.replace(/\s+/g, ' ').slice(0, 220)}"`);
+    for (const f of failures) lines.push(`- **${f.task}** #${f.run}${f.unverified ? ' (UNVERIFIED)' : ''}: ${f.detail}. It said: "${f.metrics.finalText.replace(/\s+/g, ' ').slice(0, 220)}"`);
     // Failing runs as well: a build that published on the wrong track fails, and what it built
     // instead is the thing worth reading.
     const noted = records.filter(r => r.note);
     if (noted.length) {
         lines.push('', '## What the runs produced', '', 'A pass says the thing exists. This says what it is like, which is what two wordings of the same guidance are compared on.', '');
-        for (const r of noted) lines.push(`- **${r.task}** #${r.run} (${r.ok ? 'pass' : 'FAIL'}): ${r.note}`);
+        for (const r of noted) lines.push(`- **${r.task}** #${r.run} (${r.ok ? 'pass' : r.unverified ? 'UNVERIFIED' : 'FAIL'}): ${r.note}`);
     }
     lines.push('', '## Walls it hit', '', 'Every distinct error a tool call returned. Each one is a place where the node could have said what to do next.', '');
     const walls = sums.filter(s => s.walls.length);

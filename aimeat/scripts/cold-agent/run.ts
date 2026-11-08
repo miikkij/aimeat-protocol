@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm cold-agent --compare .cold-agent/<a> .cold-agent/<b>
  *   cd aimeat && pnpm cold-agent --tasks propose-agent --runs 1 --keep   # leave the proposal to approve
  * @version-history
+ *   v1.2.2 — 2026-11-08 — A verdict can be `unverified`: the check could not decide, the run is no
+ *     pass, and the report lists it for a person to read (the house-rules check, round 2 re-check).
  *   v1.2.1 — 2026-11-08 — An arm that names a code-built specification (build-app, build-app-atelier,
  *     build-extension) is refused before anything is written, with the way to measure a change to it.
  *   v1.2.0 — 2026-10-30 — A task's followUps: the person's next turns, resumed in the same session.
@@ -254,7 +256,7 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     const ctx: TaskContext = { ...base, metrics, keep: args.keep };
     const verdict = await task.verify(ctx);
     const wandered = metrics.distinctTools.filter(t => t !== 'ToolSearch' && !task.goodTools.includes(t));
-    return { task: task.id, run, marker, ok: verdict.ok, detail: verdict.detail, ...(verdict.note ? { note: verdict.note } : {}), wandered, metrics: { ...metrics, toolCalls: metrics.toolCalls.map(c => ({ ...c, input: undefined })) } };
+    return { task: task.id, run, marker, ok: verdict.ok && !verdict.unverified, detail: verdict.detail, ...(verdict.unverified ? { unverified: true } : {}), ...(verdict.note ? { note: verdict.note } : {}), wandered, metrics: { ...metrics, toolCalls: metrics.toolCalls.map(c => ({ ...c, input: undefined })) } };
 }
 
 /**
@@ -311,7 +313,7 @@ async function main(): Promise<void> {
                 const rec = await runOne(task, run, s, args, outDir);
                 spent += rec.metrics.costUsd ?? 0;
                 records.push(rec);
-                console.log(`${rec.ok ? '✓' : '✗'} ${rec.detail} (${rec.metrics.toolCalls.length} calls, ${rec.metrics.errors} errors${rec.metrics.costUsd === null ? '' : `, $${rec.metrics.costUsd.toFixed(2)}`})`);
+                console.log(`${rec.ok ? '✓' : rec.unverified ? '? UNVERIFIED' : '✗'} ${rec.detail} (${rec.metrics.toolCalls.length} calls, ${rec.metrics.errors} errors${rec.metrics.costUsd === null ? '' : `, $${rec.metrics.costUsd.toFixed(2)}`})`);
             }
         }
     } finally {

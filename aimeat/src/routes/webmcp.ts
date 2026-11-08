@@ -17,6 +17,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   2026-11-08 — A failed tool call carries the backing route's error details, so a refusal the
+ *     extension's script named reads EXTENSION_REFUSED with its reason (extension-access/script-refusal.ts).
  *   v1.11.2 — 2026-10-31 — The metered path resolves the binding of a contracted or granted call inside
  *     the chokepoint (productRefusal), before it charges: TOOL_NOT_INVOKABLE and CAPABILITY_NOT_FOUND
  *     answered after the settle with no refund, and a mis-bound capability was charged and refunded
@@ -379,8 +381,8 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           res.json(success(config.nodeId, { app: appRef, tool: toolName, iface_version: pinnedVersion ?? null, metered: outcome.kind === 'settled', result: shared.result }));
         } catch (err) {
           if (outcome.kind === 'settled') await outcome.refund();
-          const e = err as { statusCode?: number; code?: string; message?: string };
-          res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'TOOL_INVOKE_FAILED', e.message || 'Tool invocation failed'));
+          const e = err as { statusCode?: number; code?: string; message?: string; details?: unknown };
+          res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'TOOL_INVOKE_FAILED', e.message || 'Tool invocation failed', undefined, e.details));
         }
         return;
       }
@@ -461,8 +463,8 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         }));
       } catch (err) {
         await charge?.reverse();   // the use failed: the pacing comes back
-        const e = err as { statusCode?: number; code?: string; message?: string };
-        res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'TOOL_INVOKE_FAILED', e.message || 'Tool invocation failed'));
+        const e = err as { statusCode?: number; code?: string; message?: string; details?: unknown };
+        res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'TOOL_INVOKE_FAILED', e.message || 'Tool invocation failed', undefined, e.details));
       }
       })().catch((err: unknown) => {
         logger.error('webmcp: the unpriced invoke threw outside its own handler', {

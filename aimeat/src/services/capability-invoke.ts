@@ -6,6 +6,10 @@
  *   extension through the node's own route in process, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   2026-11-08 — An extension capability's failure keeps the route's error code and details (a
+ *     refusal the script named reads EXTENSION_REFUSED with reason CLAIM_CONFLICT) where it said
+ *     EXTENSION_ERROR for every one: after the deploy of the named refusals, aimeat_app_tool_invoke
+ *     still showed Lifecycle Central's CLAIM_CONFLICT as EXTENSION_ERROR.
  *   2026-11-04 — The running connector tunnel manager is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveConnectTunnelManager (codebase analysis 2026-11-03, item D-i).
  *   v1.10.1 - 2026-11-04 - The `extension` case sends its request to the node's own HTTP server in process
@@ -308,7 +312,15 @@ export async function invokeCapability(
             { statusCode: 401, code: 'CALLER_TOKEN_INVALID' },
           );
         }
-        throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: status, code: 'EXTENSION_ERROR' });
+        // The route's own code travels on, with its details: the code is always the node's answer (a
+        // paywall, a missing extension, EXTENSION_REFUSED for a refusal the script named, whose code
+        // is details.reason; extension-access/script-refusal.ts). Only an answer without one is
+        // EXTENSION_ERROR.
+        const routeError = body.error as { message?: string; code?: unknown; details?: unknown } | undefined;
+        const routeCode = typeof routeError?.code === 'string' && /^[A-Z][A-Z0-9_]{2,63}$/.test(routeError.code) ? routeError.code : 'EXTENSION_ERROR';
+        throw Object.assign(new Error(routeError?.message || 'Extension invoke failed'), {
+          statusCode: status, code: routeCode, ...(routeError?.details !== undefined ? { details: routeError.details } : {}),
+        });
       }
       result = mode === 'raw' ? body : body.data;
       break;

@@ -22,6 +22,8 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-11-08 — The two house-rules tasks read a three-valued check (house-rules.ts v2.0.0): a run
+ *     whose document the check cannot decide is `unverified`, never a pass (round 2 re-check).
  *   2026-11-08 — share-to-workspace passes only when the three rules are in the workspace and
  *     published; the workspace's name was enough before. Later the same day: each rule is read as
  *     a sentence from the document's body (house-rules.ts), because the word check passed the
@@ -41,7 +43,7 @@
  */
 import type { RunMetrics } from './transcript.js';
 import { appQuality, describeQuality, onAtelier } from './app-quality.js';
-import { documentBodies, houseRulesMissing } from './house-rules.js';
+import { documentBodies, houseRulesCheck, houseRulesMissing } from './house-rules.js';
 
 /** `mcp`: the agent is connected over MCP as the owner's agent. `url`: it gets the address only. */
 export type Door = 'mcp' | 'url';
@@ -76,8 +78,9 @@ export interface Task {
      * as the person between the turns (a choice on a page), and reads what the agent did so far.
      */
     followUps?: Array<{ prompt: string; before?: (ctx: TaskContext) => Promise<void> }>;
-    /** `note` is what a PASSING run is worth knowing about; the report lists it. */
-    verify: (ctx: TaskContext) => Promise<{ ok: boolean; detail: string; note?: string }>;
+    /** `note` is what a PASSING run is worth knowing about; the report lists it. `unverified`: the
+     *  check could not decide either way, so the run is no pass and a person reads it. */
+    verify: (ctx: TaskContext) => Promise<{ ok: boolean; detail: string; note?: string; unverified?: boolean }>;
 }
 
 export async function api<T = Record<string, unknown>>(baseUrl: string, path: string, token: string | null, init: { method?: string; body?: unknown } = {}): Promise<{ status: number; data: T | null }> {
@@ -160,14 +163,16 @@ export const TASKS: Task[] = [
                 const hit = (list.data?.workspaces ?? []).find(w => JSON.stringify(w).includes(ctx.marker));
                 if (!hit) continue;
                 const read = await api<{ objects?: unknown; drafts?: unknown }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspace?ws=${encodeURIComponent(hit.id)}`, ctx.ownerToken);
-                const published = houseRulesMissing(documentBodies(read.data?.objects));
-                if (published.length === 0) return { ok: true, detail: `the three rules are published in workspace ${hit.id} of organism ${o.id}` };
-                const drafted = houseRulesMissing(documentBodies(read.data?.drafts));
+                const published = houseRulesCheck(documentBodies(read.data?.objects));
+                if (published.verdict === 'pass') return { ok: true, detail: `the three rules are published in workspace ${hit.id} of organism ${o.id}` };
+                const notKept = houseRulesMissing(documentBodies(read.data?.objects)).join('; ');
+                if (published.verdict === 'unverified') return { ok: false, unverified: true, detail: `the published document is about every rule, and the check cannot tell whether it keeps: ${notKept}` };
+                const drafted = houseRulesCheck(documentBodies(read.data?.drafts));
                 return {
                     ok: false,
-                    detail: drafted.length === 0
+                    detail: drafted.verdict === 'pass'
                         ? 'the rules are written as a draft and never published, so the family cannot read them'
-                        : `the workspace exists, and the published document does not keep: ${published.join('; ')}`,
+                        : `the workspace exists, and the published document does not keep: ${notKept}`,
                 };
             }
             return { ok: false, detail: 'no workspace by that name in any of the owner\'s organisms' };
@@ -201,10 +206,13 @@ export const TASKS: Task[] = [
                 if (!hit) continue;
                 const read = await api<{ objects?: unknown }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspace?ws=${encodeURIComponent(hit.id)}`, ctx.otherOwnerToken);
                 if (read.status >= 300) return { ok: false, detail: `the partner is in the organism and reading the workspace answered ${read.status}` };
-                const missing = houseRulesMissing(documentBodies(read.data?.objects));
-                return missing.length === 0
+                const check = houseRulesCheck(documentBodies(read.data?.objects));
+                const notKept = houseRulesMissing(documentBodies(read.data?.objects)).join('; ');
+                return check.verdict === 'pass'
                     ? { ok: true, detail: `the partner reads the three rules in workspace ${hit.id}${accepted ? ' (after accepting the invitation)' : ''}` }
-                    : { ok: false, detail: `the partner reads the workspace, and its published document does not keep: ${missing.join('; ')}` };
+                    : check.verdict === 'unverified'
+                        ? { ok: false, unverified: true, detail: `the partner reads a document about every rule, and the check cannot tell whether it keeps: ${notKept}` }
+                        : { ok: false, detail: `the partner reads the workspace, and its published document does not keep: ${notKept}` };
             }
             return { ok: false, detail: `the partner ${ctx.otherOwnerName} is in no organism with a workspace by that name${accepted ? ', after accepting every invitation' : ''}` };
         },

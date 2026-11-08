@@ -82,7 +82,8 @@ of them built the wrong thing three times in a row.
 - **Start the session with `pnpm agent:start`.** It prints what Claude Code's SessionStart hook
   prints: whether the session is named, whether you sit in your own worktree, main's CI and
   nightly state, and the board to read before the first edit. Claude Code runs it by itself; you
-  run it.
+  run it. On Windows the hooks run in Git Bash, which the command finds from git itself; the
+  `bash` in `C:\Windows\System32` is WSL and is never used. `AIMEAT_BASH` names another bash.
 - Every session works in its own git worktree under `.worktrees/`, never in the main checkout.
   `pnpm agent:worktree <name>` makes it the way Claude Code's WorktreeCreate hook does:
   `.worktrees/<name>` at `origin/main`, its own `pnpm install`, `pnpm test:env:init` and the git
@@ -97,7 +98,8 @@ of them built the wrong thing three times in a row.
   can reach, one at a time with `--test=<suite>`. Never start the full sweep on your own: it takes
   about two hours and runs only when Jouni asks for it.
 - Never `git add -A`. Stage files by name. No `Co-Authored-By` trailer.
-- A multi-line commit message goes in a file: `bash scripts/git-commit.sh <file>`.
+- A multi-line commit message goes in a file: `bash scripts/git-commit.sh <file>`. On Windows that
+  `bash` is Git Bash (`"C:\Program Files\Git\bin\bash.exe"` from PowerShell), never the WSL one.
 - Edit files with your editing tool, never with `sed`, a heredoc or an inline script.
 - Reuse what exists. A new MCP tool, route, table or page type needs a reason that a memory record
   and a prompt could not cover.

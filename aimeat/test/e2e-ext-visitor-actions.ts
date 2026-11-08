@@ -122,10 +122,12 @@ await test('4. A signed-in reader on the public action runs as themselves, not a
 
 await test('5. A visitor\'s run cannot write: the set is refused with VISITOR_READ_ONLY and the catalogue is unchanged', async () => {
   const r = await visitor('visitorwrite', { key: 'catalogue', value: { series: ['defaced'] } });
-  // 403 VISITOR_READ_ONLY since 2026-11-08: a refusal the context names keeps its code
-  // (services/extension-access/script-refusal.ts). Until then it read 500 EXTENSION_ERROR, the shape of a
-  // node fault; the refusal itself, and the unchanged catalogue below, are what this test holds.
-  assert(r.status === 403 && r.body.error?.code === 'VISITOR_READ_ONLY' && /VISITOR_READ_ONLY/.test(r.body.error.message),
+  // 403 EXTENSION_REFUSED with reason VISITOR_READ_ONLY since 2026-11-08: a refusal the context names
+  // keeps its code as the reason (services/extension-access/script-refusal.ts). Until then it read 500
+  // EXTENSION_ERROR, the shape of a node fault; the refusal itself, and the unchanged catalogue below,
+  // are what this test holds.
+  assert(r.status === 403 && r.body.error?.code === 'EXTENSION_REFUSED' && r.body.error?.details?.reason === 'VISITOR_READ_ONLY'
+    && /VISITOR_READ_ONLY/.test(r.body.error.message),
     `expected the write refused, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const after = await visitor('catalogue');
   assert(JSON.stringify(after.body.data.catalogue) === JSON.stringify({ series: ['Harbour Lights'] }), `catalogue changed: ${JSON.stringify(after.body.data.catalogue)}`);
@@ -133,7 +135,7 @@ await test('5. A visitor\'s run cannot write: the set is refused with VISITOR_RE
 
 await test('6. A visitor\'s run cannot delete either', async () => {
   const r = await visitor('visitordelete', { key: 'catalogue' });
-  assert(r.status === 403 && r.body.error?.code === 'VISITOR_READ_ONLY', `expected the delete refused, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.status === 403 && r.body.error?.code === 'EXTENSION_REFUSED' && r.body.error?.details?.reason === 'VISITOR_READ_ONLY', `expected the delete refused, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const after = await visitor('catalogue');
   assert(after.body.data.catalogue !== null, 'the catalogue is still there');
 });
