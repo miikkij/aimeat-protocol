@@ -36,6 +36,8 @@
  *   import { openOutward } from './dialog-outward.js';
  *   openOutward({ id, node, doc, graph, hooks, langs, onSave });
  * @version-history
+ *   v0.7.1 -- 2026-11-08 -- The vault is read only when the sign-in can list it (vaultNames), as in
+ *     the inward dialog (secaudit2026nov08b round 15c).
  *   v0.7.0 — 2026-09-06 — The agent target is a pick over the owner's own agents, and the URL
  *     target gained the headers it sends, with a picker that writes a secret's NAME into a value.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
@@ -44,7 +46,10 @@ import { el, kit } from './dom.js';
 import { say, fill } from './hooks-words.js';
 import { date as fmtDate } from '../_core/format.js';
 import { outwardShape } from './hooks-shapes.js';
-import { group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, pickOrWords, headerEditor, apexPage } from './dialog-parts.js';
+import {
+  group, fields, copyBlock, statusLine, vocabularyNote, ownerRead, pickOrWords, headerEditor, apexPage,
+  secretsListable, vaultNames,
+} from './dialog-parts.js';
 
 /** A date as short as a pick's second line needs it. */
 function seenWord(iso, langs) {
@@ -76,8 +81,12 @@ export function openOutward(spec) {
     enabled: shape.enabled,
     headers: Object.assign({}, writtenHeaders),
   };
-  /** The vault's names, once they arrive. Never a value: the route does not carry one. */
-  let vault = [];
+  /**
+   * The vault's names, once they arrive. Never a value: the route does not carry one. Null when this
+   * sign-in cannot list them, which the picker shows as "not available here".
+   * @type {string[]|null}
+   */
+  let vault = secretsListable() ? [] : null;
 
   const k = kit();
   const handle = k.dialog({
@@ -149,11 +158,10 @@ export function openOutward(spec) {
         secrets: function () { return vault; },
         onChange: function (map) { draft.headers = map; },
       });
-      ownerRead('/v1/secrets').then(function (data) {
-        const list = data && Array.isArray(data.secrets) ? data.secrets : [];
-        vault = list.map(function (s) { return String(s && s.name ? s.name : s); }).filter(Boolean);
-        headers.refresh();
-      });
+      // Asked only when this sign-in can list the vault (dialog-parts.js vaultNames).
+      if (vault !== null) {
+        vaultNames().then(function (names) { vault = names; headers.refresh(); });
+      }
 
       // The agent road: the owner's own agents, read as the owner. Until the list arrives the box
       // is the name the record already carries, so a dialog opened and closed changes nothing.

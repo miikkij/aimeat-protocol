@@ -19,6 +19,11 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.8.5 -- 2026-11-08 -- inward.keyPlaceholder and inward.tokenPlaceholder: the call's placeholders
+ *     in the dialog's language; secret.unavailable and secret.see: the picker on a page whose sign-in
+ *     cannot list the vault (secaudit2026nov08b round 15c).
+ *   v0.8.4 -- 2026-11-08 -- inward.signInWhy and inward.signIn: the program road says its address
+ *     needs the person signed in, and offers the sign-in (secaudit2026nov08b round 15c).
  *   v0.8.3 -- 2026-11-08 -- The program road says incoming webhook and API key where it said receiver
  *     and receiver key; the outgoing hook's refusal says recipient (secaudit2026nov08b round 15b).
  *   v0.8.2 -- 2026-11-08 -- inward.keyWhere and inward.ownerWhere: where the key of the program road's
@@ -63,6 +68,10 @@ export const WORDS = {
     'shell.windowsRun': 'Aja sitten tämä komento samassa kansiossa',
     'inward.keyWhere': 'Liitä API-avain kutsuun kohtaan {placeholder}. Yllä oleva linkki avaa sivun, joka näyttää avaimen vain kerran, kun teet sen. Kopioi avain silloin.',
     'inward.ownerWhere': 'Kirjoita käyttäjätunnuksesi kohtaan {placeholder}.',
+    'inward.signInWhy': 'Ohjelman osoitteessa pitää olla käyttäjätunnuksesi, ja tämä sivu tietää sen vasta, kun olet kirjautunut. Kirjaudu sisään, niin tunnuksesi tulee alla olevaan kutsuun kohdan {placeholder} tilalle.',
+    'inward.signIn': 'Kirjaudu sisään',
+    'inward.keyPlaceholder': '<API-avaimesi>',
+    'inward.tokenPlaceholder': '<tokenisi>',
     'inward.agent': 'Sano tämä omalle tekoälyllesi',
     'inward.range': 'Sallittu väli',
     'outward.title': 'Kun tämä muuttuu, kerro jollekin',
@@ -88,6 +97,8 @@ export const WORDS = {
     'secret.pick': 'Lisää salaisuus',
     'secret.none': 'Yhtään salaisuutta ei ole vielä tallessa.',
     'secret.add': 'Lisää sellainen Pääsy-sivulla',
+    'secret.unavailable': 'Tämä sivu ei näe salaisuuksiesi luetteloa. Kirjoita salaisuuden nimi arvoon muodossa {{secret:NIMI}}.',
+    'secret.see': 'Katso salaisuutesi Pääsy-sivulla',
     'agent.pick': 'Valitse agentti',
     'agent.none': 'Yksikään agenteistasi ei voi vielä toimia.',
     'agent.connect': 'Yhdistä agentti Agenttisi-sivulla',
@@ -135,6 +146,10 @@ export const WORDS = {
     'shell.windowsRun': 'Then run this command in the same folder',
     'inward.keyWhere': 'Put the API key in place of {placeholder} in the call. The link above opens the page that shows the key once, when you make it, so copy it then.',
     'inward.ownerWhere': 'Write your username in place of {placeholder}.',
+    'inward.signInWhy': 'The program\'s address must have your username, and this page knows it only when you are signed in. Sign in, and the call below gets your username in place of {placeholder}.',
+    'inward.signIn': 'Sign in',
+    'inward.keyPlaceholder': '<your API key>',
+    'inward.tokenPlaceholder': '<your token>',
     'inward.agent': 'Say this to your own AI',
     'inward.range': 'The range it accepts',
     'outward.title': 'When this changes, tell someone',
@@ -160,6 +175,8 @@ export const WORDS = {
     'secret.pick': 'Insert a secret',
     'secret.none': 'No secrets are kept yet.',
     'secret.add': 'Add one on the Access page',
+    'secret.unavailable': 'This page cannot list your secrets. Write a secret\'s name into the value as {{secret:NAME}}.',
+    'secret.see': 'See your secrets on the Access page',
     'agent.pick': 'Pick an agent',
     'agent.none': 'None of your agents can act yet.',
     'agent.connect': 'Connect one on the Your agents page',

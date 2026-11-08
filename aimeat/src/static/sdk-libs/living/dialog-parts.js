@@ -26,9 +26,16 @@
  *   both ordinary states on a new account, and a select with no options in it reads as a broken
  *   control. Both answer with one sentence and a door to where the thing is made.
  * @structure group · fields · copyBlock · statusLine · vocabularyNote · apexPage · signedInOwner ·
- *   ownerRead · pickOrWords · secretPicker · headerEditor
+ *   signInOffer · canListSecrets · secretsListable · vaultNames · ownerRead · pickOrWords ·
+ *   secretPicker · headerEditor
  * @usage  import { group, fields, copyBlock, headerEditor } from './dialog-parts.js';
  * @version-history
+ *   v0.7.3 -- 2026-11-08 -- vaultNames() reads the vault only when the sign-in can list it
+ *     (canListSecrets: the owner in person, or a token carrying secrets:manage), so a dialog inside an
+ *     app makes no refused request; the picker then says the list is not available here
+ *     (secaudit2026nov08b round 15c).
+ *   v0.7.2 -- 2026-11-08 -- signInOffer(): the page's own sign-in, when the auth library is here and
+ *     nobody is signed in, for the inward dialog's program road (secaudit2026nov08b round 15c).
  *   v0.7.1 -- 2026-11-08 -- signedInOwner(): the session's account name, which the inward dialog puts
  *     in the program road's address (secaudit2026nov08b round 15b).
  *   v0.7.0 — 2026-09-06 — The header editor, the secret picker over the owner's vault, and
@@ -170,6 +177,90 @@ export function signedInOwner() {
 }
 
 /**
+ * The page's interactive sign-in (AIMEAT.auth.signIn), when the auth library is loaded and nobody is
+ * signed in. Null otherwise: on a page without the library, and when a session exists already
+ * (signIn() would answer that session again). Called inside a click, because on an app origin it
+ * opens the grant window, and a browser opens a window only inside a user gesture.
+ * @returns {(() => Promise<any>)|null}
+ */
+export function signInOffer() {
+  try {
+    const auth = /** @type {any} */ (window).AIMEAT && /** @type {any} */ (window).AIMEAT.auth;
+    if (!auth || typeof auth.signIn !== 'function') return null;
+    if (typeof auth.getSession === 'function' && auth.getSession()) return null;
+    return function () { return Promise.resolve(auth.signIn()); };
+  } catch (e) {
+    // The notice then says to write the username in, as on a page without the auth library.
+    console.warn('[aimeat-living] The page\'s sign-in could not be read:', e && /** @type {Error} */ (e).message);
+    return null;
+  }
+}
+
+/** The permission the vault's list is read with (routes/secrets.ts, SECRETS_MANAGE_SCOPE). */
+const SECRETS_SCOPE = 'secrets:manage';
+
+/**
+ * The claims of a session's token, as the auth library reads them (auth/crypto.js parseJwt). Null
+ * for a token that does not parse; the caller then treats the session as one that cannot list.
+ * @param {any} jwt @returns {any}
+ */
+function tokenClaims(jwt) {
+  const parts = String(jwt || '').split('.');
+  if (parts.length !== 3) return null;
+  try {
+    return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+  } catch (e) {
+    console.warn('[aimeat-living] The session\'s token could not be read:', e && /** @type {Error} */ (e).message);
+    return null;
+  }
+}
+
+/**
+ * Can this session list the owner's vault? The route answers the owner in person, and a token that
+ * carries secrets:manage. An app's sign-in carries only the permissions the owner granted the app,
+ * and no wildcard holds this one, so inside such an app the read would be refused every time: the
+ * dialog then does not ask. Nobody signed in cannot list either.
+ * @param {any} session @returns {boolean}
+ */
+export function canListSecrets(session) {
+  if (!session || typeof session.fetch !== 'function') return false;
+  const claims = tokenClaims(session.jwt) || {};
+  const scopes = Array.isArray(claims.scopes) ? claims.scopes : [];
+  if (scopes.indexOf(SECRETS_SCOPE) >= 0) return true;
+  if (session._appOrigin || claims.app) return false;
+  const roles = Array.isArray(claims.roles) ? claims.roles : (Array.isArray(session.roles) ? session.roles : []);
+  return roles.indexOf('owner') >= 0;
+}
+
+/** The page's session, or null on a page without the auth library or with nobody signed in. */
+function currentSession() {
+  const ns = /** @type {any} */ (window).AIMEAT;
+  return ns && ns.auth && typeof ns.auth.getSession === 'function' ? ns.auth.getSession() : null;
+}
+
+/** Whether the signed-in session can list the vault right now (canListSecrets). */
+export function secretsListable() {
+  try { return canListSecrets(currentSession()); } catch (e) {
+    console.warn('[aimeat-living] The session could not be read:', e && /** @type {Error} */ (e).message);
+    return false;
+  }
+}
+
+/**
+ * The names in the owner's vault, for the secret picker. Null when this page's sign-in cannot list
+ * them (secretsListable), and then no request is made; null too when the read failed. The picker
+ * shows null as "not available here" and an empty list as "none kept yet". Never a value.
+ * @returns {Promise<string[]|null>}
+ */
+export async function vaultNames() {
+  if (!secretsListable()) return null;
+  const data = await ownerRead('/v1/secrets');
+  if (!data) return null;
+  const list = Array.isArray(data.secrets) ? data.secrets : [];
+  return list.map(function (s) { return String(s && s.name ? s.name : s); }).filter(Boolean);
+}
+
+/**
  * One read of this node as the signed-in owner, for a list this library offers a pick over: the
  * vault's names, the owner's agents. It is the session's own fetch, so no principal travels from
  * the record and a guest simply gets null.
@@ -207,12 +298,21 @@ export function pickOrWords(spec) {
  * The picker that puts a secret's NAME into a value box. It writes `{{secret:NAME}}` where the
  * caret is, so a header value can carry a word around it ("Bearer {{secret:X}}"), and it resets
  * itself after each pick so the same secret can be put in twice.
- * @param {{ names: string[], input: HTMLInputElement|HTMLTextAreaElement, langs?: () => string[],
+ * `names` null: this page cannot list the vault (vaultNames), and the picker says so with a door to
+ * the Access page instead of claiming the vault is empty.
+ * @param {{ names: string[]|null, input: HTMLInputElement|HTMLTextAreaElement, langs?: () => string[],
  *   base?: string }} spec
  * @returns {HTMLElement}
  */
 export function secretPicker(spec) {
   const langs = typeof spec.langs === 'function' ? spec.langs : function () { return []; };
+  if (spec.names === null) {
+    return pickOrWords({
+      words: say('secret.unavailable', langs()),
+      doorWords: say('secret.see', langs()),
+      href: apexPage('/v1/profile?tab=access'),
+    });
+  }
   const names = Array.isArray(spec.names) ? spec.names : [];
   if (!names.length) {
     return pickOrWords({
@@ -261,7 +361,7 @@ function insertAtCaret(input, text) {
  * read the DOM.
  * @param {HTMLElement} host
  * @param {{ headers?: Record<string, string>, langs?: () => string[], base?: string,
- *   secrets: () => string[], onChange: (headers: Record<string, string>) => void }} spec
+ *   secrets: () => string[]|null, onChange: (headers: Record<string, string>) => void }} spec
  * @returns {{ el: HTMLElement, refresh: () => void }}
  */
 export function headerEditor(host, spec) {
@@ -298,7 +398,9 @@ export function headerEditor(host, spec) {
 
   function draw() {
     while (list.firstChild) list.removeChild(list.firstChild);
-    const names = spec.secrets() || [];
+    // null passes through: the picker says the vault cannot be listed on this page.
+    const got = spec.secrets();
+    const names = got === null ? null : (got || []);
     rows.forEach(function (row, i) {
       const name = /** @type {HTMLInputElement} */ (el('input', {
         type: 'text', class: 'ak-input ak-living__header-name', value: row.name,

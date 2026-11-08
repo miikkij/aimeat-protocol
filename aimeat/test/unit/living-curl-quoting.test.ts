@@ -12,6 +12,8 @@
  *   more words than curl's, with a `;` operator among them.
  * @usage cd aimeat && pnpm vitest run test/unit/living-curl-quoting.test.ts
  * @version-history
+ *   v1.0.2 -- 2026-11-08 -- The memory line's expected address is single-quoted too: it now goes to
+ *     the node's own address, quoted as the receiver line is (secaudit2026nov08b round 15c).
  *   v1.0.1 -- 2026-11-08 -- The receiver line's expected address is single-quoted, as the developer's
  *     ruling on the copyable call asks (secaudit2026nov08b round 15b). The memory line is unchanged.
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14, living-inward-curl-single-quote-unescaped).
@@ -115,8 +117,9 @@ describe('the inward dialog\'s curl lines quote their body for the shell', () =>
       + ' -H "Content-Type: application/json" -H "Authorization: Bearer <your API key>"'
       + " -d '{\"value\":4.2}'",
     );
+    // The memory line's address is single-quoted since round 15c, as the receiver line's is.
     expect(shape.write.curl).toBe(
-      'curl -X POST https://node.example/v1/memory'
+      "curl -X POST 'https://node.example/v1/memory'"
       + ' -H "Content-Type: application/json" -H "Authorization: Bearer <your token>"'
       + " -d '{\"key\":\"living.notes.in.note\",\"value\":{\"value\":4.2}}'",
     );

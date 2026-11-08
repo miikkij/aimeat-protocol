@@ -23,6 +23,8 @@
  * @structure tokens · control row · formula · sentence · machine state · chain · gear · stale ·
  *   trigger · dialogs · refusals · still
  * @version-history
+ *   v0.8.2 -- 2026-11-08 -- The inward dialog's sign-in notice above the program road's call
+ *     (secaudit2026nov08b round 15c).
  *   v0.8.1 — 2026-09-19 — The decide row's line that says what was taken out before sending.
  *   v0.8.0 — 2026-09-19 — THE DECIDE ROW. Where a judgement about text stands, each answer with its
  *     confidence, what it gates and the thresholds, and — when the model was not sure enough — the
@@ -534,6 +536,22 @@
 
 .ak-living__dialog-test {
   align-self: flex-start;
+}
+
+/* THE PROGRAM ROAD'S ADDRESS WITHOUT AN ACCOUNT NAME. A box in the ordinary ink, above the call,
+ * so the placeholder in the call reads as explained rather than broken; the sign-in sits in it. */
+.ak-living__dialog-signin {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ak-gap, 0.75rem) * 0.5);
+  padding: calc(var(--ak-pad, 1rem) * 0.6);
+  border: var(--ak-line-w, 1px) solid var(--ak-line, currentColor);
+  border-radius: var(--ak-radius-sm, 0.5rem);
+}
+
+.ak-living__dialog-signin-text {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 /* ── The headers a call carries, and the pick that puts a secret's NAME in one ─────────── */

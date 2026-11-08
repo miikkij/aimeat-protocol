@@ -18,11 +18,19 @@
  *   is opened. Not a sample, not a schema: the object that would leave if the machine moved now,
  *   built by the same payload.js the delivery uses. If those two ever disagree, the dialog is
  *   lying, which is why they are one function called twice rather than two functions.
- * @structure inwardShape(ctx) · outwardShape(ctx) · memoryKeyFor(doc, id) · ownerForAddress(owner, nodeId)
+ * @structure inwardShape(ctx) · outwardShape(ctx) · memoryKeyFor(doc, id) · ownerForAddress(owner, nodeId) ·
+ *   ownerNotice(receiver, canSignIn)
  * @usage
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.6 -- 2026-11-08 -- The memory road's own call goes to the node's own address too (ctx.apex),
+ *     single-quoted for a POSIX shell, double-quoted on Windows. The key's and the token's
+ *     placeholders follow the dialog's language (inward.keyPlaceholder, inward.tokenPlaceholder),
+ *     with the English ones as the fallback (secaudit2026nov08b round 15c).
+ *   v0.7.5 -- 2026-11-08 -- The program road carries `signInNeeded`, and ownerNotice() says what the
+ *     dialog shows when the address cannot carry the account name: a sign-in on a page that can sign
+ *     the person in, a line to write the name on a page that cannot (secaudit2026nov08b round 15c).
  *   v0.7.4 -- 2026-11-08 -- The key's placeholder says `<your API key>`: a receiver is an incoming
  *     webhook and its key an API key in every text (developer, 2026-11-08; secaudit2026nov08b round 15b).
  *   v0.7.3 -- 2026-11-08 -- The program road's address is the node's own (ctx.apex), not the app's
@@ -115,6 +123,22 @@ export const OWNER_PLACEHOLDER = '<owner>';
 /** What the call carries where the key goes: the key is shown once when it is made, never again. */
 export const KEY_PLACEHOLDER = '<your API key>';
 
+/** What the memory road's call carries where the person's own token goes. */
+export const TOKEN_PLACEHOLDER = '<your token>';
+
+/**
+ * A placeholder in the dialog's language (hooks-words.js `inward.keyPlaceholder`,
+ * `inward.tokenPlaceholder`), or `fallback` when the word is missing or holds a character a shell
+ * reads inside double quotes (`"`, `$`, a backtick, a backslash, cmd.exe's `%` and `!`) or a single
+ * quote. The placeholder sits inside the double-quoted Authorization header of every line.
+ * @param {string} key @param {string[]} langs @param {string} fallback
+ * @returns {string}
+ */
+function placeholderIn(key, langs, fallback) {
+  const word = say(key, langs);
+  return /^<[^"$`\\%!'<>]+>$/.test(word) ? word : fallback;
+}
+
 /**
  * The account name for the address path, or '' when there is none this line can carry as it is. A
  * GHII of this node (`alice@<node id>`) gives its account part. Any other text gives '': the address
@@ -136,7 +160,7 @@ export function ownerForAddress(owner, nodeId) {
  * signed-in account's name, '' when the page does not know it. The POSIX line single-quotes the
  * address, so the placeholder in it stays text for the shell.
  */
-function receiverRoad(apex, owner, key, doc, id, sample) {
+function receiverRoad(apex, owner, key, doc, id, sample, keyPlaceholder) {
   const name = receiverNameFor(doc, id);
   const address = apex + '/v1/receive/' + (owner || OWNER_PLACEHOLDER) + '/' + name;
   return {
@@ -144,22 +168,41 @@ function receiverRoad(apex, owner, key, doc, id, sample) {
     key: key,
     owner: owner,
     ownerKnown: !!owner,
-    keyPlaceholder: KEY_PLACEHOLDER,
+    /** The page does not know the account name: the dialog says so and offers the sign-in (ownerNotice). */
+    signInNeeded: !owner,
+    keyPlaceholder: keyPlaceholder,
     ownerPlaceholder: OWNER_PLACEHOLDER,
     settings: apex + '/v1/profile?tab=receivers&new=key&key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name),
     address: address,
     curl: 'curl -X POST ' + shellQuoted(address)
       + ' -H "Content-Type: application/json"'
-      + ' -H "Authorization: Bearer ' + KEY_PLACEHOLDER + '"'
+      + ' -H "Authorization: Bearer ' + keyPlaceholder + '"'
       + ' -d ' + shellQuoted(JSON.stringify({ value: sample })),
     /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
-    windows: windowsCall(address, KEY_PLACEHOLDER, { value: sample }),
+    windows: windowsCall(address, keyPlaceholder, { value: sample }),
   };
 }
 
 /**
+ * What the program road says about the account name in its address. Null when the address carries
+ * it. Otherwise a notice above the call: `signIn` on a page that can sign the person in (the auth
+ * library is loaded and nobody is signed in), with the sentence and the button's words; `write` on a
+ * page that cannot (no auth library, or a session whose name this node's address cannot carry),
+ * where the person writes the name in place of the placeholder. The words are keys of hooks-words.js
+ * and their `{placeholder}` is the receiver's ownerPlaceholder.
+ * @param {{ ownerKnown?: boolean }|null|undefined} receiver @param {boolean} canSignIn
+ * @returns {{ kind: 'signIn', words: string, button: string }|{ kind: 'write', words: string }|null}
+ */
+export function ownerNotice(receiver, canSignIn) {
+  if (receiver && receiver.ownerKnown) return null;
+  return canSignIn
+    ? { kind: 'signIn', words: 'inward.signInWhy', button: 'inward.signIn' }
+    : { kind: 'write', words: 'inward.ownerWhere' };
+}
+
+/**
  * The inward dialog's whole content, for a control, a value or a source. `apex` is the node's own
- * address for the program road (default: base); `owner` the signed-in account's name or GHII and
+ * address for the two calls a person copies (default: base); `owner` the signed-in account's name or GHII and
  * `nodeId` this node's id, both optional.
  * @param {{ id: string, node: any, doc: any, graph: any, langs?: () => string[], base?: string,
  *   apex?: string, owner?: string, nodeId?: string }} ctx
@@ -183,6 +226,11 @@ export function inwardShape(ctx) {
   const expected = subject.raw ? sample : shapeFor(path || 'value', sample);
 
   const base = String(ctx.base || '');
+  // Both calls a person copies go to the node's own address: an app's origin is not where a program
+  // or a terminal reaches /v1/memory or /v1/receive on a node that shows content to signed-in accounts.
+  const apex = String(ctx.apex || base);
+  const keyPlaceholder = placeholderIn('inward.keyPlaceholder', wanted, KEY_PLACEHOLDER);
+  const tokenPlaceholder = placeholderIn('inward.tokenPlaceholder', wanted, TOKEN_PLACEHOLDER);
   const key = memoryKeyFor(doc, subjectId);
   const body = { key: key, value: { value: sample } };
   const hasRange = typeof subject.min === 'number' || typeof subject.max === 'number'
@@ -209,16 +257,17 @@ export function inwardShape(ctx) {
       key: key,
       request: {
         method: 'POST',
-        url: base + '/v1/memory',
-        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer <your token>' },
+        url: apex + '/v1/memory',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tokenPlaceholder },
         body: body,
       },
-      curl: 'curl -X POST ' + base + '/v1/memory'
+      tokenPlaceholder: tokenPlaceholder,
+      curl: 'curl -X POST ' + shellQuoted(apex + '/v1/memory')
         + ' -H "Content-Type: application/json"'
-        + ' -H "Authorization: Bearer <your token>"'
+        + ' -H "Authorization: Bearer ' + tokenPlaceholder + '"'
         + ' -d ' + shellQuoted(JSON.stringify(body)),
       /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */
-      windows: windowsCall(base + '/v1/memory', '<your token>', body),
+      windows: windowsCall(apex + '/v1/memory', tokenPlaceholder, body),
     },
     /**
      * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through
@@ -227,7 +276,7 @@ export function inwardShape(ctx) {
      * hold: a personal access token writes into its own test identity, and an agent token reaches
      * all of the owner's memory. `settings` opens the owner's Receivers page with this key filled in.
      */
-    receiver: receiverRoad(String(ctx.apex || base), ownerForAddress(ctx.owner, ctx.nodeId), key, doc, subjectId, sample),
+    receiver: receiverRoad(apex, ownerForAddress(ctx.owner, ctx.nodeId), key, doc, subjectId, sample, keyPlaceholder),
     /** The agent road: the same thing said out loud, in the language the page is reading. */
     sentence: fill(say('sentence.write', wanted), {
       key: key,

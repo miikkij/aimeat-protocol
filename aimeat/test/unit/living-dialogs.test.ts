@@ -14,6 +14,8 @@
  *   dialog change with them or this test goes red.
  * @usage cd aimeat && pnpm vitest run test/unit/living-dialogs.test.ts
  * @version-history
+ *   v1.1.1 -- 2026-11-08 -- The receiver call's key placeholder is the Finnish one on this Finnish
+ *     sheet: the placeholder follows the dialog's language (secaudit2026nov08b round 15c).
  *   v1.1.0 — 2026-11-07 — The inward shape's program road: a receiver for exactly this key.
  *   v1.0.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
  */
@@ -110,7 +112,8 @@ describe('the inward dialog: this value can come from outside', () => {
     expect(shape.receiver.name).toMatch(/^[a-z0-9][a-z0-9-]{0,39}$/);
     expect(shape.receiver.settings).toContain('/v1/profile?tab=receivers&new=key&key=living.solar.in.spot');
     expect(shape.receiver.curl).toContain('/v1/receive/<owner>/' + shape.receiver.name);
-    expect(shape.receiver.curl).toContain('Bearer <your API key>');
+    // The page reads Finnish here, and the key's placeholder follows it since round 15c.
+    expect(shape.receiver.curl).toContain('Bearer <API-avaimesi>');
     expect(shape.receiver.curl).not.toContain('/v1/memory');
   });
 
