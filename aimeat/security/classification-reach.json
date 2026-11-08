@@ -2191,9 +2191,9 @@
     },
     "src/services/key-credentials.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 3
       },
-      "why": "Reviewed 2026-11-05 (codebase analysis 2026-11-03, decision 14a), the node's own read: the held first sign-in credentials in the pseudo-owner namespace key-credentials-held, which the node itself wrote at the first sign-in; the sealed password is mailed once to the account's own verified address and goes to no model or other principal. 2026-11-08 (secaudit2026nov08 round 14): the second read is the marker in the same namespace (key-credentials-owed.<ghii>) that a link or provider first sign-in left, holding the invitation id, the session id, a password hash and the place to continue to; read by takeOwedKeyCredentials for the session that signed in, and no content goes to a model or another principal."
+      "why": "Reviewed 2026-11-05 (codebase analysis 2026-11-03, decision 14a), the node's own read: the held first sign-in credentials in the pseudo-owner namespace key-credentials-held, which the node itself wrote at the first sign-in; the sealed password is mailed once to the account's own verified address and goes to no model or other principal. 2026-11-08 (secaudit2026nov08 round 14): the second read is the marker in the same namespace (key-credentials-owed.<ghii>) that a link or provider first sign-in left, holding the invitation id, the session id, a password hash and the place to continue to; read by takeOwedKeyCredentials for the session that signed in, and no content goes to a model or another principal. 2026-11-08 (secaudit2026nov08b round 15): the third read is the record in the same namespace (key-credentials-pre-sign-in-agents.<ghii>) that lists the agent GAIIs and public keys a mailbox proof handed out before the first sign-in (notePreSignInAgentKey writes it through record-cas.ts updateRecord); endPreSignInAgentKeys reads it at the first sign-in to rekey those agents, and no content goes to a model or another principal."
     },
     "src/services/key-reencrypt/job.ts": {
       "reads": {

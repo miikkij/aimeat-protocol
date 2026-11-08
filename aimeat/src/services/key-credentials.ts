@@ -74,6 +74,7 @@ import { getEncryptionKey, encryptBound, decryptBound } from './encryption.js';
 import { provenOwnerAddress } from './owner-mail-address.js';
 import { logger } from '../utils/logger.js';
 import { generateKeyPair } from '../auth/keypair.js';
+import { updateRecord } from './record-cas.js';
 import { randomBytes } from 'node:crypto';
 
 export interface IssuedKeyCredentials {
@@ -136,15 +137,12 @@ interface PreSignInAgents { agents: Array<{ gaii: string; publicKey: string }> }
  * record.
  */
 export async function notePreSignInAgentKey(storage: Storage, ghii: string, gaii: string, publicKey: string): Promise<void> {
-  const row = await storage.getMemory(NS_HELD, preSignInAgentsKey(ghii));
-  const listed = (row?.value as PreSignInAgents | null | undefined)?.agents ?? [];
-  const value: PreSignInAgents = { agents: [...listed.filter(a => a.gaii !== gaii), { gaii, publicKey }] };
-  const now = new Date().toISOString();
-  // No lapse: a code key waits for its holder without an end date, and the first sign-in deletes this.
-  await storage.setMemory({
-    key: preSignInAgentsKey(ghii), ownerGaii: NS_HELD, value, visibility: 'private', tags: ['system'],
-    ttlHours: null, version: 1, createdAt: row?.createdAt ?? now, updatedAt: now,
-  });
+  // Written on the version read, so two proofs at once both stay listed. No lapse: a code key waits
+  // for its holder without an end date, and the first sign-in deletes this record.
+  await updateRecord<PreSignInAgents>(storage, NS_HELD, preSignInAgentsKey(ghii),
+    v => ({ agents: Array.isArray((v as PreSignInAgents | null | undefined)?.agents) ? (v as PreSignInAgents).agents : [] }),
+    cur => ({ agents: [...cur.agents.filter(a => a.gaii !== gaii), { gaii, publicKey }] }),
+    { tag: 'system', ttlHours: null });
 }
 
 /**

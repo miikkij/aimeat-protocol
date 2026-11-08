@@ -368,7 +368,7 @@
         "aimeat/src/services/receivers/manage.ts",
         "aimeat/src/tool-catalog/definitions/receivers.ts"
       ],
-      "digest": "sha256:1da46cdc8c8dfe7b7e85f9e3"
+      "digest": "sha256:7dd1ef283c4a5c7ac80b57cc"
     },
     "node:aimeat-agent-capability": {
       "reviewedOn": "2026-11-07",
@@ -842,9 +842,9 @@
       "aimeat/src/services/ai/image.ts": "6d50752cd6532f76"
     },
     "node:aimeat-receivers": {
-      "aimeat/src/services/receivers/contract.ts": "6a9461ef8fcba462",
+      "aimeat/src/services/receivers/contract.ts": "e0d05e6a43614044",
       "aimeat/src/services/receivers/receive.ts": "eb48bc222c34b250",
-      "aimeat/src/services/receivers/manage.ts": "88cc316d2834447f",
+      "aimeat/src/services/receivers/manage.ts": "da7ffccd299d68fc",
       "aimeat/src/tool-catalog/definitions/receivers.ts": "4e4b7bbb567c7c72"
     }
   }
