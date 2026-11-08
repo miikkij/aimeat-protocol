@@ -16,6 +16,8 @@
  * @structure fileStoreRouter(config, storage)
  * @usage app.use(fileStoreRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-11-08 — `takes` on the person's connect and the operator's store: which files a store
+ *     is for (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.1.0 — 2026-10-30 — Named stores: `name` and `make_default` on connect, `?name=` on disconnect,
  *     `to` and `from` on a move; the operator's PUT and DELETE /v1/admin/file-store/stores/{name}, a
  *     test by name, and a move with `from` and `to` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -48,12 +50,18 @@ const STORE_FIELDS = {
   prefix: text(200),
 };
 
-/** PUT /v1/file-store. Without `kind` only `make_default` applies, to the store `name` names. */
-const ConnectSchema = z.object({ ...STORE_FIELDS, name: text(40), make_default: z.boolean().optional(), reason: text(500) }).strict();
+/** Which files a store is for (storage/blob/store-takes.ts); the service names what is wrong in it. */
+const TakesSchema = z.object({
+  min_mb: z.number().min(0).max(10240).optional(),
+  kinds: z.array(z.enum(['video', 'audio', 'image', 'pdf'])).max(4).optional(),
+}).strict().optional();
+
+/** PUT /v1/file-store. Without `kind` only `make_default` and `takes` apply, to the store `name` names. */
+const ConnectSchema = z.object({ ...STORE_FIELDS, name: text(40), make_default: z.boolean().optional(), takes: TakesSchema, reason: text(500) }).strict();
 const MoveSchema = z.object({
   to: text(100), from: text(100), direction: z.enum(['own', 'home']).optional(), limit: z.number().int().min(1).max(200).optional(),
 }).strict();
-const NodeStoreSchema = z.object({ ...STORE_FIELDS, selectable: z.boolean().optional(), make_default: z.boolean().optional() }).strict();
+const NodeStoreSchema = z.object({ ...STORE_FIELDS, selectable: z.boolean().optional(), make_default: z.boolean().optional(), takes: TakesSchema }).strict();
 const AdminTestSchema = z.object({ name: text(40) }).strict();
 const AdminMoveSchema = z.object({ limit: z.number().int().min(1).max(500).optional(), after: text(2048), from: text(100), to: text(100) }).strict();
 const DecisionSchema = z.object({ decision: z.enum(['approve', 'decline', 'revoke']), note: text(500) }).strict();

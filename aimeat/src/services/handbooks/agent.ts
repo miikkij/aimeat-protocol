@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.65.0 -- 2026-11-08 -- A store takes only the files it is for (`takes`); a small file stays in the
+ *     database (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.64.0 -- 2026-11-07 -- Data coming in from a program: aimeat_receiver (propose, create, the key
  *     once, a CSM shape with aimeat_csm), never an access token or an agent for a program.
  *   v1.63.0 -- 2026-11-03 -- Messages: a direct message's address is name@node-id, the node id from your
@@ -163,7 +165,10 @@ the node tests the storage before saving anything); they may have several, and o
 they type the keys on their own profile page if they would rather not paste them into the chat. When you
 save a file, \`store\` on \`aimeat_storage_upload\` puts it in a store you name: the \`choices\` of
 \`aimeat_file_store_get\`, their own stores and the node stores open to everyone. Without it the file goes
-to their default. \`aimeat_file_store_move\` moves their files to a store or back home, and
+to their default. A store takes only the files it is for (its \`takes\`: by default 1 MB and up, and every
+video and sound); a smaller file of another kind stays in the node's database, and the upload's answer
+says \`store: "database"\`. \`takes: { min_mb, kinds }\` on \`aimeat_file_store_set\` changes it, when your
+owner asks. \`aimeat_file_store_move\` moves their files to a store or back home, and
 \`aimeat_file_store_remove\` disconnects a store once nothing is left in it.
 Ask your owner before you connect or disconnect anything. Each store's \`browser_access\` says whether
 apps in their browser can send files straight to it; when they cannot, its \`rule\` is the CORS rule to

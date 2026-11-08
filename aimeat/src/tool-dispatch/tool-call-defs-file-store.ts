@@ -8,13 +8,14 @@
  * @structure fileStoreCliTools[]
  * @usage import { fileStoreCliTools } from './tool-call-defs-file-store.js';
  * @version-history
+ *   v1.2.0 — 2026-11-08 — `takes` on both set tools (which files a store is for).
  *   v1.1.0 — 2026-10-30 — Named stores: name and make_default on set, name on remove, to and from on
  *     move; aimeat_admin_file_store_set and aimeat_admin_file_store_remove; a test by name and a move
  *     with from and to (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.js';
-import { requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
+import { requiredString, optionalString, optionalNumber, optionalBoolean, optionalRecord } from './tool-call-helpers.js';
 
 const enc = encodeURIComponent;
 
@@ -30,6 +31,12 @@ function pick(input: Record<string, unknown>, strings: readonly string[], boolea
   return body;
 }
 
+/** `takes` ({ min_mb, kinds }: which files the store is for) added to the body when it was given. */
+function withTakes(input: JsonObject, body: JsonObject): JsonObject {
+  const takes = optionalRecord(input, 'takes');
+  return takes ? { ...body, takes } : body;
+}
+
 export const fileStoreCliTools: ConnectCliToolDefinition[] = [
   {
     // → GET /v1/file-store
@@ -39,7 +46,7 @@ export const fileStoreCliTools: ConnectCliToolDefinition[] = [
   {
     // → PUT /v1/file-store
     name: 'aimeat_file_store_set',
-    handler: ({ client }, input) => client.put('/v1/file-store', pick(input, [...STORE_FIELDS, 'name', 'reason'], ['make_default'])),
+    handler: ({ client }, input) => client.put('/v1/file-store', withTakes(input, pick(input, [...STORE_FIELDS, 'name', 'reason'], ['make_default']))),
   },
   {
     // → DELETE /v1/file-store?name=
@@ -63,7 +70,7 @@ export const fileStoreCliTools: ConnectCliToolDefinition[] = [
     // → PUT /v1/admin/file-store/stores/:name
     name: 'aimeat_admin_file_store_set',
     handler: ({ client }, input) => client.put(`/v1/admin/file-store/stores/${enc(requiredString(input, 'name'))}`,
-      pick(input, STORE_FIELDS, ['selectable', 'make_default'])),
+      withTakes(input, pick(input, STORE_FIELDS, ['selectable', 'make_default']))),
   },
   {
     // → DELETE /v1/admin/file-store/stores/:name

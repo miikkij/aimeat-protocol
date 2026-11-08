@@ -20,6 +20,10 @@
  * @structure main() — own node on block 30500, fake S3 on block 30900
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-file-store.ts
  * @version-history
+ *   v1.1.0 — 2026-11-08 — file_store.min_mb and file_store.kinds: a small text stays in the database,
+ *     and a value that is not one is refused. The stores of the suite take every file (min_mb 0),
+ *     because it stores small text files: its setup no longer matched the designed default
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -88,6 +92,9 @@ async function startServer(s3: FakeS3): Promise<ChildProcess> {
         AIMEAT_FILE_STORE_S3_ACCESS_KEY_ID: KEY_ID,
         AIMEAT_FILE_STORE_S3_SECRET_ACCESS_KEY: SECRET,
         AIMEAT_FILE_STORE_PREFIX: '',
+        // The suite stores small text files in the stores, so they take every file; the default rule
+        // (1 MB, video and audio) is proved in e2e-file-store-named.ts and by the file_store.min_mb test below.
+        AIMEAT_FILE_STORE_MIN_MB: '0',
         AIMEAT_FILE_STORE_OWNER_PRIVATE_ORIGINS: s3.url,
         AIMEAT_OWNER_FILE_STORES: 'self',
         AIMEAT_STORAGE_QUOTA_MB: '1',
@@ -118,7 +125,7 @@ async function main() {
     let B!: Awaited<ReturnType<typeof registerOwner>>;
     let C!: Awaited<ReturnType<typeof registerOwner>>;
     const setConfig = (path: string, value: unknown) => call('/v1/admin/config', { token: op.token, method: 'PUT', body: { changes: [{ path, value }] } });
-    const ownStore = { kind: 's3', endpoint: s3.url, bucket: OWN_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET };
+    const ownStore = { kind: 's3', endpoint: s3.url, bucket: OWN_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET, takes: { min_mb: 0 } };
     const nodeObjects = () => s3.objects(NODE_BUCKET).filter(k => k.startsWith(NODE_PREFIX));
     // The node also stores a text derivative of a text file (content classification), so an object is
     // found by its bytes, not by counting.
@@ -189,6 +196,27 @@ async function main() {
             assert(holding(NODE_BUCKET, 'written to the database').length >= 1, 'nothing reached the bucket');
             const read = await fetch(`${BASE}/v1/storage/old/a.txt`, { headers: { Authorization: `Bearer ${A.token}` } });
             assert(read.status === 200 && (await read.text()) === 'written to the database', `read ${read.status}`);
+        });
+
+        await test('file_store.min_mb and file_store.kinds say which files the node\'s store takes; a small text stays in the database', async () => {
+            assert((await setConfig('file_store.min_mb', 1)).status === 200, 'min_mb 1');
+            assert((await setConfig('file_store.kinds', ['image'])).status === 200, 'kinds image');
+            const s = await call('/v1/admin/file-store', { token: op.token });
+            assert(s.body.data.takes.min_mb === 1 && s.body.data.takes.kinds.join(',') === 'image', JSON.stringify(s.body.data.takes));
+            const up = await upload(A.token, 'rule/small.txt', 'kept in the database by the rule');
+            assert(up.status === 201 && up.body.data.store === 'database', `${up.status} ${JSON.stringify(up.body.data ?? up.body.error)}`);
+            assert(holding(NODE_BUCKET, 'kept in the database by the rule').length === 0, 'the small text reached the bucket');
+            const read = await fetch(`${BASE}/v1/storage/rule/small.txt`, { headers: { Authorization: `Bearer ${A.token}` } });
+            assert(read.status === 200 && (await read.text()) === 'kept in the database by the rule', `read ${read.status}`);
+        });
+
+        await test('FAILURE: a size limit or a kind that is not one is refused on the Config tab, and the rule stays', async () => {
+            assert((await setConfig('file_store.min_mb', -5)).status === 400, 'a negative size limit was taken');
+            assert((await setConfig('file_store.kinds', ['exe'])).status === 400, 'an unknown kind was taken');
+            const s = await call('/v1/admin/file-store', { token: op.token });
+            assert(s.body.data.takes.min_mb === 1 && s.body.data.takes.kinds.join(',') === 'image', JSON.stringify(s.body.data.takes));
+            assert((await setConfig('file_store.min_mb', 0)).status === 200, 'min_mb back to 0');
+            assert((await setConfig('file_store.kinds', ['video', 'audio'])).status === 200, 'kinds back');
         });
 
         await test('FAILURE: a wrong key saves nothing, a private address is refused, a non-operator and a stranger are refused', async () => {

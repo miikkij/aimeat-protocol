@@ -24,8 +24,9 @@
  *   `technical.contentHash`: the technical stage read a new version of the source and the AI stages
  *   have not run on it yet. Whether the source changed since the technical stage ran is the
  *   caller's to compare, since this file does not read sources.
- * @structure FACT_SHARDS · SHARD_LIMIT_BYTES · sourceIdOf() · sourceHash() · shardKeyOf() ·
- *   getFacts() · putFacts() · deleteFacts() · listFacts() · coverage() · textKeyOf() · putText() ·
+ * @structure FACT_SHARDS · SHARD_PREFIX · SHARD_LIMIT_BYTES · sourceIdOf() · sourceHash() · shardKeyOf() ·
+ *   getFacts() · putFacts() · deleteFacts() · deleteFactsWhere() · allFacts() · listFacts() · coverage() ·
+ *   textKeyOf() · putText() ·
  *   getText() · deleteText() · profileKeyOf() · putProfileDetail() · getProfileDetail() ·
  *   deleteProfileDetail()
  * @usage
@@ -33,6 +34,8 @@
  *   await putFacts(deps, writer, facts);
  *   const page = await listFacts(storage, ownerGhii, { kind: 'pdf', limit: 50 });
  * @version-history
+ *   2026-11-08 — deleteFactsWhere removes every entry a test picks, one write per shard; allFacts and
+ *     SHARD_PREFIX are exported for the removal of the fingerprint loop's leftovers (leftovers.ts).
  *   2026-11-04 — No per-shard getMemory for a storage without getMemoryByKeys: it is required on
  *     Storage (codebase analysis 2026-11-03, item D-e).
  *   v1.0.0 — 2026-10-20 — Initial.
@@ -48,7 +51,7 @@ import { ContentClassError, updateOwnRecord, type ContentDeps, type ContentWrite
 import type { ContentFacts, ContentKind, ContentSource, ProfileSection } from './types.js';
 
 export const FACT_SHARDS = 32;
-const SHARD_PREFIX = 'contentclass.facts.';
+export const SHARD_PREFIX = 'contentclass.facts.';
 /** A shard is refused past this size, under the 1024 kB value ceiling. */
 export const SHARD_LIMIT_BYTES = 900 * 1024;
 const TEXT_PREFIX = 'contentclass-text/';
@@ -115,8 +118,30 @@ export async function deleteFacts(deps: ContentDeps, writer: ContentWriter, sour
 /** Every shard key, in order. */
 const SHARD_KEYS: readonly string[] = Array.from({ length: FACT_SHARDS }, (_, i) => `${SHARD_PREFIX}${String(i).padStart(2, '0')}`);
 
+/**
+ * Remove every facts entry of the owner that `drop` answers true for: one write per shard that holds
+ * one, on the version that was read. Answers how many were removed.
+ */
+export async function deleteFactsWhere(deps: ContentDeps, writer: ContentWriter, drop: (f: ContentFacts) => boolean): Promise<number> {
+  let removed = 0;
+  for (const key of SHARD_KEYS) {
+    let inShard = 0;
+    await updateOwnRecord(deps, writer, key, (cur) => {
+      if (cur === undefined || cur === null) return UNCHANGED;
+      const shard = parseShard(cur);
+      inShard = 0;
+      for (const [id, f] of Object.entries(shard.items)) {
+        if (f && typeof f === 'object' && drop(f)) { delete shard.items[id]; inShard++; }
+      }
+      return inShard ? shard : UNCHANGED;
+    });
+    removed += inShard;
+  }
+  return removed;
+}
+
 /** Every stored facts entry of the owner, read from the shards in one query. */
-async function allFacts(storage: Storage, ownerGhii: string): Promise<ContentFacts[]> {
+export async function allFacts(storage: Storage, ownerGhii: string): Promise<ContentFacts[]> {
   const rows: Array<MemoryRecord | null> = await storage.getMemoryByKeys(ownerGhii, [...SHARD_KEYS]);
   const out: ContentFacts[] = [];
   for (const r of rows) {

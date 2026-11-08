@@ -11,6 +11,9 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-08 — tidyStoredFiles, once a minute after start and before the daily file store sweep: the
+ *     content class fingerprint loop's leftovers are removed, then every file a store does not take is
+ *     moved to the database (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   2026-11-04 — compactMemoryTotals called without a presence check: it is required on Storage
  *     (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — memory-ttl-cleanup also folds the kept memory totals (storage.compactMemoryTotals;
@@ -267,9 +270,14 @@ export function registerCoreHandlers(
   // The objects in a file store that no stored file names: an erased account's, or a failed removal's
   // (services/file-store/file-store-sweep.ts).
   scheduler.registerCoreHandler('file-store-sweep', async () => {
+    await tidyStoredFiles(config, storage);
     const { sweepFileStores } = await import('./file-store/file-store-sweep.js');
     await sweepFileStores({ storage, config });
   });
+  // Once at startup (non-blocking), a minute after the node is up, so an operator runs nothing.
+  setTimeout(() => {
+    tidyStoredFiles(config, storage).catch(err => logger.error('Startup stored-file tidy failed', { error: String(err) }));
+  }, 60_000).unref();
   // The own addresses of removed apps: held for their owner, released by age and the per-owner limit
   // (services/held-app-labels.ts).
   scheduler.registerCoreHandler('held-label-release', async () => {
@@ -311,6 +319,18 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('storage-stats-snapshot', () => runStorageStatsSnapshotJob(storage));
   // Seed one snapshot at startup so the tab is never empty on a fresh boot (non-blocking).
   runStorageStatsSnapshotJob(storage).catch(err => logger.error('Startup storage-stats snapshot failed', { error: String(err) }));
+}
+
+/**
+ * The content class pipeline's loop leftovers first (services/content/leftovers.ts), then every file a
+ * store holds and would not take now back to the database (services/file-store/file-store-return.ts):
+ * in this order, so a leftover is removed rather than moved first.
+ */
+export async function tidyStoredFiles(config: AimeatConfig, storage: Storage): Promise<void> {
+  const { removeFingerprintLoopLeftovers } = await import('./content/leftovers.js');
+  await removeFingerprintLoopLeftovers({ storage, config });
+  const { returnUntakenFiles } = await import('./file-store/file-store-return.js');
+  await returnUntakenFiles({ storage, config });
 }
 
 /** Capture one storage-size snapshot (per-table row counts + total) and prune snapshots older than 30 days. */

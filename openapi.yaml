@@ -1854,6 +1854,22 @@ components:
           type: integer
           description: Seconds to wait before retry (present on RATE_LIMITED)
 
+    FileStoreTakes:
+      type: object
+      additionalProperties: false
+      description: >-
+        Which files a store is for. A file at least `min_mb` megabytes long goes to the store; a smaller
+        one keeps its bytes in the node's database unless its kind is in `kinds`. A store that never set
+        this takes 1 MB and up, and every video and sound. A part left out keeps its value. A file the
+        store holds and no longer takes moves to the database by itself within a day.
+      properties:
+        min_mb: { type: number, minimum: 0, maximum: 10240, description: '0 sends every file to the store.' }
+        kinds:
+          type: array
+          maxItems: 4
+          items: { type: string, enum: [video, audio, image, pdf] }
+          description: Kinds that go to the store whatever their size.
+
     FieldError:
       type: object
       description: One field a request was refused for (VALIDATION_ERROR). `path` is the name a form gives the field, so a page shows `message` under it.
@@ -39021,10 +39037,11 @@ paths:
         The node tests the storage (write, read, read part, list, remove under the folder) before it
         saves anything. A person may keep several named stores; the first is the default, and
         `make_default` makes another one the default. A new file of the person and their agents goes to
-        the default unless its writer names a store. The node also checks whether a browser may send to
+        the default unless its writer names a store, when the store takes it: `takes` says which files
+        a store is for, and a smaller file of another kind keeps its bytes in the node's database. The node also checks whether a browser may send to
         the store directly (its CORS rule) and keeps the answer as the store's `browser_access`; a store
         without the rule is saved all the same and takes files through the node. Without `kind`, the
-        store `name` names is tested again with its kept key, and `make_default` applies. The keys are kept encrypted under the node key and never returned. On a node
+        store `name` names is tested again with its kept key, and `make_default` and `takes` apply. The keys are kept encrypted under the node key and never returned. On a node
         where operators approve, the answer is 202 with `outcome` waiting_for_operator and files keep
         going to the node until approved. Needs the person in person, or an agent with `secrets:manage`.
         400 INVALID_INPUT names what is missing (and asks for `name` when the person has several
@@ -39054,6 +39071,7 @@ paths:
                 container: { type: string }
                 credential: { type: string, description: 'Azure: account key, connection string or container SAS URL.' }
                 prefix: { type: string, description: 'The folder inside the bucket or container.' }
+                takes: { $ref: '#/components/schemas/FileStoreTakes' }
                 reason: { type: string, description: 'For the operators, on a node where they approve.' }
       responses:
         '200': { description: Connected }
@@ -39132,8 +39150,9 @@ paths:
         With `kind` the address and key are read, the store is tested (write, read, read part, list,
         remove under its folder) and kept, its key encrypted under the node key and never returned.
         The store's `browser_access` says whether a browser may send to it directly, with the CORS rule
-        to add when it may not. Without `kind` only `selectable` (every person may name it for a file) and `make_default` (new
-        files go there; false on the default lets the environment's setting decide again) change. 400
+        to add when it may not. `takes` says which files the store is for; a smaller file of another
+        kind keeps its bytes in the database. Without `kind` only `selectable` (every person may name it for a file), `make_default` (new
+        files go there; false on the default lets the environment's setting decide again) and `takes` change. 400
         INVALID_INPUT (a reserved name: s3, azure, database), 409 FILES_IN_STORE when a store holding
         files would point at a different bucket, 409 STORE_ALREADY_CONNECTED, 422 STORE_TEST_FAILED, 503
         NO_ENCRYPTION_KEY. Reserved to the node operator.
@@ -39162,6 +39181,7 @@ paths:
                 prefix: { type: string, description: 'The folder inside the bucket or container.' }
                 selectable: { type: boolean }
                 make_default: { type: boolean }
+                takes: { $ref: '#/components/schemas/FileStoreTakes' }
       responses:
         '200': { description: Changed }
         '201': { description: Added }

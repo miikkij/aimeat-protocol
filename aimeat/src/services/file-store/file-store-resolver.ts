@@ -21,9 +21,12 @@
  *   read while its entry exists, approved or not: the rule decides where new files go, never whether
  *   a person can read the files they already have.
  * @structure StoreRefusal · choiceIdOf · ownerTarget · nodeEnvTarget · nodeTarget · resolveChoice ·
- *   writesToOwnStore · createFileStoreResolver · installFileStores
+ *   writesToOwnStore · createFileStoreResolver · storeTargetOf · installFileStores
  * @usage installFileStores(storage, config);   // once, after createStorage and the config overrides
  * @version-history
+ *   v1.2.0 — 2026-11-08 — Every target carries its store's rule (`takes`, store-takes.ts); takesOf
+ *     answers the rule of the store a reference names; writesToOwnStore asks the rule for the file's
+ *     size and type (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.1.0 — 2026-10-30 — A write may name its store (resolveChoice); the person's and the node's named
  *     stores each have a default; nodeTarget reads the named stores and is async
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -33,6 +36,8 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { BlobStoreError, nodeStoreId, type BlobStore } from '../../storage/blob/blob-types.js';
 import { wrapStorageWithFileStores, type FileStoreResolver, type FileStoreTarget } from '../../storage/blob/file-store-wrap.js';
+import { storeTakesFile, takesOrDefault, type StoreTakes } from '../../storage/blob/store-takes.js';
+import { envStoreTakes } from './store-target.js';
 import { localAccountOf, ownerGhiiOf } from '../../utils/gaii.js';
 import { nodeStoreSpec, storeFor } from './file-store-specs.js';
 import {
@@ -67,12 +72,12 @@ export function choiceIdOf(storeId: string | null | undefined): string {
 
 function ownerEntryTarget(ctx: FileStoreCtx, account: string, entry: OwnerStoreEntry): FileStoreTarget | null {
   const spec = ownerStoreSpec(ctx.config, account, entry);
-  return spec ? { storeId: entry.storeId, store: storeFor(spec, 'guarded', ctx.config), prefix: entry.prefix } : null;
+  return spec ? { storeId: entry.storeId, store: storeFor(spec, 'guarded', ctx.config), prefix: entry.prefix, takes: takesOrDefault(entry.takes) } : null;
 }
 
 function nodeEntryTarget(ctx: FileStoreCtx, entry: NodeStoreEntry): FileStoreTarget | null {
   const spec = nodeEntrySpec(ctx.config, entry);
-  return spec ? { storeId: nodeEntryStoreId(entry.name), store: storeFor(spec, 'trusted'), prefix: entry.prefix } : null;
+  return spec ? { storeId: nodeEntryStoreId(entry.name), store: storeFor(spec, 'trusted'), prefix: entry.prefix, takes: takesOrDefault(entry.takes) } : null;
 }
 
 /** The person's default store, when it may take this identity's new file now. */
@@ -88,7 +93,7 @@ export async function ownerTarget(ctx: FileStoreCtx, identity: string): Promise<
 export function nodeEnvTarget(config: AimeatConfig, kind?: 's3' | 'azure'): FileStoreTarget | null {
   const r = nodeStoreSpec(config, kind);
   if (!('spec' in r)) return null;
-  return { storeId: nodeStoreId(r.spec.kind), store: storeFor(r.spec, 'trusted'), prefix: r.prefix };
+  return { storeId: nodeStoreId(r.spec.kind), store: storeFor(r.spec, 'trusted'), prefix: r.prefix, takes: envStoreTakes(config) };
 }
 
 /** The node's store for new files: the default named store, else the environment's, else none. */
@@ -136,9 +141,16 @@ export async function resolveChoice(
 
 /** For the storage quota: does this identity's next file go to its owner's own store? Those files
  *  are kept at the person's expense, so the node's quota does not count them. */
-export async function writesToOwnStore(ctx: FileStoreCtx, identity: string, choice?: string): Promise<boolean> {
-  if (choice) return choice.startsWith('own:');
-  return (await ownerTarget(ctx, identity)) !== null;
+export async function writesToOwnStore(ctx: FileStoreCtx, identity: string, choice?: string, file?: { size: number; mimeType?: string }): Promise<boolean> {
+  if (choice) {
+    if (!choice.startsWith('own:')) return false;
+    if (!file) return true;
+    const r = await resolveChoice(ctx, identity, choice, { operator: false });
+    return r.ok && (!r.target.takes || storeTakesFile(r.target.takes, file.size, file.mimeType));
+  }
+  const target = await ownerTarget(ctx, identity);
+  if (!target) return false;
+  return !file || !target.takes || storeTakesFile(target.takes, file.size, file.mimeType);
 }
 
 export function createFileStoreResolver(ctx: FileStoreCtx): FileStoreResolver {
@@ -154,24 +166,32 @@ export function createFileStoreResolver(ctx: FileStoreCtx): FileStoreResolver {
       return (await ownerTarget(ctx, ownerGaii)) ?? (await nodeTarget(ctx));
     },
     async forRead(storeId): Promise<BlobStore | null> {
-      if (storeId === nodeStoreId('s3') || storeId === nodeStoreId('azure')) {
-        return nodeEnvTarget(ctx.config, storeId === nodeStoreId('s3') ? 's3' : 'azure')?.store ?? null;
-      }
-      if (storeId.startsWith('node:')) {
-        const entry = nodeEntryNamed(await readNodeStores(ctx), storeId.slice('node:'.length));
-        return entry ? nodeEntryTarget(ctx, entry)?.store ?? null : null;
-      }
-      if (storeId.startsWith('owner:')) {
-        const rest = storeId.slice('owner:'.length);
-        const slash = rest.indexOf('/');
-        const who = localOwner(ctx.config, slash < 0 ? rest : rest.slice(0, slash));
-        if (!who) return null;
-        const entry = (await readOwnerStores(ctx, who.account))?.stores.find(s => s.storeId === storeId);
-        return entry ? ownerEntryTarget(ctx, who.account, entry)?.store ?? null : null;
-      }
-      return null;
+      return (await storeTargetOf(ctx, storeId))?.store ?? null;
+    },
+    async takesOf(storeId): Promise<StoreTakes | null> {
+      return (await storeTargetOf(ctx, storeId))?.takes ?? null;
     },
   };
+}
+
+/** The store an id names, with its rule; null when this node no longer has it or cannot open its key. */
+export async function storeTargetOf(ctx: FileStoreCtx, storeId: string): Promise<FileStoreTarget | null> {
+  if (storeId === nodeStoreId('s3') || storeId === nodeStoreId('azure')) {
+    return nodeEnvTarget(ctx.config, storeId === nodeStoreId('s3') ? 's3' : 'azure');
+  }
+  if (storeId.startsWith('node:')) {
+    const entry = nodeEntryNamed(await readNodeStores(ctx), storeId.slice('node:'.length));
+    return entry ? nodeEntryTarget(ctx, entry) : null;
+  }
+  if (storeId.startsWith('owner:')) {
+    const rest = storeId.slice('owner:'.length);
+    const slash = rest.indexOf('/');
+    const who = localOwner(ctx.config, slash < 0 ? rest : rest.slice(0, slash));
+    if (!who) return null;
+    const entry = (await readOwnerStores(ctx, who.account))?.stores.find(s => s.storeId === storeId);
+    return entry ? ownerEntryTarget(ctx, who.account, entry) : null;
+  }
+  return null;
 }
 
 /** Wrap the node's storage so every file write and read goes through the resolver. Reads the config

@@ -16,6 +16,9 @@
  *   removeOwnerFileStore · moveOwnerFiles · decideOwnerFileStore · FILE_STORE_DOMAIN · placeOf (re-export)
  * @usage const r = await connectOwnerFileStore(ctx, { account: 'alice', actor: principal, operator: false }, body);
  * @version-history
+ *   v1.3.0 — 2026-11-08 — A store keeps which files it takes (`takes: { min_mb, kinds }`), set when it is
+ *     connected or on its own, and the view shows it; a move home sends a file the node's store does not
+ *     take to the database (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.2.0 — 2026-10-31 — Connecting a store also checks whether a browser may send to it directly, and
  *     the view gives the CORS rule to add while it may not; a call without `kind` tests the store again
  *     with its kept key (browser-access.ts).
@@ -26,6 +29,7 @@
  */
 import { parseBlobRef } from '../../storage/blob/blob-types.js';
 import { relocateStorageFile, type FileStoreTarget } from '../../storage/blob/file-store-wrap.js';
+import { readTakesInput, storeTakesFile, takesOrDefault, takesView } from '../../storage/blob/store-takes.js';
 import type { StorageFileRecord } from '../../storage/interface.js';
 import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
@@ -75,6 +79,7 @@ function entryView(rec: OwnerFileStores, e: OwnerStoreEntry, files: { file: Stor
     kind: e.target.kind, where: whereOf(e.target), place: placeOf(e.target), prefix: e.prefix,
     connected_at: e.connectedAt, connected_by: e.connectedBy, last_check: e.lastCheck ?? null,
     browser_access: browserAccessView(e.browserAccess, e.target.kind),
+    takes: takesView(takesOrDefault(e.takes)),
     files: sizeOf(files.filter(f => f.storeId === e.storeId)),
   };
 }
@@ -155,6 +160,9 @@ export async function connectOwnerFileStore(ctx: FileStoreCtx, who: OwnerActor, 
   if (nameProblem) return fail(400, 'INVALID_INPUT', nameProblem);
   const current = entryNamed(rec, name);
   const makeDefault = body.make_default === true;
+  // Which files it takes; a part left out keeps what the store had.
+  const takes = readTakesInput(body.takes, current ? takesOrDefault(current.takes) : undefined);
+  if (takes && 'problem' in takes) return fail(400, 'INVALID_INPUT', takes.problem);
 
   // No kind: the store is tested again with the key it was connected with, and `make_default` applies.
   // That is how a person learns whether the CORS rule they just added works, without typing the key again.
@@ -167,7 +175,7 @@ export async function connectOwnerFileStore(ctx: FileStoreCtx, who: OwnerActor, 
     await updateOwnerStores(ctx, who.account, cur => (cur ? {
       ...cur,
       default: makeDefault ? name : cur.default,
-      stores: cur.stores.map(s => (s.name === name ? { ...s, lastCheck, ...(browserAccess ? { browserAccess } : {}) } : s)),
+      stores: cur.stores.map(s => (s.name === name ? { ...s, lastCheck, ...(browserAccess ? { browserAccess } : {}), ...(takes ? { takes } : {}) } : s)),
     } : UNCHANGED));
     emitChange(FILE_STORE_DOMAIN);
     return { ok: true, data: { outcome: 'updated', test, view: await ownerFileStoreView(ctx, who.account, { operator: who.operator }) } };
@@ -205,6 +213,7 @@ export async function connectOwnerFileStore(ctx: FileStoreCtx, who: OwnerActor, 
     connectedAt: current && sameTarget(current.target, input.target) ? current.connectedAt : now,
     connectedBy: who.actor, lastCheck: { at: now, ok: true, message: 'write, read, read part, list and remove all worked' },
     browserAccess,
+    ...((takes ?? current?.takes) ? { takes: takes ?? current?.takes } : {}),
   };
   await updateOwnerStores(ctx, who.account, cur => {
     const base: OwnerFileStores = cur ?? { spec: 'aimeat.owner-file-stores/v2', owner: who.account, default: null, stores: [] };
@@ -293,7 +302,9 @@ export async function moveOwnerFiles(
   const failed: { key: string; error: string }[] = [];
   for (const { file } of candidates.slice(0, limit)) {
     try {
-      const out = await relocateStorageFile(ctx.storage, file.ownerGaii, file.key, target);
+      // Home is where a new file would go: a file the node's store does not take goes to the database.
+      const dest = to === 'home' && target?.takes && !storeTakesFile(target.takes, file.size, file.mimeType) ? null : target;
+      const out = await relocateStorageFile(ctx.storage, file.ownerGaii, file.key, dest);
       if (out === 'moved') moved++; else skipped++;
     } catch (err) {
       failed.push({ key: file.key, error: err instanceof Error ? err.message : String(err) });

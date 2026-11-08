@@ -13,6 +13,8 @@
  * @structure setNodeFileStore · removeNodeFileStore
  * @usage const r = await setNodeFileStore(ctx, principal, { name: 'archive', kind: 'azure', credential, container });
  * @version-history
+ *   v1.2.0 — 2026-11-08 — `takes`: which files the store takes, set when it is added or on its own
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.1.0 — 2026-10-31 — Adding a store also checks whether a browser may send to it directly (browser-access.ts).
  *   v1.0.0 — 2026-10-30 — Initial (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
@@ -27,6 +29,7 @@ import {
 } from './node-file-stores.js';
 import { placeKey, readStoreInput, sameTarget, storeNameProblem, targetOfSpec, whereOf } from './store-target.js';
 import { checkBrowserAccess } from './browser-access.js';
+import { readTakesInput, takesOrDefault } from '../../storage/blob/store-takes.js';
 
 const fail = (status: number, code: string, message: string) => ({ ok: false as const, status, code, message });
 const str = (v: unknown, max = 2048) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -38,7 +41,8 @@ async function filesIn(ctx: FileStoreCtx, storeId: string): Promise<{ count: num
 
 /**
  * Add a named store, give one a new key, or change its options. With `kind` the address and the key
- * are read, the store is tested and then kept; without it only `selectable` and `make_default` change.
+ * are read, the store is tested and then kept; without it only `selectable`, `make_default` and
+ * `takes` (which files it takes: `{ min_mb, kinds }`, storage/blob/store-takes.ts) change.
  * `make_default: false` on the default store makes the environment's setting decide again.
  */
 export async function setNodeFileStore(ctx: FileStoreCtx, actor: string, body: Record<string, unknown>): Promise<FileStoreResult<{
@@ -53,13 +57,17 @@ export async function setNodeFileStore(ctx: FileStoreCtx, actor: string, body: R
   const makeDefault = typeof body.make_default === 'boolean' ? body.make_default : undefined;
   const defaultAfter = (cur: NodeFileStores) => (makeDefault === true ? name : makeDefault === false && cur.default === name ? null : cur.default);
   const storeId = nodeEntryStoreId(name);
+  // Which files it takes; a part left out keeps what the store had.
+  const takes = readTakesInput(body.takes, current ? takesOrDefault(current.takes) : undefined);
+  if (takes && 'problem' in takes) return fail(400, 'INVALID_INPUT', takes.problem);
 
   if (!str(body.kind)) {
     if (!current) return fail(400, 'INVALID_INPUT', `Missing or not valid: kind (s3 or azure). There is no node store called "${name}" to change.`);
     const saved = await updateNodeStores(ctx, cur => {
       const entry = nodeEntryNamed(cur, name);
       if (!entry) return UNCHANGED;
-      return { ...cur, default: defaultAfter(cur), stores: cur.stores.map(s => (s.name === name ? { ...s, ...(selectable !== undefined ? { selectable } : {}) } : s)) };
+      return { ...cur, default: defaultAfter(cur), stores: cur.stores.map(s => (s.name === name
+        ? { ...s, ...(selectable !== undefined ? { selectable } : {}), ...(takes ? { takes } : {}) } : s)) };
     });
     emitChange(FILE_STORE_DOMAIN);
     const entry = nodeEntryNamed(saved, name) ?? current;
@@ -99,6 +107,7 @@ export async function setNodeFileStore(ctx: FileStoreCtx, actor: string, body: R
     addedAt: current && sameTarget(current.target, input.target) ? current.addedAt : now, addedBy: actor,
     lastCheck: { at: now, ok: true, message: 'write, read, read part, list and remove all worked' },
     browserAccess,
+    ...((takes ?? current?.takes) ? { takes: takes ?? current?.takes } : {}),
   };
   const saved = await updateNodeStores(ctx, cur => ({ ...cur, default: defaultAfter(cur), stores: [...cur.stores.filter(s => s.name !== name), entry] }));
   emitChange(FILE_STORE_DOMAIN);

@@ -7,6 +7,8 @@
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
  *   v1.34.0 -- 2026-11-07 -- aimeat_admin_receivers and visibility.receivers_mode: every receiver, the stop and the decision.
+ *   v1.34.0 -- 2026-11-08 -- Which files a store is for: `takes`, file_store.min_mb and file_store.kinds
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.33.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt: replacing the data key (codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
  *   v1.32.0 -- 2026-11-02 -- consent.app_party_signups_per_hour and consent.app_party_pending_hours (secaudit2026nov02d round 13).
@@ -239,6 +241,12 @@ from one node store to another, in batches (call it again while \`remaining\` is
 own as \`file_store.owner_stores\` allows (self, operator, off; auto is operator on a signed-in-only
 node); on an operator node \`aimeat_admin_file_store_decide\` approves, declines or revokes, as the
 operator says. A daily sweep removes, inside the store's folder only, objects no file names any more.
+Each store says which files it is for, so it holds large files and media and not small notes: a file
+from \`min_mb\` megabytes up, and files of the \`kinds\` it names (video, audio, image, pdf) whatever their
+size; by default 1 MB and up, and every video and sound. A smaller file of another kind stays in the
+database. \`takes: { min_mb, kinds }\` on \`aimeat_admin_file_store_set\` sets it for a named store, and
+\`file_store.min_mb\` and \`file_store.kinds\` for the environment's store. A file a store holds and no
+longer takes moves to the database by itself, once after start and then daily.
 
 **Security classes (operator).** \`aimeat_classification\` with \`action: "pack_list"\` shows the two
 label packs, the Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to

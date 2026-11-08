@@ -25,6 +25,9 @@
  *   await relocateStorageFile(storage, owner, key, target);   // the move actions
  *   const up = await directUploadTarget(storage, owner, undefined, 'image/png', 3600);   // client PUTs to up.url
  * @version-history
+ *   v1.3.0 — 2026-11-08 — A store takes only the files its rule names (store-takes.ts): a smaller file
+ *     of another kind keeps its bytes in the database, and a direct upload that turns out to be one is
+ *     moved there when it completes (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.2.0 — 2026-10-31 — Direct transfer: a signed write address for a new object, the row of a file
  *     whose object a client put there (adoptStorageObject), and a signed read address for a download
  *     door; the bytes of a large file never pass through the node
@@ -38,12 +41,16 @@ import type { Storage, StorageFileRecord } from '../interface.js';
 import { utf8VerdictFor } from '../../utils/app-content-type.js';
 import { logger } from '../../utils/logger.js';
 import { BlobStoreError, formatBlobRef, parseBlobRef, signedWriteHeaders, type BlobStore } from './blob-types.js';
+import { storeTakesFile, type StoreTakes } from './store-takes.js';
 
 export interface FileStoreTarget {
   storeId: string;
   store: BlobStore;
   /** Prepended to every object key, ending in `/` or empty. */
   prefix: string;
+  /** Which files the store takes (store-takes.ts); a file it does not take stays in the database.
+   *  The resolver always sets it; absent, the store takes every file. */
+  takes?: StoreTakes;
 }
 
 export interface FileStoreResolver {
@@ -52,6 +59,13 @@ export interface FileStoreResolver {
   forWrite(ownerGaii: string, choice?: string): Promise<FileStoreTarget | null>;
   /** The store a reference names; null when this node can no longer reach it (it was disconnected). */
   forRead(storeId: string): Promise<BlobStore | null>;
+  /** The rule of the store a reference names; null when this node no longer has the store. */
+  takesOf?(storeId: string): Promise<StoreTakes | null>;
+}
+
+/** Whether a target takes this file; a target with no rule takes every file. */
+function targetTakes(target: FileStoreTarget, size: number | undefined, mimeType: string | undefined): boolean {
+  return !target.takes || storeTakesFile(target.takes, size, mimeType);
 }
 
 /** The provider's own file methods, kept on the wrapped instance under a symbol: relocateStorageFile
@@ -119,7 +133,9 @@ export function wrapStorageWithFileStores(storage: Storage, resolver: FileStoreR
     const choice = file.storeChoice;
     delete file.storeChoice;
     const previous = await meta(file.ownerGaii, file.key);
-    const target = await resolver.forWrite(file.ownerGaii, choice);
+    const resolved = await resolver.forWrite(file.ownerGaii, choice);
+    // A store takes only the files it is for (store-takes.ts); the rest keep their bytes in the database.
+    const target = resolved && targetTakes(resolved, file.data.length, file.mimeType) ? resolved : null;
     if (!target) {
       const written = await create(file);
       if (previous?.blobRef) await discard(previous.blobRef, 'replaced by a database write');
@@ -231,6 +247,13 @@ export async function adoptStorageObject(storage: Storage, file: StorageFileReco
   delete row.blobRef;
   const written = await raw.create({ ...row, data: Buffer.alloc(0), blobRef, utf8Verified });
   if (previous?.blobRef && previous.blobRef !== blobRef) await raw.discard(previous.blobRef, 'replaced by a new upload');
+  // The address was made before the size was known. A file the store does not take after all (a small
+  // one, of a kind it is not for) moves to the database now, as it would have gone there through the node.
+  const takes = raw.resolver.takesOf ? await raw.resolver.takesOf(ref.storeId) : null;
+  if (takes && !storeTakesFile(takes, file.size, file.mimeType)) {
+    const out = await relocateStorageFile(storage, file.ownerGaii, file.key, null);
+    if (out === 'moved') return { ...written, blobRef: undefined };
+  }
   return written;
 }
 
@@ -253,7 +276,8 @@ export async function directDownloadUrl(storage: Storage, ownerGaii: string, key
   });
 }
 
-export type RelocateOutcome = 'moved' | 'already-there' | 'gone' | 'changed';
+/** `not-taken`: the target's rule does not take this file (store-takes.ts), so it stays where it is. */
+export type RelocateOutcome = 'moved' | 'already-there' | 'gone' | 'changed' | 'not-taken';
 
 /**
  * Move one file's bytes to `target` (a store) or, with null, back into the database. Everything else
@@ -272,6 +296,7 @@ export async function relocateStorageFile(storage: Storage, ownerGaii: string, k
   if (!file) return 'gone';
   const from = file.blobRef;
   if ((parseBlobRef(from)?.storeId ?? null) === (target?.storeId ?? null)) return 'already-there';
+  if (target && !targetTakes(target, file.size, file.mimeType)) return 'not-taken';
 
   let blobRef: string | undefined;
   if (target) {
