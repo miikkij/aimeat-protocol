@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   2026-11-08 — A CSM component takes csm.default_visibility (secaudit2026nov08 round 14).
  *   v1.17.0 — 2026-10-29 — An extension component in an account that may not install extension code
  *     (install role operator) is stored switched off and waits for an operator's one-press approval
  *     (extension-code-hold.ts; secaudit2026oct26 round 8c).
@@ -109,6 +110,7 @@ import { rewriteComponentRefs } from './component-ref-rewrite.js';
 import { releaseBareName } from './component-address.js';
 import { installRoleRefusal } from './extension-install-role.js';
 import { EXTENSION_CODE_HOLD_KEY, askOperatorsForExtensionCode, requesterFromPrincipal } from './extension-code-hold.js';
+import { csmVisibilityDefault } from './content-defaults.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -272,6 +274,7 @@ export async function registerComponent(
         const serviceObj = definition.service as Record<string, unknown> | undefined;
         const serviceType = (serviceObj?.type as string) ?? 'other';
         if (input.dryRun) break;
+        // csm.default_visibility, as POST /v1/csm without one; the name has the installer's prefix (registeredNameFor).
         await storage.createCsm({
           name: registeredAs,
           definition,
@@ -280,6 +283,7 @@ export async function registerComponent(
           registeredBy: owner,
           registeredAt: now,
           updatedAt: now,
+          visibility: csmVisibilityDefault(config),
         });
         break;
       }
