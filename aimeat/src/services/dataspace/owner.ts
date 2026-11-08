@@ -19,6 +19,8 @@
  *   getOwnerNegotiation · approveNegotiation · declineNegotiation · dataspaceSettings
  * @usage const out = await approveNegotiation(ctx, providerPid); if (!out.ok) render(out);
  * @version-history
+ *   2026-11-08 — An approval that arrives while another one makes the agreement answers 409 NOT_WAITING
+ *     and writes nothing (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -112,6 +114,10 @@ export async function approveNegotiation(ctx: DataspaceOwnerCtx, pid: string): P
     if (n.state !== 'REQUESTED' && n.state !== 'ACCEPTED') return refuse(409, 'NOT_WAITING', `This negotiation is ${n.state}; there is nothing to approve.`);
     const after = await providerAgree(ctx.deps, n, 'owner', ctx.caller.principal);
     if (!after) return refuse(404, 'NOT_FOUND', 'The negotiation is gone.');
+    // Another approval (a second press, or the agent and the owner together) is making this agreement now.
+    if ((after.state === 'REQUESTED' || after.state === 'ACCEPTED') && after.agreeing) {
+        return refuse(409, 'NOT_WAITING', 'Another approval of this request is making the agreement now. Read the negotiation again in a moment.');
+    }
     if (after.state !== 'AGREED') {
         return refuse(after.state === 'TERMINATED' ? 409 : 502, after.state === 'TERMINATED' ? 'AGREEMENT_REFUSED' : 'CALLBACK_FAILED',
             after.state === 'TERMINATED' ? `The agreement could not be made: ${after.endedReason ?? 'see the negotiation'}.` : `The consumer did not take the agreement: ${after.callbackError ?? 'no answer'}. The request still waits; try again later.`);

@@ -17,10 +17,11 @@
  *                    free (an open or a share offer); otherwise the request waits for the owner, who is
  *                    told (account event `dataspace_request`) and approves or declines (./owner.ts). A
  *                    priced offer always waits: DSP moves no money (./agreement.ts).
- *     on agreeing    the agreement materialises first (./agreement.ts), then the record is AGREED, then
- *                    the ContractAgreementMessage goes out. The record moves before the send, because the
- *                    consumer answers the agreement with its verification at once; a send that fails
- *                    puts the record back and ends what the agreement made.
+ *     on agreeing    one call claims the record (`agreeing`), so two approvals that arrive together make
+ *                    one agreement; then the agreement materialises (./agreement.ts), then the record is
+ *                    AGREED, then the ContractAgreementMessage goes out. The record moves before the
+ *                    send, because the consumer answers the agreement with its verification at once; a
+ *                    send that fails puts the record back and ends what the agreement made.
  *     on VERIFIED    the FINALIZED event.
  *   In the TCK mode a TCK dataset follows its scripted reactions instead (./tck.ts).
  * @structure DspAnswer · requestNegotiation · readNegotiationFor · counterOffer · negotiationEvent ·
@@ -28,6 +29,9 @@
  *   providerOffer · locateNegotiation
  * @usage const out = await requestNegotiation(deps, participant, req.body); res.status(out.status).json(out.body);
  * @version-history
+ *   2026-11-08 — providerAgree claims the record before it materialises, so a second approval that
+ *     arrives meanwhile writes nothing; a call that loses the move takes back only its own addition to
+ *     the contract slot (secaudit2026nov08 round 14).
  *   v1.1.0 — 2026-11-02 — The sale of a priced agreement is booked after the consumer took the
  *     agreement, once (secaudit2026nov02d round 13).
  *   v1.0.2 — 2026-11-02 — A share offer records the pinned version of its share (secaudit2026nov02d
@@ -36,6 +40,7 @@
  *     processes take none, one participant a share only (secaudit2026nov02d round 13).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.3).
  */
+import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { recordAccountEvent } from '../account-events.js';
@@ -85,12 +90,15 @@ const isAnswer = (v: unknown): v is DspAnswer => !!v && typeof (v as DspAnswer).
 const cbUrl = (n: NegotiationRecord, action: string) => callbackUrl(n.callbackAddress, 'negotiations', n.consumerPid, action);
 const to = (n: NegotiationRecord) => ({ participantId: n.participantId, authMethod: n.authMethod });
 
-/** Move a record to `to` before a send; answers the record or null when it was no longer in `from`. */
-async function move(deps: Deps, n: NegotiationRecord, from: readonly NegotiationState[], next: NegotiationState, event: string, by: 'provider' | 'owner', extra: Partial<NegotiationRecord> = {}) {
+/**
+ * Move a record to `to` before a send; answers the record or null when it was no longer in `from` (or
+ * `guard` refused the record as it stands).
+ */
+async function move(deps: Deps, n: NegotiationRecord, from: readonly NegotiationState[], next: NegotiationState, event: string, by: 'provider' | 'owner', extra: Partial<NegotiationRecord> = {}, guard: (cur: NegotiationRecord) => boolean = () => true) {
     const hex = locatePid(n.providerPid, 'cn')!.hex;
     let moved = false;
     const after = await changeNegotiation(deps.storage, n.ownerGhii, hex, cur => {
-        if (!from.includes(cur.state)) { moved = false; return UNCHANGED; }
+        if (!from.includes(cur.state) || !guard(cur)) { moved = false; return UNCHANGED; }
         moved = true;
         return withHistory({ ...cur, ...extra, state: next }, { event, from: cur.state, to: next, by });
     });
@@ -116,10 +124,34 @@ export async function providerOffer(deps: Deps, n: NegotiationRecord): Promise<v
     if (!out.ok) await moveBack(deps, n, 'REQUESTED', 'OFFERED', out.error, { lastOfferFrom: 'consumer' });
 }
 
-/** Agree: materialise, move to AGREED, send the agreement. Answers the record as it stands after. */
+/** How long one call's claim to make an agreement holds: longer than the agreement callback's three tries. */
+const AGREEING_HOLD_MS = 2 * 60_000;
+
+/**
+ * Claim the record for one call that makes its agreement, before anything is written for it: the
+ * record is still REQUESTED or ACCEPTED and no other call holds a fresh claim. Answers the claim, or
+ * null when another call makes the agreement or the record moved on.
+ */
+async function claimAgreeing(deps: Deps, n: NegotiationRecord, hex: string): Promise<string | null> {
+    const claim = randomUUID();
+    let won = false;
+    await changeNegotiation(deps.storage, n.ownerGhii, hex, cur => {
+        won = false;
+        if (cur.state !== 'REQUESTED' && cur.state !== 'ACCEPTED') return UNCHANGED;
+        if (cur.agreeing && Date.now() - Date.parse(cur.agreeing.at) < AGREEING_HOLD_MS) return UNCHANGED;
+        won = true;
+        return { ...cur, agreeing: { claim, at: new Date().toISOString() } };
+    });
+    return won ? claim : null;
+}
+
+/** Agree: claim, materialise, move to AGREED, send the agreement. Answers the record as it stands after. */
 export async function providerAgree(deps: Deps, n: NegotiationRecord, by: 'provider' | 'owner', decidedBy?: string): Promise<NegotiationRecord | null> {
     if (n.state !== 'REQUESTED' && n.state !== 'ACCEPTED') return n;
     const hex = locatePid(n.providerPid, 'cn')!.hex;
+    // One call makes the agreement: a second approval that arrives meanwhile writes nothing.
+    const claim = await claimAgreeing(deps, n, hex);
+    if (!claim) return readNegotiation(deps.storage, n.ownerGhii, hex);
     const agreementId = agreementIdOf(localAccountName(n.ownerGhii), hex);
     const made = await materialiseAgreement(deps, { ...n, agreementId });
     if (!made.ok) {
@@ -128,13 +160,17 @@ export async function providerAgree(deps: Deps, n: NegotiationRecord, by: 'provi
     }
     const agreement = agreementOf(agreementId, n.offer, { target: n.datasetId, assigner: nodeParticipantId(deps.config), assignee: n.participantId });
     const moved = await move(deps, n, ['REQUESTED', 'ACCEPTED'], 'AGREED', 'agreement', by, {
-        agreementId, agreement, waitingForOwner: false,
+        agreementId, agreement, waitingForOwner: false, agreeing: undefined,
         ...(made.value ? { materialised: made.value } : {}),
         ...(decidedBy ? { decidedBy, decidedAt: new Date().toISOString() } : {}),
-    });
+    }, cur => cur.agreeing?.claim === claim);
     if (!moved) {
-        // Terminated meanwhile: what was made for it ends again.
-        if (made.value) await endAgreement(deps, { ...n, agreementId, materialised: made.value }, 'dsp-terminated');
+        // Terminated meanwhile, or another call took over after this call's claim ran out: what this call
+        // made ends again. Unless the negotiation was terminated, the other call's agreement stands on
+        // the same contract slot, so only this call's addition is taken back.
+        const cur = await readNegotiation(deps.storage, n.ownerGhii, hex);
+        const keepSlot = !!cur && cur.state !== 'TERMINATED';
+        if (made.value) await endAgreement(deps, { ...n, agreementId, materialised: made.value }, 'dsp-terminated', { keepSlot });
         return readNegotiation(deps.storage, n.ownerGhii, hex);
     }
     const out = await sendCallback(deps.config, to(n), cbUrl(n, 'agreement'), dspBody('ContractAgreementMessage', {
@@ -142,7 +178,7 @@ export async function providerAgree(deps: Deps, n: NegotiationRecord, by: 'provi
     }));
     if (!out.ok) {
         if (made.value) await endAgreement(deps, { ...n, agreementId, materialised: made.value }, 'dsp-callback-failed');
-        await moveBack(deps, n, n.state, 'AGREED', out.error, { agreementId: undefined, agreement: undefined, materialised: undefined });
+        await moveBack(deps, n, n.state, 'AGREED', out.error, { agreementId: undefined, agreement: undefined, materialised: undefined, agreeing: undefined });
     } else if (made.value) {
         // The agreement is made: its sale is booked now, once (./agreement.ts).
         if (made.sale) await bookAgreementSale(deps, { ...n, agreementId }, made.sale);

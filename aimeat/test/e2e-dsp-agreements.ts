@@ -17,9 +17,9 @@
  *       participant still gets in, and a negotiation that ended stops counting.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dsp-agreements
  * @version-history
- *   2026-11-08 — The party listing drops an open-offer package once it is private; a share-offer
- *     agreement stops reading when the share it stood on is revoked, and is not made on a revoked one
- *     (secaudit2026nov08 round 14).
+ *   2026-11-08 — The party listing drops an open-offer package once it is private; two approvals of one
+ *     priced request make one agreement that reads; a share-offer agreement stops reading when the share
+ *     it stood on is revoked, and is not made on a revoked one (secaudit2026nov08 round 14).
  *   v1.0.1 — 2026-11-03 — PARTICIPANT_BUSY names the Config label (secaudit2026nov02d round 13b).
  *   v1.0.0 — 2026-11-02 — Initial (secaudit2026nov02d round 13).
  */
@@ -359,6 +359,31 @@ async function run(): Promise<void> {
         const names = (l.body.data?.packages ?? []).map((p: Body) => p.datapackage?.name);
         assert(l.status === 200 && !names.includes(SC), `the listing still names the narrowed package: ${show(l)}`);
         assert(!l.text.includes('third'), `the listing carries facts of the private version: ${show(l)}`);
+    });
+
+    // Two approvals of one priced request that arrive together make one agreement, and it reads.
+    const RACE = `agrrace${stamp}`;
+    await test('Two approvals of one priced request at the same time: one agreement, one sale, and the agreement reads', async () => {
+        assert((await publish(A.token, RACE, 'private', 'race')).status === 201, 'publish the race package');
+        const sell = await call(`/v1/datapackages/${A.name}/${RACE}/exchange`, { token: A.token, method: 'PUT', body: {
+            model: 'per_month', prices_money: [{ amount: 2_000_000, currency: 'EUR' }], usage_terms: { derivatives: true, resale: false, attribution: true },
+        } });
+        assert(sell.status === 200, `list on EXCHANGE: ${show(sell)}`);
+        const offer = await offerOf(X, datasetId(A.name, RACE), 'exchange');
+        const consumer = `urn:uuid:race-${stamp}`;
+        const r = await request(X, offer, datasetId(A.name, RACE), consumer);
+        assert(r.status === 201, show(r));
+        const pid = r.body.providerPid;
+        await sleep(800);
+        const both = await Promise.all([0, 1].map(() => call(`/v1/dataspace/negotiations/${encodeURIComponent(pid)}/approve`, { token: A.token, body: {} })));
+        assert(both.some(a => a.status === 200), `one approval makes the agreement: ${both.map(show).join(' | ')}`);
+        assert(both.every(a => a.status === 200 || a.status === 409), `the other one is 200 or 409: ${both.map(show).join(' | ')}`);
+        const agreement = await finalise(X, pid, consumer);
+        const read = await pull(X, agreement, `urn:uuid:racet-${stamp}`);
+        const rows = await call(`${read.endpoint}/items`, { token: read.token });
+        assert(rows.status === 200, `the booked agreement reads: ${show(rows)}`);
+        const booked = await feeRecordsOf(agreementOfPid(pid));
+        assert(booked === 1, `one sale for one agreement: ${booked}`);
     });
 
     // A share-offer agreement stands on the share it was made on.

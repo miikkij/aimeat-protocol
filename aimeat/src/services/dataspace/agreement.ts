@@ -33,6 +33,8 @@
  * @structure Materialised · AgreementSale · materialiseAgreement · bookAgreementSale · endAgreement
  * @usage const m = await materialiseAgreement(deps, negotiation); if (!m.ok) terminate(m.message);
  * @version-history
+ *   2026-11-08 — endAgreement's keepSlot takes back only one call's addition when another call made the
+ *     same negotiation's agreement (secaudit2026nov08 round 14).
  *   2026-11-08 — A share offer's agreement records the share it stood on and is made only while that
  *     share is live (secaudit2026nov08 round 14).
  *   v1.1.0 — 2026-11-02 — The sale is booked once, when the agreement is made (bookAgreementSale), never
@@ -116,11 +118,13 @@ async function anotherLiveAgreement(storage: Storage, n: NegotiationRecord): Pro
 /**
  * Undo what an agreement added to the contract slot of its participant and package: revoke the slot
  * when no other agreement of the participant on the package is live, else take back its share only.
+ * `keepSlot` takes back its share only in every case: another call made the same negotiation's
+ * agreement, which stands on the same slot.
  */
-async function undoContract(storage: Storage, n: NegotiationRecord, ref: string, owner: string): Promise<void> {
+async function undoContract(storage: Storage, n: NegotiationRecord, ref: string, owner: string, keepSlot = false): Promise<void> {
     const ext = `datapkg:${owner}/${n.packageName}`;
-    if (n.priced && await anotherLiveAgreement(storage, n)) await takeBack(storage, ref, ext, n.priced.model);
-    else await revokeEntitlement(storage, ref, ext, 'read');
+    if (n.priced && (keepSlot || await anotherLiveAgreement(storage, n))) await takeBack(storage, ref, ext, n.priced.model);
+    else if (!keepSlot) await revokeEntitlement(storage, ref, ext, 'read');
 }
 
 /** The version a share offer's share pins: recorded at the request, or read from the share itself. */
@@ -217,15 +221,19 @@ export async function bookAgreementSale(deps: Deps, n: NegotiationRecord, sale: 
     });
 }
 
-/** End what an agreement made: its share, its part of the contract, and every transfer key of the share. */
-export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: string): Promise<number> {
+/**
+ * End what an agreement made: its share, its part of the contract, and every transfer key of the share.
+ * `opts.keepSlot`: another call made this negotiation's agreement on the same contract slot, so only
+ * what this call added is taken back and the slot stays.
+ */
+export async function endAgreement(deps: Deps, n: NegotiationRecord, reason: string, opts: { keepSlot?: boolean } = {}): Promise<number> {
     const { storage, config } = deps;
     const m = n.materialised;
     if (!m) return 0;
     const ended = await endShares(storage, n.ownerGhii, c => c.id === m.shareId, reason);
     const owner = localAccountName(n.ownerGhii);
     const ref = partyRefOf(owner, m.partyName, config.nodeId);
-    if (m.entitlementId && n.packageName) await undoContract(storage, n, ref, owner);
+    if (m.entitlementId && n.packageName) await undoContract(storage, n, ref, owner, opts.keepSlot === true);
     await changeParty(storage, n.ownerGhii, m.partyName, p => {
         const keys = p.keys.filter(k => k.share !== m.shareId);
         return keys.length === p.keys.length ? UNCHANGED : { ...p, keys };
