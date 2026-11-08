@@ -28,6 +28,8 @@
  *   operatorSetStopped · operatorDecide · mintReceiverKey · receiversUsingCsm
  * @usage const out = await createOrPropose(deps, caller, body, { propose: false });
  * @version-history
+ *   v1.2.1 — 2026-11-08 — The messages a person or an agent reads say incoming webhook and API key;
+ *     every code, scope and field stays as it was (secaudit2026nov08b round 15b).
  *   v1.2.0 — 2026-11-08 — Making, approving and rotating record who was answered the key
  *     (ReceiverRecord.keyAnsweredTo; secaudit2026nov08b round 15, rotated-key-holder-not-surfaced).
  *   v1.1.0 — 2026-11-08 — The operator's start returns a receiver to the state its stop replaced, so the
@@ -65,20 +67,20 @@ function baseUrlOf(config: AimeatConfig): string {
 }
 
 function refuseVisitor(caller: CallerContext): void {
-    if (caller.visitor) throw new ReceiverError(403, 'FORBIDDEN', 'A session from another node manages no receivers here.');
+    if (caller.visitor) throw new ReceiverError(403, 'FORBIDDEN', 'A session from another node manages no incoming webhooks here.');
 }
 
 function needRead(caller: CallerContext): void {
     refuseVisitor(caller);
     if (!caller.has(RECEIVERS_READ_SCOPE) && !caller.has(RECEIVERS_MANAGE_SCOPE)) {
-        throw new ReceiverError(403, 'SCOPE_DENIED', `Reading receivers needs the "${RECEIVERS_READ_SCOPE}" permission, which the owner gives on the agent's page.`);
+        throw new ReceiverError(403, 'SCOPE_DENIED', `Reading incoming webhooks needs the "${RECEIVERS_READ_SCOPE}" permission, which the owner gives on the agent's page.`);
     }
 }
 
 function needManage(caller: CallerContext, action: string): void {
     refuseVisitor(caller);
     if (!caller.has(RECEIVERS_MANAGE_SCOPE)) {
-        throw new ReceiverError(403, 'SCOPE_DENIED', `${action} needs the "${RECEIVERS_MANAGE_SCOPE}" permission, which only the owner gives, on the agent's page. Without it, propose the receiver and the owner approves it.`);
+        throw new ReceiverError(403, 'SCOPE_DENIED', `${action} needs the "${RECEIVERS_MANAGE_SCOPE}" permission, which only the owner gives, on the agent's page. Without it, propose the incoming webhook and the owner approves it.`);
     }
 }
 
@@ -108,7 +110,7 @@ export async function listForCaller(deps: ReceiverDeps, caller: CallerContext) {
 
 async function mustGet(deps: ReceiverDeps, ownerGhii: string, name: string): Promise<ReceiverRecord> {
     const r = await getReceiver(deps.storage, ownerGhii, name);
-    if (!r) throw new ReceiverError(404, 'NOT_FOUND', `You have no receiver called "${name}".`);
+    if (!r) throw new ReceiverError(404, 'NOT_FOUND', `You have no incoming webhook called "${name}".`);
     return r;
 }
 
@@ -149,13 +151,13 @@ async function checkTarget(deps: ReceiverDeps, caller: CallerContext, target: Re
             || !appMayWriteKey(['app'], probe, true, false)
             || (target.kind === 'prefix' && (isServerWrittenKey(target.prefix) || !appMayWriteKey(['app'], target.prefix, true, false)));
         if (refused) {
-            throw new ReceiverError(422, 'RESERVED_TARGET', `"${target.kind === 'key' ? target.key : target.prefix}" is a place the server itself keeps or trusts (settings, keys, the public profile). A receiver writes your own data only: choose another key.`);
+            throw new ReceiverError(422, 'RESERVED_TARGET', `"${target.kind === 'key' ? target.key : target.prefix}" is a place the server itself keeps or trusts (settings, keys, the public profile). An incoming webhook writes your own data only: choose another key.`);
         }
         return;
     }
     const membership = await deps.storage.getMembership(target.organismId, caller.owner);
     if (!membership) {
-        throw new ReceiverError(403, 'NOT_A_MEMBER', 'You are not a member of that organism, so a receiver of yours cannot write into its workspace.');
+        throw new ReceiverError(403, 'NOT_A_MEMBER', 'You are not a member of that organism, so an incoming webhook of yours cannot write into its workspace.');
     }
 }
 
@@ -174,12 +176,12 @@ async function resolveSchema(deps: ReceiverDeps, caller: CallerContext, csm: str
 }
 
 function sayCreated(r: ReceiverRecord, address: string, keyShown: boolean): string {
-    const where = r.target.kind === 'key' ? `the key ${r.target.key}`
+    const where = r.target.kind === 'key' ? `the memory key ${r.target.key}`
         : r.target.kind === 'prefix' ? `keys under ${r.target.prefix}. (at most ${r.target.maxKeys})`
             : `the row space ${r.target.space}`;
     const shape = r.schema ? ` Every message is checked against ${r.schema.csm} before it is stored.` : ' It takes any JSON; a CSM shape is recommended.';
     const state = r.state === 'awaiting_operator' ? ' It starts working when the operator of this node approves it.' : '';
-    const key = keyShown ? ' The key is shown only now: put it straight into the program\'s secret store.' : '';
+    const key = keyShown ? ' The API key is shown only now: put it straight into the program\'s secret store.' : '';
     return `The program writes to ${address}, into ${where}.${shape}${state}${key}`;
 }
 
@@ -192,7 +194,7 @@ export async function createOrPropose(
 ): Promise<{ receiver: Record<string, unknown>; key?: string; say: string; approve_url?: string }> {
     if (opts.propose) needRead(caller); else needManage(caller, 'Making a receiver');
     const mode = receiversModeOf(deps.config);
-    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this node has switched receivers off.');
+    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this node has switched incoming webhooks off.');
     const input = normalizeReceiverInput(body);
     if (typeof input === 'string') throw new ReceiverError(400, 'INVALID_INPUT', input);
     await checkTarget(deps, caller, input.target);
@@ -223,7 +225,7 @@ export async function createOrPropose(
         const approveUrl = `${baseUrlOf(deps.config)}/v1/profile?tab=receivers&approve=${encodeURIComponent(record.name)}`;
         return {
             receiver: v, approve_url: approveUrl,
-            say: `I proposed a receiver called ${record.displayName}. Approve it here: ${approveUrl}. Nothing is written and no key exists until you approve it, and the key is then shown to you, not to me.`,
+            say: `I proposed an incoming webhook called ${record.displayName}. Approve it here: ${approveUrl}. Nothing is written and no API key exists until you approve it, and the API key is then shown to you, not to me.`,
         };
     }
     return { receiver: v, key, say: sayCreated(record, v.address as string, true) };
@@ -235,16 +237,16 @@ export async function createOrPropose(
  */
 export async function decideProposal(deps: ReceiverDeps, caller: CallerContext, name: string, decision: 'approve' | 'refuse') {
     refuseVisitor(caller);
-    if (!caller.inPerson) throw new ReceiverError(403, 'OWNER_ONLY', 'Only the owner, signed in, approves a receiver someone proposed.');
+    if (!caller.inPerson) throw new ReceiverError(403, 'OWNER_ONLY', 'Only the owner, signed in, approves an incoming webhook someone proposed.');
     const cur = await mustGet(deps, caller.ownerGhii, name);
     if (cur.state !== 'proposed') throw new ReceiverError(409, 'NOT_PROPOSED', `"${name}" is not waiting for a decision.`);
     if (decision === 'refuse') {
         await deleteReceiverRecord(deps.storage, caller.ownerGhii, name);
         emitChange('receivers', caller.ownerGhii);
-        return { refused: true, say: `The proposed receiver ${cur.displayName} was removed. Nothing was written.` };
+        return { refused: true, say: `The proposed incoming webhook ${cur.displayName} was removed. Nothing was written.` };
     }
     const mode = receiversModeOf(deps.config);
-    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this node has switched receivers off.');
+    if (mode === 'off') throw new ReceiverError(403, 'RECEIVERS_OFF', 'The operator of this node has switched incoming webhooks off.');
     const k = mintReceiverKey();
     const now = new Date().toISOString();
     const out = await updateReceiver(deps.storage, caller.ownerGhii, name, r => (r.state !== 'proposed' ? UNCHANGED : {
@@ -259,9 +261,9 @@ export async function decideProposal(deps: ReceiverDeps, caller: CallerContext, 
 
 /** Change the limits, verbs, end date, names, visibility or the CSM version of one receiver. Target and CSM stay. */
 export async function updateSettings(deps: ReceiverDeps, caller: CallerContext, name: string, patch: Record<string, unknown>) {
-    needManage(caller, 'Changing a receiver');
+    needManage(caller, 'Changing an incoming webhook');
     if (patch.target !== undefined || patch.csm !== undefined || patch.name !== undefined) {
-        throw new ReceiverError(400, 'INVALID_INPUT', 'A receiver keeps its name, target and CSM. Make a new receiver for another place or another shape; csm_version moves it to a newer version of the same CSM.');
+        throw new ReceiverError(400, 'INVALID_INPUT', 'An incoming webhook keeps its name, target and CSM. Make a new incoming webhook for another place or another shape; csm_version moves it to a newer version of the same CSM.');
     }
     const cur = await mustGet(deps, caller.ownerGhii, name);
     // The same checks as at creation, read off a body made of the current record and the patch.
@@ -280,7 +282,7 @@ export async function updateSettings(deps: ReceiverDeps, caller: CallerContext, 
     if (typeof merged === 'string') throw new ReceiverError(400, 'INVALID_INPUT', merged);
     let schema = cur.schema;
     if (patch.csm_version !== undefined) {
-        if (!cur.schema) throw new ReceiverError(400, 'INVALID_INPUT', 'This receiver has no CSM to move to another version.');
+        if (!cur.schema) throw new ReceiverError(400, 'INVALID_INPUT', 'This incoming webhook has no CSM to move to another version.');
         schema = await resolveSchema(deps, caller, cur.schema.csm, Number(patch.csm_version));
     }
     const out = await updateReceiver(deps.storage, caller.ownerGhii, name, r => ({
@@ -295,7 +297,7 @@ export async function updateSettings(deps: ReceiverDeps, caller: CallerContext, 
 
 /** The owner pauses or resumes a receiver. A receiver the operator stopped stays stopped. */
 export async function setPaused(deps: ReceiverDeps, caller: CallerContext, name: string, paused: boolean) {
-    needManage(caller, paused ? 'Pausing a receiver' : 'Resuming a receiver');
+    needManage(caller, paused ? 'Pausing an incoming webhook' : 'Resuming an incoming webhook');
     const out = await updateReceiver(deps.storage, caller.ownerGhii, name, r => {
         if (r.state === 'stopped') throw new ReceiverError(403, 'STOPPED_BY_OPERATOR', `The operator stopped "${name}"${r.stopReason ? `: ${r.stopReason}` : ''}. Only the operator starts it again.`);
         if (r.state === 'proposed' || r.state === 'awaiting_operator') throw new ReceiverError(409, 'NOT_ACTIVE', `"${name}" is not working yet.`);
@@ -309,7 +311,7 @@ export async function setPaused(deps: ReceiverDeps, caller: CallerContext, name:
 
 /** A new key, answered once. The old one keeps working for `overlap_minutes` (0 ends it now). */
 export async function rotateKey(deps: ReceiverDeps, caller: CallerContext, name: string, overlapMinutes?: unknown) {
-    needManage(caller, 'Changing a receiver\'s key');
+    needManage(caller, 'Changing an incoming webhook\'s API key');
     const overlap = overlapMinutes === undefined || overlapMinutes === null ? RECEIVER_DEFAULTS.rotateOverlapMinutes : Number(overlapMinutes);
     if (!Number.isInteger(overlap) || overlap < 0 || overlap > RECEIVER_MAXIMA.rotateOverlapMinutes) {
         throw new ReceiverError(400, 'INVALID_INPUT', `overlap_minutes is a whole number from 0 to ${RECEIVER_MAXIMA.rotateOverlapMinutes}.`);
@@ -317,7 +319,7 @@ export async function rotateKey(deps: ReceiverDeps, caller: CallerContext, name:
     const k = mintReceiverKey();
     const now = Date.now();
     const out = await updateReceiver(deps.storage, caller.ownerGhii, name, r => {
-        if (!r.keyHash) throw new ReceiverError(409, 'NOT_ACTIVE', `"${name}" has no key yet: it waits for a decision.`);
+        if (!r.keyHash) throw new ReceiverError(409, 'NOT_ACTIVE', `"${name}" has no API key yet: it waits for a decision.`);
         // Who is answered the new key is recorded, so removing that agent or app names this receiver
         // as well as removing its maker does (./makers.ts; secaudit2026nov08b round 15).
         return {
@@ -331,27 +333,27 @@ export async function rotateKey(deps: ReceiverDeps, caller: CallerContext, name:
     return {
         receiver: view(deps, caller.owner, out), key: k.key,
         say: overlap > 0
-            ? `The new key is shown only now. The old key keeps working for ${overlap} minutes, so the program can be updated without a gap.`
-            : 'The new key is shown only now. The old key stopped working at once.',
+            ? `The new API key is shown only now. The old API key keeps working for ${overlap} minutes, so the program can be updated without a gap.`
+            : 'The new API key is shown only now. The old API key stopped working at once.',
     };
 }
 
 /** Delete a receiver. Its key stops at once; what it wrote stays the owner's. */
 export async function removeReceiver(deps: ReceiverDeps, caller: CallerContext, name: string) {
-    needManage(caller, 'Deleting a receiver');
+    needManage(caller, 'Deleting an incoming webhook');
     const nameErr = validateReceiverName(name);
     if (nameErr) throw new ReceiverError(400, 'INVALID_INPUT', nameErr);
     if (!(await deleteReceiverRecord(deps.storage, caller.ownerGhii, name))) {
-        throw new ReceiverError(404, 'NOT_FOUND', `You have no receiver called "${name}".`);
+        throw new ReceiverError(404, 'NOT_FOUND', `You have no incoming webhook called "${name}".`);
     }
     await deleteReceiverLog(deps.storage, caller.ownerGhii, name);
     emitChange('receivers', caller.ownerGhii);
-    return { deleted: true, say: 'The receiver is gone and its key no longer works. What it wrote stays in your data.' };
+    return { deleted: true, say: 'The incoming webhook is gone and its API key no longer works. What it wrote stays in your data.' };
 }
 
 async function needOperator(caller: CallerContext): Promise<void> {
     if (!(await caller.operator('operator:admin'))) {
-        throw new ReceiverError(403, 'OPERATOR_ONLY', 'Only the operator of this node sees and stops every receiver.');
+        throw new ReceiverError(403, 'OPERATOR_ONLY', 'Only the operator of this node sees and stops every incoming webhook.');
     }
 }
 
@@ -421,7 +423,7 @@ export async function operatorDecide(deps: ReceiverDeps, caller: CallerContext, 
         const d = { decision, at: new Date().toISOString(), by: caller.principal, ...(reason ? { reason: reason.slice(0, 500) } : {}) };
         return decision === 'approve'
             ? { ...r, state: 'active', operatorDecision: d }
-            : { ...r, state: 'stopped', stoppedAt: d.at, stopReason: reason?.slice(0, 500) ?? 'The operator did not approve this receiver.', operatorDecision: d, stoppedFrom: 'awaiting_operator' };
+            : { ...r, state: 'stopped', stoppedAt: d.at, stopReason: reason?.slice(0, 500) ?? 'The operator did not approve this incoming webhook.', operatorDecision: d, stoppedFrom: 'awaiting_operator' };
     });
     emitChange('receivers', ownerGhii);
     return { receiver: { owner, ...view(deps, owner, out) } };
@@ -436,7 +438,7 @@ export async function receiversUsingCsm(storage: Storage, csmName: string): Prom
     const all = await listAllReceivers(storage);
     return all.filter(x => x.receiver.schema?.csm === csmName)
         .map(x => ({
-            label: `receiver ${localAccountName(x.ownerGhii)}/${x.receiver.name}`,
+            label: `incoming webhook ${localAccountName(x.ownerGhii)}/${x.receiver.name}`,
             account: localAccountName(x.ownerGhii),
             name: x.receiver.name,
             link: '/v1/profile?tab=receivers',

@@ -34,6 +34,7 @@
  *   const compiled = await getCsmCompiled(storage, 'alice.sensor');  // { name, version, jsonSchema, hash }
  *   const out = await createCsmAs({ storage, config }, caller, { yaml });  // { ok, status, data } | refusal
  * @version-history
+ *   2026-11-08 — The removal notice says incoming webhooks where it said receivers (secaudit2026nov08b round 15b).
  *   2026-11-08 — isRegisteringAccount and the read test moved unchanged to services/csm/readers.ts, so the
  *     schema-lock rule and the memory write's lock check ask the same test (secaudit2026nov08b round 15).
  *   v1.1.0 — 2026-11-08 — Ruling 2 of 2026-11-08 in deleteCsmAs: a use check may name the account of a
@@ -157,8 +158,8 @@ async function tellOtherUsers(storage: Storage, config: AimeatConfig, name: stri
       await notify(storage, `${account}@${config.nodeId}`, {
         type: 'csm_removed',
         title: `The data description ${name} was removed`,
-        body: `Its owner or whoever runs this service removed the data description (CSM) ${name}. Your receivers that use it: ${names}. `
-          + 'They keep checking messages against the copy of its shape they hold, so they go on working. To use another shape, make a new receiver.',
+        body: `Its owner or whoever runs this service removed the data description (CSM) ${name}. Your incoming webhooks that use it: ${names}. `
+          + 'They keep checking messages against the copy of its shape they hold, so they go on working. To use another shape, make a new incoming webhook.',
         ...(link ? { link } : {}),
         i18n: { key: 'csm_removed', vars: { csm: name, uses: names } },
       });

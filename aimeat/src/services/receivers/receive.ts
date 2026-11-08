@@ -25,6 +25,8 @@
  * @structure ReceiveRequest · ReceiveAnswer · receive · describeReceiver · mergePatch
  * @usage const out = await receive(fanout, ctx, { method, sub, body, contentType, bytes, idempotencyKey, ifMatch, dryRun });
  * @version-history
+ *   v1.0.1 — 2026-11-08 — The refusal messages say incoming webhook where they said receiver; every
+ *     code stays (secaudit2026nov08b round 15b).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 import { createHash } from 'node:crypto';
@@ -143,22 +145,22 @@ async function run(deps: MemoryWriteFanout, ctx: ReceiverContext, rq: ReceiveReq
         if (verb !== 'read') throw new ReceiverError(405, 'METHOD_NOT_ALLOWED', 'The _self address answers GET only.');
         return { status: 200, data: describeReceiver(ctx, deps.config.baseUrl ?? '') };
     }
-    if (!verb) throw new ReceiverError(405, 'METHOD_NOT_ALLOWED', 'A receiver takes POST, PUT, PATCH, GET and DELETE.');
+    if (!verb) throw new ReceiverError(405, 'METHOD_NOT_ALLOWED', 'An incoming webhook takes POST, PUT, PATCH, GET and DELETE.');
     if (!r.verbs.includes(verb)) {
-        throw new ReceiverError(403, 'VERB_NOT_ALLOWED', `The owner has not let this receiver ${verb === 'merge' ? 'merge fields (PATCH)' : verb === 'read' ? 'read back (GET)' : verb === 'delete' ? 'delete (DELETE)' : verb}. Nothing was done.`);
+        throw new ReceiverError(403, 'VERB_NOT_ALLOWED', `The owner has not let this incoming webhook ${verb === 'merge' ? 'merge fields (PATCH)' : verb === 'read' ? 'read back (GET)' : verb === 'delete' ? 'delete (DELETE)' : verb}. Nothing was done.`);
     }
     const sends = verb === 'write' || verb === 'merge';
     if (sends && !/^application\/(?:[a-z0-9.+-]+\+)?json\b/i.test(rq.contentType)) {
-        throw new ReceiverError(415, 'UNSUPPORTED_MEDIA_TYPE', 'A receiver takes JSON: send Content-Type: application/json.');
+        throw new ReceiverError(415, 'UNSUPPORTED_MEDIA_TYPE', 'An incoming webhook takes JSON: send Content-Type: application/json.');
     }
     if (sends && rq.bytes > r.limits.maxBytes) {
-        throw new ReceiverError(413, 'TOO_LARGE', `The message is ${rq.bytes} bytes and this receiver takes at most ${r.limits.maxBytes}. Nothing was written.`);
+        throw new ReceiverError(413, 'TOO_LARGE', `The message is ${rq.bytes} bytes and this incoming webhook takes at most ${r.limits.maxBytes}. Nothing was written.`);
     }
     if (!takeMinuteSlot(r.uid, r.limits.perMinute)) {
-        throw new ReceiverError(429, 'RATE_LIMITED', `This receiver takes at most ${r.limits.perMinute} calls a minute. Try again in a minute.`, { retryAfter: 60 });
+        throw new ReceiverError(429, 'RATE_LIMITED', `This incoming webhook takes at most ${r.limits.perMinute} calls a minute. Try again in a minute.`, { retryAfter: 60 });
     }
     if (!rq.dryRun && sends && !takeDaySlot(r.uid, r.limits.perDay)) {
-        throw new ReceiverError(429, 'DAILY_LIMIT', `This receiver takes at most ${r.limits.perDay} messages a day (UTC). Try again tomorrow, or ask the owner for a higher limit.`, { retryAfter: 3600 });
+        throw new ReceiverError(429, 'DAILY_LIMIT', `This incoming webhook takes at most ${r.limits.perDay} messages a day (UTC). Try again tomorrow, or ask the owner for a higher limit.`, { retryAfter: 3600 });
     }
     if (r.target.kind === 'space') return runSpace(deps, ctx, rq, verb);
     return runMemory(deps, ctx, rq, verb);
@@ -168,13 +170,13 @@ async function run(deps: MemoryWriteFanout, ctx: ReceiverContext, rq: ReceiveReq
 function memoryKeyOf(ctx: ReceiverContext, rq: ReceiveRequest, verb: ReceiverVerb): string | null {
     const t = ctx.receiver.target;
     if (t.kind === 'key') {
-        if (rq.sub) throw new ReceiverError(404, 'NOT_FOUND', 'This receiver writes one key: its address takes no last part.');
+        if (rq.sub) throw new ReceiverError(404, 'NOT_FOUND', 'This incoming webhook writes one memory key: its address takes no last part.');
         return t.key;
     }
     if (t.kind !== 'prefix') return null;
     if (!rq.sub) {
         if (verb === 'read') return null;
-        throw new ReceiverError(400, 'SUB_REQUIRED', `This receiver writes keys under ${t.prefix}.: add the last part to the address, such as /olohuone.`);
+        throw new ReceiverError(400, 'SUB_REQUIRED', `This incoming webhook writes memory keys under ${t.prefix}.: add the last part to the address, such as /olohuone.`);
     }
     if (!RECEIVER_SUB_RE.test(rq.sub)) {
         throw new ReceiverError(400, 'INVALID_SUB', 'The last part of the address is lowercase letters, digits, dashes and underscores, starting with a letter or a digit, at most 64 characters.');
@@ -214,7 +216,7 @@ async function runMemory(deps: MemoryWriteFanout, ctx: ReceiverContext, rq: Rece
     if (r.target.kind === 'prefix' && !current) {
         const existing = await storage.listMemory(ctx.ownerGhii, { prefix: `${r.target.prefix}.` });
         if (existing.length >= r.target.maxKeys) {
-            throw new ReceiverError(409, 'PREFIX_FULL', `${r.target.prefix}. already holds ${existing.length} keys, the most this receiver may make. Write to an existing one, or ask the owner to raise the limit. Nothing was written.`);
+            throw new ReceiverError(409, 'PREFIX_FULL', `${r.target.prefix}. already holds ${existing.length} keys, the most this incoming webhook may make. Write to an existing one, or ask the owner to raise the limit. Nothing was written.`);
         }
     }
     if (rq.ifMatch !== null && (!current || current.version !== rq.ifMatch)) {
@@ -248,14 +250,14 @@ async function runSpace(deps: MemoryWriteFanout, ctx: ReceiverContext, rq: Recei
             const res = await readRows(rowDeps, caller, { organismId: t.organismId, wsId: t.ws, space: t.space, reader, limit: 200, order: 'desc' });
             const own = res.rows.filter(row => (row as { createdBy?: string }).createdBy === ctx.principal);
             const one = rq.sub ? own.filter(row => (row as { rowId?: string }).rowId === rq.sub) : own;
-            if (rq.sub && !one.length) throw new ReceiverError(404, 'NOT_FOUND', 'This receiver wrote no row with that id.');
+            if (rq.sub && !one.length) throw new ReceiverError(404, 'NOT_FOUND', 'This incoming webhook wrote no row with that id.');
             return { status: 200, data: { space: t.space, rows: one } };
         }
         if (verb === 'delete') {
             if (!rq.sub) throw new ReceiverError(400, 'SUB_REQUIRED', 'Name the row to delete: <address>/<row id>.');
             const res = await readRows(rowDeps, caller, { organismId: t.organismId, wsId: t.ws, space: t.space, reader, limit: 200, order: 'desc' });
             const mine = res.rows.some(row => (row as { rowId?: string; createdBy?: string }).rowId === rq.sub && (row as { createdBy?: string }).createdBy === ctx.principal);
-            if (!mine) throw new ReceiverError(404, 'NOT_FOUND', 'This receiver wrote no row with that id.');
+            if (!mine) throw new ReceiverError(404, 'NOT_FOUND', 'This incoming webhook wrote no row with that id.');
             if (rq.dryRun) return { status: 200, data: { dry_run: true, would_delete: rq.sub } };
             await deleteRow(rowDeps, caller, t.organismId, t.ws, t.space, rq.sub);
             return { status: 200, data: { row_id: rq.sub, deleted: true } };

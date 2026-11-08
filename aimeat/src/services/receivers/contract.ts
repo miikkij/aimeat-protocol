@@ -34,6 +34,8 @@
  *   takesReceiverKey · verbOfMethod · parseReceiver
  * @usage const ref = receiverPrincipalOf('alice', 'ruuvi', config.nodeId);   // receiver:alice/ruuvi@node
  * @version-history
+ *   v1.2.1 — 2026-11-08 — The validation messages say incoming webhook where they said receiver
+ *     (secaudit2026nov08b round 15b).
  *   v1.2.0 — 2026-11-08 — ReceiverRecord.keyAnsweredTo and previousKey.answeredTo: who was answered a
  *     key that still works; keyHoldersOf, and the view's `key_holders` (secaudit2026nov08b round 15,
  *     rotated-key-holder-not-surfaced).
@@ -216,16 +218,16 @@ export function isReceiverPrincipal(value: unknown): value is string {
 /** Null when `name` is a receiver name, else the reason it is not. */
 export function validateReceiverName(name: unknown): string | null {
     if (typeof name !== 'string' || !RECEIVER_NAME_RE.test(name)) {
-        return 'A receiver name is 1 to 40 characters: lowercase letters, digits and dashes, starting with a letter or a digit.';
+        return 'An incoming webhook\'s name is 1 to 40 characters: lowercase letters, digits and dashes, starting with a letter or a digit.';
     }
-    if (RESERVED_RECEIVER_NAMES.includes(name)) return `"${name}" is a word the receiver routes use. Choose another name.`;
+    if (RESERVED_RECEIVER_NAMES.includes(name)) return `"${name}" is a word the incoming webhook routes use. Choose another name.`;
     return null;
 }
 
 /** Null when `sub` may name a key under a prefix target, else the reason it may not. */
 export function validateReceiverSub(sub: unknown): string | null {
     if (typeof sub !== 'string' || !RECEIVER_SUB_RE.test(sub)) {
-        return 'The last part of the address is 1 to 64 characters: lowercase letters, digits, dashes and underscores, starting with a letter or a digit. It names one key under the receiver\'s prefix.';
+        return 'The last part of the address is 1 to 64 characters: lowercase letters, digits, dashes and underscores, starting with a letter or a digit. It names one memory key under the incoming webhook\'s prefix.';
     }
     return null;
 }
@@ -306,7 +308,7 @@ export function normalizeReceiverInput(body: Record<string, unknown>): ReceiverC
     if (typeof expiresDays === 'string') return expiresDays;
     const vis = body.visibility ?? 'private';
     if (vis !== 'private' && vis !== 'owner' && !(typeof vis === 'string' && ORGANISM_VIS_RE.test(vis))) {
-        return 'visibility is "private", "owner" or "organism:<id>". A receiver never writes public records: making data public is the owner\'s own act.';
+        return 'visibility is "private", "owner" or "organism:<id>". An incoming webhook never writes public records: making data public is the owner\'s own act.';
     }
     const displayName = typeof body.display_name === 'string' ? body.display_name : undefined;
     if (displayName !== undefined && displayName.length > 120) return 'display_name is at most 120 characters.';

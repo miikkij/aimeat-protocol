@@ -147,7 +147,7 @@ describe('the inward dialog offers a Windows line a live value cannot break out 
     );
     expect(shape.receiver.windows!.curl).toBe(
       'curl.exe -X POST "https://node.example/v1/receive/<owner>/' + shape.receiver.name + '"'
-      + ' -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>"'
+      + ' -H "Content-Type: application/json" -H "Authorization: Bearer <your API key>"'
       + ' --data-binary "@value.json"',
     );
     expect(shape.write.windows!.body).toBe(JSON.stringify(shape.write.request.body));

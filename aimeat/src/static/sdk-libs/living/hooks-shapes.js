@@ -23,6 +23,8 @@
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.4 -- 2026-11-08 -- The key's placeholder says `<your API key>`: a receiver is an incoming
+ *     webhook and its key an API key in every text (developer, 2026-11-08; secaudit2026nov08b round 15b).
  *   v0.7.3 -- 2026-11-08 -- The program road's address is the node's own (ctx.apex), not the app's
  *     origin, and it carries the signed-in account's name (ctx.owner) where it said <owner>; the
  *     placeholder stays only when the page does not know the name. The POSIX line single-quotes the
@@ -111,7 +113,7 @@ function windowsCall(address, bearer, body) {
 export const OWNER_PLACEHOLDER = '<owner>';
 
 /** What the call carries where the key goes: the key is shown once when it is made, never again. */
-export const KEY_PLACEHOLDER = '<the receiver key>';
+export const KEY_PLACEHOLDER = '<your API key>';
 
 /**
  * The account name for the address path, or '' when there is none this line can carry as it is. A

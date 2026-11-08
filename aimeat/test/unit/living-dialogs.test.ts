@@ -110,7 +110,7 @@ describe('the inward dialog: this value can come from outside', () => {
     expect(shape.receiver.name).toMatch(/^[a-z0-9][a-z0-9-]{0,39}$/);
     expect(shape.receiver.settings).toContain('/v1/profile?tab=receivers&new=key&key=living.solar.in.spot');
     expect(shape.receiver.curl).toContain('/v1/receive/<owner>/' + shape.receiver.name);
-    expect(shape.receiver.curl).toContain('Bearer <the receiver key>');
+    expect(shape.receiver.curl).toContain('Bearer <your API key>');
     expect(shape.receiver.curl).not.toContain('/v1/memory');
   });
 

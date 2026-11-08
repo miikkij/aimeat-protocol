@@ -253,7 +253,7 @@ tags:
   - name: Parties
     description: Outside parties (people and programs with no account here) and the named shares of data packages to them
   - name: Receivers
-    description: An address and a key an outside program writes into exactly one place of an owner's data with, over plain REST
+    description: Incoming webhooks, the tag's older name kept for the routes /v1/receivers and /v1/receive. An incoming webhook is an address and an API key an outside program writes into exactly one place of an owner's data with, over plain REST
   - name: Dataspace
     description: The Eclipse Dataspace Protocol 2025-1 provider (catalog, contract negotiation, pull transfer) and the owner's and operator's reads of it
   - name: Workflows
@@ -336,7 +336,7 @@ components:
       scheme: bearer
       bearerFormat: aimeat_rcv_<key>
       description: >
-        A receiver's own key, made when the owner creates or approves the receiver and shown once.
+        An incoming webhook's own API key, made when the owner creates or approves the incoming webhook and shown once.
         Accepted only on /v1/receive/{owner}/{name}[/{sub}]; on every other endpoint it answers 401.
         It is never accepted in the address. The node keeps only its SHA-256. While the owner's
         account is deactivated, the key answers 403 ACCOUNT_DISABLED and nothing is written; it works
@@ -1351,7 +1351,7 @@ components:
             `assisted` = a person wrote it and a model edited or refined it. `synthesized` = a model
             combined real sources into new content at someone's direction. `ai-generated` = a model
             produced it. `machine` = a program produced it with no model and no person writing it
-            (a sensor reading, an export from another system); a write through a receiver is recorded
+            (a sensor reading, an export from another system); a write through an incoming webhook is recorded
             at this level.
         method:
           type: string
@@ -8935,7 +8935,7 @@ paths:
         automation recipe, its `eco-capability` schedules, and any pending (awaiting-approval) advisories.
         The owner's DEPOSITED refined data (the app's `eco:` writes into the owner's Memory, e.g.
         `feedback.stats.*`) is PRESERVED (peer sovereignty). Re-onboarding the app later starts over
-        from scratch (a brand-new record). The receivers the app made, and those whose key it
+        from scratch (a brand-new record). The incoming webhooks the app made, and those whose API key it
         changed and so holds, are the owner's and keep working; `receivers_kept` names them (`why`
         is `made` or `key`) and the owner gets a notice when there are any.
         Returns `{ deleted: true, app, geai, receivers_kept }`.
@@ -30059,15 +30059,15 @@ paths:
         '404': { description: NOT_FOUND }
   /v1/receive/{owner}/{name}:
     parameters:
-      - { name: owner, in: path, required: true, schema: { type: string }, description: The account the receiver belongs to. }
+      - { name: owner, in: path, required: true, schema: { type: string }, description: The account the incoming webhook belongs to. }
       - { name: name, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,39}$' } }
     post:
       operationId: receiverWrite
-      summary: A program writes through a receiver
+      summary: A program writes through an incoming webhook
       description: |
-        The credential is the receiver's own key, `Authorization: Bearer aimeat_rcv_…`, never a session and never in the address (400 KEY_IN_ADDRESS).
-        A missing key, a wrong key and a receiver that does not exist all answer the same 401. A key target writes its one memory key; a row
-        space target appends one row, or `{ "rows": [...] }` (1 to 500). When the receiver has a CSM, the value (each row's body) is checked
+        The address of an incoming webhook (the routes keep the older name "receive"). The credential is the webhook's own API key, `Authorization: Bearer aimeat_rcv_…`, never a session and never in the address (400 KEY_IN_ADDRESS).
+        A missing API key, a wrong API key and an incoming webhook that does not exist all answer the same 401. A key target writes its one memory key; a row
+        space target appends one row, or `{ "rows": [...] }` (1 to 500). When the incoming webhook has a CSM, the value (each row's body) is checked
         against the compiled schema first and a mismatch is 422 SCHEMA_VALIDATION_FAILED with `details.fields` naming each path; without one any JSON is
         taken and the node's own write checks still apply. `?dry_run=true` checks and answers what would be written without storing anything.
         `Idempotency-Key` names the row a retry replaces. A memory record written here carries provenance level `machine`.
@@ -30082,7 +30082,7 @@ paths:
         '200': { description: 'Replaced an existing record, or a dry run: `{ key, version }` or `{ dry_run, would_write }`' }
         '201': { description: 'Written: `{ key, version }` for memory, `{ space, written, row_ids }` for a row space' }
         '400': { description: 'KEY_IN_ADDRESS, SUB_REQUIRED, INVALID_SUB, INVALID_INPUT' }
-        '401': { description: 'UNAUTHORIZED (no key, a wrong key, or no such receiver)' }
+        '401': { description: 'UNAUTHORIZED (no API key, a wrong API key, or no such incoming webhook)' }
         '403': { description: 'VERB_NOT_ALLOWED, PAUSED, STOPPED, EXPIRED, NOT_APPROVED, RESERVED_KEY' }
         '409': { description: 'VERSION_CONFLICT, PREFIX_FULL' }
         '413': { description: TOO_LARGE }
@@ -30092,7 +30092,7 @@ paths:
         '503': { description: RECEIVERS_OFF }
     put:
       operationId: receiverReplace
-      summary: Replace the record (or a named row) through a receiver
+      summary: Replace the record (or a named row) through an incoming webhook
       description: The same as POST. With If-Match the write is refused when the record moved on (409 VERSION_CONFLICT).
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
@@ -30103,8 +30103,8 @@ paths:
         '401': { description: UNAUTHORIZED }
     patch:
       operationId: receiverMerge
-      summary: Merge fields into the record through a receiver
-      description: JSON Merge Patch (RFC 7396) into the receiver's record, written on the version read; the whole result is checked against the CSM. Needs the verb `merge`; a row space answers 405.
+      summary: Merge fields into the record through an incoming webhook
+      description: JSON Merge Patch (RFC 7396) into the incoming webhook's record, written on the version read; the whole result is checked against the CSM. Needs the verb `merge`; a row space answers 405.
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       requestBody: { required: true, content: { application/json: { schema: {} } } }
@@ -30113,8 +30113,8 @@ paths:
         '403': { description: VERB_NOT_ALLOWED }
     get:
       operationId: receiverRead
-      summary: Read back the receiver's own target
-      description: Needs the verb `read`. A key target answers its value; a prefix target lists its keys; a row space answers only the rows this receiver wrote.
+      summary: Read back the incoming webhook's own target
+      description: Needs the verb `read`. A key target answers its value; a prefix target lists its keys; a row space answers only the rows this incoming webhook wrote.
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       responses:
@@ -30123,7 +30123,7 @@ paths:
         '404': { description: NOT_FOUND }
     delete:
       operationId: receiverDelete
-      summary: Delete the receiver's own key through a receiver
+      summary: Delete the incoming webhook's own memory key through the webhook
       description: Needs the verb `delete`. The record goes to the bin for the grace period, as the owner's own delete does.
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
@@ -30134,16 +30134,16 @@ paths:
     parameters:
       - { name: owner, in: path, required: true, schema: { type: string } }
       - { name: name, in: path, required: true, schema: { type: string } }
-      - { name: sub, in: path, required: true, schema: { type: string }, description: 'For a prefix target the key''s last part (`[a-z0-9][a-z0-9_-]{0,63}`, the key is `<prefix>.<sub>`); for a row space a row id; `_self` answers what the receiver takes (GET).' }
+      - { name: sub, in: path, required: true, schema: { type: string }, description: 'For a prefix target the key''s last part (`[a-z0-9][a-z0-9_-]{0,63}`, the key is `<prefix>.<sub>`); for a row space a row id; `_self` answers what the incoming webhook takes (GET).' }
     post:
       operationId: receiverWriteSub
-      summary: A program writes one key under the receiver's prefix, or one named row
+      summary: A program writes one key under the incoming webhook's prefix, or one named row
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       requestBody: { required: true, content: { application/json: { schema: {} } } }
       responses:
         '201': { description: '`{ key, version }` or `{ space, written, row_ids }`' }
-        '409': { description: 'PREFIX_FULL (the prefix holds the most keys this receiver may make)' }
+        '409': { description: 'PREFIX_FULL (the prefix holds the most keys this incoming webhook may make)' }
         '422': { description: SCHEMA_VALIDATION_FAILED }
     put:
       operationId: receiverReplaceSub
@@ -30163,15 +30163,15 @@ paths:
         '200': { description: '`{ key, version }`' }
     get:
       operationId: receiverReadSub
-      summary: Read one key under the prefix or one row this receiver wrote, or `_self`
-      description: '`/_self` answers the receiver''s target, verbs, limits and the JSON schema it checks against; it needs no verb.'
+      summary: Read one key under the prefix or one row this incoming webhook wrote, or `_self`
+      description: '`/_self` answers the incoming webhook''s target, verbs, limits and the JSON schema it checks against; it needs no verb.'
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       responses:
         '200': { description: '`{ key, value, version }`, `{ space, rows }` or the `_self` description' }
     delete:
       operationId: receiverDeleteSub
-      summary: Delete one key under the prefix, or one row this receiver wrote
+      summary: Delete one key under the prefix, or one row this incoming webhook wrote
       tags: [Receivers]
       security: [{ ReceiverKey: [] }]
       responses:
@@ -30179,8 +30179,8 @@ paths:
   /v1/receivers:
     get:
       operationId: listReceivers
-      summary: The owner's receivers
-      description: The owner, or a principal holding receivers:read or receivers:manage. Each with its address, target, CSM, verbs, limits, state and today's counts; never a key. `created_by` is the principal that made or proposed it, and `key_holders` the principals that were answered a key that still works (the current key, and the replaced one while its overlap lasts); a key made before 2026-11-08 names no one in `key_holders`.
+      summary: The owner's incoming webhooks
+      description: The owner's incoming webhooks (the routes keep the older name "receivers"). The owner, or a principal holding receivers:read or receivers:manage. Each with its address, target, CSM, verbs, limits, state and today's counts; never an API key. `created_by` is the principal that made or proposed it, and `key_holders` the principals that were answered an API key that still works (the current one, and the replaced one while its overlap lasts); an API key made before 2026-11-08 names no one in `key_holders`.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       responses:
@@ -30188,12 +30188,12 @@ paths:
         '403': { description: SCOPE_DENIED }
     post:
       operationId: createReceiver
-      summary: Make a receiver
+      summary: Make an incoming webhook
       description: |
         The owner, or a principal holding receivers:manage (outside every wildcard). Body `{ name, target, csm?, csm_version?, verbs?, limits?,
         visibility?, display_name?, description?, expires_days? }`; `target` is exactly one of `{ key }`, `{ prefix, max_keys? }` or
-        `{ organism_id, ws, space }`. The answer carries `key` ONCE (Cache-Control no-store). With visibility.receivers_mode `operator`
-        the receiver waits for an operator; with `off` it is refused (403 RECEIVERS_OFF).
+        `{ organism_id, ws, space }`. The answer carries the API key as `key` ONCE (Cache-Control no-store). With visibility.receivers_mode `operator`
+        the incoming webhook waits for an operator; with `off` it is refused (403 RECEIVERS_OFF).
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
@@ -30207,8 +30207,8 @@ paths:
   /v1/receivers/proposals:
     post:
       operationId: proposeReceiver
-      summary: Propose a receiver the owner approves
-      description: A principal holding receivers:read stores a receiver WITHOUT a key. The owner approves it in person (POST /v1/receivers/{name}/decide); the key is answered to the owner then.
+      summary: Propose an incoming webhook the owner approves
+      description: A principal holding receivers:read stores an incoming webhook WITHOUT an API key. The owner approves it in person (POST /v1/receivers/{name}/decide); the API key is answered to the owner then.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
@@ -30219,7 +30219,7 @@ paths:
       - { name: name, in: path, required: true, schema: { type: string } }
     get:
       operationId: getReceiver
-      summary: One receiver and its newest deliveries
+      summary: One incoming webhook and its newest deliveries
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       responses:
@@ -30227,7 +30227,7 @@ paths:
         '404': { description: NOT_FOUND }
     patch:
       operationId: updateReceiver
-      summary: Change a receiver's limits, verbs, end date, names, visibility or CSM version
+      summary: Change an incoming webhook's limits, verbs, end date, names, visibility or CSM version
       description: receivers:manage. The name, the target and the CSM never change (400); `csm_version` moves to another version of the same CSM.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
@@ -30236,8 +30236,8 @@ paths:
         '200': { description: '`{ receiver }`' }
     delete:
       operationId: deleteReceiver
-      summary: Delete a receiver
-      description: receivers:manage. The key stops at once; what it wrote stays the owner's.
+      summary: Delete an incoming webhook
+      description: receivers:manage. The API key stops at once; what it wrote stays the owner's.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       responses:
@@ -30246,7 +30246,7 @@ paths:
   /v1/receivers/{name}/deliveries:
     get:
       operationId: receiverDeliveries
-      summary: A receiver's deliveries
+      summary: An incoming webhook's deliveries
       description: The 200 newest, newest first; `?refused=true` for the refused ones. Time, verb, status, code and reason, size and the key or rows reached; never the content.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
@@ -30258,8 +30258,8 @@ paths:
   /v1/receivers/{name}/decide:
     post:
       operationId: decideReceiverProposal
-      summary: The owner approves or refuses a proposed receiver
-      description: 'The owner in person only (403 OWNER_ONLY). `{ decision: approve | refuse }`. Approving answers the key once.'
+      summary: The owner approves or refuses a proposed incoming webhook
+      description: 'The owner in person only (403 OWNER_ONLY). `{ decision: approve | refuse }`. Approving answers the API key once.'
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30271,7 +30271,7 @@ paths:
   /v1/receivers/{name}/pause:
     post:
       operationId: pauseReceiver
-      summary: Pause a receiver
+      summary: Pause an incoming webhook
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30282,7 +30282,7 @@ paths:
   /v1/receivers/{name}/resume:
     post:
       operationId: resumeReceiver
-      summary: Resume a paused receiver
+      summary: Resume a paused incoming webhook
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30293,8 +30293,8 @@ paths:
   /v1/receivers/{name}/rotate:
     post:
       operationId: rotateReceiverKey
-      summary: A new key for a receiver
-      description: '`{ overlap_minutes? }` (default 15, 0 ends the old key now). The answer carries the new key once, and the caller is recorded as its holder (`key_holders`): when that agent or ecosystem app is removed, its delete answer names this receiver in `receivers_kept` and the owner gets a notice.'
+      summary: A new API key for an incoming webhook
+      description: '`{ overlap_minutes? }` (default 15, 0 ends the old API key now). The answer carries the new API key once, and the caller is recorded as its holder (`key_holders`): when that agent or ecosystem app is removed, its delete answer names this incoming webhook in `receivers_kept` and the owner gets a notice.'
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30305,8 +30305,8 @@ paths:
   /v1/admin/receivers:
     get:
       operationId: adminListReceivers
-      summary: Every receiver on the node (operator)
-      description: The mode, the counts and every receiver with its owner; no key and no content. `?owner=` filters.
+      summary: Every incoming webhook on the node (operator)
+      description: The mode, the counts and every incoming webhook with its owner; no API key and no content. `?owner=` filters.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30317,7 +30317,7 @@ paths:
   /v1/admin/receivers/{owner}/{name}/stop:
     post:
       operationId: adminStopReceiver
-      summary: Stop any account's receiver (operator)
+      summary: Stop any account's incoming webhook (operator)
       description: '`{ reason }` (required), which the owner reads. Only the operator starts it again.'
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
@@ -30330,7 +30330,7 @@ paths:
   /v1/admin/receivers/{owner}/{name}/start:
     post:
       operationId: adminStartReceiver
-      summary: Start a receiver the operator stopped
+      summary: Start an incoming webhook the operator stopped
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -30341,7 +30341,7 @@ paths:
   /v1/admin/receivers/{owner}/{name}/decide:
     post:
       operationId: adminDecideReceiver
-      summary: Approve or refuse a receiver waiting for the operator
+      summary: Approve or refuse an incoming webhook waiting for the operator
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -44284,9 +44284,9 @@ paths:
         versions. Requires the owner or a principal holding `csm:write`, on the
         CSMs of its own account; the node's operator may delete another
         account's CSM, which writes the operator trail. While the registering
-        account itself uses the CSM (its own receivers) the answer is 409
+        account itself uses the CSM (its own incoming webhooks) the answer is 409
         IN_USE with `details.users`, which names only those uses. Another
-        account's receiver does not block the delete: it keeps checking
+        account's incoming webhook does not block the delete: it keeps checking
         messages against the copy of the schema it holds, its owner gets a
         `csm_removed` notice, and `data.other_accounts_told` counts those
         accounts. The registering account is the account that held the name
@@ -77743,7 +77743,7 @@ paths:
                               workflows: { type: integer }
                           receivers_kept:
                             type: object
-                            description: The receivers this agent made, and those whose key it changed and so holds. They are the owner's and keep working after the agent is gone, because a program may hold their keys; the owner gets a notice when there are any, and pauses or deletes them on the Receivers page.
+                            description: The incoming webhooks this agent made, and those whose API key it changed and so holds. They are the owner's and keep working after the agent is gone, because a program may hold their API keys; the owner gets a notice when there are any, and pauses or deletes them on the Incoming webhooks page.
                             properties:
                               count: { type: integer }
                               receivers:

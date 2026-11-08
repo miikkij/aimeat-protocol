@@ -112,7 +112,7 @@ describe('the inward dialog\'s curl lines quote their body for the shell', () =>
     // bash read `<owner>` as a redirection. Everything else on the line is as before.
     expect(shape.receiver.curl).toBe(
       "curl -X POST 'https://node.example/v1/receive/<owner>/" + shape.receiver.name + "'"
-      + ' -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>"'
+      + ' -H "Content-Type: application/json" -H "Authorization: Bearer <your API key>"'
       + " -d '{\"value\":4.2}'",
     );
     expect(shape.write.curl).toBe(
