@@ -22,14 +22,14 @@
       "digest": "sha256:d24274848f11e133ffba8b1a"
     },
     "node:aimeat-refinery": {
-      "reviewedOn": "2026-11-05",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/services/refinery/message.ts",
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:255a43a31ee4bd4a603a5475"
+      "digest": "sha256:3e8f6205908b1583c01411b2"
     },
     "node:aimeat-content-classes": {
       "reviewedOn": "2026-11-06",
@@ -296,13 +296,13 @@
       "digest": "sha256:08dfb8dd0ba387e489e9a4e8"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-11-07",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:ff4ecf0f954925bd8f99e734"
+      "digest": "sha256:0c5f61f80837c08426f18038"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-11-07",
@@ -371,7 +371,7 @@
       "digest": "sha256:7dd1ef283c4a5c7ac80b57cc"
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-11-07",
+      "reviewedOn": "2026-11-08",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -381,7 +381,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:4fc6b7208d5efd69a09a02d3"
+      "digest": "sha256:7accaba694111d909b78caa1"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-11-08",
@@ -395,7 +395,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:48ecf246d6340bdedd960c42",
+      "digest": "sha256:9ffac3799de221c7ba685780",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -669,7 +669,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "2618cea800a5c7ed"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "d597081d8547baf5",
+      "aimeat/src/routes/ai.ts": "5fdb428636fbf718",
       "aimeat/src/routes/ai-providers.ts": "f36dfc6dc8278951",
       "aimeat/src/services/ai/routing.ts": "e6c717ef353fd296"
     },
@@ -744,7 +744,7 @@
       "aimeat/src/services/ai-jobs/ext-capability.ts": "bebc48a0defe8ffa"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "361927b326eedd14",
+      "aimeat/src/services/refinery/pipeline.ts": "fc234b1ffcf6442b",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "a2229bb9b8d28948",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
@@ -777,7 +777,7 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "7f71b22f4406f7f1",
+      "aimeat/src/routes/memory/bulk.ts": "789b9f81b582b966",
       "aimeat/src/routes/memory/key.ts": "3c8ab9c45cc81ee5",
       "aimeat/src/services/memory-bin.ts": "af03c3dad61b242b",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
@@ -811,7 +811,7 @@
       "aimeat/src/services/extension-ctx-contract.ts": "30bf2de59d4c1cdf",
       "aimeat/src/services/connect-tunnel-push.ts": "ad643bb8e13a78c5",
       "aimeat/src/services/workspace-rows/row-service.ts": "78c57e3d5f2025be",
-      "aimeat/src/services/refinery/pipeline.ts": "361927b326eedd14",
+      "aimeat/src/services/refinery/pipeline.ts": "fc234b1ffcf6442b",
       "aimeat/src/routes/outbound.ts": "d5e03c7e8dcc48ef"
     },
     "node:aimeat-html-page": {

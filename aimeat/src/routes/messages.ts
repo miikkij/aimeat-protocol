@@ -21,6 +21,7 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-11-08 — An attachment's transcription read asks the labels a data package version keeps of a package file (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  *   2026-11-08 — GET /requests answers from MessagesInboxService.pendingRequests, the read the overview
  *     already made, and each request carries `body`, its first message with line breaks.
  *   2026-11-04 — No per-id read for a storage without getDirectMessagesByIds: it is required on Storage
@@ -648,7 +649,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     let file: Awaited<ReturnType<typeof readAiFile>>;
     const reader = readerFor({ storage, config }, req.auth);
     try {
-      file = await readAiFile(storage, reader, ghii, key, { capability: 'transcription' });
+      file = await readAiFile({ storage, config }, reader, ghii, key, { capability: 'transcription' });
     } catch (e) {
       if (e instanceof ClassificationError) {
         res.status(e.status).json(error(config.nodeId, e.code, e.message));

@@ -10,19 +10,21 @@
  *   A storage key is resolved in the CALLER's own namespace, as /v1/ai/transcribe does, and a key
  *   that is not there answers 404: whether someone else's file exists is not something this says.
  *   An https URL is not accepted: the provider would fetch an address a caller chose, from outside.
- * @structure CALL_FILE_LIMITS · readCallFiles(storage, reader, callerGaii, files) · readCallerAudio(storage, reader, callerGaii, key)
- *   · IMAGE_INPUT_LIMITS · readImageInputs(storage, reader, callerGaii, { references, mask }, payerGaii?)
+ * @structure CALL_FILE_LIMITS · readCallFiles(deps, reader, callerGaii, files) · readCallerAudio(deps, reader, callerGaii, key)
+ *   · IMAGE_INPUT_LIMITS · readImageInputs(deps, reader, callerGaii, { references, mask }, payerGaii?)
  * @version-history
+ *   v1.3.0 — 2026-11-08 — Each reader takes { storage, config } (or a bare storage, as before) for
+ *     readAiFile, which asks the labels a data package version keeps of a package file
+ *     (secaudit2026nov08b round 15b).
  *   v1.2.0 — 2026-10-18 — readImageInputs: the reference pictures and the mask of an image call, read
  *     the same way and under the same classification gate (Comicland v3 A-1, A-2).
  *   v1.1.0 — 2026-09-29 — Both read through readAiFile (services/ai-inputs.ts) with the caller's
  *     classification reader, so a file a model may not read is refused before the call (TARGET-082).
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
  */
-import type { Storage } from '../../storage/interface.js';
 import { AiCompletionError } from './errors.js';
 import type { TextFile } from './gateway.js';
-import { readAiFile } from './inputs.js';
+import { readAiFile, aiFileDeps, type AiFileSource } from './inputs.js';
 import type { ContentReader } from '../classification/reader.js';
 import { sniffImage } from '../openrouter.js';
 
@@ -46,10 +48,10 @@ const DATA_URL = /^data:([\w.+-]+\/[\w.+-]+);base64,([A-Za-z0-9+/=\s]+)$/;
  * which the caller answers as 404: whether someone else's file exists is not something it says.
  */
 export async function readCallerAudio(
-  storage: Storage, reader: ContentReader, callerGaii: string, storageKey: string, opts: { mime?: string; filename?: string } = {},
+  deps: AiFileSource, reader: ContentReader, callerGaii: string, storageKey: string, opts: { mime?: string; filename?: string } = {},
 ): Promise<{ data: Buffer; mime: string; filename: string } | null> {
   // The one loader of content a model reads (services/ai/inputs.ts): classification first.
-  const file = await readAiFile(storage, reader, callerGaii, storageKey, { capability: 'transcription' });
+  const file = await readAiFile(deps, reader, callerGaii, storageKey, { capability: 'transcription' });
   if (!file) return null;
   return {
     data: file.data,
@@ -58,7 +60,7 @@ export async function readCallerAudio(
   };
 }
 
-export async function readCallFiles(storage: Storage, reader: ContentReader, callerGaii: string, files: unknown): Promise<TextFile[]> {
+export async function readCallFiles(deps: AiFileSource, reader: ContentReader, callerGaii: string, files: unknown): Promise<TextFile[]> {
   if (!Array.isArray(files) || files.length === 0) {
     throw new AiCompletionError('INVALID_BODY', 400, 'files must be a list of { storage_key } or { data_url } objects.');
   }
@@ -73,7 +75,7 @@ export async function readCallFiles(storage: Storage, reader: ContentReader, cal
     let mediaType: string;
     let filename = typeof raw.filename === 'string' && raw.filename ? raw.filename.slice(0, 200) : undefined;
     if (typeof raw.storage_key === 'string' && raw.storage_key) {
-      const file = await readAiFile(storage, reader, callerGaii, raw.storage_key, { capability: 'text' });
+      const file = await readAiFile(deps, reader, callerGaii, raw.storage_key, { capability: 'text' });
       if (!file) throw new AiCompletionError('NOT_FOUND', 404, `No such file in your storage: ${raw.storage_key}.`);
       data = file.data;
       mediaType = (typeof raw.mime === 'string' && raw.mime) || file.mimeType || 'application/octet-stream';
@@ -118,14 +120,14 @@ const IMAGE_INPUT_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'ima
  * in the refusal.
  */
 async function readImageInput(
-  storage: Storage, reader: ContentReader, callerGaii: string, raw: unknown, field: string, payerGaii: string | undefined,
+  deps: AiFileSource, reader: ContentReader, callerGaii: string, raw: unknown, field: string, payerGaii: string | undefined,
 ): Promise<ImageInput> {
   if (!raw || typeof raw !== 'object') throw new AiCompletionError('INVALID_BODY', 400, `${field}: each entry is an object with storage_key or data_url.`);
   const input = raw as CallFileInput;
   let data: Buffer;
   if (typeof input.storage_key === 'string' && input.storage_key) {
-    const file = await readAiFile(storage, reader, callerGaii, input.storage_key, { capability: 'image' })
-      ?? await readOwnPictureInPayerStorage(storage, reader, callerGaii, payerGaii, input.storage_key);
+    const file = await readAiFile(deps, reader, callerGaii, input.storage_key, { capability: 'image' })
+      ?? await readOwnPictureInPayerStorage(deps, reader, callerGaii, payerGaii, input.storage_key);
     if (!file) throw new AiCompletionError('NOT_FOUND', 404, `${field}: no such file in your storage: ${input.storage_key}.`);
     data = file.data;
   } else if (typeof input.data_url === 'string' && input.data_url) {
@@ -149,14 +151,15 @@ async function readImageInput(
  * because an agent reading its owner's private files goes through the ordinary checks.
  */
 async function readOwnPictureInPayerStorage(
-  storage: Storage, reader: ContentReader, callerGaii: string, payerGaii: string | undefined, key: string,
+  deps: AiFileSource, reader: ContentReader, callerGaii: string, payerGaii: string | undefined, key: string,
 ) {
   if (!payerGaii || payerGaii === callerGaii) return null;
+  const { storage } = aiFileDeps(deps);
   const file = await storage.getStorageFile(payerGaii, key);
   if (!file?.aiProvenanceId) return null;
   const record = await storage.getAiProvenance(file.aiProvenanceId);
   if (record?.principal !== callerGaii) return null;
-  return readAiFile(storage, reader, payerGaii, key, { capability: 'image' });
+  return readAiFile(deps, reader, payerGaii, key, { capability: 'image' });
 }
 
 /**
@@ -166,7 +169,7 @@ async function readOwnPictureInPayerStorage(
  * agent's call also finds the pictures it made itself in its owner's storage (`payerGaii`).
  */
 export async function readImageInputs(
-  storage: Storage, reader: ContentReader, callerGaii: string,
+  deps: AiFileSource, reader: ContentReader, callerGaii: string,
   input: { references?: unknown; mask?: unknown },
   payerGaii?: string,
 ): Promise<{ references: ImageInput[]; mask?: ImageInput }> {
@@ -176,10 +179,10 @@ export async function readImageInputs(
     throw new AiCompletionError('INVALID_BODY', 400, `reference_images: at most ${IMAGE_INPUT_LIMITS.maxImages} per call.`);
   }
   const references: ImageInput[] = [];
-  for (const r of refs) references.push(await readImageInput(storage, reader, callerGaii, r, 'reference_images', payerGaii));
+  for (const r of refs) references.push(await readImageInput(deps, reader, callerGaii, r, 'reference_images', payerGaii));
   const mask = input.mask === undefined || input.mask === null
     ? undefined
-    : await readImageInput(storage, reader, callerGaii, input.mask, 'mask', payerGaii);
+    : await readImageInput(deps, reader, callerGaii, input.mask, 'mask', payerGaii);
   if (mask && references.length === 0) {
     throw new AiCompletionError('INVALID_BODY', 400, 'mask edits the first reference image, so it needs reference_images with the picture to edit first.');
   }

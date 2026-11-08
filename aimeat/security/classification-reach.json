@@ -155,7 +155,7 @@
         "listStorageFiles": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): the file read asks through storedFileShownTo; an agent's namespace holds no data package version, so it asks the file's own label only."
     },
     "src/mcp/core.ts": {
       "reads": {
@@ -496,7 +496,7 @@
         "getMemoryByKeys": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-04 (codebase analysis item D-e): getMemoryByKeys is the rename-mode lookup of which of the caller's own keys already exist; only the keys are used. The read was there before; the check counts it since the call lost its non-null assertion."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-04 (codebase analysis item D-e): getMemoryByKeys is the rename-mode lookup of which of the caller's own keys already exist; only the keys are used. The read was there before; the check counts it since the call lost its non-null assertion. 2026-11-08 (secaudit2026nov08b round 15b): a bundled file is asked through storedFileShownTo, which adds the labels a data package version keeps for a package file."
     },
     "src/routes/memory/copy.ts": {
       "reads": {
@@ -524,7 +524,7 @@
         "listStorageFiles": 3,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/memory/files/:key asks through storedFileShownTo, which adds the labels a data package version keeps for a package file."
     },
     "src/routes/memory/key.ts": {
       "reads": {
@@ -666,7 +666,7 @@
         "getStorageFile": 3,
         "generateDownloadToken": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it). fileKeyFor (2026-10-26) reads metadata only to decide which key the request names; nothing it reads is answered, and the file under that key then passes the reader."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it). fileKeyFor (2026-10-26) reads metadata only to decide which key the request names; nothing it reads is answered, and the file under that key then passes the reader. 2026-11-08 (secaudit2026nov08b round 15b): GET /v1/pub and GET and HEAD /v1/storage/{key} ask through storedFileShownTo (services/datapackage/source-labels.ts), which adds the labels a data package version keeps for a package file."
     },
     "src/routes/subdomain-origin-docs.ts": {
       "reads": {
@@ -865,7 +865,7 @@
         "getOwnerScopeMemory": 1,
         "getStorageFile": 1
       },
-      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Since 2026-10-22 (secaudit 2026-10, r49) a record hidden from the viewer is replaced by the viewer's own record at the same key, which goes on through the same reader."
+      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Since 2026-10-22 (secaudit 2026-10, r49) a record hidden from the viewer is replaced by the viewer's own record at the same key, which goes on through the same reader. 2026-11-08 (secaudit2026nov08b round 15b): readAiFile asks through storedFileShownTo, which adds the labels a data package version keeps for a package file, when its caller passes the config (every caller in src/ does)."
     },
     "src/services/ai/policy-store.ts": {
       "reads": {
@@ -1847,7 +1847,7 @@
         "getStorageFileMeta": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-10-09: the caller's own stored file, read to check its signatures or hash it for a signing request. The metadata goes through readerFor(...).show() first, exactly as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file; nothing of it is shown except the signature report."
+      "why": "Reviewed 2026-10-09: the caller's own stored file, read to check its signatures or hash it for a signing request. The metadata goes through readerFor(...).show() first, exactly as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file; nothing of it is shown except the signature report. 2026-11-08 (secaudit2026nov08b round 15b): the reader is asked through storedFileShownTo, which adds the labels a data package version keeps for a package file."
     },
     "src/services/docsign/records.ts": {
       "reads": {
@@ -1855,7 +1855,7 @@
         "getStorageFileMeta": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given. Reviewed 2026-10-10 (wish-allekirjoitus-eudi-lompakolla): signedDocument() reads the wallet-signed PDF a signer stored for this request, for a party who may read the request; the metadata goes through readerFor(...).show() first, as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file."
+      "why": "Reviewed 2026-10-09, the node's own read: signing requests and their index keys under the reserved owner sys:docsign, which no principal writes. Who may read a request is decided in records.ts (its parties, its creator, a person whose agent is a party); the public lookup shows only the signatures given. Reviewed 2026-10-10 (wish-allekirjoitus-eudi-lompakolla): signedDocument() reads the wallet-signed PDF a signer stored for this request, for a party who may read the request; the metadata goes through readerFor(...).show() first, as GET /v1/storage/{key} does, and the bytes are read only when the reader let the caller see the file. 2026-11-08 (secaudit2026nov08b round 15b): that ask goes through storedFileShownTo, which adds the labels a data package version keeps when the request's document is a package file."
     },
     "src/services/ecosystem-automation-advisories.ts": {
       "reads": {

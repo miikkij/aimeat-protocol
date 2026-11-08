@@ -39,11 +39,16 @@
  *   datapackage/source-labels:single-rank-picked-source-stands-for-all-labels).
  * @structure SOURCE_LABELS_PREFIX · SOURCE_TARGETS_KEPT · versionSourceTargets · onePerLabel · recordVersionLabelSource ·
  *   versionLabelSources · packageCopyTargets · fileCopyTargets · hiddenByLabelSources · hiddenBySourceLabel ·
- *   packageVersionOfFile · packageFileHiddenBySourceLabel
+ *   packageVersionOfFile · packageFileHiddenBySourceLabel · storedFileShownTo
  * @usage
  *   const targets = await versionSourceTargets(deps, sources.flatMap(s => s.labelSources ?? []));
  *   if (await hiddenBySourceLabel(deps, reader, ownerGhii, name, hash)) return null;
+ *   const file = meta ? await storedFileShownTo({ storage, config }, reader, gaii, key, meta) : undefined;
  * @version-history
+ *   v2.2.0 — 2026-11-08 — storedFileShownTo: the file's own label and the version's labels in one ask, for
+ *     the reads of a stored file other than GET /v1/pub; packageFileHiddenBySourceLabel asks nothing for a
+ *     file in an agent's or an app's namespace, whose service namespace does not exist (secaudit2026nov08b
+ *     round 15b).
  *   v2.1.0 — 2026-11-08 — packageCopyTargets and fileCopyTargets: what a copy of a package version or
  *     of a stored file carries, for a derived product (secaudit2026nov08b round 15).
  *   v2.0.0 — 2026-11-08 — Every copied item is the label source, not the highest-ranked one; the read
@@ -58,6 +63,7 @@ import { effectiveLabels } from '../classification/effective.js';
 import { labelById, type ClassificationLabel } from '../classification/defaults.js';
 import { fileTarget, targetId } from '../classification/labels.js';
 import { bare, resourceKey } from './contract.js';
+import { isValidGHII } from '../../utils/gaii.js';
 
 /** The service-owned prefix, in the package owner's service namespace. */
 export const SOURCE_LABELS_PREFIX = 'datapkg-labels.';
@@ -186,10 +192,28 @@ export function packageVersionOfFile(key: string): { name: string; hash: string 
     return m ? { name: m[1]!, hash: m[2]! } : null;
 }
 
-/** True when `key` is a file of a package version whose label source keeps this reader out (GET /v1/pub). */
+/**
+ * True when `key` is a file of a package version whose label source keeps this reader out (GET /v1/pub).
+ * A package belongs to an account identity, whose service namespace holds its label source; a file of
+ * that shape in an agent's or an app's namespace is no package file and asks nothing.
+ */
 export async function packageFileHiddenBySourceLabel(
     deps: Deps, reader: Pick<ContentReader, 'show' | 'kind'>, ownerGhii: string, key: string,
 ): Promise<boolean> {
     const v = packageVersionOfFile(key);
-    return v ? hiddenBySourceLabel(deps, reader, ownerGhii, v.name, v.hash) : false;
+    return v && isValidGHII(ownerGhii) ? hiddenBySourceLabel(deps, reader, ownerGhii, v.name, v.hash) : false;
+}
+
+/**
+ * The stored file as this reader may see it, else undefined: the file's own label and, for a file of a
+ * package version, the labels the version keeps, the two GET /v1/pub asks. A read that hands a stored
+ * file's content to a caller asks here, so a reader GET /v1/pub answers 404 gets the file nowhere else
+ * (secaudit2026nov08b round 15b).
+ */
+export async function storedFileShownTo<F extends { workspaceRef?: string | null }>(
+    deps: Deps, reader: Pick<ContentReader, 'show' | 'kind'>, ownerGaii: string, key: string, file: F,
+): Promise<F | undefined> {
+    const [shown] = await reader.show([file], () => fileTarget(ownerGaii, key, file.workspaceRef));
+    if (!shown || deps.config.classificationMode === 'off') return shown;
+    return await packageFileHiddenBySourceLabel(deps, reader, ownerGaii, key) ? undefined : shown;
 }

@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.2 -- 2026-11-08 -- GET /v1/memory/files/:key asks the labels a data package version keeps, as
+ *     GET /v1/pub does (datapackage/source-labels.ts storedFileShownTo; secaudit2026nov08b round 15b).
  *   v1.15.1 -- 2026-11-05 -- POST refuses a group_id naming no group, inline and presigned (storage-file-write.ts).
  *   v1.15.0 -- 2026-11-01 -- The presigned mint carries the welcome page's writer in the token
  *     (`page_writer`), and DELETE notes it through the shared delete (services/storage-page-keys.ts;
@@ -85,7 +87,7 @@ import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-pro
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai/provenance-marks.js';
 import type { MemoryRouteCtx } from './shared.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { fileTarget } from '../../services/classification/labels.js';
+import { storedFileShownTo } from '../../services/datapackage/source-labels.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../../services/content-defaults.js';
 import { choiceIdOf, resolveChoice } from '../../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../../storage/blob/blob-types.js';
@@ -390,9 +392,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   router.get('/v1/memory/files/:key', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
-    // The classification reader (TARGET-082): a file this caller may not see answers as absent.
+    // The classification reader (TARGET-082): a file this caller may not see answers as absent, and a
+    // data package version's file asks the labels the version keeps too, as GET /v1/pub does.
     const stored = await storage.getStorageFile(gaii, key);
-    const [file] = stored ? await readerFor({ storage, config }, req.auth).show([stored], () => fileTarget(gaii, key, stored.workspaceRef)) : [];
+    const file = stored ? await storedFileShownTo({ storage, config }, readerFor({ storage, config }, req.auth), gaii, key, stored) : undefined;
 
     if (!file) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));

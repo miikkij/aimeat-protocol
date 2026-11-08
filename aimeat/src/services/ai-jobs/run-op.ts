@@ -21,6 +21,8 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key, viewer?)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.10.2 -- 2026-11-08 -- The transcription's audio read asks the labels a data package version keeps of a
+ *     package file (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  *   v1.10.1 -- 2026-11-04 -- The payer is the job principal's caller facts (`principalCaller(owner).payer`,
  *     services/caller-facts.ts), the answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   v1.10.0 -- 2026-11-02 -- An ecosystem app's job is paid by its owner (aiPayerOf); its picture stays
@@ -183,7 +185,7 @@ export async function runJobOp(
         const reader = jobReader({ storage, config }, job);
         let file: Awaited<ReturnType<typeof readAiFile>>;
         try {
-            file = await readAiFile(storage, reader, job.owner, key, { capability: 'transcription' }, { config, viewer: jobReadViewer(job) });
+            file = await readAiFile({ storage, config }, reader, job.owner, key, { capability: 'transcription' }, { config, viewer: jobReadViewer(job) });
         } catch (err) {
             if (err instanceof AiInputHiddenError) throw new AiJobError(err.code, err.status, err.message);
             throw err;
