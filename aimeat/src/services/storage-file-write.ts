@@ -40,6 +40,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-08 — A direct upload the store does not take moves to the database only within the
+ *     per-file ceiling storageMaxFileSizeMb; a larger one stays in its store (secaudit2026nov08b round 15).
  *   2026-11-08 — The storage quota is asked with the file's media type, because a person's store takes
  *     a small file only when it is of a kind the store is for (storage/blob/store-takes.ts).
  *   v1.16.0 — 2026-11-05 — groupBindingRefusal() also refuses a group id naming no group, on the write,
@@ -449,7 +451,7 @@ export async function writeStorageFile(
         ...(input.store?.id ? { storeChoice: input.store.id } : {}),
     };
     const file = input.object
-        ? await adoptStorageObject(storage, record, input.object.blobRef)
+        ? await adoptStorageObject(storage, record, input.object.blobRef, { maxDatabaseBytes: config.storageMaxFileSizeMb * 1024 * 1024 })
         : await storage.createStorageFile(record);
     await storeHeldProvenance(storage, held);
 
