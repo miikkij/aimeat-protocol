@@ -23,7 +23,9 @@
  *   import { TASKS } from './tasks.js';
  * @version-history
  *   2026-11-08 — share-to-workspace passes only when the three rules are in the workspace and
- *     published; the workspace's name was enough before.
+ *     published; the workspace's name was enough before. Later the same day: each rule is read as
+ *     a sentence from the document's body (house-rules.ts), because the word check passed the
+ *     rules turned round and a title holding the words.
  *   2026-10-30 — build-structure-flow (by name): three turns through the structure page, from the
  *     drawn layouts to a published app built by the person's picks; followUps on a task.
  *   2026-10-29 — build-structure (by name): a new app's first message carries the structure page's
@@ -38,6 +40,7 @@
  */
 import type { RunMetrics } from './transcript.js';
 import { appQuality, describeQuality, onAtelier } from './app-quality.js';
+import { documentBodies, houseRulesMissing } from './house-rules.js';
 
 /** `mcp`: the agent is connected over MCP as the owner's agent. `url`: it gets the address only. */
 export type Door = 'mcp' | 'url';
@@ -149,20 +152,21 @@ export const TASKS: Task[] = [
             // draft is the author's alone and the family reads only what is published (instruction
             // audit 2026-11-08: this check passed on the workspace's name).
             const orgs = await api<{ organisms: { id: string }[] }>(ctx.baseUrl, `/v1/organisms?member=${encodeURIComponent(ctx.ownerName)}`, ctx.ownerToken);
-            const rules = (text: string) => ['shoe', 'quiet', 'wash'].filter(w => !text.includes(w));
+            // Each rule is read as a sentence that says it, never as a word, and only from a body,
+            // never a title (house-rules.ts; the audit re-check passed the rules turned round).
             for (const o of orgs.data?.organisms ?? []) {
                 const list = await api<{ workspaces?: { id: string; name?: string }[] }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspaces`, ctx.ownerToken);
                 const hit = (list.data?.workspaces ?? []).find(w => JSON.stringify(w).includes(ctx.marker));
                 if (!hit) continue;
                 const read = await api<{ objects?: unknown; drafts?: unknown }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspace?ws=${encodeURIComponent(hit.id)}`, ctx.ownerToken);
-                const published = rules(JSON.stringify(read.data?.objects ?? '').toLowerCase());
-                if (published.length === 0) return { ok: true, detail: `the rules are published in workspace ${hit.id} of organism ${o.id}` };
-                const drafted = rules(JSON.stringify(read.data?.drafts ?? '').toLowerCase());
+                const published = houseRulesMissing(documentBodies(read.data?.objects));
+                if (published.length === 0) return { ok: true, detail: `the three rules are published in workspace ${hit.id} of organism ${o.id}` };
+                const drafted = houseRulesMissing(documentBodies(read.data?.drafts));
                 return {
                     ok: false,
                     detail: drafted.length === 0
                         ? 'the rules are written as a draft and never published, so the family cannot read them'
-                        : `the workspace exists and the published rules miss: ${published.join(', ')}`,
+                        : `the workspace exists, and the published document does not keep: ${published.join('; ')}`,
                 };
             }
             return { ok: false, detail: 'no workspace by that name in any of the owner\'s organisms' };

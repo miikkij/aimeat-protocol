@@ -3950,6 +3950,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         <p class="pb-step-hint" data-i18n="pb.step2hint">Open Claude, ChatGPT or any AI chat, paste this in, and answer its questions. It will build your app and hand you a single HTML file.</p>
         <div class="pb-preview-label" data-i18n="pb.promptPreview">Prompt preview</div>
         <div class="pb-preview" id="pb-preview"></div>
+        <button type="button" class="modal-btn pb-step-btn" id="pb-atelier-retry" hidden data-i18n="pb.atelierRetry">Try again</button>
         <button class="modal-btn primary pb-step-btn" id="pb-copy-btn" data-i18n="pb.copy">&#x1F4CB; Copy Prompt</button>
       </div>
 
@@ -4410,6 +4411,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "pb.trackAtelierDesc": "The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.",
       "pb.trackNew": "new",
       "pb.atelierLoading": "Fetching the Atelier build guide from your node…",
+      "pb.atelierFailed": "The Atelier build guide did not load from your node. Your app stays on the Atelier track: press Try again.",
+      "pb.atelierRetry": "Try again",
+      "pb.atelierAbsent": "Your node has no Atelier build guide, so this prompt builds the app on the Classic track.",
       "pb.includeCortex": "Include Cortex Extensions",
       "pb.livePreview": "Live Preview",
       "pb.copy": "Copy Prompt",
@@ -5512,6 +5516,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       "pb.trackAtelierDesc": "Uusi rata: elävät tyylit (sanomalehti, galleria, neonkonsoli…), asettelut joita tekoälysi voi järjestellä myöhemmin julkaisematta uudelleen, liike valmiina.",
       "pb.trackNew": "uusi",
       "pb.atelierLoading": "Haetaan Atelier-rakennusohjetta nodeltasi…",
+      "pb.atelierFailed": "Atelier-rakennusohje ei latautunut nodeltasi. Appisi pysyy Atelier-radalla. Paina Yritä uudelleen.",
+      "pb.atelierRetry": "Yritä uudelleen",
+      "pb.atelierAbsent": "Nodellasi ei ole Atelier-rakennusohjetta, joten tämä kehote rakentaa appin Perinteiselle radalle.",
       "pb.includeCortex": "Sisällytä Cortex-laajennukset",
       "pb.livePreview": "Esikatselu",
       "pb.copy": "Kopioi prompti",
@@ -7014,6 +7021,14 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     return `<div class="cortex-mini-card" onclick="showCortexPopup('` + cortexArg(encodeURIComponent(ext.name)) + `')"><div class="cortex-mini-name">&#x1F4E6; ` + escapeHtml(ext.short_name || ext.name) + '</div><div class="cortex-mini-meta">' + libCount + " lib &middot; " + schemaCount + " schema</div></div>";
   }
 
+  // src/static/app-catalog/js/atelier-guide.js
+  function atelierGuideOutcome(status, body) {
+    var prompt2 = body && typeof body === "object" && body.data && typeof body.data === "object" ? body.data.prompt : null;
+    if (status >= 200 && status < 300 && typeof prompt2 === "string" && prompt2.trim()) return "ok";
+    if (status === 404) return "absent";
+    return "error";
+  }
+
   // src/static/app-catalog/js/cortex.js
   var cortexToken = null;
   function cortexEsc(str) {
@@ -7329,6 +7344,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     loadPbTemplates();
     loadPbPacks();
     loadPbCore();
+    pbShowAtelierRetry();
     openDlg("prompt-builder-overlay");
     desc.focus();
     updatePbPreview();
@@ -7354,19 +7370,57 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         }
       }).catch(function() {
       });
-      fetch(base4 + "/v1/prompts/build-app-atelier?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
-        return r.json();
-      }).then(function(d) {
-        var full = d && d.data && d.data.prompt;
-        if (full && typeof full === "string") {
-          pbCoreAtelier[mode] = full;
-          updatePbPreview();
-        } else pbAtelierMissing(mode);
-      }).catch(function(err) {
-        console.warn("Atelier build guide not loaded; using Classic for a new app", err);
-        pbAtelierMissing(mode);
-      });
+      loadPbAtelier(base4, mode);
     });
+  }
+  var pbAtelierFailed = { new: false, improve: false };
+  function loadPbAtelier(base4, mode) {
+    pbAtelierFailed[mode] = false;
+    fetch(base4 + "/v1/prompts/build-app-atelier?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
+      return r.text().then(function(text) {
+        var body = null;
+        try {
+          body = JSON.parse(text);
+        } catch (err) {
+          console.warn("Atelier build guide: the answer is not JSON", err);
+        }
+        return { status: r.status, body };
+      });
+    }, function(err) {
+      console.warn("Atelier build guide: the request failed", err);
+      return { status: 0, body: null };
+    }).then(function(res) {
+      var outcome = atelierGuideOutcome(res.status, res.body);
+      if (outcome === "ok") {
+        pbCoreAtelier[mode] = res.body.data.prompt;
+        pbShowAtelierRetry();
+        updatePbPreview();
+        return;
+      }
+      if (outcome === "absent") {
+        pbCoreAtelier[mode] = null;
+        pbAtelierMissing(mode);
+        return;
+      }
+      pbAtelierFailed[mode] = true;
+      pbShowAtelierRetry();
+      updatePbPreview();
+    });
+  }
+  function pbShowAtelierRetry() {
+    var btn = document.getElementById("pb-atelier-retry");
+    if (!btn) return;
+    var mode = pbSourceApp ? "improve" : "new";
+    btn.hidden = !(pbTrack === "atelier" && pbAtelierFailed[mode] && !pbCoreAtelier[mode]);
+    var copy = document.getElementById("pb-copy-btn");
+    if (copy) copy.disabled = !btn.hidden;
+    btn.onclick = function() {
+      var config = loadConfig();
+      if (!config.aimeatUrl) return;
+      btn.hidden = true;
+      loadPbAtelier(config.aimeatUrl.replace(/\/+$/, ""), mode);
+      updatePbPreview();
+    };
   }
   function pbAtelierMissing(mode) {
     if (mode !== "new" || pbSourceApp || pbTrack !== "atelier") return;
@@ -7376,6 +7430,8 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       r.checked = r.value === "classic";
     });
     pbApplyTrackUi();
+    pbShowAtelierRetry();
+    showNotice(t("pb.atelierAbsent") || "Your node has no Atelier build guide, so this prompt builds the app on the Classic track.", "info");
     updatePbPreview();
   }
   function loadPbTemplates() {
@@ -7565,6 +7621,9 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     var prompt2 = "";
     if (pbTrack === "atelier") {
       var aCore = pbCoreAtelier[mode === "improve" && pbSourceApp ? "improve" : "new"];
+      if (!aCore && pbAtelierFailed[mode === "improve" && pbSourceApp ? "improve" : "new"]) {
+        return t("pb.atelierFailed") || "The Atelier build guide did not load from your node. Your app stays on the Atelier track: press Try again.";
+      }
       if (!aCore) return t("pb.atelierLoading") || "Fetching the Atelier build guide from your node…";
       var aOut = description ? "The app idea, in the owner's words: " + description + "\n\n" + aCore : aCore;
       if (mode === "improve" && pbSourceApp && pbSourceApp.blob) {

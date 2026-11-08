@@ -14,6 +14,8 @@
  *   cannot pay either. Every case sends the request with no Authorization header at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-visitor-actions
  * @version-history
+ *   v1.0.1 — 2026-11-08 — Tests 5 and 6 expect 403 VISITOR_READ_ONLY: the source changed by design (a named
+ *     refusal keeps its code), the refusal it holds is the same.
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-7).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -120,7 +122,10 @@ await test('4. A signed-in reader on the public action runs as themselves, not a
 
 await test('5. A visitor\'s run cannot write: the set is refused with VISITOR_READ_ONLY and the catalogue is unchanged', async () => {
   const r = await visitor('visitorwrite', { key: 'catalogue', value: { series: ['defaced'] } });
-  assert(r.status === 500 && r.body.error?.code === 'EXTENSION_ERROR' && /VISITOR_READ_ONLY/.test(r.body.error.message),
+  // 403 VISITOR_READ_ONLY since 2026-11-08: a refusal the context names keeps its code
+  // (services/extension-access/script-refusal.ts). Until then it read 500 EXTENSION_ERROR, the shape of a
+  // node fault; the refusal itself, and the unchanged catalogue below, are what this test holds.
+  assert(r.status === 403 && r.body.error?.code === 'VISITOR_READ_ONLY' && /VISITOR_READ_ONLY/.test(r.body.error.message),
     `expected the write refused, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const after = await visitor('catalogue');
   assert(JSON.stringify(after.body.data.catalogue) === JSON.stringify({ series: ['Harbour Lights'] }), `catalogue changed: ${JSON.stringify(after.body.data.catalogue)}`);
@@ -128,7 +133,7 @@ await test('5. A visitor\'s run cannot write: the set is refused with VISITOR_RE
 
 await test('6. A visitor\'s run cannot delete either', async () => {
   const r = await visitor('visitordelete', { key: 'catalogue' });
-  assert(r.status === 500 && /VISITOR_READ_ONLY/.test(r.body.error?.message ?? ''), `expected the delete refused, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.status === 403 && r.body.error?.code === 'VISITOR_READ_ONLY', `expected the delete refused, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const after = await visitor('catalogue');
   assert(after.body.data.catalogue !== null, 'the catalogue is still there');
 });

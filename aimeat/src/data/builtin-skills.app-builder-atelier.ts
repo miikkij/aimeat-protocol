@@ -18,7 +18,9 @@
  *     clean look (build-introduction-step.ts).
  *   2026-11-08 — metadata.entry_point: "true", so the handbook's skill list names this skill although
  *     its name begins with the Classic skill's (services/skills-by-situation.ts). "Every Atelier app
- *     names its register" and step 8 are scoped to the level fine, as the spec now is.
+ *     names its register" and step 8 are scoped to the level fine, as the spec now is. Step 3 is
+ *     scoped to fine as well, and steps 7 and 8 name one size matrix (390×844, 1280×900, 1280×460)
+ *     where step 8 said 390 and 1440 (instruction audit re-check, 2026-11-08).
  *   v1.40.0 — 2026-11-02 — Kit 0.69.0: fingerprint (the node's profile of a document) named beside the
  *     handbook, with the facts route the app reads it from. Read against describe-data.js after it joined.
  *   v1.39.0 — 2026-10-30 — A new app asks for its style kit (aimeat_designbook_kit) before it picks a genre, and a look the person wants again is saved as a kit.
@@ -301,7 +303,9 @@ moved under you says so.
    look at that genre running and approve it, and only then fork the app from it. An app built
    straight from a drawing drifts from it screen by screen, and the owner is the one who finds each
    difference (Postinjalostamo, 2026-09-28: three rounds of corrections).
-3. **Build** — start from a GENRE, never from the bare shell: pick the register the page belongs
+3. **Build** — on the level \`fine\` (and on a page that states no level), start from a GENRE, never
+   from the bare shell; a \`proto\` or \`plain\` page starts from the shell \`shell-atelier\` and skips
+   the genre and the register. On \`fine\`: pick the register the page belongs
    in from \`GET /v1/designbook?kind=genre\`, fork it from \`GET /v1/app-templates/genre-<id>\`,
    and keep its \`<meta name="aimeat-register">\` line (or name your own register with
    \`custom:<name>\`); the publish refuses an Atelier app that names none. Then compose screens
@@ -455,13 +459,15 @@ moved under you says so.
    camera, a screen you cannot see). An app that sits unpublished waiting for a browser is an app
    the owner asked for and did not get.
 8. **Accept it beside the genre it forked.** (A \`proto\` or \`plain\` page forked no genre: the
-   seven measured checks below are its acceptance.) An Atelier app is finished when a screenshot at 390
-   and at 1440, in both themes, holds up NEXT TO the genre page it came from (open the genre at
+   seven measured checks below are its acceptance.) ONE SIZE MATRIX holds for every check here and
+   in step 7, the specification's "Finishing" included: 390×844, 1280×900 and 1280×460, in both
+   themes. An Atelier app is finished when its screenshots at 390×844 and 1280×900, in both themes,
+   hold up NEXT TO the genre page it came from (open the genre at
    \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre shelf at
    \`GET /v1/designbook?kind=genre\`). Put the two pictures side by side and ask one question
    while looking: **would this pass beside the genre?** Element counts and a green matrix passed
    on pages the owner then rejected, so the picture is the evidence. Alongside it, seven measured
-   checks: page width equal to the viewport at both sizes; no element past the viewport edge,
+   checks, at every size of the matrix: page width equal to the viewport; no element past the viewport edge,
    including inside a box with \`overflow-x: clip\` or \`hidden\`; no visible text under 11 px; no
    control under 40 px at 390; contrast 4.5 for body text and 3.0 for large; no animation whose
    duration is over 1 ms under reduced motion (a collapsed one stays in

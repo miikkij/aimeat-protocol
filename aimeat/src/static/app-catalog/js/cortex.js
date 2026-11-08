@@ -7,6 +7,10 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   v1.5.1 — 2026-11-08 — Only a 404 for the Atelier guide moves a new app to Classic, with a
+ *     notice; a 401, 403, 500, a network failure or a body that is not the guide keeps Atelier,
+ *     says the load failed in the preview and shows Try again (atelier-guide.js; the audit
+ *     re-check found every failure switched the track with no word).
  *   v1.5.0 — 2026-11-08 — The track picker is hidden for a new app too: a new app is built on
  *     Atelier, as in the App Catalog's Create dialog, and the builder falls back to Classic only
  *     when the node serves no Atelier guide (instruction audit 2026-11-08: the picker still offered
@@ -36,6 +40,7 @@ import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
 import { openDlg, closeDlg } from './dialogs.js';
 import { cortexArg, cortexCardHtml } from './cortex-card.js';
+import { atelierGuideOutcome } from './atelier-guide.js';
 
 // ── Cortex Extensions Bar ─────────────────────────
 
@@ -422,6 +427,7 @@ function openPromptBuilder(app) {
   loadPbPacks();
   // Load the canonical platform-instructions core from the node (single source of truth)
   loadPbCore();
+  pbShowAtelierRetry();
 
   openDlg('prompt-builder-overlay');
   desc.focus();
@@ -452,28 +458,65 @@ function loadPbCore() {
         if (body && typeof body === 'string') { pbCore[mode] = body; updatePbPreview(); }
       })
       .catch(function () { /* older node without the endpoint — inline fallback is used */ });
-    fetch(base + '/v1/prompts/build-app-atelier?mode=' + mode + '&lang=' + encodeURIComponent(getLang()))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var full = d && d.data && d.data.prompt;
-        if (full && typeof full === 'string') { pbCoreAtelier[mode] = full; updatePbPreview(); }
-        else pbAtelierMissing(mode);
-      })
-      .catch(function (err) {
-        console.warn('Atelier build guide not loaded; using Classic for a new app', err);
-        pbAtelierMissing(mode);
-      });
+    loadPbAtelier(base, mode);
   });
 }
 
-// An older node serves no Atelier guide: a new app can then only be built on Classic, so the
-// builder switches to it rather than showing a preview that never loads.
+// The Atelier guide for one mode. Only a 404 (a node from before the Atelier track) moves a new
+// app to Classic, and the person is told; any other failure keeps Atelier, says so in the preview
+// and offers to try again (atelier-guide.js has the decision and why).
+var pbAtelierFailed = { new: false, improve: false };
+function loadPbAtelier(base, mode) {
+  pbAtelierFailed[mode] = false;
+  fetch(base + '/v1/prompts/build-app-atelier?mode=' + mode + '&lang=' + encodeURIComponent(getLang()))
+    .then(function (r) {
+      return r.text().then(function (text) {
+        var body = null;
+        try { body = JSON.parse(text); } catch (err) { console.warn('Atelier build guide: the answer is not JSON', err); }
+        return { status: r.status, body: body };
+      });
+    }, function (err) {
+      console.warn('Atelier build guide: the request failed', err);
+      return { status: 0, body: null };
+    })
+    .then(function (res) {
+      var outcome = atelierGuideOutcome(res.status, res.body);
+      if (outcome === 'ok') { pbCoreAtelier[mode] = res.body.data.prompt; pbShowAtelierRetry(); updatePbPreview(); return; }
+      if (outcome === 'absent') { pbCoreAtelier[mode] = null; pbAtelierMissing(mode); return; }
+      pbAtelierFailed[mode] = true;
+      pbShowAtelierRetry();
+      updatePbPreview();
+    });
+}
+
+// The "Try again" button under the preview shows while the guide the builder needs failed to load.
+function pbShowAtelierRetry() {
+  var btn = document.getElementById('pb-atelier-retry');
+  if (!btn) return;
+  var mode = (pbSourceApp ? 'improve' : 'new');
+  btn.hidden = !(pbTrack === 'atelier' && pbAtelierFailed[mode] && !pbCoreAtelier[mode]);
+  // A failed load leaves no prompt to copy: the preview holds the failure, not a prompt.
+  var copy = document.getElementById('pb-copy-btn');
+  if (copy) copy.disabled = !btn.hidden;
+  btn.onclick = function () {
+    var config = loadConfig();
+    if (!config.aimeatUrl) return;
+    btn.hidden = true;
+    loadPbAtelier(config.aimeatUrl.replace(/\/+$/, ''), mode);
+    updatePbPreview();
+  };
+}
+
+// An older node serves no Atelier guide (404): a new app can then only be built on Classic, so
+// the builder switches to it and says so, rather than showing a preview that never loads.
 function pbAtelierMissing(mode) {
   if (mode !== 'new' || pbSourceApp || pbTrack !== 'atelier') return;
   pbTrack = 'classic';
   var radios = document.querySelectorAll('input[name="pb-track"]');
   radios.forEach(function (r) { r.checked = r.value === 'classic'; });
   pbApplyTrackUi();
+  pbShowAtelierRetry();
+  showNotice(t('pb.atelierAbsent') || 'Your node has no Atelier build guide, so this prompt builds the app on the Classic track.', 'info');
   updatePbPreview();
 }
 
@@ -661,6 +704,9 @@ function buildPromptFromBuilder() {
   // fallback — because the two guides never mix (TARGET-074).
   if (pbTrack === 'atelier') {
     var aCore = pbCoreAtelier[(mode === 'improve' && pbSourceApp) ? 'improve' : 'new'];
+    if (!aCore && pbAtelierFailed[(mode === 'improve' && pbSourceApp) ? 'improve' : 'new']) {
+      return t('pb.atelierFailed') || 'The Atelier build guide did not load from your node. Your app stays on the Atelier track: press Try again.';
+    }
     if (!aCore) return t('pb.atelierLoading') || 'Fetching the Atelier build guide from your node…';
     var aOut = description
       ? "The app idea, in the owner's words: " + description + '\n\n' + aCore

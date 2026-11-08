@@ -33,6 +33,11 @@
  *     publish gate (app-artifact-lint.ts, 2026-09-19); "Finishing" names the four things every app
  *     owes after a publish (step 9 of the Atelier skill) and asks published, checked and accepted
  *     to be reported apart.
+ *   v1.44.1 — 2026-11-08 — ADDITIVE: "Finishing" names its three sizes as the one size matrix and
+ *     the two that are put beside the genre on `fine`, matching skill steps 7 and 8. The register
+ *     section's scope moves into its first sentence, shorter: the part `genre` had reached 24 040
+ *     characters on a node at http://localhost:<port>, past the 24 000 a part may carry
+ *     (e2e-mcp-orientation 17c).
  *   v1.43.0 — 2026-11-07 — ADDITIVE: the interview's introduction question after the data map, and the section "An introduction, when the owner asked for one" after "Data, in short" (build-introduction-step.ts); the spec token moves with the body.
  *   v1.42.0 — 2026-10-30 — ADDITIVE: THE STYLE KIT COMES BEFORE THE GENRE, first in "The Design Book first" (KIT_PROMPT_PARAGRAPH in design-book/kit.ts).
  *   v1.41.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew
@@ -479,14 +484,13 @@ function composeBody(config: AimeatConfig): string {
   // lesson: a hand-written menu drifts and the builder reads the refusal as a broken AI).
   const genres = getAppTemplateIndex().filter((t) => t.kind === 'genre');
   body += '## Start from a GENRE — a complete committed register, and the register is required\n\n';
-  body += 'Every Atelier app names the register it committed to, and the publish refuses one that '
+  body += 'On `fine`, every Atelier app names the register it committed to, and the publish refuses one that '
     + 'does not: `<meta name="aimeat-register" content="genre-<id>">` is in every genre\'s head '
     + 'already, so a fork carries it; a page that commits to a look of its own declares '
     + '`<meta name="aimeat-register" content="custom:<name>">`, where the name says what the '
     + 'register is (custom:game, custom:ledger) and is never "default". The bare shell carries a '
     + 'REPLACE-ME line in that place, and the gate refuses it as served: the shell is a frame, '
-    + 'not a page. This section is for the level `fine`; a `proto` or `plain` page forks no genre '
-    + 'and the publish asks it for no register.\n\n';
+    + 'not a page.\n\n';
   body += 'Whatever the app is — a poster, a console, a departure board, a ledger — do not '
     + 'assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
     + 'page in a committed register; fetch it with `GET ' + base + '/v1/app-templates/<id>`, swap '
@@ -753,7 +757,10 @@ function composeBody(config: AimeatConfig): string {
     + '(`agent_face_present`), a skill bound to the app (`bound_skills_count` above zero), the '
     + 'data map (`data_map_present`, written with `aimeat_datamap_set`) and the design spec '
     + '(`design_spec_present`, written with `aimeat_app_manage { action: "spec_set" }`); step 9 '
-    + 'of the skill `node:aimeat-app-builder-atelier` says what each one holds. Report published, '
+    + 'of the skill `node:aimeat-app-builder-atelier` says what each one holds. These three sizes '
+    + 'are the one size matrix for every check, the skill\'s included; on the level `fine`, the '
+    + 'screenshots at 390×844 and 1280×900 are also put beside the genre the app forked (step 8 '
+    + 'of the skill). Report published, '
     + 'checked and accepted as three separate things: a check you could not run is said, never '
     + 'counted as passed.\n\n';
 

@@ -11,8 +11,8 @@ of them built the wrong thing three times in a row.
    lives. Everything below is a pointer into it or a rule that bites before you would find it.
 2. **`.claude/rules/*.md`.** Rules for one kind of code. The `paths` list at the top of each file
    says which files it covers. Claude Code loads them by itself when it opens a matching file; you
-   have to open the ones that match what you are about to touch. The table in `CLAUDE.md` ("Rules
-   that load by path") says which is which.
+   run `pnpm rules:for <the files you will edit>` and read every file it names before the edit. It
+   reads the same `paths` lists, so you get the rules Claude Code gets.
 3. **`.claude/skills/<name>/SKILL.md`.** How one kind of task is done here. Read the one that
    matches the task BEFORE you start:
    - `aimeat-app-building`: building, publishing or changing an app on AIMEAT.
@@ -28,7 +28,8 @@ of them built the wrong thing three times in a row.
 
 ## Building an app: the rules that were broken
 
-- **A new app is built on the Atelier track, forked from a genre.** Load the skill
+- **A new app is built on the Atelier track; on the finest level it is forked from a genre.** A
+  quick prototype or an ordinary page starts from the Atelier shell with no genre. Load the skill
   `node:aimeat-app-builder-atelier` and read its specification: `aimeat_handbook_get { tier:
   "build-app-atelier" }`, in parts: `genre`, `libraries`, `book` and `patterns` before any code. The Classic track is
   for an app that is already Classic, or when Jouni asks for it by name. "Quicker to start" is not
@@ -64,8 +65,9 @@ of them built the wrong thing three times in a row.
 - **The genre is the look.** A look preset with components stacked in it, under a genre's name, is
   the default page every app looks like, and it is what gets sent back.
 - **Judge what it looks like, not only that it works.** Passing tests, contrast and page width do
-  not make a page good. Put the result beside the genre it was forked from, at 390 and 1440 px, in
-  both themes and both languages, and ask whether it holds up. A broken header in your own
+  not make a page good. Check every page at 390×844, 1280×900 and 1280×460, in both themes and
+  both languages; on the finest level, put the result at 390×844 and 1280×900 beside the genre it
+  was forked from and ask whether it holds up. A broken header in your own
   screenshot is a reason to stop, whatever else passed.
 - **Look for a browser before you say you have none, and never let its absence hold a publish
   back.** List your tools and search them for `playwright`, `browser` and `chrome`: this machine
@@ -77,9 +79,14 @@ of them built the wrong thing three times in a row.
 
 ## Working in this repository
 
+- **Start the session with `pnpm agent:start`.** It prints what Claude Code's SessionStart hook
+  prints: whether the session is named, whether you sit in your own worktree, main's CI and
+  nightly state, and the board to read before the first edit. Claude Code runs it by itself; you
+  run it.
 - Every session works in its own git worktree under `.worktrees/`, never in the main checkout.
-  Set it up from `origin/main` with `git worktree add .worktrees/<session> origin/main`, then
-  `cd aimeat && pnpm install`, then `pnpm test:env:init`. Never copy `.env.test.*` by hand: the
+  `pnpm agent:worktree <name>` makes it the way Claude Code's WorktreeCreate hook does:
+  `.worktrees/<name>` at `origin/main`, its own `pnpm install`, `pnpm test:env:init` and the git
+  hooks on. Then work from that folder. Never copy `.env.test.*` by hand: the
   examples name one port and one database for everybody, and the test runner empties that
   database between suites, so two sessions testing at once wipe each other.
 - Coordination lives on aimeat.io, not in chat. Name the session and the project

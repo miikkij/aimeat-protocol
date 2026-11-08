@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm cold-agent --compare .cold-agent/<a> .cold-agent/<b>
  *   cd aimeat && pnpm cold-agent --tasks propose-agent --runs 1 --keep   # leave the proposal to approve
  * @version-history
+ *   v1.2.1 — 2026-11-08 — An arm that names a code-built specification (build-app, build-app-atelier,
+ *     build-extension) is refused before anything is written, with the way to measure a change to it.
  *   v1.2.0 — 2026-10-30 — A task's followUps: the person's next turns, resumed in the same session.
  *   v1.1.0 — 2026-10-02 — `--keep`: a task's verify leaves what the run made on the sandbox.
  *   v1.0.0 — 2026-09-18 — Initial (wish-kylm-agentti-ja-oikea-teht-v-mittaus-...).
@@ -120,11 +122,27 @@ function loadSandbox(): Sandbox {
 /**
  * An arm is `{ name, prompts: { "<managed prompt id>": "<content>" } }`. It reaches MANAGED prompts
  * (the tier handbooks, the portal prompt packages), which an operator can edit on a live node. The
- * builder functions (build-app, build-extension) and the surface handbooks are code and have no
- * override, so an arm cannot reach them yet.
+ * builder functions (build-app, build-app-atelier, build-extension) and the surface handbooks are
+ * code and have no override, so an arm cannot reach them, and one that names them is refused with
+ * the way to measure them instead (CODE_BUILT).
  */
+/** Texts the node builds from code: an arm cannot reach them, and the PATCH answers 404. */
+const CODE_BUILT: Record<string, string> = {
+    'build-app': 'src/services/build-app-prompt.ts',
+    'build-app-atelier': 'src/services/build-atelier-prompt.ts (and its build-atelier-*.ts parts)',
+    'build-extension': 'src/services/build-extension-prompt.ts',
+};
+
 async function applyArm(s: Sandbox, armPath: string): Promise<{ name: string; ids: string[] }> {
     const arm = JSON.parse(readFileSync(armPath, 'utf8')) as { name: string; prompts: Record<string, string> };
+    // Refused before anything is written: an experiment on the wrong layer measures nothing, and the
+    // instruction audit of 2026-11-08 named exactly that risk for the build specifications.
+    const unreachable = Object.keys(arm.prompts).filter(id => id.split('/')[0] in CODE_BUILT);
+    if (unreachable.length) {
+        throw new Error(`arm ${arm.name}: ${unreachable.join(', ')} ${unreachable.length > 1 ? 'are' : 'is'} built from code, not a managed prompt, so an arm cannot change ${unreachable.length > 1 ? 'them' : 'it'}. `
+            + `Change ${unreachable.map(id => CODE_BUILT[id.split('/')[0]]).join(' and ')} in a worktree of its own, run \`pnpm sandbox\` and this measurement there, `
+            + 'and compare the two reports with --compare <before> <after>.');
+    }
     for (const [id, content] of Object.entries(arm.prompts)) {
         const set = await api(s.baseUrl, `/v1/admin/prompts/${id}`, s.owners[0].token, { method: 'PATCH', body: { content } });
         if (set.status >= 300) throw new Error(`arm ${arm.name}: could not set prompt ${id} (${set.status})`);

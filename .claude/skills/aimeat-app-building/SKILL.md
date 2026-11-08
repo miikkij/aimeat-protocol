@@ -9,7 +9,7 @@ description: The research-first precondition for building any app on AIMEAT, and
 
 The moment the task is "build / make / publish an app on AIMEAT":
 
-> You have `aimeat_*` MCP tools. Follow the research-first flow: load the skill `node:aimeat-app-builder` and call `aimeat_appdev_overview` first. A NEW app goes on the **Atelier track**: load `node:aimeat-app-builder-atelier`, read its specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts, or `GET /v1/prompts/build-app-atelier`) and fork a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`). `GET /v1/prompts/build-app` and the Classic shells are for improving an app that is already Classic, or when Jouni asks for Classic by name.
+> You have `aimeat_*` MCP tools. Follow the research-first flow: load the skill of the app's track and call `aimeat_appdev_overview` first. A NEW app goes on the **Atelier track**: load `node:aimeat-app-builder-atelier` and read its specification (`aimeat_handbook_get { tier: "build-app-atelier" }`, in parts, or `GET /v1/prompts/build-app-atelier`). The owner chooses the level first: on `fine` (and when no level is stated) the build forks a genre (`aimeat_designbook_search { kind: "genre" }`, then `aimeat_app_template_get { id: "genre-<id>" }`); a `proto` or `plain` page starts from the shell `shell-atelier` with no genre and no register. `node:aimeat-app-builder`, `GET /v1/prompts/build-app` and the Classic shells are for improving an app that is already Classic, or when Jouni asks for Classic by name.
 
 **The track is not changed in the middle of a build.** On 2026-09-19 a model began on Atelier, judged the Classic shell quicker to start from, changed over, and handed Jouni an app with a hand-built header and a broken sign-in bar; it had accepted that because its own tests passed. "Quicker to start" is not a reason. If the Atelier road stops you, say what stopped you and wait. The publish names a build that left the track (`app_hints`, pitfall `track-drift`), and a finished app is compared with the genre it was forked from before it is shown.
 
@@ -87,9 +87,10 @@ When editing that prompt or any app-building guidance, verify every API claim ag
 
 A **group application** is one where several people work on the same thing, somebody owns it, a
 person may belong to more than one of them, and not everyone may do everything. The full guidance is
-in the node-served spec (`GET /v1/prompts/build-app`, section "If several people share it"), because
-that is what every builder fetches. Two things belong here as well, because they decide the work
-before any code is written.
+in the node-served spec of the app's track: on Atelier, `GET /v1/prompts/build-app-atelier` (the
+interview's data map questions and "How the data map answers steer the build"); on Classic,
+`GET /v1/prompts/build-app`, section "If several people share it". Two things belong here as well,
+because they decide the work before any code is written.
 
 **Both build interviews ask the data map step, and nothing is built before a yes.** Three questions (who opens the app: just me, my organisation, anyone; for each kind of data, is it personal, shared by the team or public; who may change the shared data), then a two- or three-sentence scenario from the person's own idea with named people, which they confirm. Team data goes to one organism workspace (`AIMEAT.organism`, `workspacePicker`), never to per-user memory, which gives every person an empty copy (pitfall `team-data-in-personal-memory`; TaskGrid on orgnode.example was asked for one shared talent database and kept one per person). Who opens it is the app's `open_to` setting. The text is in `aimeat/src/services/build-data-map-step.ts`, included by both `build-app-prompt.ts` and `build-atelier-prompt.ts`; change it there, once.
 

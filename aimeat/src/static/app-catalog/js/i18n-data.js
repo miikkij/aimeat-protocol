@@ -5,6 +5,8 @@
  *   stay in main.js and import this table. Keep en + fi keys in lockstep (Rule 4).
  * @usage import { I18N } from './i18n-data.js'
  * @version-history
+ *   v1.7.1 — 2026-11-08 — pb.atelierFailed, pb.atelierRetry and pb.atelierAbsent (en, fi): the prompt
+ *     builder says when the Atelier guide did not load, and when the node has none.
  *   v1.7.0 — 2026-10-11 — Price and pacing (en, fi): pacing.free and pacing.amount, the monetize editor's
  *     price group and pacing field, the cost view's pacing column; monetize.priceMorsels removed (a
  *     morsel is pacing, never a price); Finnish says murunen, never morseli, in these strings.
@@ -459,6 +461,9 @@ export const I18N = {
       'pb.trackAtelierDesc': 'The new track: living looks (newspaper, gallery, neon console…), layouts your AI can rearrange later without republishing, motion built in.',
       'pb.trackNew': 'new',
       'pb.atelierLoading': 'Fetching the Atelier build guide from your node…',
+      'pb.atelierFailed': 'The Atelier build guide did not load from your node. Your app stays on the Atelier track: press Try again.',
+      'pb.atelierRetry': 'Try again',
+      'pb.atelierAbsent': 'Your node has no Atelier build guide, so this prompt builds the app on the Classic track.',
       'pb.includeCortex': 'Include Cortex Extensions',
       'pb.livePreview': 'Live Preview',
       'pb.copy': 'Copy Prompt',
@@ -1561,6 +1566,9 @@ export const I18N = {
       'pb.trackAtelierDesc': 'Uusi rata: elävät tyylit (sanomalehti, galleria, neonkonsoli…), asettelut joita tekoälysi voi järjestellä myöhemmin julkaisematta uudelleen, liike valmiina.',
       'pb.trackNew': 'uusi',
       'pb.atelierLoading': 'Haetaan Atelier-rakennusohjetta nodeltasi…',
+      'pb.atelierFailed': 'Atelier-rakennusohje ei latautunut nodeltasi. Appisi pysyy Atelier-radalla. Paina Yritä uudelleen.',
+      'pb.atelierRetry': 'Yritä uudelleen',
+      'pb.atelierAbsent': 'Nodellasi ei ole Atelier-rakennusohjetta, joten tämä kehote rakentaa appin Perinteiselle radalle.',
       'pb.includeCortex': 'Sisällytä Cortex-laajennukset',
       'pb.livePreview': 'Esikatselu',
       'pb.copy': 'Kopioi prompti',
