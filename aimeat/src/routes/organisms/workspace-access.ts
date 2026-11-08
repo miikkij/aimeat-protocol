@@ -6,6 +6,9 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — A code key's list entry and cancel act only on the account the key made (registered
+ *     at or before the invitation); after that account's erasure the cancel closes the key and leaves
+ *     a later holder of the name alone (secaudit2026nov08 round 14).
  *   2026-11-04 — The running mail service is read from nodeContext() (services/node-context.ts) in place of
  *     getActiveEmailService (codebase analysis 2026-11-03, item D-i).
  *   2026-11-04 — The key mail goes through mail-gate.ts sendMail as a third-party mail (codebase analysis 2026-11-03, item B3).
@@ -111,6 +114,7 @@ import { isValidEmail } from '../../utils/email-validator.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { newPasswordRefusal } from '../../services/sign-in-policy.js';
 import { sendMail } from '../../services/mail-gate.js';
+import { accountMadeBy } from '../../services/key-credentials.js';
 
 /** Why the key mail draws on no account count (mail-gate.ts third-party). */
 const KEY_MAIL_BOUND = 'Only an owner of the organism mints a key, under the route\'s rate limit (30 in ten minutes); the mail carries the key it made.';
@@ -694,11 +698,13 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const rows = (await storage.listInvitationsByOrganism(id, { status: 'pending' })).filter(v => v.type === 'code' && (all || v.invitedBy === inviter));
     const items: Array<{ id: string; email: string; display: string | null; status: string; activated: boolean; created_at: string; expires_at: string }> = [];
     for (const v of rows) {
-      // Activation is derived, not stored: the provisioned account has logged in at least once.
+      // Activation is derived, not stored: the provisioned account has logged in at least once. Only
+      // the account the key made counts: after its erasure the name may belong to someone else, whose
+      // sign-ins are not this key's (secaudit2026nov08 round 14).
       let activated = false;
       if (v.provisionedOwner) {
         const g = await storage.getGHII(`${v.provisionedOwner}@${config.nodeId}`);
-        activated = !!g?.lastLoginAt;
+        activated = !!g?.lastLoginAt && accountMadeBy(g, v);
       }
       items.push({
         id: v.id, email: v.email,
@@ -724,8 +730,12 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     if (inv.status !== 'pending') { res.status(409).json(error(config.nodeId, 'INVALID_STATE', `Key is already ${inv.status}`)); return; }
 
     // Refuse if the account has already been used (activated) — a live keyholder cannot be cancelled.
-    if (inv.provisionedOwner) {
-      const g = await storage.getGHII(`${inv.provisionedOwner}@${config.nodeId}`);
+    // The account must be the one this key made. The invitation names it by its bare name, which is
+    // released when the account is erased: a later holder of the name is somebody else's account, and
+    // cancelling the key closes it without touching that account (secaudit2026nov08 round 14).
+    const keyAccount = inv.provisionedOwner ? await storage.getGHII(`${inv.provisionedOwner}@${config.nodeId}`) : null;
+    if (inv.provisionedOwner && keyAccount && accountMadeBy(keyAccount, inv)) {
+      const g = keyAccount;
       if (g?.lastLoginAt) {
         res.status(409).json(error(config.nodeId, 'ALREADY_ACTIVATED', 'This key has already been used — it can no longer be cancelled'));
         return;
