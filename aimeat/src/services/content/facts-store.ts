@@ -26,7 +26,7 @@
  *   caller's to compare, since this file does not read sources.
  * @structure FACT_SHARDS · SHARD_PREFIX · SHARD_LIMIT_BYTES · sourceIdOf() · sourceHash() · shardKeyOf() ·
  *   getFacts() · putFacts() · deleteFacts() · deleteFactsWhere() · allFacts() · listFacts() · coverage() ·
- *   textKeyOf() · putText() ·
+ *   textKeyOf() · isPipelineFileKey() · putText() ·
  *   getText() · deleteText() · profileKeyOf() · putProfileDetail() · getProfileDetail() ·
  *   deleteProfileDetail()
  * @usage
@@ -34,6 +34,8 @@
  *   await putFacts(deps, writer, facts);
  *   const page = await listFacts(storage, ownerGhii, { kind: 'pdf', limit: 50 });
  * @version-history
+ *   2026-11-08 — isPipelineFileKey: the exact shape of the pipeline's own file names, for the
+ *     leftovers job (secaudit2026nov08b round 15).
  *   2026-11-08 — deleteFactsWhere removes every entry a test picks, one write per shard; allFacts and
  *     SHARD_PREFIX are exported for the removal of the fingerprint loop's leftovers (leftovers.ts).
  *   2026-11-04 — No per-shard getMemory for a storage without getMemoryByKeys: it is required on
@@ -218,6 +220,13 @@ export async function coverage(storage: Storage, ownerGhii: string): Promise<{
 
 /** The stored text file of a source: `contentclass-text/<sourceHash>.txt`. */
 export function textKeyOf(sourceId: string): string { return `${TEXT_PREFIX}${sourceHash(sourceId)}.txt`; }
+
+const OWN_TEXT_KEY = /^contentclass-text\/[0-9a-f]{24}\.txt$/;
+const OWN_PROFILE_KEY = /^contentclass-profile\/[0-9a-f]{24}\.json$/;
+
+/** Whether a key has exactly the shape textKeyOf or profileKeyOf gives, the names this pipeline
+ *  writes its own files under. A key that only starts with `contentclass-` is not one of them. */
+export function isPipelineFileKey(key: string): boolean { return OWN_TEXT_KEY.test(key) || OWN_PROFILE_KEY.test(key); }
 
 /** Store the text read from a source as a private file of the owner. Answers its key. */
 export async function putText(deps: ContentDeps, writer: ContentWriter, sourceId: string, text: string): Promise<string> {
