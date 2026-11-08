@@ -25,6 +25,8 @@
  *     flag stops counting (secaudit2026oct31w2 round 10, W2-9).
  *   2026-11-01 -- A hit's record id is read from the end of its key (recordRowAt), so a hit in a record
  *     whose id holds a dot names its whole id (secaudit2026oct31w2 round 10b, dotted record ids).
+ *   2026-11-08 -- An access request or a skill file under the workspace root is no hit, whatever space a
+ *     manifest declares over it (secaudit2026nov08 round 14).
  */
 import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
 import { withoutFlagHiddenMemory } from './moderation-flags.js';
@@ -34,7 +36,7 @@ import { workspaceMetaReader } from './workspace-meta.js';
 import { decideWorkspaceRead } from './workspace-access.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
-import { recordRowAt } from './workspace-record-key.js';
+import { recordRowAt, isNodeReservedPart } from './workspace-record-key.js';
 
 export interface OrganismSearchHit {
   ws: string;
@@ -134,7 +136,8 @@ export async function searchOrganismContent(
   for (const hit of hits) {
     const parsed = parseWsKey(hit.record.key, id);
     if (!parsed) continue;
-    if (parsed.rest.startsWith('meta.')) continue;
+    // The node's own records under the workspace (access requests, skills) are no space's hits either.
+    if (parsed.rest.startsWith('meta.') || isNodeReservedPart(parsed.rest)) continue;
     const meta = await resolveWs(parsed.ws);
     if (!meta || !meta.canRead) continue;
     const ot = meta.types.find(t => parsed.rest.startsWith(t.ns + '.'));

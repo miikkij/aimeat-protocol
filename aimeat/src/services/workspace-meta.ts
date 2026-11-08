@@ -80,6 +80,10 @@
  *     registry lookup, the choice between copies, the one reader) moved to ./workspace-meta-read.ts,
  *     a pure move, so that this module can import the rule without an import cycle; every name is
  *     re-exported here.
+ *   2026-11-08 — normalizeObjectTypes refuses a new space over a part the node keeps for itself (meta
+ *     itself, meta.share, meta.intake, meta.fingerprint and the other node meta records, access.*,
+ *     skills.*), naming the part and a namespace to use; meta.goals, meta.plans and meta.decisions stay
+ *     free. A full replace keeps a space the stored manifest already declares (secaudit2026nov08 round 14).
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -89,6 +93,7 @@ import {
   type WorkspaceManifest, type WorkspaceRegistryEntry,
 } from './workspace-meta-read.js';
 import { fenceChangeRefusal, type FenceCaller } from './fenced-space.js';
+import { isNodeReservedPart } from './workspace-record-key.js';
 
 // The read half (who registered a workspace, which copy of a meta record counts, the one reader)
 // is ./workspace-meta-read.ts since 2026-10-13. Every name is re-exported, so importers of this
@@ -203,9 +208,19 @@ export async function readWorkspaceSchemas(
  *  additive). Rejects unsupported backings with an instructive error instead of accepting a space
  *  no read path will ever show, and infers mode:'document' when an objectType declares
  *  kind:'document' without a mode. Returns a new array; throws WorkspaceMetaError. */
-export function normalizeObjectTypes(objectTypes: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+export function normalizeObjectTypes(
+  objectTypes: Array<Record<string, unknown>>,
+  /** Namespaces the manifest already declares: a space over a reserved part that was stored before the
+   *  rule keeps its place in a full replace (it lists only its own records, workspace-record-key.ts). */
+  declaredBefore?: ReadonlySet<string>,
+): Array<Record<string, unknown>> {
   return objectTypes.map(ot => {
     const name = String(ot?.name ?? '?');
+    const ns = ot?.namespace;
+    if (typeof ns === 'string' && isNodeReservedPart(ns) && !declaredBefore?.has(ns)) {
+      throw new WorkspaceMetaError('INVALID_MANIFEST',
+        `objectType "${name}": the namespace "${ns}" is a part of the workspace the node keeps for itself (its manifest, readme, share, access requests, intake forms, comments, fingerprints and skills), so a space there would hold none of your records. Choose another namespace, such as "shared.${ns.split('.').pop() || name}".`);
+    }
     const backing = ot?.backing;
     if (typeof backing === 'string' && backing && !SUPPORTED_BACKINGS.has(backing)) {
       throw new WorkspaceMetaError('INVALID_MANIFEST',
@@ -457,7 +472,9 @@ export async function updateWorkspaceMeta(
   // 2. Manifest = the structure. A full replace covers add/remove space, policy/gate and settings.
   if (manifest) {
     if (!Array.isArray((manifest as { objectTypes?: unknown }).objectTypes)) throw new WorkspaceMetaError('INVALID_MANIFEST', 'manifest must have an objectTypes array.');
-    const normalizedTypes = normalizeObjectTypes(manifest.objectTypes as Array<Record<string, unknown>>);
+    const declaredBefore = new Set(((manRec?.value as { objectTypes?: Array<{ namespace?: unknown }> } | null)?.objectTypes ?? [])
+      .flatMap(o => (typeof o?.namespace === 'string' ? [o.namespace] : [])));
+    const normalizedTypes = normalizeObjectTypes(manifest.objectTypes as Array<Record<string, unknown>>, declaredBefore);
     const manifestValue: Record<string, unknown> = { ...manifest, objectTypes: normalizedTypes, id: orgId, status: (manifest.status as string) || 'active' };
     if (name) manifestValue.name = name;
     const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);

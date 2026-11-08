@@ -17,6 +17,9 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-11-08 — findWsEntry is the gate's (services/organism-gate.ts, workspaceRegistrations), so the
+ *     access, member and transfer tools name the creator the REST gate and the access layer name
+ *     (secaudit2026nov08 round 14, mcp/workspaces.ts:findWsEntry:first-store-order-registry-copy).
  *   2026-10-27 — aimeat_workspace_object_delete and _revert_to_draft ask the fenced-space rule for the
  *     workspace the record's key lies in, not the ws argument (secaudit2026oct26,
  *     mcp-workspace:delete-fence-ws-from-input).
@@ -344,17 +347,13 @@ export function registerWorkspaceTools(
 
     // ── workspace-access helpers (shared with the GET/POST workspace-access routes) ──
     const bareOwner = (gaii: string) => localAccountName(gaii);
-    /** Find a workspace's registry entry across every member's registry. */
+    /** Find a workspace's registry entry: the gate's lookup, so the copy that counts names the creator
+     *  (workspaceRegistrations), as on the REST routes and in the access layer, never the first copy in
+     *  store order (secaudit2026nov08 round 14). */
     const findWsEntry = async (orgId: string, ws: string): Promise<{ createdBy: string; ownerGaii: string; name?: string } | null> => {
-        const regKey = `organism.${orgId}.meta.workspaces`;
-        const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
-        for (const rec of items) {
-            if (rec.key !== regKey) continue;
-            const list = (rec.value as { workspaces?: Array<{ id: string; createdBy?: string; name?: string }> } | null)?.workspaces ?? [];
-            const entry = list.find(w => w.id === ws);
-            if (entry) return { createdBy: entry.createdBy ?? bareOwner(rec.ownerGaii), ownerGaii: rec.ownerGaii, ...(entry.name ? { name: entry.name } : {}) };
-        }
-        return null;
+        const entry = await H.findWsEntry(orgId, ws);
+        if (!entry) return null;
+        return { createdBy: entry.createdBy ?? bareOwner(entry.ownerGaii), ownerGaii: entry.ownerGaii, ...(entry.name ? { name: entry.name } : {}) };
     };
     /** Active membership role of the agent's owner in an org, or null. */
     const roleOf = async (orgId: string): Promise<string | null> => {
