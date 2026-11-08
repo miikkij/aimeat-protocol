@@ -39,6 +39,9 @@
  *   if (!await spendOnce('signature', sig, Date.now() + 300_000)) refuse();
  *   const c = await windowCounter('mail-send').bump(account, { windowMs: 60_000 });
  * @version-history
+ *   v1.1.1 — 2026-11-08 — spendOnce spends in this process's memory when the registered storage has no
+ *     spend (a partial storage registered for the session checks alone), as with no storage at all
+ *     (secaudit2026nov08 round 14, after the operator confirm token began to spend through spendOnce).
  *   v1.1.0 — 2026-11-08 — windowCounter(kind).release(key): take back a count reserved before a check
  *     (secaudit2026nov08 round 14, services/admin-password.ts).
  *   v1.0.1 — 2026-11-04 — The payload's AES-GCM goes through utils/aes-gcm.ts, the node's one
@@ -227,7 +230,9 @@ export function spendOnceHere(kind: string, value: string, expiresAt: number, no
  */
 export async function spendOnce(kind: string, value: string, expiresAt: number, now = Date.now()): Promise<boolean> {
   const storage = claimStorage();
-  if (!storage) return spendOnceHere(kind, value, expiresAt, now);
+  // A registered object without the spend (a partial storage registered for the session checks
+  // alone) spends in this process's memory, as with no storage at all.
+  if (!storage || typeof (storage as Partial<Storage>).spendEphemeralClaim !== 'function') return spendOnceHere(kind, value, expiresAt, now);
   const first = await storage.spendEphemeralClaim(kind, rowId(kind, value), expiresAt, now);
   sweepSoon(storage, now);
   return first;
