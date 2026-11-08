@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — The schema lock is asked with the caller, on bulk and on import: a CSM's own lock does not
+ *     govern a caller that CSM's visibility refuses (secaudit2026nov08b round 15).
  *   2026-11-05 — A bulk entry at 'group' that names no group and finds none on the record fails by name,
  *     and so does one naming a group id with no group (storage/memory-sharing.ts). An import takes no group id, so its entry at 'group' keeps the group
  *     its record has, or is stored private with its data kept. The import wrote it to nobody.
@@ -276,7 +278,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         maxValueSizeBytes: config.memoryMaxValueSizeKb * 1024,
         totalQuotaBytes: config.memoryQuotaMb * 1024 * 1024,
       },
-      validate: (key, value) => validateMemoryWrite(key, value, storage),
+      // A CSM's own lock does not govern a caller that CSM's visibility refuses (round 15).
+      validate: (key, value) => validateMemoryWrite(key, value, storage, undefined, req.auth ?? null),
     }, 'bulk');
     await fileBatchWriteAsks({ storage, config }, ownerAsks, result);
 
@@ -499,7 +502,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         maxValueSizeBytes: config.memoryMaxValueSizeKb * 1024,
         totalQuotaBytes: Number.MAX_SAFE_INTEGER,   // preserve prior import behaviour (no total-bytes cap)
       },
-      validate: (key, value) => validateMemoryWrite(key, value, storage),
+      validate: (key, value) => validateMemoryWrite(key, value, storage, undefined, req.auth ?? null),
     }, 'import');
     await fileBatchWriteAsks({ storage, config }, ownerAsks, result);
 

@@ -8,6 +8,8 @@
  * @structure registerCopyRoute(router, ctx)
  * @usage registerCopyRoute(router, ctx)   // from registerBulkRoutes, at the position the route had
  * @version-history
+ *   2026-11-08 — The schema lock is asked with the caller: a CSM's own lock does not govern a caller that
+ *     CSM's visibility refuses (secaudit2026nov08b round 15).
  *   v1.3.2 — 2026-11-05 — A copy at visibility 'group' onto a record that has no group is refused with
  *     400 INVALID_INPUT: this route takes no group id (storage/memory-sharing.ts).
  *   v1.3.1 — 2026-10-24 — The shared anonymous agent copies only anonymous.* keys (403 FORBIDDEN, the
@@ -124,8 +126,9 @@ export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     // A schema lock holds on the copy as on every other write: the copy lands under the caller's own
-    // key, so it is validated against the schema that key falls under (feature-list audit #51).
-    const copyValidation = await validateMemoryWrite(key, sourceRecord.value, storage);
+    // key, so it is validated against the schema that key falls under (feature-list audit #51). A CSM's
+    // own lock does not govern a caller that CSM's visibility refuses (round 15).
+    const copyValidation = await validateMemoryWrite(key, sourceRecord.value, storage, undefined, req.auth ?? null);
     if (!copyValidation.valid) {
       res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
         'The copied value does not match the schema locked on this key. Read the schema at schema_url; the copy is stored only when the value matches it.', 422, {

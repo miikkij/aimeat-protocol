@@ -12,6 +12,7 @@
  *   this covers the archive, the key ceiling and the quota, which a shared E2E node cannot reach.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-result-precheck.test.ts
  * @version-history
+ *   2026-11-08 — A private CSM's lock and a writer the CSM refuses (secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, capability-loss review).
  */
 import { describe, it, expect } from 'vitest';
@@ -56,6 +57,20 @@ describe('the start refuses what the answer\'s write would refuse', () => {
         expect(await ask(stub({ schemaType: ['object', 'string'] }))).toBeNull();
         expect(await ask(stub({ schemaType: 'object' }), 'out.answer', 'text', true)).toBeNull();
         expect(await ask(stub({ schemaType: 'object' }), 'out.answer', 'transcribe', true)).toBeNull();
+    });
+
+    it('a private CSM\'s lock is not named to a writer the CSM refuses, and still refuses its own account (round 15)', async () => {
+        const csmLocked = (visibility: string): Storage => ({
+            ...stub(),
+            findApplicableSchema: async () => ({ keyPattern: 'csm.bob.secret', schemaJson: { type: 'object' } }),
+            getCsm: async (name: string) => (name === 'bob.secret'
+                ? { name, registeredBy: 'bob', registeredAt: '2026-01-01T00:00:00.000Z', jsonSchemaKey: 'csm.bob.secret', visibility } : null),
+            getOwner: async (name: string) => ({ name, createdAt: '2025-01-01T00:00:00.000Z' }),
+        } as unknown as Storage);
+        expect(await ask(csmLocked('private'), 'csm.bob.secret.answer')).toBeNull();
+        expect(await ask(csmLocked('public'), 'csm.bob.secret.answer')).toMatchObject({ status: 422, code: 'SCHEMA_VALIDATION_FAILED' });
+        const own = await resultWriteRefusal({ storage: csmLocked('private'), config }, { ownerGhii: `bob@${NODE}`, key: 'csm.bob.secret.answer', op: 'text' });
+        expect(own).toMatchObject({ status: 422, code: 'SCHEMA_VALIDATION_FAILED' });
     });
 
     it('a new key past the key ceiling is 413, and an existing key there is not', async () => {

@@ -43739,6 +43739,10 @@ paths:
           - a pattern under `organism.<id>.` is set by the organism's admins, the
             workspace's creator, or the member whose namespace it is
             (403 SCHEMA_PATTERN_NOT_YOURS); a wildcard organism id is operator only;
+          - a pattern under `csm.` is set only by the account that registered every
+            CSM it reaches (not a later account of an erased author's name) and its
+            agents, or, for a name nobody registered, the account the name starts
+            with (403 SCHEMA_PATTERN_NOT_YOURS); a pattern over every CSM is operator only;
           - the same pattern locked by someone else, under either apply_to, or a key
             another account's lock already governs, is refused
             (403 SCHEMA_LOCKED_BY_OTHER) unless the operator overrides it.
@@ -43845,7 +43849,11 @@ paths:
         the one PUT admits: the account holder, an agent of theirs holding
         memory:write, or the operator. Only the principal that set the lock, the
         account holder for a lock one of their agents set, or the operator, may
-        remove it (403 NOT_SCHEMA_OWNER).
+        remove it (403 NOT_SCHEMA_OWNER). The prefix row at a registered CSM's own
+        key (`csm.<name>`) holds that CSM's schema: its holder removes it only as the
+        account that registered the CSM, or that account's agent; any other holder,
+        such as a later account of an erased author's name, gets 403
+        SCHEMA_PATTERN_NOT_YOURS, and the operator may still remove it.
         Without apply_to the exact lock is the row, else the prefix lock; the other
         row of the same pattern, which may be another principal's, is left in place.
       tags: [Schema]

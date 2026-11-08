@@ -129,6 +129,39 @@ describe('schemaLockRefusal: a wildcard over another account\'s deeper lock, and
     });
 });
 
+describe('rule 5 asks for the registering account, and answers alike for a CSM the caller may not read (round 15)', () => {
+    const CSM_AT = '2026-03-01T00:00:00.000Z';
+    function nodeWith(csms: Array<Record<string, unknown>>, owners: Record<string, string>): Storage {
+        return {
+            ...storageWith([]),
+            async listSchemas() { return []; },
+            async listCsms() { return csms; },
+            async getCsm(name: string) { return csms.find(c => c.name === name) ?? null; },
+            async getOwner(name: string) { return owners[name] ? { name, createdAt: owners[name] } : null; },
+        } as unknown as Storage;
+    }
+    const sensor = { name: 'alice.sensor', registeredBy: 'alice', registeredAt: CSM_AT, jsonSchemaKey: 'csm.alice.sensor', visibility: 'public' };
+    it('refuses a later account of the registering account\'s name, and admits the registering account and its agent', async () => {
+        const later = { storage: nodeWith([sensor], { alice: '2026-06-01T00:00:00.000Z' }), config };
+        expect((await schemaPatternRefusal(later, plain, 'csm.alice.sensor'))?.code).toBe('SCHEMA_PATTERN_NOT_YOURS');
+        expect((await schemaPatternRefusal(later, plain, 'csm.alice.sensor.detail'))?.code).toBe('SCHEMA_PATTERN_NOT_YOURS');
+        const same = { storage: nodeWith([sensor], { alice: '2026-01-01T00:00:00.000Z' }), config };
+        expect(await schemaPatternRefusal(same, plain, 'csm.alice.sensor')).toBeNull();
+        expect(await schemaPatternRefusal(same, { ...plain, principal: 'bot#alice@node-1', roles: ['agent'] }, 'csm.alice.sensor')).toBeNull();
+        expect(await schemaPatternRefusal(later, operator, 'csm.alice.sensor')).toBeNull();
+    });
+    it('gives the same reason for another account\'s private CSM as for a name nobody registered', async () => {
+        const bob = { ...plain, principal: 'bob@node-1', owner: 'bob' };
+        const deps = { storage: nodeWith([{ ...sensor, name: 'alice.secret', jsonSchemaKey: 'csm.alice.secret', visibility: 'private' }, sensor], { alice: '2026-01-01T00:00:00.000Z', bob: '2026-01-01T00:00:00.000Z' }), config };
+        const hidden = await schemaPatternRefusal(deps, bob, 'csm.alice.secret');
+        const missing = await schemaPatternRefusal(deps, bob, 'csm.alice.nothing');
+        expect(hidden?.code).toBe('SCHEMA_PATTERN_NOT_YOURS');
+        expect(hidden?.details?.reason).toBe(missing?.details?.reason);
+        // A CSM bob may read is still named as another account's.
+        expect((await schemaPatternRefusal(deps, bob, 'csm.alice.sensor'))?.details?.reason).toBe('registered_by_other');
+    });
+});
+
 describe('scheduleKindScopeRefusal', () => {
     const agent = { isOwnerSession: false, scopes: ['task:write', 'workflow:write'] };
     it('refuses editing and running an ai schedule without ai:use', () => {

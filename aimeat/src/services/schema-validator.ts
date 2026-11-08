@@ -8,6 +8,9 @@
  *   also checked against the workspace manifest's write guards (services/write-guards.ts)
  *   here, so one call site covers the REST, MCP and publish surfaces alike.
  * @version-history
+ *   2026-11-08 — validateMemoryWrite takes the writer: the lock row a CSM owns does not govern a writer
+ *     the CSM's visibility refuses, so the answer neither names the CSM's lock nor lists its fields
+ *     (secaudit2026nov08b round 15, memory-write-violations-describe-unreadable-csm-lock).
  *   2026-11-07 — effectiveSchemaOf(): the schema a lock enforces, with its strict mode applied, taken
  *     out of validateMemoryWrite unchanged so the workspace row path validates a row body against
  *     the same compiled schema (services/workspace-rows/row-schema.ts; developer ruling 2026-11-07).
@@ -38,6 +41,8 @@ import type { Storage } from '../storage/interface.js';
 import { getStats } from './stats.js';
 import { logger } from '../utils/logger.js';
 import { registerInputFormats } from './input-formats.js';
+import type { AudienceAuth } from './audience.js';
+import { csmLockHiddenFromWriter } from './csm/readers.js';
 
 // CJS-ESM interop: ajv and ajv-formats are CJS packages
 const require = createRequire(import.meta.url);
@@ -254,11 +259,20 @@ export interface ValidationResult {
   schemaKey?: string;
 }
 
+/**
+ * Check one memory write against the lock that governs its key. `writer` is who writes (null: nobody
+ * signed in); a door that knows it passes it. Under a CSM's keys (`csm.<name>…`), a lock under `csm.`
+ * does not govern a writer who may not read that CSM: a CSM the caller may not read answers as a missing
+ * one (ruling 2 of 2026-11-07), so such a write is answered as a write under no lock, and the answer never
+ * names the CSM's lock or lists its fields (secaudit2026nov08b round 15). Without `writer` every lock
+ * governs, as before.
+ */
 export async function validateMemoryWrite(
   memoryKey: string,
   value: unknown,
   storage: Storage,
-  writeCtx?: import('./write-guards.js').WriteGuardCtx
+  writeCtx?: import('./write-guards.js').WriteGuardCtx,
+  writer?: AudienceAuth | null,
 ): Promise<ValidationResult> {
   // Write guards run first: a conflicting write in a guarded namespace is refused before any
   // schema work, whatever surface it came through (REST memory write, MCP, publish).
@@ -270,6 +284,9 @@ export async function validateMemoryWrite(
 
   if (!schemaRecord) {
     return { valid: true }; // No schema = no validation
+  }
+  if (writer !== undefined && await csmLockHiddenFromWriter(storage, memoryKey, schemaRecord.keyPattern, writer)) {
+    return { valid: true };
   }
 
   const schemaToValidate = effectiveSchemaOf(schemaRecord);

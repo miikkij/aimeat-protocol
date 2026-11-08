@@ -23,6 +23,8 @@
  *   const refusal = await resultWriteRefusal({ storage, config }, { ownerGhii, key, startedBy, op, json });
  *   if (refusal) throw new AiJobError(refusal.code, refusal.status, refusal.message);
  * @version-history
+ *   2026-11-08 — The schema-type check skips the lock a CSM owns when the job's writer may not read that
+ *     CSM, as the write does, so the refusal never names it (secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, ai-jobs/service.ts:writeResult): the organism
  *     check moved here from service.ts, and the archive, schema-type, key-count and quota checks were
  *     added so a job the write would refuse is refused before any cost.
@@ -34,6 +36,7 @@ import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
 import { isKeyArchived } from '../archive.js';
 import { checkMemoryQuota } from '../quota.js';
 import { jobWriter } from './starter.js';
+import { csmLockHiddenFromWriter, writerAudienceAuth } from '../csm/readers.js';
 import type { AiJobStartedBy } from './types.js';
 import type { AiOp } from './op.js';
 
@@ -71,7 +74,12 @@ export async function resultWriteRefusal(
 
     const want = answerType(spec.op, !!spec.json);
     if (want) {
-        const lock = await storage.findApplicableSchema(key);
+        // As the write asks it: a CSM's own lock does not govern a writer that CSM's visibility refuses,
+        // so it is neither named nor applied here (round 15).
+        const writer = jobWriter({ owner: ownerGhii, started_by: spec.startedBy });
+        const found = await storage.findApplicableSchema(key);
+        const hidden = !!found && await csmLockHiddenFromWriter(storage, key, found.keyPattern, writerAudienceAuth(writer.principal, writer.targetGaii, writer.federated));
+        const lock = hidden ? null : found;
         const declared = lock?.schemaJson?.type;
         const types = typeof declared === 'string' ? [declared] : Array.isArray(declared) ? declared.map(String) : null;
         if (lock && types && !types.includes(want)) {

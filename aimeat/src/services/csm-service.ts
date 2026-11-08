@@ -34,6 +34,8 @@
  *   const compiled = await getCsmCompiled(storage, 'alice.sensor');  // { name, version, jsonSchema, hash }
  *   const out = await createCsmAs({ storage, config }, caller, { yaml });  // { ok, status, data } | refusal
  * @version-history
+ *   2026-11-08 — isRegisteringAccount and the read test moved unchanged to services/csm/readers.ts, so the
+ *     schema-lock rule and the memory write's lock check ask the same test (secaudit2026nov08b round 15).
  *   v1.1.0 — 2026-11-08 — Ruling 2 of 2026-11-08 in deleteCsmAs: a use check may name the account of a
  *     use (CsmUse); only the registering account's own uses block, others' owners get a csm_removed
  *     notice. The registering account is the name's holder since the CSM was registered
@@ -54,7 +56,8 @@ import type { Storage, CsmRecord, CsmVersionRecord } from '../storage/interface.
 import type { CallerContext } from './caller-context.js';
 import { parseCsm, validateCsm, csmToJsonSchema, type CsmDefinition } from './csm-parser.js';
 import { inferCsmFromSample } from './csm/infer.js';
-import { parseAudience, formatAudience, audienceAllows, isOrganismMember, type AudienceAuth } from './audience.js';
+import { parseAudience, formatAudience, isOrganismMember } from './audience.js';
+import { isRegisteringAccount, csmMayReadAs, csmLockHiddenFrom } from './csm/readers.js';
 import { csmVisibilityDefault } from './content-defaults.js';
 import { operatorOverride } from './operator-override.js';
 import { emitChange } from './event-bus.js';
@@ -219,31 +222,9 @@ function writerAccount(caller: CallerContext): string | null {
   return localAccountOf(caller.owner);
 }
 
-/**
- * Whether `account` is the account that registered the CSM: the same name, and that name's account was
- * registered no later than the CSM. A deleted account's name is released for reuse (decision
- * 2026-08-10), so an account registered after the CSM is a later holder of the name, not its author
- * (secaudit2026nov08 round 14). No account record, or no readable time, answers by the name alone: a
- * signed-in caller always has an account, and the check never takes a right away on a guess.
- */
-async function isRegisteringAccount(storage: Storage, record: CsmRecord, account: string | null): Promise<boolean> {
-  if (!account || record.registeredBy !== account) return false;
-  const holder = await storage.getOwner(account);
-  const registered = Date.parse(holder?.createdAt ?? '');
-  const named = Date.parse(record.registeredAt ?? '');
-  return !Number.isFinite(registered) || !Number.isFinite(named) || registered <= named;
-}
-
-/** May this caller (null: nobody signed in) read the CSM? The registering account always may. */
+/** May this caller (null: nobody signed in) read the CSM? The registering account always may (services/csm/readers.ts). */
 export async function csmMayRead(storage: Storage, record: CsmRecord, viewer: CallerContext | null): Promise<boolean> {
-  const audience = parseAudience(record.visibility ?? 'public') ?? { level: 'private' as const };
-  if (audience.level === 'public') return true;
-  if (!viewer) return false;
-  const auth: AudienceAuth = viewer.auth;
-  // Private names the registering account; a later holder of the name is not it.
-  const ownerName = audience.level === 'private' && auth.owner === record.registeredBy
-    && !(await isRegisteringAccount(storage, record, auth.owner)) ? undefined : record.registeredBy;
-  return audienceAllows(storage, audience, auth, { ...(ownerName ? { ownerName } : {}) });
+  return csmMayReadAs(storage, record, viewer ? viewer.auth : null);
 }
 
 /**
@@ -252,10 +233,7 @@ export async function csmMayRead(storage: Storage, record: CsmRecord, viewer: Ca
  * of 2026-11-07); every other row stays public metadata, as before (secaudit2026nov08 round 14).
  */
 export async function csmLockShownTo(storage: Storage, keyPattern: string, viewer: CallerContext | null): Promise<boolean> {
-  if (!keyPattern.startsWith('csm.')) return true;
-  const record = await storage.getCsm(keyPattern.slice('csm.'.length));
-  if (!record || record.jsonSchemaKey !== keyPattern) return true;
-  return csmMayRead(storage, record, viewer);
+  return !(await csmLockHiddenFrom(storage, keyPattern, viewer ? viewer.auth : null));
 }
 
 /** The visibility as this viewer may read it: the owner sees the organism's id, others its level. */

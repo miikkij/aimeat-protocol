@@ -14,8 +14,17 @@
  *   4 The schema-lock row a private CSM owns is not listed on GET /v1/schemas, not answered on
  *     GET /v1/memory/{key}/schema, and the CSM is not in the federation cross-catalogue, for a caller
  *     the CSM refuses; its owner, a public CSM and a plain lock answer as before.
+ *   5 A memory write under a private CSM's key by an account the CSM refuses answers as under a CSM
+ *     that does not exist: no lock named, no field listed, and the lock-route refusal gives the same
+ *     reason. The owner, any account under a public CSM and an organism member under its CSM still get
+ *     the full refusal (round 15).
+ *   6 The next account of an erased installer's name is refused a lock on the installer's package CSM,
+ *     which has no lock row; an account never erased sets, changes and removes its own CSM's lock, and a
+ *     package with a CSM and a cortex schema part on its key installs (round 15).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=csm-ownership
  * @version-history
+ *   2026-11-08 — Sections 5 and 6 (secaudit2026nov08b round 15: memory-write-violations-describe-unreadable-csm-lock,
+ *     csm-family-decided-by-name-not-registering-account).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14: in-use-counts-other-accounts-receivers,
  *     csm-component-name-skips-owner-prefix, registeredBy-bare-name-survives-account-erasure,
  *     schema-lock-table-public-read).
@@ -232,6 +241,143 @@ await test('4 A private CSM\'s lock row is hidden from a caller the CSM refuses;
     assert(!names.includes(secret), 'the private CSM is in the cross-catalogue');
     assert(names.includes(open), 'the public federable CSM is in the cross-catalogue');
     await call(`/v1/memory/${enc(plain)}/schema`, { token: A.token, method: 'DELETE' });
+});
+
+// ── 5 A memory write under a CSM the writer may not read (round 15) ───────────
+
+const SHAPE = (name: string) => `csm: "1.0"
+service:
+  name: ${name}
+  type: data
+  description: Readings a program sends
+data_schema:
+  required:
+    temperature: { type: number }
+    unit: { type: string, enum: [celsius, fahrenheit] }
+`;
+async function shaped(token: string, name: string, visibility: string): Promise<string> {
+    const r = await call('/v1/csm', { token, body: { yaml: SHAPE(name), visibility } });
+    assert(r.status === 201, `CSM ${name}: ${show(r)}`);
+    return r.body.data.csm.name as string;
+}
+const write = (token: string, key: string, value: unknown) => call('/v1/memory', { token, body: { key, value, visibility: 'private' } });
+/** A 422 that names the lock at csm.<name> and lists both required fields and the enum's values. */
+function fullRefusal(r: Answer, name: string, who: string) {
+    assert(r.status === 422 && codeOf(r) === 'SCHEMA_VALIDATION_FAILED', `${who}: ${show(r)}`);
+    assert(String(r.body.error?.details?.schema_url ?? '').includes(enc(`csm.${name}`)), `${who}: the schema_url names the lock: ${show(r)}`);
+    const v = JSON.stringify(r.body.error?.details?.violations ?? []);
+    assert(v.includes('temperature') && v.includes('unit'), `${who}: every missing field is listed: ${v}`);
+}
+
+let orgId = '';
+await test('5a attack: B\'s write under A\'s private CSM answers as under a CSM that does not exist, and names neither its lock nor its fields', async () => {
+    const hidden = await shaped(A.token, `hidden${stamp}`, 'private');
+    const missing = `${A.name}.nothing${stamp}`;
+    const h = await write(B.token, `csm.${hidden}.probe`, {});
+    const m = await write(B.token, `csm.${missing}.probe`, {});
+    assert(m.status === 201, `the write under no CSM: ${show(m)}`);
+    assert(h.status === m.status, `the write under A's private CSM answers ${h.status}, under none ${m.status}: ${show(h)}`);
+    assert(!h.text.includes('temperature') && !h.text.includes('fahrenheit') && !h.text.includes('schema_url'), `the answer describes A's CSM: ${show(h)}`);
+    const typed = await write(B.token, `csm.${hidden}.typed`, { temperature: 'warm', unit: 'kelvin' });
+    assert(typed.status === 201, `a wrongly typed value under A's private CSM: ${show(typed)}`);
+    // A row A set under its own private CSM's keys answers the same way.
+    const sub = await call(`/v1/memory/${enc(`csm.${hidden}.exact`)}/schema`, { token: A.token, method: 'PUT', body: { schema: { type: 'object', required: ['secretfield'] }, apply_to: 'exact', schema_mode: 'open' } });
+    assert(sub.status === 200, `A locks a key under its own private CSM: ${show(sub)}`);
+    const se = await write(B.token, `csm.${hidden}.exact`, {});
+    assert(se.status === 201 && !se.text.includes('secretfield') && !se.text.includes('schema_url'), `B's write under A's exact row: ${show(se)}`);
+    const own = await write(A.token, `csm.${hidden}.exact`, {});
+    assert(own.status === 422 && own.text.includes('secretfield'), `A's own write under its exact row: ${show(own)}`);
+    const patched = await call(`/v1/memory/${enc(`csm.${hidden}.probe`)}`, { token: B.token, method: 'PATCH', body: { patch: { note: 'x' } } });
+    assert(patched.status === 200, `B patches its own record under A's private CSM: ${show(patched)}`);
+    const schemaPut = (pattern: string) => call(`/v1/memory/${enc(pattern)}/schema`, { token: B.token, method: 'PUT', body: { schema: { type: 'object' }, apply_to: 'prefix', schema_mode: 'open' } });
+    const ph = await schemaPut(`csm.${hidden}`);
+    const pm = await schemaPut(`csm.${missing}`);
+    assert(ph.status === 403 && pm.status === 403, `B locks under A's name: ${show(ph)} / ${show(pm)}`);
+    assert(ph.body.error?.details?.reason === pm.body.error?.details?.reason, `the reasons differ: ${show(ph)} / ${show(pm)}`);
+});
+
+await test('5b use: the owner, any account under a public CSM and an organism member under its CSM get the full refusal; a non-member does not', async () => {
+    const hidden = await shaped(A.token, `own${stamp}`, 'private');
+    fullRefusal(await write(A.token, `csm.${hidden}.probe`, {}), hidden, 'A under its own private CSM');
+    const open = await shaped(A.token, `open${stamp}`, 'public');
+    fullRefusal(await write(B.token, `csm.${open}.probe`, {}), open, 'B under A\'s public CSM');
+    const ok = await write(B.token, `csm.${open}.good`, { temperature: 3, unit: 'celsius' });
+    assert(ok.status === 201, `a valid value under A's public CSM: ${show(ok)}`);
+    const o = await call('/v1/organisms', { token: A.token, body: { name: `CSM Org ${stamp}`, description: 'x', type: 'project', join_policy: 'invite_only', visibility: 'private' } });
+    assert(o.status === 201, `organism: ${show(o)}`);
+    orgId = o.body.data.organism.id as string;
+    const add = await call(`/v1/organisms/${orgId}/members`, { token: A.token, body: { ghii: B.name } });
+    assert(add.status === 201, `add B: ${show(add)}`);
+    const team = await shaped(A.token, `team${stamp}`, `organism:${orgId}`);
+    fullRefusal(await write(B.token, `csm.${team}.probe`, {}), team, 'B, a member, under the organism CSM');
+    const d = await registerOwner(BASE, `cowd${stamp}`);
+    const outsider = await write(d.token, `csm.${team}.probe`, {});
+    assert(outsider.status === 201, `a non-member under the organism CSM answers as under none: ${show(outsider)}`);
+    await call(`/v1/owners/${d.name}`, { token: d.token, method: 'DELETE' });
+});
+
+// ── 6 A package's CSM after its author is erased (round 15) ───────────────────
+
+await test('6a attack: the next account of an erased installer\'s name is refused a lock on that installer\'s package CSM', async () => {
+    const eName = `cowe${stamp}`;
+    const e = await registerOwner(BASE, eName);
+    const pkgName = `${eName}.pkg${stamp}`;
+    const made = await call('/v1/packages', { token: e.token, body: { name: pkgName, components: [{ id: 'csm-main', type: 'csm', label: 'Main', content: YAML(`gauge${stamp}`) }] } });
+    assert(made.status === 201, `package: ${show(made)}`);
+    const inst = await call(`/v1/packages/${enc(`${pkgName}::${eName}`)}/install`, { token: e.token, body: {} });
+    assert(inst.status === 201, `install: ${show(inst)}`);
+    const comp = (inst.body.data.installedComponents as Array<{ componentId: string; registeredAs: string }>).find(c => c.componentId === 'csm-main');
+    assert(comp, `the CSM component: ${show(inst)}`);
+    const name = comp.registeredAs;
+    const before = await call(`/v1/csm/${enc(name)}`, { token: B.token });
+    assert(before.status === 200, `B reads the package CSM: ${show(before)}`);
+    const erased = await call(`/v1/owners/${eName}`, { token: e.token, method: 'DELETE' });
+    assert(erased.status === 200, `erase E: ${show(erased)}`);
+    await registerOwner(BASE, eName);
+    const tok = await ownerSignIn(BASE, eName);
+    assert(tok.body.ok === true, `the new account signs in: ${JSON.stringify(tok.body?.error)}`);
+    const t2 = tok.body.data.token as string;
+    try {
+        const put = (pattern: string, applyTo: string) => call(`/v1/memory/${enc(pattern)}/schema`, {
+            token: t2, method: 'PUT', body: { schema: { type: 'object', properties: { other: { type: 'string' } }, required: ['other'] }, apply_to: applyTo, schema_mode: 'strict' },
+        });
+        const prefix = await put(`csm.${name}`, 'prefix');
+        assert(prefix.status === 403 && codeOf(prefix) === 'SCHEMA_PATTERN_NOT_YOURS', `the new account locks the erased installer's CSM: ${show(prefix)}`);
+        const exact = await put(`csm.${name}.reading`, 'exact');
+        assert(exact.status === 403 && codeOf(exact) === 'SCHEMA_PATTERN_NOT_YOURS', `the new account locks a key under it: ${show(exact)}`);
+        const after = await call(`/v1/csm/${enc(name)}`, { token: B.token });
+        assert(after.status === 200 && JSON.stringify(after.body.data.csm.json_schema) === JSON.stringify(before.body.data.csm.json_schema),
+            `the CSM's published schema changed: ${show(after)}`);
+    } finally {
+        await call(`/v1/owners/${eName}`, { token: t2, method: 'DELETE' });
+    }
+});
+
+await test('6b use: an account never erased sets, changes and removes the lock of its own CSM; a package CSM with a cortex schema part on it installs', async () => {
+    const own = await csm(A.token, `lockable${stamp}`);
+    const put = (title: string) => call(`/v1/memory/${enc(`csm.${own}`)}/schema`, {
+        token: A.token, method: 'PUT', body: { schema: { type: 'object', properties: { [title]: { type: 'string' } } }, apply_to: 'prefix', schema_mode: 'open' },
+    });
+    const first = await put('first');
+    assert(first.status === 200, `A sets the lock of its own CSM: ${show(first)}`);
+    const second = await put('second');
+    assert(second.status === 200, `A changes it: ${show(second)}`);
+    const removed = await call(`/v1/memory/${enc(`csm.${own}`)}/schema?apply_to=prefix`, { token: A.token, method: 'DELETE' });
+    assert(removed.status === 200, `A removes it: ${show(removed)}`);
+
+    const pkgName = `${B.name}.withcx${stamp}`;
+    const pattern = `csm.${B.name}.dial${stamp}`;
+    const cortex = {
+        id: 'cortex-dial', type: 'cortex', label: 'dial', dependencies: [],
+        content: JSON.stringify({
+            manifest: `apiVersion: cortex.aimeat.org/v1\nkind: Extension\nmetadata:\n  name: cowdial${stamp}\nspec:\n  version: "1.0.0"\n  components:\n    - type: schema\n      name: shape\n      key_pattern: "${pattern}"\n      apply_to: prefix\n      schema:\n        type: object\n        properties:\n          title: { type: string }\n`,
+            libs: {},
+        }),
+    };
+    const made = await call('/v1/packages', { token: B.token, body: { name: pkgName, components: [{ id: 'csm-main', type: 'csm', label: 'Main', content: YAML(`dial${stamp}`) }, cortex] } });
+    assert(made.status === 201, `package: ${show(made)}`);
+    const inst = await call(`/v1/packages/${enc(`${pkgName}::${B.name}`)}/install`, { token: B.token, body: {} });
+    assert(inst.status === 201, `B installs a CSM and a cortex schema part on its key: ${show(inst)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
