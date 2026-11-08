@@ -21,6 +21,8 @@
  *   readNodeStores · updateNodeStores · nodeEntryNamed · sealNodeCredential · nodeStoreView · nodeEntrySpec
  * @usage const rec = await readNodeStores(ctx); const entry = nodeEntryNamed(rec, rec.default);
  * @version-history
+ *   v1.2.0 — 2026-11-08 — An entry keeps which files it takes (`takes`), and the view answers it
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.1.1 — 2026-11-05 — credentialContext exported for the data key's re-encrypt job (codebase
  *     analysis 2026-11-03, decision 4a of 2026-11-05).
  *   v1.1.0 — 2026-10-31 — An entry keeps its last browser check, and the view answers it with the rule to add.
@@ -28,6 +30,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { BlobSpec } from '../../storage/blob/blob-types.js';
+import { takesOrDefault, takesView, type StoreTakes } from '../../storage/blob/store-takes.js';
 import { decryptBound, encryptBound, getEncryptionKey } from '../encryption.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
@@ -53,6 +56,8 @@ export interface NodeStoreEntry {
   lastCheck?: { at: string; ok: boolean; message: string };
   /** Whether a browser on this node may send to it directly: written with lastCheck. */
   browserAccess?: BrowserAccess;
+  /** Which files it takes (storage/blob/store-takes.ts); absent reads as DEFAULT_TAKES. */
+  takes?: StoreTakes;
 }
 
 export interface NodeFileStores {
@@ -105,6 +110,7 @@ export function nodeStoreView(ctx: FileStoreCtx, rec: NodeFileStores, e: NodeSto
     kind: e.target.kind, where: whereOf(e.target), place: placeOf(e.target), prefix: e.prefix,
     added_at: e.addedAt, added_by: e.addedBy, last_check: e.lastCheck ?? null,
     browser_access: browserAccessView(e.browserAccess, e.target.kind),
+    takes: takesView(takesOrDefault(e.takes)),
     // False when the node's key no longer opens the store's key: an operator enters it again.
     reachable: nodeEntrySpec(ctx.config, e) !== null,
     files,

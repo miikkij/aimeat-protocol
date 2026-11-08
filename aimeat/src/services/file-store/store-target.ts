@@ -11,17 +11,25 @@
  *   names the bucket itself, so the overlap check (prefixesOverlap) and the daily sweep can see that
  *   two store ids share it. Without that, the sweep of one store would remove the objects of the other,
  *   because no row of its own names them.
- * @structure StoreTarget · STORE_NAME · storeNameProblem · readStoreInput · specFromTarget · targetOfSpec ·
- *   placeKey · prefixesOverlap · whereOf · placeOf · sameTarget
+ * @structure envStoreTakes · StoreTarget · STORE_NAME · storeNameProblem · readStoreInput · specFromTarget ·
+ *   targetOfSpec · placeKey · prefixesOverlap · whereOf · placeOf · sameTarget
  * @usage const input = readStoreInput(config, body, { reach: 'owner', defaultPrefix });
  * @version-history
+ *   v1.1.0 — 2026-11-08 — envStoreTakes: the rule of the environment's store, from file_store.min_mb and
+ *     file_store.kinds (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.0.0 — 2026-10-30 — Initial: moved out of owner-file-store-actions.ts and shared with the named node
  *     stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { BlobSpec } from '../../storage/blob/blob-types.js';
 import { normalizePrefix } from '../../config-file-store.js';
+import { takesOrDefault, type StoreTakes } from '../../storage/blob/store-takes.js';
 import { azureSpecFrom, ownerEndpointAllowed } from './file-store-specs.js';
+
+/** The rule of the store the environment names: file_store.min_mb and file_store.kinds. */
+export function envStoreTakes(config: Pick<AimeatConfig, 'fileStoreMinMb' | 'fileStoreKinds'>): StoreTakes {
+  return takesOrDefault({ minBytes: Math.round(config.fileStoreMinMb * 1024 * 1024), kinds: config.fileStoreKinds });
+}
 
 /** The parts of a store that are not secret, as they were given. */
 export type StoreTarget =

@@ -1371,6 +1371,13 @@
       },
       "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the length of an arrived memory record, to decide whether to inspect it; nothing is shown or sent from here, and the inspection reads it again through the classification reader (pipeline.ts)."
     },
+    "src/services/content/leftovers.ts": {
+      "reads": {
+        "listMemoryKeysByPrefix": 1,
+        "listStorageFiles": 1
+      },
+      "why": "Reviewed 2026-11-08 (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post), the node's own read: the owners that have contentclass.facts.<nn> shards (keys only, no values) and each owner's file list without bytes, to delete the content class pipeline's own contentclass- files that no facts entry names. Nothing is shown or sent; no item content is read."
+    },
     "src/services/content/pipeline.ts": {
       "reads": {
         "getStorageFileMeta": 1,

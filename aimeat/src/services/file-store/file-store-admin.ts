@@ -9,6 +9,9 @@
  * @structure FileStoreResult · nodeFileStoreStatus · probeStore · testNodeFileStore · checkOf · moveFilesToNodeStore
  * @usage const status = await nodeFileStoreStatus({ storage, config });
  * @version-history
+ *   v1.3.0 — 2026-11-08 — The status shows which files each store takes (`takes`), and a move to where a
+ *     new file would go sends a file that store does not take to the database
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.2.0 — 2026-10-31 — A test also checks whether a browser may send to the store directly, and the
  *     answer gives the CORS rule to add when it may not (browser-access.ts).
  *   v1.1.0 — 2026-10-30 — The named node stores in the status, a test of one by name, and a move from
@@ -24,7 +27,8 @@ import { nodeStoreSpec, storeFor } from './file-store-specs.js';
 import { choiceIdOf, nodeTarget, ownerTarget, resolveChoice } from './file-store-resolver.js';
 import { listOwnerStores, ownerStoreMode, readApprovals, type FileStoreCtx } from './owner-file-store.js';
 import { nodeEntryNamed, nodeEntrySpec, nodeEntryStoreId, nodeStoreView, readNodeStores, updateNodeStores } from './node-file-stores.js';
-import { placeOf, targetOfSpec, whereOf } from './store-target.js';
+import { envStoreTakes, placeOf, targetOfSpec, whereOf } from './store-target.js';
+import { storeTakesFile, takesOrDefault, takesView } from '../../storage/blob/store-takes.js';
 import { browserAccessView, checkBrowserAccess } from './browser-access.js';
 
 export type FileStoreResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string; message: string };
@@ -48,6 +52,8 @@ export async function nodeFileStoreStatus(ctx: FileStoreCtx) {
     place: 'spec' in spec ? placeOf(targetOfSpec(spec.spec)) : null,
     prefix: 'spec' in spec ? spec.prefix : null,
     missing: 'missing' in spec ? spec.missing : [],
+    // Which files the environment's store takes (file_store.min_mb, file_store.kinds).
+    takes: takesView(envStoreTakes(ctx.config)),
     // The named store that takes new files, or null when the environment's setting decides.
     default_store: named.default ? nodeEntryStoreId(named.default) : null,
     // Where a new file goes when neither its writer nor its owner's own storage decides.
@@ -69,6 +75,7 @@ export async function nodeFileStoreStatus(ctx: FileStoreCtx) {
         kind: e.target.kind, where: whereOf(e.target), place: placeOf(e.target),
         connected_at: e.connectedAt, last_check: e.lastCheck ?? null, reason: o.reason ?? null,
         browser_access: browserAccessView(e.browserAccess, e.target.kind),
+        takes: takesView(takesOrDefault(e.takes)),
         files: places.find(p => p.store === e.storeId) ?? NONE,
         approval: approvals.owners.find(a => a.owner === o.owner) ?? null,
       }))),
@@ -191,7 +198,9 @@ export async function moveFilesToNodeStore(ctx: FileStoreCtx, opts: { limit?: un
   const failed: { owner: string; key: string; error: string }[] = [];
   for (const f of page) {
     try {
-      const to = fixed ?? (await ownerTarget(ctx, f.ownerGaii)) ?? node;
+      const auto = fixed ? null : (await ownerTarget(ctx, f.ownerGaii)) ?? node;
+      // Where a new file would go: a file that store does not take goes to the database.
+      const to = fixed ?? (auto?.takes && !storeTakesFile(auto.takes, f.size, f.mimeType) ? null : auto);
       const out = await relocateStorageFile(ctx.storage, f.ownerGaii, f.key, to);
       if (out === 'moved') { moved++; bytes += f.size; } else skipped++;
     } catch (err) {

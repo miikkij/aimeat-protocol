@@ -4,6 +4,32 @@
     {
       "date": "2026-11-08",
       "kind": "fix",
+      "id": "2026-11-08-an-extensions-refusal-says-why",
+      "highlight": false,
+      "audience": [
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "An extension's refusal says why",
+        "fi": "Laajennuksen hylkäys kertoo syynsä"
+      },
+      "summary": {
+        "en": "When an extension refuses a call, you see its reason and the right status, not a node fault.",
+        "fi": "Kun laajennus hylkää kutsun, näet sen syyn ja oikean tilan, et solmun vikaa."
+      },
+      "impact": {
+        "en": "A caller that read the extension's own code as the error code now reads it from error.details.reason.",
+        "fi": "Jos ohjelmasi luki laajennuksen oman koodin virhekoodista, se lukee sen nyt kentästä error.details.reason."
+      },
+      "body": {
+        "en": "When an extension refuses a call and names why, for example an overlapping claim, the answer says so: the code is EXTENSION_REFUSED, the extension's own reason is in error.details.reason and in the message, and the status follows the reason (409 for a conflict, 404 for something missing). Before, every such refusal looked like a fault in the node. App tools pass the same answer on.",
+        "fi": "Kun laajennus hylkää kutsun ja kertoo syyn, esimerkiksi päällekkäisen varauksen, vastaus kertoo sen. Koodi on EXTENSION_REFUSED, laajennuksen oma syy on kentässä error.details.reason ja viestissä, ja tila seuraa syytä (409 ristiriidasta, 404 puuttuvasta). Aiemmin jokainen tällainen hylkäys näytti solmun vialta. Sovellusten työkalut välittävät saman vastauksen."
+      }
+    },
+    {
+      "date": "2026-11-08",
+      "kind": "fix",
       "id": "2026-11-08-read-a-message-request-in-full-on-a-phone",
       "highlight": false,
       "audience": [

@@ -40,6 +40,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-08 — The storage quota is asked with the file's media type, because a person's store takes
+ *     a small file only when it is of a kind the store is for (storage/blob/store-takes.ts).
  *   v1.16.0 — 2026-11-05 — groupBindingRefusal() also refuses a group id naming no group, on the write,
  *     the mint and the routes that ask before them (Jouni, 2026-11-05).
  *   v1.15.0 — 2026-11-04 — groupBindingRefusal(): the write and the presigned mint refuse visibility
@@ -418,7 +420,7 @@ export async function writeStorageFile(
     if (storeRefused) return storeRefused;
 
     // M-2 (§8.4): the account-wide ceiling, which is a different gate from the per-file one above.
-    const quota = await checkStorageQuota(config, storage, ownerGaii, size, input.store?.id);
+    const quota = await checkStorageQuota(config, storage, ownerGaii, size, input.store?.id, input.mimeType);
     if (!quota.allowed) {
         return { ok: false, status: 413, code: 'QUOTA_EXCEEDED', limit: 'account', message: quota.reason! };
     }

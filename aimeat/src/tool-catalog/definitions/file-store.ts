@@ -14,6 +14,8 @@
  * @structure fileStoreTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.3.0 — 2026-11-08 — `takes` on both set tools: which files a store is for; the views answer it
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.2.0 — 2026-10-31 — `browser_access` (direct browser transfer and the CORS rule to add) in the
  *     views and tests; aimeat_file_store_set without `kind` tests the store again.
  *   v1.1.0 — 2026-10-30 — Named stores: `name` and `make_default` on set, `name` on remove, `to` and
@@ -21,7 +23,18 @@
  *     a test by name and a move with `from` and `to` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
+import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
+
+/** Which files a store takes (storage/blob/store-takes.ts); shared by the person's and the operator's set. */
+const TAKES_INPUT = {
+    type: 'object',
+    description: 'Which files the store is for: { min_mb, kinds }. A file at least min_mb megabytes long goes to the store; a smaller one keeps its bytes in the node\'s database unless its kind is in kinds (video, audio, image, pdf). min_mb 0 sends every file. A store that never set this takes 1 MB and up, and every video and sound. A part left out keeps its value. A file the store holds and no longer takes moves to the database by itself within a day.',
+    zod: z.object({
+        min_mb: z.number().min(0).max(10240).optional().describe('Megabytes; 0 sends every file.'),
+        kinds: z.array(z.enum(['video', 'audio', 'image', 'pdf'])).optional().describe('Kinds that go to the store whatever their size.'),
+    }),
+} as const;
 
 /** The address and key fields of a store, shared by the person's and the operator's set. */
 const STORE_INPUT = {
@@ -50,7 +63,7 @@ export const fileStoreTools = [
     },
     {
         name: 'aimeat_file_store_set',
-        description: 'Connect a store of the person\'s own for their files, under a `name`: an S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any S3-compatible service) or an Azure Blob container, with their own keys. A person may have several; the first becomes the default, and `make_default: true` makes another one the default. A new file of the person and of their agents goes to the default unless its writer names another store (`store` on aimeat_storage_upload); files in their own storage do not count toward the node\'s storage quota; files already stored stay where they are until moved (aimeat_file_store_move). The node tests the storage first (write, read, read part, list, remove under the folder) and saves nothing when a step fails (STORE_TEST_FAILED names the step). It also checks whether a browser may send files to it directly (the store\'s CORS rule) and answers that in `browser_access` with the rule to add; a store without the rule is still saved and takes files through the node. The keys are kept encrypted and are never returned. S3: `bucket`, `access_key_id`, `secret_access_key`, and `endpoint` (an https address; leave it out for Amazon S3) and `region`. Azure: `credential` (the account key with `account` and `container`, a connection string with `container`, or a container SAS URL alone; only the account key or a connection string lets a browser send directly). Without `kind`, the store `name` names is tested again with the key it was connected with (call it after the person added a CORS rule) and `make_default` applies. On a node where operators approve, the answer is `outcome` "waiting_for_operator" (HTTP 202) and files keep going to the node until approved. Pointing a store that holds files at a different bucket is refused (FILES_IN_STORE): move them first. Needs the person in person or the secrets:manage permission. Prefer that the person types the keys on their own profile page when they would rather not paste them into a chat. Same as PUT /v1/file-store.',
+        description: 'Connect a store of the person\'s own for their files, under a `name`: an S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any S3-compatible service) or an Azure Blob container, with their own keys. A person may have several; the first becomes the default, and `make_default: true` makes another one the default. A new file of the person and of their agents goes to the default unless its writer names another store (`store` on aimeat_storage_upload), when the store takes it: `takes` says which files a store is for (by default 1 MB and up, and every video and sound); a smaller file of another kind keeps its bytes in the node\'s database. Files in their own storage do not count toward the node\'s storage quota; files already stored stay where they are until moved (aimeat_file_store_move). The node tests the storage first (write, read, read part, list, remove under the folder) and saves nothing when a step fails (STORE_TEST_FAILED names the step). It also checks whether a browser may send files to it directly (the store\'s CORS rule) and answers that in `browser_access` with the rule to add; a store without the rule is still saved and takes files through the node. The keys are kept encrypted and are never returned. S3: `bucket`, `access_key_id`, `secret_access_key`, and `endpoint` (an https address; leave it out for Amazon S3) and `region`. Azure: `credential` (the account key with `account` and `container`, a connection string with `container`, or a container SAS URL alone; only the account key or a connection string lets a browser send directly). Without `kind`, the store `name` names is tested again with the key it was connected with (call it after the person added a CORS rule), and `make_default` and `takes` apply. On a node where operators approve, the answer is `outcome` "waiting_for_operator" (HTTP 202) and files keep going to the node until approved. Pointing a store that holds files at a different bucket is refused (FILES_IN_STORE): move them first. Needs the person in person or the secrets:manage permission. Prefer that the person types the keys on their own profile page when they would rather not paste them into a chat. Same as PUT /v1/file-store.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Connect Own File Storage', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -61,6 +74,7 @@ export const fileStoreTools = [
             ...STORE_INPUT,
             prefix: { type: 'string', description: 'The folder inside the bucket or container. Default aimeat/<account>@<node>/<name>/.' },
             make_default: { type: 'boolean', description: 'Make this store the one new files go to when their writer names none.' },
+            takes: TAKES_INPUT,
             reason: { type: 'string', description: 'Why, for the operators, on a node where they approve.' },
         },
     },
@@ -103,7 +117,7 @@ export const fileStoreTools = [
     },
     {
         name: 'aimeat_admin_file_store_set',
-        description: 'Operator-only. Add a named store for the whole node, give one a new key, or change its options: an S3 bucket or an Azure Blob container. The node tests it first (write, read, read part, list, remove under its folder) and saves nothing when a step fails (STORE_TEST_FAILED); `browser_access` on the store says whether a browser may send to it directly and gives the CORS rule to add when it may not. The keys are kept encrypted on the node and never returned. `selectable: true` lets every person name it for a file (`store: "node:<name>"`); an operator may always. `make_default: true` sends every new file there when neither its writer nor its owner\'s own storage decides; `make_default: false` on the default lets the environment\'s setting decide again. Without `kind`, only `selectable` and `make_default` change. Pointing a store that holds files at a different bucket is refused (FILES_IN_STORE). The names s3, azure and database are taken. Same as PUT /v1/admin/file-store/stores/{name}.',
+        description: 'Operator-only. Add a named store for the whole node, give one a new key, or change its options: an S3 bucket or an Azure Blob container. The node tests it first (write, read, read part, list, remove under its folder) and saves nothing when a step fails (STORE_TEST_FAILED); `browser_access` on the store says whether a browser may send to it directly and gives the CORS rule to add when it may not. The keys are kept encrypted on the node and never returned. `selectable: true` lets every person name it for a file (`store: "node:<name>"`); an operator may always. `make_default: true` sends every new file there when neither its writer nor its owner\'s own storage decides; `make_default: false` on the default lets the environment\'s setting decide again. `takes` says which files the store is for (by default 1 MB and up, and every video and sound); a smaller file of another kind keeps its bytes in the node\'s database. Without `kind`, only `selectable`, `make_default` and `takes` change. Pointing a store that holds files at a different bucket is refused (FILES_IN_STORE). The names s3, azure and database are taken. Same as PUT /v1/admin/file-store/stores/{name}.',
         caller: 'operator',
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Add or Change a File Store', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -116,6 +130,7 @@ export const fileStoreTools = [
             prefix: { type: 'string', description: 'The folder inside the bucket or container. Default aimeat/<node>/stores/<name>/.' },
             selectable: { type: 'boolean', description: 'Whether every person may choose this store for a file.' },
             make_default: { type: 'boolean', description: 'true: new files go here. false on the default: the environment\'s setting decides again.' },
+            takes: TAKES_INPUT,
         },
     },
     {

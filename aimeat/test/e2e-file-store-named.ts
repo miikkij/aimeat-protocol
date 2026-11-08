@@ -23,6 +23,12 @@
  *   suites of one lane run one after another)
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-file-store-named.ts
  * @version-history
+ *   v1.2.0 — 2026-11-08 — A store says which files it is for: the store `media` keeps the default rule
+ *     (a small text stays in the database, a small sound and a large file go to the store), the
+ *     operator changes the rule over REST and MCP, and a rule that is not one is refused. The other
+ *     stores of the suite take every file (`takes: { min_mb: 0 }`, file_store.min_mb 0), because the
+ *     suite moves small text files: their setup no longer matched the designed default
+ *     (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.1.0 — 2026-10-31 — The browser check: browser_access with the CORS rule, a test again by name, and
  *     its refusals.
  *   v1.0.0 — 2026-10-30 — Initial (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -99,6 +105,9 @@ async function startServer(s3: FakeS3): Promise<ChildProcess> {
         AIMEAT_FILE_STORE_S3_ACCESS_KEY_ID: KEY_ID,
         AIMEAT_FILE_STORE_S3_SECRET_ACCESS_KEY: SECRET,
         AIMEAT_FILE_STORE_PREFIX: '',
+        // The suite moves small text files between stores, so every store here takes every file; the
+        // rule's own behaviour is proved with the store `media` below, which keeps the default rule.
+        AIMEAT_FILE_STORE_MIN_MB: '0',
         AIMEAT_FILE_STORE_OWNER_PRIVATE_ORIGINS: s3.url,
         AIMEAT_OWNER_FILE_STORES: 'self',
         AIMEAT_RL_GLOBAL: '100000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000', AIMEAT_RL_MEMORY: '10000',
@@ -126,8 +135,9 @@ async function main() {
     let op!: Awaited<ReturnType<typeof registerOwner>>;
     let A!: Awaited<ReturnType<typeof registerOwner>>;
     let B!: Awaited<ReturnType<typeof registerOwner>>;
-    const archive = { kind: 's3', endpoint: s3.url, bucket: ARCHIVE_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET };
-    const own = { kind: 's3', endpoint: s3.url, bucket: OWN_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET };
+    const ALL = { min_mb: 0 };
+    const archive = { kind: 's3', endpoint: s3.url, bucket: ARCHIVE_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET, takes: ALL };
+    const own = { kind: 's3', endpoint: s3.url, bucket: OWN_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET, takes: ALL };
     const setNodeStore = (name: string, body: Body, token = op.token) => call(`/v1/admin/file-store/stores/${name}`, { token, method: 'PUT', body });
     // The node also stores a text derivative of a text file (content classification), so an object is
     // found by its bytes, not by counting.
@@ -312,7 +322,7 @@ async function main() {
             // A named store inside the environment's own folder of the same bucket: the environment's
             // sweep lists its objects, and no row names them under node:s3.
             const twinPrefix = `${NODE_PREFIX}twin/`;
-            const twin = await setNodeStore('twin', { kind: 's3', endpoint: s3.url, bucket: NODE_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET, prefix: twinPrefix, selectable: true });
+            const twin = await setNodeStore('twin', { kind: 's3', endpoint: s3.url, bucket: NODE_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET, prefix: twinPrefix, selectable: true, takes: ALL });
             assert(twin.status === 201, `${twin.status} ${JSON.stringify(twin.body)}`);
             const up = await upload(A.token, 'a/twin.txt', 'kept by the sibling', 'node:twin');
             assert(up.status === 201 && up.body.data.store === 'node:twin', JSON.stringify(up.body.data));
@@ -352,6 +362,59 @@ async function main() {
             const ownAgent = await makeAgent(BASE, A, ['storage:read']);
             const denied = await callTool(await openSession(BASE, ownAgent.token), 'aimeat_admin_file_store_set', { name: 'x', selectable: true });
             assert(denied.isError, 'an owner\'s agent changed a node store');
+        });
+
+        // The store says which files it is for (storage/blob/store-takes.ts). `media` keeps the default
+        // rule: 1 MB and up, and every video and sound; a smaller file of another kind stays in the database.
+        const MEDIA_PREFIX = `aimeat/${NODE_ID}/stores/media/`;
+        const uploadAs = (token: string, key: string, bytes: Buffer, mime: string, store: string) =>
+            call('/v1/storage', { token, body: { key, data: bytes.toString('base64'), mime_type: mime, store } });
+        const takesOf = async () => ((await call('/v1/admin/file-store', { token: op.token })).body.data.stores as Body[]).find(s => s.name === 'media')?.takes;
+
+        await test('a store takes the files it is for: a small text stays in the database, a small sound and a large file go to the store', async () => {
+            const add = await setNodeStore('media', { kind: 's3', endpoint: s3.url, bucket: ARCHIVE_BUCKET, access_key_id: KEY_ID, secret_access_key: SECRET, prefix: MEDIA_PREFIX, selectable: true });
+            assert(add.status === 201, `${add.status} ${JSON.stringify(add.body)}`);
+            assert(JSON.stringify(add.body.data.store.takes) === JSON.stringify({ min_mb: 1, kinds: ['video', 'audio'] }), JSON.stringify(add.body.data.store.takes));
+
+            const note = await upload(A.token, 'a/media-note.txt', 'a small note for media', 'node:media');
+            assert(note.status === 201 && note.body.data.store === 'database', `${note.status} ${JSON.stringify(note.body.data ?? note.body.error)}`);
+            assert(holding(ARCHIVE_BUCKET, 'a small note for media').length === 0, 'the small note went to the store');
+            assert((await readText(A.token, 'a/media-note.txt')).text === 'a small note for media', 'the small note does not read');
+
+            const sound = await uploadAs(A.token, 'a/beep.mp3', Buffer.from('a small sound'), 'audio/mpeg', 'node:media');
+            assert(sound.status === 201 && sound.body.data.store === 'node:media', `${sound.status} ${JSON.stringify(sound.body.data ?? sound.body.error)}`);
+            assert(holding(ARCHIVE_BUCKET, 'a small sound').every(k => k.startsWith(MEDIA_PREFIX)) && holding(ARCHIVE_BUCKET, 'a small sound').length === 1, 'the sound is not in the store');
+
+            const large = await uploadAs(A.token, 'a/large.txt', Buffer.alloc(1100 * 1024, 97), 'text/plain', 'node:media');
+            assert(large.status === 201 && large.body.data.store === 'node:media', `${large.status} ${JSON.stringify(large.body.data ?? large.body.error)}`);
+        });
+
+        await test('the operator changes which files a store takes, over REST and over MCP', async () => {
+            const all = await setNodeStore('media', { takes: { min_mb: 0 } });
+            assert(all.status === 200 && all.body.data.store.takes.min_mb === 0 && all.body.data.store.takes.kinds.join(',') === 'video,audio', JSON.stringify(all.body));
+            const note = await upload(A.token, 'a/media-note-2.txt', 'now the store takes notes', 'node:media');
+            assert(note.status === 201 && note.body.data.store === 'node:media', JSON.stringify(note.body.data ?? note.body.error));
+            const opAgent = await makeAgent(BASE, op, ['operator:admin', 'storage:read']);
+            const set = await callTool(await openSession(BASE, opAgent.token), 'aimeat_admin_file_store_set', { name: 'media', takes: { min_mb: 2, kinds: ['image'] } });
+            assert(!set.isError, set.text.slice(0, 300));
+            const t = await takesOf();
+            assert(t.min_mb === 2 && t.kinds.join(',') === 'image', JSON.stringify(t));
+        });
+
+        await test('FAILURE: a rule that is not one is refused and changes nothing', async () => {
+            const negative = await setNodeStore('media', { takes: { min_mb: -1 } });
+            assert(negative.status === 400, `a negative size limit: ${negative.status}`);
+            const kind = await setNodeStore('media', { takes: { kinds: ['exe'] } });
+            assert(kind.status === 400, `an unknown kind: ${kind.status}`);
+            const shape = await setNodeStore('media', { takes: 'everything' });
+            assert(shape.status === 400, `a rule that is not an object: ${shape.status}`);
+            const ownTooLarge = await call('/v1/file-store', { token: B.token, method: 'PUT', body: { ...own, name: 'bad', takes: { min_mb: 99999 } } });
+            assert(ownTooLarge.status === 400, `a person's store with a size limit past the ceiling: ${ownTooLarge.status}`);
+            assert(((await call('/v1/file-store', { token: B.token })).body.data.stores as Body[]).every(s => s.name !== 'bad'), 'the refused store was kept');
+            const t = await takesOf();
+            assert(t.min_mb === 2 && t.kinds.join(',') === 'image', `the rule changed: ${JSON.stringify(t)}`);
+            const notOperator = await call('/v1/admin/file-store/stores/media', { token: A.token, method: 'PUT', body: { takes: { min_mb: 0 } } });
+            assert(notOperator.status === 403, `a non-operator changed the rule: ${notOperator.status}`);
         });
     } finally {
         await stopServer(server);

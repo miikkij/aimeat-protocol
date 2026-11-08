@@ -22,6 +22,8 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-11-08 — The two house-rules tasks report access (published, readable by the partner) and
+ *     content apart; content is proven only in an accepted wording (house-rules.ts v3.0.0, round 3).
  *   2026-11-08 — The two house-rules tasks read a three-valued check (house-rules.ts v2.0.0): a run
  *     whose document the check cannot decide is `unverified`, never a pass (round 2 re-check).
  *   2026-11-08 — share-to-workspace passes only when the three rules are in the workspace and
@@ -163,16 +165,19 @@ export const TASKS: Task[] = [
                 const hit = (list.data?.workspaces ?? []).find(w => JSON.stringify(w).includes(ctx.marker));
                 if (!hit) continue;
                 const read = await api<{ objects?: unknown; drafts?: unknown }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspace?ws=${encodeURIComponent(hit.id)}`, ctx.ownerToken);
+                // Two proofs, reported apart: where the document is (published or not) is proven by
+                // the read; what it says is proven only when the check knows the wording.
                 const published = houseRulesCheck(documentBodies(read.data?.objects));
-                if (published.verdict === 'pass') return { ok: true, detail: `the three rules are published in workspace ${hit.id} of organism ${o.id}` };
+                const where = `published in workspace ${hit.id} of organism ${o.id}`;
+                if (published.verdict === 'pass') return { ok: true, detail: `${where}; content proven: the three rules in an accepted wording` };
                 const notKept = houseRulesMissing(documentBodies(read.data?.objects)).join('; ');
-                if (published.verdict === 'unverified') return { ok: false, unverified: true, detail: `the published document is about every rule, and the check cannot tell whether it keeps: ${notKept}` };
+                if (published.verdict === 'unverified') return { ok: false, unverified: true, detail: `${where}; content not proven, a person reads it: ${notKept}` };
                 const drafted = houseRulesCheck(documentBodies(read.data?.drafts));
                 return {
                     ok: false,
                     detail: drafted.verdict === 'pass'
                         ? 'the rules are written as a draft and never published, so the family cannot read them'
-                        : `the workspace exists, and the published document does not keep: ${notKept}`,
+                        : `the workspace exists; the published document does not keep: ${notKept}`,
                 };
             }
             return { ok: false, detail: 'no workspace by that name in any of the owner\'s organisms' };
@@ -208,11 +213,13 @@ export const TASKS: Task[] = [
                 if (read.status >= 300) return { ok: false, detail: `the partner is in the organism and reading the workspace answered ${read.status}` };
                 const check = houseRulesCheck(documentBodies(read.data?.objects));
                 const notKept = houseRulesMissing(documentBodies(read.data?.objects)).join('; ');
+                // Access is proven by the partner's own read; the content only by a known wording.
+                const where = `the partner reads workspace ${hit.id}${accepted ? ' (after accepting the invitation)' : ''}`;
                 return check.verdict === 'pass'
-                    ? { ok: true, detail: `the partner reads the three rules in workspace ${hit.id}${accepted ? ' (after accepting the invitation)' : ''}` }
+                    ? { ok: true, detail: `${where}; content proven: the three rules in an accepted wording` }
                     : check.verdict === 'unverified'
-                        ? { ok: false, unverified: true, detail: `the partner reads a document about every rule, and the check cannot tell whether it keeps: ${notKept}` }
-                        : { ok: false, detail: `the partner reads the workspace, and its published document does not keep: ${notKept}` };
+                        ? { ok: false, unverified: true, detail: `${where}; content not proven, a person reads it: ${notKept}` }
+                        : { ok: false, detail: `${where}; its published document does not keep: ${notKept}` };
             }
             return { ok: false, detail: `the partner ${ctx.otherOwnerName} is in no organism with a workspace by that name${accepted ? ', after accepting every invitation' : ''}` };
         },

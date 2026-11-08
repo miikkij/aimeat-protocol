@@ -8,11 +8,14 @@
  *   the line ceiling. The rows are in services/config-schema-file-store.ts: everything except the
  *   credentials changes from the Config tab or through chat (PUT /v1/admin/config); the credentials
  *   come from the environment only, as the SMTP password does.
- * @structure FileStoreKind · OwnerFileStores · FileStoreConfig · normalizePrefix · nodeFilePrefix · fileStoreDefaults()
+ * @structure FileStoreKind · OwnerFileStores · FileStoreConfig · FILE_KINDS · normalizePrefix · nodeFilePrefix ·
+ *   fileStoreDefaults()
  * @usage
  *   import { fileStoreDefaults } from './config-file-store.js';
  *   const config = { ...fileStoreDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-11-08 — fileStoreMinMb and fileStoreKinds: which files the environment's store takes;
+ *     the others stay in the database (wish-a-file-store-says-what-it-is-for-so-small-files-stay-in-post).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 
@@ -53,6 +56,12 @@ export interface FileStoreConfig {
   fileStoreAzureEndpoint: string;
   /** AIMEAT_FILE_STORE_AZURE_CREDENTIAL (secret): the account key, a connection string or a container SAS URL. */
   fileStoreAzureCredential: string | null;
+  /** AIMEAT_FILE_STORE_MIN_MB: a file at least this many megabytes long goes to the environment's store;
+   *  a smaller one stays in the database unless its kind is in fileStoreKinds. Default 1; 0 sends every file. */
+  fileStoreMinMb: number;
+  /** AIMEAT_FILE_STORE_KINDS: the kinds of file (video, audio, image, pdf) that go to the environment's
+   *  store whatever their size. Comma separated; default video,audio. */
+  fileStoreKinds: string[];
   /** AIMEAT_OWNER_FILE_STORES: auto (default), off, operator or self. */
   ownerFileStores: OwnerFileStores;
   /**
@@ -65,6 +74,16 @@ export interface FileStoreConfig {
 
 function oneOf<T extends string>(raw: string | undefined, allowed: readonly T[], fallback: T): T {
   return (allowed as readonly string[]).includes(raw ?? '') ? (raw as T) : fallback;
+}
+
+/** The kinds a store rule names; the same list as STORE_FILE_KINDS in storage/blob/store-takes.ts,
+ *  repeated because this file imports nothing. */
+export const FILE_KINDS: readonly string[] = ['video', 'audio', 'image', 'pdf'];
+
+/** A size limit in whole megabytes from 0 to 10240; anything else is the default, 1. */
+function minMbOf(raw: string | undefined): number {
+  const n = raw === undefined || raw.trim() === '' ? NaN : Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 10240 ? n : 1;
 }
 
 /** A prefix that is empty or ends in exactly one `/`, with no leading `/`. */
@@ -92,6 +111,10 @@ export function fileStoreDefaults(env: NodeJS.ProcessEnv = process.env): FileSto
     fileStoreAzureContainer: (env.AIMEAT_FILE_STORE_AZURE_CONTAINER ?? '').trim(),
     fileStoreAzureEndpoint: (env.AIMEAT_FILE_STORE_AZURE_ENDPOINT ?? '').trim(),
     fileStoreAzureCredential: env.AIMEAT_FILE_STORE_AZURE_CREDENTIAL?.trim() || null,
+    fileStoreMinMb: minMbOf(env.AIMEAT_FILE_STORE_MIN_MB),
+    fileStoreKinds: env.AIMEAT_FILE_STORE_KINDS === undefined
+      ? ['video', 'audio']
+      : env.AIMEAT_FILE_STORE_KINDS.split(',').map(s => s.trim().toLowerCase()).filter(s => FILE_KINDS.includes(s)),
     ownerFileStores: oneOf(env.AIMEAT_OWNER_FILE_STORES, ['auto', 'off', 'operator', 'self'] as const, 'auto'),
     fileStoreOwnerPrivateOrigins: (env.AIMEAT_FILE_STORE_OWNER_PRIVATE_ORIGINS ?? '').split(',')
       .map(s => s.trim().replace(/\/+$/, '').toLowerCase()).filter(Boolean),
