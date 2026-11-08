@@ -12,6 +12,9 @@
  *   The planner runs for real (prepareAiCall); the completion itself is a spy, so no provider is called.
  * @usage pnpm exec vitest run test/unit/notebook-ai-payer.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-08 — An app grant on ai:use is named as the app its grant names (caller `app`,
+ *     verifiedApp), as POST /v1/ai/complete names it (secaudit2026nov08b round 15,
+ *     librarian:notebook-app-grant-planned-as-owner).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14).
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -53,7 +56,8 @@ let storage: Storage;
 let config: AimeatConfig;
 let server: http.Server;
 let base = '';
-const tokens: Record<'owner' | 'agent' | 'eco', string> = { owner: '', agent: '', eco: '' };
+const APP = `${OWNER}/notes.html`;
+const tokens: Record<'owner' | 'agent' | 'eco' | 'app', string> = { owner: '', agent: '', eco: '', app: '' };
 
 async function session(id: string, gaii: string): Promise<void> {
   const now = new Date();
@@ -93,6 +97,11 @@ beforeAll(async () => {
   tokens.agent = await issueJWT({ sub: AGENT, owner: OWNER, node: NODE_ID, roles: ['agent'], scopes: ['ai:use', 'memory:read'] }, 3600, 's-agent');
   await session('s-eco', GEAI);
   tokens.eco = await issueJWT({ sub: GEAI, owner: OWNER, node: NODE_ID, roles: ['ecosystem'], scopes: ['ai:use'], eco_app: 'helpdesk' }, 3600, 's-eco');
+  await storage.createAppGrant({
+    grantId: 'appgrant-notes', app: APP, appName: 'Notes', appOrigin: 'https://notes.apps.node.test', owner: OWNER, gaii: OWNER_GHII,
+    scopes: ['ai:use'], revoked: false, createdAt: new Date(Date.now() + 1000).toISOString(),
+  } as never);
+  tokens.app = await issueJWT({ sub: OWNER_GHII, owner: OWNER, node: NODE_ID, roles: ['app'], scopes: ['ai:use'], app_grant: 'appgrant-notes', app: APP }, 3600);
 
   const app = express();
   app.use(express.json());
@@ -148,6 +157,19 @@ describe('an outside app on ai:use', () => {
     expect(paidBy()).toMatchObject({ gaii: OWNER_GHII, caller: 'app', verifiedApp: 'eco:helpdesk' });
     expect(await allowanceOf(GEAI)).toBeNull();
   });
+});
+
+// An app grant's identity is the owner GHII, with the app it names beside it (routes/app-grants.ts
+// issueAccessToken). The notebook routes planned it as the owner in person under the notebook feature
+// id, so the owner's allowlist, per-app quota and policy for that app did not apply; POST
+// /v1/ai/complete names the app (secaudit2026nov08b round 15, librarian:notebook-app-grant-planned-as-owner).
+describe('an app grant on ai:use', () => {
+  for (const path of ['/v1/librarian/classify', '/v1/librarian/plan', '/v1/librarian/distribute']) {
+    it(`${path} is paid by the owner, with the grant's app named as the asking app`, async () => {
+      await post(path, 'app');
+      expect(paidBy()).toMatchObject({ gaii: OWNER_GHII, caller: 'app', verifiedApp: APP });
+    });
+  }
 });
 
 describe('usage: the owner in person', () => {
