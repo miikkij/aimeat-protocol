@@ -35,6 +35,9 @@
  *   if (r === 'sent') ...
  * @version-history
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, item B3).
+ *   v1.0.1 — 2026-11-08 — The per-sender slot is taken before the delivery is awaited and given back
+ *     when it fails, so overlapping sends of one sender cannot all pass the limit (secaudit2026nov08
+ *     round 14, mail-gate:sender-limit-counted-after-delivery).
  */
 import type { EmailService, EmailAttachment } from './email.js';
 import type { GHIIRecord } from '../storage/interface.js';
@@ -86,11 +89,27 @@ export type MailOutcome = 'sent' | 'failed' | 'mail_off' | 'no_address' | 'limit
 const sentBySender = new Map<string, number[]>();
 const DAY_MS = 86_400_000;
 
-function underSenderLimit(limit: SenderLimit, now: number): boolean {
+/**
+ * Take one of the sender's daily slots, before the delivery is awaited: answers false when the
+ * sender used today's mails. The slot is the `now` entry pushed here; releaseSlot removes it when
+ * the delivery does not go out. Check and push run in one synchronous step, so overlapping sends
+ * of one sender cannot all read the same count.
+ */
+function reserveSlot(limit: SenderLimit, now: number): boolean {
   if (limit.perDay <= 0) return true;
   const recent = (sentBySender.get(limit.key) ?? []).filter(at => now - at < DAY_MS);
+  if (recent.length >= limit.perDay) { sentBySender.set(limit.key, recent); return false; }
+  recent.push(now);
   sentBySender.set(limit.key, recent);
-  return recent.length < limit.perDay;
+  return true;
+}
+
+/** Give back the slot reserveSlot took at `now` (a delivery that answered false or threw). */
+function releaseSlot(limit: SenderLimit, now: number): void {
+  if (limit.perDay <= 0) return;
+  const recent = sentBySender.get(limit.key);
+  const at = recent ? recent.lastIndexOf(now) : -1;
+  if (recent && at >= 0) recent.splice(at, 1);
 }
 
 /** Whether the sender under `limit` has used today's mails, read without counting. */
@@ -135,8 +154,9 @@ function deliver(email: EmailService, to: string, m: MailMessage): Promise<boole
 
 /**
  * Send `message` as `intent` allows. The checks run in this order: the mail service is on, the
- * address is allowed, the sender is under its daily limit; then one send, and a sent owner mail
- * under a limit is counted.
+ * address is allowed, the sender takes one of its daily slots; then one send. An owner mail under a
+ * limit holds its slot while the delivery is in flight and gives it back when the delivery answers
+ * false or throws, so only sent mails stay counted.
  */
 export async function sendMail(email: EmailService | null | undefined, intent: MailIntent, message: MailMessage): Promise<MailOutcome> {
   if (!email?.enabled) return 'mail_off';
@@ -144,10 +164,12 @@ export async function sendMail(email: EmailService | null | undefined, intent: M
   if (!to) return 'no_address';
   const limit = intent.kind === 'owner' ? intent.limit : undefined;
   const now = Date.now();
-  if (limit && !underSenderLimit(limit, now)) return 'limit';
-  const ok = await deliver(email, to, message);
-  if (!ok) return 'failed';
-  // Counted only while a limit is in force (underSenderLimit made the entry).
-  if (limit) sentBySender.get(limit.key)?.push(now);
-  return 'sent';
+  if (limit && !reserveSlot(limit, now)) return 'limit';
+  let ok = false;
+  try {
+    ok = await deliver(email, to, message);
+  } finally {
+    if (limit && !ok) releaseSlot(limit, now);
+  }
+  return ok ? 'sent' : 'failed';
 }
