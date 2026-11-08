@@ -101,6 +101,8 @@
     "maker": {
       "kept": "{maker} teki {n} vastaanotinta. Ne toimivat edelleen, kun {maker} on poistettu.",
       "kept_one": "{maker} teki yhden vastaanottimen. Se toimii edelleen, kun {maker} on poistettu.",
+      "keyKept": "{maker} vaihtoi {n} vastaanottimen avaimen ja sai uuden avaimen. Vastaanottimet toimivat edelleen, kun {maker} on poistettu.",
+      "keyKept_one": "{maker} vaihtoi yhden vastaanottimen avaimen ja sai uuden avaimen. Vastaanotin toimii edelleen, kun {maker} on poistettu.",
       "why": "Vastaanotin on sinun, ei sen tekijän. Ohjelma, jolla on vastaanottimen avain, voi yhä kirjoittaa tietoihisi.",
       "pause": "Keskeytä ne nyt",
       "pause_one": "Keskeytä se nyt",
@@ -12596,6 +12598,8 @@
   "notiftext.agent_standing_work_resumed.body": "Aiempi agentti, jonka nimi oli myös {agent}, oli tehnyt ajastuksia ({schedules}) ja tallentanut työnkulkuja ({workflows}). Ne käynnistyvät nyt taas tämän agentin nimissä ja niillä oikeuksilla, jotka annoit sille. Jos et halua, että tämä agentti tekee niitä, poista ne Ajastin-välilehdellä.",
   "notiftext.receivers_kept_after_maker.title": "{maker} on poistettu, ja sen tekemät vastaanottimet toimivat edelleen",
   "notiftext.receivers_kept_after_maker.body": "{maker} teki vastaanottimia ({count}): {names}. Ne ovat sinun, joten ne toimivat edelleen: ohjelma, jolla on vastaanottimen avain, voi yhä kirjoittaa tietoihisi. Jos et tunne ohjelmaa, keskeytä tai poista vastaanotin Vastaanottimet-sivulla.",
+  "notiftext.receivers_key_kept_after_holder.title": "{maker} on poistettu, ja vastaanottimet, joiden avaimen se vaihtoi, toimivat edelleen",
+  "notiftext.receivers_key_kept_after_holder.body": "{maker} vaihtoi vastaanottimien avaimen ja sai uuden avaimen ({count}): {names}. Vastaanottimet ovat sinun, joten ne toimivat edelleen: ohjelma, jolla on vastaanottimen avain, voi yhä kirjoittaa tietoihisi. Jos et tunne ohjelmaa, vaihda avain tai keskeytä vastaanotin Vastaanottimet-sivulla.",
   "notiftext.agent_mode_self_set.title": "{agent} vaihtoi itse toimintatilaansa",
   "notiftext.agent_mode_self_set.body": "{agent} toimii nyt tilassa ”{mode}”. Tilassa ”workstation” (työasema) agentti voi vastata puolestasi, kun jokin tavoitteistasi odottaa vastaustasi. Voit vaihtaa tilan agentin sivulla.",
   "notiftext.agent_mode_set_by_agent.title": "{by} vaihtoi agentin {agent} toimintatilan",

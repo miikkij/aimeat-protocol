@@ -8935,8 +8935,9 @@ paths:
         automation recipe, its `eco-capability` schedules, and any pending (awaiting-approval) advisories.
         The owner's DEPOSITED refined data (the app's `eco:` writes into the owner's Memory, e.g.
         `feedback.stats.*`) is PRESERVED (peer sovereignty). Re-onboarding the app later starts over
-        from scratch (a brand-new record). The receivers the app made are the owner's and keep
-        working; `receivers_kept` names them and the owner gets a notice when there are any.
+        from scratch (a brand-new record). The receivers the app made, and those whose key it
+        changed and so holds, are the owner's and keep working; `receivers_kept` names them (`why`
+        is `made` or `key`) and the owner gets a notice when there are any.
         Returns `{ deleted: true, app, geai, receivers_kept }`.
       tags: [Ecosystem Apps]
       security:
@@ -8949,7 +8950,7 @@ paths:
           description: The app name of the GEAI to disconnect.
       responses:
         '200':
-          description: "Deleted. Response data is `{ deleted: true, app, geai, receivers_kept: { count, receivers: [{ name, display_name, state }] } }`."
+          description: "Deleted. Response data is `{ deleted: true, app, geai, receivers_kept: { count, receivers: [{ name, display_name, state, why }] } }`."
         '403':
           description: Owner role required.
         '404':
@@ -30174,7 +30175,7 @@ paths:
     get:
       operationId: listReceivers
       summary: The owner's receivers
-      description: The owner, or a principal holding receivers:read or receivers:manage. Each with its address, target, CSM, verbs, limits, state and today's counts; never a key.
+      description: The owner, or a principal holding receivers:read or receivers:manage. Each with its address, target, CSM, verbs, limits, state and today's counts; never a key. `created_by` is the principal that made or proposed it, and `key_holders` the principals that were answered a key that still works (the current key, and the replaced one while its overlap lasts); a key made before 2026-11-08 names no one in `key_holders`.
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       responses:
@@ -30288,7 +30289,7 @@ paths:
     post:
       operationId: rotateReceiverKey
       summary: A new key for a receiver
-      description: '`{ overlap_minutes? }` (default 15, 0 ends the old key now). The answer carries the new key once.'
+      description: '`{ overlap_minutes? }` (default 15, 0 ends the old key now). The answer carries the new key once, and the caller is recorded as its holder (`key_holders`): when that agent or ecosystem app is removed, its delete answer names this receiver in `receivers_kept` and the owner gets a notice.'
       tags: [Receivers]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -77726,7 +77727,7 @@ paths:
                               workflows: { type: integer }
                           receivers_kept:
                             type: object
-                            description: The receivers this agent made. They are the owner's and keep working after the agent is gone, because a program may hold their keys; the owner gets a notice when there are any, and pauses or deletes them on the Receivers page.
+                            description: The receivers this agent made, and those whose key it changed and so holds. They are the owner's and keep working after the agent is gone, because a program may hold their keys; the owner gets a notice when there are any, and pauses or deletes them on the Receivers page.
                             properties:
                               count: { type: integer }
                               receivers:
@@ -77737,6 +77738,10 @@ paths:
                                     name: { type: string }
                                     display_name: { type: string }
                                     state: { type: string }
+                                    why:
+                                      type: string
+                                      enum: [made, key]
+                                      description: '`made` when the agent made it, `key` when it changed the key and was answered the new one.'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

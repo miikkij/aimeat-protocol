@@ -28,6 +28,8 @@
  *   operatorSetStopped · operatorDecide · mintReceiverKey · receiversUsingCsm
  * @usage const out = await createOrPropose(deps, caller, body, { propose: false });
  * @version-history
+ *   v1.2.0 — 2026-11-08 — Making, approving and rotating record who was answered the key
+ *     (ReceiverRecord.keyAnsweredTo; secaudit2026nov08b round 15, rotated-key-holder-not-surfaced).
  *   v1.1.0 — 2026-11-08 — The operator's start returns a receiver to the state its stop replaced, so the
  *     owner's pause stays (secaudit2026nov08 round 14, start-drops-owner-pause).
  *   2026-11-08 — receiversUsingCsm names each receiver's account, so a CSM delete is blocked only by
@@ -212,6 +214,7 @@ export async function createOrPropose(
     if (!opts.propose) {
         const k = mintReceiverKey();
         record.keyHash = k.hash; record.keyId = k.id; key = k.key;
+        record.keyAnsweredTo = caller.principal;
     }
     await createReceiverRecord(deps.storage, caller.ownerGhii, record);
     emitChange('receivers', caller.ownerGhii);
@@ -246,6 +249,7 @@ export async function decideProposal(deps: ReceiverDeps, caller: CallerContext, 
     const now = new Date().toISOString();
     const out = await updateReceiver(deps.storage, caller.ownerGhii, name, r => (r.state !== 'proposed' ? UNCHANGED : {
         ...r, state: mode === 'operator' ? 'awaiting_operator' : 'active', keyHash: k.hash, keyId: k.id, approvedAt: now,
+        keyAnsweredTo: caller.principal,
     }));
     if (out.keyHash !== k.hash) throw new ReceiverError(409, 'NOT_PROPOSED', `"${name}" was decided meanwhile.`);
     emitChange('receivers', caller.ownerGhii);
@@ -314,9 +318,13 @@ export async function rotateKey(deps: ReceiverDeps, caller: CallerContext, name:
     const now = Date.now();
     const out = await updateReceiver(deps.storage, caller.ownerGhii, name, r => {
         if (!r.keyHash) throw new ReceiverError(409, 'NOT_ACTIVE', `"${name}" has no key yet: it waits for a decision.`);
+        // Who is answered the new key is recorded, so removing that agent or app names this receiver
+        // as well as removing its maker does (./makers.ts; secaudit2026nov08b round 15).
         return {
-            ...r, keyHash: k.hash, keyId: k.id, keyRotatedAt: new Date(now).toISOString(),
-            previousKey: overlap > 0 && r.keyId ? { hash: r.keyHash, id: r.keyId, until: new Date(now + overlap * 60_000).toISOString() } : null,
+            ...r, keyHash: k.hash, keyId: k.id, keyRotatedAt: new Date(now).toISOString(), keyAnsweredTo: caller.principal,
+            previousKey: overlap > 0 && r.keyId
+                ? { hash: r.keyHash, id: r.keyId, until: new Date(now + overlap * 60_000).toISOString(), answeredTo: r.keyAnsweredTo ?? null }
+                : null,
         };
     });
     emitChange('receivers', caller.ownerGhii);

@@ -30,10 +30,13 @@
  *   RECEIVERS_MANAGE_SCOPE · RECEIVER_NAME_RE · RECEIVER_SUB_RE · MAX_RECEIVERS · RECEIVER_DEFAULTS ·
  *   RECEIVER_MAXIMA · RECEIVER_VERBS · ReceiverTarget · ReceiverSchema · ReceiverRecord · ReceiverState ·
  *   receiverPrincipalOf · parseReceiverPrincipal · isReceiverPrincipal · validateReceiverName ·
- *   validateReceiverSub · normalizeReceiverInput · effectiveState · receiverView · takesReceiverKey ·
- *   verbOfMethod · parseReceiver
+ *   validateReceiverSub · normalizeReceiverInput · effectiveState · keyHoldersOf · receiverView ·
+ *   takesReceiverKey · verbOfMethod · parseReceiver
  * @usage const ref = receiverPrincipalOf('alice', 'ruuvi', config.nodeId);   // receiver:alice/ruuvi@node
  * @version-history
+ *   v1.2.0 — 2026-11-08 — ReceiverRecord.keyAnsweredTo and previousKey.answeredTo: who was answered a
+ *     key that still works; keyHoldersOf, and the view's `key_holders` (secaudit2026nov08b round 15,
+ *     rotated-key-holder-not-surfaced).
  *   v1.1.0 — 2026-11-08 — ReceiverRecord.stoppedFrom: the state an operator's stop replaced
  *     (secaudit2026nov08 round 14, start-drops-owner-pause).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -154,11 +157,17 @@ export interface ReceiverRecord {
     /** SHA-256 of the key; null while proposed (no key exists before the owner approves). */
     keyHash: string | null;
     keyId: string | null;
-    /** The key a rotation replaced, accepted until `until`. */
-    previousKey?: { hash: string; id: string; until: string } | null;
+    /** The key a rotation replaced, accepted until `until`, and the principal it had been answered to. */
+    previousKey?: { hash: string; id: string; until: string; answeredTo?: string | null } | null;
     createdAt: string;
     /** The principal that made or proposed it. */
     createdBy: string;
+    /**
+     * The principal the current key was answered to in plain text: whoever made the receiver, the owner
+     * who approved a proposal, or whoever rotated the key. Absent on a key made before 2026-11-08
+     * (secaudit2026nov08b round 15, rotated-key-holder-not-surfaced).
+     */
+    keyAnsweredTo?: string | null;
     approvedAt?: string | null;
     expiresAt: string;
     keyRotatedAt?: string | null;
@@ -334,6 +343,19 @@ export function receiverAddress(baseUrl: string, owner: string, name: string): s
     return `${baseUrl.replace(/\/$/, '')}/v1/receive/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
 }
 
+/**
+ * The principals that were answered a key of this receiver that still works: the current key's, and
+ * the replaced key's while its overlap lasts. A key made before 2026-11-08 names no one here; its
+ * maker is `createdBy`.
+ */
+export function keyHoldersOf(r: Pick<ReceiverRecord, 'keyHash' | 'keyAnsweredTo' | 'previousKey'>, now = Date.now()): string[] {
+    const holders = new Set<string>();
+    if (r.keyHash && r.keyAnsweredTo) holders.add(r.keyAnsweredTo);
+    const prev = r.previousKey;
+    if (prev?.answeredTo && Date.parse(prev.until) > now) holders.add(prev.answeredTo);
+    return [...holders];
+}
+
 /** What a receiver looks like to its owner and the owner's agents: no key hash. */
 export function receiverView(r: ReceiverRecord, owner: string, nodeId: string, baseUrl: string, log?: {
     lastDeliveryAt: string | null; lastRefusalAt: string | null; failedAttempts: number; today: number; refusedToday: number;
@@ -359,6 +381,7 @@ export function receiverView(r: ReceiverRecord, owner: string, nodeId: string, b
         ...(r.previousKey ? { previous_key_until: r.previousKey.until } : {}),
         created_at: r.createdAt,
         created_by: r.createdBy,
+        key_holders: keyHoldersOf(r),
         approved_at: r.approvedAt ?? null,
         expires_at: r.expiresAt,
         key_rotated_at: r.keyRotatedAt ?? null,

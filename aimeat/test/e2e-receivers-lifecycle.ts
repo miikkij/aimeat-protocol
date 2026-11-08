@@ -13,8 +13,16 @@
  *     Maker removed: an agent and an ecosystem app that made a receiver are deleted; the delete answer
  *       names the receiver (receivers_kept), the owner gets one notice, and the receiver keeps writing
  *       (developer ruling 3, 2026-11-08). An agent that made none answers count 0 and sends no notice.
+ *     Key holder removed: an agent that changed the key of a receiver the owner made is deleted; the
+ *       answer names the receiver, the owner gets one notice of its own kind, the list view names the
+ *       agent in `key_holders`, and the receiver keeps writing.
+ *     Erasure: the rows an erased account's receiver wrote into another owner's row space name the
+ *       erasure's pseudonym, and a later account of the name with a receiver of the same name lists
+ *       none of them; before the erasure the receiver reads its own row (the designed use).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=receivers-lifecycle
  * @version-history
+ *   v1.1.0 — 2026-11-08 — Key holder removed and Erasure (secaudit2026nov08b round 15:
+ *     rotated-key-holder-not-surfaced, receiver-principal-not-pseudonymised).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14: start-drops-owner-pause,
  *     owner-deactivation-not-asked, maker-lifecycle-not-surfaced, older item O3).
  */
@@ -214,6 +222,69 @@ await test('Maker removed: removing the ecosystem app that made a receiver names
     const n = (await notices(A.token)).filter(x => x.i18n?.key === 'receivers_kept_after_maker' && x.i18n?.vars?.maker === app);
     assert(n.length === 1 && String(n[0]!.i18n.vars.count) === '1', `one notice: ${JSON.stringify(n)}`);
     assert((await send(A.name, 'byeco', key, { after: true })).status === 201, 'the receiver keeps writing after its maker is gone');
+});
+
+// ── The principal that holds a receiver's key is removed (secaudit2026nov08b round 15) ──────
+
+await test('Key holder removed: deleting an agent that changed the key of a receiver the owner made names it in the answer and a notice, and the receiver keeps writing', async () => {
+    await make(A.token, { name: 'rotated', target: { key: 'rlc.rotated' } });
+    const ag = await makeAgent(BASE, A, ['receivers:manage'], `rlcrot${stamp % 1000}`);
+    const rot = await call('/v1/receivers/rotated/rotate', { token: ag.token, body: { overlap_minutes: 0 } });
+    assert(rot.status === 200 && typeof rot.body.data.key === 'string', `the agent changes the key: ${show(rot)}`);
+    const key = rot.body.data.key as string;
+    const d = await call(`/v1/agents/${ag.name}`, { token: A.token, method: 'DELETE' });
+    assert(d.status === 200 && d.body.data.deleted === true, `delete: ${show(d)}`);
+    const kept = d.body.data.receivers_kept;
+    assert(kept?.count === 1 && kept.receivers?.[0]?.name === 'rotated', `the answer names the receiver whose key the agent holds: ${show(d)}`);
+    const n = (await notices(A.token)).filter(x => x.i18n?.key === 'receivers_key_kept_after_holder' && x.i18n?.vars?.maker === ag.name);
+    assert(n.length === 1 && String(n[0]!.i18n.vars.count) === '1', `one notice: ${JSON.stringify(n)}`);
+    assert(!(await notices(A.token)).some(x => x.i18n?.key === 'receivers_kept_after_maker' && x.i18n?.vars?.maker === ag.name), 'no "made" notice for a receiver it did not make');
+    assert((await send(A.name, 'rotated', key, { after: true })).status === 201, 'the receiver keeps writing after the key holder is gone');
+});
+
+await test('Key holder removed, designed use: the list view names who holds each receiver\'s key', async () => {
+    await make(A.token, { name: 'ownheld', target: { key: 'rlc.ownheld' } });
+    const ag = await makeAgent(BASE, A, ['receivers:manage'], `rlcview${stamp % 1000}`);
+    assert((await call('/v1/receivers/ownheld/rotate', { token: ag.token, body: { overlap_minutes: 0 } })).status === 200, 'rotate');
+    const list = await call('/v1/receivers', { token: A.token });
+    const r = (list.body.data.receivers as Body[]).find(x => x.name === 'ownheld');
+    assert(Array.isArray(r?.key_holders) && r!.key_holders.includes(ag.gaii), `key_holders: ${JSON.stringify(r)}`);
+    assert((await call(`/v1/agents/${ag.name}`, { token: A.token, method: 'DELETE' })).status === 200, 'clean up the agent');
+});
+
+// ── An erased account's receiver rows (secaudit2026nov08b round 15) ───────────
+
+await test('Erasure: rows an erased account\'s receiver wrote into another owner\'s row space name the erasure, and a later account of the name does not get them', async () => {
+    const o = await call('/v1/organisms', { token: A.token, body: { name: `Rlc ${stamp}`, description: 'x', type: 'project', join_policy: 'invite_only', visibility: 'private' } });
+    assert(o.status === 201, `organism: ${show(o)}`);
+    const org = o.body.data.organism.id as string;
+    const w = await call(`/v1/organisms/${org}/workspaces`, { token: A.token, body: { name: 'Sensors', manifest: { objectTypes: [
+        { name: 'readings', schemaRef: 'schema:readings@1', namespace: 'sensors.readings', backing: 'rows', writeRole: 'member' },
+    ] } } });
+    assert(w.status === 201, `workspace: ${show(w)}`);
+    const ws = w.body.data.ws as string;
+    const cname = `rlcc${stamp}`, rowId = `x${stamp}`;
+    const joinAndMake = async (): Promise<{ token: string; key: string }> => {
+        const c = await registerOwner(BASE, cname);
+        const add = await call(`/v1/organisms/${org}/members`, { token: A.token, body: { ghii: c.name, role: 'member', workspaces: [{ ws, role: 'contributor' }] } });
+        assert(add.status === 201, `add ${c.name}: ${show(add)}`);
+        const { key } = await make(c.token, { name: 'r1', target: { organism_id: org, ws, space: 'readings' }, verbs: ['read'] });
+        return { token: c.token, key };
+    };
+    const first = await joinAndMake();
+    const wrote = await send(cname, 'r1', first.key, { rows: [{ row_id: rowId, body: { celsius: 1 } }] });
+    assert(wrote.status === 201 && wrote.body.data.written === 1, `the receiver writes a row: ${show(wrote)}`);
+    const own = await call(`/v1/receive/${cname}/r1`, { token: first.key });
+    assert(own.status === 200 && own.body.data.rows.some((r: Body) => r.rowId === rowId), `designed use: the receiver reads its own row: ${show(own)}`);
+    const erase = await call(`/v1/owners/${cname}`, { token: first.token, method: 'DELETE' });
+    assert(erase.status === 200, `erase: ${show(erase)}`);
+    const later = await joinAndMake();
+    const listed = await call(`/v1/receive/${cname}/r1`, { token: later.key });
+    assert(listed.status === 200 && Array.isArray(listed.body.data.rows), `read: ${show(listed)}`);
+    assert(!listed.body.data.rows.some((r: Body) => r.rowId === rowId), `a later account's receiver lists the erased account's row: ${show(listed)}`);
+    const row = await call(`/v1/organisms/${org}/workspace/rows/readings/${rowId}?ws=${ws}`, { token: A.token });
+    assert(row.status === 200, `the row stays for the organism: ${show(row)}`);
+    assert(!row.text.includes(`receiver:${cname}/`) && row.text.includes('erased:'), `the row names the erasure, not the name: ${show(row)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

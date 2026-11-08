@@ -101,6 +101,8 @@
     "maker": {
       "kept": "{maker} made {n} receivers. They keep working after {maker} is removed.",
       "kept_one": "{maker} made one receiver. It keeps working after {maker} is removed.",
+      "keyKept": "{maker} changed the key of {n} receivers and got the new key. They keep working after {maker} is removed.",
+      "keyKept_one": "{maker} changed the key of one receiver and got the new key. It keeps working after {maker} is removed.",
       "why": "A receiver is yours, not its maker's. A program that holds its key can still write into your data.",
       "pause": "Pause them now",
       "pause_one": "Pause it now",
@@ -11859,6 +11861,8 @@
   "notiftext.agent_standing_work_resumed.body": "An earlier agent with the name {agent} had made scheduled tasks ({schedules}) and saved workflows ({workflows}). They now run again under this agent, with the permissions you gave it. If this agent should not do them, delete them on the Scheduler tab.",
   "notiftext.receivers_kept_after_maker.title": "{maker} is removed, and the receivers it made keep working",
   "notiftext.receivers_kept_after_maker.body": "{maker} made receivers ({count}): {names}. They are yours, so they keep working: a program that holds a receiver's key can still write into your data. If you do not know that program, pause or delete the receiver on the Receivers page.",
+  "notiftext.receivers_key_kept_after_holder.title": "{maker} is removed, and the receivers whose key it changed keep working",
+  "notiftext.receivers_key_kept_after_holder.body": "{maker} changed the key of receivers and got the new key ({count}): {names}. They are yours, so they keep working: a program that holds a receiver's key can still write into your data. If you do not know that program, change the key or pause the receiver on the Receivers page.",
   "notiftext.agent_mode_self_set.title": "{agent} changed its own working mode",
   "notiftext.agent_mode_self_set.body": "{agent} now works in the \"{mode}\" mode. In the \"workstation\" mode, an agent can answer for you when one of your goals waits for your answer. You can change the mode on the agent's page.",
   "notiftext.agent_mode_set_by_agent.title": "{by} changed the working mode of {agent}",
