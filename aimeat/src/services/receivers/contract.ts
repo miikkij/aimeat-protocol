@@ -34,6 +34,8 @@
  *   verbOfMethod · parseReceiver
  * @usage const ref = receiverPrincipalOf('alice', 'ruuvi', config.nodeId);   // receiver:alice/ruuvi@node
  * @version-history
+ *   v1.1.0 — 2026-11-08 — ReceiverRecord.stoppedFrom: the state an operator's stop replaced
+ *     (secaudit2026nov08 round 14, start-drops-owner-pause).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  */
 
@@ -163,6 +165,12 @@ export interface ReceiverRecord {
     pausedAt?: string | null;
     stoppedAt?: string | null;
     stopReason?: string | null;
+    /**
+     * The state the operator's stop replaced, so the operator's start returns to it: the owner's pause
+     * stays until the owner lifts it. Absent on a receiver stopped before 2026-11-08, which starts as
+     * it did then (active when it has a key).
+     */
+    stoppedFrom?: ReceiverState | null;
     /** The operator's decision when the node asks one (receivers.mode = operator). */
     operatorDecision?: { decision: 'approve' | 'refuse'; at: string; by: string; reason?: string } | null;
 }

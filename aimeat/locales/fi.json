@@ -98,6 +98,21 @@
       "expired": "Vanhentunut"
     },
     "by": { "you": "Sinä", "agent": "Agenttisi {agent}" },
+    "maker": {
+      "kept": "{maker} teki {n} vastaanotinta. Ne toimivat edelleen, kun {maker} on poistettu.",
+      "kept_one": "{maker} teki yhden vastaanottimen. Se toimii edelleen, kun {maker} on poistettu.",
+      "why": "Vastaanotin on sinun, ei sen tekijän. Ohjelma, jolla on vastaanottimen avain, voi yhä kirjoittaa tietoihisi.",
+      "pause": "Keskeytä ne nyt",
+      "pause_one": "Keskeytä se nyt",
+      "pauseWhat": "Jos keskeytät ne, ohjelmat eivät voi enää kirjoittaa. Voit jatkaa niitä Vastaanottimet-sivulla.",
+      "pauseWhat_one": "Jos keskeytät sen, ohjelma ei voi enää kirjoittaa. Voit jatkaa sitä Vastaanottimet-sivulla.",
+      "keep": "Jos et tee mitään, ne kirjoittavat kuten ennenkin.",
+      "keep_one": "Jos et tee mitään, se kirjoittaa kuten ennenkin.",
+      "paused": "{n} vastaanotinta on keskeytetty. Voit jatkaa niitä Vastaanottimet-sivulla.",
+      "paused_one": "Vastaanotin on keskeytetty. Voit jatkaa sitä Vastaanottimet-sivulla.",
+      "pauseFailed": "Kaikkia vastaanottimia ei voitu keskeyttää. Yritä uudelleen tai keskeytä ne Vastaanottimet-sivulla.",
+      "open": "Avaa Vastaanottimet-sivu"
+    },
     "limitsLine": "{perMinute} minuutissa · viesti enintään {size} · {perDay} päivässä",
     "verb": {
       "write": "Kirjoitus (POST, PUT)",
@@ -138,7 +153,8 @@
       "EXPIRED": "Vastaanotin on vanhentunut.",
       "NOT_APPROVED": "Vastaanotin odottaa ylläpitäjän hyväksyntää.",
       "RECEIVERS_OFF": "Vastaanottimet ovat pois päältä tällä palvelimella.",
-      "UNAUTHORIZED": "Avain puuttui tai oli väärä."
+      "UNAUTHORIZED": "Avain puuttui tai oli väärä.",
+      "ACCOUNT_DISABLED": "Tilisi on suljettu, joten vastaanotin ei kirjoittanut mitään."
     },
     "keyIdChip": "avain {id}",
     "stoppedTitle": "Palvelun ylläpitäjä pysäytti tämän vastaanottimen.",
@@ -12570,6 +12586,8 @@
   "notiftext.agent_standing_work_stopped.body": "{agent} oli tehnyt ajastuksia ({schedules}) ja tallentanut työnkulkuja ({workflows}). Ne säilyvät, mutta ne eivät käynnisty. Jos hyväksyt uuden agentin, jonka nimi on {agent}, ne käynnistyvät taas sen nimissä. Jos haluat lopettaa ne kokonaan, poista ne Ajastin-välilehdellä.",
   "notiftext.agent_standing_work_resumed.title": "Uusi agentti {agent} jatkaa vanhan agentin toistuvia töitä",
   "notiftext.agent_standing_work_resumed.body": "Aiempi agentti, jonka nimi oli myös {agent}, oli tehnyt ajastuksia ({schedules}) ja tallentanut työnkulkuja ({workflows}). Ne käynnistyvät nyt taas tämän agentin nimissä ja niillä oikeuksilla, jotka annoit sille. Jos et halua, että tämä agentti tekee niitä, poista ne Ajastin-välilehdellä.",
+  "notiftext.receivers_kept_after_maker.title": "{maker} on poistettu, ja sen tekemät vastaanottimet toimivat edelleen",
+  "notiftext.receivers_kept_after_maker.body": "{maker} teki vastaanottimia ({count}): {names}. Ne ovat sinun, joten ne toimivat edelleen: ohjelma, jolla on vastaanottimen avain, voi yhä kirjoittaa tietoihisi. Jos et tunne ohjelmaa, keskeytä tai poista vastaanotin Vastaanottimet-sivulla.",
   "notiftext.agent_mode_self_set.title": "{agent} vaihtoi itse toimintatilaansa",
   "notiftext.agent_mode_self_set.body": "{agent} toimii nyt tilassa ”{mode}”. Tilassa ”workstation” (työasema) agentti voi vastata puolestasi, kun jokin tavoitteistasi odottaa vastaustasi. Voit vaihtaa tilan agentin sivulla.",
   "notiftext.agent_mode_set_by_agent.title": "{by} vaihtoi agentin {agent} toimintatilan",
@@ -29439,6 +29457,13 @@
         "what": "Hyväksyit agentin, jolla on sama nimi kuin aiemmin poistamallasi agentilla. Aiemman agentin toistuvat työt käynnistyvät nyt uuden agentin nimissä ja niillä oikeuksilla, jotka annoit uudelle agentille.",
         "tipLabel": "Mitä voit tehdä",
         "tip": "Tarkista, että uusi agentti on se, jota tarkoitit. Jos ei ole, poista ajastukset Ajastin-välilehdellä tai poista agentti."
+      },
+      "receivers_kept_after_maker": {
+        "title": "Vastaanottimet toimivat, vaikka niiden tekijä on poistettu",
+        "short": "Poistit agentin tai sovelluksen, ja sen tekemät vastaanottimet toimivat edelleen.",
+        "what": "Vastaanotin on osoite ja avain, joiden kautta ohjelma kirjoittaa yhteen paikkaan tietojasi. Agentti tai sovellus voi tehdä vastaanottimen puolestasi, ja se saa avaimen kerran. Vastaanotin on sinun, joten se ei pysähdy, kun sen tekijä poistetaan. Ohjelma, jolla on avain, voi yhä kirjoittaa.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Avaa Vastaanottimet-sivu. Keskeytä tai poista vastaanotin, jonka ohjelmaa et tunne. Säilytä ne, joita ohjelmasi tarvitsevat."
       },
       "agent_mode_self_set": {
         "title": "Agentin toimintatila",

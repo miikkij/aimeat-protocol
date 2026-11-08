@@ -98,6 +98,21 @@
       "expired": "Past its end date"
     },
     "by": { "you": "You", "agent": "Your agent {agent}" },
+    "maker": {
+      "kept": "{maker} made {n} receivers. They keep working after {maker} is removed.",
+      "kept_one": "{maker} made one receiver. It keeps working after {maker} is removed.",
+      "why": "A receiver is yours, not its maker's. A program that holds its key can still write into your data.",
+      "pause": "Pause them now",
+      "pause_one": "Pause it now",
+      "pauseWhat": "If you pause them, the programs can no longer write. You resume them on the Receivers page.",
+      "pauseWhat_one": "If you pause it, the program can no longer write. You resume it on the Receivers page.",
+      "keep": "If you do nothing, they keep writing as before.",
+      "keep_one": "If you do nothing, it keeps writing as before.",
+      "paused": "{n} receivers are paused. You resume them on the Receivers page.",
+      "paused_one": "The receiver is paused. You resume it on the Receivers page.",
+      "pauseFailed": "Not every receiver could be paused. Try again, or pause them on the Receivers page.",
+      "open": "Open the Receivers page"
+    },
     "limitsLine": "{perMinute} a minute · at most {size} a message · {perDay} a day",
     "verb": {
       "write": "Write (POST, PUT)",
@@ -138,7 +153,8 @@
       "EXPIRED": "The receiver is past its end date.",
       "NOT_APPROVED": "The receiver waits for the operator's approval.",
       "RECEIVERS_OFF": "Receivers are switched off on this server.",
-      "UNAUTHORIZED": "The key was missing or wrong."
+      "UNAUTHORIZED": "The key was missing or wrong.",
+      "ACCOUNT_DISABLED": "Your account was deactivated, so the receiver wrote nothing."
     },
     "keyIdChip": "key {id}",
     "stoppedTitle": "The operator stopped this receiver.",
@@ -11833,6 +11849,8 @@
   "notiftext.agent_standing_work_stopped.body": "{agent} had made scheduled tasks ({schedules}) and saved workflows ({workflows}). They are kept, but they do not run. If you approve a new agent with the name {agent}, they start again under it. To stop them for good, delete them on the Scheduler tab.",
   "notiftext.agent_standing_work_resumed.title": "The new agent {agent} took over repeating work from an earlier agent",
   "notiftext.agent_standing_work_resumed.body": "An earlier agent with the name {agent} had made scheduled tasks ({schedules}) and saved workflows ({workflows}). They now run again under this agent, with the permissions you gave it. If this agent should not do them, delete them on the Scheduler tab.",
+  "notiftext.receivers_kept_after_maker.title": "{maker} is removed, and the receivers it made keep working",
+  "notiftext.receivers_kept_after_maker.body": "{maker} made receivers ({count}): {names}. They are yours, so they keep working: a program that holds a receiver's key can still write into your data. If you do not know that program, pause or delete the receiver on the Receivers page.",
   "notiftext.agent_mode_self_set.title": "{agent} changed its own working mode",
   "notiftext.agent_mode_self_set.body": "{agent} now works in the \"{mode}\" mode. In the \"workstation\" mode, an agent can answer for you when one of your goals waits for your answer. You can change the mode on the agent's page.",
   "notiftext.agent_mode_set_by_agent.title": "{by} changed the working mode of {agent}",
@@ -28717,6 +28735,13 @@
         "what": "You approved an agent with the same name as an agent that you removed earlier. The repeating work of the earlier agent now runs under the new one, with the permissions you gave the new one.",
         "tipLabel": "What you can do",
         "tip": "Check that the new agent is the one you meant. If it is not, delete the scheduled tasks on the Scheduler tab, or remove the agent."
+      },
+      "receivers_kept_after_maker": {
+        "title": "Receivers that keep working after their maker is removed",
+        "short": "You removed an agent or an app, and the receivers it made still work.",
+        "what": "A receiver is an address and a key through which a program writes into one place of your data. An agent or an app can make one for you, and it gets the key once. The receiver is yours, so it does not stop when its maker is removed, and a program that holds the key can still write.",
+        "tipLabel": "What you can do",
+        "tip": "Open the Receivers page. Pause or delete a receiver whose program you do not know, and keep the ones your programs need."
       },
       "agent_mode_self_set": {
         "title": "An agent's working mode",

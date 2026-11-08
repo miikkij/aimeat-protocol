@@ -1,6 +1,6 @@
 # 04 Identity and access
 
-> Checked against AIMEAT node 4.2.0 (commit 4bc3cc631) on 2026-11-07. Maintained with the code: see the README for how.
+> Checked against AIMEAT node 4.2.0 (commit 78d1b3950) on 2026-11-08. Maintained with the code: see the README for how.
 
 This page answers how people, AI agents and apps sign in to a node, who may get an account, what each role may do, and what happens when a person leaves. It is for the identity and access management owner and the security officer. The setup steps for Entra, SAML and SCIM stay in [Organisation node sign-in](../organisation-node-sign-in.md); this page says what to decide and what the code does.
 
@@ -96,8 +96,10 @@ flowchart LR
   deact --> bg["Schedules, workflow triggers, unattended extension runs, queued AI jobs wait"]
   deact --> data["Data, memberships and history stay"]
   data -->|operator or the person, in person| erase["Erasure: DELETE /v1/owners/:name"]
-  deact -->|aimeat_admin_owner_enable| react["Reactivated: the person signs in again, old credentials stay dead"]
+  deact -->|aimeat_admin_owner_enable| react["Reactivated: the person signs in again, old sessions and tokens stay dead"]
 ```
+
+Receiver keys and outside party keys are not revoked: they are refused while the account is deactivated and work again on reactivation, as schedules do. To end one for good, delete the receiver or the party, or have the operator stop the receiver.
 
 | What | On deactivation | Source |
 |---|---|---|
@@ -109,6 +111,9 @@ flowchart LR
 | New sign-in | 403 `ACCOUNT_DISABLED` on every method, SAML included | `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/src/routes/saml-login.ts` |
 | Schedules, workflow triggers, unattended extension runs | Skipped with a log line, kept | `aimeat/src/services/owner-lifecycle.ts` |
 | AI jobs already queued, and jobs a restart or another process takes up | Wait in the queue with a sentence that names the deactivation; nothing is paid or written; they run after reactivation | `aimeat/src/services/ai-jobs/run-gate.ts` |
+| Receiver keys | Refused with 403 `ACCOUNT_DISABLED` on every call; nothing is written, read or deleted. The receiver is kept and the key works again on reactivation | `aimeat/src/services/receivers/verify.ts` |
+| Outside party keys and tokens, share links, app party sign-ins | Refused with 403 `ACCOUNT_DISABLED`; nothing shared can be read. The party is kept and its key works again on reactivation | `aimeat/src/services/parties/verify.ts`, `aimeat/src/services/parties/invite.ts`, `aimeat/src/services/app-parties/service.ts` |
+| Webhooks to the person's agents | Not sent, nothing counted against the webhook; delivery resumes on reactivation | `aimeat/src/services/webhook-dispatcher.ts` |
 | Data, organism memberships, history | Kept | [Organisation node sign-in](../organisation-node-sign-in.md), section 7 |
 | Other federated nodes | The federation attestation refuses the account | `aimeat/test/e2e-owner-deactivation.ts` |
 
@@ -242,7 +247,7 @@ An agent or app that tries these is refused with `PERSON_REQUIRED` or the accoun
 | Personal access token | None unless `expires_in` is given | per token | `DELETE /v1/access/tokens/:id`; revoking it ends its exchanged JWT at the next request | `aimeat/src/routes/access-tokens.ts` |
 | MCP OAuth access and refresh tokens | per MCP client | per client | `POST /v1/mcp/token/revoke`, agent removal | `aimeat/src/mcp/oauth.ts` |
 | SCIM token | Until replaced | per connection | `aimeat_admin_sso_scim_token` issues a new one | `aimeat/src/routes/scim.ts` |
-| Receiver key | 365 days by default, at most 730 | `expires_days` per receiver | `POST /v1/receivers/:name/rotate` (the old key works for 15 minutes unless `overlap_minutes` is 0), pause, delete; the operator's stop `POST /v1/admin/receivers/:owner/:name/stop` | `aimeat/src/services/receivers/manage.ts` |
+| Receiver key | 365 days by default, at most 730 | `expires_days` per receiver | `POST /v1/receivers/:name/rotate` (the old key works for 15 minutes unless `overlap_minutes` is 0), pause, delete; the operator's stop `POST /v1/admin/receivers/:owner/:name/stop` (the operator's start returns the receiver to the state the stop replaced, so the owner's pause stays). Refused while the owner's account is deactivated. Not ended when the agent or ecosystem app that made it is deleted: the owner is told and pauses it | `aimeat/src/services/receivers/manage.ts`, `aimeat/src/services/receivers/makers.ts` |
 
 - Every access JWT the node issues is EdDSA. Each kind of token (a session, a download address, a share link, an app grant and the others) is signed with its own key, derived from the node's Ed25519 key for that kind alone and named in the token's header, so a token of one kind does not verify as another (`aimeat/src/auth/node-signer.ts`). A token issued before 2026-11-04 was signed with the node key itself and keeps working until it expires. Personal access tokens, SCIM tokens and refresh tokens are opaque random values stored as SHA-256 hashes (`aimeat/src/routes/access-tokens.ts`, `aimeat/src/routes/scim.ts`).
 - Token revocations persist in the database. Each process caches the answer for 60 seconds and marks a token it revokes itself at once (`aimeat/src/auth/jwt.ts`).

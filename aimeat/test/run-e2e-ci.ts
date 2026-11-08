@@ -15,6 +15,7 @@
  *   2026-11-08 -- e2e-workspace-reserved-parts.ts joins the list (not the guard tier): the node-reserved parts of a workspace are no space of any manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
  *   2026-11-08 -- e2e-schema-lock-holders.ts joins the list (not the guard tier): a CSM's lock belongs to its registering account, a wildcard lock does not outrank another account's deeper lock, a package's cortex asks the lock rule, and an erased account's locks do not pass to the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-08 -- e2e-csm-ownership.ts joins the list (not the guard tier): only the registering account's own receivers block a CSM delete, a package CSM takes the installer's prefix, the next account of an erased name has no CSM rights, a private CSM's schema-lock row is not public (secaudit2026nov08 round 14).
+ *   2026-11-08 -- e2e-receivers-lifecycle.ts joins the list (not the guard tier): the operator's start keeps the owner's pause, a deactivated account's receiver and party keys wait, a removed maker's receivers are named (secaudit2026nov08 round 14).
  *   2026-11-07 -- e2e-csm.ts joins the list (not the guard tier): a new CSM's name gets the owner's prefix, its visibility filters every read, PUT keeps versions and refuses a stale one, the draft stores nothing, an agent needs csm:write (developer ruling 2026-11-07).
  *   2026-11-07 -- e2e-receivers.ts joins the list (not the guard tier): receivers, the address and key an outside program writes into one place of an owner's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-11-07 -- e2e-rows-schema.ts joins the list (not the guard tier): a row space's JSON Schema binds every writer, and only the creator or an admin changes it (developer ruling 2026-11-07).
@@ -1334,6 +1335,8 @@ const ALL_SUITES = [
     'test/e2e-party.ts',
     // Receivers: an outside program writes into exactly one place of an owner's data with its own key; the shape, the target, the key, the lifecycle, the verbs, the permissions and the node setting.
     'test/e2e-receivers.ts',
+    // A receiver and an outside party when people change: the operator's start keeps the owner's pause, a deactivated account's keys wait, a removed maker's receivers are named (secaudit2026nov08 round 14).
+    'test/e2e-receivers-lifecycle.ts',
     // Named shares: a party reads one package over the reads, OData, the CSV and /v1/pub; terms, pins, expiry, revoke (plan doc-mvwxcas3dom3, D3).
     'test/e2e-data-share.ts',
     // A named share to a person on another AIMEAT node: exactly that visitor reads, a namesake never (WP9c).

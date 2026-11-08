@@ -28,6 +28,8 @@
  *   operatorSetStopped · operatorDecide · mintReceiverKey · receiversUsingCsm
  * @usage const out = await createOrPropose(deps, caller, body, { propose: false });
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The operator's start returns a receiver to the state its stop replaced, so the
+ *     owner's pause stays (secaudit2026nov08 round 14, start-drops-owner-pause).
  *   2026-11-08 — receiversUsingCsm names each receiver's account, so a CSM delete is blocked only by
  *     the registering account's own receivers (ruling 2 of 2026-11-08; secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -375,7 +377,12 @@ export async function operatorList(deps: ReceiverDeps, caller: CallerContext, op
     };
 }
 
-/** The operator stops or starts any receiver. A stop needs a reason, which the owner reads. */
+/**
+ * The operator stops or starts any receiver. A stop needs a reason, which the owner reads. The stop
+ * keeps the state it replaced (stoppedFrom) and the start returns to it, so a receiver the owner paused
+ * stays paused, and one waiting for the operator waits again. A receiver stopped before stoppedFrom
+ * existed starts as before: active when it has a key.
+ */
 export async function operatorSetStopped(deps: ReceiverDeps, caller: CallerContext, owner: string, name: string, stopped: boolean, reason?: string) {
     await needOperator(caller);
     if (stopped && (typeof reason !== 'string' || reason.trim().length < 3)) {
@@ -383,9 +390,15 @@ export async function operatorSetStopped(deps: ReceiverDeps, caller: CallerConte
     }
     const ownerGhii = `${owner}@${deps.config.nodeId}`;
     const out = await updateReceiver(deps.storage, ownerGhii, name, r => {
-        if (stopped) return { ...r, state: 'stopped', stoppedAt: new Date().toISOString(), stopReason: reason!.trim().slice(0, 500) };
+        if (stopped) {
+            // A second stop keeps the state the first one replaced.
+            const from = r.state === 'stopped' ? (r.stoppedFrom ?? null) : r.state;
+            return { ...r, state: 'stopped', stoppedAt: new Date().toISOString(), stopReason: reason!.trim().slice(0, 500), stoppedFrom: from };
+        }
         if (r.state !== 'stopped') return UNCHANGED;
-        return { ...r, state: r.keyHash ? 'active' : 'proposed', stoppedAt: null, stopReason: null };
+        const back = r.stoppedFrom && r.stoppedFrom !== 'stopped' && (r.keyHash || r.stoppedFrom === 'proposed')
+            ? r.stoppedFrom : r.keyHash ? 'active' : 'proposed';
+        return { ...r, state: back, stoppedAt: null, stopReason: null, stoppedFrom: null };
     });
     emitChange('receivers', ownerGhii);
     return { receiver: { owner, ...view(deps, owner, out) } };
@@ -400,7 +413,7 @@ export async function operatorDecide(deps: ReceiverDeps, caller: CallerContext, 
         const d = { decision, at: new Date().toISOString(), by: caller.principal, ...(reason ? { reason: reason.slice(0, 500) } : {}) };
         return decision === 'approve'
             ? { ...r, state: 'active', operatorDecision: d }
-            : { ...r, state: 'stopped', stoppedAt: d.at, stopReason: reason?.slice(0, 500) ?? 'The operator did not approve this receiver.', operatorDecision: d };
+            : { ...r, state: 'stopped', stoppedAt: d.at, stopReason: reason?.slice(0, 500) ?? 'The operator did not approve this receiver.', operatorDecision: d, stoppedFrom: 'awaiting_operator' };
     });
     emitChange('receivers', ownerGhii);
     return { receiver: { owner, ...view(deps, owner, out) } };

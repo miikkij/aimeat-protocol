@@ -319,7 +319,9 @@ components:
         shared with it: user `<owner>/<party name>`, password the party key. What Excel, Power BI and
         Tableau send to an OData feed. Accepted only on the data package reads, the OData feed, the
         package files under /v1/pub and /v1/parties/me; a wrong key on the OData feed answers 401 with
-        `WWW-Authenticate: Basic realm="aimeat"`. Never a sign-in to this node.
+        `WWW-Authenticate: Basic realm="aimeat"`. Never a sign-in to this node. While the owner's
+        account is deactivated, every party key and token of it answers 403 ACCOUNT_DISABLED; they
+        work again when the operator reactivates the account.
     PartyTokenAuth:
       type: http
       scheme: bearer
@@ -336,7 +338,9 @@ components:
       description: >
         A receiver's own key, made when the owner creates or approves the receiver and shown once.
         Accepted only on /v1/receive/{owner}/{name}[/{sub}]; on every other endpoint it answers 401.
-        It is never accepted in the address. The node keeps only its SHA-256.
+        It is never accepted in the address. The node keeps only its SHA-256. While the owner's
+        account is deactivated, the key answers 403 ACCOUNT_DISABLED and nothing is written; it works
+        again when the operator reactivates the account.
     DataspaceAuth:
       type: http
       scheme: bearer
@@ -8909,7 +8913,9 @@ paths:
         automation recipe, its `eco-capability` schedules, and any pending (awaiting-approval) advisories.
         The owner's DEPOSITED refined data (the app's `eco:` writes into the owner's Memory, e.g.
         `feedback.stats.*`) is PRESERVED (peer sovereignty). Re-onboarding the app later starts over
-        from scratch (a brand-new record). Returns `{ deleted: true, app, geai }`.
+        from scratch (a brand-new record). The receivers the app made are the owner's and keep
+        working; `receivers_kept` names them and the owner gets a notice when there are any.
+        Returns `{ deleted: true, app, geai, receivers_kept }`.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -8921,7 +8927,7 @@ paths:
           description: The app name of the GEAI to disconnect.
       responses:
         '200':
-          description: "Deleted. Response data is `{ deleted: true, app, geai }`."
+          description: "Deleted. Response data is `{ deleted: true, app, geai, receivers_kept: { count, receivers: [{ name, display_name, state }] } }`."
         '403':
           description: Owner role required.
         '404':
@@ -77684,6 +77690,19 @@ paths:
                             properties:
                               schedules: { type: integer }
                               workflows: { type: integer }
+                          receivers_kept:
+                            type: object
+                            description: The receivers this agent made. They are the owner's and keep working after the agent is gone, because a program may hold their keys; the owner gets a notice when there are any, and pauses or deletes them on the Receivers page.
+                            properties:
+                              count: { type: integer }
+                              receivers:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    name: { type: string }
+                                    display_name: { type: string }
+                                    state: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

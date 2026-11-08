@@ -98,6 +98,21 @@
       "expired": "Vencido"
     },
     "by": { "you": "Tú", "agent": "Tu agente {agent}" },
+    "maker": {
+      "kept": "{maker} hizo {n} receptores. Siguen funcionando cuando {maker} se elimina.",
+      "kept_one": "{maker} hizo un receptor. Sigue funcionando cuando {maker} se elimina.",
+      "why": "Un receptor es tuyo, no de quien lo hizo. Un programa que tiene su clave todavía puede escribir en tus datos.",
+      "pause": "Pausarlos ahora",
+      "pause_one": "Pausarlo ahora",
+      "pauseWhat": "Si los pausas, los programas ya no pueden escribir. Los reanudas en la página Receptores.",
+      "pauseWhat_one": "Si lo pausas, el programa ya no puede escribir. Lo reanudas en la página Receptores.",
+      "keep": "Si no haces nada, siguen escribiendo como antes.",
+      "keep_one": "Si no haces nada, sigue escribiendo como antes.",
+      "paused": "{n} receptores están en pausa. Los reanudas en la página Receptores.",
+      "paused_one": "El receptor está en pausa. Lo reanudas en la página Receptores.",
+      "pauseFailed": "No se pudieron pausar todos los receptores. Inténtalo de nuevo o páusalos en la página Receptores.",
+      "open": "Abrir la página Receptores"
+    },
     "limitsLine": "{perMinute} por minuto · como máximo {size} por mensaje · {perDay} por día",
     "verb": {
       "write": "Escribir (POST, PUT)",
@@ -138,7 +153,8 @@
       "EXPIRED": "El receptor venció.",
       "NOT_APPROVED": "El receptor espera la aprobación de quien gestiona el servicio.",
       "RECEIVERS_OFF": "Los receptores están desactivados en este servidor.",
-      "UNAUTHORIZED": "Faltaba la clave o no era la correcta."
+      "UNAUTHORIZED": "Faltaba la clave o no era la correcta.",
+      "ACCOUNT_DISABLED": "Tu cuenta está desactivada, así que el receptor no escribió nada."
     },
     "keyIdChip": "clave {id}",
     "stoppedTitle": "Quien gestiona este servicio detuvo este receptor.",
@@ -11284,6 +11300,8 @@
   "notiftext.agent_standing_work_stopped.body": "{agent} había hecho programaciones ({schedules}) y flujos de trabajo guardados ({workflows}). Se conservan, pero no se ejecutan. Si apruebas un agente nuevo con el nombre {agent}, vuelven a ejecutarse a su nombre. Para detenerlos del todo, elimínalos en la pestaña Programador.",
   "notiftext.agent_standing_work_resumed.title": "El nuevo agente {agent} retomó el trabajo recurrente de un agente anterior",
   "notiftext.agent_standing_work_resumed.body": "Un agente anterior con el nombre {agent} había hecho programaciones ({schedules}) y flujos de trabajo guardados ({workflows}). Ahora vuelven a ejecutarse a nombre de este agente, con los permisos que le diste. Si este agente no debe hacerlos, elimínalos en la pestaña Programador.",
+  "notiftext.receivers_kept_after_maker.title": "{maker} se eliminó, y los receptores que hizo siguen funcionando",
+  "notiftext.receivers_kept_after_maker.body": "{maker} hizo receptores ({count}): {names}. Son tuyos, así que siguen funcionando: un programa que tiene la clave de un receptor todavía puede escribir en tus datos. Si no conoces ese programa, pausa o elimina el receptor en la página Receptores.",
   "notiftext.agent_mode_self_set.title": "{agent} cambió su propio modo de trabajo",
   "notiftext.agent_mode_self_set.body": "Ahora {agent} trabaja en el modo «{mode}». En el modo «workstation», un agente puede responder por ti cuando uno de tus objetivos espera tu respuesta. Puedes cambiar el modo en la página del agente.",
   "notiftext.agent_mode_set_by_agent.title": "{by} cambió el modo de trabajo de {agent}",
@@ -27080,6 +27098,13 @@
         "what": "Aprobaste un agente con el mismo nombre que un agente que eliminaste antes. El trabajo recurrente del agente anterior ahora se ejecuta con el nuevo, con los permisos que le diste al nuevo.",
         "tipLabel": "Qué puedes hacer",
         "tip": "Comprueba que el nuevo agente sea el que querías. Si no lo es, elimina las programaciones en la pestaña Programador, o elimina el agente."
+      },
+      "receivers_kept_after_maker": {
+        "title": "Receptores que siguen funcionando cuando se elimina quien los hizo",
+        "short": "Eliminaste un agente o una aplicación, y los receptores que hizo siguen funcionando.",
+        "what": "Un receptor es una dirección y una clave con las que un programa escribe en un lugar de tus datos. Un agente o una aplicación puede hacer uno por ti, y recibe la clave una vez. El receptor es tuyo, así que no se detiene cuando se elimina quien lo hizo, y un programa que tiene la clave todavía puede escribir.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Abre la página Receptores. Pausa o elimina un receptor cuyo programa no conoces, y conserva los que tus programas necesitan."
       },
       "agent_mode_self_set": {
         "title": "El modo de trabajo de un agente",

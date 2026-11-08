@@ -15,6 +15,8 @@
  *   crumb · pageLinks · LIMITS
  * @usage import { x, api, targetWords, curlFor } from './frame.js';
  * @version-history
+ *   v1.1.0 — 2026-11-08 — refusalWords knows ACCOUNT_DISABLED, a write refused while the account is
+ *     deactivated (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht;
  *     design canvas "Vastaanottimet", artboards Settings, Create, Detail and Chat).
  */
@@ -129,7 +131,8 @@ export function refusalWords(code) {
   if (!code) return '';
   const known = ['SCHEMA_INVALID', 'SCHEMA_VALIDATION_FAILED', 'TOO_LARGE', 'RATE_LIMITED', 'DAILY_LIMIT', 'VERB_NOT_ALLOWED',
     'UNSUPPORTED_MEDIA_TYPE', 'PREFIX_FULL', 'VERSION_CONFLICT', 'SUB_REQUIRED', 'INVALID_SUB', 'INVALID_INPUT',
-    'METHOD_NOT_ALLOWED', 'NOT_FOUND', 'PAUSED', 'STOPPED', 'EXPIRED', 'NOT_APPROVED', 'RECEIVERS_OFF', 'UNAUTHORIZED'];
+    'METHOD_NOT_ALLOWED', 'NOT_FOUND', 'PAUSED', 'STOPPED', 'EXPIRED', 'NOT_APPROVED', 'RECEIVERS_OFF', 'UNAUTHORIZED',
+    'ACCOUNT_DISABLED'];
   const c = code === 'SCHEMA_VALIDATION_FAILED' ? 'SCHEMA_INVALID' : code;
   return known.includes(code) ? x('code.' + c) : '';
 }

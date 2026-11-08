@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — DELETE /v1/agents/:name answers `receivers_kept` (the receivers the agent made, which
+ *     keep working) and tells the owner (secaudit2026nov08 round 14, maker-lifecycle-not-surfaced).
  *   2026-11-05 — POST /v1/agents/import marks the imported agent as having had a store place's default (`*` covers
  *     it) at approval (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-05 — POST /v1/agents/import stores a bundle record at 'group' as private: a bundle names no group.
@@ -93,6 +95,7 @@ import { putPortRedirect } from '../../services/agent-port-redirect.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
+import { receiversMadeBy, noticeReceiversKept } from '../../services/receivers/makers.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
@@ -651,6 +654,8 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // What the agent made that keeps standing: it stops with the agent, and a new agent under the
     // same name runs it again; the owner is told both (services/agent-standing-work.ts).
     const standing = await standingWorkOf(storage, ownerGhiiOf(agent.gaii), agent.gaii);
+    // The receivers it made are the owner's and keep working; the answer and a notice say so (ruling 3, 2026-11-08).
+    const receiversKept = await receiversMadeBy(storage, ownerGhiiOf(agent.gaii), agent.gaii);
 
     const deleted = await storage.deleteAgent(agent.gaii);
     if (!deleted) {
@@ -690,6 +695,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // reach at all, so this is what takes the socket itself down (mcp/session-registry.ts).
     const closedMcp = closeMcpSessionsForGaii(agent.gaii);
     await noticeStandingWork(storage, ownerGhiiOf(agent.gaii), agent.name, standing, 'stopped');
+    await noticeReceiversKept(storage, ownerGhiiOf(agent.gaii), agent.name, receiversKept);
 
     res.json(success(config.nodeId, {
       deleted: true, name: agentName, gaii: agent.gaii,
@@ -698,6 +704,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       sessions_revoked: endedSessions,
       mcp_sessions_closed: closedMcp,
       standing_work: standing,
+      receivers_kept: receiversKept,
     }));
     emitChange('agents');
   });
