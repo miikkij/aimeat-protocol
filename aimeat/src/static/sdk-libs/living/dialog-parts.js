@@ -25,10 +25,12 @@
  *   A PICK OVER A LIST NOBODY HAS FILLED SAYS SO. An empty vault and an owner with no agents are
  *   both ordinary states on a new account, and a select with no options in it reads as a broken
  *   control. Both answer with one sentence and a door to where the thing is made.
- * @structure group · fields · copyBlock · statusLine · vocabularyNote · apexPage · ownerRead ·
- *   pickOrWords · secretPicker · headerEditor
+ * @structure group · fields · copyBlock · statusLine · vocabularyNote · apexPage · signedInOwner ·
+ *   ownerRead · pickOrWords · secretPicker · headerEditor
  * @usage  import { group, fields, copyBlock, headerEditor } from './dialog-parts.js';
  * @version-history
+ *   v0.7.1 -- 2026-11-08 -- signedInOwner(): the session's account name, which the inward dialog puts
+ *     in the program road's address (secaudit2026nov08b round 15b).
  *   v0.7.0 — 2026-09-06 — The header editor, the secret picker over the owner's vault, and
  *     ownerRead/pickOrWords, which the agent pick in the outward dialog stands on too.
  *   v0.6.0 — 2026-09-06 — Initial (the living document, stage 5: hooks).
@@ -149,6 +151,23 @@ export function statusLine(host) {
 }
 
 /* ── What the owner's own lists are read with ───────────────────────────────────────────────── */
+
+/**
+ * The signed-in account's name as the session carries it, for an address a program calls in the
+ * owner's name. '' for a guest and on a page without the auth library.
+ * @returns {string}
+ */
+export function signedInOwner() {
+  try {
+    const ns = /** @type {any} */ (window).AIMEAT;
+    const session = ns && ns.auth && typeof ns.auth.getSession === 'function' ? ns.auth.getSession() : null;
+    return session && typeof session.owner === 'string' ? session.owner : '';
+  } catch (e) {
+    // The address then keeps its placeholder, and the dialog says what goes in its place.
+    console.warn('[aimeat-living] The signed-in account could not be read:', e && /** @type {Error} */ (e).message);
+    return '';
+  }
+}
 
 /**
  * One read of this node as the signed-in owner, for a list this library offers a pick over: the

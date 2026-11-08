@@ -22,9 +22,11 @@
  *   IT IS NOT RENDERED WHERE IT CANNOT WORK. On a node that sends no mail (EMAIL_LOGIN false) there
  *   is no link, because the request would answer 200 and nothing would ever arrive.
  *
- * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open }
+ * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open, keep, resume }
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.7.0 -- 2026-11-08 -- keep() and resume(): the language switch draws the step again with the typed
+ *     address and, once the link was sent, the sent line (modal-view-keep.js; secaudit2026nov08b round 15b).
  *   v1.6.0 — 2026-11-01 — Opened first, the link to the password reads "Muut kirjautumistavat"
  *     (modal.loginLinkOtherWays), and the address field's example is in the page's language
  *     (modal.emailPlaceholder: "sinä@esimerkki.fi"; Jouni's review of v33, K24).
@@ -112,7 +114,7 @@ export function hereAddress() {
  * @param {(view: string) => void} ctx.showView Shows one view of the modal.
  * @param {string} [ctx.redirect] The place the link returns to; this page when absent.
  * @param {{ linkFirstOpened?: boolean } | null} [ctx.openFirst] The dialog's options, when it opens on this step.
- * @returns {{ open: () => void }}
+ * @returns {{ open: () => void, keep?: () => any, resume?: (state: any) => void }}
  */
 export function wireLoginLinkStep(ctx) {
   var i = ctx.i;
@@ -166,5 +168,17 @@ export function wireLoginLinkStep(ctx) {
   // own options, so a redraw of the same dialog does not pull the person back here.
   var first = ctx.openFirst;
   if (first && !first.linkFirstOpened) { first.linkFirstOpened = true; open(); }
-  return { open: open };
+  return {
+    open: open,
+    /** The typed address and whether the link was sent, for the language switch (modal-view-keep.js). */
+    keep: function () { return { email: emailEl.value, sent: msgEl.style.display === 'block' }; },
+    /** Draw the step again with what keep() returned, the sent line in this drawing's words. Sends nothing. */
+    resume: function (state) {
+      open();
+      emailEl.value = state.email || '';
+      if (!state.sent) return;
+      msgEl.textContent = i.loginLinkSent || 'If an account here has this verified address, we sent a sign-in link to it. Check your inbox.';
+      msgEl.style.display = 'block';
+    },
+  };
 }

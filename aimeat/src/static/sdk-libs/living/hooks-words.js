@@ -19,6 +19,9 @@
  *   import { say, fill } from './hooks-words.js';
  *   say('inward.title', ['fi']);   // 'Tämä arvo voi tulla ulkoa'
  * @version-history
+ *   v0.8.2 -- 2026-11-08 -- inward.keyWhere and inward.ownerWhere: where the key of the program road's
+ *     call comes from, and what goes in place of the account name when the page does not know it
+ *     (secaudit2026nov08b round 15b).
  *   v0.8.1 -- 2026-11-08 -- The words that name the shell a curl line is for (shell.*), and the two
  *     steps of the Windows form (secaudit2026nov08b round 15).
  *   v0.8.0 — 2026-11-07 — The words of the program road (inward.receiverWhy, inward.receiverMake,
@@ -56,6 +59,8 @@ export const WORDS = {
     'shell.windows': 'Windowsissa: PowerShell tai komentokehote',
     'shell.windowsFile': 'Tallenna tämä tiedostoon {file}',
     'shell.windowsRun': 'Aja sitten tämä komento samassa kansiossa',
+    'inward.keyWhere': 'Liitä avain kutsuun kohtaan {placeholder}. Yllä oleva linkki avaa sivun, joka näyttää avaimen vain kerran, kun teet sen. Kopioi avain silloin.',
+    'inward.ownerWhere': 'Kirjoita käyttäjätunnuksesi kohtaan {placeholder}.',
     'inward.agent': 'Sano tämä omalle tekoälyllesi',
     'inward.range': 'Sallittu väli',
     'outward.title': 'Kun tämä muuttuu, kerro jollekin',
@@ -126,6 +131,8 @@ export const WORDS = {
     'shell.windows': 'On Windows: PowerShell or Command Prompt',
     'shell.windowsFile': 'Save this as {file}',
     'shell.windowsRun': 'Then run this command in the same folder',
+    'inward.keyWhere': 'Put the key in place of {placeholder} in the call. The link above opens the page that shows the key once, when you make it, so copy it then.',
+    'inward.ownerWhere': 'Write your username in place of {placeholder}.',
     'inward.agent': 'Say this to your own AI',
     'inward.range': 'The range it accepts',
     'outward.title': 'When this changes, tell someone',
