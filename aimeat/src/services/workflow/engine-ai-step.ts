@@ -58,6 +58,8 @@
  *   v1.15.0 — 2026-10-27 — The step reads its inputs with the reader of the principal the run acts for,
  *     so an agent's clearance and a label's audience apply as on the agent's own read; the owner's run
  *     reads as before (run-reader.ts; secaudit2026oct26, step-reads-use-system-reader-not-run-principal).
+ *   v1.15.1 — 2026-11-08 — The audio file of op 'transcribe' asks the labels a data package version keeps
+ *     of a package file (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -140,7 +142,7 @@ export function dispatchAiStep(
   const transcribe = async (): Promise<ResultWrite | undefined> => {
     const audioKey = template(action.audio_key ?? '', run.vars);
     // The one loader of what a model reads (services/ai/inputs.ts).
-    const file = await readAiFile(deps.storage, reader, ownerGhii, audioKey, { capability: 'transcription' });
+    const file = await readAiFile(deps, reader, ownerGhii, audioKey, { capability: 'transcription' });
     if (!file) throw new Error(`audio_key "${audioKey}" is not a file in the owner's storage`);
     const r = await transcribeForOwner(deps.storage, deps.config, ownerGhii, {
       audio: { data: file.data, mime: file.mimeType || 'application/octet-stream', filename: audioKey.split('/').pop() || 'audio' },

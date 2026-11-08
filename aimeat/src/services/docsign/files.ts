@@ -5,17 +5,20 @@
  * @description Reads a file the caller stored on this node (aimeat_storage_upload, the Files tab), so
  *   an AI can validate or hash a document it uploaded without carrying the bytes through its own
  *   context. The same rule as GET /v1/storage/{key}: the caller's own namespace, through the
- *   classification reader, behind storage:read. A file the caller may not see answers as absent.
+ *   classification reader, behind storage:read. A file the caller may not see answers as absent; a data
+ *   package version's file asks the labels the version keeps too, as GET /v1/pub does.
  * @structure readOwnFile · documentFromStorage
  * @usage const bytes = await readOwnFile(ctx, caller, 'contracts/lease.pdf');
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — documentFromStorage also says where the file is (source).
+ *   v1.2.0 — 2026-11-08 — The read asks the labels a data package version keeps (datapackage/source-labels.ts
+ *     storedFileShownTo; secaudit2026nov08b round 15b).
  */
 import { createHash } from 'node:crypto';
 import type { CallerContext } from '../caller-context.js';
 import { readerFor } from '../classification/reader.js';
-import { fileTarget } from '../classification/labels.js';
+import { storedFileShownTo } from '../datapackage/source-labels.js';
 import { DocsignError, type DocsignCtx } from './records.js';
 import { docsignMaxBytes } from '../../config-docsign.js';
 
@@ -23,7 +26,7 @@ export async function readOwnFile(ctx: DocsignCtx, caller: CallerContext, key: s
   if (!caller.has('storage:read')) throw new DocsignError('SCOPE_DENIED', 403, 'Reading a stored file needs storage:read.');
   const gaii = caller.principal;
   const meta = await ctx.storage.getStorageFileMeta(gaii, key);
-  const [file] = meta ? await readerFor(ctx, caller.auth).show([meta], () => fileTarget(gaii, key, meta.workspaceRef)) : [];
+  const file = meta ? await storedFileShownTo(ctx, readerFor(ctx, caller.auth), gaii, key, meta) : undefined;
   if (!file) throw new DocsignError('NOT_FOUND', 404, `File not found in your namespace: ${key}`);
   const max = docsignMaxBytes(ctx.config);
   if (file.size > max) {

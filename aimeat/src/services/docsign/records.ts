@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-11-08 — A party's read of a request's stored file asks the labels a data package version keeps, so a party outside one of them gets no PDF from the node, as GET /v1/pub answers it 404 (secaudit2026nov08b round 15b).
  *   2026-10-27 — A request made before the caller's account existed is not the caller's: getRequest answers 404 and listRequests leaves it out, so the next holder of an erased account name (or an agent of the same name under it) neither reads nor signs what named the earlier holder (secaudit2026oct26, party-identity-bound-by-reusable-account-name).
  *   2026-10-25 -- A wallet signature's statement carries the certificate's subject and issuer, and the checks and the public lookup show them (secaudit2026oct22, lead 3924).
  *   2026-10-25 -- A wallet signature's caveats (WalletEvidence.caveats) are sealed into its statement, and the checks and the public lookup carry them (secaudit2026oct22, lead 3895).
@@ -66,7 +67,7 @@ import { beginSigning, finishSigning } from '../passkeys.js';
 import { notify } from '../notify.js';
 import { removeStorageFile } from '../storage-file-write.js';
 import { readerFor } from '../classification/reader.js';
-import { fileTarget } from '../classification/labels.js';
+import { storedFileShownTo } from '../datapackage/source-labels.js';
 import { logger } from '../../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import {
@@ -646,11 +647,12 @@ export async function noteWalletAttempt(ctx: DocsignCtx, id: string, attempt: No
  * (in the signer's files) or the request's own document (in the creator's files). Reading it here
  * is the request's own purpose, shared with the parties who agreed to sign the same document. A
  * classification label the owner put on the file still decides, through the same reader GET
- * /v1/storage/{key} uses, and a file whose bytes no longer have the recorded hash is not it.
+ * /v1/storage/{key} uses, and so do the labels a data package version keeps when the file is one of its
+ * files (as GET /v1/pub asks). A file whose bytes no longer have the recorded hash is not it.
  */
 async function requestFile(ctx: DocsignCtx, caller: CallerContext, owner: string, key: string, sha256: string): Promise<Buffer | null> {
   const meta = await ctx.storage.getStorageFileMeta(owner, key);
-  const [shown] = meta ? await readerFor(ctx, caller.auth).show([meta], () => fileTarget(owner, key, meta.workspaceRef)) : [];
+  const shown = meta ? await storedFileShownTo(ctx, readerFor(ctx, caller.auth), owner, key, meta) : undefined;
   const file = shown ? await ctx.storage.getStorageFile(owner, key) : null;
   return file && documentHash(file.data) === sha256 ? file.data : null;
 }

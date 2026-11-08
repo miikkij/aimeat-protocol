@@ -11,6 +11,7 @@
  *   storage and the call is paid by the owner, in the agent's name, as the REST route does.
  * @structure registerAiCapabilityTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-11-08 — aimeat_ai_transcribe reads the audio with { storage, config }, so a package file asks the labels its version keeps (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  *   2026-11-04 — The payer is the session principal's caller facts (`principalCaller(gaii).payer`), the
  *     answer aiPayerOf gave (codebase analysis 2026-11-03, item B1).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -81,7 +82,7 @@ export function registerAiCapabilityTools(
     try {
       // The caller's own storage, never another namespace: the lookup /v1/ai/transcribe makes.
       const reader = readerForAgent({ storage, config }, getAgentGaii());
-      const audio = await readCallerAudio(storage, reader, getAgentGaii(), storage_key, { ...(filename ? { filename } : {}) });
+      const audio = await readCallerAudio({ storage, config }, reader, getAgentGaii(), storage_key, { ...(filename ? { filename } : {}) });
       if (!audio) return toolError('NOT_FOUND', 'No such file in your storage.');
       const r = await transcribeForOwner(storage, config, w.payer, {
         audio,

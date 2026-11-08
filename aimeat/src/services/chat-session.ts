@@ -32,6 +32,7 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.21.1 -- 2026-11-08 -- The attachments are read with { storage, config }, as every AI input file is (services/ai/inputs.ts; secaudit2026nov08b round 15b).
  *   v1.21.0 -- 2026-11-07 -- A chat agent that does not start answers CHAT_AGENT_DOWN in the person's language and marks the agent down (chat/agent-health.ts); one whose process ends mid-turn answers CHAT_AGENT_STOPPED, and the next turn starts a fresh one; "goose exited (…)" stays in the log (Jouni, 2026-11-07).
  *   v1.20.0 -- 2026-11-07 -- chatPayer() moved into services/chat/chat-status.ts chatAiStatus(), which asks the same plan once for the payer, the model and the refusal.
  *   v1.19.0 -- 2026-11-02 -- The turn note carries the person's local date and time (clockLine): their
@@ -419,7 +420,7 @@ export async function* runChatTurn(
     // format negotiation nobody asked for. Anything else is left out of the prompt and said out
     // loud — a file the model never saw is worse than one it was told about.
     // The attached files go to the chat's model: the classification reader's useForAi decides (TARGET-082).
-    const { images, quoted, notes, skipped } = await readAttachments(storage, systemReader({ storage, config }, gaii), gaii, attachmentKeys, { pdfLimits: pdfReadLimits(config) });
+    const { images, quoted, notes, skipped } = await readAttachments({ storage, config }, systemReader({ storage, config }, gaii), gaii, attachmentKeys, { pdfLimits: pdfReadLimits(config) });
 
     const prompt = [
         text,

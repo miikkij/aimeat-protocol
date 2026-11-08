@@ -42,6 +42,8 @@
  *     the batch threw, and prepends to the runs list on its version (writeMemoryRecord expectedVersion).
  *   v1.2.1 — 2026-10-29 — A PDF attachment is read under the node's PDF read limits; one whose text
  *     was not read says so on its row (text_not_read) (secaudit2026oct26 round 8c, memory-b-09).
+ *   v1.2.2 — 2026-11-08 — An attachment's read asks the labels a data package version keeps of a package
+ *     file (services/ai/inputs.ts readAiFile; secaudit2026nov08b round 15b).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -243,7 +245,7 @@ export async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ tex
     // is named on the row and left out of the extraction; the message is still filed.
     let file;
     try {
-      file = await readAiFile(ctx.deps.storage, callerReader(ctx), ctx.caller.principal, stored.key, { capability: 'refinery.extract' });
+      file = await readAiFile(ctx.deps, callerReader(ctx), ctx.caller.principal, stored.key, { capability: 'refinery.extract' });
     } catch (err) {
       if (!(err instanceof ClassificationError)) throw err;
       out.stored.push({ filename: att.filename, key: stored.key, mime: stored.mime_type, size: stored.size, error: `${err.code}: ${err.message}` });
@@ -275,7 +277,7 @@ function callerReader(ctx: Ctx) {
 
 async function extract(ctx: Ctx, cls: RefineryClass, msg: MailMessage, att: { text: string; fileKeys: string[] }): Promise<Json> {
   const files = att.fileKeys.length
-    ? await readCallFiles(ctx.deps.storage, callerReader(ctx), ctx.caller.principal, att.fileKeys.map((k) => ({ storage_key: k })))
+    ? await readCallFiles(ctx.deps, callerReader(ctx), ctx.caller.principal, att.fileKeys.map((k) => ({ storage_key: k })))
     : undefined;
   const model = (files ? ctx.def.models.vision : ctx.def.models.text) || undefined;
   // As whoever runs the batch: the app or agent that started it, under the owner's rules for it
