@@ -14027,7 +14027,7 @@
     "cfgDesc_mcp_unused_client_days": "An MCP client registration that no sign-in used is deleted after this many days. A client someone signed in with stays. 0 keeps every registration.",
     "cfgDesc_mcp_legacy_sessions_per_principal": "How many open sessions of the older MCP protocol one AI or person keeps. A new session past it closes their least recently used one, and that app connects again by itself. 0 means no limit.",
     "cfgDesc_mcp_legacy_sessions_per_owner": "How many open sessions of the older MCP protocol one person and all of their AIs keep together. A new session past it closes their least recently used one, and that app connects again by itself. 0 means no limit.",
-    "cfgDesc_mcp_legacy_sessions_total": "How many open sessions of the older MCP protocol the whole server keeps. Each one holds its own copy of the tool list in memory. A new session past it closes the least recently used one, and that app connects again by itself. 0 means no limit.",
+    "cfgDesc_mcp_legacy_sessions_total": "How many open sessions of the older MCP protocol the whole server keeps. Each one holds its own copy of the tool list in memory. A new session past it closes the least recently used session of the person who holds the most, and that app connects again by itself. 0 means no limit.",
     "cfgDesc_storage_request_statement_ms": "On PostgreSQL, how long one database query may run while the server answers a page, an app or an AI. A longer query stops and that request fails. Scheduled jobs keep the database's own limit of 120 seconds. The default 120000 is that same limit. 0 means no limit.",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
     "cfgDesc_registration_members_see_each_other": "For a company server. Every person with an account here is in every other person's address book as a colleague, and a first message between two of them needs no approval. Off by default.",
@@ -30228,7 +30228,7 @@
         "legacy_sessions_total": {
           "title": "Older MCP sessions in all",
           "short": "How many open sessions of the older MCP protocol the whole server keeps. 0 means no limit. The default is 1000.",
-          "what": "Each open session of the older MCP protocol (2025) holds a copy of the tool list in this server's memory, about 3 MB. This limit keeps all of them together from filling the memory. When a new session passes it, the server closes the session that was unused the longest, whoever has it. That app gets an answer that the session is gone and connects again by itself.",
+          "what": "Each open session of the older MCP protocol (2025) holds a copy of the tool list in this server's memory, about 3 MB. This limit keeps all of them together from filling the memory. When a new session passes it, the server closes the session that was unused the longest among the sessions of the person who holds the most, so one person's many sessions do not push out other people's. That app gets an answer that the session is gone and connects again by itself.",
           "range": "A whole number, 0 or more. The default is 1000. 0 means no limit.",
           "low": "Lower: less memory in use; on a busy server, apps connect again more often.",
           "high": "Higher: more sessions stay open, and they can use more memory.",

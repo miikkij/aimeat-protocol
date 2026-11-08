@@ -61,7 +61,7 @@
         "aimeat/src/services/receivers/verify.ts",
         "aimeat/src/services/receivers/policy.ts"
       ],
-      "digest": "sha256:3ed39fee09656cdfb68a7b99"
+      "digest": "sha256:e50c26a79cb482eef49b7fce"
     },
     "05-data-protection.md": {
       "reviewedOn": "2026-11-02",
@@ -219,7 +219,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:ef267e4085baf2ec709de6c0"
+      "digest": "sha256:34cdaf6100a605e98a043f0d"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
