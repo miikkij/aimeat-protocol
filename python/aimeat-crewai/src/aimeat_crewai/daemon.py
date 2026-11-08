@@ -14,6 +14,9 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  unreleased -- 2026-11-08 -- secaudit2026nov08b round 15: both liaisons get `agent_identity`, so
+    the offers publish tool picks its credential by the agent's full identity. A bare name another
+    owner's agent carries in the same home no longer picks that owner's stored token.
   unreleased -- 2026-11-04 -- codebase analysis 2026-11-03, item A14: a task the owner paused (or sent
     back to planning) between the poll and the kickoff is held, not cancelled. It is not failed and
     not added to done_ids, so the daemon runs it when the owner starts it again; before, it never ran
@@ -1987,6 +1990,7 @@ def run_crew_daemon(
             with create_liaison_agent(
                 mcp_server_params=serve_params(agent_name=identity.gaii, **serve_opts),
                 agent_name=agent_name,
+                agent_identity=identity.gaii,
                 tool_filter=resolved_tool_filter,
                 tool_filter_if_offered=resolved_if_offered,
                 llm=llm,
@@ -2059,6 +2063,7 @@ def run_crew_daemon(
     with create_liaison_agent(
         mcp_server_params=serve_params(agent_name=identity.gaii, **serve_opts),
         agent_name=agent_name,
+        agent_identity=identity.gaii,
         tool_filter=resolved_tool_filter,
         tool_filter_if_offered=resolved_if_offered,
         llm=llm,

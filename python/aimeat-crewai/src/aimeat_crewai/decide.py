@@ -49,6 +49,7 @@ from .credentials import (
     daemon_route,
     expired_token_message,
     held_node_url,
+    shared_name_message,
     stored_agent_token_file,
 )
 from .paths import aimeat_home, connector_config_path, connector_node_url, home_is_explicit
@@ -291,6 +292,12 @@ def _node(
     if not token and agent_name:
         token, token_file, expired = stored_agent_token_file(agent_name)
     token = token or os.environ.get("AIMEAT_AGENT_TOKEN")
+    if not token and via_daemon is None:
+        # A bare name two owners' agents carry in this home picks no stored token; say so and ask for
+        # the full identity rather than "no agent token" (credentials.shared_name_message).
+        shared = shared_name_message(agent_name)
+        if shared:
+            raise DecideError(shared)
     url = node_url or os.environ.get("AIMEAT_NODE_URL") or ""
     ignored_config: Path | None = None
     other_agents_config: Path | None = None

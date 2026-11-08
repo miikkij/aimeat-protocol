@@ -36,6 +36,8 @@ __all__ = [
     "expired_token_message",
     "held_node_url",
     "jwt_expiry",
+    "owners_holding",
+    "shared_name_message",
     "stored_agent_token",
     "stored_agent_token_file",
 ]
@@ -78,15 +80,51 @@ def jwt_expiry(token: str) -> datetime | None:
         return None
 
 
+def owners_holding(agent: str) -> list[str]:
+    """The owners whose token (``tokens/<agent>@<owner>.token``) or key (``keys/<agent>@<owner>.key``)
+    for the bare name ``agent`` this home holds, sorted. The Node connector counts both kinds the
+    same way (config.ts otherOwnerHoldsAgent): an agent the daemon's enrolment connected holds only a
+    key, so counting token files alone missed it."""
+    home = aimeat_home()
+    owners: set[str] = set()
+    for folder, ext in (("tokens", ".token"), ("keys", ".key")):
+        try:
+            files = list((home / folder).glob(f"{agent}@*{ext}"))
+        except OSError:
+            continue
+        for path in files:
+            name = path.name[: -len(ext)]
+            file_agent, _, owner = name.partition("@")
+            if file_agent == agent and owner:
+                owners.add(owner)
+    return sorted(owners)
+
+
+def shared_name_message(agent_name: str | None) -> str | None:
+    """Why a bare ``agent_name`` picks no stored credential: the agents of two or more owners in this
+    home carry it. None for a full identity, or a name at most one owner holds."""
+    if not agent_name or "#" in agent_name:
+        return None
+    owners = owners_holding(agent_name)
+    if len(owners) < 2:
+        return None
+    held = ", ".join(f"{agent_name}@{o}" for o in owners)
+    return (
+        f"'{agent_name}' is the name of more than one owner's agent in the connector home {aimeat_home()}: "
+        f"{held}. Nothing was sent. Pass the full identity, agent#owner@node (for example "
+        f"{agent_name}#{owners[0]}@<node id>), as agent_name for the agent this crew runs as."
+    )
+
+
 def _candidates(agent_name: str) -> list[Path]:
     """The token files for ``agent_name``, in the order they are read.
 
     1. ``<AIMEAT_HOME>/agents/<name>/.token`` (the documented location; see mcp_client.http_params).
     2. ``<AIMEAT_HOME>/tokens/<agent>@<owner>.token``, where the Node connector keeps a v1 bearer and
        where the hosted fleet writes the concierge's (aimeat-commercial provision.ts). ``agent_name``
-       may be the full identity ``agent#owner@node``; a bare name is used when exactly one owner's
-       file matches it, because two owners' agents of one name on one machine cannot be told apart by
-       the name alone.
+       may be the full identity ``agent#owner@node``; a bare name is used when exactly one owner
+       holds a token or a key of that name in the home, because two owners' agents of one name on one
+       machine cannot be told apart by the name alone (owners_holding).
     """
     home = aimeat_home()
     agent, owner = agent_name, None
@@ -102,7 +140,7 @@ def _candidates(agent_name: str) -> list[Path]:
             matches = sorted(tokens_dir.glob(f"{agent}@*.token"))
         except OSError:
             matches = []
-        if len(matches) == 1:
+        if len(matches) == 1 and len(owners_holding(agent)) == 1:
             candidates.append(matches[0])
     return candidates
 
