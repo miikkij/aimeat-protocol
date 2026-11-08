@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   2026-11-08 — memoryMaxArchivedKeysPerAgent (secaudit2026nov08b round 15b, storage/memory-totals:
+ *     postgres-archived-rows-count-no-bytes).
  *   v1.33.0 — 2026-11-07 — microservicesCentralUrl.
  *   v1.32.0 — 2026-11-06 — extensionZipMaxFiles.
  *   v1.31.0 — 2026-11-04 — The SMTP fields moved to config-types-smtp.ts (SmtpConfig, mixed in) unchanged
@@ -341,6 +343,12 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   memoryQuotaMb: number;
   memoryMaxValueSizeKb: number;
   memoryMaxKeysPerAgent: number;
+  /**
+   * The most archived memory keys each owner and each agent may hold (services/memory-ceilings.ts
+   * archiveWithinCeiling). Archived rows are outside memoryMaxKeysPerAgent, so archiving frees room
+   * among live rows; this is their own ceiling, asked when an archive would add to it. 0 = no limit.
+   */
+  memoryMaxArchivedKeysPerAgent: number;
   /**
    * How long a deleted memory record stays takeable-back before the sweeper removes it for good.
    *

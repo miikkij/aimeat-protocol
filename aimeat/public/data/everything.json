@@ -921,10 +921,10 @@
      "slug": "g-5-memory-records",
      "cells": [
       "<strong>Memory records</strong>",
-      "A JSON store per identity with visibility (private; owner, for your agents; group; members, for anyone signed in on this node; public), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default.",
+      "A JSON store per identity with visibility (private; owner, for your agents; group; members, for anyone signed in on this node; public), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default, and 10 000 archived keys beside them.",
       "<code>/v1/memory</code>, <code>aimeat_memory_*</code>"
      ],
-     "plain": "Memory records A JSON store per identity with visibility (private; owner, for your agents; group; members, for anyone signed in on this node; public), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default. /v1/memory, aimeat_memory_*"
+     "plain": "Memory records A JSON store per identity with visibility (private; owner, for your agents; group; members, for anyone signed in on this node; public), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default, and 10 000 archived keys beside them. /v1/memory, aimeat_memory_*"
     },
     {
      "slug": "g-5-optimistic-locking",
@@ -1216,10 +1216,10 @@
      "slug": "g-6-archive-and-unarchive-knowledge",
      "cells": [
       "<strong>Archive and unarchive knowledge</strong>",
-      "Retire an organism, workspace, space or record. Archived material is read-only and excluded from normal reads; archive-aware search can find it. Restoring a parent leaves items that were archived separately retired.",
-      "<code>/v1/organisms/:id/archive</code>, <code>/v1/organisms/:id/unarchive</code>, <code>aimeat_organism_archive</code>"
+      "Retire an organism, workspace, space or record. Archived material is read-only and excluded from normal reads; archive-aware search can find it. Restoring a parent leaves items that were archived separately retired. Archived keys leave the memory keys cap, so archiving frees room, and count toward an archived memory keys cap of their own instead (10 000 per identity by default, the operator's setting on the Config tab, 0 for no limit). An archive that would pass it is refused with the setting named and nothing archived; taking content out of the archive and deleting it are never refused by it.",
+      "<code>/v1/organisms/:id/archive</code>, <code>/v1/organisms/:id/unarchive</code>, <code>aimeat_organism_archive</code>, <code>AIMEAT_MEMORY_MAX_ARCHIVED_KEYS</code> (<code>quota.memory_max_archived_keys_per_agent</code>)"
      ],
-     "plain": "Archive and unarchive knowledge Retire an organism, workspace, space or record. Archived material is read-only and excluded from normal reads; archive-aware search can find it. Restoring a parent leaves items that were archived separately retired. /v1/organisms/:id/archive, /v1/organisms/:id/unarchive, aimeat_organism_archive"
+     "plain": "Archive and unarchive knowledge Retire an organism, workspace, space or record. Archived material is read-only and excluded from normal reads; archive-aware search can find it. Restoring a parent leaves items that were archived separately retired. Archived keys leave the memory keys cap, so archiving frees room, and count toward an archived memory keys cap of their own instead (10 000 per identity by default, the operator's setting on the Config tab, 0 for no limit). An archive that would pass it is refused with the setting named and nothing archived; taking content out of the archive and deleting it are never refused by it. /v1/organisms/:id/archive, /v1/organisms/:id/unarchive, aimeat_organism_archive, AIMEAT_MEMORY_MAX_ARCHIVED_KEYS (quota.memory_max_archived_keys_per_agent)"
     },
     {
      "slug": "g-6-workspace-graphs-and-reference-checks",

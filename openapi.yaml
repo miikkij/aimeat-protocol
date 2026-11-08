@@ -19581,7 +19581,9 @@ paths:
         asks the limits a write asks: one that would take the principal past the
         node's memory key limit (`memoryMaxKeysPerAgent`) or memory quota
         (`memoryQuotaMb`) answers 413 QUOTA_EXCEEDED naming that setting, and the
-        record stays in the bin.
+        record stays in the bin. A record that was archived when it was deleted comes
+        back archived, so it also asks the archived memory key limit
+        (`memoryMaxArchivedKeysPerAgent`), with the same answer.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -51293,6 +51295,13 @@ paths:
         (structure overview, workspace read, organism search) — keeping the working set focused — yet
         stays findable via archive search (`?archived=only`) and `?includeArchived=true`, and resolvable
         by key. Archiving a container CASCADES to its contents. Creator/admin only.
+
+        Archived rows leave the memory key limit, so an archive frees room among live keys, and count
+        toward an archived memory key limit of their own (`memoryMaxArchivedKeysPerAgent`,
+        `AIMEAT_MEMORY_MAX_ARCHIVED_KEYS`, default 10000, 0 for no limit). An archive that would take
+        the archiving account, in person or through one of its agents, past it answers 413
+        QUOTA_EXCEEDED naming that setting, and nothing is archived. Rows of other members are archived
+        without asking their count. Unarchive and delete are never refused by this limit.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -51315,6 +51324,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 'QUOTA_EXCEEDED: the archive would pass the archived memory key limit (memoryMaxArchivedKeysPerAgent); nothing was archived' }
 
   /v1/organisms/{id}/unarchive:
     post:

@@ -141,7 +141,10 @@ guest receives is missing from that table, so change the table in the same commi
   cannot finish 500 records. A space that only grows (closed claims, finished tickets) is kept
   small with `archiveRecords` (up to 500, undoable, the organism's creator or an admin, and
   `organism:write` on a token): an archived record leaves every read, and a workspace read costs
-  time per record, so 771 closed claims made every read of one workspace slow.
+  time per record, so 771 closed claims made every read of one workspace slow. Archived records
+  count toward an archived memory key limit of their own (10 000 per identity by default,
+  `AIMEAT_MEMORY_MAX_ARCHIVED_KEYS`): past it the call throws `QUOTA_EXCEEDED` and archives none of
+  the ids, so a space that archives for ever also deletes the archived records it no longer needs.
 - **A collector writes one key per PERIOD, never one per item fetched.** The namespace carries the
   same budget as any principal: 1024 kB per value, 1000 keys by default. `ext:halytyskartta-ext` keeps
   a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; `ext:luotain` kept one

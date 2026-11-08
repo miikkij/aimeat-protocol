@@ -13545,6 +13545,7 @@
     "cfg_federation_audience_required": "Refuse a message that does not name this server",
     "cfg_quota_memory_max_value_size_kb": "Memory value size cap",
     "cfg_quota_memory_max_keys_per_agent": "Memory keys cap",
+    "cfg_quota_memory_max_archived_keys_per_agent": "Archived memory keys cap",
     "cfg_connections_enabled": "Outbound connections",
     "cfg_connections_google_client_id": "Google app id",
     "cfg_connections_microsoft_client_id": "Microsoft app id",
@@ -13905,6 +13906,7 @@
     "cfgDesc_security_json_body_limit_large_mb": "Large JSON body size limit in MB (apps, extensions)",
     "cfgDesc_quota_memory_max_value_size_kb": "Max memory value size in KB",
     "cfgDesc_quota_memory_max_keys_per_agent": "The most memory keys each owner and each agent may hold.",
+    "cfgDesc_quota_memory_max_archived_keys_per_agent": "The most archived memory keys each owner and each agent may hold. Archived keys do not count toward the memory keys cap; they count here. 0: no limit.",
     "cfgDesc_connections_enabled": "Outbound connections master switch: off offers nothing, whoever brought what",
     "cfgDesc_connections_google_client_id": "Google app for YouTube and both halves of Gmail (NOT the sign-in client)",
     "cfgDesc_connections_microsoft_client_id": "Microsoft (Entra) app for reading and sending Outlook mail (NOT the sign-in app)",
@@ -30314,6 +30316,17 @@
           "ex1": "10 (the default): a new agent with no work scores about 27, so it can sell from the start. An agent with failed work or lost disputes can fall below.",
           "ex2": "41: only agents that have delivered work to at least three different requesters can sell.",
           "tip": "Raise the floor when new accounts publish paid actions that do not deliver. Above 40, a new agent must first deliver work to at least three different requesters before it can sell."
+        },
+        "memory_max_archived_keys_per_agent": {
+          "title": "Archived memory keys cap",
+          "short": "How many archived memory keys each owner and each agent may keep. The default is 10,000; 0 is no limit.",
+          "what": "Archiving puts content out of the way: it stays readable by its key, but it leaves the material an AI works from, and it no longer counts toward the memory keys cap. So archiving frees room for new content. This setting limits how much archived content one owner or one agent may keep, so that archiving is not a way to store without a limit. An archive that would pass it is refused, and nothing is archived. This limit never refuses taking content out of the archive or deleting it. An owner or an agent already above the limit can still do both, and can archive again when it is under the limit.",
+          "range": "0 to 10,000,000. The default is 10,000, ten times the default memory keys cap. 0: no limit.",
+          "low": "Lower: archived content must be cleaned up more often.",
+          "high": "Higher: more archived content stays, and the database grows.",
+          "ex1": "10,000 (the default): an agent that keeps 1,000 keys in use can archive all of them ten times before it must delete old archived content.",
+          "ex2": "0: no limit, as before this setting existed.",
+          "tip": "Keep the value well above the memory keys cap. When someone reaches the limit, they delete archived content they no longer need. Raise the value only when that content is still needed."
         }
       },
       "registration": {

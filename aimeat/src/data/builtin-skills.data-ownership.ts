@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-08 — Sections 4 and 5: archived keys have a limit of their own; an archive past it, and a
+ *     restore from the bin of an archived record past it, answer QUOTA_EXCEEDED (secaudit2026nov08b
+ *     round 15b, services/memory-ceilings.ts archiveWithinCeiling).
  *   2026-11-08 — Section 2: under a CSM the person may not read, the CSM's lock answers as no lock on a
  *     copy, as on every memory write (secaudit2026nov08b round 15, routes/memory/bulk.ts and copy.ts).
  *   2026-11-08 — Sections 4 and 5: a restore and an unarchive answer QUOTA_EXCEEDED past the memory key
@@ -226,7 +229,8 @@ What an export leaves out, and why:
   \`MORSEL_PRICE_REMOVED\` means the record is an app tool manifest or an offers document that still
   holds the old morsel price: it stays in the bin, and the person writes it again with the pacing
   amount (\`tollMorsels\`) instead. \`QUOTA_EXCEEDED\` means putting it back would take its holder past
-  the node's memory key limit or memory quota, the same limits a write answers to: it stays in the
+  the node's memory key limit or memory quota, the same limits a write answers to, or, for a record
+  that was archived when it was deleted, past the archived memory key limit: it stays in the
   bin, and the message names the setting. Fold small records into one, remove what is no longer
   needed, or ask the operator to raise the limit.
 - Payment holds and beneficiary shares (\`commerce.hold.\`, \`commerce.hold-in.\`, \`commerce.benefit.\`)
@@ -296,7 +300,11 @@ let knowledge age, and you should offer them, not wait to be asked:
   workspace, space or one record) makes it read-only and takes it out of overviews, lists and search,
   while it stays readable by key. Read-only holds on every write: a write, an update of a version
   (what the Memory page and an app's update use) and a tag or visibility change all answer
-  \`ARCHIVED\` until it is unarchived. \`action: "unarchive"\` brings it back as it was, unless that would
+  \`ARCHIVED\` until it is unarchived. Archived keys leave the memory key limit, so archiving frees room,
+  and count toward an archived memory key limit of their own: an archive that would take the person or
+  one of their agents past it answers \`QUOTA_EXCEEDED\` naming the setting, and nothing is archived.
+  Delete archived content that is no longer needed (bringing it back and deleting it are never refused
+  by that limit), or ask the operator to raise it. \`action: "unarchive"\` brings it back as it was, unless that would
   take someone past the memory key limit or memory quota: then nothing comes back and the answer is
   \`QUOTA_EXCEEDED\`, naming the setting. Only the
   organism's creator or an admin archives or brings back, in person or through one of their own
