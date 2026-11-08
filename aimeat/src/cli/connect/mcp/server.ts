@@ -25,6 +25,9 @@
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-11-08 -- Stdio mode with --agent (and --owner) serves and polls for that agent only, so a tool
+ *     call's agent_name cannot pick another credential in the home; an --agent the home does not hold
+ *     stops the start. No --agent, and the daemon, are unchanged (secaudit2026nov08b round 15).
  *   2026-10-25 -- A runner or wake command nobody connected through the connector does not run, and
  *     the start says so in one line per command (command-trust.ts; secaudit2026oct22, lead 4763).
  *   2026-10-20 -- Stdio mode serves through serveStdio: a 2025 client keeps the initialize handshake,
@@ -44,7 +47,7 @@
  */
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { McpServer } from '@modelcontextprotocol/server';
-import { loadAllAgents, getConfigDir } from '../config.js';
+import { loadAllAgents, getConfigDir, type LoadedAgent } from '../config.js';
 import { heldNotices } from '../command-trust.js';
 import { checkConnectorHome } from '../home-access.js';
 import { buildRegistry, type AgentRegistry } from '../agent-registry.js';
@@ -93,17 +96,39 @@ export function buildMcpServer(role: SurfaceRole | 'all', registry: AgentRegistr
   return mcp;
 }
 
+/**
+ * The one agent `--agent` (a bare name or a full identity) and `--owner` name, or the start stops
+ * with a line that says what the home holds. A bare name two owners share needs --owner or the full
+ * identity, the rule `registry.resolve` applies to a tool call.
+ */
+function namedAgent(loaded: LoadedAgent[], agent: string, owner?: string): LoadedAgent {
+  const matches = loaded.filter(a => (a.gaii === agent || a.agent === agent) && (!owner || a.owner === owner));
+  if (matches.length === 1) return matches[0];
+  const held = loaded.map(a => a.gaii).sort().join(', ');
+  if (matches.length === 0) {
+    console.error(`Agent "${agent}"${owner ? ` of ${owner}` : ''} is not in the connector home at ${getConfigDir()}. It holds: ${held}.`);
+  } else {
+    console.error(`"${agent}" is the name of more than one agent in the connector home: ${matches.map(a => a.gaii).sort().join(', ')}. Pass --owner, or the full identity as --agent.`);
+  }
+  process.exit(1);
+}
+
 export async function runServe(flags: Record<string, string>): Promise<void> {
   const loaded = await loadAllAgents();
   if (loaded.length === 0) {
     console.error('No agents configured. Run: aimeat connect');
     process.exit(1);
   }
+  const daemon = flags.http === 'true' || flags.daemon === 'true';
+  // Stdio mode with --agent serves that agent only (a CrewAI liaison spawns `serve --agent <its
+  // agent>`), so a tool call's agent_name cannot pick another credential in the home. The daemon
+  // binds one agent per session already (local-mcp.ts), and without --agent every agent is served.
+  const served = !daemon && flags.agent ? [namedAgent(loaded, flags.agent, flags.owner)] : loaded;
   // A runner or wake command nobody connected through the connector (it came with the folder) does
   // not run; one line names it and says that `aimeat connect` here connects it (command-trust.ts).
-  for (const notice of heldNotices(loaded)) console.error(notice);
+  for (const notice of heldNotices(served)) console.error(notice);
 
-  const registry = buildRegistry(loaded);
+  const registry = buildRegistry(served);
 
   // v2 purpose-scoped surface: `aimeat connect serve --surface agent` registers ONLY that surface's
   // tools (same allowlist as the server /v2/mcp/<role>), so a local connector can offer the focused
@@ -118,7 +143,7 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
   // ── Daemon mode (Phase 4): loopback HTTP surface + one tunnel WS per agent ──
   // Only the daemon binds a port and writes the discovery file, so per-crew
   // stdio spawns (the default below) never collide with it.
-  if (flags.http === 'true' || flags.daemon === 'true') {
+  if (daemon) {
     const { runServeDaemon } = await import('./local-server.js');
     // The session's own registry, not the daemon's: it holds the one identity that session speaks
     // as, so every tool module's `registry.resolve()` has a single unambiguous answer.
