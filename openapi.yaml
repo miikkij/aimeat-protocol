@@ -79076,7 +79076,7 @@ paths:
       operationId: postAdminConsulImport
       tags: [Federation, Admin]
       summary: Pull config from Consul KV and apply
-      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported. A setting GET /v1/admin/config marks `appliesAt "restart"` is stored and takes effect at the next start; the answer names those in `at_restart`, and the running value stays until then.
+      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported. A setting GET /v1/admin/config marks `appliesAt "restart"` is stored and takes effect at the next start; the answer names those in `at_restart`, and the running value stays until then. For an AI credential (the operator's agent on operator:admin), a Consul value that would make a setting an AI may only make stricter looser than the node runs is not imported; `held_back` names each with the reason, and the operator imports it signed in in person. The operator in person imports every value.
       security:
         - BearerAuth: []
       responses:
@@ -79094,6 +79094,14 @@ paths:
                         properties:
                           imported: { type: integer }
                           total: { type: integer }
+                          held_back:
+                            type: array
+                            description: The values an AI caller did not import, because each would make a tighten-only setting looser.
+                            items:
+                              type: object
+                              properties:
+                                path: { type: string }
+                                reason: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

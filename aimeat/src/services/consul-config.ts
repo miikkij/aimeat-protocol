@@ -9,9 +9,13 @@
  * @structure
  *   - ConsulConfigService interface: loadAll / startWatching / stopWatching / set / health
  *   - createConsulConfigService(config): returns an instance, or null when Consul is disabled
+ *   - consulValuesForCaller(caller, config, values): the values the import route applies, and the held-back ones
  *   - polling watcher hashes loadAll() output to detect and dispatch config changes
  *
  * @version-history
+ *   2026-11-08 — consulValuesForCaller: the import route holds back, for an AI credential, a Consul
+ *     value that would make a tighten-only setting looser, and names it (secaudit2026nov08 round 14,
+ *     admin-config/consul-import-skips-tighten-only-rule-for-ai-caller).
  *   2026-10-25 — A log level Consul changed reaches the running logger (setLogLevel). On a running
  *     node (the watch, the import) a row that applies at the next start is returned in `atRestart`
  *     instead of being written to the running config.
@@ -32,9 +36,11 @@
  */
 
 import type { AimeatConfig } from '../config.js';
-import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue, writeConfigField } from './config-schema.js';
+import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue, writeConfigField, readConfigField } from './config-schema.js';
 import { syncRateLimitTiers } from './config-rate-limit-sync.js';
 import { isSealed } from './config-sealing.js';
+import { looseningRefusal, tightenOnlyOf } from './config-strictness.js';
+import type { ReaderCredential } from './classification/reader-kind.js';
 import { logger, setLogLevel } from '../utils/logger.js';
 
 export interface ConsulConfigService {
@@ -190,4 +196,29 @@ export function applyConsulValues(
   // log level the running logger.
   if (applied.length > 0) { syncRateLimitTiers(config); setLogLevel(config.logLevel); }
   return { applied, skipped, sealed, atRestart };
+}
+
+/**
+ * The Consul values a caller may import (POST /v1/admin/consul/import), and the ones held back: a
+ * value that would make a tighten-only setting (`aiMayOnlyTighten`, config-strictness.ts) looser than
+ * the node runs is held back for an AI credential, with the reason the Config page gives. The operator
+ * in person is held back nothing. The boot load and the watch take no caller and do not ask this.
+ */
+export function consulValuesForCaller(
+  caller: ReaderCredential | null | undefined, config: AimeatConfig, values: Record<string, string>,
+): { values: Record<string, string>; heldBack: { path: string; reason: string }[] } {
+  const kept: Record<string, string> = {};
+  const heldBack: { path: string; reason: string }[] = [];
+  for (const [dotPath, raw] of Object.entries(values)) {
+    const field = MUTABLE_CONFIG_MAP[dotPath];
+    if (field && tightenOnlyOf(dotPath)) {
+      let next: unknown;
+      // A value the setting does not read is left to applyConsulValues, which skips it.
+      try { next = parseConfigValue(field, raw); } catch (err) { logger.debug('consul import: a value the setting does not read', { dotPath, error: String(err) }); next = undefined; }
+      const refusal = next === undefined ? null : looseningRefusal(caller, dotPath, readConfigField(config, field), next);
+      if (refusal) { heldBack.push({ path: dotPath, reason: refusal.message }); continue; }
+    }
+    kept[dotPath] = raw;
+  }
+  return { values: kept, heldBack };
 }
