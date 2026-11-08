@@ -19542,6 +19542,13 @@ paths:
         the bin with 400 MORSEL_PRICE_REMOVED, as the same document is refused on
         POST, PUT and PATCH. A knowledge package manifest whose two pacing names
         disagree is refused the same way.
+
+
+        A restored key counts toward its principal's key limit again, so a restore
+        asks the limits a write asks: one that would take the principal past the
+        node's memory key limit (`memoryMaxKeysPerAgent`) or memory quota
+        (`memoryQuotaMb`) answers 413 QUOTA_EXCEEDED naming that setting, and the
+        record stays in the bin.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19570,6 +19577,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '413':
+          description: QUOTA_EXCEEDED. Putting the record back would pass the memory key limit or the memory quota; the message names the setting, and the record stays in the bin.
   /v1/memory/{key}:
     get:
       operationId: readMemory
@@ -51244,6 +51253,11 @@ paths:
         Reverse an archive. Uses SMART RESTORE: restores ONLY the content that THIS target's archival
         flagged (its `archivedRoot`), leaving any item that was archived separately still archived.
         Same body shape and creator/admin gate as POST /v1/organisms/{id}/archive.
+
+        Restored rows count toward their principals' memory limits again, so an unarchive asks the
+        limits a write asks: one that would take a principal past the node's memory key limit
+        (`memoryMaxKeysPerAgent`) or memory quota (`memoryQuotaMb`) answers 413 QUOTA_EXCEEDED naming
+        that setting, and nothing is brought back.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -51266,6 +51280,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 'QUOTA_EXCEEDED. Bringing the content back would pass a principal''s memory key limit or memory quota; the message names the setting, and nothing is brought back.' }
 
   /v1/organisms/{id}/revert:
     post:
@@ -81687,6 +81702,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: 'QUOTA_EXCEEDED. Putting the record back would pass that principal''s memory key limit or memory quota; the message names the setting, and the record stays in the bin.' }
   /v1/admin/extensions/available:
     get:
       operationId: getAdminExtensionsAvailable

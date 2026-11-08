@@ -19,10 +19,15 @@
  *   records each passes on its own and the batch still lands over the line.
  * @structure
  *   - memoryCeilingRefusal() — value size, key count and byte budget for a planned set
+ *   - flipWithinCeilings() — a restore or unarchive kept only when it leaves every principal it grew within the limits
  * @usage
  *   const refusal = await memoryCeilingRefusal({ storage, config }, target, [{ key, value }]);
  *   if (refusal) return { ok: false, ...refusal };
+ *   const kept = await flipWithinCeilings({ storage, config }, [owner], () => storage.restoreMemory(owner, key), words);
  * @version-history
+ *   2026-11-08 — flipWithinCeilings: a restore from the bin and an unarchive ask the key ceiling and
+ *     the byte quota, and a refusal names the setting (secaudit2026nov08 round 14,
+ *     services/memory-ceilings:count-returning-transitions-skip-ceiling).
  *   2026-11-04 — No countMemory and sumMemoryBytes for a storage without getMemoryTotals: it is
  *     required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The key count and the byte total come from one read of the kept totals
@@ -144,4 +149,71 @@ export async function memoryCeilings(
             usedBytes: quota.currentBytes - replacing + additional,
         },
     };
+}
+
+/** Thrown inside the transaction of flipWithinCeilings to roll the flip back. */
+class CeilingRollback extends Error {
+    constructor(readonly refusal: CeilingRefusal) { super(refusal.message); }
+}
+
+/**
+ * Run a flip that returns stored rows to principals' totals (a restore from the bin, an unarchive) and
+ * keep it only when no principal it grew ends past the key ceiling or the byte quota
+ * (secaudit2026nov08 round 14, count-returning-transitions-skip-ceiling).
+ *
+ * The flip runs in one transaction; the kept totals (storage/memory-totals.ts) are read before it and
+ * after it in the same transaction, so what the flip returned is measured by the same triggers that
+ * count it on either provider (PostgreSQL counts no bytes for an archived row, SQLite counts every
+ * row). A principal past a limit rolls the flip back. Only growth is refused: a principal the flip
+ * did not grow is never refused for being over a limit already. Overage within the quota is charged
+ * as a write's is. `owners` may name more principals than the flip touches.
+ */
+export async function flipWithinCeilings<T>(
+    deps: { storage: Storage; config: AimeatConfig },
+    owners: readonly string[],
+    flip: () => Promise<T>,
+    /** What the refusal says the flip was, and what happens to the rows: "Putting it back", "It stays in the bin." */
+    words: { act: string; stays: string },
+): Promise<{ ok: true; value: T } | { ok: false; refusal: CeilingRefusal }> {
+    const { storage, config } = deps;
+    const unique = [...new Set(owners)];
+    const overage: Array<[string, number]> = [];
+    try {
+        const value = await storage.transaction(async () => {
+            const before = new Map<string, { keys: number; bytes: number }>();
+            for (const o of unique) before.set(o, await storage.getMemoryTotals(o));
+            const out = await flip();
+            for (const o of unique) {
+                const was = before.get(o)!;
+                const now = await storage.getMemoryTotals(o);
+                if (now.keys > was.keys && now.keys > config.memoryMaxKeysPerAgent) {
+                    throw new CeilingRollback({
+                        status: 413, code: 'QUOTA_EXCEEDED',
+                        message: `${words.act} would take ${o} past the memory key limit of ${config.memoryMaxKeysPerAgent} keys `
+                            + '(the node setting memoryMaxKeysPerAgent, AIMEAT_MEMORY_MAX_KEYS, which the operator sets on the Config tab). '
+                            + `${words.stays} One value may hold ${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one `
+                            + 'record holding an array or an object keyed by id, or ask the operator to raise the limit.',
+                    });
+                }
+                if (now.bytes > was.bytes) {
+                    const quota = await checkMemoryQuota(config, storage, o, now.bytes - was.bytes, 0, was.bytes);
+                    if (!quota.allowed) {
+                        throw new CeilingRollback({
+                            status: 413, code: 'QUOTA_EXCEEDED',
+                            message: `${words.act} would take ${o} past its memory quota. ${quota.reason ?? ''} `
+                                + `The quota is the node setting memoryQuotaMb (AIMEAT_MEMORY_QUOTA_MB, ${config.memoryQuotaMb} MB), `
+                                + `which the operator sets on the Config tab. ${words.stays} Remove records you no longer need, or ask the operator to raise the quota.`,
+                        });
+                    }
+                    if (quota.overageMorsels > 0) overage.push([o, quota.overageMorsels]);
+                }
+            }
+            return out;
+        });
+        for (const [o, morsels] of overage) await chargeOverage(storage, o, morsels, 'memory_overage');
+        return { ok: true, value };
+    } catch (err) {
+        if (err instanceof CeilingRollback) return { ok: false, refusal: err.refusal };
+        throw err;
+    }
 }
