@@ -43749,7 +43749,10 @@ paths:
     get:
       operationId: getMemorySchema
       summary: Get schema for a memory key
-      description: Retrieve the JSON Schema locked to a specific memory key or prefix. No authentication required.
+      description: |
+        Retrieve the JSON Schema locked to a specific memory key or prefix. No authentication
+        required. The lock a CSM owns (`csm.<name>`) follows that CSM's visibility: to a caller who
+        may not read the CSM, the answer is `has_schema: false`, as for a key with no lock.
       tags: [Schema]
       parameters:
         - name: key
@@ -43830,7 +43833,8 @@ paths:
         List all registered schema locks on this node, or those whose key pattern starts with
         `prefix`. No authentication required. The list is not paged: every matching lock is in one
         answer, with `total` its length. The schema body and its semantic context are read per lock
-        with GET /v1/memory/{key}/schema.
+        with GET /v1/memory/{key}/schema. The lock a CSM owns (`csm.<name>`) is listed only to a
+        caller who may read that CSM (its visibility: public, members, organism or private).
       tags: [Schema]
       parameters:
         - name: prefix
@@ -44215,8 +44219,15 @@ paths:
         Remove a Community Service Manifest, its schema lock and its kept
         versions. Requires the owner or a principal holding `csm:write`, on the
         CSMs of its own account; the node's operator may delete another
-        account's CSM, which writes the operator trail. While a module of the
-        node uses the CSM the answer is 409 IN_USE with `details.users`.
+        account's CSM, which writes the operator trail. While the registering
+        account itself uses the CSM (its own receivers) the answer is 409
+        IN_USE with `details.users`, which names only those uses. Another
+        account's receiver does not block the delete: it keeps checking
+        messages against the copy of the schema it holds, its owner gets a
+        `csm_removed` notice, and `data.other_accounts_told` counts those
+        accounts. The registering account is the account that held the name
+        when the CSM was registered; a later account of a released name is
+        not it.
       tags: [CSM]
       security:
         - BearerAuth: []
@@ -52795,7 +52806,8 @@ paths:
       description: |
         Browse the merged catalogue of actions and agents across
         all genesis-peered federations. No authentication required (Tier 0).
-        Entries are aggregated from connected genesis peers.
+        Entries are aggregated from connected genesis peers. A local CSM is
+        listed when it is federable and public.
       tags: [Cross-Federation]
       parameters:
         - name: q

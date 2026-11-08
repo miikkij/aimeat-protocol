@@ -16,6 +16,7 @@
  * @usage
  *   import { computeServiceSummary, computeSummaryHash } from '../utils/service-summary.js';
  * @version-history
+ *   2026-11-08 — A federable CSM is in the summary only when it is public (secaudit2026nov08 round 14).
  *   v1.1.0 — 2026-10-11 — An action entry carries tollMorsels, its pacing amount per use; `price` is a
  *     deprecated mirror until 4.0.0 (a morsel is pacing, not a price).
  *   v1.0.0 — 2026-05-20 — Initial implementation for Federation Mesh Phase 2
@@ -118,8 +119,10 @@ export async function computeServiceSummary(
             post_count: 0,
         }));
 
+    // A public CSM only, as for boards: a peer is no account of this node, and a private, members or
+    // organism CSM answers as a missing one to anyone it refuses (csm-service.ts ruling 2 of 2026-11-07).
     const csms: ServiceSummaryCsm[] = allCsms
-        .filter(c => c.federate === true)
+        .filter(c => c.federate === true && (c.visibility ?? 'public') === 'public')
         .map(c => ({
             name: c.name,
             serviceType: c.serviceType,

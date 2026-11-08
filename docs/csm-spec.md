@@ -53,8 +53,17 @@ The node keeps these beside the YAML; none of them is a key of the YAML itself
 - **The schema hash.** `GET /v1/csm/{name}` answers the compiled JSON Schema and
   `schema_hash`, the sha256 of its stable JSON (object keys sorted), so a program
   can tell whether the shape changed.
-- **In use.** While a module of the node uses a CSM, `DELETE` answers 409
-  `IN_USE` and names the users.
+- **In use.** While the registering account itself uses a CSM (its own
+  receivers), `DELETE` answers 409 `IN_USE` and names those uses. Another
+  account's receiver does not stop the delete: it keeps checking messages
+  against the copy of the schema it holds, and its owner gets a notice that the
+  CSM was removed (developer ruling of 2026-11-08).
+- **The registering account.** The account that registered a CSM writes it. A
+  deleted account's name is released for reuse, so an account registered later
+  under the same name does not read, change or delete the earlier account's CSMs.
+- **The schema lock.** The lock at `csm.<name>` holds the compiled schema, so
+  `GET /v1/schemas` and `GET /v1/memory/{key}/schema` show it only to a caller
+  who may read the CSM.
 - **A draft from a sample.** `POST /v1/csm/draft { name, sample }` answers a CSM
   inferred from one sample object and stores nothing: integers, numbers,
   booleans, strings, ISO 8601 date-times with a zone as `format: date-time`,

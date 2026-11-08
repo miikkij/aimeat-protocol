@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-08 -- e2e-csm-ownership.ts joins the list (not the guard tier): only the registering account's own receivers block a CSM delete, a package CSM takes the installer's prefix, the next account of an erased name has no CSM rights, a private CSM's schema-lock row is not public (secaudit2026nov08 round 14).
  *   2026-11-07 -- e2e-csm.ts joins the list (not the guard tier): a new CSM's name gets the owner's prefix, its visibility filters every read, PUT keeps versions and refuses a stale one, the draft stores nothing, an agent needs csm:write (developer ruling 2026-11-07).
  *   2026-11-07 -- e2e-receivers.ts joins the list (not the guard tier): receivers, the address and key an outside program writes into one place of an owner's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-11-07 -- e2e-rows-schema.ts joins the list (not the guard tier): a row space's JSON Schema binds every writer, and only the creator or an admin changes it (developer ruling 2026-11-07).
@@ -1349,6 +1350,8 @@ const ALL_SUITES = [
     'test/e2e-iam-parties.ts',
     // CSMs: the owner prefix, visibility on every read, versions with a stale-version refusal, the draft, csm:write (developer ruling 2026-11-07).
     'test/e2e-csm.ts',
+    // Who controls a CSM and who reads its schema-lock row: ruling 2 on deletion, a package CSM's prefix, the next account of an erased name, a private CSM's lock row (secaudit2026nov08 round 14).
+    'test/e2e-csm-ownership.ts',
     // The one-time share link: the mail, preview, redeem once with a new key, the refusals, and DuckDB and pandas reading as a party (WP9b). Runs its own node with mail on (28566).
     'test/e2e-party-invite.ts',
     // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
