@@ -9,13 +9,17 @@
  *   with its explanation, explain.context.readers), the one loud action that copies the sentence to
  *   go on with it in chat, archive or bring back, delete; then its core, its concepts, its
  *   references, the contexts it includes or keeps out, and the views its AI keeps. One column under
- *   1100px, the list first. With no context, one dashed aside says that a context starts in chat.
+ *   1100px, the list first. Over both, the page introduction says what a context is, when one starts,
+ *   what the person gains and what this page is for; with no context it is the whole page.
  *   Pure render over the ctx bag of contexts-tab.js; every part is a library component, and the
  *   file writes no class.
- * @structure renderContextsView · listPart · contextRow · deletedNote · detailPart · headPart ·
+ * @structure renderContextsView · introPart · listPart · contextRow · deletedNote · detailPart · headPart ·
  *   corePart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
  * @usage import { renderContextsView } from './contexts/view.js';
  * @version-history
+ *   v1.2.0 — 2026-11-08 — The page introduction (PageStart with the page's own parts): what a context
+ *     is, when one starts, what the person gains and what this page is for. It replaces the one-line
+ *     empty state and the head's lede.
  *   v1.1.0 — 2026-11-08 — Browser check findings: every numbered section shows its running number
  *     (no counts in that place); a view's frequency in the reader's language when it is a known
  *     value; the rows are ConversationList rows (one button per row, at least 44px, the chosen one on
@@ -29,6 +33,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { ago, date, num } from '/js/format.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { PageSection } from '/components/PageSection.js';
 import { ConversationList, ConversationRows, ConversationSection, ConversationRow } from '/components/ConversationList.js';
 import { Action, Loud, Actions } from '/components/Action.js';
@@ -54,13 +59,32 @@ export function renderContextsView(ctx) {
   let body;
   if (ctx.failed) body = html`<${Note} kind="quiet">${x('loadFailed')} <${Action} small soft onClick=${() => ctx.reload()}>${x('retry')}<//><//>`;
   else if (!ctx.items) body = html`<${Note} kind="loading" />`;
-  else if (!all.length) body = html`${deletedNote(ctx)}<${Note} kind="aside">${x('empty')}<//>`;
+  else if (!all.length) body = deletedNote(ctx);
   else body = html`<${Beside} start narrow side=${listPart(ctx)}>${detailPart(ctx, ctx.current)}<//>`;
   return html`
     <${SettingsPage} name="ctx" crumb=${crumb()} title=${t('profile.tabs.contexts')} marks=${marks}
-      desc=${x('lede')} after=${html`<${ctx.ConfirmUI} />`}>
+      start=${introPart(ctx.items !== null && !all.length)} after=${html`<${ctx.ConfirmUI} />`}>
       ${body}
     <//>`;
+}
+
+/**
+ * What a context is, when one starts, what the person gains and what this page is for: the page
+ * introduction of the Settings pages (components/PageStart.js). Open by default; it folds to its
+ * title once the person folds it, remembered in this browser. With no context it stays open, and it
+ * is the page's whole content.
+ */
+function introPart(alone) {
+  const gains = ['gain1', 'gain2', 'gain3', 'gain4'];
+  return html`<${PageStart} id="contexts" done=${false} keepOpen=${alone}
+    title=${x('intro.title')} lead=${x('intro.lead')} showLabel=${x('intro.show')}
+    parts=${[
+      { key: 'when', label: x('intro.whenTitle'), body: html`<${Note} kind="hint">${x('intro.when')}<//>` },
+      { key: 'gain', label: x('intro.gainTitle'), body: html`<${Stack} list gap="small">
+        ${gains.map((g) => html`<${Note} key=${g} kind="hint" inline>${x('intro.' + g)}<//>`)}
+      <//>` },
+      { key: 'page', label: x('intro.pageTitle'), body: html`<${Note} kind="hint">${x('intro.page')}<//>` },
+    ]} />`;
 }
 
 /* ── The list ─────────────────────────────────────────────────────────────────────────────────── */
