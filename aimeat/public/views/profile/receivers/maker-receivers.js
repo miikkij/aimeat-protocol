@@ -66,10 +66,10 @@ export function MakerReceivers({ maker, label }) {
       ${result?.paused !== undefined && html`<${Note} kind="message">${tn('receivers.maker.paused', result.paused)}<//>`}
       ${result?.failed && html`<${Note} kind="message" error>${x('maker.pauseFailed')}<//>`}
       ${pausable.length > 0 && result?.paused === undefined && html`
-        <div>${x('maker.pauseWhat')}</div>
-        <div>${x('maker.keep')}</div>
+        <div>${tn('receivers.maker.pauseWhat', pausable.length)}</div>
+        <div>${tn('receivers.maker.keep', pausable.length)}</div>
         <${Actions}>
-          <${Action} small disabled=${busy} busy=${busy} onClick=${pauseAll}>${x('maker.pause')}<//>
+          <${Action} small disabled=${busy} busy=${busy} onClick=${pauseAll}>${tn('receivers.maker.pause', pausable.length)}<//>
           <${Action} small href="/v1/profile?tab=receivers">${x('maker.open')}<//>
         <//>`}
     <//>`;

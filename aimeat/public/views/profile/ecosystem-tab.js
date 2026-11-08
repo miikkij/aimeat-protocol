@@ -290,8 +290,8 @@ export default function EcosystemTab({ onStats, showToast }) {
             ${t('profile.ecosystem.revoke')}
           <//>`}>
         <${Stack} gap="medium">
-          <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
           ${revokeApp && html`<${MakerReceivers} maker=${apps.find(a => a.app === revokeApp)?.geai} label=${revokeApp} />`}
+          <p>${t('profile.ecosystem.revokeWarn', { app: revokeApp })}</p>
           <${TextField} value=${revokeInput} ariaLabel=${t('profile.ecosystem.revokeTitle', { app: revokeApp || '' })}
             placeholder=${revokeApp || ''} onInput=${v => setRevokeInput(v)} />
         <//>
