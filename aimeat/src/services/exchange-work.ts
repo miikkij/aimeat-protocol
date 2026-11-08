@@ -9,12 +9,18 @@
  *   budget — through the SAME G1 entitlement + G2 settlement as a synchronous call (settlement-rail ⊥
  *   pricing-model). Unlike data/app-tool calls (synchronous), the charge fires when the agent delivers, not
  *   on a request. Memory-backed under a system namespace; surfaced to the two parties by the authorised routes.
- * @structure AgentWork · newWorkId · putWork · claimWorkForDelivery · releaseWorkClaim · getWork · listWorkByConsumer / ByProvider · workView / workViews
+ * @structure AgentWork · newWorkId · putWork · claimWorkForDelivery · releaseWorkClaim · isOpenForPayment ·
+ *   claimWorkForPayment · settleWorkPayment · releaseWorkPayment · cancelOpenWork · getWork ·
+ *   listWorkByConsumer / ByProvider · workView / workViews
  * @usage
  *   const w = await putWork(storage, { workId: newWorkId(), offeringId, consumerGaii, ... });
  *   // on delivery the exchange route settles via settleMeteredCoordinate against the consumer.
  *   res.json(success(nodeId, { work: await workView(storage, config, w) }));
  * @version-history
+ *   2026-11-08 — claimWorkForPayment / settleWorkPayment / releaseWorkPayment / cancelOpenWork: an A2A
+ *     paid turn claims the work (`paying`) on its record's version before it collects, writes the paid
+ *     record only while it holds that claim, and a cancel is written on the version it read
+ *     (secaudit2026nov08 round 14, continueWork:no-claim-before-collect).
  *   2026-10-27 — The work listings read only the service's own namespace (secaudit2026oct26).
  *   v1.3.0 — 2026-10-18 — claimWorkForDelivery / releaseWorkClaim: a delivery claims the work on its
  *     record's version before it settles, so two deliveries at the same moment settle once
@@ -53,8 +59,11 @@ export interface AgentWork {
   input: unknown;
   output: unknown;
   note: string;
-  /** `delivering` while one delivery holds the claim and settles (claimWorkForDelivery). */
-  state: 'open' | 'delivering' | 'delivered' | 'cancelled';
+  /** `delivering` while one delivery holds the claim and settles (claimWorkForDelivery); `paying`
+   *  while one paid A2A turn holds the claim and collects (claimWorkForPayment). */
+  state: 'open' | 'paying' | 'delivering' | 'delivered' | 'cancelled';
+  /** The paid turn holding the `paying` claim: its own id and when it took the claim. */
+  payingClaim?: { id: string; at: string };
   unit: EntitlementUnit;
   currency: string | null;
   chargedUnits: number;  // amount settled on delivery, in `unit` (0 until delivered)
@@ -107,6 +116,83 @@ export async function claimWorkForDelivery(storage: Storage, id: string): Promis
 /** Put a claimed work item back to `open`, after a refusal that settled nothing. */
 export async function releaseWorkClaim(storage: Storage, w: AgentWork): Promise<void> {
   await putWork(storage, { ...w, state: 'open' });
+}
+
+/**
+ * How long a `paying` claim holds. A turn whose process ended during the collect leaves the claim
+ * behind; after this the work takes a payment again. Far longer than a facilitator call takes.
+ */
+export const PAYING_CLAIM_HOLD_MS = 10 * 60_000;
+
+/** The work item without a paid turn's claim on it. */
+function withoutPayingClaim(w: AgentWork): AgentWork {
+  const out = { ...w };
+  delete out.payingClaim;
+  return out;
+}
+
+/** True when an A2A paid turn may claim this work: open and unpaid, or left `paying` past the hold. */
+export function isOpenForPayment(w: AgentWork, nowMs = Date.now()): boolean {
+  if (w.chargedUnits > 0) return false;
+  if (w.state === 'open') return true;
+  if (w.state !== 'paying') return false;
+  const at = w.payingClaim ? Date.parse(w.payingClaim.at) : NaN;
+  return !Number.isFinite(at) || nowMs - at > PAYING_CLAIM_HOLD_MS;
+}
+
+/**
+ * Move a work item to `paying` on the stored record's version before an A2A paid turn collects
+ * (secaudit2026nov08 round 14). Of two turns that both read it open, one claims it and collects; the
+ * other gets `claimed: null` and collects nothing. `current` is the record as last read.
+ */
+export async function claimWorkForPayment(storage: Storage, id: string): Promise<{ claimed: AgentWork | null; current: AgentWork | null }> {
+  const out: { claimed: AgentWork | null; current: AgentWork | null } = { claimed: null, current: null };
+  await updateRecord(storage, NS, keyOf(id), v => (v ?? null) as AgentWork | null, cur => {
+    out.current = cur && cur.workId ? cur : null;
+    out.claimed = out.current && isOpenForPayment(out.current)
+      ? { ...out.current, state: 'paying', payingClaim: { id: randomUUID(), at: new Date().toISOString() } }
+      : null;
+    return out.claimed ?? UNCHANGED;
+  }, { tag: 'exchange-work' });
+  return out;
+}
+
+/**
+ * Write the paid record of a claimed work item: `change` applied to the stored record, back to `open`
+ * for the provider. Throws when the claim is no longer this turn's, so the caller's sale is not booked
+ * and the collected payment is handled as undelivered.
+ */
+export async function settleWorkPayment(storage: Storage, claim: AgentWork, change: (w: AgentWork) => AgentWork): Promise<AgentWork> {
+  return updateRecord(storage, NS, keyOf(claim.workId), v => (v ?? null) as AgentWork | null, (cur): AgentWork => {
+    if (!cur || cur.state !== 'paying' || cur.payingClaim?.id !== claim.payingClaim?.id) {
+      throw new Error(`Work ${claim.workId} changed while its payment was settled.`);
+    }
+    return { ...withoutPayingClaim(change(cur)), state: 'open' };
+  }, { tag: 'exchange-work' }) as Promise<AgentWork>;
+}
+
+/** Put a work item this turn claimed back to `open`, after a payment that moved no money. */
+export async function releaseWorkPayment(storage: Storage, claim: AgentWork): Promise<void> {
+  await updateRecord(storage, NS, keyOf(claim.workId), v => (v ?? null) as AgentWork | null, (cur): AgentWork | typeof UNCHANGED => {
+    if (!cur || cur.state !== 'paying' || cur.payingClaim?.id !== claim.payingClaim?.id) return UNCHANGED;
+    return { ...withoutPayingClaim(cur), state: 'open' };
+  }, { tag: 'exchange-work' });
+}
+
+/**
+ * Cancel an open, unpaid work item on the stored record's version. Answers the record as stored after
+ * the attempt, and whether this call cancelled it.
+ */
+export async function cancelOpenWork(storage: Storage, id: string): Promise<{ cancelled: boolean; current: AgentWork | null }> {
+  const out: { cancelled: boolean; current: AgentWork | null } = { cancelled: false, current: null };
+  await updateRecord(storage, NS, keyOf(id), v => (v ?? null) as AgentWork | null, cur => {
+    out.current = cur && cur.workId ? cur : null;
+    out.cancelled = !!out.current && isOpenForPayment(out.current);
+    if (!out.cancelled) return UNCHANGED;
+    out.current = { ...withoutPayingClaim(out.current!), state: 'cancelled' };
+    return out.current;
+  }, { tag: 'exchange-work' });
+  return out;
 }
 
 export async function getWork(storage: Storage, id: string): Promise<AgentWork | null> {
