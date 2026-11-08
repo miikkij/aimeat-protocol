@@ -88,9 +88,11 @@ type StarterKind = 'agent' | 'app' | 'ecosystem';
  */
 function starterKind(s: AiJobStartedBy): StarterKind | null {
     if (isAgentStarter(s)) return 'agent';
+    // The kind is caller-facts.ts credentialKind's; an app is asked by the app its grant names, and an
+    // ecosystem app by its GEAI.
     const kind = credentialKind(s);
-    if (kind === 'app' && s.app) return 'app';
-    if (kind === 'ecosystem' && s.principal.includes('#')) return 'ecosystem';
+    if (kind === 'app') return s.app ? kind : null;
+    if (kind === 'ecosystem') return s.principal.includes('#') ? kind : null;
     return null;
 }
 
