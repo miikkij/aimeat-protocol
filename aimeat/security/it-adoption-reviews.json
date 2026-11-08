@@ -219,7 +219,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:82df6a8be5da0dbfc3f8805e"
+      "digest": "sha256:377f1269a5731e43262b47bd"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -421,7 +421,7 @@
       "aimeat/src/mcp/legacy-sessions.ts": "e1e17ec26e540150",
       "aimeat/src/services/passkeys.ts": "cc84dd5812a7537a",
       "aimeat/src/middleware/rate-limit.ts": "4b1242a9d37451ff",
-      "aimeat/src/services/ai-jobs/service.ts": "5fe511c5ffa5cf5a",
+      "aimeat/src/services/ai-jobs/service.ts": "2938b630f02d3dff",
       "aimeat/src/services/config-apply.ts": "9a4e295d031eff60",
       "aimeat/src/services/operator-access-audit.ts": "b5bdb2950de0f079",
       "aimeat/src/config-private-host.ts": "8130055a22bdaa7a",

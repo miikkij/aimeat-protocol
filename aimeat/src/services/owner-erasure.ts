@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-11-08 — After the transaction the account's live AI jobs are let go in the runner, with nothing
+ *     written under the erased identity, and the log names `ai_jobs:<n>` when there were some
+ *     (secaudit2026nov08b round 15, runGate:erased-account-runs-as-active).
  *   2026-11-08 — Step code_invitation: the pending code key that provisioned the account is closed, so
  *     it does not act on the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-04 — The service_records step erases the person's service namespace (services/service-records.ts),
@@ -99,6 +102,7 @@ import { appendRequest, removeAppDocsOfOwner } from './compliance/docs.js';
 import { eraseNameBoundGrants } from './name-bound-grants-erasure.js';
 import { serviceNamespaceOf } from '../utils/service-namespace.js';
 import { isValidGHII } from '../utils/gaii.js';
+import { nodeContext } from './node-context.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -478,6 +482,18 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     // 3. The per-identity cascade, agents, GHIIs and the owner record.
     await storage.deleteOwner(name);
   });
+
+  // The account's AI jobs live in the runner of this process, beside their stored records, and a job
+  // that waited for a deactivated account or sat in the queue would otherwise run now, pay, and write
+  // its record, its answer and its day log under the erased identity again. After the transaction, so
+  // a rolled-back erasure keeps its jobs (services/ai-jobs/service.ts dropAccountJobs; secaudit2026nov08b
+  // round 15, runGate:erased-account-runs-as-active).
+  const aiJobs = nodeContext().aiJobs;
+  if (aiJobs) {
+    const n = await aiJobs.dropAccountJobs(ghii)
+      .catch(err => { logger.warn('owner-erasure: the account\'s AI jobs were not let go', { name, error: String(err) }); return 0; });
+    if (n) deletionLog.push(`ai_jobs:${n}`);
+  }
 
   // The erasure is a data subject request the node carried out (GDPR art. 17): it logs itself in the
   // node's request list, so the operator can show it was done and when (plan doc-mvlftkh9zmc9, C4.3).

@@ -20,6 +20,10 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.14.0 — 2026-11-08 — 25d-25g: a deactivated account erased while its job waits lets the job go with
+ *     nothing paid and leaves no job to the next holder of the name; an agent the owner took ai:use from
+ *     and an app whose grant was revoked have their queued jobs end before the provider is called; an app
+ *     whose grant stands runs to done (secaudit2026nov08b round 15). No case changed.
  *   v1.13.0 — 2026-11-08 — 25a-25c: a deactivated account's queued job waits with nothing paid and runs
  *     after reactivation; a job of an agent deleted before it ran ends AI_JOB_STARTER_GONE with no
  *     provider call; an agent that stays runs to done (secaudit2026nov08 round 14). No case changed.
@@ -1685,6 +1689,89 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         const end = await waitForState(g, started.data.job_id as string, ['done', 'failed', 'cancelled']);
         assert(end.state === 'done', `end ${end.state} ${JSON.stringify(end.error)}`);
         assert((await readMemory(g, 'aijob.gate.stays')).body.data?.value === STUB_CONTENT, 'the answer landed');
+    });
+
+    // ── 25d-25g (secaudit2026nov08b round 15) ──
+    await test('25d. A deactivated account erased while its job waits: the job is let go, the provider hears nothing, and the next holder of the name finds no job', async () => {
+        const h = await setupOwner('h');
+        await pointAtStub(h);
+        const blocker = await holdTheSlot('aijob.gate.blocker4');
+        const r = await startJob(h, { prompt: 'waits, then its account is erased', result_key: 'aijob.gate.erased' });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const off = await json(`/v1/admin/owners/${h.name}/disable`, { method: 'POST', headers: auth(a.token) });
+        assert(off.status === 200, `deactivate: ${off.status} ${JSON.stringify(off.body?.error)}`);
+        const seen = completionsSeen;
+        releaseHeld();
+        await waitForState(e, blocker, ['done']);
+
+        const del = await json(`/v1/owners/${h.name}`, { method: 'DELETE', headers: auth(a.token) });
+        assert(del.status === 200, `the operator erases the account: ${del.status} ${JSON.stringify(del.body?.error)}`);
+        assert((del.body.data.deletion_log as string[]).includes('ai_jobs:1'), `the erasure names the job it let go: ${JSON.stringify(del.body.data.deletion_log)}`);
+        // Past the runner's next look at the account (ACCOUNT_RECHECK_MS, 15 s).
+        await sleep(17_000);
+        assert(completionsSeen === seen, `the provider was called ${completionsSeen - seen} time(s) for an erased account's job`);
+
+        const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: h.name, display_name: 'Next holder', password: 'AiJobsTest1234' }) });
+        assert(reg.status === 201, `the name is registered again: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+        const tok = await ownerSignIn(BASE, h.name, 'AiJobsTest1234');
+        const next: Owner = { ...h, token: tok.body.data.token as string };
+        const jobs = await listJobs(next, '?state=all');
+        assert(jobs.status === 200 && jobs.body.data.jobs.length === 0, `the next holder sees no job: ${JSON.stringify(jobs.body?.data ?? jobs.body?.error)}`);
+        assert((await readMemory(next, 'aijob.gate.erased')).status === 404, 'no answer was written for the erased account');
+    });
+
+    await test('25e. An agent the owner took ai:use from: its queued job ends SCOPE_DENIED with the agent\'s page named, and the provider hears nothing', async () => {
+        const agent = await makeAgent(BASE, g, ['ai:use', 'memory:write'], 'aijobnoai');
+        const s = await openSession(BASE, agent.token, 'aijob-noai');
+        const blocker = await holdTheSlot('aijob.gate.blocker5');
+        const started = await callTool(s, 'aimeat_ai_job_start', { prompt: 'started by an agent that loses ai:use', result_key: 'aijob.gate.noai' });
+        assert(!started.isError, `the agent's start: ${started.text}`);
+        const id = started.data.job_id as string;
+        const narrow = await json('/v1/agents/aijobnoai/scopes', { method: 'PATCH', headers: auth(g.token), body: JSON.stringify({ scopes: ['memory:write'] }) });
+        assert(narrow.status === 200, `the owner takes ai:use away: ${narrow.status} ${JSON.stringify(narrow.body?.error)}`);
+
+        const seen = completionsSeen;
+        releaseHeld();
+        await waitForState(e, blocker, ['done']);
+        const end = await waitForState(g, id, ['done', 'failed', 'cancelled']);
+        assert(end.state === 'failed' && end.error?.code === 'SCOPE_DENIED', `end ${end.state} ${JSON.stringify(end.error)}`);
+        assert(/tab=agents&agent=aijobnoai/.test(end.error.message) && /yourself/.test(end.error.message), `the refusal names where to give it back: ${end.error.message}`);
+        assert(completionsSeen === seen, `the provider was called ${completionsSeen - seen} time(s) for an agent without ai:use`);
+        assert((await readMemory(g, 'aijob.gate.noai')).status === 404, 'nothing was written');
+    });
+
+    await test('25f. An app whose grant the owner revoked: its queued job ends AI_JOB_STARTER_GONE, and the provider hears nothing', async () => {
+        await publishApp(g, 'jobrevoked.html', 'ai:use', "AIMEAT.ai.job.start({ prompt: 'x', result_key: 'k' })");
+        const token = await appGrantToken(g, 'jobrevoked.html', 'ai:use');
+        const blocker = await holdTheSlot('aijob.gate.blocker6');
+        const r = await json('/v1/ai/jobs', { method: 'POST', headers: auth(token), body: JSON.stringify({ prompt: 'started by an app', result_key: 'aijob.gate.apprevoked' }) });
+        assert(r.status === 202, `the app's start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const grants = await json('/v1/app-grants', { headers: auth(g.token) });
+        const grant = (grants.body.data.grants as Array<{ grant_id: string; app: string }>).find(x => x.app === `${g.name}/jobrevoked.html`);
+        assert(!!grant, `the app's grant is listed: ${JSON.stringify(grants.body?.data ?? grants.body?.error)}`);
+        const rev = await json(`/v1/app-grants/${grant!.grant_id}`, { method: 'DELETE', headers: auth(g.token) });
+        assert(rev.status === 200, `the owner revokes the app: ${rev.status} ${JSON.stringify(rev.body?.error)}`);
+
+        const seen = completionsSeen;
+        releaseHeld();
+        await waitForState(e, blocker, ['done']);
+        const end = await waitForState(g, r.body.data.job_id as string, ['done', 'failed', 'cancelled']);
+        assert(end.state === 'failed' && end.error?.code === 'AI_JOB_STARTER_GONE', `end ${end.state} ${JSON.stringify(end.error)}`);
+        assert(completionsSeen === seen, `the provider was called ${completionsSeen - seen} time(s) for a revoked app`);
+        assert((await readMemory(g, 'aijob.gate.apprevoked')).status === 404, 'nothing was written');
+    });
+
+    await test('25g. Control: an app whose grant stands has its queued job run to done, as before', async () => {
+        await publishApp(g, 'jobstands.html', 'ai:use', "AIMEAT.ai.job.start({ prompt: 'x', result_key: 'k' })");
+        const token = await appGrantToken(g, 'jobstands.html', 'ai:use');
+        const blocker = await holdTheSlot('aijob.gate.blocker7');
+        const r = await json('/v1/ai/jobs', { method: 'POST', headers: auth(token), body: JSON.stringify({ prompt: 'started by an app that stays', result_key: 'aijob.gate.appstands' }) });
+        assert(r.status === 202, `the app's start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        releaseHeld();
+        await waitForState(e, blocker, ['done']);
+        const end = await waitForState(g, r.body.data.job_id as string, ['done', 'failed', 'cancelled']);
+        assert(end.state === 'done', `end ${end.state} ${JSON.stringify(end.error)}`);
+        assert((await readMemory(g, 'aijob.gate.appstands')).body.data?.value === STUB_CONTENT, 'the answer landed');
     });
 
     // ── 19a-19c: the same node, started again with the publish gate on ──
