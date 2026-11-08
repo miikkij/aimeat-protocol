@@ -15,6 +15,8 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   2026-11-08 — A cortex component's schema parts ask the schema lock rule (package-schema-lock.ts)
+ *     as the installer (`lockCaller`), before the first write and on a dry run (secaudit2026nov08 round 14).
  *   v1.17.0 — 2026-10-29 — An extension component in an account that may not install extension code
  *     (install role operator) is stored switched off and waits for an operator's one-press approval
  *     (extension-code-hold.ts; secaudit2026oct26 round 8c).
@@ -105,6 +107,8 @@ import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
 import { mergeExtensionConfig } from './packages/compose/package-config.js';
 import { registerSkillComponent, deleteSkillComponent } from './packages/install/package-skill-component.js';
 import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './packages/compose/package-component-collisions.js';
+import { cortexLockRuleRefusal, ownerLockCaller } from './packages/install/package-schema-lock.js';
+import type { SchemaLockCaller } from './schema-lock-rule.js';
 import { rewriteComponentRefs } from './component-ref-rewrite.js';
 import { releaseBareName } from './component-address.js';
 import { installRoleRefusal } from './extension-install-role.js';
@@ -172,6 +176,8 @@ export interface ComponentRegistrationInput {
    * (secaudit2026oct26).
    */
   codeWriter?: string;
+  /** Who installs, for the schema lock rule on a cortex's schema parts; absent: the owner in person. */
+  lockCaller?: SchemaLockCaller;
   /**
    * URL rewrites applied to app HTML content at install time. Built by the
    * installer from already-registered cortex/extension components in the same
@@ -382,6 +388,9 @@ export async function registerComponent(
           type, content, registeredAs, componentId, owner, ownerGaii, groupId: input.packageContext?.groupId,
         });
         if (lockRefusal) return { success: false, componentId, registeredAs, error: lockRefusal.error };
+        // And the lock rule the schema route and the activation ask (package-schema-lock.ts).
+        const ruled = await cortexLockRuleRefusal({ storage, config: input.config }, input.lockCaller ?? ownerLockCaller(owner, ownerGaii), content, componentId);
+        if (ruled) return { success: false, componentId, registeredAs, error: ruled.error };
 
         if (input.dryRun) break;
         await storage.createCortexExtension({

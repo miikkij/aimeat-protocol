@@ -20,6 +20,10 @@
  *   import { installPackage } from './package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   2026-11-08 — A cortex schema part asks the schema lock rule as the installer before anything
+ *     registers, on a dry run too: a node-wide pattern, another organism's records or a key another
+ *     account's lock governs is refused with the rule's code (package-schema-lock.ts; secaudit2026nov08
+ *     round 14).
  *   v1.15.0 — 2026-10-31 — A package its author sells to accounts installs for an account holding a
  *     paid purchase (packageVisibleTo); anyone else gets 402 PURCHASE_REQUIRED while it is listed for
  *     sale (sale/package-account-entitlement.ts).
@@ -107,6 +111,7 @@ import type { Scheduler } from '../../scheduler.js';
 import { logger } from '../../../utils/logger.js';
 import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { installRoleRefusal } from '../../extension-install-role.js';
+import { packageLockCaller, cortexLockRuleRefusal } from './package-schema-lock.js';
 
 export interface PackageInstallDeps {
     storage: Storage;
@@ -368,7 +373,10 @@ export async function installPackage(
     };
     const pkgRef = { config, groupId, instanceId };
     const warnings: string[] = [];
+    // Who installs, for the schema lock rule on a cortex's schema parts (package-schema-lock.ts).
+    const lockCaller = await packageLockCaller(storage, caller);
     const registrationOf = (comp: PackageComponent, registeredAs: string, dryRun: boolean) => ({
+        lockCaller,
         config,
         ...(dryRun ? { dryRun: true } : {}),
         componentId: comp.id,
@@ -411,6 +419,11 @@ export async function installPackage(
             owner, ownerGaii, groupId,
         });
         if (taken) return { ok: false, status: 409, code: taken.code, message: `${taken.message} Nothing was installed.` };
+        // Nor a lock the schema lock rule refuses this installer (package-schema-lock.ts).
+        if (comp.type === 'cortex') {
+            const ruled = await cortexLockRuleRefusal({ storage, config }, lockCaller, comp.content, comp.id);
+            if (ruled) return { ok: false, status: ruled.status, code: ruled.code, message: `${ruled.message} Nothing was installed.` };
+        }
     }
     // The config the install was given (package-config.ts): every value checked against what its part
     // declares, and a required app field left empty refused by name, before anything registers. A dry
