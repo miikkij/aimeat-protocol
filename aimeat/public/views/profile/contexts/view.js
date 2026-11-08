@@ -9,14 +9,18 @@
  *   with its explanation, explain.context.readers), the one loud action that copies the sentence to
  *   go on with it in chat, archive or bring back, delete; then its core, its concepts, its
  *   references, the contexts it includes or keeps out, and the views its AI keeps. One column under
- *   1100px, the list first. Over both, the page introduction says what a context is, when one starts,
- *   what the person gains and what this page is for; with no context it is the whole page.
+ *   1100px, the list first. The guidance is the standard parts of .claude/rules/page-guidance.md:
+ *   the head's paragraph, the title's question mark (explain.concept.context), PageStart
+ *   (pageStart.contexts.*) and the list's own empty line; nothing else on the page explains.
  *   Pure render over the ctx bag of contexts-tab.js; every part is a library component, and the
  *   file writes no class.
- * @structure renderContextsView · introPart · listPart · contextRow · deletedNote · detailPart · headPart ·
+ * @structure renderContextsView · listPart · contextRow · deletedNote · detailPart · headPart ·
  *   corePart · conceptsPart · referencesPart · linksPart · keepWords · viewsPart
  * @usage import { renderContextsView } from './contexts/view.js';
  * @version-history
+ *   v1.3.0 — 2026-11-08 — The guidance follows the page-guidance rule: the page's own introduction is
+ *     gone, and the head's paragraph, the title's question mark (concept.context), the standard
+ *     PageStart and the list's empty line carry it; the view toggle lost its tooltip-only words.
  *   v1.2.0 — 2026-11-08 — The page introduction (PageStart with the page's own parts): what a context
  *     is, when one starts, what the person gains and what this page is for. It replaces the one-line
  *     empty state and the head's lede.
@@ -59,32 +63,17 @@ export function renderContextsView(ctx) {
   let body;
   if (ctx.failed) body = html`<${Note} kind="quiet">${x('loadFailed')} <${Action} small soft onClick=${() => ctx.reload()}>${x('retry')}<//><//>`;
   else if (!ctx.items) body = html`<${Note} kind="loading" />`;
-  else if (!all.length) body = deletedNote(ctx);
+  else if (!all.length) body = listPart(ctx);
   else body = html`<${Beside} start narrow side=${listPart(ctx)}>${detailPart(ctx, ctx.current)}<//>`;
+  // The page's guidance is the standard parts (.claude/rules/page-guidance.md): the head's paragraph,
+  // the question mark on the title (explain.concept.context), PageStart (pageStart.contexts.*, folded
+  // once the person has a context) and the list's own empty line.
+  const start = html`<${PageStart} id="contexts" done=${ctx.items ? all.length > 0 : null} />`;
   return html`
-    <${SettingsPage} name="ctx" crumb=${crumb()} title=${t('profile.tabs.contexts')} marks=${marks}
-      start=${introPart(ctx.items !== null && !all.length)} after=${html`<${ctx.ConfirmUI} />`}>
+    <${SettingsPage} name="ctx" crumb=${crumb()} title=${t('profile.tabs.contexts')} help="concept.context" marks=${marks}
+      desc=${x('lede')} start=${start} after=${html`<${ctx.ConfirmUI} />`}>
       ${body}
     <//>`;
-}
-
-/**
- * What a context is, when one starts, what the person gains and what this page is for: the page
- * introduction of the Settings pages (components/PageStart.js). Open by default; it folds to its
- * title once the person folds it, remembered in this browser. With no context it stays open, and it
- * is the page's whole content.
- */
-function introPart(alone) {
-  const gains = ['gain1', 'gain2', 'gain3', 'gain4'];
-  return html`<${PageStart} id="contexts" done=${false} keepOpen=${alone}
-    title=${x('intro.title')} lead=${x('intro.lead')} showLabel=${x('intro.show')}
-    parts=${[
-      { key: 'when', label: x('intro.whenTitle'), body: html`<${Note} kind="hint">${x('intro.when')}<//>` },
-      { key: 'gain', label: x('intro.gainTitle'), body: html`<${Stack} list gap="small">
-        ${gains.map((g) => html`<${Note} key=${g} kind="hint" inline>${x('intro.' + g)}<//>`)}
-      <//>` },
-      { key: 'page', label: x('intro.pageTitle'), body: html`<${Note} kind="hint">${x('intro.page')}<//>` },
-    ]} />`;
 }
 
 /* ── The list ─────────────────────────────────────────────────────────────────────────────────── */
@@ -96,7 +85,7 @@ function listPart(ctx) {
   return html`
     <${Stack} gap="medium">
       ${deletedNote(ctx)}
-      <${ConversationList}>
+      <${ConversationList} empty=${ctx.items && !ctx.items.length ? x('empty') : undefined}>
         <${ConversationRows}>${ctx.active.map((c) => contextRow(ctx, c))}<//>
         ${ctx.archived.length ? html`
           <${ConversationSection} kind="archive" label=${x('archivedGroup')} count=${num(ctx.archived.length)}
@@ -269,7 +258,7 @@ function viewsPart(ctx, c, nextNum) {
           const view = ctx.viewsOpen[id] || 'line';
           const last = v.last && typeof v.last === 'object' && typeof v.last.text === 'string' && v.last.text ? v.last : null;
           // The toggle is a word in the control cut (44px), not the 28px icon: line → peek → all → line.
-          const toggle = last ? html`<${Action} small soft control title=${x('toggleView')}
+          const toggle = last ? html`<${Action} small soft control
             onClick=${() => ctx.setViewOpen(id, nextPeek(view))}>${view === 'full' ? x('showLess') : x('showMore')}<//>` : null;
           return html`
             <${Box} key=${id} name=${v.ask} marks=${v.keep ? html`<${Mark}>${keepWords(v.keep)}<//>` : null} end=${toggle}>

@@ -161,7 +161,7 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
         summary: 'The start of a page for a person who has not used it yet: one quiet block under the head that says what the page is for, gives one first action (a prompt to paste into their own AI, and the page\'s own button for the same) and says what happens next. It folds to one line, and the browser remembers that per page.',
         module: '/components/PageStart.js', sheet: '/css/components/page-start.css',
         data: {
-            shape: 'PageStart({ id, vars, purpose, prompt, next, action, link, done, title, lead, parts, showLabel, keepOpen }) · in a Settings page: SettingsPage({ start })',
+            shape: 'PageStart({ id, vars, purpose, prompt, next, action, link, done }) · in a Settings page: SettingsPage({ start })',
             fields: {
                 id: 'the page: its words are the locale\'s pageStart.<id>.* (purpose, prompt, next, action, link), and its fold is remembered under it',
                 vars: 'the values the prompt\'s {placeholders} take (an address)',
@@ -171,14 +171,9 @@ export const PAGE_ENTRIES: UiEntryWritten[] = [
                 action: '{ onClick | href | copy, label }: the page\'s own button for the same first action',
                 link: '{ onClick | href, label }: a way on after the purpose sentence',
                 done: 'true when the first action is done (it starts folded), null while the page does not know yet, false or absent: open; the person\'s own choice wins',
-                title: 'the head words in place of "Start here", for a page that explains a thing ("What is a context?")',
-                lead: 'a sentence over the parts, shown while open',
-                parts: '[{ key, label, body }]: the page\'s own parts in place of the three above, in the same columns',
-                showLabel: 'the words that open a folded block, in place of "Show how to start"',
-                keepOpen: 'no fold: the block stays open (a page with nothing on it yet)',
             },
         },
-        useFor: ['The top of a main page a newcomer lands on: memory, organisms, agents, connect your AI, wallet, access, packages, apps, notebook, AI.', 'What a thing is, when it is used and what the person gains, at the top of its page (contexts).'],
+        useFor: ['The top of a main page a newcomer lands on: memory, organisms, agents, connect your AI, wallet, access, packages, apps, notebook, AI.'],
         variants: [{ name: 'folded', class: 'page-start--folded', prop: 'done or the person\'s choice', when: 'the person has done the first action, or folded it: one line with the way to open it' }],
         example: {
             id: 'memory',

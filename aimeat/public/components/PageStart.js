@@ -24,22 +24,12 @@
  *     it does not know yet (folded until it knows), false or absent: open. The person's own choice
  *     wins over it.
  *
- *   A page that explains a thing rather than a first step passes its own words (additive, 2026-11-08):
- *   - title: the block's head words in place of "Start here" (a question: "What is a context?").
- *   - lead: a sentence over the parts, shown while open.
- *   - parts: [{ key, label, body }] in place of the three parts above, in the same columns (the
- *     middle one is the widest); `body` is any library part (a Note, a list, a PromptCard).
- *   - showLabel: the words that open a folded block, in place of "Show how to start".
- *   - keepOpen: no fold at all (a page with nothing on it yet, where the block is the whole page).
- *
  *   Built from the library's parts (Label, Note, Action, PromptCard); its sheet,
  *   css/components/page-start.css, only lays the parts out. The catalogue entry is `page-start`.
- * @structure PageStart({ id, vars, purpose, prompt, next, action, link, done, title, lead, parts, showLabel, keepOpen })
+ * @structure PageStart({ id, vars, purpose, prompt, next, action, link, done })
  * @usage html`<${PageStart} id="memory" done=${hasEntries} action=${{ onClick: openForm }} />`
  *        In a Settings page: SettingsPage's `start` slot draws it under the head.
  * @version-history
- *   v1.1.0 — 2026-11-08 — `title`, `lead`, `parts`, `showLabel` and `keepOpen`, for a page that explains
- *     what a thing is (the Contexts page); the look and the existing pages are unchanged.
  *   v1.0.0 — 2026-10-03 — Initial (guidance for normal people, part B): what a page is for, what to do
  *     first and what happens next, on the ten main Settings pages.
  */
@@ -74,36 +64,13 @@ function writeChoice(id, folded) {
 /**
  * @param {{ id: string, vars?: Record<string, any>, purpose?: any, prompt?: string, next?: any,
  *   action?: { onClick?: () => void, href?: string, copy?: string, label?: any } | null,
- *   link?: { onClick?: () => void, href?: string, label?: any } | null, done?: boolean | null,
- *   title?: any, lead?: any, parts?: Array<{ key: string, label: any, body: any }> | null, showLabel?: any,
- *   keepOpen?: boolean }} props
+ *   link?: { onClick?: () => void, href?: string, label?: any } | null, done?: boolean | null }} props
  */
-export function PageStart({ id, vars, purpose, prompt, next, action, link, done, title, lead, parts, showLabel, keepOpen }) {
+export function PageStart({ id, vars, purpose, prompt, next, action, link, done }) {
   const [choice, setChoice] = useState(() => readChoice(id));
   const part = (name) => words(`pageStart.${id}.${name}`, vars);
-  const folded = !keepOpen && (choice === '1' || choice === '0' ? choice === '1' : (done === true || done === null));
+  const folded = choice === '1' || choice === '0' ? choice === '1' : (done === true || done === null);
   const toggle = () => { setChoice(folded ? '0' : '1'); writeChoice(id, !folded); };
-  const head = title ?? t('pageStart.label');
-
-  // A page's own parts (added 2026-11-08): the same columns and labels, the page's words.
-  if (parts) {
-    return html`
-      <section class=${cx('page-start', folded && 'page-start--folded')} aria-label=${typeof head === 'string' ? head : t('pageStart.label')}>
-        <div class="page-start-head">
-          <${Label}>${head}<//>
-          ${keepOpen ? null : html`<${Action} small soft expanded=${!folded} onClick=${toggle}>${folded ? (showLabel ?? t('pageStart.show')) : t('pageStart.hide')}<//>`}
-        </div>
-        ${folded ? null : html`
-          ${lead ? html`<${Note} kind="lead">${lead}<//>` : null}
-          <div class="page-start-parts">
-            ${parts.map((p) => html`
-              <div class="page-start-part" key=${p.key}>
-                <${Label} block>${p.label}<//>
-                ${p.body}
-              </div>`)}
-          </div>`}
-      </section>`;
-  }
 
   const forWords = purpose ?? part('purpose');
   const promptText = prompt ?? part('prompt');
