@@ -69,8 +69,7 @@
         { "id": "workflows", "labelKey": "profile.tabs.workflows", "sections": [
           { "id": "wp-list", "num": "01", "labelKey": "profile.workflows.title" },
           { "id": "wp-waiting", "num": "02", "labelKey": "profile.workflows.cover.secWaiting" },
-          { "id": "wp-new", "num": "03", "labelKey": "profile.workflows.cover.secNew" },
-          { "id": "wp-how", "num": "04", "labelKey": "profile.workflows.cover.howTitle" }
+          { "id": "wp-new", "num": "03", "labelKey": "profile.workflows.cover.secNew" }
         ] },
         { "id": "receivers", "labelKey": "profile.tabs.receivers", "sections": [
           { "id": "rc-list", "num": "01", "labelKey": "receivers.secList" },
@@ -90,22 +89,19 @@
           { "id": "ct-people", "num": "01", "labelKey": "contacts.cover.secPeople" },
           { "id": "ct-noaccount", "num": "02", "labelKey": "contacts.cover.secNoAccount" },
           { "id": "ct-agents", "num": "03", "labelKey": "contacts.cover.secAgents" },
-          { "id": "ct-add", "num": "04", "labelKey": "contacts.cover.add" },
-          { "id": "ct-where", "num": "05", "labelKey": "contacts.cover.whereTitle" }
+          { "id": "ct-add", "num": "04", "labelKey": "contacts.cover.add" }
         ] },
         { "id": "notifications", "labelKey": "profile.tabs.notifications", "sections": [
           { "id": "nt-inbox", "num": "01", "labelKey": "notifpage.secInbox" },
           { "id": "nt-senders", "num": "02", "labelKey": "notifpage.secSenders" },
           { "id": "nt-devices", "num": "03", "labelKey": "notifpage.secDevices" },
-          { "id": "nt-quiet", "num": "04", "labelKey": "notifpage.quietTitle" },
-          { "id": "nt-how", "num": "05", "labelKey": "notifpage.howTitle" }
+          { "id": "nt-quiet", "num": "04", "labelKey": "notifpage.quietTitle" }
         ] },
         { "id": "email", "labelKey": "profile.tabs.email", "sections": [
           { "id": "em-address", "num": "01", "labelKey": "emailpage.secAddress" },
           { "id": "em-mailboxes", "num": "02", "labelKey": "emailpage.secMailboxes" },
           { "id": "em-sent", "num": "03", "labelKey": "emailpage.secSent" },
-          { "id": "em-letters", "num": "04", "labelKey": "emailpage.lettersTitle" },
-          { "id": "em-chat", "num": "05", "labelKey": "emailpage.chatTitle" }
+          { "id": "em-letters", "num": "04", "labelKey": "emailpage.lettersTitle" }
         ] },
         { "id": "chatsessions", "labelKey": "profile.tabs.chatSessions" }
       ] },
@@ -138,8 +134,7 @@
           { "id": "ad-start", "num": "01", "labelKey": "appdevpage.secStart" },
           { "id": "ad-learned", "num": "02", "labelKey": "appdevpage.secLearned" },
           { "id": "ad-proposals", "num": "03", "labelKey": "appdevpage.secProposals" },
-          { "id": "ad-curated", "num": "04", "labelKey": "appdevpage.secCurated" },
-          { "id": "ad-how", "num": "05", "labelKey": "appdevpage.secHow" }
+          { "id": "ad-curated", "num": "04", "labelKey": "appdevpage.secCurated" }
         ] },
         { "id": "extensions", "labelKey": "profile.tabs.extensions", "sections": [
           { "id": "ex-ext", "num": "", "labelKey": "extpage.secExt" },
@@ -207,11 +202,12 @@
         ] },
         { "id": "dataWallet", "labelKey": "profile.tabs.dataWallet", "sections": [
           { "id": "dw-targets", "num": "01", "labelKey": "dwpage.secTargets" },
-          { "id": "dw-trail", "num": "02", "labelKey": "dwpage.secTrail" },
-          { "id": "dw-grant", "num": "03", "labelKey": "dwpage.secGrant" },
-          { "id": "dw-export", "num": "04", "labelKey": "dwpage.secExport" },
-          { "id": "dw-class", "num": "05", "labelKey": "dwpage.cls.title" },
-          { "id": "dw-roads", "num": "06", "labelKey": "dwpage.secRoads" }
+          { "id": "dw-parties", "num": "02", "labelKey": "dataout.party.title" },
+          { "id": "dw-trail", "num": "03", "labelKey": "dwpage.secTrail" },
+          { "id": "dw-grant", "num": "04", "labelKey": "dwpage.secGrant" },
+          { "id": "dw-export", "num": "05", "labelKey": "dwpage.secExport" },
+          { "id": "dw-class", "num": "06", "labelKey": "dwpage.cls.title" },
+          { "id": "dw-content", "num": "07", "labelKey": "dwpage.cc.title" }
         ] },
         { "id": "storage", "labelKey": "profile.tabs.storage", "sections": [
           { "id": "fs-rule", "num": "01", "labelKey": "profile.storage.rule.title" },

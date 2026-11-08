@@ -11,18 +11,20 @@
  *   cost me". The place is read from what the node itself knows about the agent (its health verdict,
  *   its delivery channel, its mode, its identity version); nothing here is asked of the agent.
  *
- *   ONE LIST FOR THE CARD AND THE PICTURE. The four places are PLACES, which the "where an agent runs"
- *   picture on the page draws and agentFacts() picks one of, so the two cannot name a place differently.
+ *   THE FOUR PLACES. PLACES lists where an agent can run, and agentFacts() picks one of them. The
+ *   page's question mark (explain.concept.agent.what) names the same four places in words; the
+ *   picture that drew this list on the page went on 2026-11-08.
  * @structure PLACES · placeOf(agent) · agentFacts(agent)
  * @usage import { agentFacts } from './agent-facts.js'; const f = agentFacts(agent); f.runsOn, f.thinksWith, f.paidBy
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The places picture went into concept.agent; the description says so.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import { t } from '/js/i18n.js';
 
 const f = (key, vars) => t('profile.agents.facts.' + key, vars);
 
-/** The four places an agent can run, in the order the picture draws them. */
+/** The four places an agent can run, in the order concept.agent names them. */
 export const PLACES = ['chat', 'machine', 'node', 'service'];
 
 /**

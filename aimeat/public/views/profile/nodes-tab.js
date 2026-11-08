@@ -3,8 +3,15 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Profile tab for managing personal node registrations, visibility,
- *   agent assignments, tunnel URLs, and mailbox status.
+ *   agent assignments, tunnel URLs, and mailbox status. The page explains itself the designed way
+ *   (.claude/rules/page-guidance.md): the title's question mark is concept.own_server, and on the
+ *   Nodes sub-tab the page's start (PageStart id "nodes") opens the register form as its action and
+ *   folds once a server is registered. The Node stats sub-tab draws its own start and question mark.
  * @version-history
+ *   v1.23.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "nodes" on the Nodes sub-tab (its action opens the register form, so the form's open
+ *     state and the server count moved up to the page wrapper) and the title's question mark
+ *     concept.own_server; the head's line is two sentences.
  *   v1.22.0 -- 2026-10-16 -- A failed load shows "Could not load your servers." with Retry instead of an
  *     empty list, and no longer reports 0 servers to the header (QA audit F6-05).
  *   v1.21.2 -- 2026-10-11 -- The setup guide link opens the guide on GitHub; /docs/personal-node-setup-guide.md is not a path the node serves.
@@ -70,6 +77,7 @@ import { Fields, Field, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { Check } from '/components/Check.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
+import { PageStart } from '/components/PageStart.js';
 import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import NodeStatsTab from './node-stats-tab.js';
@@ -81,13 +89,14 @@ const stepWords = (s) => String(s).replace(/^\s*\d+\.\s*/, '');
 
 /* Default export below wraps the node list and Node stats into one page with
  * sub-tabs — Node stats left the sidebar menu (2026-06-10 sidebar reorg). */
-function NodesList({ session, showToast, onStats }) {
+/* The register form's open state and the server count live in the page wrapper (NodesTab), because
+ * the page's start opens the same form and folds once a server is registered. */
+function NodesList({ session, showToast, onStats, showNodeForm, setShowNodeForm, onCount }) {
   const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const tunnelUrl = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel';
   const [nodes, setNodes] = useState(null);
   const nodesLoad = useLoadState();
-  const [showNodeForm, setShowNodeForm] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [expandedSetups, setExpandedSetups] = useState(new Set());
 
@@ -114,6 +123,7 @@ function NodesList({ session, showToast, onStats }) {
       setNodes(list);
       nodesLoad.ok();
       onStats?.({ nodes: list.length });
+      onCount?.(list.length);
     } catch (err) {
       // Neither an empty list nor "0 servers" to the header: a failed load is drawn as one, and the
       // header keeps the figure it had.
@@ -248,14 +258,25 @@ function NodeForm({ onRegister, onCancel }) {
    then the Nodes | Node stats sub-tabs (Node stats merged here from the menu) ── */
 export default function NodesTab(props) {
   const [sub, setSub] = useState('nodes');
+  const [showNodeForm, setShowNodeForm] = useState(false);
+  // null until the list has loaded (the start stays folded until the page knows), then the count.
+  const [count, setCount] = useState(null);
+  // The start belongs to the Nodes sub-tab; the Node stats sub-tab draws its own under its heading.
+  const start = sub === 'nodes'
+    ? html`<${PageStart} id="nodes" done=${count === null ? null : count > 0} action=${{ onClick: () => setShowNodeForm(true) }} />`
+    : null;
   return html`
     <${SettingsPage} page
       crumb=${[t('nav.profile'), t('profile.landing.menuInfra'), t('profile.tabs.nodes')]}
       title=${t('profile.tabs.nodes')}
-      desc=${t('profile.nodes.desc')}>
+      help="concept.own_server"
+      desc=${t('profile.nodes.desc')}
+      start=${start}>
       <${Tabs} bar kind="view" value=${sub} onSelect=${setSub}
         items=${[{ value: 'nodes', label: t('profile.tabs.nodes') }, { value: 'stats', label: t('profile.tabs.nodeStats') }]} />
-      <${TabPanel} value=${sub}>${sub === 'nodes' ? html`<${NodesList} ...${props} />` : html`<${NodeStatsTab} ...${props} />`}<//>
+      <${TabPanel} value=${sub}>${sub === 'nodes'
+        ? html`<${NodesList} ...${props} showNodeForm=${showNodeForm} setShowNodeForm=${setShowNodeForm} onCount=${setCount} />`
+        : html`<${NodeStatsTab} ...${props} />`}<//>
     <//>
   `;
 }

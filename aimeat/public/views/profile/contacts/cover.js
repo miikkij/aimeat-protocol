@@ -6,11 +6,17 @@
  *   direction A). The COVER reads the address book through people: the people with an account
  *   (relation, tags, shared organisms, last message; a message door and their page), the people
  *   without one (with an invitation), the agents and apps under the person they belong to, and
- *   two folds: the three roads to add someone, and where contacts are used. A person opens as
- *   their own page (person.js). Pure render functions over the ctx bag.
- * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents · whereUsed
+ *   the fold with the three roads to add someone. The page's start (PageStart: what the address
+ *   book is for, the prompt that adds a person, the add fold as its button) and the title's
+ *   question mark (concept.contact: what an entry is and the six places the book is used). A
+ *   person opens as their own page (person.js). Pure render functions over the ctx bag. How the
+ *   page explains itself: .claude/rules/page-guidance.md.
+ * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.15.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart and the title's question mark concept.contact; the fold "Where contacts are used"
+ *     (ct-where) is gone, its six places are in the concept.
  *   v1.14.0 -- 2026-10-26 -- The saved card's "the other N came from messages" counts the rows of origin 'message'; it took everything not saved, colleagues included.
  *   v1.13.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry under People and
  *     no "nobody yet" line in the other sections (ctx.contactsFailed) (QA audit F6-05).
@@ -43,7 +49,8 @@ import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { FigureStrip } from '/components/FigureStrip.js';
-import { List, Row, Name, More } from '/components/List.js';
+import { More } from '/components/List.js';
+import { PageStart } from '/components/PageStart.js';
 import { Tabs, Tab } from '/components/Tabs.js';
 import { Tinted } from '/components/Figure.js';
 import { TextField } from '/components/TextField.js';
@@ -85,10 +92,16 @@ function renderCover(ctx) {
     { key: 'shared', n: sharedTotal, label: c('stripShared'), sub: sharedNames || c('stripSharedNone') },
     { key: 'saved', n: savedByMe, label: c('stripSaved'), sub: c('stripSavedSub', { n: fromMessages }) },
   ]} />`;
+  // The start: folded once the person has saved someone; its button opens the add fold.
+  const start = html`<${PageStart} id="contacts"
+    done=${ctx.contactsFailed || (ctx.loading && !ctx.contacts.length) ? null : savedByMe > 0}
+    action=${{ onClick: () => ctx.openAdd('name') }} />`;
   return html`
     <${SettingsPage} name="ct"
       crumb=${crumb(ctx, [])}
       title=${t('contacts.title')}
+      help="concept.contact"
+      start=${start}
       marks=${[
         mark(people.length, 'chipPeople'),
         noAccount.length ? mark(noAccount.length, 'chipNoAccount') : null,
@@ -108,7 +121,6 @@ function renderCover(ctx) {
         { id: 'ct-noaccount', num: '02', label: c('secNoAccount'), count: noAccount.length },
         { id: 'ct-agents', num: '03', label: c('secAgents'), count: agents.length },
         { id: 'ct-add', num: '04', label: c('add'), count: '' },
-        { id: 'ct-where', num: '05', label: c('whereTitle'), count: '' },
       ]}
       pagesLabel=${c('pages')}
       pages=${pageLinks(ctx)}
@@ -117,7 +129,6 @@ function renderCover(ctx) {
       ${secNoAccount(ctx)}
       ${secAgents(ctx)}
       <${FoldSection} id="ct-add" num="04" title=${c('add')} sub=${c('addSub')} open=${ctx.folds.add} onToggle=${() => ctx.setFold('add', !ctx.folds.add)}>${addBody(ctx)}<//>
-      <${FoldSection} id="ct-where" num="05" title=${c('whereTitle')} sub=${c('whereSub')} open=${ctx.folds.where} onToggle=${() => ctx.setFold('where', !ctx.folds.where)}>${whereUsed()}<//>
     <//>`;
 }
 
@@ -167,10 +178,4 @@ function secAgents(ctx) {
       ${ctx.contactsFailed ? null : !list.length ? html`<${Note} kind="quiet">${ctx.agentsFilter === 'mine' ? c('emptyMine') : c('emptyOthers')}<//>` : agentRows(ctx, sortPeople(list))}
       <${Hint}>${c('agentsHint')}<//>
     <//>`;
-}
-
-/** Where contacts are used: the six doors, once, two to a line. */
-function whereUsed() {
-  const rows = ['organism', 'workspace', 'group', 'message', 'wallet', 'app'];
-  return html`<${List} cols="name-name">${rows.map(k => html`<${Row} key=${k}><${Name} meta=${c('where.' + k + 'D')}>${c('where.' + k + 'T')}<//><//>`)}<//><${Hint}>${c('whereHint')}<//>`;
 }

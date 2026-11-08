@@ -5,11 +5,15 @@
  * @description The Skills page in the poster face: the owner's shelf of expertise. The mast and the
  *   strip; three shelves as rows (own skills, this server's library, workspace skills), each with a
  *   filter row and a search; the two roads to a new skill (ask your AI, or write it yourself in the
- *   editor); and the section that says how an agent loads a skill. What opens under a row is
- *   rows.js. Pure render over the ctx bag.
+ *   editor); and the section with the rule an AI copies and the facts of how a skill loads. The
+ *   page explains itself the designed way (.claude/rules/page-guidance.md): the start (PageStart
+ *   "skills": what a skill gives, the prompt for one's own AI, the editor as the page's own button)
+ *   and the title's question mark (concept.skill). What opens under a row is rows.js. Pure render
+ *   over the ctx bag.
  * @structure renderPage · shelf · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.25.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart "skills" (folded once the person has a skill of their own; its button opens the editor) and the title's question mark concept.skill; the lead that explained refs in section 05 moved into the concept, and the head's paragraph is two sentences.
  *   v1.24.0 -- 2026-09-26 -- On the component kit (page group G7): the empty lines and leads are the Note, the editor is the TextArea with the Tabs for who may see it and the Action doors, the rule an AI gets is the Box with its copy door; the workspace tag counts nothing yet in the dim tone again (main's og-chip--dim). The page writes no class.
  *   v1.23.0 -- 2026-09-26 -- A shelf's filters, search line, rows and more line are the List component (components/List.js: Filters, SearchLine, List, More): the page passes the words, the counts and the rows (component plan C1).
  *   v1.23.0 -- 2026-09-26 -- The page's frame is the SettingsPage component (components/SettingsPage.js): the crumb, the head (its tags as data, the loud copy and the new-skill link from the Action kit), the rail's sections and its sibling pages are data, and the rail owns the scroll (component plan C9).
@@ -64,6 +68,7 @@ import { TextArea } from '/components/TextField.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Roads, Road } from '/components/Roads.js';
 import { List, Filters, Filter, SearchLine, More } from '/components/List.js';
+import { PageStart } from '/components/PageStart.js';
 
 const PAGE = 20;
 const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
@@ -103,10 +108,13 @@ export function renderPage(ctx) {
     { id: 'sk-new', num: '04', label: x('secNew') },
     { id: 'sk-ai', num: '05', label: x('secAi') },
   ];
+  // The start: folded once the person has a skill of their own; its button is the page's own editor.
+  const start = html`<${PageStart} id="skills" done=${lib ? own.length > 0 : null}
+    action=${{ onClick: () => { ctx.openEditor(); scrollToSection('sk-new'); } }} />`;
 
   return html`
-    <${SettingsPage} name="skills" crumb=${crumb()} title=${t('skills.tabLabel')} sub=${x('titleSub')} marks=${marks}
-      desc=${none ? x('descEmpty', { n: node.length }) : x('desc')} actions=${actions} strip=${strip}
+    <${SettingsPage} name="skills" crumb=${crumb()} title=${t('skills.tabLabel')} sub=${x('titleSub')} help="concept.skill" marks=${marks}
+      desc=${none ? x('descEmpty', { n: node.length }) : x('desc')} actions=${actions} start=${start} strip=${strip}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${shelf(ctx, 'own', '01', x('secOwn'), lib ? (own.length ? x('secOwnSub', { n: own.length, bound: bound.length }) : x('secOwnNone')) : null, own, true)}
@@ -194,13 +202,12 @@ function secNew(ctx, num) {
     <//>`;
 }
 
-/* ── How an agent loads a skill ───────────────────────────────────────────────────────────────── */
+/* ── How an agent loads a skill: the rule to copy and the facts (what a ref is: concept.skill) ─── */
 
 function secAgent(ctx, num, node) {
   const pub = node.filter((s) => s.visibility === 'public').length;
   return html`
     <${PageSection} id="sk-ai" num=${num} title=${x('secAi')} count=${null}>
-      <${Note} kind="lead">${x('aiIntro')}<//>
       <${Box} doors=${html`<${Action} small copy=${agentRule(ctx.nodeUrl)} copiedLabel=${x('copied')}>${x('copyRule')}<//>`}>
         <${Label} block>${x('ruleLabel')}<//>
         <${Note} kind="lead">${x('ruleBody')}<//>

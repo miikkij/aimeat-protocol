@@ -24,8 +24,13 @@
  *   - REPORTS         — button definitions: id, label key, and which stats it leads with
  *   - getRange(period) — preset key → { from, to }
  *   - UsageTab (default) — fetch + render
+ *   HOW IT EXPLAINS ITSELF (.claude/rules/page-guidance.md): the title's question mark is
+ *   concept.usage (the two kinds of report, what is counted and what is not), and the page's start
+ *   (PageStart id "usage") gives the prompt that has one's own AI read the same reports.
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.9.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "usage" and the title's question mark concept.usage.
  *   v1.8.0 -- 2026-09-26 -- Every part is a component that takes data (SettingsPage, Tabs for the
  *     report bar and the time window, FigureStrip, List with its empty line, Note, Layout); the page
  *     writes no class and its pf-ureport-* rules go.
@@ -55,6 +60,7 @@ import { Note } from '/components/Note.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { List, Row, Name, Num } from '/components/List.js';
 import { Row as Line, Space } from '/components/Layout.js';
+import { PageStart } from '/components/PageStart.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -199,7 +205,9 @@ export default function UsageTab() {
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuBusiness'), t('profile.tabs.usage')]}
       title=${t('profile.usage.title')}
-      desc=${t('profile.usage.intro')}>
+      help="concept.usage"
+      desc=${t('profile.usage.intro')}
+      start=${html`<${PageStart} id="usage" />`}>
       ${controls}
 
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}

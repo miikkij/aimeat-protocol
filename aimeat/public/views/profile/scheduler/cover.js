@@ -9,10 +9,13 @@
  *   schedules as a fold. Each schedule opens as a PAGE under the same crumb (detail.js); the new
  *   schedule form, the paused and failed lists and the old calendar are pages reached from the rail.
  *   Pure render functions over the ctx bag scheduler-tab.js assembles; every part is a component
- *   that takes data (the page writes no class).
+ *   that takes data (the page writes no class). How the page explains itself
+ *   (.claude/rules/page-guidance.md): PageStart "scheduler" under the head, on the empty cover too,
+ *   and the title's question mark concept.schedule.
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   v1.24.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart under the head (folded once a schedule exists, its button the new-schedule form) and the title's question mark concept.schedule, on the empty cover as on the full one.
  *   v1.23.0 -- 2026-11-01 -- With no schedule at all the page is one sentence (cover.descEmpty) and the two ways on, without the "Seuraavaksi 01" section that repeated it (Jouni's review of v33, K53).
  *   v1.22.0 -- 2026-10-31 -- With no schedule at all the cover is the explanation, "Tee ensimmäinen agentti →" (to the Home's new-agent page) with "tai tee ajastus itse", and the one empty line: no strip, tags, filters or side panel (Jouni's review of v31, K53-K55). "Ei vielä hallinnoituja ajastuksia" reads "Sinulla ei ole vielä ajastuksia".
  *   v1.21.0 -- 2026-10-31 -- The week's rhythm, the continuous ones, the rarer ones and the agents' reported times are drawn only when they hold something (v31 K54); with no schedule at all, "next up" says where an approved agent's run will appear (K53); the head says in plain words what the page is (K55).
@@ -55,6 +58,7 @@ import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { PageSection } from '/components/PageSection.js';
 import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Figure } from '/components/Figure.js';
 import { List, Row, Name, Desc, Who, Num, When, Cell, Doors, Group, SearchLine, More } from '/components/List.js';
@@ -119,19 +123,24 @@ function renderCover(ctx) {
     { key: 'failed', n: m.failed.length, label: c('stripFailed'), sub: c('stripFailedSub') },
   ]} />`;
 
+  // The start (page-guidance.md): folded once a schedule exists; its button is this page's own form.
+  const start = html`<${PageStart} id="scheduler" done=${m.all.length > 0}
+    action=${{ onClick: () => ctx.pickView({ kind: 'page', id: 'create' }) }} />`;
+
   // With no schedule at all the page is its explanation and one way on: no counters, tags, filters
   // or side panel, which would only count zeros (Jouni's review of v31, K53-K55).
   if (!ctx.occLoading && m.all.length === 0 && ctx.internal.length === 0) {
     // One sentence and the two ways on; the "Seuraavaksi 01" section only repeated it (review of v33).
-    return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')}
-      desc=${c('descEmpty')}
+    return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')} help="concept.schedule"
+      desc=${c('descEmpty')} start=${start}
       actions=${html`
         <${Loud} href="/v1/home?new-agent=1">${c('firstAgent')}<//>
         <${Actions}><${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'create' })}>${c('orSchedule')}<//><//>`}
       strip=${ctx.error ? html`<${Note} kind="message" error>${ctx.error}<//>` : null} />`;
   }
 
-  return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')}
+  return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')} help="concept.schedule"
+    start=${start}
     marks=${[
       tag(m.all.length, 'chipAll'), tag(m.rhythm.length, 'chipWeekly'), tag(m.continuous.length, 'chipCont'), tag(m.rare.length, 'chipRare'),
       tag(m.paused.length, 'chipPaused', 'dim'), tag(m.failed.length, 'chipFailed', m.failed.length ? 'coral' : 'dim'),

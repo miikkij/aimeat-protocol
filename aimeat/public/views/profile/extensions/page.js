@@ -6,11 +6,17 @@
  *   The mast and the strip; the server extensions as rows (yours first, the others' behind a
  *   filter; what each does, who uses it, its actions) with a filter row and a search; the cortexes
  *   the same way; and how a new one starts (the two prompts from the node, the install form). What
- *   opens under a row is rows.js. Pure render over the ctx bag, made of the component kit: the page
- *   passes data and never a class.
+ *   opens under a row is rows.js. The page explains itself the designed way
+ *   (.claude/rules/page-guidance.md): the start (PageStart "extensions", its button copies the
+ *   extension guide) and the title's question mark (concept.extension). Pure render over the ctx
+ *   bag, made of the component kit: the page passes data and never a class.
  * @structure renderPage · secExtensions · secCortexes · secNew
  * @usage import { renderPage } from './extensions/page.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "extensions" (folded once the person has an extension or a cortex of their own; its
+ *     button copies the extension guide) and the title's question mark concept.extension, which now
+ *     says what an extension and a cortex are; the head's paragraph is two sentences.
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     is SettingsPage (crumb, head, marks, strip, rail as data), the strip FigureStrip, the filters
  *     Filters and Filter, the searches SearchLine, the lists the List, "show more" the More line,
@@ -61,6 +67,7 @@ import { Choice } from '/components/Choice.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Space } from '/components/Layout.js';
 import { scrollToSection } from '/components/Rail.js';
+import { PageStart } from '/components/PageStart.js';
 import { x, kindOf, crumb, pageLinks } from './frame.js';
 import { extRow, cortexRow } from './rows.js';
 // Aliased: `num` is already the name of this page's section-number parameter.
@@ -100,10 +107,13 @@ export function renderPage(ctx) {
   const sections = none
     ? [{ id: 'ex-new', num: '01', label: x('secNew'), count: '' }, { id: 'ex-ext', num: '02', label: x('secExt'), count: 0 }, { id: 'ex-cortex', num: '03', label: x('secCortex'), count: platformCx.length }]
     : [{ id: 'ex-ext', num: '01', label: x('secExt'), count: exts ? mine.length : '' }, { id: 'ex-cortex', num: '02', label: x('secCortex'), count: cxs ? myCx.length : '' }, { id: 'ex-new', num: '03', label: x('secNew'), count: '' }];
+  // The start: folded once the person has an extension or a cortex of their own; its button copies the guide.
+  const start = html`<${PageStart} id="extensions" done=${exts && cxs ? mine.length + myCx.length > 0 : null}
+    action=${ctx.extPrompt ? { copy: ctx.extPrompt } : undefined} />`;
 
   return html`
-    <${SettingsPage} name="ext" crumb=${crumb()} title=${t('profile.tabs.extensions')} sub=${x('titleSub')} marks=${marks}
-      desc=${none ? x('descEmpty') : x('desc')} actions=${mast} strip=${strip}
+    <${SettingsPage} name="ext" crumb=${crumb()} title=${t('profile.tabs.extensions')} sub=${x('titleSub')} help="concept.extension" marks=${marks}
+      desc=${none ? x('descEmpty') : x('desc')} actions=${mast} start=${start} strip=${strip}
       railTitle=${x('railTitle')} sections=${sections} pagesLabel=${x('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${none ? html`${secNew(ctx, '01', true)}${secExtensions(ctx, mine, others, '02')}${secCortexes(ctx, myCx, otherCx, platformCx, '03')}`

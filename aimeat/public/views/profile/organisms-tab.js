@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.37.0 -- 2026-11-08 -- The Archived fold's title has no emoji (no emoji in the interface).
  *   v2.36.0 -- 2026-10-27 -- A refused create shows each field's message under that field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (js/input-limits.js) (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.35.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of an empty
  *     list, and leaves the lists as they were, so the open organism is no longer closed as if it had
@@ -734,7 +735,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 ${sortMode === 'custom' && activeMine.length > 1 ? html`
                   <${Note}>${t('organisms.reorderHint') || 'Drag rows to reorder — the order is saved to your profile.'}<//>` : null}`}
             ${archivedMine.length > 0 ? html`
-              <${Section} fold num="" title=${'🗄️ ' + (t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
+              <${Section} fold num="" title=${(t('organisms.archivedSection') || 'Archived ({n})').replace('{n}', String(archivedMine.length))} open=${archivedOpen} onToggle=${() => setArchivedOpen(o => !o)}>
                 <${List} cols=${ORG_COLS} keepCols>${archivedMine.map(org => renderOrgRow(org, true))}<//>
               <//>` : null}
           `}

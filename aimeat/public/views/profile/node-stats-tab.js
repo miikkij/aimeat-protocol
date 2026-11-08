@@ -3,8 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Profile tab showing real-time node statistics including uptime,
- *   request counts, tunnel metrics, mailbox stats, and security counters.
+ *   request counts, tunnel metrics, mailbox stats, and security counters. Not drawn with
+ *   SettingsPage (it is the Nodes page's second sub-tab, and the nodeStats tab on its own), so it
+ *   explains itself through what it draws (.claude/rules/page-guidance.md): the question mark
+ *   concept.node_stats after its heading's words, and the page's start (PageStart id "nodeStats")
+ *   under the heading.
  * @version-history
+ *   v1.10.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     the question mark concept.node_stats after the heading's words (HelpTip, as PageHead draws a
+ *     page's), and PageStart "nodeStats" under the heading, with the prompt that has one's own AI
+ *     read the figures.
  *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (FigureStrip lead, CardGrid of section Cards, Facts with the status code as the name's state, SubHeading, Note, Space): the page passes data and writes no class. Under the Nodes page head the sub-tab keeps its own name and line as a level-2 sub-heading (page group G8).
  *   v1.8.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.7.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -33,6 +41,8 @@ import { Card, CardGrid } from '/components/Card.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
+import { HelpTip } from '/components/HelpTip.js';
+import { PageStart } from '/components/PageStart.js';
 import { getNodeStats } from '/js/services/stats.js';
 import { num, dateTime as fmtDateTime, duration } from '/js/format.js';
 
@@ -82,7 +92,12 @@ export default function NodeStatsTab() {
 
   // Under the Nodes page head (Jouni's decision "Nodes page head") this sub-tab keeps its own name
   // and line as a level-2 sub-heading: main showed them, and the Nodes head names the page, not it.
-  const head = html`<${SubHeading} level=${2} desc=${error ? null : t('profile.nodeStats.desc')}>${t('profile.nodeStats.title')}<//>`;
+  // The page's question mark after the heading's words, as PageHead draws one after a page title,
+  // and the page's start under the heading (this sub-tab has no SettingsPage head of its own).
+  const title = t('profile.nodeStats.title');
+  const head = html`
+    <${SubHeading} level=${2} desc=${error ? null : t('profile.nodeStats.desc')}>${title} <${HelpTip} term="concept.node_stats" label=${title} /><//>
+    <${PageStart} id="nodeStats" />`;
   if (error) return html`${head}<${Note} kind="meta">${t('profile.nodeStats.error')}<//>`;
   if (!data) return html`<${LoadingLine} text=${t('profile.nodeStats.loading')} />`;
   const s = data;

@@ -3,13 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The Email page in the poster face (design canvas "AIMEAT Sähköpostin sivu",
- *   direction A). Three sections and two folds: your address and what it is used for (with the
+ *   direction A). Three sections and a fold: your address and what it is used for (with the
  *   change and the code), your mailboxes (the mail providers, each connection's state, the
- *   addresses it may send as, who may use it), what left through the node, and behind folds what
- *   the node mails you (with the switches) and mail from a chat. Pure render over the ctx bag.
- * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold · chatFold
+ *   addresses it may send as, who may use it), what left through the node, and behind a fold what
+ *   the node mails you (with the switches). The page's start (PageStart: the prompt connects a
+ *   mailbox through the person's own AI, the mailboxes section is its button) and the title's
+ *   question mark (concept.mailbox: reading and sending, who a mail may go to, an app's
+ *   delegation, whose a connection is). Pure render over the ctx bag. How the page explains
+ *   itself: .claude/rules/page-guidance.md.
+ * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.22.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart and the title's question mark concept.mailbox; the fold "Mail from a chat" (em-chat)
+ *     is gone: its examples are in the concept, its prompt is the head's "Prompt for your AI".
  *   v1.21.0 -- 2026-10-28 -- The agentNarrowed row is gone: the node no longer narrows an agent by itself, so that email is never sent.
  *   v1.20.0 -- 2026-10-18 -- A letters row for the email the node sends when it narrows an agent that held all permissions (email.agentNarrowed, on unless switched off).
  *   v1.19.0 -- 2026-10-18 -- The letters open with the language they come in: a choice of English, Suomi or Español that sets the account language (PUT /v1/ghii locale), which every email the node sends the owner already followed but which only the profile dialog could set.
@@ -52,8 +59,8 @@ import { scrollToSection } from '/components/Rail.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { List, Row, Tick, Lead, Name, Desc, When, Cell, Doors, More } from '/components/List.js';
 import { Card, CardGrid } from '/components/Card.js';
-import { Roads, Road } from '/components/Roads.js';
 import { Tabs } from '/components/Tabs.js';
+import { PageStart } from '/components/PageStart.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
@@ -81,10 +88,15 @@ export function renderCover(ctx) {
       ? { key: 'last', n: rel(lastMail.at), label: c('stripLastMail'), sub: `${kindWord(lastMail.kind)}${lastMail.subject ? ' · ' + lastMail.subject : ''}` }
       : { key: 'last', n: '·', label: c('stripLastMail'), sub: c('stripLastMailNone') },
   ]} />`;
+  // The start: folded once a mailbox is connected; its button goes to the mailboxes.
+  const start = html`<${PageStart} id="email" done=${ctx.me ? mailboxes > 0 : null}
+    action=${{ onClick: () => scrollToSection('em-mailboxes') }} />`;
   return html`
     <${SettingsPage} name="em"
       crumb=${crumb()}
       title=${c('title')}
+      help="concept.mailbox"
+      start=${start}
       marks=${[
         verified ? { label: c('chipVerified') } : { label: c('chipUnverified'), tone: 'coral' },
         mailboxes ? { label: c('chipMailboxes', { n: mailboxes }) } : null,
@@ -102,7 +114,6 @@ export function renderCover(ctx) {
         { id: 'em-mailboxes', num: '02', label: c('secMailboxes'), count: mailboxes },
         { id: 'em-sent', num: '03', label: c('secSent'), count: ctx.outboundTotal },
         { id: 'em-letters', num: '04', label: c('lettersTitle'), count: '' },
-        { id: 'em-chat', num: '05', label: c('chatTitle'), count: '' },
       ]}
       pagesLabel=${c('pages')}
       pages=${pageLinks()}
@@ -111,7 +122,6 @@ export function renderCover(ctx) {
       ${secMailboxes(ctx)}
       ${secSent(ctx)}
       <${FoldSection} id="em-letters" num="04" title=${c('lettersTitle')} sub=${c('lettersSub')} open=${ctx.folds.letters} onToggle=${() => ctx.setFold('letters', !ctx.folds.letters)}>${lettersFold(ctx)}<//>
-      <${FoldSection} id="em-chat" num="05" title=${c('chatTitle')} sub=${c('chatSub')} open=${ctx.folds.chat} onToggle=${() => ctx.setFold('chat', !ctx.folds.chat)}>${chatFold(ctx)}<//>
     <//>`;
 }
 
@@ -239,16 +249,4 @@ function lettersFold(ctx) {
     ${ctx.mailLog.length ? html`
       <${Space} above="large"><${Label} block>${c('lastLetters')}<//><//>
       <${CardGrid} cols="two">${ctx.mailLog.slice(0, 8).map((e, i) => html`<${Card} key=${i} name=${kindWord(e.kind)} meta=${`${rel(e.at)}${e.subject ? ' · ' + e.subject : ''}`} />`)}<//>` : null}`;
-}
-
-function chatFold(ctx) {
-  const road = (k, code) => html`<${Road} key=${k} kicker=${c('road.' + k + 'K')} name=${c('road.' + k + 'T')} text=${c('road.' + k + 'D')} codeLine=${code} />`;
-  return html`
-    <${Roads} cols="three">
-      ${road('read', 'aimeat_mail_search · aimeat_mail_read')}
-      ${road('send', 'aimeat_mail_send · aimeat_mail_aliases')}
-      ${road('app', 'POST /v1/connections/:id/delegations')}
-    <//>
-    <${Space} above="medium"><${Actions}><${Loud} onClick=${() => ctx.copyPrompt()}>${c('copyPrompt')}<//><//><//>
-    <${Hint}>${c('chatHint')}<//>`;
 }

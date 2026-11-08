@@ -7,6 +7,9 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 -- The "How this works" fold goes: what the automation does (the app publishes, AIMEAT
+ *     hands the data to your agent, the agent writes its results, they come back to you) is said once in
+ *     the page's question mark, concept.outside_app (.claude/rules/page-guidance.md).
  *   2026-10-19 -- The agent checkboxes show each agent's shown name, in alphabetical order (listAgents).
  *   v1.24.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the flow card, its numbered steps, the status timeline and the run log are components/EcoAutomation.js; a part of the card is the heavy-ruled Split under its Sub-heading (Jouni's decision "Sub-heading": the coral section title goes); the choices are the Check, the Select and the TextField, a recommended agent a row box around its Check, an advisory a row box with its tags and doors, the states and tags the Mark, the lines the Note. It writes no class.
  *   v1.23.0 -- 2026-09-26 -- An advisory's dates and source are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
@@ -62,7 +65,6 @@ import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { CADENCES, CRON_TO_CADENCE, defaultTriggerGlob, primarySchedulable, allowedCadencesFor, recommendationFor } from './ecosystem-tab.helpers.js';
 import { swallowed } from '/js/swallowed.js';
 import { Hint } from '/components/Hint.js';
-import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { FlowCard, FlowStep, StatusTimeline, StatusStep, RunLog } from '/components/EcoAutomation.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark, Marks, Code } from '/components/Mark.js';
@@ -252,7 +254,6 @@ export function EcoAutomationSection({ app, showToast }) {
   const [requireApproval, setRequireApproval] = useState(false); // default = push
   const [triggerGlob, setTriggerGlob] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showHow, setShowHow] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // ── status-timeline interaction state ──
@@ -468,18 +469,6 @@ export function EcoAutomationSection({ app, showToast }) {
   return html`
     <${EcoSection} title=${t('profile.ecosystem.automationTitle')}>
       <${Hint}>${t('profile.ecosystem.autoIntro')}<//>
-
-      <div><${Tab} tone="fold" on=${showHow} expanded=${showHow} onClick=${() => setShowHow(o => !o)}>
-        ${t('profile.ecosystem.autoHowTitle')}
-      <//></div>
-      ${showHow && html`
-        <${Stack}>
-          <${Hint}>${t('profile.ecosystem.autoHowLead')}<//>
-          <${IndexList} steps>
-            ${[1, 2, 3, 4].map((n) => html`<${IndexStep} key=${n}>${t(`profile.ecosystem.autoHowStep${n}`)}<//>`)}
-          <//>
-          <${Hint}>${t('profile.ecosystem.autoHowDoc')}<//>
-        <//>`}
 
       <!-- ── the ONE config card, read top-to-bottom ── -->
       <${FlowCard} save=${html`<${Loud} control disabled=${saving} onClick=${onSave}>${t('profile.ecosystem.autoSave')}<//>`}>

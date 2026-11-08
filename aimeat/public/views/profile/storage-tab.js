@@ -12,16 +12,24 @@
  *   says so (a store still connected can then still be emptied and disconnected). One read,
  *   GET /v1/file-store (the aimeat_file_store_get tool returns the same), re-read on the SSE change
  *   domains `notifications` (an operator's decision reaches the person as one), `files`, `config` and
- *   `file-store`. In order: the figure strip (files in your stores, files on this service), the rule
- *   here, where your files are (where new files go, files per place, the service's stores you may
- *   choose, and the move between places), your stores (store-sections.js), the connect form
- *   (connect-form.js), and the aside for the person's own AI. Every part is a library component; the
- *   page passes data and writes no class.
+ *   `file-store`. In order: the title's question mark (concept.own_storage: what one's own storage
+ *   is, what the test does, where files go, when to use something else), the page's start
+ *   (PageStart: what the page is for, the prompt for one's own AI, whose button goes to the connect
+ *   form, and what happens next), the figure strip (files in your stores, files on this service), the
+ *   rule here, where your files are (where new files go, files per place, the service's stores you
+ *   may choose, and the move between places), your stores (store-sections.js) and the connect form
+ *   (connect-form.js). Every part is a library component; the page passes data and writes no class.
+ *   How the page explains itself: .claude/rules/page-guidance.md.
  * @structure StorageTab({ showToast }) — load · RuleSection · PlacesSection · StoresSection
- *   (storage/store-sections.js) · moveAll · makeDefault · testAgain · disconnect · ConnectForm · AiAside
+ *   (storage/store-sections.js) · moveAll · makeDefault · testAgain · disconnect · ConnectForm
  * @usage Registered in views/profile.js TABS as { id: 'storage', key: 'profile.tabs.storage' }; menu
  *   entry in landing-page.cards.js (the Account group, after Data Wallet).
  * @version-history
+ *   v1.4.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head (folded once a store is connected; its button goes to the connect form,
+ *     on a service that lets people connect one) and the title's question mark, concept.own_storage.
+ *     The dashed aside about one's own AI and its four tool names goes: the start's prompt is that
+ *     sentence now.
  *   v1.3.0 — 2026-10-31 — Each store says whether a browser may send files straight to it, shows the CORS
  *     rule to add while it may not, and has Test again (storage/browser-access.js).
  *   v1.2.0 — 2026-10-30 — Named stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-):
@@ -48,7 +56,9 @@ import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Facts } from '/components/Facts.js';
 import { Note } from '/components/Note.js';
-import { Mark, Marks, Code } from '/components/Mark.js';
+import { Mark } from '/components/Mark.js';
+import { PageStart } from '/components/PageStart.js';
+import { scrollToSection } from '/components/Rail.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import { S, ConnectForm, placeWords } from './storage/connect-form.js';
@@ -57,8 +67,6 @@ import { refusalWords, RefusalNote } from './storage/store-words.js';
 
 const html = htm.bind(h);
 
-/** The tools the person's own AI manages the same storage with. */
-const AI_TOOLS = ['aimeat_file_store_get', 'aimeat_file_store_set', 'aimeat_file_store_move', 'aimeat_file_store_remove'];
 /** Files moved per call: the route's default. */
 const MOVE_BATCH = 50;
 /** A ceiling on the batches of one press. */
@@ -78,15 +86,6 @@ function RuleSection({ v }) {
     <${Section} id="fs-rule" num="01" title=${S('rule.title')}>
       <${Note} kind="lead">${S('rule.mode.' + v.mode)}<//>
       ${approvalRow ? html`<${Facts} rows=${[approvalRow]} />` : null}
-    <//>`;
-}
-
-/** The aside: the person's own AI manages the same storage with four tools. */
-function AiAside() {
-  return html`
-    <${Note} kind="aside" size="small">
-      <b>${S('ai.title')}</b> ${S('ai.text')}
-      <${Marks}>${AI_TOOLS.map(n => html`<${Code} key=${n}>${n}<//>`)}<//>
     <//>`;
 }
 
@@ -204,12 +203,17 @@ export default function StorageTab({ showToast }) {
   const placesNum = showPlaces ? next() : '';
   const storesNum = showStores ? next() : '';
   const connectNum = next();
+  // The start: folded once a store is connected; its button goes to the connect form where there is one.
+  const start = html`<${PageStart} id="storage" done=${v ? stores.length > 0 : null}
+    action=${v && !off ? { onClick: () => scrollToSection('fs-connect') } : undefined} />`;
 
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.storage')]}
       title=${S('title')}
+      help="concept.own_storage"
       desc=${S('desc')}
+      start=${start}
       strip=${strip}
       after=${html`<${ConfirmUI} />`}>
       <${RefusalNote} refusal=${refusal} />
@@ -222,7 +226,6 @@ export default function StorageTab({ showToast }) {
         ${off ? null : html`
           <${Section} id="fs-connect" num=${connectNum} title=${stores.length ? S('connect.titleMore') : S('connect.title')}>
             <${ConnectForm} mode=${v.mode} approved=${approved} names=${stores.map((s) => s.name)} onConnected=${() => load()} clearSignal=${clearSignal} />
-          <//>`}
-        ${off ? null : html`<${AiAside} />`}` : null}
+          <//>`}` : null}
     <//>`;
 }

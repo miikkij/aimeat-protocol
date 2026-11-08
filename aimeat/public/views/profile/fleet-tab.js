@@ -19,10 +19,16 @@
  *   connect flow — and every row here links into it. This one answers "which one should I look at",
  *   which is the question that had no surface at all.
  *
- * @structure FleetTab (default) — section header, the button, then the fleet
+ *   HOW IT EXPLAINS ITSELF (.claude/rules/page-guidance.md): PageStart "fleet" under the head and
+ *   the title's question mark concept.agent.
+ *
+ * @structure FleetTab (default) — section header, the start, the button, then the fleet
  * @usage registered in views/profile.js TABS as `fleet`, listed in the Automation group of
  *   SIDEBAR_GROUPS (landing-page.cards.js).
  * @version-history
+ *   v1.4.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head (what the page is for, the prompt that asks one's own AI which agents
+ *     have gone quiet, what follows) and the title's question mark concept.agent.
  *   v1.3.1 — 2026-09-27 — The comment names the frame the fleet takes now (css/views/fleet.css went).
  *   v1.3.0 — 2026-09-26 — The page head is SettingsPage (crumb, title, words under it), the page
  *     writes no class (page group G1a); the embedded fleet's own sheet keys on .og-fleet.
@@ -43,6 +49,7 @@ import FleetView from '/views/fleet.js';
 import BasicAgentsPanel from '/views/profile/agents/basic-agents-panel.js';
 import { AgentDefaultsSection } from './agents/agent-defaults-section.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 
 export default function FleetTab({ session, showToast }) {
   // Embedded, the fleet draws no page frame of its own: views/fleet.js wraps it in the PageFrame only
@@ -50,8 +57,10 @@ export default function FleetTab({ session, showToast }) {
   return html`
     <${SettingsPage} name="fleet"
       crumb=${[t('nav.profile'), t('profile.landing.menuAutomation'), t('profile.tabs.fleet')]}
-      title=${t('profile.tabs.fleet')}
-      desc=${t('fleet.desc')}>
+      title=${t('profile.tabs.fleet')} help="concept.agent"
+      desc=${t('fleet.desc')}
+      start=${/* No `done`: the agent list is FleetView's own load, which this page does not read. */
+        html`<${PageStart} id="fleet" />`}>
 
       ${/* THE STARTER CARD IS A SLOT, NOT A HEADER. It sat above the fleet at first, and on a
             1280x460 screen the whole first view was an invitation to create MORE agents while

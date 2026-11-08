@@ -7,7 +7,10 @@
  *   local copies; external <img> stripped as a tracking-pixel defense). The composer is the same
  *   Toast UI editor used by workspace documents (Markdown⇄WYSIWYG toggle, lazy-loaded), with a
  *   markdown-textarea + live-preview fallback. First contact is gated as a request (accept/block).
- *   Re-fetches on SSE updates.
+ *   Re-fetches on SSE updates. The page's start (PageStart: the prompt asks the person's AI what
+ *   waits for an answer, New message is its button) and the title's question mark (concept.message)
+ *   stand on the messenger, never on its pages; how the page explains itself:
+ *   .claude/rules/page-guidance.md.
  * @structure InboxTab (default, stateful container) · panels (ThreadPanel/TrackedPanel/ResultsPanel in
  *   ./inbox-tab/panels.js, ListPanel in ./inbox-tab/list-panel.js) · sub-components
  *   (MessageBubble/ReplyWithAiPopover/… in ./inbox-tab/components.js) · the conversation components
@@ -15,6 +18,9 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.16.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart and the title's question mark concept.message on the messenger; listsKnown says when
+ *     the lists have been read once, so the start folds only for a person who has conversations.
  *   v2.15.0 -- 2026-10-26 -- Marks on a single message (./inbox-tab/reactions.js), passed to the thread.
  *   v2.14.0 -- 2026-10-25 -- The list draws at once from this browser's last overview (./inbox-tab/overview-cache.js) and is replaced when the server answers; the mount asks for `?compact=true` (previews and agent names, not whole bodies and agent records).
  *   v2.13.0 -- 2026-10-21 -- Group chat: "New group" opens a group with its first message, the list carries the
@@ -193,6 +199,7 @@ import { MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } fro
 import { Composer } from '/components/Composer.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { TextField } from '/components/TextField.js';
 import { Panes, Pane, PaneHead, PaneFields } from '/components/ConversationPane.js';
 import { Mark } from '/components/Mark.js';
@@ -212,6 +219,8 @@ import { swallowed } from '/js/swallowed.js';
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
+  // The lists were read once (the saved overview, the server's or the four lists): until then the start stays folded.
+  const [listsKnown, setListsKnown] = useState(false);
   // Which broadcast rows the person has opened up. Collapsed is the default and the point: the server
   // hands twenty copies of one announcement down as one row, and this is per-viewer, per-visit state
   // about what they wanted to look inside — nothing worth persisting.
@@ -280,6 +289,7 @@ export default function InboxTab({ showToast }) {
     ]);
     setRequests(reqs);
     setConversations(convs);
+    setListsKnown(true);
     setImportant(new Set(impIds));
     setTrackedList(trs.filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
   }, []);
@@ -303,6 +313,7 @@ export default function InboxTab({ showToast }) {
     if (d.peerAvatars && typeof d.peerAvatars === 'object') setPeerAvatars(p => ({ ...p, ...d.peerAvatars }));
     setRequests(d.requests || []);
     setConversations(d.conversations || []);
+    setListsKnown(true);
     setImportant(new Set(d.important || []));
     setTrackedList((d.tracked || []).filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
     setMyAgents(d.agents || []);
@@ -713,6 +724,9 @@ export default function InboxTab({ showToast }) {
     <${SettingsPage} name="ib" page
       crumb=${[t('nav.profile') || 'Settings', ...(isPage ? [{ label: t('inbox.title'), onClick: goIdle }, pageTitle] : [t('inbox.title')])]}
       title=${isPage ? pageTitle : t('inbox.title')}
+      help=${isPage ? undefined : 'concept.message'}
+      start=${isPage ? null : html`<${PageStart} id="messages" done=${listsKnown ? (conversations.length + requests.length) > 0 : null}
+        action=${{ onClick: startCompose }} />`}
       sub=${isPage ? null : html`
         <span>${(t('inbox.cover.figConvs') || '{n} conversations').replace('{n}', String(convTotal))}</span>
         ${unreadTotal ? html`<${Mark} tone="sun">${(t('inbox.cover.figUnread') || '{n} unread').replace('{n}', String(unreadTotal))}<//>` : null}

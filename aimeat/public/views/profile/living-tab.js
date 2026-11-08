@@ -2,15 +2,21 @@
  * @file living-tab.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Profile "Living Documents" tab (Phase 0). Two areas: a personal TEMPLATE collection
- *   (create/edit/delete reusable charter+template skeletons) and the DEPLOYED instances (a template
- *   deployed into a workspace, rendered as living markdown). Phase 0 has no background pulse — content
- *   per slot is added/derived manually so the assemble→render model is exercised end to end. Surfaced
- *   as a top-level tab because instances generate cost once the pulse lands.
- *   See docs/plans/2026-06-21-living-documents-plan.md.
+ * @description Profile "Document templates" tab (living documents). Two areas: a personal TEMPLATE
+ *   collection (create/edit/delete reusable charter+template skeletons) and the DEPLOYED instances (a
+ *   template deployed into a workspace, rendered as living markdown). "Pulse now" refreshes an open
+ *   document here; the server's living-pulse core job (services/living-pulse.ts) refreshes the
+ *   sections no agent fills on each document's cadence with nobody present. How the page explains
+ *   itself (.claude/rules/page-guidance.md): PageStart "living" under the head and the title's
+ *   question mark concept.living_document. See docs/plans/2026-06-21-living-documents-plan.md.
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.25.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart under the head (folded once a template or a document exists, its button New template)
+ *     and the title's question mark concept.living_document. The head's paragraph is two sentences and
+ *     no longer says the background refresh is to come: the server pulse runs (the description said
+ *     "Phase 0 has no background pulse", which stopped being true with services/living-pulse.ts).
  *   v1.24.0 -- 2026-10-25 -- The open document reads again on the live event, so a pending section
  *     decided elsewhere stops showing Approve and Reject; the two buttons wait while an answer is on its way.
  *   v1.23.0 -- 2026-10-02 -- The question marks that explain the automation fields: living.trust, living.activity_trigger (components/HelpTip.js).
@@ -74,6 +80,7 @@ import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { useConfirm } from '/components/Modal.js';
 import { SettingsPage } from '/components/SettingsPage.js';
+import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
 import { Action, Actions, Loud, Icon } from '/components/Action.js';
 import { Mark, Label, Code } from '/components/Mark.js';
@@ -496,9 +503,14 @@ export default function LivingTab({ session, showToast }) {
 
   // ── Render: main ──
 
+  // The start (page-guidance.md): folded once a template or a document exists; its button is this
+  // page's own "New template". An opened document has the page to itself.
+  const start = opened ? null : html`<${PageStart} id="living"
+    done=${templates === null || instances === null ? null : (templates.length + instances.length) > 0}
+    action=${{ onClick: newTemplate }} />`;
   return html`
     <${SettingsPage} crumb=${[t('nav.profile'), t('profile.landing.menuInformation'), t('profile.tabs.living')]}
-      title=${t('profile.living.title')} desc=${t('profile.living.desc')} after=${ConfirmUI}>
+      title=${t('profile.living.title')} help="concept.living_document" desc=${t('profile.living.desc')} start=${start} after=${ConfirmUI}>
     ${opened ? renderOpened() : html`
       ${deploying && renderDeploy()}
       ${editing && renderEditor()}

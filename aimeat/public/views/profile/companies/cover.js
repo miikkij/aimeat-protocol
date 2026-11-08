@@ -5,10 +5,15 @@
  * @description The Companies cover in the poster face (design canvas "AIMEAT Yritysten sivu",
  *   direction A): every company as a row whose condition is written out — are the invoice
  *   details filled in, whose server its mail leaves from, who may act in its name — and the
- *   register form. A row opens the company's own page (company.js). Pure render over the ctx bag.
+ *   register form. A row opens the company's own page (company.js). The cover explains itself the
+ *   designed way (.claude/rules/page-guidance.md): the page's start (PageStart "companies") and the
+ *   title's question mark (concept.company). Pure render over the ctx bag.
  * @structure renderCover · secRows · secCreate
  * @usage import { renderCover } from './companies/cover.js';
  * @version-history
+ *   v1.12.0 -- 2026-11-08 -- The cover explains itself the designed way (.claude/rules/page-guidance.md):
+ *     PageStart "companies" in the start slot (folded once a company exists; its button goes to the
+ *     register form) and the title's question mark concept.company.
  *   v1.11.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; List with the company's Lead mark; TextField; AddressPreview; Action; Layout): the page passes data and writes no class. Put back from main: "0 companies" is a dim tag (page group G8).
  *   v1.10.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.9.0 -- 2026-09-25 -- "Details n/m" when not all are filled in is the Status (attention), a unification: Jouni's decision "Status".
@@ -44,6 +49,7 @@ import { AddressPreview } from '/components/AddressPreview.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { c, crumb, pageLinks, factsOf, kindWord, initials } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { PageStart } from '/components/PageStart.js';
 
 export function renderCover(ctx) {
   const rows = ctx.companies.map((co) => ({ co, facts: factsOf(co), x: ctx.extras[co.id] || {} }));
@@ -62,10 +68,15 @@ export function renderCover(ctx) {
     { key: 'sent', n: sent, label: c('stripSent'), sub: c('stripSentSub') },
   ]} />`;
 
+  // The start: folded once a company exists; its button goes to the register form (section 02).
+  const start = html`<${PageStart} id="companies" done=${ctx.loaded ? rows.length > 0 : null}
+    action=${{ onClick: () => scrollToSection('co-create') }} />`;
   return html`
     <${SettingsPage} name="co"
       crumb=${crumb(null)}
       title=${c('title')}
+      help="concept.company"
+      start=${start}
       marks=${[
         // No company yet counts nothing: main's dim tag.
         { label: c('chipCompanies', { n: rows.length }), tone: rows.length ? undefined : 'dim' },
