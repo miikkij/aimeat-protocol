@@ -37,7 +37,11 @@
  *   cd aimeat && pnpm cold-agent --tasks remember,build-app --arm arms/calm-build-app.json
  *   cd aimeat && pnpm cold-agent --compare .cold-agent/<a> .cold-agent/<b>
  *   cd aimeat && pnpm cold-agent --tasks propose-agent --runs 1 --keep   # leave the proposal to approve
+ *   cd aimeat && pnpm cold-agent --suite context --onto on       # a person's contexts (context-cases.ts)
  * @version-history
+ *   v1.3.0 — 2026-11-08 — `--suite context` with `--onto on|off|auto`: the context suite, whose
+ *     arm says whether each seeded context carries its concepts (context-cases.ts). `--effort`,
+ *     high by default, passed to the CLI.
  *   v1.2.2 — 2026-11-08 — A verdict can be `unverified`: the check could not decide, the run is no
  *     pass, and the report lists it for a person to read (the house-rules check, round 2 re-check).
  *   v1.2.1 — 2026-11-08 — An arm that names a code-built specification (build-app, build-app-atelier,
@@ -57,15 +61,22 @@ import { parseTranscript, type RunMetrics } from './transcript.js';
 import { compareReports, renderReport, type RunRecord } from './report.js';
 import { scriptedTranscript } from './scripted.js';
 import { skillTasks } from './skill-cases.js';
+import { contextTasks, type Onto } from './context-cases.js';
 import { SANDBOX_MAX_APPS } from '../lib/sandbox-limits.js';
 
 const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 interface Args {
     driver: 'claude' | 'scripted';
-    /** `tasks`: did the person get what they asked for. `skills`: did the right skill get loaded. */
-    suite: 'tasks' | 'skills';
+    /** `tasks`: did the person get what they asked for. `skills`: did the right skill get loaded.
+     *  `context`: did the agent use the person's contexts correctly (context-cases.ts). */
+    suite: 'tasks' | 'skills' | 'context';
+    /** The context suite's arm: whether each seeded context carries its concepts block. */
+    onto: Onto;
     model: string;
+    /** The CLI's effort level. High by the developer's ruling of 2026-11-08: the same model and
+     *  effort the developer works with in chat. */
+    effort: string;
     runs: number;
     tasks: string[] | null;
     arm: string | null;
@@ -88,14 +99,18 @@ interface Args {
 function parseArgs(argv: string[]): Args {
     const get = (name: string) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : undefined; };
     const ci = argv.indexOf('--compare');
-    const suite = get('suite') === 'skills' ? 'skills' : 'tasks';
+    const asked = get('suite');
+    const suite = asked === 'skills' ? 'skills' : asked === 'context' ? 'context' : 'tasks';
+    const onto = get('onto');
     return {
         driver: get('driver') === 'scripted' ? 'scripted' : 'claude',
         suite,
+        onto: onto === 'on' || onto === 'auto' ? onto : 'off',
         // Opus, by the developer's ruling of 2026-09-18: the point is what a GOOD model does here.
         // Tuning the node's guidance until a weaker model copes measures the wrong reader, and the
         // first baseline, taken on Sonnet, had to be taken again.
         model: get('model') ?? 'opus',
+        effort: get('effort') ?? 'high',
         runs: Number(get('runs') ?? 3),
         tasks: get('tasks')?.split(',') ?? null,
         arm: get('arm') ?? null,
@@ -185,7 +200,7 @@ function autoApprove(s: Sandbox): () => void {
  */
 function claudeTranscript(task: Task, prompt: string, s: Sandbox, args: Args, cwd: string, resume?: string): Promise<string> {
     const cli = ['-p', '--output-format', 'stream-json', '--verbose', '--model', args.model,
-        '--max-budget-usd', String(args.maxBudgetUsd), '--setting-sources', 'project', '--strict-mcp-config'];
+        '--effort', args.effort, '--max-budget-usd', String(args.maxBudgetUsd), '--setting-sources', 'project', '--strict-mcp-config'];
     // A follow-up turn goes on in the same session, which the CLI keeps under the same directory.
     if (resume) cli.push('--resume', resume);
     if (task.door === 'mcp') {
@@ -287,7 +302,7 @@ async function main(): Promise<void> {
     if (args.compare) { console.log(compareReports(args.compare[0], args.compare[1])); return; }
 
     const s = loadSandbox();
-    const suite = args.suite === 'skills' ? skillTasks() : TASKS;
+    const suite = args.suite === 'skills' ? skillTasks() : args.suite === 'context' ? contextTasks(args.onto) : TASKS;
     // A task marked `byNameOnly` runs when it is asked for and never as part of "everything": the
     // ten-task baseline is compared run to run, and a three-dollar build must not join it by default.
     const tasks = suite.filter(t => (args.tasks ? args.tasks.some(want => t.id === want || t.id.startsWith(`${want}:`)) : !t.byNameOnly));
@@ -320,7 +335,7 @@ async function main(): Promise<void> {
         if (arm) await restoreArm(s, arm.ids);
     }
 
-    const meta = { stamp, driver: args.driver, model: args.driver === 'scripted' ? 'none' : args.model, runs: args.runs, arm: arm?.name ?? (args.preface ? 'preface:' + basename(args.preface) : 'baseline'), spentUsd: spent };
+    const meta = { stamp, driver: args.driver, model: args.driver === 'scripted' ? 'none' : args.model, runs: args.runs, arm: arm?.name ?? (args.preface ? 'preface:' + basename(args.preface) : args.suite === 'context' ? `onto:${args.onto}` : 'baseline'), spentUsd: spent };
     writeFileSync(join(outDir, 'results.json'), JSON.stringify({ meta, records }, null, 2));
     const report = renderReport(meta, records, suite);
     writeFileSync(join(outDir, 'report.md'), report);

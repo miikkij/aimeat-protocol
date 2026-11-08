@@ -239,6 +239,7 @@
  */
 
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
+import { CONTEXT_SKILL_ENTRY } from './builtin-skills.context.js';
 import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
 import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
 import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
@@ -276,6 +277,7 @@ export interface BuiltinSkill {
 
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
+  CONTEXT_SKILL_ENTRY,
   AGENT_AVATAR_SKILL_ENTRY,
   ...RECURRING_WORK_SKILL_ENTRIES,
   ...CONVERSATION_SKILL_ENTRIES,

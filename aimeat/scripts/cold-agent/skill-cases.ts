@@ -31,6 +31,7 @@
  * @usage
  *   cd aimeat && pnpm cold-agent --suite skills --model sonnet --runs 3
  * @version-history
+ *   (2026-11-08) Three sentences for aimeat-context, the skill for a person's contexts.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.0.0 — 2026-09-18 — Initial: 7 skills, 30 sentences, 6 of them needing no skill.
  *   v1.1.0 — 2026-09-19 — Every entry-point skill has sentences now: 21 skills, 71 sentences. A case
@@ -128,6 +129,10 @@ export const SKILL_CASES: SkillCase[] = [
     // The node itself
     { expect: 'aimeat-node-guide', say: 'What is this AIMEAT thing, technically? How does an AI connect to it?' },
     { expect: 'aimeat-node-guide', say: 'I am a developer. Where is the API and how do I get a token?' },
+    // A person's contexts
+    { expect: 'aimeat-context', say: 'Keep a context of my flat renovation so any assistant I use knows where we are.' },
+    { expect: 'aimeat-context', say: 'Where do we stand with the community radio project? Pick up from what we had.' },
+    { expect: 'aimeat-context', say: 'Make the wedding plan include the catering notes, but keep my health stuff out of my work notes.' },
     // Sentences that need no skill
     { expect: null, say: 'Remember that the plumber is coming on Thursday at nine.' },
     { expect: null, say: 'What did I ask you to remember about the plumber?' },

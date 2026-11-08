@@ -49,6 +49,9 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.9.1 — 2026-11-08 — When the test mailbox sends no redirect, the error names the status, the
+ *     address and the start of the answer (incident: pnpm sandbox fails at the test mailbox step;
+ *     the second start on the same machine passed, so the cause is still open).
  *   v1.9.0 — 2026-10-29 — AIMEAT_SANDBOX_FREE_MODEL names the free model, so a spent AI allowance can
  *     be seen (the stand-in's POST /sandbox/ai-key spends its key).
  *   v1.8.0 — 2026-10-25 — The node and the test mailbox stop themselves after 6 hours without a
@@ -412,7 +415,7 @@ async function connectMailbox(token: string): Promise<string> {
     const cookie = res.headers.getSetCookie().filter(c => c.startsWith('aimeat_oauth_')).map(c => c.split(';')[0]).join('; ');
     const consent = await fetch(start.body.data.authorize_url, { redirect: 'manual' });
     const callback = consent.headers.get('location');
-    if (!callback) throw new Error('the test mailbox did not send the browser back');
+    if (!callback) throw new Error(`the test mailbox did not send the browser back: ${consent.status} from ${start.body.data.authorize_url}: ${(await consent.text()).slice(0, 300)}`);
     const done = await fetch(callback, { redirect: 'manual', headers: { Cookie: cookie } });
     if (done.status >= 400) throw new Error(`the node refused the test mailbox: ${done.status} ${await done.text()}`);
     const list = await api<{ connections: Array<{ id: string; provider: string }> }>('/v1/connections', { token });
