@@ -1,0 +1,13 @@
+-- 0128_storage_file_row_version.sql
+--
+-- A stored file's row version (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
+-- Every write of a "StorageFile" row sets "rowVersion" to a new random token. A move of the file's
+-- bytes between the database and an object store writes the row only while "rowVersion" is still the
+-- one it read (moveStorageFileBytes), so a visibility, tags or provenance change, or a re-upload,
+-- that lands while the bytes are on their way is never overwritten.
+--
+-- NULL = a row written before this column existed. The move compares NULL as a value, and the first
+-- write of such a row gives it a token, so nothing needs to be filled in here.
+--
+-- Mirrors the SQLite column added in sqlite/schema-columns-files.ts.
+ALTER TABLE "StorageFile" ADD COLUMN IF NOT EXISTS "rowVersion" TEXT;

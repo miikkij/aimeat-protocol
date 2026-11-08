@@ -2246,6 +2246,7 @@ export interface StorageFile {
   key: string;
   mimeType: string;
   ownerGaii: string;
+  rowVersion: string | null;
   size: number;
   tags: Generated<string[] | null>;
   utf8Verified: boolean | null;

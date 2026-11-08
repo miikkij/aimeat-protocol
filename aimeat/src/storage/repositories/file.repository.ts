@@ -11,6 +11,8 @@
  *   - chunked-upload methods: create/get/addChunk/delete for resumable uploads
  *
  * @version-history
+ *   2026-11-08 — moveStorageFileBytes: the write that moves a file's bytes is conditional on the row's
+ *     version (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
  *   2026-10-30 — listStorageFilesInDatabase is listStorageFilesIn: the files of any one place, so a
  *     move can empty a store as well as the database (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — setStorageFileBlobRef, storageFileBlobRefsIn, listStorageFilesInDatabase and countStorageFilesByStore, and
@@ -26,7 +28,7 @@
  *   v1.4.0 — 2026-10-08 — setStorageFileProvenance, and StorageFileRecord.aiProvenanceId on every
  *     read (AI provenance for stored files).
  */
-import type { StorageFileRecord, ChunkedUploadRecord } from '../interface.js';
+import type { StorageFileRecord, ChunkedUploadRecord, StorageFileBytesMove } from '../interface.js';
 
 export interface FileRepository {
   createStorageFile(file: StorageFileRecord): Promise<StorageFileRecord>;
@@ -65,6 +67,11 @@ export interface FileRepository {
    *  the object and empty its `data`. Only while the row still holds its bytes and still has `size`,
    *  so a re-upload that landed in between is never emptied. False when it did not match. */
   setStorageFileBlobRef(ownerGaii: string, key: string, blobRef: string, size: number): Promise<boolean>;
+  /** Move a file's bytes: write only where they are (`blobRef`, `data`, `size`, `utf8Verified`) and
+   *  give the row a new version, only while the row's version and reference are still the ones in
+   *  `move.expect`. Visibility, tags, provenance and the rest are not written, so a change to them is
+   *  never undone by a move. False when the row changed since it was read, or is gone. */
+  moveStorageFileBytes(ownerGaii: string, key: string, move: StorageFileBytesMove): Promise<boolean>;
   /** Of these object references, the ones some row still holds. The orphan sweep asks this for each
    *  page of objects it lists, so an object no row names can be removed. */
   storageFileBlobRefsIn(refs: string[]): Promise<string[]>;

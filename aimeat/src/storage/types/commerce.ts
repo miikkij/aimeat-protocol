@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-11-08 — StorageFileRecord.rowVersion, and StorageFileBytesMove, the conditional write
+ *     that moves a file's bytes (secaudit2026nov08b round 15b, file-store/relocate-from-store-rewrites-stale-row).
  *   v1.7.1 — 2026-10-30 — StorageFileRecord.storeChoice: the store a write's writer named, taken off by
  *     the file-store wrapper; ChunkedUploadRecord.storeChoice carries it from init to complete
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -308,6 +310,22 @@ export interface StorageFileRecord {
   /** On a write only: the store its writer named (`own:<name>`, `node:<name>`), already checked by
    *  services/storage-file-write.ts. The file-store wrapper takes it off before the row is written. */
   storeChoice?: string;
+  /** On a read only: the row's version, a random token every write of the row replaces. Absent for a
+   *  row nothing has written since the column was added. A caller's value is never stored. */
+  rowVersion?: string;
+}
+
+/** The conditional write that moves a file's bytes (FileRepository.moveStorageFileBytes): where the
+ *  bytes go, and the row the move read, which must still be the row's state for the write to land. */
+export interface StorageFileBytesMove {
+  /** The row as the move read it. `rowVersion` absent compares as a row with no version yet. */
+  expect: { rowVersion?: string; blobRef?: string };
+  /** The new object reference; absent puts the bytes in the row. */
+  blobRef?: string;
+  /** The bytes the row holds: the file's bytes when `blobRef` is absent, else empty. */
+  data: Buffer;
+  size: number;
+  utf8Verified?: boolean;
 }
 
 export interface ChunkedUploadRecord {
