@@ -13,9 +13,17 @@
  *   to without seeing it. The row also looked the same for a new app and for a key replacement of a
  *   working connection. Now the row shows both, and the approval sends `data_areas` from the ticks
  *   (ecosystem-tab.helpers.js chosenAreas).
- * @structure EcoPendingAccess({ request, ticks, onTick })
- * @usage html`<${EcoPendingAccess} request=${r} ticks=${ticks[r.user_code]} onTick=${(i, on) => ...} />`
+ *
+ *   OWN-TICK WORDS (secaudit2026nov08 round 14, older item O5). A word the app asks for that no
+ *   access level carries (`own_tick_scopes` of the request: receivers:manage, the read-as-owner
+ *   words and the rest) is shown in plain words, unticked; the approval sends only the ones the owner
+ *   ticks (ecosystem-tab.helpers.js chosenScopes), the way the agent permission editor treats them.
+ * @structure EcoPendingAccess({ request, ticks, onTick, wordTicks, onWordTick })
+ * @usage html`<${EcoPendingAccess} request=${r} ticks=${ticks[r.user_code]} onTick=${(i, on) => ...}
+ *   wordTicks=${words[r.user_code]} onWordTick=${(word, on) => ...} />`
  * @version-history
+ *   v1.2.0 — 2026-11-08 — The words outside every access level, unticked, one tick each
+ *     (secaudit2026nov08 round 14, older item O5).
  *   v1.1.0 — 2026-10-27 — A same-key reconnect that did not prove it holds the pinned key
  *     (`key_proven` false) is marked with the danger tone and a hint (secaudit2026oct26,
  *     token-pickup-without-pinned-key-proof). A question mark beside the mark explains it
@@ -31,16 +39,22 @@ import { Hint } from '/components/Hint.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { Stack } from '/components/Layout.js';
 import { areaSentence, initialTicks } from './ecosystem-tab.helpers.js';
+import { permLabel } from './agents/scope-config.js';
 
 const html = htm.bind(h);
 
+/** One own-tick word in plain words: the sentence the agent permission editor shows for it. */
+const wordLabel = (word) => { const [domain, perm] = String(word).split(':'); return perm ? permLabel(perm, domain) : word; };
+
 /**
  * The data areas with their ticks, and the reconnect and key-change markers.
- * @param {{ request: any, ticks?: boolean[], onTick: (index: number, on: boolean) => void }} props
+ * @param {{ request: any, ticks?: boolean[], onTick: (index: number, on: boolean) => void,
+ *   wordTicks?: Record<string, boolean>, onWordTick?: (word: string, on: boolean) => void }} props
  */
-export function EcoPendingAccess({ request, ticks, onTick }) {
+export function EcoPendingAccess({ request, ticks, onTick, wordTicks, onWordTick }) {
   const areas = request?.requested_data_areas || [];
   const on = Array.isArray(ticks) ? ticks : initialTicks(request);
+  const words = request?.own_tick_scopes || [];
   // A same-key reconnect that did not sign with the pinned key (key_proven false) is marked like a
   // key change, since anyone who knows the public key can send it.
   const unproven = request.reconnect && !request.key_changed && request.key_proven === false;
@@ -71,5 +85,13 @@ export function EcoPendingAccess({ request, ticks, onTick }) {
               <//>`)}
           </div>`
         : html`<${Hint}>${t('profile.ecosystem.areasNone')}<//>`}
+      ${words.length > 0 && html`
+        <div>
+          <${Hint}>${t('profile.ecosystem.ownTickTitle')}<//>
+          ${words.map((w) => html`
+            <${Check} key=${w} checked=${(wordTicks || {})[w] === true} onChange=${(v) => onWordTick?.(w, v)}>
+              ${wordLabel(w)} (${w})
+            <//>`)}
+        </div>`}
     <//>`;
 }

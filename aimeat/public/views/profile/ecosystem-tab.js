@@ -10,6 +10,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.25.0 -- 2026-11-08 -- A waiting request lists the words no access level carries, unticked, and the approval adds only the ones the owner ticked to the access level's scopes (ecosystem-tab.pending.js; secaudit2026nov08 round 14, older item O5).
  *   v3.24.0 -- 2026-11-08 -- The disconnect dialog says which receivers the app made, that they keep working, and offers one press that pauses them (receivers/maker-receivers.js; secaudit2026nov08 round 14, ruling 3).
  *   v3.23.0 -- 2026-10-25 -- A waiting request lists the data areas the app asked for, each with a tick, and the approval sends data_areas from the ticks; a reconnect and a key change are marked, with both key fingerprints (ecosystem-tab.pending.js; secaudit2026oct22, leads 2378 and 2415).
  *   v3.22.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage (the count the tally Mark), the waiting requests the small attention note with a List (the grant level a Select that keeps its choice), the apps the List whose row opens its panel (a revoked app faded, main's .pf-eco-card-revoked), each part of the panel the heavy-ruled Split under its Sub-heading, the written data the Folds, the revoke dialog the Action, Loud and TextField. The empty part the panel drew between "ask in Claude" and the data (a bare heavy rule) goes. It writes no class.
@@ -154,7 +155,7 @@ import { timeAgo } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
 import { LoadingLine } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
-import { ECO_PRESETS, initialTicks, chosenAreas } from './ecosystem-tab.helpers.js';
+import { ECO_PRESETS, initialTicks, chosenAreas, chosenScopes } from './ecosystem-tab.helpers.js';
 import { EcoPendingAccess } from './ecosystem-tab.pending.js';
 import { EcoAutomationSection, EcoSection } from './ecosystem-tab.automation.js';
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
@@ -185,6 +186,7 @@ export default function EcosystemTab({ onStats, showToast }) {
   const [expanded, setExpanded] = useState(null);     // expanded geai
   const [presetByCode, setPresetByCode] = useState({}); // userCode → preset
   const [ticksByCode, setTicksByCode] = useState({});   // userCode → one tick per requested data area
+  const [wordsByCode, setWordsByCode] = useState({});   // userCode → { own-tick word: ticked }
   const [revokeApp, setRevokeApp] = useState(null);   // app pending typed-name revoke
   const [revokeInput, setRevokeInput] = useState('');
   const [subForm, setSubForm] = useState({});         // app → { event }
@@ -252,7 +254,8 @@ export default function EcosystemTab({ onStats, showToast }) {
     const request = pending.find(r => r.user_code === userCode);
     try {
       // data_areas from the owner's ticks, always as a list: a body without one grants the app's own.
-      await approve(userCode, { action: 'approve', scopes: ECO_PRESETS[preset], data_areas: chosenAreas(request, ticksByCode[userCode]) });
+      // scopes: the access level, plus each word outside every level only when the owner ticked it.
+      await approve(userCode, { action: 'approve', scopes: chosenScopes(ECO_PRESETS[preset], request, wordsByCode[userCode]), data_areas: chosenAreas(request, ticksByCode[userCode]) });
       showToast?.(t('profile.ecosystem.approved'), 'success');
       await loadData();
     } catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.approveError'), 'error'); }
@@ -318,7 +321,9 @@ export default function EcosystemTab({ onStats, showToast }) {
                     <${Note} kind="meta" inline>${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}<//>
                   <//>
                   <${EcoPendingAccess} request=${r} ticks=${ticksByCode[r.user_code]}
-                    onTick=${(i, v) => setTicksByCode(m => { const next = [...(m[r.user_code] || initialTicks(r))]; next[i] = v; return { ...m, [r.user_code]: next }; })} />
+                    onTick=${(i, v) => setTicksByCode(m => { const next = [...(m[r.user_code] || initialTicks(r))]; next[i] = v; return { ...m, [r.user_code]: next }; })}
+                    wordTicks=${wordsByCode[r.user_code]}
+                    onWordTick=${(w, v) => setWordsByCode(m => ({ ...m, [r.user_code]: { ...(m[r.user_code] || {}), [w]: v } }))} />
                 <//>
                 <${Doors}>
                   <${Label}>${t('profile.ecosystem.grantLevel')}<//>

@@ -143,6 +143,11 @@ the request with its `user_code` on the **Outside apps** tab of Settings & Contr
 - `GET /v1/ecosystem-apps/pending`: the owner lists pending hello requests.
 - `POST /v1/ecosystem-apps/:userCode/approve`: the owner approves or denies, and chooses the scopes
   and data areas the GEAI may use. The status becomes active and the credential can be picked up.
+- A scope that no wildcard carries (`receivers:manage`, `party:manage`, `share:manage`, the
+  `*-as-owner` words and the rest) is granted only when the owner ticks it. The pending row lists
+  them as `own_tick_scopes`, the Outside apps tab shows them unticked, and an approval that names no
+  scopes leaves them out unless your app already held them (`held_back_scopes` in the answer). Ask
+  for such a scope only when your app needs it, and say why in your setup guide.
 
 ### 3.3 `POST /v1/ecosystem-apps/token`: the connector polls for the credential
 

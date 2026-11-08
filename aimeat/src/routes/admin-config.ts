@@ -18,6 +18,9 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-11-08 -- POST /v1/admin/consul/import holds back, for an AI caller, a Consul value that would make
+ *     a tighten-only setting looser, and names it in `held_back`; the operator in person imports every
+ *     value as before (secaudit2026nov08 round 14, consul-import-skips-tighten-only-rule-for-ai-caller).
  *   2026-11-05 -- A purchase plan the Consul import applies gives the store place's default to the agents that
  *     have not had it, as PUT does (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-04 -- DELETE removes the saved value through resetConfigValue, which asks the setting's own
@@ -80,7 +83,7 @@ import { buildConfigView, changeNodeSettings } from '../services/config-admin-vi
 import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
-import { applyConsulValues } from '../services/consul-config.js';
+import { applyConsulValues, consulValuesForCaller } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { recordOperatorNodeAct } from '../services/operator-access-audit.js';
@@ -224,21 +227,24 @@ export function adminConfigRouter(
     });
 
     // POST /v1/admin/consul/import — pull config from Consul KV and apply to runtime + DB
-    router.post('/v1/admin/consul/import', requireAuth(), requireOperator(storage), async (_req, res) => {
+    router.post('/v1/admin/consul/import', requireAuth(), requireOperator(storage), async (req, res) => {
         if (!consulService) {
             res.status(400).json(error(config.nodeId, 'CONSUL_DISABLED', 'Consul is not enabled'));
             return;
         }
 
-        const values = await consulService.loadAll();
+        // An AI credential (the operator's agent on operator:admin) does not put back a Consul value
+        // that makes a tighten-only setting looser than the node runs: that value is held back and
+        // named, the rest is imported. The operator in person imports everything, as before
+        // (secaudit2026nov08 round 14, consul-import-skips-tighten-only-rule-for-ai-caller).
+        const { values, heldBack } = consulValuesForCaller(req.auth, config, await consulService.loadAll());
         // applyConsulValues drops sealed paths itself (it is also the boot loader and the watch
         // callback), so `applied` cannot contain one and nothing sealed reaches the database here.
         // The node is running, so a row read once at start is stored and waits for the next start.
         const { applied, sealed, atRestart } = applyConsulValues(config, values, { running: true });
 
-        // Persist to DB if available. The values are the ones in the operator's Consul, which the caller
-        // did not choose here, so the tighten-only rule of applyConfigChanges is not asked; whether it
-        // should be for an AI caller is an open question (codebase analysis 2026-11-03, item B4).
+        // Persist to DB if available. The values are the ones in the operator's Consul, which the
+        // caller did not choose here; a looser tighten-only value was held back above for an AI caller.
         if (storage.supportsConfigPersistence()) {
             for (const dotPath of [...applied, ...atRestart]) {
                 // A secret row is stored encrypted, as PUT stores it (services/config-at-rest.ts).
@@ -251,9 +257,11 @@ export function adminConfigRouter(
         await placeDefaultAfterSettings(storage, config, applied);
 
         res.json(success(config.nodeId, {
-            imported: applied.length + atRestart.length, total: Object.keys(values).length,
+            imported: applied.length + atRestart.length, total: Object.keys(values).length + heldBack.length,
             ...(atRestart.length > 0 ? { at_restart: atRestart } : {}),
             ...(sealed.length > 0 ? { sealed } : {}),
+            // The looser tighten-only values an AI caller did not import: the operator imports them in person.
+            ...(heldBack.length > 0 ? { held_back: heldBack } : {}),
         }));
         emitChange('config');
     });

@@ -43,6 +43,11 @@
  *   v1.3.0 — 2026-08-11 — Security audit H-2: gateOwnerOrAiUse excludes agent and ecosystem sessions
  *     from the owner branch, matching requireScope and routes/ai.ts. classify/plan/distribute spend
  *     the owner's AI key, so an agent reaches them on `ai:use`.
+ *   v1.4.0 — 2026-11-08 — classify/plan/distribute are paid by the owner GHII with the agent or the
+ *     outside app named (notebookPayer, as POST /v1/ai/complete takes callerOf(req).payer), so the
+ *     owner's allowance, budget, the agent's cap, the app rules and the owner's own key apply; the
+ *     read side keeps the caller's own identity (secaudit2026nov08 round 14,
+ *     aimeat/notebook-ai/payer-is-caller-identity-not-owner).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -57,6 +62,7 @@ import { denyScope403 } from '../auth/deny.js';
 import { librarianSearch } from '../services/librarian.js';
 import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
+import { aiCallerOfPrincipal, type AiCallerContext } from '../services/ai/caller-context.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 import { planNote } from '../services/notebook-plan.js';
@@ -85,6 +91,15 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
       'Sign in, or give your assistant permission to use AI on your behalf in Profile → Agents.',
       undefined, { required_scope: 'ai:use' }));
     return false;
+  }
+
+  /**
+   * Who pays for a notebook AI call and who asks: the owner GHII pays (caller-facts.ts
+   * payerOfPrincipal), and an agent or an outside app is named as the asker, as POST /v1/ai/complete
+   * does. The owner in person and an app grant (whose identity is the owner GHII) are the owner, as before.
+   */
+  function notebookPayer(req: Request): { gaii: string; who: AiCallerContext } {
+    return { gaii: callerOf(req, config.nodeId, storage).payer.payer, who: aiCallerOfPrincipal(resolveIdentity(req.auth!, config.nodeId)) };
   }
 
   // GET /v1/librarian/search — ranked full-text search across all of the caller's content.
@@ -172,7 +187,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     try {
       const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
       const result = await classifyNote(storage, config, {
-        gaii: viewerGaii,
+        ...notebookPayer(req),
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,
@@ -204,7 +219,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     try {
       const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
       const result = await planNote(storage, config, {
-        gaii: viewerGaii,
+        ...notebookPayer(req),
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,
@@ -236,7 +251,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     try {
       const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
       const result = await distributeNote(storage, config, {
-        gaii: viewerGaii,
+        ...notebookPayer(req),
         ownerName: req.auth!.owner as string,
         viewerGaii,
         text,

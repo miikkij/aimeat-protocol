@@ -11,6 +11,8 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold · howFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.18.0 -- 2026-11-08 -- An outside app (kind `ecosystem`) is a sender row of its own, with what it
+ *     is and a way to the Outside apps page, so the owner can mute it (secaudit2026nov08 round 14).
  *   v1.17.0 -- 2026-10-16 -- A failed first load of the inbox shows the could-not-load note with Retry
  *     instead of "nothing here" (ctx.itemsFailed) (QA audit F6-05).
  *   v1.16.0 -- 2026-10-02 -- The question marks that explain the quiet hours: notify.throttle, notify.breakthrough (components/HelpTip.js).
@@ -152,9 +154,10 @@ function secSenders(ctx) {
   const others = ctx.senders.map(r => ({
     ...r,
     sub: [kindWord(r.kind), r.granted_at ? c('grantedOn', { when: day(r.granted_at) }) : null, r.count ? c('sentN', { n: r.count, when: rel(r.last_at) }) : c('sentNone')].filter(Boolean).join(' · '),
-    what: r.kind === 'app' ? c('appWhat') : r.kind === 'extension' ? c('extensionWhat') : c('agentWhat'),
+    what: r.kind === 'app' ? c('appWhat') : r.kind === 'extension' ? c('extensionWhat') : r.kind === 'ecosystem' ? c('ecosystemWhat') : c('agentWhat'),
     door: r.kind === 'app' && r.grant_id ? html`<${Action} small soft disabled=${ctx.busy} onClick=${() => ctx.revokeApp(r)}>${c('revokeGrant')}<//>`
-      : r.kind === 'agent' ? html`<${Action} small soft onClick=${() => ctx.openTab('agents')}>${t('profile.tabs.agents')}<//>` : null,
+      : r.kind === 'agent' ? html`<${Action} small soft onClick=${() => ctx.openTab('agents')}>${t('profile.tabs.agents')}<//>`
+      : r.kind === 'ecosystem' ? html`<${Action} small soft onClick=${() => ctx.openTab('ecosystem')}>${t('profile.tabs.ecosystem')}<//>` : null,
   }));
   return html`
     <${PageSection} id="nt-senders" num="02" title=${c('secSenders')} count=${c('secSendersSub')}>

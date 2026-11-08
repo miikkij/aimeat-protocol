@@ -14,6 +14,8 @@
  *   - classifyNote() — resolve model → build context → prompt → chokepoint → parse → suggestion
  * @usage const result = await classifyNote(storage, config, { gaii, ownerName, text });
  * @version-history
+ *   v1.4.0 — 2026-11-08 — classifyNote and distributeNote take `who` (the agent or outside app that
+ *     asked), passed to resolveOwnerModel with the owner GHII as `gaii` (secaudit2026nov08 round 14).
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8b: classify and distribute run through the completion
  *     chokepoint (via notebook-ai.ts), so both mint provenance and appear in the owner's AI ledger
  *     as `notebook:classify` / `notebook:distribute`. They were billed to nobody before.
@@ -32,6 +34,7 @@ import { stripCodeblock } from './llm-strip.js';
 import { collectWorkspaceSummary } from './structure-overview.js';
 import type { ContentReader } from './classification/reader.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
+import type { AiCallerContext } from './ai/caller-context.js';
 import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
 import { NOTEBOOK_DISTRIBUTE_SYSTEM, NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
 import { logger } from '../utils/logger.js';
@@ -148,13 +151,13 @@ function resolveTarget(context: PlacementOrganism[], raw: RawSuggestion): Placem
 export async function classifyNote(
   storage: Storage,
   config: AimeatConfig,
-  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; reader: ContentReader },
+  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; reader: ContentReader; who?: AiCallerContext },
 ): Promise<ClassifyResult> {
   const text = opts.text.trim();
   if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
 
   // Owner's own model (shared resolution; throws NO_OPENROUTER_KEY when no key is configured).
-  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:classify');
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:classify', opts.who);
 
   const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii, reader: opts.reader });
   const prompt = fillPrompt(await loadClassifyTemplate(storage), context, text);
@@ -224,12 +227,12 @@ interface RawChunk extends RawSuggestion { createNew?: { suggest?: unknown; orga
 export async function distributeNote(
   storage: Storage,
   config: AimeatConfig,
-  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; reader: ContentReader },
+  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; reader: ContentReader; who?: AiCallerContext },
 ): Promise<DistributeResult> {
   const text = opts.text.trim();
   if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
 
-  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:distribute');
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:distribute', opts.who);
   const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii, reader: opts.reader });
   const prompt = (await loadDistributeTemplate(storage))
     .split('{{structure}}').join(JSON.stringify({ organisms: context }, null, 2))
