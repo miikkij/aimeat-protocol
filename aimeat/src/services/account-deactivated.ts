@@ -22,9 +22,13 @@
  *
  *   An identity that names no local account (a system job, a federated visitor, an identity of
  *   another node) is never deactivated here, and the answer is null.
- * @structure deactivatedAccountSkip(storage, identity)
+ *   Since 2026-11-08 also before an AI job runs (services/ai-jobs/run-gate.ts): the job stays queued
+ *   and runs after reactivation.
+ * @structure deactivatedAccountSkip(storage, identity) · deactivatedAccountOf(storage, identity)
  * @usage const skip = await deactivatedAccountSkip(storage, job.ownerScope); if (skip) { ...skip... }
  * @version-history
+ *   v1.1.0 -- 2026-11-08 -- deactivatedAccountOf(): the same read as facts, for the AI job runner
+ *     (secaudit2026nov08 round 14, reclaimJobs:restarts-deactivated-account-job).
  *   v1.0.1 -- 2026-10-27 -- Two more callers: a workflow run in flight and the goal sweep (secaudit2026oct26).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, owner-deactivation:background-work-keeps-acting).
  */
@@ -36,11 +40,23 @@ import { localAccountOf } from '../utils/gaii.js';
  * active, unknown, or not a local account. `identity` is a GHII, a GAII, a GEAI or a bare account name.
  */
 export async function deactivatedAccountSkip(storage: Pick<Storage, 'getOwner'>, identity: string | null | undefined): Promise<string | null> {
+  const off = await deactivatedAccountOf(storage, identity);
+  if (!off) return null;
+  return `Skipped: the account "${off.name}" was deactivated on ${off.since}. `
+    + 'Its schedules, workflow triggers and unattended extension runs wait, and nothing is deleted. '
+    + 'They run again at their next time after the operator reactivates the account.';
+}
+
+/**
+ * The same read, as facts for a caller that words its own sentence (services/ai-jobs/run-gate.ts):
+ * the account name and the day it was deactivated, or null as above.
+ */
+export async function deactivatedAccountOf(
+  storage: Pick<Storage, 'getOwner'>, identity: string | null | undefined,
+): Promise<{ name: string; since: string } | null> {
   const name = identity ? localAccountOf(identity) : null;
   if (!name) return null;
   const owner = await storage.getOwner(name);
   if (!owner?.disabledAt) return null;
-  return `Skipped: the account "${name}" was deactivated on ${owner.disabledAt.slice(0, 10)}. `
-    + 'Its schedules, workflow triggers and unattended extension runs wait, and nothing is deleted. '
-    + 'They run again at their next time after the operator reactivates the account.';
+  return { name, since: owner.disabledAt.slice(0, 10) };
 }

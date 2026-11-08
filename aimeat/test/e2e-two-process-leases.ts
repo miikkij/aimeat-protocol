@@ -13,7 +13,9 @@
  *     3. killing the process that holds the jobs lets the other take them over after its lease runs
  *        out: A is killed with a job running and one queued; B fails the running one with
  *        node_restarted, as one process does after a crash (test/e2e-ai-jobs.ts case 15), and runs the
- *        queued one to done.
+ *        queued one to done;
+ *     4. A, started again, runs a job and B takes its cancel: the job ends cancelled once and A writes
+ *        no answer (services/ai-jobs/run-gate.ts stillHeld; secaudit2026nov08 round 14).
  *
  *   NOTHING INSIDE THE NODES IS MOCKED. A local OpenAI-compatible stub stands in for the provider; it
  *   can hold a request open, so a job stays running for as long as a case needs.
@@ -23,6 +25,7 @@
  *   process (codebase analysis 2026-11-03, high-availability report sections 2e and 6).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-two-process-leases
  * @version-history
+ *   v1.1.0 -- 2026-11-08 -- Case 4: a cancel taken by the other process (secaudit2026nov08 round 14); cases 1-3 unchanged.
  *   v1.0.1 -- 2026-11-05 -- Both processes start with AIMEAT_NODE_PROCESSES=multiple, which several
  *     processes on one database now need (Jouni 2026-11-05, decision 6a); no assertion changed.
  *   v1.0.0 -- 2026-11-04 -- Initial (codebase analysis 2026-11-03, item HA 2.5-2.7).
@@ -127,7 +130,7 @@ async function kill(child: ChildProcess): Promise<void> {
 
 console.log('\n=== TWO PROCESSES, ONE DATABASE: RUN-ONCE WORK ===\n');
 
-const procA = await startProcess('A');
+let procA = await startProcess('A');
 // B starts once A has migrated the database, as a second process joins a running node.
 let procB = await startProcess('B');
 
@@ -234,6 +237,27 @@ try {
         assert(endRunning.state === 'failed' && endRunning.error?.code === 'node_restarted',
             `the job that was running ended ${endRunning.state} ${endRunning.error?.code}`);
         console.log(`     (B took the jobs over ${Math.round(tookMs / 1000)} s after A was killed)`);
+    });
+
+    // secaudit2026nov08 round 14: the process that runs a job writes no answer after another process
+    // took the cancel, and the job ends once.
+    await test('4. A job A runs and B cancels ends cancelled once, and A writes no answer', async () => {
+        procA = await startProcess('A');
+        holding = true;
+        const r = await startJob(BASE_A, 'twoproc.cancelled');
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const id = r.body.data.job_id as string;
+        await waitHeld(1);
+        const c = await json(BASE_B, `/v1/ai/jobs/${id}/cancel`, { method: 'POST', headers: auth(owner.token) });
+        assert(c.status === 200 && c.body.data?.state === 'cancelled', `cancel on B: ${c.status} ${JSON.stringify(c.body?.data ?? c.body?.error)}`);
+        release();
+        await sleep(3_000);
+        const answer = await json(BASE_A, `/v1/memory/${encodeURIComponent('twoproc.cancelled')}`, { headers: auth(owner.token) });
+        assert(answer.status === 404, `A wrote the answer of a job B cancelled: ${answer.status} ${JSON.stringify(answer.body?.data?.value)}`);
+        const all = await json(BASE_A, '/v1/ai/jobs?state=all&limit=500', { headers: auth(owner.token) });
+        assert(all.status === 200, `list ${all.status}`);
+        const entries = (all.body.data.jobs as any[]).filter((j: any) => j.id === id);
+        assert(entries.length === 1 && entries[0].state === 'cancelled', `the job's entries: ${JSON.stringify(entries.map((e: any) => e.state))}`);
     });
 } finally {
     await kill(procA).catch(() => undefined);

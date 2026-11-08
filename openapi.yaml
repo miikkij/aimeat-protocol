@@ -21565,6 +21565,15 @@ paths:
         process that ended without stopping, is `failed` with error code `node_restarted`.
 
 
+        Before a job runs, its account and its starter are asked as they are at that moment. A queued
+        job of a deactivated account stays `queued` with `waiting` (a sentence that names the
+        deactivation); nothing is paid or written, and it runs after the account is reactivated. A job
+        whose starting agent was deleted ends `failed` with error code `AI_JOB_STARTER_GONE` before the
+        provider is called; a job whose starting agent's permissions were narrowed runs with the
+        narrower permissions, and ends `failed` with `SCOPE_DENIED` when its `on_done` needs
+        `ext:invoke` the agent no longer holds.
+
+
         Requires an owner session or a token carrying `ai:use`.
       tags: [Memory]
       security:
