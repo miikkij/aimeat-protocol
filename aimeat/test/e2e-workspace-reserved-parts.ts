@@ -188,5 +188,68 @@ await test('Usage: the declared space\'s own row and the other spaces still read
     assert(unlock.status === 200, `share unlock ${show(unlock)}`);
 });
 
+// ── The MCP access tools and the registry copy that counts (mcp/workspaces.ts findWsEntry) ──
+console.log('\nMCP access tools: the workspace creator is the one the REST gate names');
+
+let zorg!: RegisteredOwner, aadm!: RegisteredOwner, dan!: RegisteredOwner;
+let zOrg = '', zWs = '';
+
+await test('Setup: zorg\'s workspace; aadm, an admin, writes a registry copy naming himself and is demoted; dan asks for access', async () => {
+    // aadm's name sorts before zorg's, so the first copy in store order is aadm's.
+    zorg = await registerOwner(BASE, `zrp${stamp}`);
+    aadm = await registerOwner(BASE, `arp${stamp}`);
+    dan = await registerOwner(BASE, `drp${stamp}`);
+    const o = await call('POST', '/v1/organisms', zorg.token, { name: `Copies ${stamp}`, type: 'project', join_policy: 'invite_only', visibility: 'private' });
+    assert(o.status === 201, `organism ${show(o)}`);
+    zOrg = o.body.data.organism.id;
+    const w = await call('POST', `/v1/organisms/${zOrg}/workspaces`, zorg.token, { name: 'Notes', manifest: { objectTypes: [baseTypes[0]] } });
+    assert(w.status === 201, `workspace ${show(w)}`);
+    zWs = w.body.data.ws;
+    for (const who of [aadm, dan]) {
+        const add = await call('POST', `/v1/organisms/${zOrg}/members`, zorg.token, { ghii: who.name });
+        assert(add.status === 201, `add ${who.name}: ${show(add)}`);
+    }
+    const promote = await call('POST', `/v1/organisms/${zOrg}/admins`, zorg.token, { target_ghii: aadm.name });
+    assert(promote.status === 200 || promote.status === 201, `promote ${show(promote)}`);
+    const reg = await call('POST', '/v1/memory', aadm.token, { key: `organism.${zOrg}.meta.workspaces`, value: { workspaces: [{ id: zWs, name: 'Notes', createdBy: aadm.name }] }, visibility: 'private' });
+    assert(reg.status === 201 || reg.status === 200, `aadm's registry copy ${show(reg)}`);
+    const demote = await call('DELETE', `/v1/organisms/${zOrg}/admins/${aadm.name}`, zorg.token);
+    assert(demote.status === 200, `demote ${show(demote)}`);
+    const ask = await call('POST', `/v1/organisms/${zOrg}/workspace-access`, dan.token, { ws: zWs, message: `dan-asks-${stamp}` });
+    assert(ask.status === 201 && ask.body.data.workspace_creator === zorg.name, `dan asks ${show(ask)}`);
+    // The control: the REST door refuses aadm.
+    const rest = await call('GET', `/v1/organisms/${zOrg}/workspace-access?ws=${zWs}`, aadm.token);
+    assert(rest.status === 403, `REST lets aadm list: ${show(rest)}`);
+});
+
+await test('Refused: on MCP the demoted admin neither lists the requests nor decides one', async () => {
+    const session = await agentSession(aadm, ['organism:read', 'organism:invite'], 'reserved-parts-aadm');
+    const list = await callTool(session, 'aimeat_workspace_access', { organism_id: zOrg, ws: zWs, action: 'list' });
+    assert(list.isError && !list.text.includes(`dan-asks-${stamp}`), `MCP let aadm list: ${list.text.slice(0, 300)}`);
+    const decide = await callTool(session, 'aimeat_workspace_access', { organism_id: zOrg, ws: zWs, action: 'decide', requester: dan.name, decision: 'deny' });
+    assert(decide.isError, `MCP let aadm decide: ${decide.text.slice(0, 300)}`);
+    const req = await call('GET', `/v1/organisms/${zOrg}/workspace-access?ws=${zWs}`, zorg.token);
+    const dans = (req.body.data.requests ?? []).find((r: any) => r.requester === dan.name);
+    assert(dans && dans.status === 'pending', `dan's request was decided: ${JSON.stringify(dans)}`);
+});
+
+await test('Usage: the workspace creator lists the requests on MCP as before', async () => {
+    const session = await agentSession(zorg, ['organism:read', 'organism:invite'], 'reserved-parts-zorg');
+    const list = await callTool(session, 'aimeat_workspace_access', { organism_id: zOrg, ws: zWs, action: 'list' });
+    assert(!list.isError && list.text.includes(`dan-asks-${stamp}`), `zorg lists: ${list.text.slice(0, 300)}`);
+});
+
+// Before the fix the MCP door named aadm the creator, so the approval wrote dan's role under aadm,
+// where the access layer does not look: the approval said yes and dan still read nothing.
+await test('Refused: the creator\'s MCP approval no longer lands under a creator the access layer does not read; dan reads', async () => {
+    const session = await agentSession(zorg, ['organism:read', 'organism:invite'], 'reserved-parts-zorg2');
+    const decide = await callTool(session, 'aimeat_workspace_access', { organism_id: zOrg, ws: zWs, action: 'decide', requester: dan.name, decision: 'approve', role: 'viewer' });
+    assert(!decide.isError, `zorg decides: ${decide.text.slice(0, 300)}`);
+    const read = await call('GET', `/v1/organisms/${zOrg}/workspace?ws=${zWs}`, dan.token);
+    assert(read.status === 200 && read.body.data.manifest, `dan reads after the approval: ${show(read)}`);
+    const members = await callTool(session, 'aimeat_workspace_members', { organism_id: zOrg, ws: zWs });
+    assert(!members.isError && members.text.includes(dan.name), `members: ${members.text.slice(0, 300)}`);
+});
+
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);
 process.exit(failed > 0 ? 1 : 0);
