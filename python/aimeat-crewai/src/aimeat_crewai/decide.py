@@ -48,7 +48,8 @@ from .credentials import (
     ExpiredToken,
     daemon_route,
     expired_token_message,
-    stored_agent_token,
+    held_node_url,
+    stored_agent_token_file,
 )
 from .paths import aimeat_home, connector_config_path, connector_node_url, home_is_explicit
 
@@ -269,10 +270,12 @@ def _node(
     ``prefer_daemon`` puts it first, ahead of a stored token: ``node_llm()`` sets it, because the
     daemon's credential is always current and a v1 token in the home may not be.
 
-    The address is the argument, then ``AIMEAT_NODE_URL``, then ``node_url:`` in the connector home's
-    ``config.yaml``. That file is read for a token from the argument or the environment only when
-    ``AIMEAT_HOME`` is set; a token stored in the same home always pairs with it. Otherwise the file
-    is ignored with one logged line naming it.
+    The address is the argument, then ``AIMEAT_NODE_URL``, then the connector home. A token stored in
+    the home goes to its own agent's node (``agents/<owner>/<agent>/config.yaml``), else to the
+    home's ``config.yaml`` when that file names this agent or no agent (credentials.held_node_url);
+    a home ``config.yaml`` written for another agent raises, naming the file. For a token from the
+    argument or the environment, the home's ``config.yaml`` is read only when ``AIMEAT_HOME`` is set;
+    otherwise the file is ignored with one logged line naming it.
     """
     explicit = bool(node_url or agent_token)
     daemon = None if explicit else daemon_route(agent_name)
@@ -284,21 +287,28 @@ def _node(
         return via_daemon
     token = agent_token
     expired: list[ExpiredToken] = []
-    token_from_home = False
+    token_file: Path | None = None
     if not token and agent_name:
-        token, expired = stored_agent_token(agent_name)
-        token_from_home = bool(token)
+        token, token_file, expired = stored_agent_token_file(agent_name)
     token = token or os.environ.get("AIMEAT_AGENT_TOKEN")
     url = node_url or os.environ.get("AIMEAT_NODE_URL") or ""
     ignored_config: Path | None = None
-    if not url:
+    other_agents_config: Path | None = None
+    if not url and token_file is not None:
+        # A token stored in the home goes only to the node its own agent was connected to: that
+        # agent's settings, else the home's config.yaml when it was written for this agent. The
+        # connector writes that file for the first agent it connects, so for a second agent on
+        # another node it names the wrong node (secaudit2026nov08 round 14).
+        url, other_agents_config = held_node_url(token_file)
+        url = url or ""
+    elif not url:
         # The home's config.yaml names the node only for a token of the same source: a home set with
         # AIMEAT_HOME, or a token read from that home. Without AIMEAT_HOME the home is the current
         # folder, which may be one somebody else wrote, so a token from the argument or the
         # environment is not sent to the address it names (secaudit2026oct22). With no token at all
         # nothing is sent, and reading the address keeps the "no agent token" message.
         home_url = connector_node_url()
-        if home_url and token and not token_from_home and not home_is_explicit():
+        if home_url and token and not home_is_explicit():
             ignored_config = connector_config_path()
             _report_ignored_config(ignored_config)
         else:
@@ -309,6 +319,14 @@ def _node(
     if via_daemon is not None:
         return via_daemon
     if not url:
+        if other_agents_config is not None:
+            raise DecideError(
+                f"node_url is required: the node_url in {other_agents_config} is the node of the agent that file "
+                f"names, and the stored token for {agent_name} is for another agent, so it is not sent there. "
+                f"The connector keeps each agent's own node in agents/<owner>/<agent>/config.yaml in the same "
+                "home, and that file is missing. Pass node_url=, set AIMEAT_NODE_URL, or connect the agent "
+                "again with `aimeat connect add`."
+            )
         if ignored_config is not None:
             raise DecideError(
                 f"node_url is required: the node_url in {ignored_config} was not used, because that file is in "

@@ -216,7 +216,10 @@ The node and the token resolve as for `decide()`: the arguments, then the connec
 for `agent_name`, then `AIMEAT_NODE_URL` and `AIMEAT_AGENT_TOKEN`. With no address from those,
 `node_url:` in the connector home's `config.yaml` names the node, but for a token from the
 arguments or `AIMEAT_AGENT_TOKEN` only when `AIMEAT_HOME` is set (0.39.0+). Without `AIMEAT_HOME`
-the home is the current folder, and the token does not go to an address a folder names.
+the home is the current folder, and the token does not go to an address a folder names. A token
+stored in the home goes to its own agent's node, `node_url:` in `agents/<owner>/<agent>/config.yaml`;
+the home's `config.yaml` names the node for it only when that file names this agent or no agent
+(0.39.1+).
 
 **The node chooses the model.** `/v1/llm/chat/completions` does not read the request's `model`:
 the owner's preference decides, then the node's default, and the answer says which model ran.
