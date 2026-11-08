@@ -219,7 +219,8 @@ arguments or `AIMEAT_AGENT_TOKEN` only when `AIMEAT_HOME` is set (0.39.0+). With
 the home is the current folder, and the token does not go to an address a folder names. A token
 stored in the home goes to its own agent's node, `node_url:` in `agents/<owner>/<agent>/config.yaml`;
 the home's `config.yaml` names the node for it only when that file names this agent or no agent
-(0.40.0+).
+(0.40.0+). When agents of two owners in one home carry the same name, give the full identity
+`agent#owner@node`: a bare name then picks no stored token (0.41.0+).
 
 **The node chooses the model.** `/v1/llm/chat/completions` does not read the request's `model`:
 the owner's preference decides, then the node's default, and the answer says which model ran.

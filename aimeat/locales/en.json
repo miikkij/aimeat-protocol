@@ -11781,7 +11781,7 @@
   "notiftext.subscription_renewal_refunded.title": "The renewal of {name} did not go through",
   "notiftext.subscription_renewal_refunded.body": "Your card was charged, and the renewal could not be saved, so the charge was refunded. The subscription ends on {date} unless a renewal goes through. The renewal is tried again each day until then.",
   "notiftext.subscription_renewal_not_recorded.title": "The renewal of {name} was charged and not saved",
-  "notiftext.subscription_renewal_not_recorded.body": "Your card was charged, and the renewal could not be saved. The refund did not go through, so the money was not returned. Contact the seller, or the people who run this node, and give them the reference {reference}: the seller has a record of this payment. This period is not charged again.",
+  "notiftext.subscription_renewal_not_recorded.body": "Your card was charged, and the renewal could not be saved. The refund did not go through, so the money was not returned. Contact the seller, or the people who run this service, and give them the reference {reference}: the seller has a record of this payment. This period is not charged again.",
   "notiftext.package_renewed.title": "The update service for {name} was renewed",
   "notiftext.package_renewed.body": "Your card was charged {amount}, and new versions come for another {days} days.",
   "notiftext.payment_not_delivered.title": "A payment of {amount} was taken and the order was not delivered",

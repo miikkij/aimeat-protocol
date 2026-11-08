@@ -121,11 +121,11 @@
     },
     "src/commerce/subscriptions.ts": {
       "reads": {
-        "getMemory": 5,
+        "getMemory": 6,
         "listMemory": 2,
         "listAllMemory": 1
       },
-      "why": "Reviewed 2026-10-18 (Comicland v3 A-5), the node's own read: an extension's own published offer (`subscription.plans` in ext:{name}), the buyer's service-owned subscription records (commerce.subscription.*) to extend, list, cancel and renew them, and the seller's payment setup (commerce.psp) for the renewal charge. What a buyer is shown is their own records' facts without the kept card's ids; no content is shown to anyone else."
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-5), the node's own read: an extension's own published offer (`subscription.plans` in ext:{name}), the buyer's service-owned subscription records (commerce.subscription.*) to extend, list, cancel and renew them, and the seller's payment setup (commerce.psp) for the renewal charge. What a buyer is shown is their own records' facts without the kept card's ids; no content is shown to anyone else. 2026-11-08 (secaudit2026nov08b round 15): renewOne also asks whether the seller holds the period's undelivered-payment record, a presence test whose value is not read or shown."
     },
     "src/commerce/ucp-guest-checkout.ts": {
       "reads": {

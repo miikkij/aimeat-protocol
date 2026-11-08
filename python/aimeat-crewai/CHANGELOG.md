@@ -3,6 +3,21 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.41.0 - 2026-11-08
+
+A minor release, as 0.40.0 was: a call that went out before is now refused, with the reason and what
+to do instead.
+
+- **A bare agent name shared by two owners picks no stored token.** When agents of two owners carry
+  the same name in one connector home, a bare `agent_name` no longer picks the other owner's stored
+  token. `decide()` and `publish_offers()` stop before they send anything, unless a token comes from
+  `AIMEAT_AGENT_TOKEN` or a connector daemon serves the agent, and the message names both owners'
+  agents and asks for the full identity `agent#owner@node`. A home with one owner resolves exactly as
+  before.
+- **`publish_offers()` takes a full identity**, and keeps the bare name as the memory key
+  (`agents.<name>.offers`). `create_liaison_agent(agent_identity=...)` binds the liaison's offers tool
+  to that identity, and the crew daemon passes it.
+
 ## 0.40.0 - 2026-11-08
 
 A minor release, as 0.39.0 was: two calls that went out before are now refused, each with the reason

@@ -11232,7 +11232,7 @@
   "notiftext.subscription_renewal_refunded.title": "No se pudo renovar la suscripción {name}",
   "notiftext.subscription_renewal_refunded.body": "Se hizo el cobro a tu tarjeta, pero la renovación no se pudo guardar, así que se devolvió el cobro. La suscripción termina el {date}, a menos que una renovación salga bien antes. La renovación se intenta de nuevo cada día hasta entonces.",
   "notiftext.subscription_renewal_not_recorded.title": "Se cobró la renovación de {name}, pero no se guardó",
-  "notiftext.subscription_renewal_not_recorded.body": "Se hizo el cobro a tu tarjeta, pero la renovación no se pudo guardar. La devolución no salió bien, así que el dinero no se devolvió. Ponte en contacto con el vendedor o con quienes gestionan este nodo, y dales la referencia {reference}: el vendedor tiene un registro de este pago. Este periodo no se vuelve a cobrar.",
+  "notiftext.subscription_renewal_not_recorded.body": "Se hizo el cobro a tu tarjeta, pero la renovación no se pudo guardar. La devolución no salió bien, así que el dinero no se devolvió. Ponte en contacto con el vendedor o con quienes gestionan este servicio, y dales la referencia {reference}: el vendedor tiene un registro de este pago. Este periodo no se vuelve a cobrar.",
   "notiftext.package_renewed.title": "Se renovó el servicio de actualizaciones de {name}",
   "notiftext.package_renewed.body": "Se cobraron {amount} a tu tarjeta, y las versiones nuevas siguen llegando durante {days} días más.",
   "notiftext.payment_not_delivered.title": "Se cobró un pago de {amount} y el pedido no se entregó",
