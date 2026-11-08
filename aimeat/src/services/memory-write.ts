@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-08 — A receiver's write at 'organism:<id>' is checked against the owner it writes for: the
+ *     membership check cut the receiver's own identity (receiver:<owner>/<name>@<node>) to an account
+ *     no organism has, so a member's receiver was refused with NOT_ORGANISM_MEMBER.
  *   2026-11-05 — A write at 'group' that names no group and finds none on the record is refused with 400
  *     INVALID_INPUT, nothing stored (storage/memory-sharing.ts). A row an older node stored that way
  *     stays writable and the write carries the warning GROUP_NOT_NAMED. A group id naming no group is
@@ -257,8 +260,12 @@ export async function writeMemoryRecord(
     }
     // 1b'. A record made visible to one organism names an organism the writer's account is an active
     //      member of, decided by services/audience.ts through services/organism-visibility.ts.
+    //      A receiver writes for its owner, and its identity (receiver:<owner>/<name>@<node>, built by the
+    //      server from the verified key) names no account, so the check reads the owner it writes for:
+    //      the namespace the record lands in, which services/organism-visibility.ts accepts as the writer.
+    const writesForOwner = caller.roles.includes('receiver') && caller.principal.startsWith('receiver:');
     const audienceRefusal = await organismVisibilityRefusal(storage, input.visibility, {
-        identity: caller.principal, federated: isForeignPrincipal(caller),
+        identity: writesForOwner ? caller.targetGaii : caller.principal, federated: isForeignPrincipal(caller),
     });
     if (audienceRefusal) return { ok: false, ...audienceRefusal };
 
