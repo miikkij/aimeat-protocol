@@ -38,6 +38,11 @@
  *     from their allowance as it does for chat. No model is named for such a call, so the plan
  *     chooses it and a spent allowance falls back to the free model. A person with their own key keeps
  *     the model chosen here, as before (codebase analysis 2026-11-03, item A10).
+ *   v1.5.0 — 2026-11-08 — resolveOwnerModel takes who asks (`who`, caller-context.ts): an agent or an
+ *     outside app is planned and paid as the owner GHII with the agent or the app named, so the
+ *     owner's allowance, budget, the agent's cap and the app rules apply, and the owner's own key is
+ *     found. The owner in person is the default (secaudit2026nov08 round 14,
+ *     aimeat/notebook-ai/payer-is-caller-identity-not-owner).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -45,7 +50,7 @@ import type { CompletionOptions } from './openrouter.js';
 import { completeForOwner, prepareAiCall, AiCompletionError, type CompleteForOwnerResult } from './ai/completion.js';
 import { getEncryptionKey } from './encryption.js';
 import { hasOwnAiKey } from './own-key-coverage.js';
-import { OWNER_CALLER } from './ai/caller-context.js';
+import { OWNER_CALLER, type AiCallerContext } from './ai/caller-context.js';
 import { nodeAiProviders } from './ai/providers.js';
 
 /** Raised with a stable `code` so routes can map it to the right HTTP status + envelope. */
@@ -64,6 +69,8 @@ export interface OwnerModel {
   model?: string;
   /** Per-feature attribution, so the owner's usage breakdown says which feature spent what. */
   appId: string;
+  /** Who asks: the owner, or the owner's agent or outside app the call is paid for (caller-context.ts). */
+  who?: AiCallerContext;
 }
 
 /**
@@ -79,6 +86,10 @@ export async function resolveOwnerModel(
   config: AimeatConfig,
   gaii: string,
   appId: string,
+  /** Who asks. `gaii` is then the owner GHII that pays (caller-facts.ts payerOfPrincipal), never
+   *  the agent's or the app's own identity; the owner's allowance, budget, the agent's cap and the
+   *  app rules apply. Absent: the owner in person, as before. */
+  who: AiCallerContext = OWNER_CALLER,
 ): Promise<OwnerModel> {
   const [apiKeyRecord, prefsRecord] = await Promise.all([
     storage.getMemory(gaii, 'openrouter.apikey'),
@@ -102,16 +113,16 @@ export async function resolveOwnerModel(
     // known without planning (as before this check asked the planner).
     if (nodeAiProviders(config).length === 0) throw noKeyError();
     try {
-      await prepareAiCall(storage, config, gaii, { appId, caller: OWNER_CALLER.caller });
+      await prepareAiCall(storage, config, gaii, { appId, ...who });
     } catch (e) {
       throw notebookErrorOf(e);
     }
     // No model is named, so the plan chooses it as it does for chat: the person's setting, the
     // node's default, and the free model when the allowance is spent.
-    return { storage, config, gaii, appId };
+    return { storage, config, gaii, appId, who };
   }
   const model = (prefs.model as string) || (prefs.reasoningModel as string) || (prefs.executionModel as string) || 'openrouter/free';
-  return { storage, config, gaii, model, appId };
+  return { storage, config, gaii, model, appId, who };
 }
 
 /** The refusal for a person no key can pay for. The code is the one clients branch on. */
@@ -153,8 +164,9 @@ export async function completeOwner(
       systemPrompt,
       model: owner.model,
       appId: owner.appId,
-      // The notebook features run for the owner, on the owner's own request.
-      caller: OWNER_CALLER.caller,
+      // The owner in person by default; an agent or an outside app named when one asked (the
+      // librarian routes, secaudit2026nov08 round 14).
+      ...(owner.who ?? OWNER_CALLER),
       temperature: options?.temperature,
       topP: options?.top_p,
       maxTokens: options?.max_tokens,

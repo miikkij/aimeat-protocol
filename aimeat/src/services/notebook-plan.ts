@@ -14,6 +14,8 @@
  *   - planNote() — resolve model → build context → prompt → chokepoint → parse → validated plan
  * @usage const result = await planNote(storage, config, { gaii, ownerName, viewerGaii, text });
  * @version-history
+ *   v1.3.0 — 2026-11-08 — planNote takes `who` (the agent or outside app that asked), passed to
+ *     resolveOwnerModel with the owner GHII as `gaii` (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-06-21 — Initial (Phase 1): reason + librarian-assess planning over OpenRouter.
  *   v1.1.0 — 2026-06-21 — Phase 2: `delegate` step kind + offer catalogue grounding (the client passes a
  *     compact catalogue of the owner's agent offers; delegate steps are validated against it).
@@ -25,6 +27,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { stripCodeblock } from './llm-strip.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
+import type { AiCallerContext } from './ai/caller-context.js';
 import { buildPlacementContext, type PlacementOrganism } from './notebook-classify.js';
 import { NOTEBOOK_PLAN_SYSTEM, NOTEBOOK_PLAN_TEMPLATE } from './notebook-plan-prompt.js';
 import { logger } from '../utils/logger.js';
@@ -152,12 +155,12 @@ function resolveSteps(raw: unknown, catalogue: CatalogueOffer[]): PlanStep[] {
 export async function planNote(
   storage: Storage,
   config: AimeatConfig,
-  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; catalogue?: unknown; reader: ContentReader },
+  opts: { gaii: string; ownerName: string; viewerGaii: string; text: string; catalogue?: unknown; reader: ContentReader; who?: AiCallerContext },
 ): Promise<PlanResult> {
   const text = opts.text.trim();
   if (!text) throw new NotebookAiError('INVALID_INPUT', 'text is required');
 
-  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:plan');
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:plan', opts.who);
   const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii, reader: opts.reader });
   const catalogue = normaliseCatalogue(opts.catalogue);
   const prompt = fillPrompt(await loadPlanTemplate(storage), context, catalogue, text);
