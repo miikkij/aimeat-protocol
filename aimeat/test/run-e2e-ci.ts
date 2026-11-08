@@ -986,6 +986,8 @@ const ALL_SUITES = [
     'test/e2e-agent-refusals.ts',
     // An agent's refusal hands its person one address; Allow there works in the same conversation.
     'test/e2e-agent-permission-ask.ts',
+    // A person's contexts reach every AI they connect that can read memory, and nobody else's.
+    'test/e2e-context-index.ts',
     'test/e2e-agent-health.ts',
     'test/e2e-open-items.ts',
     'test/e2e-app-access-code.ts',
