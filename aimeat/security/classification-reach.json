@@ -2637,9 +2637,10 @@
     },
     "src/services/parties/shares.ts": {
       "reads": {
+        "getMemory": 1,
         "getStorageFile": 2
       },
-      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3), the node's own read: a data package's pointer and descriptor (metadata the package service wrote) to check a share names a package and version that exist, and to build the connection file's table list for the owner or the party the owner shared it with. The rows themselves are read through openPackage and readRows, which pass the classification reader."
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3), the node's own read: a data package's pointer and descriptor (metadata the package service wrote) to check a share names a package and version that exist, and to build the connection file's table list for the owner or the party the owner shared it with. The rows themselves are read through openPackage and readRows, which pass the classification reader. Reviewed 2026-11-08 (secaudit2026nov08 round 14, share-offer-outlives-source-share): getMemory reads the owner's Dataspace negotiation record (dataspace.negotiation.<hex>, written only by the dataspace service) to find the share an older agreement stood on; it reads the offer's kind and reference, no content."
     },
     "src/services/parties/store.ts": {
       "reads": {
