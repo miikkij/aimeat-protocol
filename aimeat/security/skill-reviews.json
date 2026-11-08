@@ -66,7 +66,7 @@
       "watches": [
         "aimeat/src/services/model-recommendation.ts"
       ],
-      "digest": "sha256:428ce0d34c2be672cf05834a",
+      "digest": "sha256:151344e28d26294c42633854",
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
@@ -553,7 +553,7 @@
       "aimeat/src/services/open-items.ts": "43236657d5a52e6f"
     },
     "node:aimeat-first-conversation": {
-      "aimeat/src/services/model-recommendation.ts": "bcdcc9d3bce636f6"
+      "aimeat/src/services/model-recommendation.ts": "6fcabd4bfc91255b"
     },
     "node:aimeat-welcome-pages": {
       "aimeat/src/mcp/portfolio.ts": "604995ccbf786988"
