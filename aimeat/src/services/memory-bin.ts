@@ -21,6 +21,9 @@
  *   deleteMemoryRecord() · restoreLevel() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-11-08 — restoreMemoryRecord asks the key ceiling and byte quota (flipWithinCeilings): a
+ *     restore that would take the principal past one answers 413 QUOTA_EXCEEDED naming the setting,
+ *     and the record stays in the bin (secaudit2026nov08 round 14).
  *   2026-11-04 — An operator's ?owner= naming an account's service namespace is refused with
  *     SERVICE_RECORD, for delete and restore (codebase analysis 2026-11-03, item B6).
  *   2026-10-31 — A restore lowered on a closed node stores its level in the same UPDATE that clears
@@ -96,13 +99,14 @@ import { closedNodeLevel } from './closed-node-level.js';
 import type { MemoryRecord } from '../storage/interface.js';
 import { isServiceNamespace } from '../utils/service-namespace.js';
 import { serviceRecordRefusal } from '../utils/own-door-keys.js';
+import { flipWithinCeilings } from './memory-ceilings.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
 export interface MemoryBinRefusal {
   ok: false;
   code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
-    | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD'
+    | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | 'SERVICE_RECORD' | 'QUOTA_EXCEEDED'
     | LegacyPacingWriteRefusal['code'];
   message: string;
   /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
@@ -478,7 +482,17 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
   // is stored by the same UPDATE that clears the tombstone, so the record is never readable at the
   // level it went in at (secaudit 2026-10-31 inv-24).
   const lowered = level && level !== visibility ? level : undefined;
-  if (!found || !(await deps.storage.restoreMemory(found, req.key, lowered))) {
+  // A restored key counts toward its principal's key ceiling again, so the restore asks it as a write
+  // does, and the record stays in the bin when it would pass it (secaudit2026nov08 round 14).
+  let restored = false;
+  if (found) {
+    const owner = found;
+    const kept = await flipWithinCeilings(deps, [owner], () => deps.storage.restoreMemory(owner, req.key, lowered),
+      { act: `Putting "${req.key}" back`, stays: 'It stays in the bin until its grace window ends.' });
+    if (!kept.ok) return { ok: false, code: kept.refusal.code, message: kept.refusal.message, status: kept.refusal.status };
+    restored = kept.value;
+  }
+  if (!found || !restored) {
     return {
       ok: false, code: 'NOT_RESTORABLE',
       message: 'There is nothing of that name waiting to be put back. Either it was never deleted, or it has already been removed for good.',

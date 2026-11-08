@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-08 — Sections 4 and 5: a restore and an unarchive answer QUOTA_EXCEEDED past the memory key
+ *     limit or quota (secaudit2026nov08 round 14, services/memory-ceilings.ts flipWithinCeilings).
  *   2026-11-05 — Section 2: an imported entry at `group` keeps its record's group, or is stored private (routes/memory/bulk.ts).
  *   2026-11-02 — Section 6: erasure removes the person's own MCP servers and their own sign-ins on
  *     shared ones (owner-erasure.ts step mcp_user_credentials).
@@ -217,7 +219,10 @@ What an export leaves out, and why:
   \`memory:write\`. \`NOT_RESTORABLE\` means it was never deleted, is not theirs, or the window closed.
   \`MORSEL_PRICE_REMOVED\` means the record is an app tool manifest or an offers document that still
   holds the old morsel price: it stays in the bin, and the person writes it again with the pacing
-  amount (\`tollMorsels\`) instead.
+  amount (\`tollMorsels\`) instead. \`QUOTA_EXCEEDED\` means putting it back would take its holder past
+  the node's memory key limit or memory quota, the same limits a write answers to: it stays in the
+  bin, and the message names the setting. Fold small records into one, remove what is no longer
+  needed, or ask the operator to raise the limit.
 - Payment holds and beneficiary shares (\`commerce.hold.\`, \`commerce.hold-in.\`, \`commerce.benefit.\`)
   are written only by the payment routes. The person, signed in themselves, may delete one of theirs to
   clear a finished hold away; an agent may not, and a deleted one does not come back from the bin
@@ -285,7 +290,9 @@ let knowledge age, and you should offer them, not wait to be asked:
   workspace, space or one record) makes it read-only and takes it out of overviews, lists and search,
   while it stays readable by key. Read-only holds on every write: a write, an update of a version
   (what the Memory page and an app's update use) and a tag or visibility change all answer
-  \`ARCHIVED\` until it is unarchived. \`action: "unarchive"\` brings it back as it was. Only the
+  \`ARCHIVED\` until it is unarchived. \`action: "unarchive"\` brings it back as it was, unless that would
+  take someone past the memory key limit or memory quota: then nothing comes back and the answer is
+  \`QUOTA_EXCEEDED\`, naming the setting. Only the
   organism's creator or an admin archives or brings back, in person or through one of their own
   agents; an agent attached to the organism is refused whoever its owner is, on REST and over MCP alike. Use it for a
   finished project, not for something wrong; wrong things are deleted.

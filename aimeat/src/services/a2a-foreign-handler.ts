@@ -34,6 +34,11 @@
  * @structure ForeignA2AHandler
  * @usage new ForeignA2AHandler(storage, config, agent, peer, card, payment)
  * @version-history
+ *   2026-11-08 -- A paid turn claims the work before it collects, so two turns for one quote collect
+ *     once; a payment collected whose paid record cannot be written is refunded or kept as undelivered
+ *     for the seller and the operator, and the caller is told not to pay again; a cancel is written on
+ *     the version it read (secaudit2026nov08 round 14, continueWork:no-claim-before-collect,
+ *     continueWork:settled-payment-failed-write-unrecorded).
  *   2026-11-04 -- The paid work record and the sale's booking commit in one transaction
  *     (settleSessionlessSale, commerce/settle-purchase.ts; codebase analysis 2026-11-03, item B2).
  *   v1.3.0 -- 2026-10-27 -- The provider's paid-work notice says where the caller's key is published
@@ -63,7 +68,12 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { fromA2APart } from './a2a-projection.js';
 import { findSellableOffering, priceForForeignCaller, A2A_X402_EXTENSION } from './a2a-offering.js';
 import type { ForeignPeer } from './a2a-foreign.js';
-import { newWorkId, putWork, getWork, type AgentWork } from './exchange-work.js';
+import {
+  newWorkId, putWork, getWork, isOpenForPayment, claimWorkForPayment, settleWorkPayment, releaseWorkPayment,
+  cancelOpenWork, type AgentWork,
+} from './exchange-work.js';
+import { refundCollected, refundSentence, recordUndeliveredPayment } from '../commerce/undelivered-payment.js';
+import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
 import { getPaymentHandler } from '../commerce/payment-handlers.js';
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
 import { PossiblePaymentError, recordPossiblePayment } from '../commerce/possible-payment.js';
@@ -136,7 +146,8 @@ function workAsTask(work: AgentWork, quoted?: Record<string, unknown> | null): T
   const line = work.state === 'delivered' ? 'Delivered.'
     : work.state === 'cancelled' ? 'Cancelled.'
       : quoted ? 'Payment required before this starts.'
-        : 'Accepted and waiting for the agent.';
+        : work.state === 'paying' ? 'A payment for this work is being settled.'
+          : 'Accepted and waiting for the agent.';
 
   const statusMessage: Message = {
     messageId: `${work.workId}:status`,
@@ -277,8 +288,7 @@ export class ForeignA2AHandler implements A2ARequestHandler {
    * quote and the payment is caught by the facilitator rather than honoured from a stale record.
    */
   private async continueWork(work: AgentWork, _message: Message): Promise<Task> {
-    if (work.state !== 'open') return workAsTask(work);
-    if (work.chargedUnits > 0) return workAsTask(work);
+    if (!isOpenForPayment(work)) return workAsTask(work);
 
     const resource = `${this.config.baseUrl}/v1/a2a/${encodeURIComponent(this.agent.owner)}/${encodeURIComponent(this.agent.name)}`;
     const found = await findSellableOffering(this.storage, this.agent, work.offeringId);
@@ -323,6 +333,19 @@ export class ForeignA2AHandler implements A2ARequestHandler {
     // this road exactly as on the checkout one, so what the buyer signs for is the gross either way.
     const fee = percentFee(priced.price.amount, commerceFeePercent(this.config));
 
+    // THE WORK IS CLAIMED BEFORE THE MONEY MOVES (secaudit2026nov08 round 14). Of two paid turns for
+    // one quote at the same moment, one claims it on its record's version and collects; the other
+    // collects nothing. Work that is no longer open answers as it stands.
+    const { claimed, current } = await claimWorkForPayment(this.storage, work.workId);
+    if (!claimed) {
+      if (current && current.state !== 'paying') return workAsTask(current);
+      throw rpcError(A2A_FOREIGN_CODE.PAYMENT_UNAVAILABLE,
+        'Another payment for this work is being settled now. Nothing was taken for this message. Read the task with GetTask before you pay again.');
+    }
+
+    // Set once the collect returned: from there on the money has moved, and a failure is handled as a
+    // payment taken and not delivered, never as a refusal the caller may answer by paying again.
+    let collected: { trackingCode: string } | null = null;
     try {
       // VERIFY AND SETTLE THROUGH THE EXISTING HANDLER. Nothing about the money is decided here:
       // the facilitator says whether the payment is real and moves it, exactly as it does for a
@@ -343,6 +366,7 @@ export class ForeignA2AHandler implements A2ARequestHandler {
       );
 
       const trackingCode = receipt?.trackingCode ?? `x402_${work.workId}`;
+      collected = { trackingCode };
 
       // THE SELLER'S SIDE OF THE SALE, through the same two calls the checkout path makes: the
       // operator's fee as a receivable under the operator's own GHII, and then whoever the seller
@@ -350,19 +374,20 @@ export class ForeignA2AHandler implements A2ARequestHandler {
       // transaction belongs; nothing here creates an account for the buyer, and nothing here is a
       // second fee mechanism — it is `bookSessionlessSale`, which lives beside the checkout leg. Booked
       // in one transaction with the paid work record (settleSessionlessSale), so a work record that
-      // cannot be written leaves no sale booked.
-      const paid: AgentWork = {
-        ...work,
-        chargedUnits: priced.price.amount,
-        note: `${work.note} · paid ${trackingCode}`,
-      };
+      // cannot be written leaves no sale booked. The paid record is written only while this turn
+      // still holds the work's claim (settleWorkPayment).
       const booked = await settleSessionlessSale(this.storage, this.config, {
         gross: priced.price.amount, currency: priced.price.currency,
         sellerGhii: work.providerGhii, buyerRef: this.peer.gaii,
         ext: work.ext, action: work.action,
         trackingCode, handler: X402_HANDLER_ID,
         reference: `a2a:${work.workId}:${work.ext}:${work.action}`,
-      }, () => putWork(this.storage, paid));
+      }, () => settleWorkPayment(this.storage, claimed, cur => ({
+        ...cur,
+        chargedUnits: priced.price.amount,
+        note: `${cur.note} · paid ${trackingCode}`,
+      })));
+      const paid = booked.delivered;
 
       // NOW the provider hears about it. Telling them before the money arrived would be asking them
       // to start work a stranger had not paid for.
@@ -383,6 +408,14 @@ export class ForeignA2AHandler implements A2ARequestHandler {
       return workAsTask(paid);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      if (collected) {
+        // The money moved and the paid record was not written (secaudit2026nov08 round 14). The sale
+        // is booked in one transaction with that write, so nothing is booked; the payment is handed
+        // back when the rail can, else kept as undelivered for the seller and the operator, as the
+        // checkout and the party purchase do (commerce/undelivered-payment.ts).
+        return this.collectedNotWritten(claimed, priced.price.amount, priced.price.currency, collected.trackingCode, handler, psp?.value, message);
+      }
+      await releaseWorkPayment(this.storage, claimed).catch(e => logger.warn('a2a: could not release a payment claim', { workId: work.workId, error: String(e) }));
       logger.warn('a2a: a foreign payment did not settle', { workId: work.workId, peer: this.peer.gaii, error: message });
       // The payment service did not answer, so the money may have moved: the provider and the
       // operator are told and the message says not to pay again yet (commerce/possible-payment.ts).
@@ -403,6 +436,40 @@ export class ForeignA2AHandler implements A2ARequestHandler {
     }
   }
 
+  /**
+   * A paid turn whose payment was collected and whose paid record could not be written: ask the rail
+   * to refund, keep an undelivered payment for the seller and the operator when it cannot, put the
+   * work back to open, and answer with a refusal that says whether the money came back and, when it
+   * did not, not to pay again (secaudit2026nov08 round 14).
+   */
+  private async collectedNotWritten(
+    claim: AgentWork, amount: number, currency: string, trackingCode: string,
+    handler: PaymentHandler, psp: unknown, reason: string,
+  ): Promise<never> {
+    const reference = `a2a:${claim.workId}`;
+    const ctx = { storage: this.storage, config: this.config };
+    const refund = await refundCollected(ctx, handler, {
+      buyerGhii: this.peer.gaii, amount, trackingCode,
+      seller: { ghii: claim.providerGhii, owner: claim.providerOwner, psp },
+    });
+    await releaseWorkPayment(this.storage, claim)
+      .catch(e => logger.warn('a2a: could not release a payment claim', { workId: claim.workId, error: String(e) }));
+    if (refund.outcome === 'failed' || refund.outcome === 'not_possible') {
+      await recordUndeliveredPayment(ctx, {
+        session: {
+          id: reference, buyerGhii: this.peer.gaii, sellerGhii: claim.providerGhii, total: amount, currency,
+          items: [{ title: `"${claim.taskType}" from your agent ${this.agent.name}, bought over A2A by ${this.peer.displayName}` }],
+        } as unknown as CheckoutSessionRecord,
+        trackingCode, rail: X402_HANDLER_ID, refund, reason,
+      });
+    }
+    logger.error('a2a: a foreign payment was collected and the paid work was not written', {
+      workId: claim.workId, peer: this.peer.gaii, trackingCode, refund: refund.outcome, error: reason,
+    });
+    throw rpcError(A2A_FOREIGN_CODE.PAYMENT_UNAVAILABLE,
+      `The payment was taken and the work could not be recorded. ${refundSentence(refund, reference)}`);
+  }
+
   async getTask(params: GetTaskRequest, _ctx: ServerCallContext): Promise<Task> {
     const work = await this.ownWork(params.id);
     return workAsTask(work);
@@ -410,19 +477,22 @@ export class ForeignA2AHandler implements A2ARequestHandler {
 
   async cancelTask(params: CancelTaskRequest, _ctx: ServerCallContext): Promise<Task> {
     const work = await this.ownWork(params.id);
-    if (work.state !== 'open') {
-      throw new JsonRpcTaskNotCancelableError({ message: `This work is ${work.state} and does not change now.` });
-    }
-    if (work.chargedUnits > 0) {
+    // Written on the version read, so a paid turn that claimed the work in the meantime keeps it
+    // (secaudit2026nov08 round 14).
+    const { cancelled, current } = await cancelOpenWork(this.storage, work.workId);
+    if (cancelled && current) return workAsTask(current);
+    const now = current ?? work;
+    if (now.state === 'open' && now.chargedUnits > 0) {
       // Paid work is the provider's to finish or refund; a buyer cancelling it unilaterally would
       // be taking the money back through a door that has no refund behind it.
       throw new JsonRpcTaskNotCancelableError({
         message: 'This work is paid for. Ask the provider to settle or refund it.',
       });
     }
-    const cancelled: AgentWork = { ...work, state: 'cancelled' };
-    await putWork(this.storage, cancelled);
-    return workAsTask(cancelled);
+    if (now.state === 'paying') {
+      throw new JsonRpcTaskNotCancelableError({ message: 'A payment for this work is being settled now. Read it again in a moment.' });
+    }
+    throw new JsonRpcTaskNotCancelableError({ message: `This work is ${now.state} and does not change now.` });
   }
 
   async listTasks(_p: ListTasksRequest, _c: ServerCallContext): Promise<ListTasksResponse> {

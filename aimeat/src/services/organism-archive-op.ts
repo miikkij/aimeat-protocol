@@ -20,11 +20,15 @@
  *   const out = await organismArchiveOp({ storage, config }, caller, organismId, 'archive', body);
  *   if (!out.ok) render(out.status, out.code, out.message, out.details);
  * @version-history
+ *   2026-11-08 — An unarchive asks the memory key ceiling and byte quota of every principal it returns
+ *     rows to, and is rolled back with a refusal that names the setting (secaudit2026nov08 round 14,
+ *     services/memory-ceilings:count-returning-transitions-skip-ceiling).
  *   v1.0.0 — 2026-10-16 — Initial, out of routes/organisms/shared.ts archiveHandler and mcp/organisms.ts (QA audit D2-08).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { archiveTarget, unarchiveTarget, archiveRoleOf, type ArchiveLevel, type ArchiveTarget } from './archive.js';
+import { archiveTarget, unarchiveTarget, archiveRoleOf, archivedOwnersUnder, type ArchiveLevel, type ArchiveTarget } from './archive.js';
+import { flipWithinCeilings } from './memory-ceilings.js';
 import { archiveFenceTarget, fencedSpaceRefusal } from './fenced-space.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { emitChange } from './event-bus.js';
@@ -85,9 +89,19 @@ export async function organismArchiveOp(
   }
   let result;
   try {
-    result = mode === 'archive'
-      ? await archiveTarget(storage, v.target, caller.principal)
-      : await unarchiveTarget(storage, v.target, caller.principal);
+    if (mode === 'archive') {
+      result = await archiveTarget(storage, v.target, caller.principal);
+    } else {
+      // An unarchive returns rows to their principals' key counts (and, on PostgreSQL, bytes), so it
+      // asks the same limits a write asks, and is rolled back whole when it would pass one
+      // (secaudit2026nov08 round 14).
+      const target = v.target;
+      const kept = await flipWithinCeilings(deps, await archivedOwnersUnder(storage, target),
+        () => unarchiveTarget(storage, target, caller.principal),
+        { act: 'Bringing this back from the archive', stays: 'It stays archived.' });
+      if (!kept.ok) return { ok: false, status: kept.refusal.status, code: kept.refusal.code, message: kept.refusal.message };
+      result = kept.value;
+    }
   } catch (e) {
     return { ok: false, status: 400, code: 'ARCHIVE_FAILED', message: (e as Error).message || `Could not ${mode}` };
   }

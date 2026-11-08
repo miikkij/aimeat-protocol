@@ -12767,6 +12767,7 @@
     "cfg_mcp_capability_use_approval": "Preguntar antes de que la herramienta de otra cuenta use la sesión de una persona",
     "cfg_mcp_unused_client_days": "Registros de clientes sin uso (días)",
     "cfg_mcp_legacy_sessions_per_principal": "Sesiones MCP del protocolo antiguo por IA o persona",
+    "cfg_mcp_legacy_sessions_per_owner": "Sesiones MCP del protocolo antiguo por persona y sus IA",
     "cfg_mcp_legacy_sessions_total": "Sesiones MCP del protocolo antiguo en total",
     "cfg_storage_request_statement_ms": "Límite de una consulta a la base de datos al responder (ms)",
     "cfg_registration_mode": "Quién puede registrarse",
@@ -13121,6 +13122,7 @@
     "cfgDesc_mcp_capability_use_approval": "En algunos servidores MCP cada persona inicia sesión con su propia cuenta. Allí, una capacidad que publicó otra cuenta actúa como la persona que la usa. Preguntar siempre: el primer uso de cada capacidad de otra cuenta le pregunta una vez a esa persona, con una pulsación; cada capacidad nueva cuesta una pulsación, también las del operador. Preguntar, salvo las herramientas de los operadores (predeterminado): la capacidad de un operador se ejecuta sin preguntar, y la de cualquier otra cuenta pregunta una vez; el operador ya tiene todos los permisos aquí, así que no se pierde protección. Apagado: no se pregunta nada, y la persona ya no decide qué herramienta actúa en su nombre. El cambio se aplica enseguida. Una IA puede hacerlo más estricto, nunca menos.",
     "cfgDesc_mcp_unused_client_days": "Un registro de cliente MCP con el que nadie inició sesión se borra pasados estos días. Un cliente con el que alguien inició sesión se conserva. 0 conserva todos los registros.",
     "cfgDesc_mcp_legacy_sessions_per_principal": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener una IA o una persona. Al pasar el límite, una sesión nueva cierra la que lleva más tiempo sin usarse, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
+    "cfgDesc_mcp_legacy_sessions_per_owner": "Cuántas sesiones abiertas del protocolo MCP antiguo pueden tener en total una persona y todas sus IA. Al pasar el límite, una sesión nueva cierra la suya que lleva más tiempo sin usarse, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
     "cfgDesc_mcp_legacy_sessions_total": "Cuántas sesiones abiertas del protocolo MCP antiguo puede tener todo el servidor. Cada una guarda en memoria su propia copia de la lista de herramientas. Al pasar el límite, una sesión nueva cierra la que lleva más tiempo sin usarse, y esa aplicación vuelve a conectarse sola. 0 significa sin límite.",
     "cfgDesc_storage_request_statement_ms": "En PostgreSQL, cuánto puede durar una consulta a la base de datos mientras el servidor responde a una página, una aplicación o una IA. Una consulta más larga se detiene y esa petición falla. Las tareas programadas conservan el límite propio de la base de datos, de 120 segundos. El valor por defecto 120000 es ese mismo límite. 0 significa sin límite.",
     "cfgDesc_registration_mode": "Quién puede tener cuenta nueva: open (todos), oauth (primer inicio por un proveedor de identidad, o invitación — sin registro por contraseña), invite (solo invitaciones de miembros), closed (nadie). Las cuentas existentes siempre entran.",
@@ -28518,6 +28520,15 @@
           "low": "Menor: una aplicación que tiene muchas sesiones abiertas pierde antes las más antiguas y vuelve a conectarse.",
           "high": "Mayor: una IA o una persona puede tener más sesiones abiertas, y usan más memoria.",
           "tip": "Deja el valor por defecto. Una aplicación usa una sesión a la vez, así que una IA real no llega a 100."
+        },
+        "legacy_sessions_per_owner": {
+          "title": "Sesiones MCP del protocolo antiguo por persona y sus IA",
+          "short": "Cuántas sesiones abiertas del protocolo MCP antiguo pueden tener en total una persona y todas sus IA. 0 significa sin límite. El valor por defecto es 300.",
+          "what": "Una persona puede conectar muchas IA, y cada IA que usa el protocolo MCP antiguo (2025) tiene sus propias sesiones con este servidor. Este límite cuenta juntas las sesiones de una persona y de todas sus IA. Cuando abren una sesión por encima de este número, el servidor cierra su sesión que lleva más tiempo sin usarse. Las sesiones de otras personas no se cierran por ello. Esa aplicación recibe la respuesta de que la sesión ya no existe y vuelve a conectarse sola.",
+          "range": "Un número entero, 0 o más. El valor por defecto es 300. 0 significa sin límite.",
+          "low": "Menor: una persona con muchas IA pierde antes sus sesiones más antiguas, y esas aplicaciones vuelven a conectarse.",
+          "high": "Mayor: una persona y sus IA pueden tener más sesiones abiertas, y usan más memoria.",
+          "tip": "Deja el valor por defecto. Súbelo solo para una persona que usa a la vez muchas IA con el protocolo antiguo."
         },
         "legacy_sessions_total": {
           "title": "Sesiones MCP del protocolo antiguo en total",

@@ -13,6 +13,7 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   2026-11-08 — mcpLegacySessionsPerOwner (secaudit2026nov08 round 14, mcp-legacy-session-node-cap-evicts-other-owners).
  *   2026-11-04 — dbRequestStatementMs (codebase analysis 2026-11-03, item C8), mcpLegacySessionsPerPrincipal
  *     and mcpLegacySessionsTotal (item C5).
  *   2026-10-31 — scheduleMaxPerOwner, scheduleMinIntervalSeconds and realtimeRoomsPerOwner
@@ -136,9 +137,15 @@ export interface NodeLimitsConfig {
    */
   mcpLegacySessionsPerPrincipal: number;
   /**
+   * The most 2025-era MCP sessions one account's principals keep open together (the owner and all of
+   * their agents). Past it, a new session closes that account's least recently used one.
+   * AIMEAT_MCP_LEGACY_SESSIONS_PER_OWNER, default 300; 0 is no limit (secaudit2026nov08 round 14).
+   */
+  mcpLegacySessionsPerOwner: number;
+  /**
    * The most 2025-era MCP sessions the node keeps open in all. Past it, a new session closes the least
-   * recently used one. AIMEAT_MCP_LEGACY_SESSIONS_TOTAL, default 1000; 0 is no limit (codebase
-   * analysis 2026-11-03, item C5).
+   * recently used one of the account holding the most sessions. AIMEAT_MCP_LEGACY_SESSIONS_TOTAL,
+   * default 1000; 0 is no limit (codebase analysis 2026-11-03, item C5; secaudit2026nov08 round 14).
    */
   mcpLegacySessionsTotal: number;
 }
@@ -168,6 +175,7 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     realtimeRoomsPerOwner: wholeOr(env.AIMEAT_REALTIME_ROOMS_PER_OWNER, 50),
     dbRequestStatementMs: wholeOr(env.AIMEAT_DB_REQUEST_STATEMENT_MS, 120_000),
     mcpLegacySessionsPerPrincipal: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_PER_PRINCIPAL, 100),
+    mcpLegacySessionsPerOwner: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_PER_OWNER, 300),
     mcpLegacySessionsTotal: wholeOr(env.AIMEAT_MCP_LEGACY_SESSIONS_TOTAL, 1000),
   };
 }

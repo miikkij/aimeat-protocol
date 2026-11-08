@@ -31,6 +31,10 @@
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   2026-11-08 — A renewal claims its period on the record's version before the card is charged, so
+ *     two renewals of one period at the same moment (two daily runs, or the buyer's allow of a raised
+ *     price beside the daily run) charge and extend it once (secaudit2026nov08 round 14,
+ *     subscriptions:renewal-deliver-not-bound-to-period).
  *   2026-11-04 — A renewal's write and its beneficiary booking commit in one transaction
  *     (commerce/settle-purchase.ts; codebase analysis 2026-11-03, item B2).
  *   v1.2.1 — 2026-10-27 — A plan whose period got shorter at an amount that does not fall with it is a
@@ -102,6 +106,8 @@ export interface SubscriptionRecord {
   last_failure?: { at: string; reason: string };
   /** The buyer was asked about a raised price for this period (commerce/subscription-price-ask.ts). */
   price_question?: SubscriptionPriceQuestion;
+  /** The renewal charging this period now: its reference and when it claimed the period (claimPeriod). */
+  renewing?: { reference: string; at: string };
   updated_at: string;
 }
 
@@ -262,6 +268,38 @@ export async function runSubscriptionRenewals(storage: Storage, config: AimeatCo
 const renewalReference = (sub: SubscriptionRecord) => `subrenew:${sub.buyer_ghii}:${sub.ext}:${sub.plan}:${sub.active_until}`;
 
 /**
+ * How long a renewal's claim on its period holds. A run whose process ended during the charge leaves
+ * the claim behind; after this the period may be claimed again (the charge's reference keys it for
+ * idempotency at a payment provider that supports it).
+ */
+const RENEWAL_CLAIM_HOLD_MS = 60 * 60_000;
+
+/**
+ * Claim the period `sub` was read in, for the renewal `reference`, before its card is charged
+ * (secaudit2026nov08 round 14). Written on the record's version, and refused when the period was
+ * renewed already, has moved on, or another renewal holds a live claim on it. Of two callers that read
+ * the same period (two daily runs, or the buyer's allow beside the daily run), one claims and charges.
+ */
+async function claimPeriod(storage: Storage, sub: SubscriptionRecord, reference: string): Promise<boolean> {
+  const out = { claimed: false };
+  await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => {
+    const held = cur?.renewing && Date.now() - Date.parse(cur.renewing.at) < RENEWAL_CLAIM_HOLD_MS;
+    out.claimed = !!cur && cur.active_until === sub.active_until && cur.last_order !== reference && !held;
+    if (!out.claimed) return UNCHANGED;
+    const at = new Date().toISOString();
+    return { ...cur!, renewing: { reference, at }, updated_at: at };
+  }, { tag: SUBSCRIPTION_ACTION });
+  return out.claimed;
+}
+
+/** The record without a renewal's claim on its period. */
+function withoutClaim(rec: SubscriptionRecord): SubscriptionRecord {
+  const out = { ...rec };
+  delete out.renewing;
+  return out;
+}
+
+/**
  * The buyer allowed the raised price they were asked about (publish-requests/apply-subscription-
  * price.ts): it becomes the amount they agreed to, and the period renews now rather than at the next
  * daily run. Refused when the subscription, its period or the plan's price is no longer what was asked.
@@ -301,6 +339,11 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
         cur => ({ ...(cur ?? sub), price_question: q, updated_at: new Date().toISOString() }), { tag: SUBSCRIPTION_ACTION });
     });
   }
+  // The period is claimed before the charge: another renewal of the same period at the same moment
+  // charges nothing (secaudit2026nov08 round 14).
+  if (!await claimPeriod(storage, sub, reference)) {
+    return { result: 'skipped', detail: 'already renewed, or being renewed, for this period' };
+  }
   const seller = { ghii: sellerGhii, owner: ext.installedBy, psp: (await storage.getMemory(sellerGhii, 'commerce.psp'))?.value ?? undefined };
   // A plan an agent bought renews as that agent's purchase, held to the daily limit its owner set,
   // checked and counted in one step right before the charge and given back when the charge fails, as
@@ -321,8 +364,9 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
     const overLimit = err instanceof CommerceError && err.code.startsWith('PURCHASE_LIMIT_');
     const reason = err instanceof CommerceError ? `${err.code}: ${err.message}` : err instanceof Error ? err.message : String(err);
     const told = sub.last_failure?.reason.startsWith(`[${sub.active_until}]`);
+    // The claim ends with the failed charge, so the next daily run tries the period again.
     await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
-      ...(cur ?? sub), last_failure: { at: new Date().toISOString(), reason: `[${sub.active_until}] ${reason}` }, updated_at: new Date().toISOString(),
+      ...withoutClaim(cur ?? sub), last_failure: { at: new Date().toISOString(), reason: `[${sub.active_until}] ${reason}` }, updated_at: new Date().toISOString(),
     }), { tag: SUBSCRIPTION_ACTION });
     if (!told) {
       const date = sub.active_until.slice(0, 10);
@@ -344,7 +388,7 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
   const { delivered: renewed } = await settlePurchase(storage, config, {
     from: 'paid',
     deliver: () => updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
-      ...(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
+      ...withoutClaim(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
       active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
       last_order: reference, updated_at: new Date().toISOString(),
     }), { tag: SUBSCRIPTION_ACTION }),

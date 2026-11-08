@@ -13647,6 +13647,7 @@
     "cfg_mcp_capability_use_approval": "Ask before another account's tool uses a person's sign-in",
     "cfg_mcp_unused_client_days": "Unused client registrations (days)",
     "cfg_mcp_legacy_sessions_per_principal": "Older MCP sessions per AI or person",
+    "cfg_mcp_legacy_sessions_per_owner": "Older MCP sessions per person and their AIs",
     "cfg_mcp_legacy_sessions_total": "Older MCP sessions in all",
     "cfg_storage_request_statement_ms": "Database query limit while answering (ms)",
     "cfg_registration_mode": "Who may register",
@@ -14001,6 +14002,7 @@
     "cfgDesc_mcp_capability_use_approval": "On some MCP servers each person signs in with their own account. There, a capability that another account published acts as the person who uses it. Always ask: the first use of each other account's capability asks that person once, with one press; each new capability costs a press, the operator's own too. Ask, except for operators' tools (default): an operator's capability runs without asking, and every other account's asks once; the operator already holds every right here, so this gives no protection away. Off: nothing asks, and the person loses the say over which tool acts as them. A change takes effect at once. An AI can make it stricter, never looser.",
     "cfgDesc_mcp_unused_client_days": "An MCP client registration that no sign-in used is deleted after this many days. A client someone signed in with stays. 0 keeps every registration.",
     "cfgDesc_mcp_legacy_sessions_per_principal": "How many open sessions of the older MCP protocol one AI or person keeps. A new session past it closes their least recently used one, and that app connects again by itself. 0 means no limit.",
+    "cfgDesc_mcp_legacy_sessions_per_owner": "How many open sessions of the older MCP protocol one person and all of their AIs keep together. A new session past it closes their least recently used one, and that app connects again by itself. 0 means no limit.",
     "cfgDesc_mcp_legacy_sessions_total": "How many open sessions of the older MCP protocol the whole server keeps. Each one holds its own copy of the tool list in memory. A new session past it closes the least recently used one, and that app connects again by itself. 0 means no limit.",
     "cfgDesc_storage_request_statement_ms": "On PostgreSQL, how long one database query may run while the server answers a page, an app or an AI. A longer query stops and that request fails. Scheduled jobs keep the database's own limit of 120 seconds. The default 120000 is that same limit. 0 means no limit.",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
@@ -30155,6 +30157,15 @@
           "low": "Lower: an app that keeps many sessions open loses its oldest ones sooner and connects again.",
           "high": "Higher: one AI or person can keep more sessions, and more memory, in use.",
           "tip": "Keep the default. One app uses one session at a time, so a real AI does not reach 100."
+        },
+        "legacy_sessions_per_owner": {
+          "title": "Older MCP sessions per person and their AIs",
+          "short": "How many open sessions of the older MCP protocol one person and all of their AIs keep together. 0 means no limit. The default is 300.",
+          "what": "A person can connect many AIs, and each AI that speaks the older MCP protocol (2025) keeps its own sessions with this server. This limit counts the sessions of one person and all of their AIs together. When they open a session past this number, the server closes their session that was unused the longest. Sessions of other people are not closed for it. That app gets an answer that the session is gone and connects again by itself.",
+          "range": "A whole number, 0 or more. The default is 300. 0 means no limit.",
+          "low": "Lower: a person with many AIs loses their oldest sessions sooner, and those apps connect again.",
+          "high": "Higher: one person and their AIs can keep more sessions, and more memory, in use.",
+          "tip": "Keep the default. Raise it only for a person who runs a large number of AIs on the older protocol at the same time."
         },
         "legacy_sessions_total": {
           "title": "Older MCP sessions in all",

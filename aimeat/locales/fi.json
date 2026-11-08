@@ -14384,6 +14384,7 @@
     "cfg_mcp_capability_use_approval": "Kysy ennen kuin toisen tilin työkalu käyttää henkilön kirjautumista",
     "cfg_mcp_unused_client_days": "Käyttämättömät asiakasrekisteröinnit (päivää)",
     "cfg_mcp_legacy_sessions_per_principal": "Vanhan MCP-protokollan sessiot tekoälyä tai ihmistä kohden",
+    "cfg_mcp_legacy_sessions_per_owner": "Vanhan MCP-protokollan sessiot ihmistä ja hänen tekoälyjään kohden",
     "cfg_mcp_legacy_sessions_total": "Vanhan MCP-protokollan sessiot yhteensä",
     "cfg_storage_request_statement_ms": "Tietokantakyselyn aikaraja vastattaessa (ms)",
     "cfg_registration_mode": "Kuka saa rekisteröityä",
@@ -14738,6 +14739,7 @@
     "cfgDesc_mcp_capability_use_approval": "Joillekin MCP-palvelimille jokainen kirjautuu omalla tilillään. Siellä toisen tilin julkaisema kyvykkyys toimii sen henkilön nimissä, joka käyttää sitä. Kysy aina: kun henkilö käyttää toisen tilin kyvykkyyttä ensimmäisen kerran, häneltä kysytään kerran yhdellä painalluksella. Jokainen uusi kyvykkyys vaatii painalluksen, myös ylläpitäjän omat. Kysy, paitsi ylläpitäjien työkaluista (oletus): ylläpitäjän kyvykkyys toimii kysymättä, ja muiden tilien kyvykkyydet kysyvät kerran. Ylläpitäjällä on jo kaikki oikeudet tällä palvelimella, joten suojaa ei menetetä. Pois: mitään ei kysytä, eikä henkilö voi enää päättää, mikä työkalu toimii hänen nimissään. Muutos tulee voimaan heti. Tekoäly voi tiukentaa asetusta mutta ei löysentää sitä.",
     "cfgDesc_mcp_unused_client_days": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. Rekisteröinti, jolla joku on kirjautunut, säilyy. 0 säilyttää kaikki rekisteröinnit.",
     "cfgDesc_mcp_legacy_sessions_per_principal": "Montako vanhan MCP-protokollan sessiota yhdellä tekoälyllä tai ihmisellä voi olla auki. Kun raja ylittyy, uusi sessio sulkee heidän pisimpään käyttämättä olleen sessionsa, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
+    "cfgDesc_mcp_legacy_sessions_per_owner": "Montako vanhan MCP-protokollan sessiota yhdellä ihmisellä ja kaikilla hänen tekoälyillään voi olla yhteensä auki. Kun raja ylittyy, uusi sessio sulkee heidän pisimpään käyttämättä olleen sessionsa, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_mcp_legacy_sessions_total": "Montako vanhan MCP-protokollan sessiota koko palvelimella voi olla auki. Jokainen sessio pitää muistissa oman kopion työkalulistasta. Kun raja ylittyy, uusi sessio sulkee pisimpään käyttämättä olleen session, ja se sovellus yhdistää itse uudelleen. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_storage_request_statement_ms": "PostgreSQL-tietokannassa: kuinka kauan yksi tietokantakysely saa kestää, kun palvelin vastaa sivulle, sovellukselle tai tekoälylle. Pidempi kysely pysäytetään, ja se pyyntö epäonnistuu. Ajastetuilla töillä on tietokannan oma 120 sekunnin raja. Oletus 120000 on sama raja. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
@@ -30877,6 +30879,15 @@
           "low": "Pienempi: sovellus, joka pitää monta sessiota auki, menettää vanhimmat sessionsa aiemmin ja yhdistää uudelleen.",
           "high": "Suurempi: yksi tekoäly tai ihminen voi pitää enemmän sessioita auki, ja ne vievät enemmän muistia.",
           "tip": "Pidä oletus. Sovellus käyttää yhtä sessiota kerrallaan, joten oikea tekoäly ei yllä sataan."
+        },
+        "legacy_sessions_per_owner": {
+          "title": "Vanhan MCP-protokollan sessiot ihmistä ja hänen tekoälyjään kohden",
+          "short": "Montako vanhan MCP-protokollan sessiota yhdellä ihmisellä ja kaikilla hänen tekoälyillään voi olla yhteensä auki. 0 tarkoittaa, että rajaa ei ole. Oletus on 300.",
+          "what": "Ihminen voi yhdistää monta tekoälyä, ja jokaisella vanhaa MCP-protokollaa (2025) käyttävällä tekoälyllä on omat sessionsa tämän palvelimen kanssa. Tämä raja laskee yhteen yhden ihmisen ja kaikkien hänen tekoälyjensä sessiot. Kun he avaavat session tämän rajan yli, palvelin sulkee heidän sessionsa, jota ei ole käytetty pisimpään aikaan. Muiden ihmisten sessioita ei suljeta sen takia. Sovellus saa vastauksen, että sessio on poissa, ja yhdistää itse uudelleen.",
+          "range": "Kokonaisluku, 0 tai suurempi. Oletus on 300. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "Pienempi: ihminen, jolla on monta tekoälyä, menettää vanhimmat sessionsa aiemmin, ja ne sovellukset yhdistävät uudelleen.",
+          "high": "Suurempi: yksi ihminen tekoälyineen voi pitää enemmän sessioita auki, ja ne vievät enemmän muistia.",
+          "tip": "Pidä oletus. Nosta rajaa vain ihmiselle, joka käyttää yhtä aikaa hyvin montaa vanhan protokollan tekoälyä."
         },
         "legacy_sessions_total": {
           "title": "Vanhan MCP-protokollan sessiot yhteensä",

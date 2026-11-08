@@ -15,10 +15,12 @@
  *   `archived` on its entry in the `organism.{id}.meta.workspaces` registry; a record-table/space and a
  *   single record have no separate marker — their archived state is the flag on their rows, counted via
  *   countArchivedByKeyPrefix. The write guard (isKeyArchived) enforces read-only.
- * @structure ARCHIVE ROOT format; archiveTarget/unarchiveTarget; isKeyArchived; setRegistryWorkspaceArchived;
+ * @structure ARCHIVE ROOT format; archiveTarget/unarchiveTarget; archivedOwnersUnder; isKeyArchived; setRegistryWorkspaceArchived;
  *   archiveRoleOf (the creator-or-admin rule); archiveRecordsBatchOp (many records of one space)
  * @usage import { archiveTarget, unarchiveTarget, isKeyArchived } from '../services/archive.js';
  * @version-history
+ *   2026-11-08 — archivedOwnersUnder: the principals an unarchive can return rows to, whose memory
+ *     limits organism-archive-op.ts asks before the flip (secaudit2026nov08 round 14).
  *   v1.2.0 — 2026-10-13 — archiveRecordsBatchOp takes one more refusal for the keys it would archive
  *     and asks it before the first record is archived. The extension sandbox passes the fenced-space
  *     rule (services/fenced-space.ts): a record space that names extensions takes an agent's archive
@@ -143,6 +145,22 @@ export async function unarchiveTarget(storage: Storage, t: ArchiveTarget, actor:
     await setRegistryWorkspaceArchived(storage, t.orgId, t.ws!, false, actor, at);
   }
   return { root, count, level: t.level };
+}
+
+/**
+ * The principals holding archived rows under a target's key scope: every principal an unarchive of it
+ * can return rows to, and possibly more (organism-archive-op.ts asks their memory limits first).
+ */
+export async function archivedOwnersUnder(storage: Storage, t: ArchiveTarget): Promise<string[]> {
+  const { base } = keyScopeFor(t);
+  const owners = new Set<string>();
+  const page = 1000;
+  for (let offset = 0; ; offset += page) {
+    const { items } = await storage.listAllMemoryMeta({ prefix: base, archived: 'only', limit: page, offset });
+    for (const r of items) owners.add(r.ownerGaii);
+    if (items.length < page) break;
+  }
+  return [...owners];
 }
 
 export interface ArchivedState { archived: boolean; level?: ArchiveLevel; root?: string }
