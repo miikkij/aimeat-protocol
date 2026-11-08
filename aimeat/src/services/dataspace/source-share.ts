@@ -98,6 +98,7 @@ export async function endAgreementsOnEndedSources(deps: Deps, ownerGhii: string,
     return ended;
 }
 
+// process-local: nothing breaks; it only lets a second install in the same process replace the first, and every process installs its own at boot.
 let installed: (() => void) | null = null;
 
 /** Register the step with services/parties/shares.ts, once per process (a second call replaces the first). */

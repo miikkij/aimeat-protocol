@@ -349,6 +349,7 @@ async function packageShareTerms(
  * Dataspace modules import this file.
  */
 type SharesEndedHook = (storage: Storage, ownerGhii: string) => Promise<unknown>;
+// process-local: nothing breaks; every process registers the same steps at its own boot, and a step runs in the process that ended the share.
 const sharesEndedHooks = new Set<SharesEndedHook>();
 
 /** Register a step that runs after a share of an owner ended. Answers the function that removes it. */
