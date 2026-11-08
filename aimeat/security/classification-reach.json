@@ -1356,6 +1356,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, each entry gated by canReadWorkspace."
     },
+    "src/services/context/index-line.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-11-08 (wish-oma-konteksti): the person's own context records (context.*), listed to write their names and summaries into the MCP instructions and the handbook of that person's own connecting AI. Both callers pass the connecting principal's classification reader (readerForAgent), and the rows go through presentMemories before a line is written, so a context classified away from AI is not named; private contexts are left out for an agent, and a session without memory:read gets no index."
+    },
     "src/services/content/classes.ts": {
       "reads": {
         "getMemory": 2

@@ -184,6 +184,7 @@ import { stableToolSchemas } from './tool-schema-cache.js';
 import { shortenChatTools } from './chat-tool-text.js';
 import { instructionsFor } from './instructions.js';
 import { readBuildInputs } from '../services/mcp-build-inputs.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 import { mcpAudienceRefusal } from './oauth-binding.js';
@@ -282,7 +283,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // The person's contexts are named only to a session that can open them: one whose scopes
         // reach aimeat_memory_read (services/context/index-line.ts).
         const isAgent = parseGaiiLoose(agentGaii).agent !== '';
-        const reader = { readsMemory: !config.mcpEnforceScopes || scopeAllowsTool(scopes, 'aimeat_memory_read'), agentSession: isAgent };
+        const reader = {
+            readsMemory: !config.mcpEnforceScopes || scopeAllowsTool(scopes, 'aimeat_memory_read'),
+            agentSession: isAgent,
+            identity: agentGaii,
+            content: readerForAgent({ storage, config }, agentGaii, scopes),
+        };
         const { guidance, supportAnsweredBy, contexts } = await readBuildInputs(storage, config, owner, stateless, Date.now(), reader);
         // An agent's person can allow a missing permission with one press; an owner, an app and an
         // ecosystem app have no such page (services/permission-ask.ts).

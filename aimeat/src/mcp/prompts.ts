@@ -145,7 +145,8 @@ export function registerPromptsTools(
                 // cut the instructions before them. Only to a session that can open them.
                 const session = caller?.();
                 const contexts = session && session.has('memory:read')
-                    ? await contextIndexLine(storage, config, ownerName, parseGaiiLoose(getAgentGaii()).agent !== '')
+                    ? await contextIndexLine(storage, config, ownerName, parseGaiiLoose(getAgentGaii()).agent !== '', Date.now(),
+                        readerForAgent({ storage, config }, getAgentGaii(), session.scopes))
                     : null;
                 const text = [handbookForRole(which), skills, journey, contexts, guidance].filter(Boolean).join('\n\n');
                 return { content: [{ type: 'text' as const, text }] };

@@ -28,6 +28,7 @@ import { logger } from '../utils/logger.js';
 import { proactiveGuidance } from './proactive-mode.js';
 import { resolveSupportRoute } from './message-alias.js';
 import { contextIndexLine } from './context/index-line.js';
+import type { ContentReader } from './classification/reader.js';
 
 export interface BuildInputs { guidance: string | null; supportAnsweredBy: string | null; contexts: string | null }
 
@@ -36,17 +37,27 @@ export interface BuildInputs { guidance: string | null; supportAnsweredBy: strin
  * hold no memory:read, which then gets no index (it could open none of them); `agentSession`
  * hides the contexts the owner keeps private from an agent.
  */
-export interface BuildReader { readsMemory: boolean; agentSession: boolean }
+export interface BuildReader {
+    readsMemory: boolean;
+    agentSession: boolean;
+    /** The connecting principal, whose classification reader filters the index (one cache entry each). */
+    identity?: string;
+    /** That principal's classification reader (services/classification/reader.ts). */
+    content?: ContentReader;
+}
 
+// process-local: a second process builds its own index for a connecting session, from the same
+// storage, at most BUILD_INPUTS_TTL_MS apart; nothing is lost, as with guidanceByOwner.
 const contextsByReader = new Map<string, { at: number; value: string | null }>();
 
 async function readContexts(storage: Storage, config: AimeatConfig, owner: string | undefined, reader: BuildReader, cached: boolean, now: number): Promise<string | null> {
     if (!owner || !reader.readsMemory) return null;
-    if (!cached) return contextIndexLine(storage, config, owner, reader.agentSession);
-    const k = `${owner}\u0000${reader.agentSession ? 'a' : 'o'}`;
+    if (!cached) return contextIndexLine(storage, config, owner, reader.agentSession, now, reader.content);
+    // Per principal, because each has its own classification reader and its own scopes.
+    const k = `${owner}\u0000${reader.identity ?? ''}\u0000${reader.agentSession ? 'a' : 'o'}`;
     const hit = contextsByReader.get(k);
     if (hit && now - hit.at < BUILD_INPUTS_TTL_MS) return hit.value;
-    const value = await contextIndexLine(storage, config, owner, reader.agentSession);
+    const value = await contextIndexLine(storage, config, owner, reader.agentSession, now, reader.content);
     contextsByReader.set(k, { at: now, value });
     if (contextsByReader.size > 10_000) {
         for (const [key, v] of contextsByReader) if (now - v.at >= BUILD_INPUTS_TTL_MS) contextsByReader.delete(key);
