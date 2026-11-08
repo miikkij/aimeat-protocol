@@ -22,6 +22,8 @@
  * @structure keyCredentialsViewHtml(i, field) · wireKeyCredentialsStep(ctx) → { open(details) }
  * @usage import { keyCredentialsViewHtml, wireKeyCredentialsStep } from './modal-key-credentials.js';
  * @version-history
+ *   v1.1.0 — 2026-11-08 — A line says when an agent key handed out with the code before this sign-in
+ *     stopped at it (`agent_keys_ended`; secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14; the developer's ruling 1 of 2026-11-08).
  */
 import { escHtml } from './theme.js';
@@ -51,6 +53,7 @@ export function keyCredentialsViewHtml(i, field) {
   return '<div id="aimeat-key-view" class="aimeat-body" style="display:none">'
     + '<h3 class="aimeat-sub-title">' + escHtml(i.keyCredTitle || 'Your sign-in details') + '</h3>'
     + '<p class="aimeat-sub-desc">' + escHtml(i.keyCredDesc || 'The access code you received no longer works. From now on, sign in with this username and password. Save the password now: it is shown only here.') + '</p>'
+    + '<p id="aimeat-kc-agents" class="aimeat-hint" style="display:none">' + escHtml(i.keyCredAgentKeys || 'Before this sign-in, an email address was confirmed with the access code, and an agent key for this account was given out then. That key no longer works.') + '</p>'
     + '<p class="aimeat-hint">' + escHtml(i.usernameLabel || 'Username') + ': <code id="aimeat-kc-user" class="aimeat-ts-secret"></code> '
     + '<button type="button" class="aimeat-cancel" data-kc-copy="aimeat-kc-user">' + copy + '</button></p>'
     + '<p class="aimeat-hint">' + escHtml(i.passwordLabel || 'Password') + ': <code id="aimeat-kc-pass" class="aimeat-ts-secret" style="font-size:16px"></code> '
@@ -84,7 +87,7 @@ export function keyCredentialsViewHtml(i, field) {
  * @param {Record<string, string>} ctx.i Modal strings.
  * @param {(view: string) => void} ctx.showView The modal's view switcher.
  * @param {() => void} ctx.onDone What the modal does when the person has seen the details.
- * @returns {{ open: (details: { credentials: { username: string, password: string }, jwt: string, continueTo?: string | null }) => void }}
+ * @returns {{ open: (details: { credentials: { username: string, password: string, agent_keys_ended?: number }, jwt: string, continueTo?: string | null }) => void }}
  */
 export function wireKeyCredentialsStep(ctx) {
   var i = ctx.i;
@@ -175,6 +178,8 @@ export function wireKeyCredentialsStep(ctx) {
       errEl.style.display = 'none';
       $('aimeat-kc-user').textContent = details.credentials.username;
       $('aimeat-kc-pass').textContent = details.credentials.password;
+      // An agent key handed out with the code before this sign-in stopped at it (agent_keys_ended).
+      $('aimeat-kc-agents').style.display = details.credentials.agent_keys_ended > 0 ? '' : 'none';
       ctx.showView('key');
       showAddress();
     },

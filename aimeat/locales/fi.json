@@ -19800,6 +19800,7 @@
     "twoStepExpired": "Aika ottaa kaksivaiheinen kirjautuminen käyttöön loppui. Kirjaudu uudelleen.",
     "keyCredTitle": "Kirjautumistietosi",
     "keyCredDesc": "Saamasi pääsykoodi ei enää toimi. Kirjaudu tästä lähtien tällä käyttäjänimellä ja salasanalla. Tallenna salasana nyt, sillä näet sen vain tässä.",
+    "keyCredAgentKeys": "Ennen tätä kirjautumista sähköpostiosoite vahvistettiin pääsykoodilla, ja silloin tälle tilille annettiin agentin avain. Se avain ei enää toimi.",
     "keyCredCopy": "Kopioi",
     "keyCredCopied": "Kopioitu",
     "keyCredPasskeyTitle": "Kirjaudu ilman salasanaa",

@@ -79515,6 +79515,8 @@ paths:
                               email_sent: { type: boolean, description: Whether the email with these details left now }
                               email_held: { type: boolean, description: 'Present when the address is not verified: true when the email waits for the address to be verified, false when this node cannot keep it to send later (no data key)' }
                               email_note: { type: string, description: Present with email_held. A sentence for the person about the email. }
+                              agent_keys_ended: { type: integer, description: 'Present when agent keys that POST /v1/ghii/verify-email or GET /v1/ghii/magic-link/verify handed out before this first sign-in stopped working at it (the agent was rekeyed and its earlier tokens end; the agent and its permissions stay): how many.' }
+                              agent_keys_note: { type: string, description: Present with agent_keys_ended. A sentence for the person. }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -79819,6 +79821,8 @@ paths:
                               username: { type: string, description: The exact sign-in name }
                               password: { type: string, description: The new password }
                               email_sent: { type: boolean, description: Always false }
+                              agent_keys_ended: { type: integer, description: 'Present when agent keys handed out before this first sign-in stopped working at it: how many.' }
+                              agent_keys_note: { type: string, description: Present with agent_keys_ended. A sentence for the person. }
                           continue_to: { type: string, nullable: true, description: Where the sign-in was going }
         '401':
           $ref: '#/components/responses/Unauthorized'

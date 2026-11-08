@@ -19063,6 +19063,7 @@
     "twoStepExpired": "The time to set up two-step sign-in has run out. Sign in again.",
     "keyCredTitle": "Your sign-in details",
     "keyCredDesc": "The access code you received no longer works. From now on, sign in with this username and password. Save the password now: it is shown only here.",
+    "keyCredAgentKeys": "Before this sign-in, an email address was confirmed with the access code, and an agent key for this account was given out then. That key no longer works.",
     "keyCredCopy": "Copy",
     "keyCredCopied": "Copied",
     "keyCredPasskeyTitle": "Sign in without a password",

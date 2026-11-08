@@ -17877,6 +17877,7 @@
     "twoStepExpired": "Se acabó el tiempo para activar la verificación en dos pasos. Inicia sesión de nuevo.",
     "keyCredTitle": "Tus datos de acceso",
     "keyCredDesc": "El código de acceso que recibiste ya no funciona. A partir de ahora, inicia sesión con este nombre de usuario y esta contraseña. Guarda la contraseña ahora: solo se muestra aquí.",
+    "keyCredAgentKeys": "Antes de este inicio de sesión se confirmó una dirección de correo con el código de acceso, y entonces se entregó una clave de agente para esta cuenta. Esa clave ya no funciona.",
     "keyCredCopy": "Copiar",
     "keyCredCopied": "Copiado",
     "keyCredPasskeyTitle": "Inicia sesión sin contraseña",
