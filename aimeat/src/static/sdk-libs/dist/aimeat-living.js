@@ -5394,6 +5394,11 @@
       curl: 'curl.exe -X POST "' + address + '" -H "Content-Type: application/json" -H "Authorization: Bearer ' + bearer + '" --data-binary "@' + WINDOWS_BODY_FILE + '"'
     };
   }
+  var SAMPLE_MAX = 1e3;
+  function sampleParam(body) {
+    const json = JSON.stringify(body) || "";
+    return json && json.length <= SAMPLE_MAX ? "&sample=" + encodeURIComponent(json) : "";
+  }
   var OWNER_PLACEHOLDER = "<owner>";
   var KEY_PLACEHOLDER = "<your API key>";
   var TOKEN_PLACEHOLDER = "<your token>";
@@ -5419,7 +5424,7 @@
       signInNeeded: !owner,
       keyPlaceholder,
       ownerPlaceholder: OWNER_PLACEHOLDER,
-      settings: apex + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
+      settings: apex + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name) + sampleParam({ value: sample }),
       address,
       curl: "curl -X POST " + shellQuoted(address) + ' -H "Content-Type: application/json" -H "Authorization: Bearer ' + keyPlaceholder + '" -d ' + shellQuoted(JSON.stringify({ value: sample })),
       /** The same call for a Windows shell (windowsCall). `curl` above is for sh, bash and zsh. */

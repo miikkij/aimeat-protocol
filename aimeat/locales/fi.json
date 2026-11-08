@@ -821,7 +821,15 @@
       "tryLabel": "Kokeile",
       "aiLabel": "Tai anna tämä tekoälyllesi",
       "aiHint": "Palvelimen englanninkielinen lause tekoälylle. Se kertoo osoitteen ja sen, missä API-avain on, mutta ei itse API-avainta.",
-      "done": "Valmis, API-avain on tallessa"
+      "done": "Valmis, API-avain on tallessa",
+      "commandsBody": "Liitä toinen komennoista terminaaliin ja aja se. Komento kirjoittaa yhden koearvon sinne, minne tämä saapuva webhook kirjoittaa: {target}. Osoite, API-avain ja viesti ovat jo komennossa, joten sinun ei tarvitse muuttaa mitään.",
+      "commandsDryBody": "Liitä toinen komennoista terminaaliin ja aja se. Palvelin tarkistaa viestin kuten minkä tahansa viestin eikä tallenna mitään. Osoite, API-avain ja viesti ovat jo komennossa.",
+      "commandsDry": "Pelkkä koeajo, ei tallennusta (lisää ?dry_run=true)",
+      "bashLabel": "macOS, Linux tai Git Bash",
+      "psLabel": "Windows PowerShell",
+      "copyBash": "Kopioi macOS:lle ja Linuxille",
+      "copyPs": "Kopioi PowerShelliin",
+      "commandsOnce": "Komennoissa on API-avain. Ne näytetään vain nyt, kuten API-avainkin."
     },
     "dry": {
       "title": "Koeajo ilman tallennusta",

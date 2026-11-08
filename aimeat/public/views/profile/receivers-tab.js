@@ -14,13 +14,18 @@
  *   (the approve_url the propose call answers); `?receiver=<name>` opens one receiver's page;
  *   `?new=key&key=<memory key>&name=<suggested name>` opens the form with "one memory key" chosen and
  *   both filled in, each only when it passes the server's own check (the living documents' inward
- *   gear links here). The words are taken off the address once read, so a reload does not reopen them.
+ *   gear links here); `&sample=<JSON>` on that address is the value's current reading, taken only as
+ *   the example message of the ready commands after that create (commands.js sampleFromAddress).
+ *   The words are taken off the address once read, so a reload does not reopen them.
  *
  *   LIVE: the node announces every management change as the `receivers` domain on the SSE stream;
  *   deliveries are read when the receiver's page opens and on its Refresh action, never on a timer.
  * @structure ReceiversTab() — state + handlers → renderReceiversView(ctx)
  * @usage registered in profile.js TABS as id 'receivers'.
  * @version-history
+ *   v1.1.0 — 2026-11-09 — The key-once dialog carries the example message of its ready commands (the
+ *     CSM's, the address's `sample`, or the default) and the switch that adds ?dry_run=true; the test
+ *     box starts with the same message (secaudit2026nov08b round 15d).
  *   v1.0.0 — 2026-11-07 — Initial.
  */
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -33,6 +38,7 @@ import { swallowed } from '/js/swallowed.js';
 import { renderReceiversView } from './receivers/cover.js';
 import { x, api, LIMITS, validName, validKey, slugOf, dryRun, refusalWords } from './receivers/frame.js';
 import { formErrors, bodyOf } from './receivers/dialogs.js';
+import { exampleBody, sampleFromAddress } from './receivers/commands.js';
 
 const SAMPLE = '{"temperature": 21.4, "at": "2026-11-07T10:40:00Z"}';
 
@@ -54,9 +60,9 @@ const emptyForm = () => ({
 function takeAddressWords() {
   const url = new URL(window.location.href);
   const p = url.searchParams;
-  const got = { approve: p.get('approve'), receiver: p.get('receiver'), newKind: p.get('new'), key: p.get('key'), name: p.get('name') };
+  const got = { approve: p.get('approve'), receiver: p.get('receiver'), newKind: p.get('new'), key: p.get('key'), name: p.get('name'), sample: p.get('sample') };
   let changed = false;
-  for (const k of ['approve', 'receiver', 'new', 'key', 'name']) if (p.has(k)) { p.delete(k); changed = true; }
+  for (const k of ['approve', 'receiver', 'new', 'key', 'name', 'sample']) if (p.has(k)) { p.delete(k); changed = true; }
   if (changed) history.replaceState(null, '', url);
   return got;
 }
@@ -69,6 +75,9 @@ export default function ReceiversTab({ session, showToast }) {
   const toast = (msg, isError) => showToast?.(msg, isError);
 
   const [asked] = useState(takeAddressWords);
+  // The living document's sample (`&sample=`): only ever the example message of the ready commands
+  // after the create the gear opened, and gone with the first key dialog.
+  const gearSample = useRef(asked.newKind === 'key' ? sampleFromAddress(asked.sample || '') : '');
   const [list, setList] = useState(null);
   const [mode, setMode] = useState('self');
   const [failed, setFailed] = useState(false);
@@ -176,8 +185,29 @@ export default function ReceiversTab({ session, showToast }) {
     finally { setBusy(false); }
   };
 
-  /** The key-once dialog for an answer that carries a key. */
-  const showKey = (out, rotated) => setDialog({ kind: 'key', receiver: out.receiver, key: out.key, say: out.say || '', rotated, testBody: SAMPLE, test: null, testing: false });
+  /**
+   * The key-once dialog for an answer that carries a key. Its ready commands carry an example message:
+   * from the data description (CSM) the incoming webhook checks against, read here with the owner's
+   * session; else the sample the page was opened with; else the default. The test box starts with
+   * the same message. The key stays in this dialog's state only.
+   */
+  const showKey = (out, rotated) => {
+    const r = out.receiver;
+    const fallback = exampleBody({ sample: gearSample.current });
+    gearSample.current = '';
+    const csm = r?.schema;
+    setDialog({
+      kind: 'key', receiver: r, key: out.key, say: out.say || '', rotated, test: null, testing: false,
+      example: csm ? null : fallback, testBody: csm ? SAMPLE : fallback, commandsDry: false,
+    });
+    if (!csm) return;
+    const settle = (example) => setDialog((d) => (d && d.kind === 'key' && d.key === out.key
+      ? { ...d, example, testBody: d.testBody === SAMPLE ? example : d.testBody } : d));
+    api.csmVersion(csm.csm, csm.version)
+      .then((v) => settle(v?.json_schema ? exampleBody({ jsonSchema: v.json_schema }) : fallback))
+      .catch((e) => { swallowed('receivers-tab: csm example', e); settle(fallback); });
+  };
+  const setCommandsDry = (on) => setDialog((d) => (d && d.kind === 'key' ? { ...d, commandsDry: !!on } : d));
   const setTestBody = (v) => setDialog((d) => (d && d.kind === 'key' ? { ...d, testBody: v } : d));
   const runDryRun = async () => {
     const d = dialog;
@@ -257,7 +287,7 @@ export default function ReceiversTab({ session, showToast }) {
     owner, ownerGhii, list, mode, failed, reload: load, view, detail, detailFailed, deliveries, loadingDeliveries, filter, setFilter,
     dialog, setDialog, closeDialog: () => setDialog(null), busy, csms, pickers, ConfirmUI,
     openCover, openDetail, openCreate: () => openCreate(), setForm, touch, pickOrg, pickWs, submitCreate,
-    setTestBody, runDryRun, openDecide, decide, pause, resume, rotate, remove, openExtend, submitExtend,
+    setTestBody, runDryRun, setCommandsDry, origin: window.location.origin, openDecide, decide, pause, resume, rotate, remove, openExtend, submitExtend,
     reloadDetail: () => (view.kind === 'detail' ? loadDetail(view.name) : null),
   };
   return renderReceiversView(ctx);

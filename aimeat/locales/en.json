@@ -810,7 +810,15 @@
       "tryLabel": "Try it",
       "aiLabel": "Or give your AI this",
       "aiHint": "The server's sentence for an AI, in English. It names the address and where the API key is kept, never the API key.",
-      "done": "Done, the API key is saved"
+      "done": "Done, the API key is saved",
+      "commandsBody": "Paste one of these into a terminal and run it. It writes one test value where this incoming webhook writes: {target}. The address, the API key and the message are already in the command, so there is nothing to change.",
+      "commandsDryBody": "Paste one of these into a terminal and run it. The server checks the message as it checks every message, and stores nothing. The address, the API key and the message are already in the command.",
+      "commandsDry": "Test only, store nothing (adds ?dry_run=true)",
+      "bashLabel": "macOS, Linux or Git Bash",
+      "psLabel": "Windows PowerShell",
+      "copyBash": "Copy for macOS and Linux",
+      "copyPs": "Copy for PowerShell",
+      "commandsOnce": "The commands hold the API key. Like the API key, they are shown only now."
     },
     "dry": {
       "title": "Test without storing",

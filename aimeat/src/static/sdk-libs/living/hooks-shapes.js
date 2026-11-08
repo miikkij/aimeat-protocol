@@ -24,6 +24,10 @@
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.7 -- 2026-11-09 -- The program road's settings link carries `&sample=`, the message the
+ *     value's current reading makes (at most 1000 characters of JSON), so the Incoming webhooks page's
+ *     ready commands carry the document's real value (secaudit2026nov08b round 15d; v0.7.5 and v0.7.6
+ *     are round 15c's).
  *   v0.7.6 -- 2026-11-08 -- The memory road's own call goes to the node's own address too (ctx.apex),
  *     single-quoted for a POSIX shell, double-quoted on Windows. The key's and the token's
  *     placeholders follow the dialog's language (inward.keyPlaceholder, inward.tokenPlaceholder),
@@ -117,6 +121,21 @@ function windowsCall(address, bearer, body) {
   };
 }
 
+/** The longest sample, in characters of JSON, the settings link carries (the page takes the same). */
+const SAMPLE_MAX = 1000;
+
+/**
+ * `&sample=<URL-encoded JSON>` for the settings link: the message the value's current reading makes,
+ * so the page's ready commands carry it. '' when it is longer than SAMPLE_MAX or is not JSON.
+ * @param {any} body
+ * @returns {string}
+ */
+function sampleParam(body) {
+  // The curl line beside it stringifies the same body, so a value that cannot be stringified fails there.
+  const json = JSON.stringify(body) || '';
+  return json && json.length <= SAMPLE_MAX ? '&sample=' + encodeURIComponent(json) : '';
+}
+
 /** What the address carries where the account name goes when the page does not know it. */
 export const OWNER_PLACEHOLDER = '<owner>';
 
@@ -172,7 +191,8 @@ function receiverRoad(apex, owner, key, doc, id, sample, keyPlaceholder) {
     signInNeeded: !owner,
     keyPlaceholder: keyPlaceholder,
     ownerPlaceholder: OWNER_PLACEHOLDER,
-    settings: apex + '/v1/profile?tab=receivers&new=key&key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name),
+    settings: apex + '/v1/profile?tab=receivers&new=key&key=' + encodeURIComponent(key) + '&name=' + encodeURIComponent(name)
+      + sampleParam({ value: sample }),
     address: address,
     curl: 'curl -X POST ' + shellQuoted(address)
       + ' -H "Content-Type: application/json"'
