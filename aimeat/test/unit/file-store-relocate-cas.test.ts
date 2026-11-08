@@ -22,8 +22,11 @@ import { RELOCATE_ATTEMPTS, relocateStorageFile, wrapStorageWithFileStores, type
 import type { BlobStore } from '../../src/storage/blob/blob-types.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, StorageFileRecord } from '../../src/storage/interface.js';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 
 const SQLITE_PATH = `./test/.relocate-cas-${process.pid}.db`;
+// A run that asks for PostgreSQL (CI's Postgres job) fails here without a URL, never skips the half.
+requirePostgresWhenAsked('file-store-relocate-cas');
 const PG_URL = process.env.DATABASE_URL ?? '';
 const SOURCE = 'owner:bob@node-1/main';
 const OTHER = 'node:main';
