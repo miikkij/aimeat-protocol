@@ -24,6 +24,7 @@
           { "id": "og-ai", "num": "08", "labelKey": "organisms.forAi" }
         ] },
         { "id": "memory", "labelKey": "profile.tabs.memory" },
+        { "id": "contexts", "labelKey": "profile.tabs.contexts" },
         { "id": "notebook", "labelKey": "profile.tabs.notebook" },
         { "id": "living", "labelKey": "profile.tabs.living" },
         { "id": "knowledge", "labelKey": "knowledge.tabLabel", "sections": [
