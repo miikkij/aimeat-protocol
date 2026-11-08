@@ -1,5 +1,5 @@
 /**
- * @file src/services/eco-own-tick-scopes.ts
+ * @file src/services/ecosystem/own-tick-scopes.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Which scopes an outside app's approval grants when the owner names none, and which
@@ -21,7 +21,7 @@
  * @version-history
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14, older item O5).
  */
-import { isOutsideWildcard } from '../utils/scope-coverage.js';
+import { isOutsideWildcard } from '../../utils/scope-coverage.js';
 
 /** The words of `scopes` that only an exact, deliberate grant confers. */
 export function ownTickWords(scopes: readonly unknown[] | null | undefined): string[] {

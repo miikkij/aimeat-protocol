@@ -95,7 +95,7 @@ import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
 import { ecoHelloProofVerifies, markReturnProven, returnProven } from '../services/device-return-proof.js';
 import { reconnectView } from './ecosystem-apps-reconnect.js';
-import { approvalScopes, ownTickWords } from '../services/eco-own-tick-scopes.js';
+import { approvalScopes, ownTickWords } from '../services/ecosystem/own-tick-scopes.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -385,7 +385,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
 
     // Owner may narrow the requested scopes/areas; fall back to what the app asked for, then defaults.
     // Without a body list, a word outside every wildcard is granted only when the app already held
-    // it; the rest wait for the owner's own tick (services/eco-own-tick-scopes.ts, older item O5).
+    // it; the rest wait for the owner's own tick (services/ecosystem/own-tick-scopes.ts, older item O5).
     const existing = await storage.getEcosystemAppByOwnerAndApp(request.ownerName, request.app);
     const { scopes: finalScopes, heldBack } = approvalScopes(Array.isArray(scopes) ? scopes : undefined,
       request.scopes ?? config.defaultEcoScopes, existing?.scopes);
