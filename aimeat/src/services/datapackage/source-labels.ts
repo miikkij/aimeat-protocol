@@ -2,9 +2,9 @@
  * @file src/services/datapackage/source-labels.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A data package version built from classified content carries the strictest label of
- *   what it was built from (secaudit2026nov08 round 14,
- *   dataproduct/sources-memory:records-source-drops-source-record-labels).
+ * @description A data package version built from classified content keeps the labels of what it was
+ *   built from (secaudit2026nov08 round 14,
+ *   dataproduct/sources-memory:records-source-drops-source-record-labels; secaudit2026nov08b round 15).
  *
  *   WHY. A data product over a workspace records space reads the records as its maker and writes their
  *   rows into the maker's own package files. A record another member wrote, labelled for fewer readers
@@ -14,95 +14,155 @@
  *   classification design says a copy of labelled content keeps the label's reader rules
  *   (classification/label-rows.ts: "publishing never makes an unlabelled copy").
  *
- *   HOW. At the build, the source item with the highest-ranked effective label (in the policy of its
- *   own scope, where classification is on) is the version's label source, recorded in the maker's
- *   service namespace under `datapkg-labels.<name>.<hash>` (services/service-records.ts), which no
- *   memory route writes. Every read of the version's rows (store.ts loadResourceRows) and of its files
- *   through GET /v1/pub asks the classification reader about that item as well as the file: a reader
- *   its label keeps out reads no row, a reader it admits reads as before. The label is read live, so a
- *   raise of the source's label reaches the package at once. With classification off, or a product
- *   with no labelled source, nothing is recorded and nothing changes.
- * @structure SOURCE_LABELS_PREFIX · strictestSourceTarget · recordVersionLabelSource ·
- *   versionLabelSource · hiddenBySourceLabel · packageFileHiddenBySourceLabel
+ *   HOW. At the build, the label address of every item the rows were copied from (in the scopes where
+ *   classification is on) is the version's label source, recorded in the maker's service namespace
+ *   under `datapkg-labels.<name>.<hash>` (services/service-records.ts), which no memory route writes.
+ *   Every read of the version's rows (store.ts loadResourceRows) and of its files through GET /v1/pub
+ *   asks the classification reader about those items as well as the file: a reader that one of their
+ *   labels keeps out reads no row, a reader every label admits reads as before. The labels are read
+ *   live, so a label set or raised later on any of the items reaches the package at once. With
+ *   classification off, or a product with no labelled source, nothing is recorded and nothing changes.
+ *
+ *   ONE ITEM PER LABEL IS ASKED. The audience, the AI rule and the clearance a label sets are the same
+ *   for every item that carries it, so a read groups the recorded items by their effective label (read
+ *   live, in the policy of each item's scope) and asks the reader about one item of each label: the
+ *   audit log gets one row per label, not one per record. An AI or anonymous reader passes a label
+ *   hidden from AI only through a person's exception on one item, so for such a label every item is
+ *   asked. A version copied from more than SOURCE_TARGETS_KEPT items records one item per label instead,
+ *   so the record stays bounded; for those versions a label set later on an item not recorded does
+ *   not reach the version (the next build records it).
+ *
+ *   WHY NOT ONE ITEM BY RANK (round 14 kept the highest-ranked item only). Rank does not order a
+ *   label's audience or its AI rule (classification/levels.ts weakerFields compares them apart), so a
+ *   lower-ranked label with a narrower audience was dropped, and a label set after the build on any
+ *   item but the picked one never reached the version (secaudit2026nov08b round 15,
+ *   datapackage/source-labels:single-rank-picked-source-stands-for-all-labels).
+ * @structure SOURCE_LABELS_PREFIX · SOURCE_TARGETS_KEPT · versionSourceTargets · recordVersionLabelSource ·
+ *   versionLabelSources · hiddenByLabelSources · hiddenBySourceLabel · packageVersionOfFile ·
+ *   packageFileHiddenBySourceLabel
  * @usage
- *   const target = await strictestSourceTarget(deps, sources.flatMap(s => s.labelSources ?? []));
+ *   const targets = await versionSourceTargets(deps, sources.flatMap(s => s.labelSources ?? []));
  *   if (await hiddenBySourceLabel(deps, reader, ownerGhii, name, hash)) return null;
  * @version-history
+ *   v2.0.0 — 2026-11-08 — Every copied item is the label source, not the highest-ranked one; the read
+ *     asks one item per effective label; a recorded single target still reads (secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14).
  */
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { serviceRecords } from '../service-records.js';
-import { classificationActiveFor, policyFor } from '../classification/policy.js';
+import { activePolicies, type ContentReader } from '../classification/reader.js';
 import { effectiveLabels } from '../classification/effective.js';
-import { labelById } from '../classification/defaults.js';
+import { labelById, type ClassificationLabel } from '../classification/defaults.js';
 import { targetId } from '../classification/labels.js';
-import type { ContentReader } from '../classification/reader.js';
 import { bare } from './contract.js';
 
 /** The service-owned prefix, in the package owner's service namespace. */
 export const SOURCE_LABELS_PREFIX = 'datapkg-labels.';
 
+/** Above this many copied items a version records one item per label (see the file header). */
+export const SOURCE_TARGETS_KEPT = 2000;
+
 type Deps = { storage: Storage; config: Pick<AimeatConfig, 'classificationMode' | 'nodeId'> };
+
+/** The stored value: `{ targets }`. A single target is a version recorded by round 14. */
+interface StoredSources { targets: ContentLabelTarget[] }
 
 const isTarget = (v: unknown): v is ContentLabelTarget => {
     const t = v as Partial<ContentLabelTarget> | null;
     return !!t && typeof t === 'object' && typeof t.kind === 'string' && typeof t.scope === 'string' && typeof t.key === 'string';
 };
-const records = (storage: Storage) => serviceRecords<ContentLabelTarget>(storage, SOURCE_LABELS_PREFIX, { parse: v => (isTarget(v) ? v : null) });
+const parseStored = (v: unknown): StoredSources | null => {
+    if (isTarget(v)) return { targets: [{ kind: v.kind, scope: v.scope, key: v.key }] };
+    const list = (v as { targets?: unknown } | null)?.targets;
+    return Array.isArray(list) ? { targets: list.filter(isTarget) } : null;
+};
+const records = (storage: Storage) => serviceRecords<StoredSources>(storage, SOURCE_LABELS_PREFIX, { parse: parseStored });
 const recordKey = (name: string, contentHash: string) => `${name}.${bare(contentHash)}`;
+const plain = (t: ContentLabelTarget): ContentLabelTarget => ({ kind: t.kind, scope: t.scope, key: t.key });
 
-/**
- * The source item whose effective label ranks highest, among the scopes where classification is on.
- * Null when classification is off for every scope the items lie in.
- */
-export async function strictestSourceTarget(deps: Deps, targets: readonly ContentLabelTarget[]): Promise<ContentLabelTarget | null> {
-    if (deps.config.classificationMode === 'off' || !targets.length) return null;
-    const byScope = new Map<string, ContentLabelTarget[]>();
-    for (const t of targets) byScope.set(t.scope, [...(byScope.get(t.scope) ?? []), t]);
-    let best: { t: ContentLabelTarget; rank: number } | null = null;
-    for (const [scope, list] of byScope) {
-        if (!(await classificationActiveFor(deps.storage, deps.config, scope))) continue;
-        const policy = await policyFor(deps.storage, deps.config, scope);
+/** The items grouped by effective label, per scope where classification is on. */
+async function labelGroups(deps: Deps, targets: readonly ContentLabelTarget[]): Promise<Array<{ label: ClassificationLabel | null; items: ContentLabelTarget[] }>> {
+    const policies = await activePolicies(deps, targets.map(t => t.scope));
+    const groups = new Map<string, { label: ClassificationLabel | null; items: ContentLabelTarget[] }>();
+    for (const [scope, policy] of policies) {
+        const list = targets.filter(t => t.scope === scope);
         const eff = await effectiveLabels(deps.storage, policy, list);
         for (const t of list) {
-            const rank = labelById(policy, eff.get(targetId(t))?.label ?? policy.defaultLabel)?.rank ?? -1;
-            if (!best || rank > best.rank) best = { t, rank };
+            const id = eff.get(targetId(t))?.label ?? policy.defaultLabel;
+            const g = `${scope}\u0000${id}`;
+            const cur = groups.get(g) ?? { label: labelById(policy, id) ?? labelById(policy, policy.defaultLabel) ?? null, items: [] };
+            cur.items.push(t);
+            groups.set(g, cur);
         }
     }
-    return best ? { kind: best.t.kind, scope: best.t.scope, key: best.t.key } : null;
+    return [...groups.values()];
 }
 
-/** Record (or, with null, clear) the label source of one version of `name`. Written before the version is readable. */
+/**
+ * The items a version records as its label source: every distinct one, among the scopes where
+ * classification is on, or one per effective label above SOURCE_TARGETS_KEPT. Null when classification
+ * is off for every scope the items lie in.
+ */
+export async function versionSourceTargets(deps: Deps, targets: readonly ContentLabelTarget[]): Promise<ContentLabelTarget[] | null> {
+    if (deps.config.classificationMode === 'off' || !targets.length) return null;
+    const distinct = new Map<string, ContentLabelTarget>();
+    for (const t of targets) if (isTarget(t)) distinct.set(targetId(t), plain(t));
+    const policies = await activePolicies(deps, [...distinct.values()].map(t => t.scope));
+    const kept = [...distinct.values()].filter(t => policies.has(t.scope));
+    if (!kept.length) return null;
+    if (kept.length <= SOURCE_TARGETS_KEPT) return kept;
+    return (await labelGroups(deps, kept)).map(g => g.items[0]!);
+}
+
+/** Record (or, with null or none, clear) the label source of one version of `name`. Written before the version is readable. */
 export async function recordVersionLabelSource(
-    storage: Storage, ownerGhii: string, name: string, contentHash: string, target: ContentLabelTarget | null,
+    storage: Storage, ownerGhii: string, name: string, contentHash: string, targets: readonly ContentLabelTarget[] | null,
 ): Promise<void> {
     const r = records(storage);
-    if (target) { await r.put(ownerGhii, recordKey(name, contentHash), target); return; }
+    if (targets?.length) { await r.put(ownerGhii, recordKey(name, contentHash), { targets: targets.map(plain) }); return; }
     await r.delete(ownerGhii, recordKey(name, contentHash));
 }
 
-/** The label source of one version, or null when it was built from no labelled source. */
-export async function versionLabelSource(storage: Storage, ownerGhii: string, name: string, contentHash: string): Promise<ContentLabelTarget | null> {
-    return records(storage).get(ownerGhii, recordKey(name, contentHash));
+/** The label source of one version: the items it was copied from, none when it was built from no labelled source. */
+export async function versionLabelSources(storage: Storage, ownerGhii: string, name: string, contentHash: string): Promise<ContentLabelTarget[]> {
+    return (await records(storage).get(ownerGhii, recordKey(name, contentHash)))?.targets ?? [];
+}
+
+/** True when one of the items' labels keeps this reader out. One item per label is asked (file header). */
+export async function hiddenByLabelSources(
+    deps: Deps, reader: Pick<ContentReader, 'show' | 'kind'>, targets: readonly ContentLabelTarget[],
+): Promise<boolean> {
+    if (!targets.length || deps.config.classificationMode === 'off') return false;
+    const groups = await labelGroups(deps, targets);
+    const firsts = groups.map(g => g.items[0]!);
+    if (firsts.length && (await reader.show(firsts, t => t)).length < firsts.length) return true;
+    // An exception a person made for one item does not open the other items of a label hidden from AI.
+    if (reader.kind !== 'ai' && reader.kind !== 'anonymous') return false;
+    const rest = groups.filter(g => g.label?.aiVisibility === 'hidden').flatMap(g => g.items.slice(1));
+    return rest.length > 0 && (await reader.show(rest, t => t)).length < rest.length;
 }
 
 /** True when the version's label source keeps this reader out (and with it every row of the version). */
 export async function hiddenBySourceLabel(
-    storage: Storage, reader: Pick<ContentReader, 'show'>, ownerGhii: string, name: string, contentHash: string,
+    deps: Deps, reader: Pick<ContentReader, 'show' | 'kind'>, ownerGhii: string, name: string, contentHash: string,
 ): Promise<boolean> {
-    const target = await versionLabelSource(storage, ownerGhii, name, contentHash);
-    if (!target) return false;
-    return (await reader.show([target], t => t)).length === 0;
+    return hiddenByLabelSources(deps, reader, await versionLabelSources(deps.storage, ownerGhii, name, contentHash));
 }
 
 /** `datapkg/{name}/{hash}/{rest}`: the package and version a stored file belongs to, else null. */
 const VERSION_FILE_RE = /^datapkg\/([a-z0-9][a-z0-9-]{0,62}[a-z0-9])\/([a-f0-9]{64})\/.+$/;
 
+/** The package name and version hash of a stored package file, else null. */
+export function packageVersionOfFile(key: string): { name: string; hash: string } | null {
+    const m = VERSION_FILE_RE.exec(key);
+    return m ? { name: m[1]!, hash: m[2]! } : null;
+}
+
 /** True when `key` is a file of a package version whose label source keeps this reader out (GET /v1/pub). */
 export async function packageFileHiddenBySourceLabel(
-    storage: Storage, reader: Pick<ContentReader, 'show'>, ownerGhii: string, key: string,
+    deps: Deps, reader: Pick<ContentReader, 'show' | 'kind'>, ownerGhii: string, key: string,
 ): Promise<boolean> {
-    const m = VERSION_FILE_RE.exec(key);
-    return m ? hiddenBySourceLabel(storage, reader, ownerGhii, m[1]!, m[2]!) : false;
+    const v = packageVersionOfFile(key);
+    return v ? hiddenBySourceLabel(deps, reader, ownerGhii, v.name, v.hash) : false;
 }

@@ -36,8 +36,8 @@ export interface ResolvedSource extends SourceTable {
     fetchedAt: string;
     /**
      * The label address of each item the rows were copied from, when the source's items carry
-     * classification labels of their own (a workspace records space). The version records the one
-     * with the strictest label (services/datapackage/source-labels.ts), so the copy keeps its readers.
+     * classification labels of their own (a workspace records space). The version records them
+     * (services/datapackage/source-labels.ts), so the copy keeps the readers of every one of their labels.
      */
     labelSources?: ContentLabelTarget[];
 }

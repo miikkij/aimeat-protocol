@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-08 -- e2e-datapackage-label-sources.ts joins the list (not the guard tier): a data package version keeps the labels of every item it was copied from (secaudit2026nov08b round 15).
  *   2026-11-08 -- e2e-workspace-reserved-parts.ts joins the list (not the guard tier): the node-reserved parts of a workspace are no space of any manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
  *   2026-11-08 -- e2e-schema-lock-holders.ts joins the list (not the guard tier): a CSM's lock belongs to its registering account, a wildcard lock does not outrank another account's deeper lock, a package's cortex asks the lock rule, and an erased account's locks do not pass to the next holder of the name (secaudit2026nov08 round 14).
  *   2026-11-08 -- e2e-csm-ownership.ts joins the list (not the guard tier): only the registering account's own receivers block a CSM delete, a package CSM takes the installer's prefix, the next account of an erased name has no CSM rights, a private CSM's schema-lock row is not public (secaudit2026nov08 round 14).
@@ -1334,6 +1335,8 @@ const ALL_SUITES = [
     'test/e2e-dataproduct-canvas.ts',
     // A records source allows the audience its workspace admits, not the whole organism (secaudit2026nov02d round 13).
     'test/e2e-dataproduct-records-audience.ts',
+    // A data package version keeps the labels of every item it was copied from: records, another package, a memory record, an extension run's reads (secaudit2026nov08b round 15).
+    'test/e2e-datapackage-label-sources.ts',
     // Outside parties: made, stopped, deleted, never a node session, never a members or organism reader (plan doc-mvwxcas3dom3, D2).
     'test/e2e-party.ts',
     // Receivers: an outside program writes into exactly one place of an owner's data with its own key; the shape, the target, the key, the lifecycle, the verbs, the permissions and the node setting.

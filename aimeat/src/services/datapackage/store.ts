@@ -28,6 +28,8 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-08 — `opts.labelSource` is the list of source items, and loadResourceRows asks about each of
+ *     their labels (./source-labels.ts; secaudit2026nov08b round 15).
  *   2026-11-08 — publishPackage records the version's label source (`opts.labelSource`) before any write,
  *     and loadResourceRows asks the classification reader about it beside the file: a version built from
  *     labelled records keeps the strictest source label (./source-labels.ts; secaudit2026nov08 round 14).
@@ -187,8 +189,8 @@ export type PublishResult =
 export async function publishPackage(
     deps: StoreDeps, ownerGhii: string, input: PublishInput, producedBy: ProducedBy,
     /** dryRun: check and build the version, store nothing (services/dataproduct preview). labelSource:
-     *  the source item whose label the version keeps (./source-labels.ts), recorded before any write. */
-    opts: { dryRun?: boolean; labelSource?: ContentLabelTarget | null } = {},
+     *  the source items whose labels the version keeps (./source-labels.ts), recorded before any write. */
+    opts: { dryRun?: boolean; labelSource?: readonly ContentLabelTarget[] | null } = {},
 ): Promise<PublishResult> {
     const { storage, config } = deps;
     const ownerName = localAccountName(ownerGhii);
@@ -660,8 +662,8 @@ async function loadResourceRows(
     const asReader = reader?.party ? { sub: reader.sub ?? '', owner: '', roles: ['party'] } : reader?.sub ? reader as ReaderAuth : null;
     const content = readerFor(deps, asReader);
     const [shown] = await content.show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
-    // A version built from labelled content keeps its strictest source label (./source-labels.ts).
-    if (!shown || await hiddenBySourceLabel(deps.storage, content, parsed.ownerGhii, parsed.name, hash)) return null;
+    // A version built from labelled content keeps the labels of its source items (./source-labels.ts).
+    if (!shown || await hiddenBySourceLabel(deps, content, parsed.ownerGhii, parsed.name, hash)) return null;
     return { all: fromCsv(shown.data, res.schema), res };
 }
 
