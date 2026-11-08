@@ -1,11 +1,17 @@
 /**
  * @file test/e2e-capabilities.ts
  * @description E2E for the capability layer over the HTTP door: manual CRUD, visibility, invoke,
- *   stats, the cortex and extension aggregators, vouch, cross-owner list isolation, and the webhook
- *   policy gate.
+ *   stats, the cortex and extension aggregators, vouch, cross-owner list isolation, the webhook
+ *   policy gate, and the Capabilities page's publishing with the page's own bodies (publish.js).
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   v1.3.0 -- 2026-11-08 -- Phase 10b and two tests on the second node: the page's hand-added form
+ *     with "Visible to agents" ticked publishes the entry, and another account lists, opens and calls
+ *     it (the MCP search lists it too); unticked stays a private draft; "Show to agents" publishes a
+ *     public draft; a plain owner's ticked entry is refused on self_only and waits for review on a
+ *     moderated node. The second node runs capability_publishing 'moderated' instead of 'self_only'.
+ *     Red before the fix: the page's body carried no status, so the ticked entry was a draft.
  *   v1.2.2 — 2026-10-25 — A non-operator owner is refused POST /v1/admin/capabilities/aggregate with
  *     403, so check:denial-coverage holds the route's operator check.
  *   v1.2.1 — 2026-10-23 — The operators from POST /v1/admin/setup/register get a password and sign in
@@ -74,7 +80,9 @@ import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { suitePort } from './helpers/free-port.js';
 import { registerOwner, ownerSignIn, tokenRoles, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
-import { makeAgent } from './helpers/mcp-session.js';
+import { makeAgent, openSession, callTool, type McpSession } from './helpers/mcp-session.js';
+// The exact bodies the Capabilities page sends (Phase 10b and the moderated node in Phase 11).
+import { manualCreateBody, visibilityPatch, shownToAgents } from '../public/views/profile/capabilities/publish.js';
 import * as ed from '@noble/ed25519';
 
 // ─── State ───
@@ -988,6 +996,109 @@ await test('Cleanup B + operator caps', async () => {
     }
 });
 
+// ─── Phase 10b: the Capabilities page publishes what "Visible to agents" asks for ───
+// The page's hand-added form sent `visibility` and no `status`, so a ticked entry was stored as a
+// public DRAFT: no other account could open or call it, the MCP search did not list it, and nothing
+// on the page made it active. These tests send the exact body the page sends (publish.js, imported
+// below). Against the old body (no status) the first test fails on its first assertion: status
+// 'draft', not 'active'. The shared test server runs capability_publishing 'self_only', so the
+// publishing account here is the suite's operator, whom no publishing rule holds back; the plain
+// owner's refusal is the last test of the phase, and the moderated node is Phase 11's second node.
+console.log('\nPhase 10b — The page publishes a ticked entry');
+
+const pageStamp = Math.random().toString(36).slice(2, 8);
+const pageOther = { name: 'cappage-b-' + pageStamp, token: '' };
+let pageOtherAgent: McpSession | null = null;
+const pageIds: string[] = [];
+
+/** POST the page's add body as `token`; answers the call and the stored record. */
+async function pageAdd(token: string, form: Record<string, unknown>, base = BASE) {
+    return json('/v1/capabilities', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(manualCreateBody(form)) }, base);
+}
+const reachedBy = async (id: string, token: string, base = BASE) => {
+    const got = await json(`/v1/capabilities/${id}`, { headers: { Authorization: `Bearer ${token}` } }, base);
+    const inv = await json(`/v1/capabilities/${id}/invoke`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ input: {} }) }, base);
+    const list = await json(`/v1/capabilities?per_page=500&search=${encodeURIComponent(pageStamp)}`, { headers: { Authorization: `Bearer ${token}` } }, base);
+    const listed = (list.body.data?.capabilities ?? []).some((c: any) => c.id === id);
+    // A capability with no webhook answers invoke with 400 NOT_CALLABLE once it is reached; a closed one answers 404.
+    return { read: got.status, invoke: `${inv.status} ${inv.body.error?.code ?? ''}`.trim(), listed };
+};
+
+await test('Page setup: another account and its agent', async () => {
+    const { body } = await json('/v1/capabilities');
+    assert(body.data?.policy?.publishing === 'self_only', `this node must boot with capabilityPublishing=self_only, got '${body.data?.policy?.publishing}'`);
+    assert(isOperator === true, 'the suite owner must be the operator for this phase (AIMEAT_ADMIN_PASSWORD)');
+    pageOther.token = (await registerOwner(BASE, pageOther.name)).token;
+    const agent = await makeAgent(BASE, pageOther, ['work:request']);
+    pageOtherAgent = await openSession(BASE, agent.token, 'cappage-other-agent');
+});
+
+await test('Page: "Visible to agents" ticked publishes; another account lists, opens and calls it, and the MCP search lists it', async () => {
+    const made = await pageAdd(ownerToken, { name: `Page public ${pageStamp}`, summary: 'added on the page, ticked', visibility: 'public' });
+    assert(made.status === 201, `add: ${made.status} ${JSON.stringify(made.body.error)}`);
+    pageIds.push(made.body.data.id);
+    assert(made.body.data.status === 'active', `a ticked entry must be published (status active), got '${made.body.data.status}'`);
+    assert(made.body.data.visibility === 'public', `visibility: ${made.body.data.visibility}`);
+    const r = await reachedBy(made.body.data.id, pageOther.token);
+    assert(r.read === 200, `another account opens it: ${r.read}`);
+    assert(r.invoke === '400 NOT_CALLABLE', `another account calls it (reached, no webhook): ${r.invoke}`);
+    assert(r.listed, 'another account lists it');
+    const mcp = await callTool(pageOtherAgent!, 'aimeat_capabilities_list', { search: pageStamp });
+    assert(!mcp.isError && (mcp.data?.capabilities ?? []).some((c: any) => c.id === made.body.data.id), `the MCP search lists it: ${mcp.text.slice(0, 200)}`);
+});
+
+await test('Page: unticked stays a private draft that another account cannot open, call or find', async () => {
+    const made = await pageAdd(ownerToken, { name: `Page private ${pageStamp}`, summary: 'added on the page, unticked', visibility: 'private' });
+    assert(made.status === 201, `add: ${made.status} ${JSON.stringify(made.body.error)}`);
+    pageIds.push(made.body.data.id);
+    assert(made.body.data.visibility === 'private' && made.body.data.status === 'draft', `unticked: ${made.body.data.visibility} ${made.body.data.status}`);
+    const r = await reachedBy(made.body.data.id, pageOther.token);
+    assert(r.read === 404 && r.invoke.startsWith('404') && !r.listed, `another account reached the private entry: ${JSON.stringify(r)}`);
+    const own = await reachedBy(made.body.data.id, ownerToken);
+    assert(own.read === 200 && own.listed, `the owner still has it: ${JSON.stringify(own)}`);
+});
+
+await test('Page: "Show to agents" publishes a public draft the old form left behind', async () => {
+    // The old form's body: visibility public, no status. The row offered only "Hide from agents" for it.
+    const old = await json('/v1/capabilities', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: `Page old draft ${pageStamp}`, summary: 'the old form', visibility: 'public', source: { type: 'manual', ref: 'manual', version: '1.0.0' } }),
+    });
+    assert(old.status === 201 && old.body.data.status === 'draft', `old body: ${old.status} ${old.body.data?.status}`);
+    pageIds.push(old.body.data.id);
+    assert(!shownToAgents({ visibility: old.body.data.visibility, status: old.body.data.status }), 'a public draft must offer "Show to agents"');
+    const before = await reachedBy(old.body.data.id, pageOther.token);
+    assert(before.read === 404, `the draft was reached before it was shown: ${before.read}`);
+    const put = await json(`/v1/capabilities/${old.body.data.id}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify(visibilityPatch(old.body.data, 'public')),
+    });
+    assert(put.status === 200 && put.body.data.status === 'active', `show: ${put.status} ${put.body.data?.status}`);
+    const after = await reachedBy(old.body.data.id, pageOther.token);
+    assert(after.read === 200 && after.listed, `another account after "Show to agents": ${JSON.stringify(after)}`);
+    const hide = await json(`/v1/capabilities/${old.body.data.id}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify(visibilityPatch(put.body.data, 'private')),
+    });
+    assert(hide.status === 200 && hide.body.data.visibility === 'private', `hide: ${hide.status} ${hide.body.data?.visibility}`);
+    const hidden = await reachedBy(old.body.data.id, pageOther.token);
+    assert(hidden.read === 404 && !hidden.listed, `another account after "Hide from agents": ${JSON.stringify(hidden)}`);
+});
+
+await test('Page: on a self_only node a plain owner\'s ticked entry is refused with 403 PUBLIC_DISABLED and nothing is stored', async () => {
+    const name = `Page refused ${pageStamp}`;
+    const made = await pageAdd(pageOther.token, { name, summary: 'ticked by a plain owner', visibility: 'public' });
+    assert(made.status === 403 && made.body.error?.code === 'PUBLIC_DISABLED', `expected 403 PUBLIC_DISABLED, got ${made.status} ${made.body.error?.code}`);
+    const list = await json(`/v1/capabilities?per_page=500&search=${encodeURIComponent(pageStamp)}`, { headers: { Authorization: `Bearer ${pageOther.token}` } });
+    assert(!(list.body.data?.capabilities ?? []).some((c: any) => c.name === name), 'a refused entry must not be stored');
+    const plain = await pageAdd(pageOther.token, { name: `Page plain private ${pageStamp}`, visibility: 'private' });
+    assert(plain.status === 201 && plain.body.data.status === 'draft', `the same owner's unticked entry: ${plain.status} ${JSON.stringify(plain.body.error)}`);
+    await json(`/v1/capabilities/${plain.body.data.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${pageOther.token}` } });
+});
+
+await test('Page cleanup', async () => {
+    for (const id of pageIds) await json(`/v1/capabilities/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+    await json(`/v1/owners/${pageOther.name}`, { method: 'DELETE', headers: { Authorization: `Bearer ${pageOther.token}` } });
+});
+
 // ─── Phase 11: the webhook gate reads the NORMALISED source (August 2026 audit, NEW-1) ───
 // POST /v1/capabilities checked the webhook policy against the source the CALLER SENT, while the
 // record was built from a source that defaults a missing type to 'manual'. So a body carrying a
@@ -1055,7 +1166,10 @@ async function startAllowlistNode(): Promise<ChildProcess> {
             // The whole point of this node: webhooks admitted only from one named domain.
             AIMEAT_CAPABILITY_WEBHOOKS: 'allowlist_only',
             AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST: 'hooks.example.test',
-            AIMEAT_CAPABILITY_PUBLISHING: 'self_only',
+            // Moderated, so the page's publishing can be proved where every public entry waits for
+            // review. The webhook tests above post private entries as the operator, whom neither
+            // 'self_only' nor 'moderated' holds back, so they read the same either way.
+            AIMEAT_CAPABILITY_PUBLISHING: 'moderated',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
         cwd: process.cwd(),
@@ -1099,6 +1213,42 @@ await test('Allowlist only: a listed domain still goes through with `source` omi
     assert(body.data.source.type === 'manual' && body.data.source.ref === 'manual',
         `record should carry the normalised manual source: ${JSON.stringify(body.data.source)}`);
     assert(body.data.webhookUrl === 'https://hooks.example.test/x', `webhook stored: ${body.data.webhookUrl}`);
+});
+
+// The page's publishing on a moderated node: a plain owner's ticked entry goes to the operator's
+// review, another account cannot reach it until then, and the operator's acceptance opens it.
+const modA = { name: 'capmod-a-' + pageStamp, token: '' };
+const modB = { name: 'capmod-b-' + pageStamp, token: '' };
+
+await test('Moderated node: a plain owner\'s ticked entry waits for review, and another account cannot reach it until the operator accepts it', async () => {
+    const { body } = await json('/v1/capabilities', {}, ALT_BASE);
+    assert(body.data?.policy?.publishing === 'moderated', `alt node publishing: ${body.data?.policy?.publishing}`);
+    modA.token = (await registerOwner(ALT_BASE, modA.name)).token;
+    modB.token = (await registerOwner(ALT_BASE, modB.name)).token;
+    const made = await pageAdd(modA.token, { name: `Mod public ${pageStamp}`, summary: 'ticked on a moderated node', visibility: 'public' }, ALT_BASE);
+    assert(made.status === 201, `add: ${made.status} ${JSON.stringify(made.body.error)}`);
+    assert(made.body.data.status === 'pending_review', `a ticked entry on a moderated node waits for review, got '${made.body.data.status}'`);
+    const waiting = await reachedBy(made.body.data.id, modB.token, ALT_BASE);
+    assert(waiting.read === 404 && waiting.invoke.startsWith('404') && !waiting.listed, `another account reached an entry under review: ${JSON.stringify(waiting)}`);
+    const accept = await json(`/v1/capabilities/${made.body.data.id}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${altToken}` }, body: JSON.stringify({ status: 'active' }),
+    }, ALT_BASE);
+    assert(accept.status === 200 && accept.body.data.status === 'active', `the operator accepts: ${accept.status} ${accept.body.data?.status}`);
+    const open = await reachedBy(made.body.data.id, modB.token, ALT_BASE);
+    assert(open.read === 200 && open.invoke === '400 NOT_CALLABLE' && open.listed, `another account after the review: ${JSON.stringify(open)}`);
+});
+
+await test('Moderated node: "Show to agents" on a private draft sends it to review; unticked stays private', async () => {
+    const made = await pageAdd(modA.token, { name: `Mod private ${pageStamp}`, visibility: 'private' }, ALT_BASE);
+    assert(made.status === 201 && made.body.data.status === 'draft' && made.body.data.visibility === 'private', `unticked: ${made.status} ${made.body.data?.status} ${made.body.data?.visibility}`);
+    const hidden = await reachedBy(made.body.data.id, modB.token, ALT_BASE);
+    assert(hidden.read === 404 && !hidden.listed, `another account reached the private draft: ${JSON.stringify(hidden)}`);
+    const show = await json(`/v1/capabilities/${made.body.data.id}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${modA.token}` }, body: JSON.stringify(visibilityPatch(made.body.data, 'public')),
+    }, ALT_BASE);
+    assert(show.status === 200 && show.body.data.status === 'pending_review' && show.body.data.visibility === 'public', `show: ${show.status} ${show.body.data?.status} ${show.body.data?.visibility}`);
+    const still = await reachedBy(made.body.data.id, modB.token, ALT_BASE);
+    assert(still.read === 404, `another account reached it before the review: ${still.read}`);
 });
 
 await test('Stop the allowlist node', async () => {

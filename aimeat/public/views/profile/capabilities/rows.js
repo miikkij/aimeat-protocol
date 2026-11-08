@@ -8,9 +8,13 @@
  *   call and the call count; the doors. Opened: every member with its own summary, input shape,
  *   calls and a try door; the try panel; the agent's invoke line; who may call and the cost; trust
  *   (vouches, review) with the vouch door; calls with the counting note; where the source is managed.
+ *   An own entry that is public and published (or waiting for review) offers "Hide from agents"; any
+ *   other own entry, a public draft included, offers "Show to agents", which publishes it.
  * @structure providerRow · providerOpen
  * @usage import { providerRow } from './rows.js';
  * @version-history
+ *   v1.18.0 -- 2026-11-08 -- A public draft offers "Show to agents" instead of "Hide from agents": it was
+ *     public in name only, and the row had no way to publish it (shownToAgents, publish.js).
  *   v1.17.0 -- 2026-09-26 -- On the component kit (page group G7): a provider's row, its members and its opened panel are the List (the status dot and the version tag are the Name's, the member ids the words' line, the id form and its call line a typewriter cell), the try panel the Box's copy tone with the TextArea and the tall Code block, the facts the Facts (the copy inside a value the Action's link tone, main's crumb link). The file writes no class.
  *   v1.16.0 -- 2026-09-26 -- An opened provider's members are the Listing (listing, listing-row, the id as the name with its state as the line under it, the words cell, the figure cell, the doors), a unification: the look most tabs use.
  *   v1.15.0 -- 2026-09-26 -- A try's answer is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
@@ -46,6 +50,7 @@ import { Facts } from '/components/Facts.js';
 import { TextArea } from '/components/TextField.js';
 import { List, Row, Name, Desc, Num, Cell, Doors, Panel } from '/components/List.js';
 import { x, ownerName, authWord, costWord, memberSummary, agentTextFor, schemaWords, callsWord, vouchesWord, openTab } from './frame.js';
+import { shownToAgents } from './publish.js';
 
 function subLine(g) {
   const parts = [g.own ? x('own') : x('ownedBy', { owner: ownerName(g.ownerGhii) })];
@@ -90,7 +95,7 @@ function providerOpen(ctx, g) {
   const toggleVouch = () => ctx.vouch(g);
   const doors = html`
     <${Action} small copy=${agentText} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
-    ${g.own ? html`<${Action} small soft onClick=${() => ctx.setVisibility(g, g.visibility === 'public' ? 'private' : 'public')}>${g.visibility === 'public' ? x('hideFromAgents') : x('showToAgents')}<//>` : null}
+    ${g.own ? html`<${Action} small soft onClick=${() => ctx.setVisibility(g, shownToAgents(g) ? 'private' : 'public')}>${shownToAgents(g) ? x('hideFromAgents') : x('showToAgents')}<//>` : null}
     ${g.own && g.type === 'manual' ? html`<${Action} small soft onClick=${() => ctx.remove(g)}>${x('remove')}<//>` : null}
     <${Action} small soft onClick=${() => ctx.toggle(g)}>${x('close')}<//>`;
   const member = (c) => {

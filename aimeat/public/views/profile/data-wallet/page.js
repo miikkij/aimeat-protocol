@@ -17,6 +17,10 @@
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.28.0 — 2026-11-08 — May do offers Read and write for one person on one workspace (canWriteFor in
+ *     frame.js), the shape the server gives write in, and explains itself (question mark
+ *     dataWallet.may). An organism's members are never offered with a key area, which had no recipient
+ *     and could not be granted.
  *   v1.27.0 — 2026-11-08 — The grant form's To whom, For what and Valid explain themselves (question
  *     marks dataWallet.who, dataWallet.purpose, dataWallet.until), with facts from services/consent-write.ts,
  *     storage/consent-recipient.ts and the form's submitGrant in data-wallet-tab.js.
@@ -91,7 +95,7 @@ import { Choice } from '/components/Choice.js';
 import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { HelpTip } from '/components/HelpTip.js';
-import { x, n, crumb, pageLinks, whoOf } from './frame.js';
+import { x, n, crumb, pageLinks, whoOf, canWriteFor } from './frame.js';
 import { targetRow, personRow, revokedRow, groupRow, eventRow, groupId } from './rows.js';
 import { secClassification, classificationCount } from './classification.js';
 import { secContentClasses, contentCount } from './content-classes.js';
@@ -235,8 +239,13 @@ function secGrant(ctx) {
   const f = ctx.form;
   const org = ctx.orgs.find((o) => o.id === f.orgId);
   const wsList = org?.workspaces || [];
-  const canWrite = f.what === 'ws';
+  const canWrite = canWriteFor(f);
   const whoIsPicker = f.whoKind === 'contact';
+  // An organism's members are the members of the organism chosen under To what, so they take a
+  // workspace or a whole organism and never a key area: the pair is not offered, and choosing them
+  // while a key area is chosen moves To what to the whole organism.
+  const membersOnly = f.whoKind === 'orgMembers';
+  const pickWho = (v) => ctx.setForm(v === 'orgMembers' && f.what === 'key' ? { whoKind: v, what: 'org' } : { whoKind: v });
   const ready = (whoIsPicker ? !!f.who.trim() : true) && (f.what === 'key' ? !!f.key.trim() : !!f.orgId && (f.what !== 'ws' || !!f.wsId)) && !!f.why.trim();
   const whoHint = f.whoKind === 'all' ? x('form.whoAllHint') : f.whoKind === 'orgMembers' ? x('form.whoOrgMembersHint') : f.whoKind === 'nodeUsers' ? x('form.whoNodeUsersHint') : x('form.whoHint');
   const whatHint = f.what === 'key' ? undefined : f.what === 'ws' ? x('form.wsHint') : x('form.orgHint');
@@ -245,11 +254,12 @@ function secGrant(ctx) {
       <${Note} kind="lead">${x('grantIntro')}<//>
       <${Fields}>
         <${Field} label=${x('form.who')} help="dataWallet.who" hint=${whoHint} group>
-          ${opt(ctx, 'whoKind', x('form.who'), [['contact', x('form.whoContact')], ['orgMembers', x('form.whoOrgMembers')], ['nodeUsers', x('form.whoNodeUsers')], ['all', x('form.whoAll')]])}
+          <${Choice} ariaLabel=${x('form.who')} value=${f.whoKind} onChange=${pickWho}
+            options=${[['contact', x('form.whoContact')], ['orgMembers', x('form.whoOrgMembers')], ['nodeUsers', x('form.whoNodeUsers')], ['all', x('form.whoAll')]]} />
           ${whoIsPicker ? html`<${ContactPicker} value=${f.who} onChange=${(v) => ctx.setForm({ who: v })} valueMode="full" placeholder=${x('form.whoPlaceholder')} />` : null}
         <//>
         <${Field} label=${x('form.what')} hint=${whatHint} group>
-          ${opt(ctx, 'what', x('form.what'), [['ws', x('form.whatWs')], ['org', x('form.whatOrg')], ['key', x('form.whatKey')]])}
+          ${opt(ctx, 'what', x('form.what'), [['ws', x('form.whatWs')], ['org', x('form.whatOrg')], membersOnly ? null : ['key', x('form.whatKey')]].filter(Boolean))}
           ${f.what === 'key' ? html`<${Line}><${TextField} ariaLabel=${x('form.whatKey')} value=${f.key} placeholder="portfolio.**" onInput=${(v) => ctx.setForm({ key: v })} /><${HelpTip} term="consent.key_area" label=${x('form.whatKey')} /><//>` : html`
             <${Select} ariaLabel=${x('form.whatOrg')} value=${f.orgId} placeholder=${ctx.orgs.length ? x('form.pickOrg') : x('form.noOrgs')}
               options=${ctx.orgs.map((o) => [o.id, o.name])} onChange=${(v) => ctx.setForm({ orgId: v, wsId: '' })} />
@@ -257,7 +267,7 @@ function secGrant(ctx) {
               placeholder=${!f.orgId ? x('form.pickOrgFirst') : wsList.length ? x('form.pickWs') : x('form.noWs')}
               options=${wsList.map((w) => [w.id, w.name])} onChange=${(v) => ctx.setForm({ wsId: v })} />` : null}`}
         <//>
-        <${Choice} label=${x('form.may')} hint=${x('form.mayHint')} value=${f.may} onChange=${(v) => ctx.setForm({ may: v })}
+        <${Choice} label=${x('form.may')} help="dataWallet.may" hint=${x('form.mayHint')} value=${canWrite ? f.may : 'read'} onChange=${(v) => ctx.setForm({ may: v })}
           options=${[['read', x('form.mayRead')], canWrite ? ['write', x('form.mayWrite')] : null].filter(Boolean)} />
         <${TextField} label=${x('form.why')} help="dataWallet.purpose" value=${f.why} placeholder=${x('form.whyPlaceholder')} onInput=${(v) => ctx.setForm({ why: v })} />
         <${Choice} label=${x('form.scope')} help="consent.scope" value=${f.scope} onChange=${(v) => ctx.setForm({ scope: v })}

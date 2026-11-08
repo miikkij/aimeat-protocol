@@ -8,10 +8,13 @@
  *   agent), what a grant lets them do (read, write, sign in), the permissions grouped by what they
  *   open, the trail's groups in words, the grant and revoke events read off the permissions' own
  *   timestamps, dates, the crumb and the rail links.
- * @structure x · targetOf · targetWords · whoOf · accessorWords · roleOf · grantWords · targetRows ·
+ * @structure x · targetOf · targetWords · whoOf · accessorWords · roleOf · canWriteFor · grantWords · targetRows ·
  *   groupWords · consentEvents · dateWord · timeWord · spanWord · crumb · pageLinks · openTab
  * @usage import { x, targetRows, groupWords } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-11-08 — roleOf reads the role the server stamped (metadata.wsRole); a purpose typed
+ *     as `workspace-contributor` reads as contributor only on a grant older than the stamp. canWriteFor:
+ *     the grant form offers Read and write for one person on one workspace, the shape the server takes.
  *   v1.1.0 — 2026-09-26 — On the component kit (page group G7): the crumb and the rail's page links are
  *     data for SettingsPage (components/Crumb.js, Rail.js), and openTab is Rail.js's.
  *   v1.0.0 — 2026-09-04 — Initial (design canvas "AIMEAT Tietolompakko-sivu", direction A).
@@ -110,16 +113,33 @@ export function accessorWords(gaii) {
 
 /* ── What a grant lets them do ────────────────────────────────────────────────────────────────── */
 
-/** 'contributor' | 'viewer' | 'access' | 'login' | 'read' */
+/** Purpose words decided the role only for a grant older than this (LEGACY_ROLE_PURPOSE_BEFORE in services/workspace-roles.ts). */
+const LEGACY_ROLE_PURPOSE_BEFORE = '2026-11-08T00:00:00.000Z';
+
+/**
+ * 'contributor' | 'viewer' | 'access' | 'login' | 'read'. The workspace role is the one the server
+ * stamped (metadata.wsRole), as the write check reads it (wsRoleOf in services/workspace-roles.ts);
+ * the purpose a person typed says it only for a grant made before the stamp decided.
+ */
 export function roleOf(c) {
+  const stamped = c?.metadata?.wsRole;
+  if (stamped === 'contributor' || stamped === 'viewer') return stamped;
   const p = String(c?.purpose || '');
-  if (p === 'workspace-contributor' || p === 'workspace-contribution') return 'contributor';
-  if (p === 'workspace-viewer') return 'viewer';
+  const legacy = String(c?.granted_at || '') < LEGACY_ROLE_PURPOSE_BEFORE;
+  if ((p === 'workspace-contributor' || p === 'workspace-contribution') && legacy) return 'contributor';
+  if (p === 'workspace-viewer' || p === 'workspace-contributor') return 'viewer';
   if (p === 'workspace-access') return 'access';
   if (p === 'federation_login_all' || c?.scope === 'auth') return 'login';
   return 'read';
 }
 export const roleWord = (role) => x('role.' + role);
+
+/**
+ * Whether the grant form may offer Read and write: one person (not one agent) on one workspace. The
+ * server gives write only in that shape, and only when the workspace's creator grants it
+ * (consentWsRole in services/workspace-roles.ts); a person's write covers their agents.
+ */
+export const canWriteFor = (f) => f.what === 'ws' && f.whoKind === 'contact' && !String(f.who || '').includes('#');
 
 /** Recipient kinds that name many people, so the verb agrees in the plural. */
 const PLURAL_WHO = new Set(['all', 'orgMembers', 'node', 'domain']);

@@ -16,6 +16,9 @@
  * @structure GoalsTab (default) · GoalRules({ goal, agents, onSaved, confirm, showToast })
  * @usage Registered in profile.js TABS as { id: 'goals', component: GoalsTab }.
  * @version-history
+ *   v1.3.0 — 2026-11-08 — The Rounds save sends the cron (and the condition) even when emptied, so the
+ *     server refuses an empty cron on a clock round instead of keeping the old one; the server now keeps
+ *     the time zone and the works per round this page does not show (group k3-goalrounds).
  *   v1.2.0 — 2026-11-08 — The settings a label cannot explain carry their question mark: the way the
  *     work is shared (goals.mode), when the coordinator is away (goals.substitute), the round time
  *     (goals.roundCron), works started per day (goals.perDay) and the minutes before a taken work
@@ -178,8 +181,15 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
       ${(trigger === 'clock' || trigger === 'condition') && html`
         <${TextField} label=${g('cron', 'When (cron, for example 0 7 * * 1-5)')} value=${cron} onInput=${setCron} code help="goals.roundCron" />`}
       ${trigger === 'condition' && html`<${TextField} label=${g('condition', 'Act only when')} value=${condition} onInput=${setCondition} help="concept.watch" />`}
+      ${/* The save names only the fields on this page. The server keeps what it leaves out (the time
+            zone, the works per round), and an emptied field is sent empty, so an empty cron on a clock
+            round is refused and an emptied condition is cleared. */''}
       <${Actions}><${Loud} control disabled=${!!busy} onClick=${() => save('rounds', {
-        rounds: trigger === 'none' ? null : { trigger, ...(cron.trim() ? { cron: cron.trim() } : {}), ...(condition.trim() ? { condition: condition.trim() } : {}) },
+        rounds: trigger === 'none' ? null : {
+          trigger,
+          ...(trigger === 'clock' || trigger === 'condition' ? { cron: cron.trim() } : {}),
+          ...(trigger === 'condition' ? { condition: condition.trim() } : {}),
+        },
       })}>${g('save', 'Save')}<//><//>
       <//>
     <//>

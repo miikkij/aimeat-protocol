@@ -30,6 +30,9 @@
  *   const out = await createBoardPost({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.6.0 — 2026-11-08 — The posting rule 'anyone' admits only a caller that may read the board
+ *     (boardReadRefusal). It asked nothing before, so any signed-in caller that knew a shared board's
+ *     id posted and replied to it without being able to read it. A public board's 'anyone' is unchanged.
  *   v1.5.0 — 2026-10-17 — An organism board (`organism:<id>`) takes posts and replies from whoever may
  *     read it (services/board-read-access.ts organismBoardAdmits), narrowed by posting 'owner'. The
  *     caller carries the session's `auth` for it (plan doc-mvcn6c7e4e5q, V3.5).
@@ -54,7 +57,7 @@ import { provenanceForWrite, provenanceDeclarationRefusal } from './ai/provenanc
 import { isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { notifyBoardSubscribers } from './board-subscribers.js';
-import { boardOrganismAudience, organismBoardAdmits } from './board-read-access.js';
+import { boardOrganismAudience, organismBoardAdmits, boardReadRefusal } from './board-read-access.js';
 import type { AudienceAuth } from './audience.js';
 
 /** The bounds BoardPostSchema applies on the HTTP door, named here so both doors share them. */
@@ -106,12 +109,19 @@ const DEFAULT_TTL_HOURS = 168;
  * keeper, the keeper's other principals and the roster; a public one from anyone signed in. A
  * keeper may narrow either to 'owner' (an announcements board) or a public one to 'members'.
  * An organism board takes posts from whoever may read it; 'owner' narrows it to the keeper.
+ *
+ * 'anyone' means anyone who may READ the board (services/board-read-access.ts boardReadRefusal).
+ * On a public board that is every signed-in caller; on a shared board it is the keeper, the
+ * keeper's other principals, the roster and a caller the consent layer admits. Until 2026-11-08
+ * the 'anyone' rule asked nothing, so a caller that knew a shared board's id posted to a board it
+ * could not read.
  */
 async function boardPostAccessRefusal(
-    storage: Storage,
-    board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis' | 'rules'>,
+    deps: { storage: Storage; config: AimeatConfig },
+    board: Pick<BoardRecord, 'id' | 'visibility' | 'ownerGaii' | 'allowedGaiis' | 'rules'>,
     caller: BoardPostCaller,
 ): Promise<{ ok: false; status: number; code: string; message: string } | null> {
+    const { storage } = deps;
     if (boardOrganismAudience(board.visibility)) {
         if (!(await organismBoardAdmits(storage, board, caller.gaii, caller.auth))) {
             return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'This board is for the members of one organisation. Ask to join it to post here.' };
@@ -135,6 +145,12 @@ async function boardPostAccessRefusal(
         }
         if (posting === 'members' && !own && !board.allowedGaiis.includes(caller.gaii)) {
             return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'You are not invited to this board' };
+        }
+        if (posting === 'anyone' && !own) {
+            const unreadable = await boardReadRefusal(deps, caller.gaii, board, caller.auth);
+            if (unreadable) {
+                return { ok: false, status: unreadable.status, code: unreadable.code, message: 'Anyone who can read this board may post on it, and you cannot read it. Ask its keeper to add you to the member list.' };
+            }
         }
     }
     return null;
@@ -193,7 +209,7 @@ export async function createBoardPost(
     }
 
     // Who may post here — the same question a REPLY asks, which is why it is its own function.
-    const denied = await boardPostAccessRefusal(storage, board, caller);
+    const denied = await boardPostAccessRefusal(deps, board, caller);
     if (denied) return denied;
 
     // The provenance refusal, BEFORE the price is debited (invariant 14). provenanceForWrite below
@@ -358,7 +374,7 @@ export async function createBoardReply(
     if (!board) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Board not found: ${input.boardId}` };
 
     // A reply is a post. Who may post here is the same question, and neither door was asking it.
-    const denied = await boardPostAccessRefusal(storage, board, caller);
+    const denied = await boardPostAccessRefusal(deps, board, caller);
     if (denied) return denied;
 
     const body = String(input.body ?? '');

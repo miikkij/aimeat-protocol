@@ -9,6 +9,8 @@
  * @structure goalTools — the four definitions · GOAL_SET_ACTIONS · GOAL_WORK_ACTIONS
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.2.0 — 2026-11-08 — The `rounds` field says that an update keeps what it leaves out, and that a
+ *     clock round needs a cron (group k3-goalrounds).
  *   v1.1.0 — 2026-10-25 — aimeat_goal_set and aimeat_goal_work take the goal's and the work's fields at
  *     the top level, as the REST routes read them (GOAL_INPUT_FIELDS, WORK_INPUT_FIELDS); `input` and
  *     `work` still work. The four are on the agent surface (and full); the chat surface stays at its
@@ -82,7 +84,7 @@ export const goalTools = [
       parent_goal_id: { type: 'string', description: 'For create: makes a subgoal that spends from this goal.' },
       works: { type: 'array', description: 'The works, as listed in the description.' },
       reactions: { type: 'array', description: 'When this is done, which work starts, as listed in the description.' },
-      rounds: { type: 'object', description: '{ trigger manual|clock|condition, cron?, timezone?, condition?, works? }.' },
+      rounds: { type: 'object', description: '{ trigger manual|clock|condition, cron?, timezone?, condition?, works? }. On update, a field you leave out keeps its value ("" or [] clears it); a clock round needs a cron.' },
       this_round_only: { type: 'boolean', description: 'For update of a round goal: the change holds for this round only.' },
       kind: { type: 'string', enum: ['file', 'memory', 'link', 'text'], description: 'For attach: what the material is.' },
       ref: { type: 'string', description: 'For attach: the storage key, the record key, the address or the text.' },

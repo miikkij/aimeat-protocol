@@ -3545,6 +3545,21 @@ components:
           nullable: true
         metadata:
           type: object
+          description: >-
+            Free-form. The node writes `collection_method` and `wsRole` itself and drops a request's
+            own values for them.
+        role:
+          type: string
+          enum: [read, write]
+          description: >-
+            Request only. What the recipient may do; absent means `read`. `write` is the contributor
+            role on one workspace: `data_pattern` `organism.<id>.w.<ws>.**`, `recipient`
+            `ghii:<name>@<this node>` (it covers that person's agents), granted by the workspace's
+            creator signed in as themselves. Any other `write` is refused: 400 WRITE_NOT_SUPPORTED for
+            another pattern or recipient, 403 WRITE_NOT_SUPPORTED when the caller is not the
+            workspace's creator (an organism admin uses /v1/organisms/{id}/workspace-access/grant).
+            The node stamps the role as `metadata.wsRole` (`contributor`, or `viewer` for `read` in
+            the same shape). `purpose` is free text and never decides what the recipient may do.
 
     # === Phase 0: TOTP ===
     TotpSetupResponse:
@@ -25113,7 +25128,9 @@ paths:
         The owner or the goal's coordinator changes it; the coordinator only within what the goal's
         permissions allow. With `preview: true` nothing changes and the answer names the taken works the
         change would end and what they cost so far. `this_round_only` makes a change for the current
-        round of a round goal. Taken works the change ends are told so in their tasks. `task:write`.
+        round of a round goal. Taken works the change ends are told so in their tasks. A change to
+        `rounds` keeps the fields it leaves out (an empty string or an empty list clears one); a field the
+        new trigger does not use is dropped, and a `clock` round without a cron is refused. `task:write`.
       security:
         - BearerAuth: []
       requestBody:
@@ -44463,7 +44480,9 @@ paths:
           description: |
             Nothing was granted. Either the session does not carry
             `consent:manage` (SCOPE_DENIED), or the recipient is `*` and the
-            publish gate asked the owner first (PUBLISH_REQUESTED).
+            publish gate asked the owner first (PUBLISH_REQUESTED), or `role`
+            is `write` and the caller is not the workspace's creator
+            (WRITE_NOT_SUPPORTED).
           content:
             application/json:
               schema:

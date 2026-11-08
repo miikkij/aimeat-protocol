@@ -7,10 +7,17 @@
  *   with its actions, an app with its tools, an agent with its offers, a hand-added webhook. This
  *   file is the state and the handlers (open a provider, try an action through the invoke proxy,
  *   copy the agent's text, vouch, hide from agents, add or remove a hand-added one); the render is
- *   capabilities/page.js and capabilities/rows.js.
+ *   capabilities/page.js and capabilities/rows.js. The bodies of the add and show calls are
+ *   capabilities/publish.js: "Visible to agents" ticked publishes the entry.
  * @structure CapabilitiesTab() — state (caps, policy, details, filters, queries, expanded, test, form) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'capabilities'.
  * @version-history
+ *   v3.1.0 -- 2026-11-08 -- "Visible to agents" ticked publishes the entry: the form sent no status,
+ *     so a ticked entry was stored as a public draft that no other account could open or call and
+ *     nothing on the page made active. The add body asks for status 'active' when ticked (draft when
+ *     not), and "Show to agents" publishes a draft too (capabilities/publish.js). On a moderated node
+ *     the toast says the entry waits for the operator's review. The form opens unticked, as its
+ *     explanation (capabilities.public) says.
  *   v3.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Kyvykkyydet-sivu", direction A):
  *     rows grouped by provider instead of one flat list of every action; app tools and agent offers
  *     now in the registry; cortexes left to the Libraries page; the try, vouch, hide and remove doors
@@ -30,9 +37,12 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { renderPage } from './capabilities/page.js';
 import { x, groupCapabilities, agentTextFor, schemaProps } from './capabilities/frame.js';
+import { manualCreateBody, visibilityPatch, waitsForReview } from './capabilities/publish.js';
 
 const emptyFilter = () => ({ who: '', use: '', priced: false, vouched: false });
-const emptyForm = () => ({ open: false, name: '', summary: '', webhookUrl: '', tags: '', visibility: 'public' });
+// Unticked when the form opens: ticked publishes at once (capabilities/publish.js), so it is a choice
+// the person makes, never a default.
+const emptyForm = () => ({ open: false, name: '', summary: '', webhookUrl: '', tags: '', visibility: 'private' });
 
 export default function CapabilitiesTab({ session, showToast }) {
   const sess = session || getSession();
@@ -133,11 +143,15 @@ export default function CapabilitiesTab({ session, showToast }) {
   const setVisibility = async (g, visibility) => {
     setBusy(g.key);
     try {
+      let pending = false;
+      const published = g.members.some((c) => c.status === 'draft');
       for (const c of g.members) {
-        const r = await apiPut(`/v1/capabilities/${encodeURIComponent(c.id)}`, { visibility });
+        const r = await apiPut(`/v1/capabilities/${encodeURIComponent(c.id)}`, visibilityPatch(c, visibility));
         if (r && r.ok === false) { fail(r); return; }
+        if (waitsForReview(r?.data)) pending = true;
       }
-      showToast?.(visibility === 'public' ? x('shownToast', { name: g.name }) : x('hiddenToast', { name: g.name }));
+      const toast = visibility !== 'public' ? 'hiddenToast' : pending ? 'pendingToast' : published ? 'publishedToast' : 'shownToast';
+      showToast?.(x(toast, { name: g.name }));
       load();
     } catch (e) { fail(e); } finally { setBusy(null); }
   };
@@ -158,14 +172,9 @@ export default function CapabilitiesTab({ session, showToast }) {
   const createManual = async () => {
     setBusy('create');
     try {
-      const r = await apiPost('/v1/capabilities', {
-        name: form.name.trim(), summary: form.summary.trim(), callable: !!form.webhookUrl.trim(),
-        visibility: form.visibility, webhookUrl: form.webhookUrl.trim() || undefined,
-        source: { type: 'manual', ref: 'manual', version: '1.0.0' },
-        tags: form.tags.split(',').map((s) => s.trim()).filter(Boolean),
-      });
+      const r = await apiPost('/v1/capabilities', manualCreateBody(form));
       if (r && r.ok === false) { fail(r); return; }
-      showToast?.(x('createdToast', { name: form.name.trim() }));
+      showToast?.(x(waitsForReview(r?.data) ? 'pendingToast' : 'createdToast', { name: form.name.trim() }));
       setFormState(emptyForm());
       load();
     } catch (e) { fail(e); } finally { setBusy(null); }

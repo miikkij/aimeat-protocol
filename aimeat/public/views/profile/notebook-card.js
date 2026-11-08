@@ -9,11 +9,16 @@
  *       → fold results + Sources into the note → file as one or split.
  *     - Distribute (Phase 3): split the (enriched) note into chunks, file each to its own home.
  *   Trust toggles (from the parent's notebook.settings) drive auto-detect-on-capture (the `autoEnrich`
- *   prop), auto-run-plan, and auto-distribute-on-file.
+ *   prop), auto-run-plan, and auto-distribute-on-file. The automatic run starts only the plan steps
+ *   that do not ask first; it stops at a step whose gate is set and waits for the person's Run or Skip.
  * @structure NoteCard({ note, showToast, orgNames, settings, autoEnrich, onChanged, onOrgsChanged, onDelete })
  * @usage html`<${NoteCard} note=${note} showToast=${showToast} orgNames=${orgNames} settings=${settings}
  *                autoEnrich=${auto} onChanged=${loadInbox} onOrgsChanged=${loadOrgNames} onDelete=${handleDelete} />`
  * @version-history
+ *   v1.18.0 -- 2026-11-08 -- "Run plan automatically" reads each step's gate: the run stops before a
+ *     step that asks first (by default every step that goes to an agent), marks it with a note, and
+ *     goes on to the following steps once the person presses Run or Skip on it. Run all steps still
+ *     runs every step, because that press is the person's own.
  *   2026-09-28 -- The action row wraps: at 390 px Delete ran 5 px past the page and was cut off.
  *   v1.17.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a note's first line, an organism or workspace name, the AI's reason or an error
@@ -85,7 +90,7 @@ import { Peek, PeekToggle, nextPeek } from '/components/Peek.js';
 import { createMemory, deleteMemory } from '/js/services/memory.js';
 import { classifyNote, materializeDocument, distributeNote, distributeChunks } from '/js/services/notebook.js';
 import { TrackResponseModal } from './track-response-modal.js';
-import { generatePlan, runStep, composeEnrichedMarkdown, buildCatalogue } from '/js/services/notebook-plan.js';
+import { generatePlan, runStep, runPlanSteps, composeEnrichedMarkdown, buildCatalogue } from '/js/services/notebook-plan.js';
 import * as offersService from '/js/services/offers.js';
 import { Markdown } from '/components/Markdown.js';
 import { OpenRouterSettings } from './openrouter-settings.js';
@@ -259,11 +264,12 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       const existing = Array.isArray(note.value?.enrichments) ? note.value.enrichments : [];
       const plan = data?.plan || { steps: [], summary: '', confidence: 0 };
       skippedRef.current = new Set();
-      setEnrich({ plan, enrichments: existing, runningStepId: null, doneStepIds: existing.map(e => e.stepId), skippedStepIds: [], offersFeed, stepStatus: {} });
+      setEnrich({ plan, enrichments: existing, runningStepId: null, waitingStepId: null, doneStepIds: existing.map(e => e.stepId), skippedStepIds: [], offersFeed, stepStatus: {} });
       setPlanning(false);
       if (settings?.autoRunPlan && plan.steps.length) {
         const handled = new Set(existing.map(e => e.stepId));
-        await runStepsBatch({ priorEnrichments: existing, plan, offersFeed }, plan.steps, handled);
+        // The automatic run starts only the steps that do not ask first, and stops at the first that does.
+        await runStepsBatch({ priorEnrichments: existing, plan, offersFeed }, plan.steps, handled, true);
       }
     } catch (e) {
       setEnrichError({ message: e.message || t('profile.error'), code: e.code });
@@ -273,7 +279,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   /** Run one step, persist its result into the note, update enrich state; return the new enrichments. */
   async function executeStep(step, ctx) {
     const { priorEnrichments, plan, offersFeed } = ctx;
-    setEnrich(s => s ? { ...s, runningStepId: step.id } : s);
+    setEnrich(s => s ? { ...s, runningStepId: step.id, waitingStepId: null } : s);
     const onStatus = (id, status) => setEnrich(s => s ? { ...s, stepStatus: { ...(s.stepStatus || {}), [id]: status } } : s);
     const result = await runStep(step, { noteText: baseText(), priorEnrichments, offersFeed, onStatus });
     const enrichments = [...priorEnrichments.filter(e => e.stepId !== step.id), result];
@@ -283,26 +289,41 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     return enrichments;
   }
 
-  async function runStepsBatch(ctx, steps, handledIds) {
+  /** Run the plan's steps in order. `stopAtGate` is the automatic run: it stops before the first step
+   *  whose gate asks the person first and marks that step as waiting for their Run or Skip. */
+  async function runStepsBatch(ctx, steps, handledIds, stopAtGate = false) {
     let prior = ctx.priorEnrichments;
-    for (const step of steps) {
-      if (handledIds.has(step.id) || skippedRef.current.has(step.id)) continue;  // honor a mid-batch skip
-      try {
-        prior = await executeStep(step, { ...ctx, priorEnrichments: prior });
-      } catch (e) {
-        setEnrich(s => s ? { ...s, runningStepId: null } : s);
-        showToast(e.message === 'TIMEOUT' ? t('profile.notebook.delegateTimeout') : (e.message || t('profile.error')), true);
-        break;
-      }
-    }
-  }
-
-  async function runOneStep(step) {
-    try { await executeStep(step, { priorEnrichments: enrich.enrichments, plan: enrich.plan, offersFeed: enrich.offersFeed }); }
-    catch (e) {
+    try {
+      const waiting = await runPlanSteps(steps, {
+        stopAtGate,
+        isHandled: (step) => handledIds.has(step.id) || skippedRef.current.has(step.id),  // honor a mid-batch skip
+        execute: async (step) => { prior = await executeStep(step, { ...ctx, priorEnrichments: prior }); },
+      });
+      setEnrich(s => s ? { ...s, waitingStepId: waiting ? waiting.id : null } : s);
+    } catch (e) {
       setEnrich(s => s ? { ...s, runningStepId: null } : s);
       showToast(e.message === 'TIMEOUT' ? t('profile.notebook.delegateTimeout') : (e.message || t('profile.error')), true);
     }
+    return prior;
+  }
+
+  /** With "Run plan automatically" on, a step the person ran or skipped by hand lets the automatic run
+   *  go on to the next steps, up to the next step that asks first. */
+  async function continueAutoRun(enrichments, extraHandledIds) {
+    if (!settings?.autoRunPlan || !enrich) return;
+    const handled = new Set([...(enrich.doneStepIds || []), ...(enrich.skippedStepIds || []), ...extraHandledIds]);
+    await runStepsBatch({ priorEnrichments: enrichments, plan: enrich.plan, offersFeed: enrich.offersFeed }, enrich.plan.steps, handled, true);
+  }
+
+  async function runOneStep(step) {
+    let enrichments;
+    try { enrichments = await executeStep(step, { priorEnrichments: enrich.enrichments, plan: enrich.plan, offersFeed: enrich.offersFeed }); }
+    catch (e) {
+      setEnrich(s => s ? { ...s, runningStepId: null } : s);
+      showToast(e.message === 'TIMEOUT' ? t('profile.notebook.delegateTimeout') : (e.message || t('profile.error')), true);
+      return;
+    }
+    await continueAutoRun(enrichments, [step.id]);
   }
 
   async function handleRunAll() {
@@ -312,7 +333,9 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
 
   const handleSkipStep = (step) => {
     skippedRef.current.add(step.id);  // so an in-flight auto-run batch skips it when it gets there
-    setEnrich(s => s ? { ...s, skippedStepIds: [...new Set([...s.skippedStepIds, step.id])] } : s);
+    setEnrich(s => s ? { ...s, skippedStepIds: [...new Set([...s.skippedStepIds, step.id])], waitingStepId: s.waitingStepId === step.id ? null : s.waitingStepId } : s);
+    // Skipping the step the automatic run stopped at lets the run go on (an in-flight run needs no push).
+    if (enrich?.waitingStepId === step.id && !enrich.runningStepId) void continueAutoRun(enrich.enrichments, [step.id]);
   };
 
   // ── Distribute: split → file each chunk ──
@@ -375,7 +398,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   };
 
   const renderEnrichPanel = () => {
-    const { plan, enrichments, runningStepId, doneStepIds, skippedStepIds, stepStatus = {} } = enrich;
+    const { plan, enrichments, runningStepId, waitingStepId, doneStepIds, skippedStepIds, stepStatus = {} } = enrich;
     const steps = plan?.steps || [];
     const conf = typeof plan?.confidence === 'number' ? Math.round(plan.confidence * 100) : null;
     const allHandled = steps.every(s => doneStepIds.includes(s.id) || skippedStepIds.includes(s.id));
@@ -405,6 +428,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
                       <${Action} small disabled=${runningStepId === step.id} onClick=${() => handleSkipStep(step)}>${t('profile.notebook.skipStep')}<//>`}>
                     ${step.description && html`<${Note} kind="meta">${step.description}<//>`}
                     ${step.rationale && html`<${PlanNote}>${step.rationale}<//>`}
+                    ${waitingStepId === step.id && !done && !skipped && html`<${Note} kind="aside" size="small">${t('profile.notebook.stepWaits')}<//>`}
                     ${running && step.kind === 'delegate' && html`<${PlanNote}>${t('profile.notebook.delegateWaiting').replace('{agent}', step.agent || '')}${stepStatus[step.id] ? ` (${stepStatus[step.id]})` : ''}<//>`}
                   <//>`;
               })}

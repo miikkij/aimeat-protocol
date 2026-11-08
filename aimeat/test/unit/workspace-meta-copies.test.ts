@@ -22,6 +22,10 @@
  *     changes none of their answers
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-meta-copies.test.ts
  * @version-history
+ *   v1.2.1 — 2026-11-08 — The two contributor grants carry metadata.wsRole, as grantWorkspaceRole
+ *     (services/workspace-roles.ts) has written every role grant since 2026-07-11: the write check
+ *     reads the stamped role now, not the purpose word. The setup had stopped matching production;
+ *     no assertion changed.
  *   v1.2.0 — 2026-10-20 — The workspace role is the MEMBER's permission, not an agent-only one, so a
  *     plain member's content write is refused in person as it is through an agent, a contributor
  *     grant opens it for both, and the creator, their agent and an organism manager keep writing
@@ -121,6 +125,7 @@ describe('who writes a workspace\'s meta namespace', () => {
       id: 'consent-bob', ownerGaii: `alice@${NODE}`, dataPattern: `organism.${ORG}.w.${WS}.**`,
       recipient: `ghii:bob@${NODE}`, purpose: 'workspace-contributor', scope: 'private',
       expires: null, status: 'active', grantedAt: now(), revokedAt: null,
+      metadata: { source: 'grant', grantedBy: 'alice', wsRole: 'contributor' },
     } as ConsentRecord;
     await storage.createConsent(grant);
     const agent = { principal: `bot#bob@${NODE}`, owner: 'bob', roles: ['agent'] };
@@ -169,6 +174,7 @@ describe('who writes a workspace\'s meta namespace', () => {
       id: 'consent-bob-person', ownerGaii: `alice@${NODE}`, dataPattern: `organism.${ORG}.w.${WS}.**`,
       recipient: `ghii:bob@${NODE}`, purpose: 'workspace-contributor', scope: 'local',
       expires: null, status: 'active', grantedAt: now(), revokedAt: null,
+      metadata: { source: 'grant', grantedBy: 'alice', wsRole: 'contributor' },
     } as ConsentRecord);
     const key = `organism.${ORG}.w.${WS}.books.notes.n1.draft`;
     expect(await checkOrganismNamespaceAccess({ storage, config }, human('bob'), key, 'write')).toBeNull();
