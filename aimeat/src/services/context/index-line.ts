@@ -59,7 +59,10 @@ function marksOf(v: ContextValue, now: number): string {
     return marks.length ? ` [${marks.join('; ')}]` : '';
 }
 
-const HEAD = 'This person keeps contexts: larger things they work on with their AI, each one record under their memory key context.<slug>. When the conversation touches one, read it first (aimeat_memory_read, owner_scope true) and keep it up to date as you work; the skill aimeat-context says how.';
+// "Touches" includes writing: measured 2026-11-08, asked for a scene set in a story world on this
+// list, the AI wrote it without a single call in 2 runs of 3 and broke the world's rules. Naming a
+// question, a piece of writing and a plan is what the sentence has to say.
+const HEAD = 'This person keeps contexts: larger things they work on with their AI, each one record under their memory key context.<slug>. When their request touches one of these (a question about it, a piece of writing set in it, a plan or a message about it), read that context first (aimeat_memory_read, owner_scope true), then answer from it, and keep it up to date as you work; the skill aimeat-context says how.';
 const NONE = 'This person keeps no contexts yet. When a topic keeps coming back in the conversation, offer once to keep a context of it; the skill aimeat-context says how.';
 
 function oneLine(s: string, max: number): string {

@@ -140,7 +140,10 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
 
 The context is kept for an AI. A person gets a view: ask who it is for and write it in their
 words, at their level, from the context. A view keeps the facts and changes only how they are
-told. When the person wants a view kept up to date, add it to \`views\` with \`keep\` and write
+told. **It adds nothing the context does not say**: no weekday the context does not name, no
+purpose of a meeting, no "still" or "as usual", no detail that would make the note read better.
+If the reader needs something the context lacks, leave it out and tell the person what is
+missing. When the person wants a view kept up to date, add it to \`views\` with \`keep\` and write
 its newest text into \`last\`. For a view on a clock ("every Monday"), create a schedule of kind
 \`ai\` over the context's key with \`aimeat_schedule_create\`, its prompt the view request, so the
 node writes the view even when no AI is connected.
