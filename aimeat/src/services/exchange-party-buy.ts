@@ -57,6 +57,10 @@
  *   const done = await completePartyPurchase(deps, purchaseId, { handler: 'test.money', instrument: 'x' });
  *   const r = await completePartyPurchaseFromStripe(deps, sellerGhii, purchaseId, stripeSessionId);
  * @version-history
+ *   2026-11-08 -- buyable() answers 403 ACCOUNT_DISABLED while the provider's account is deactivated, so a
+ *     purchase is neither opened nor completed (nothing charged); a card page already paid takes the
+ *     refund for an offering that cannot be sold, and the refusal names the deactivation
+ *     (secaudit2026nov08b round 15, exchange-party-buy/deactivated-provider-package-sold-to-refused-party).
  *   2026-11-04 — The completion write and the sale's booking commit in one transaction
  *     (settleSessionlessSale, commerce/settle-purchase.ts; codebase analysis 2026-11-03, item B2).
  *   v1.2.0 — 2026-11-03 — secaudit2026nov02d round 13b: a card page purchase paid inside its hour and
@@ -103,6 +107,7 @@ import { insertParty, findPartyByUid, removeParty, changeParty } from './parties
 import { connectionFileOf, isLiveShare, partySharesOf, setShareMeta, sharePatternOf, shareMetaOf, shareView } from './parties/shares.js';
 import type { PartyContext } from './parties/verify.js';
 import { emitChange } from './event-bus.js';
+import { deactivatedSince } from './account-deactivated.js';
 import { logger } from '../utils/logger.js';
 
 /** How long an open purchase waits for its payment. */
@@ -158,7 +163,8 @@ export interface CompleteOptions {
 /** Whether a purchase takes one of the month's slots: paid (or being paid), or open and still waiting for its payment. */
 const holdsSlot = (p: PartyPurchase, nowMs: number): boolean => p.status !== 'open' || Date.parse(p.expiresAt) > nowMs;
 
-type Refusal = { ok: false; status: number; code: string; message: string };
+/** `since`: set by buyable() when the provider's account is deactivated (the day, YYYY-MM-DD). */
+type Refusal = { ok: false; status: number; code: string; message: string; since?: string };
 const refuse = (status: number, code: string, message: string): Refusal => ({ ok: false, status, code, message });
 
 const b64u = (s: string): string => Buffer.from(s, 'utf8').toString('base64url');
@@ -210,8 +216,16 @@ async function buyable(storage: Storage, offeringId: string): Promise<{ ok: true
     if (!o || o.state !== 'listed') return refuse(404, 'NOT_FOUND', 'No such listed offering.');
     if (o.kind !== 'datapackage' || o.surface?.kind !== 'datapackage') return refuse(409, 'NOT_SOLD_TO_PARTIES', 'Only a data package is sold to a buyer without an AIMEAT account. Sign in to an account to buy this.');
     if (o.unit !== 'money') return refuse(409, 'NOT_SOLD_TO_PARTIES', 'This data package has no money price, so a buyer without an account cannot pay for it. Ask the provider to share it with you by name.');
+    // Every read of a party of a deactivated account answers 403 ACCOUNT_DISABLED (parties/verify.ts),
+    // so the purchase waits the same way rather than charging for reads that are refused
+    // (secaudit2026nov08b round 15). Nothing is deleted: the offering sells again after reactivation.
+    const deactivated = await deactivatedSince(storage, o.providerGhii);
+    if (deactivated) return { ...refuse(403, 'ACCOUNT_DISABLED', `${providerDeactivated(deactivated)} Nothing was charged. Buy it again after the operator of this server reactivates the account.`), since: deactivated };
     return { ok: true, o, surface: o.surface };
 }
+
+/** Why a deactivated provider's package is not sold now; the refusal adds what happened to the payment. */
+const providerDeactivated = (since: string): string => `The account that sells this data package was deactivated on ${since}, so it sells nothing now.`;
 
 /**
  * Price and keep an open purchase of a datapackage offering. `renewal` is the verified party of the
@@ -440,7 +454,11 @@ export async function completePartyPurchase(
     const made: DeliveryWrites = {};
     try {
         // A card payment for an offering that cannot be sold any more goes back (the catch refunds).
-        if (!found.ok) throw Object.assign(new Error('The seller no longer sells this offering here, so the purchase cannot be delivered'), { code: found.code, statusCode: found.status });
+        // The same for a provider deactivated after the card page was paid (secaudit2026nov08b round 15).
+        if (!found.ok) {
+            const why = found.since ? `${providerDeactivated(found.since)} The purchase cannot be delivered` : 'The seller no longer sells this offering here, so the purchase cannot be delivered';
+            throw Object.assign(new Error(why), { code: found.code, statusCode: found.status });
+        }
         const { o, surface } = found;
         // The party: the renewing one, or a new one made now, with its first key. Completed by the
         // webhook, a new party gets its key when the buyer comes back (handOver): nobody reads this answer.

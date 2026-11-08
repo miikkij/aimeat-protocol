@@ -28,10 +28,15 @@
  *   token (services/parties/verify.ts), an app party's sign-in (services/app-parties/service.ts), and
  *   the agent webhook dispatcher (services/webhook-dispatcher.ts). Each refuses or skips while the flag
  *   is set and works again on reactivation, because nothing is deleted.
+ *   Since 2026-11-08 (round 15) also the two sales to a buyer with no account here: the foreign A2A
+ *   quote and payment (services/a2a-offering.ts priceForForeignCaller) and the outside party's data
+ *   package purchase (services/exchange-party-buy.ts buyable). Neither charges while the flag is set.
  * @structure deactivatedAccountSkip(storage, identity) · deactivatedAccountOf(storage, identity) ·
  *   deactivatedSince(storage, identity)
  * @usage const skip = await deactivatedAccountSkip(storage, job.ownerScope); if (skip) { ...skip... }
  * @version-history
+ *   v1.1.1 -- 2026-11-08 -- Two more callers named in the description: the foreign A2A sale and the outside
+ *     party's purchase (secaudit2026nov08b round 15). No code change here.
  *   v1.1.0 -- 2026-11-08 -- deactivatedAccountOf(): the same read as facts, for the AI job runner
  *     (secaudit2026nov08 round 14, reclaimJobs:restarts-deactivated-account-job); deactivatedSince for
  *     the credentials without a session (secaudit2026nov08 round 14). Both read the owner once, through

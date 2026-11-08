@@ -25,6 +25,10 @@
  *     its promised run has passed (the pointer's time set back).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=exchange-datapackage
  * @version-history
+ *   2026-11-08 -- D5.4: a deactivated provider's package is neither opened nor completed for a buyer
+ *     without an account (403 ACCOUNT_DISABLED, nothing charged), and the same purchase completes and
+ *     reads after reactivation (secaudit2026nov08b round 15,
+ *     exchange-party-buy/deactivated-provider-package-sold-to-refused-party).
  *   v1.3.0 — 2026-11-02 — D5.4: openings without a party key count against the address's hourly
  *     limit (consent.party_purchases_per_hour), a renewal with the key does not, 0 is no limit
  *     (secaudit2026nov02d round 13).
@@ -33,7 +37,7 @@
  *   v1.1.0 — 2026-11-01 — D6: the listing carries the package's freshness.
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5).
  */
-import { registerOwner, setupOperator } from './helpers/owner-login.js';
+import { registerOwner, setupOperator, ownerToken } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -294,6 +298,51 @@ await test('D5.4 openings without a party key count against the address\'s hourl
     } finally {
         await setLimit(20);
     }
+});
+
+// secaudit2026nov08b round 15 (exchange-party-buy/deactivated-provider-package-sold-to-refused-party):
+// every party read of a deactivated provider answers 403 ACCOUNT_DISABLED (parties/verify.ts), so the
+// purchase waits the same way and nothing is charged. A provider of its own, so A keeps selling below.
+await test('D5.4 a deactivated provider\'s package is not sold to a buyer without an account; after reactivation the same purchase completes and reads', async () => {
+    const d = await registerOwner(BASE, `xdz${stamp}`);
+    let dToken = d.token;
+    const DPKG = `xdz${stamp}`;
+    const p = await call('/v1/datapackages', { token: dToken, body: { name: DPKG, changes: 'v', visibility: 'private', resources: [{ name: 'items', rows: [{ id: 1, label: 'z' }] }] } });
+    assert(p.status === 201, `publish: ${show(p)}`);
+    const s = await sell(DPKG, { model: 'per_read', prices_money: [{ amount: 100_000, currency: 'EUR' }], usage_terms: terms }, dToken, d.name);
+    assert(s.status === 200, `sell: ${show(s)}`);
+    const dOffering = s.body.data.listing.listed[0].offeringId as string;
+    const buy = () => call(`/v1/exchange/offerings/${dOffering}/buy`, { body: { party: { display_name: 'Late Buyer', kind: 'program' }, reads: 2, handler: 'test.money' } });
+    // Opened while the provider is active, completed while it is deactivated.
+    const earlier = await buy();
+    assert(earlier.status === 201, `opened while active: ${show(earlier)}`);
+    const earlierId = earlier.body.data.purchase.id as string;
+
+    const off = await call(`/v1/admin/owners/${d.name}/disable`, { token: OP.token, body: {} });
+    assert(off.status === 200, `the operator deactivates the provider: ${show(off)}`);
+    try {
+        const open = await buy();
+        assert(open.status === 403 && codeOf(open) === 'ACCOUNT_DISABLED', `a new purchase: ${show(open)}`);
+        assert(/deactivated on \d{4}-\d{2}-\d{2}/.test(open.body.error?.message ?? '') && /Nothing was charged/.test(open.body.error?.message ?? ''), `the refusal says why and that nothing was charged: ${show(open)}`);
+        const done = await call(`/v1/exchange/purchases/${earlierId}/complete`, { body: { handler: 'test.money', instrument: 'x' } });
+        assert(done.status === 403 && codeOf(done) === 'ACCOUNT_DISABLED' && !done.body.data?.connection, `an open purchase is not completed: ${show(done)}`);
+        const read = await call(`/v1/exchange/purchases/${earlierId}`);
+        assert(read.status === 200 && read.body.data.purchase.status === 'open', `and stays open, unpaid: ${show(read)}`);
+    } finally {
+        const on = await call(`/v1/admin/owners/${d.name}/enable`, { token: OP.token, body: {} });
+        assert(on.status === 200, `the operator reactivates the provider: ${show(on)}`);
+    }
+
+    dToken = await ownerToken(BASE, d.name);
+    const parties = await call('/v1/parties', { token: dToken });
+    assert(parties.status === 200 && !(parties.body.data.parties as Body[]).some(x => x.displayName === 'Late Buyer' || x.display_name === 'Late Buyer'), `no party was made while deactivated: ${show(parties)}`);
+    const done = await call(`/v1/exchange/purchases/${earlierId}/complete`, { body: { handler: 'test.money', instrument: 'x' } });
+    assert(done.status === 200 && done.body.data.connection?.key, `after reactivation the same purchase completes: ${show(done)}`);
+    const conn = done.body.data.connection as Body;
+    const rows = await call(`/v1/datapackages/${d.name}/${DPKG}/rows/items`, { basic: `${conn.authentication.basic.user}:${conn.key}` });
+    assert(rows.status === 200 && rows.body.data.rows.length === 1, `and the key reads: ${show(rows)}`);
+    const fresh = await buy();
+    assert(fresh.status === 201, `a new purchase opens again: ${show(fresh)}`);
 });
 
 console.log('\nD5.5 deliversData, ODPS');

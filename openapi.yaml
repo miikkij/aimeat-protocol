@@ -12460,6 +12460,10 @@ paths:
         The refusal codes outside A2A's own set are -32040 (nothing is published for hire here),
         -32041 (not what you named, or you named nothing and there are several), -32042 (for sale,
         but this node cannot take your money right now) and -32043 (principals of this account only).
+        While the seller's account is deactivated, a new message and the payment turn of quoted work
+        both answer -32042 with the day of the deactivation in the message: nothing is quoted or
+        charged, quoted work stays open and unpaid, and the same offering sells again after the
+        operator reactivates the account.
 
         THE SCOPE IS PER METHOD, not per door: one HTTP door with a dozen methods behind it cannot be
         gated by one middleware without being wrong for eleven of them. `SendMessage` needs
@@ -26535,7 +26539,7 @@ paths:
         '201': { description: '`{ purchase, pay }`: the open purchase and how to pay it (`complete_url`, and `card_page_url` for the card page).' }
         '400': { description: INVALID_INPUT }
         '401': { description: INVALID_PARTY_CREDENTIAL }
-        '403': { description: FORBIDDEN. The party credential belongs to another provider }
+        '403': { description: 'FORBIDDEN (the party credential belongs to another provider), or ACCOUNT_DISABLED (the provider''s account is deactivated: no purchase is kept and nothing is charged; the message names the day, and the offering sells again after the operator reactivates the account)' }
         '404': { description: No such listed offering }
         '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price), USE_YOUR_ACCOUNT, or PROVIDER_TAKES_NO_CARD (`com.stripe.checkout` asked and the provider has connected no Stripe account; nothing is kept, and the message names the other handlers this node offers, if any)' }
         '422': { description: 'UNKNOWN_PAYMENT_HANDLER, or Stripe refused to open the card page (its own code; the purchase is not kept)' }
@@ -26584,6 +26588,7 @@ paths:
       responses:
         '200': { description: '`{ purchase, party, share, contract, connection, key_note?, say }`' }
         '402': { description: 'The payment did not go through, or PAYMENT_REFUNDED (this payment was refunded after a failed delivery; start a new purchase)' }
+        '403': { description: 'ACCOUNT_DISABLED: the provider''s account is deactivated. With `test.money` nothing is collected and the purchase stays open, so it completes after the operator reactivates the account inside its hour; a card page already paid is refunded, and the message says whether the refund went through.' }
         '404': { description: 'No such purchase, NOT_FOUND or NOT_SOLD_TO_PARTIES (the offering is no longer for sale; a card payment made for it was refunded, and the message says whether it was), or PURCHASE_ENDED (the webhook completed the purchase and the seller then removed its party or share; the message names the purchase id to give the seller)' }
         '409': { description: 'ALREADY_COMPLETED or PURCHASE_BUSY' }
         '410': { description: 'PURCHASE_EXPIRED (the hour passed and no payment was made for the purchase)' }

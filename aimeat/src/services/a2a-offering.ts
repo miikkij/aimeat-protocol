@@ -22,6 +22,10 @@
  * @structure offeringsForAgent() · findSellableOffering() · priceForForeignCaller()
  * @usage const o = await findSellableOffering(storage, config, agent, skillId);
  * @version-history
+ *   v1.1.0 -- 2026-11-08 -- priceForForeignCaller refuses while the seller's account is deactivated, so a
+ *     stranger is neither quoted nor charged for work nobody can deliver; the handler answers -32042
+ *     with the day of the deactivation (secaudit2026nov08b round 15,
+ *     a2a-foreign-handler/deactivated-provider-offering-quoted-and-charged).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a foreign path).
  */
 import type { AimeatConfig } from '../config.js';
@@ -31,6 +35,7 @@ import {
 } from './exchange-market.js';
 import { isMoneyCurrency } from '../commerce/money.js';
 import { buildGAII } from '../utils/gaii.js';
+import { deactivatedSince } from './account-deactivated.js';
 import {
   getX402Network, getX402Asset, buildExactRequirements, extractPayTo,
 } from '../commerce/x402-facilitator.js';
@@ -152,6 +157,18 @@ export interface ForeignPrice {
 export async function priceForForeignCaller(
   storage: Storage, config: AimeatConfig, offering: Offering, resource: string,
 ): Promise<{ ok: true; price: ForeignPrice } | { ok: false; code: string; message: string }> {
+  // A deactivated seller takes no new paid work (secaudit2026nov08b round 15). Deactivation ended every
+  // credential its agent needs to deliver, and paid open work has no refund that does not go through
+  // the seller, so the quote and the payment wait. Both turns of the handler price here before any
+  // work is written or any money moves; nothing is deleted, and the offering sells after reactivation.
+  const deactivated = await deactivatedSince(storage, offering.providerGhii);
+  if (deactivated) {
+    return {
+      ok: false, code: 'ACCOUNT_DISABLED',
+      message: `The account that publishes this work was deactivated on ${deactivated}, so it takes no paid work now. `
+        + 'Nothing was charged. You can hire it again after the operator of this server reactivates the account.',
+    };
+  }
   if (!config.x402Enabled) {
     return {
       ok: false, code: 'PAYMENT_UNAVAILABLE',
