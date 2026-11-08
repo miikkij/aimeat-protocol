@@ -16,6 +16,8 @@
  * @usage
  *   import { CONTEXT_SKILL_ENTRY } from './builtin-skills.context.js';
  * @version-history
+ *   v1.1.0 — 2026-11-08 — Opt-in: a context starts only when the person asks for one; the AI no
+ *     longer offers one when a topic repeats. A context that exists is still kept up to date.
  *   v1.0.0 — 2026-11-08 — Initial (wish-oma-konteksti-muoto-syntyy-k-yt-ss-n-kym-pyynn-st).
  */
 import type { BuiltinSkill } from './builtin-skills.js';
@@ -26,7 +28,7 @@ export const CONTEXT_SKILL_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-context
-description: How to use and shape a person's contexts on an AIMEAT node. A context holds together something larger the person works on (a project, a long conversation with someone, a trip, a story world) in a form that grew with use. Use when the person asks about something they have been working on, says "keep a context", "remember where we are with X", "what is open in X", combines two things they work on, or when a topic keeps coming back in the conversation.
+description: How to use and shape a person's contexts on an AIMEAT node. A context holds together something larger the person works on (a project, a long conversation with someone, a trip, a story world) in a form that grew with use. Use when the person asks about something they have been working on, says "make this a context" or "keep a context", "remember where we are with X", "what is open in X", or combines two things they work on.
 license: MIT
 metadata:
   audience: agent
@@ -101,11 +103,11 @@ calls for it. A \`ref\` is \`memory:<key>\`, \`memory:<owner>/<key>\`, \`workspa
 
 ## Shaping a context as you work
 
-- **When a topic keeps coming back** and no context covers it, offer once: "This looks like
-  something you keep working on. Shall I keep a context of it?" After a yes, keep it up to
-  date yourself without asking each time.
-- **When the person says "keep a context of this"**, create it at once, \`kind\` set by what it
-  is, visibility \`owner\`.
+- **A context starts only when the person asks for one** ("make this a context", "keep a context
+  of this"). Then create it at once, \`kind\` set by what it is, visibility \`owner\`. Do not offer
+  one and do not start one on your own, however often a topic comes back.
+- **A context that exists you keep up to date yourself** while you work in it, without asking
+  each time.
 - **When something new is settled**, write it into the context before the conversation ends.
   Read the whole record first and write it back whole, with \`expected_version\`, so nothing
   that was there is lost and nothing appears twice. Move what was open to what was decided.

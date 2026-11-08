@@ -50,7 +50,7 @@
         "aimeat/src/services/context/index-line.ts",
         "aimeat/src/services/mcp-build-inputs.ts"
       ],
-      "digest": "sha256:9f981a271eb19bcfcec05598"
+      "digest": "sha256:42a24b36c71be7e3fd77b5e2"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-11-04",
@@ -856,7 +856,7 @@
       "aimeat/src/tool-catalog/definitions/receivers.ts": "4e4b7bbb567c7c72"
     },
     "node:aimeat-context": {
-      "aimeat/src/services/context/index-line.ts": "4966936721cf67c5",
+      "aimeat/src/services/context/index-line.ts": "81fac0dce0f2172f",
       "aimeat/src/services/mcp-build-inputs.ts": "30340abebd1814dc"
     }
   }

@@ -41,9 +41,11 @@ describe('contextIndexLine', () => {
         expect(seen).toEqual({ owner: 'alice@node-1', prefix: 'context.' });
     });
 
-    it('with no contexts, tells the AI to offer one', async () => {
+    it('with no contexts, tells the AI to start one only when the person asks', async () => {
         const line = await contextIndexLine(storageWith([]), config, 'alice');
         expect(line).toMatch(/keeps no contexts yet/);
+        expect(line).toMatch(/only when they ask/);
+        expect(line).not.toMatch(/offer once/);
         expect(line).toMatch(/aimeat-context/);
     });
 
