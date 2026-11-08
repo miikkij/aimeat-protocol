@@ -22,14 +22,24 @@
  *        the CSMs of its own account. The operator may still delete another account's CSM, and that
  *        writes the operator trail.
  *     6. A CSM some module says it uses (registerCsmUseCheck) is not deleted: 409 IN_USE names the users.
- * @structure CSM_WRITE_SCOPE · registerCsmUseCheck · csmUsers · getCsmCompiled · ownerPrefixed ·
- *   csmMayRead · listCsmsFor · getCsmFor · listCsmVersionsFor · getCsmVersionFor · csmTemplates ·
+ *   Ruled by the developer on 2026-11-08 (ruling 2): the registering account may delete its own CSM.
+ *     Other accounts' receivers keep validating against their stored copy, and their owners get a
+ *     notice that the CSM was removed. Only the registering account's own uses block the delete, and
+ *     the refusal names no other account's receiver.
+ * @structure CSM_WRITE_SCOPE · CsmUse · registerCsmUseCheck · csmUsers · getCsmCompiled · ownerPrefixed ·
+ *   csmMayRead · csmLockShownTo · listCsmsFor · getCsmFor · listCsmVersionsFor · getCsmVersionFor · csmTemplates ·
  *   draftCsmFromSample · createCsmAs · updateCsmAs · setCsmVisibilityAs · deleteCsmAs
  * @usage
  *   registerCsmUseCheck(async (name) => receiversNaming(name));   // a module that uses CSMs
  *   const compiled = await getCsmCompiled(storage, 'alice.sensor');  // { name, version, jsonSchema, hash }
  *   const out = await createCsmAs({ storage, config }, caller, { yaml });  // { ok, status, data } | refusal
  * @version-history
+ *   v1.1.0 — 2026-11-08 — Ruling 2 of 2026-11-08 in deleteCsmAs: a use check may name the account of a
+ *     use (CsmUse); only the registering account's own uses block, others' owners get a csm_removed
+ *     notice. The registering account is the name's holder since the CSM was registered
+ *     (isRegisteringAccount), so the next account of an erased name neither reads a private CSM nor
+ *     changes or deletes one. csmLockShownTo: the schema-lock row a CSM owns follows its visibility
+ *     (secaudit2026nov08 round 14).
  *   2026-11-08 — lockSchema: a lock another principal set on `csm.<name>` before the CSM was
  *     registered passes to the registering account; its own and a seeded `system@` lock stay as they
  *     are (secaudit2026nov08 round 14, lockSchema-keeps-foreign-lock-holder).
@@ -48,6 +58,7 @@ import { parseAudience, formatAudience, audienceAllows, isOrganismMember, type A
 import { csmVisibilityDefault } from './content-defaults.js';
 import { operatorOverride } from './operator-override.js';
 import { emitChange } from './event-bus.js';
+import { notify } from './notify.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { localAccountOf } from '../utils/gaii.js';
 import { isOwnersLock } from './packages/compose/package-component-collisions.js';
@@ -75,17 +86,29 @@ const refuse = (status: number, code: string, message: string, details?: Record<
 
 // ── Who uses a CSM ─────────────────────────────────────────────────────────
 
-type CsmUseCheck = (name: string) => Promise<string[]>;
+/**
+ * One use a check names: `label` for the registering account and the operator ("receiver alice/home"),
+ * the account it belongs to (a bare account name of this node), and optionally the use's own name as
+ * that account knows it (the receiver's name) and the page where that account sees it. A use given as
+ * a plain string belongs to no known account and blocks a delete as before.
+ */
+export interface CsmUse { label: string; account: string; name?: string; link?: string }
+
+/** A use as the delete reads it: `account` is null for a plain string. */
+type Use = { label: string; account: string | null; name?: string; link?: string };
+
+type CsmUseCheck = (name: string) => Promise<Array<string | CsmUse>>;
 // Every process registers the same checks when its modules load, and each check reads storage, so a
 // second process answers the same users; nothing here is state one process holds for another.
 const useChecks: CsmUseCheck[] = [];
 
 /**
  * A module that relies on a CSM says so here: its check answers who uses the named CSM (an empty
- * list when nobody). DELETE answers 409 IN_USE while any check names a user. Returns a function that
- * takes the check back (a test, a module that stops).
+ * list when nobody). DELETE answers 409 IN_USE while any check names a use of the registering account,
+ * or a use given as a plain string. Returns a function that takes the check back (a test, a module
+ * that stops).
  */
-export function registerCsmUseCheck(check: (name: string) => Promise<string[]>): () => void {
+export function registerCsmUseCheck(check: CsmUseCheck): () => void {
   useChecks.push(check);
   return () => {
     const at = useChecks.indexOf(check);
@@ -93,17 +116,54 @@ export function registerCsmUseCheck(check: (name: string) => Promise<string[]>):
   };
 }
 
-/** Every user the registered checks name for this CSM. A check that throws names nobody, and is logged. */
-export async function csmUsers(name: string): Promise<string[]> {
-  const users: string[] = [];
+/** Every use the registered checks name, once each; `account` is null for a plain string. A check that throws names nobody, and is logged. */
+async function csmUses(name: string): Promise<Use[]> {
+  const uses: Use[] = [];
   for (const check of [...useChecks]) {
     try {
-      for (const u of await check(name)) if (typeof u === 'string' && u && !users.includes(u)) users.push(u);
+      for (const u of await check(name)) {
+        const use: Use | null = typeof u === 'string' ? { label: u, account: null }
+          : u && typeof u.label === 'string' && typeof u.account === 'string'
+            ? { label: u.label, account: u.account, ...(typeof u.name === 'string' ? { name: u.name } : {}), ...(typeof u.link === 'string' ? { link: u.link } : {}) }
+            : null;
+        if (use?.label && !uses.some(x => x.label === use.label)) uses.push(use);
+      }
     } catch (err) {
       logger.warn('csmUsers: a use check failed; it names no user', { name, error: String(err) });
     }
   }
-  return users;
+  return uses;
+}
+
+/** Every user the registered checks name for this CSM, as labels. */
+export async function csmUsers(name: string): Promise<string[]> {
+  return (await csmUses(name)).map(u => u.label);
+}
+
+/**
+ * Tell each other account whose use of a removed CSM did not block the delete (ruling 2 of
+ * 2026-11-08): its receivers keep checking messages against the copy they hold. Never throws.
+ */
+async function tellOtherUsers(storage: Storage, config: AimeatConfig, name: string, uses: Use[]): Promise<number> {
+  const byAccount = new Map<string, Use[]>();
+  for (const u of uses) if (u.account && !u.account.includes('@')) byAccount.set(u.account, [...(byAccount.get(u.account) ?? []), u]);
+  for (const [account, mine] of byAccount) {
+    const names = mine.map(u => u.name ?? u.label).join(', ');
+    const link = mine.find(u => u.link)?.link;
+    try {
+      await notify(storage, `${account}@${config.nodeId}`, {
+        type: 'csm_removed',
+        title: `The data description ${name} was removed`,
+        body: `Its owner or whoever runs this service removed the data description (CSM) ${name}. Your receivers that use it: ${names}. `
+          + 'They keep checking messages against the copy of its shape they hold, so they go on working. To use another shape, make a new receiver.',
+        ...(link ? { link } : {}),
+        i18n: { key: 'csm_removed', vars: { csm: name, uses: names } },
+      });
+    } catch (err) {
+      logger.warn('deleteCsmAs: the notice to another user of the CSM failed', { name, account, error: String(err) });
+    }
+  }
+  return byAccount.size;
 }
 
 // ── The compiled schema ────────────────────────────────────────────────────
@@ -159,13 +219,43 @@ function writerAccount(caller: CallerContext): string | null {
   return localAccountOf(caller.owner);
 }
 
+/**
+ * Whether `account` is the account that registered the CSM: the same name, and that name's account was
+ * registered no later than the CSM. A deleted account's name is released for reuse (decision
+ * 2026-08-10), so an account registered after the CSM is a later holder of the name, not its author
+ * (secaudit2026nov08 round 14). No account record, or no readable time, answers by the name alone: a
+ * signed-in caller always has an account, and the check never takes a right away on a guess.
+ */
+async function isRegisteringAccount(storage: Storage, record: CsmRecord, account: string | null): Promise<boolean> {
+  if (!account || record.registeredBy !== account) return false;
+  const holder = await storage.getOwner(account);
+  const registered = Date.parse(holder?.createdAt ?? '');
+  const named = Date.parse(record.registeredAt ?? '');
+  return !Number.isFinite(registered) || !Number.isFinite(named) || registered <= named;
+}
+
 /** May this caller (null: nobody signed in) read the CSM? The registering account always may. */
 export async function csmMayRead(storage: Storage, record: CsmRecord, viewer: CallerContext | null): Promise<boolean> {
   const audience = parseAudience(record.visibility ?? 'public') ?? { level: 'private' as const };
   if (audience.level === 'public') return true;
   if (!viewer) return false;
   const auth: AudienceAuth = viewer.auth;
-  return audienceAllows(storage, audience, auth, { ownerName: record.registeredBy });
+  // Private names the registering account; a later holder of the name is not it.
+  const ownerName = audience.level === 'private' && auth.owner === record.registeredBy
+    && !(await isRegisteringAccount(storage, record, auth.owner)) ? undefined : record.registeredBy;
+  return audienceAllows(storage, audience, auth, { ...(ownerName ? { ownerName } : {}) });
+}
+
+/**
+ * Whether a schema-lock row may be shown to this viewer (null: nobody signed in). The row a CSM owns,
+ * its jsonSchemaKey, carries the CSM's compiled schema, so it follows the CSM's visibility (ruling 2
+ * of 2026-11-07); every other row stays public metadata, as before (secaudit2026nov08 round 14).
+ */
+export async function csmLockShownTo(storage: Storage, keyPattern: string, viewer: CallerContext | null): Promise<boolean> {
+  if (!keyPattern.startsWith('csm.')) return true;
+  const record = await storage.getCsm(keyPattern.slice('csm.'.length));
+  if (!record || record.jsonSchemaKey !== keyPattern) return true;
+  return csmMayRead(storage, record, viewer);
 }
 
 /** The visibility as this viewer may read it: the owner sees the organism's id, others its level. */
@@ -463,7 +553,7 @@ export async function createCsmAs(deps: CsmDeps, caller: CallerContext, input: C
 async function ownCsm(deps: CsmDeps, caller: CallerContext, account: string, name: string, verb: string): Promise<CsmRecord | CsmRefusal> {
   const record = await readable(deps, caller, name);
   if (!record) return notFound(name);
-  if (record.registeredBy !== account) return refuse(403, 'FORBIDDEN', `You can only ${verb} CSM services you registered`);
+  if (!(await isRegisteringAccount(deps.storage, record, account))) return refuse(403, 'FORBIDDEN', `You can only ${verb} CSM services you registered`);
   return record;
 }
 
@@ -532,8 +622,13 @@ export async function setCsmVisibilityAs(deps: CsmDeps, caller: CallerContext, n
 
 /**
  * DELETE /v1/csm/{name}. The registering account deletes its own; the operator deletes another
- * account's and the operator trail records it. A CSM a module uses answers 409 IN_USE.
- * `asOperator` skips the ownership question for the admin route, whose own gate already asked it.
+ * account's and the operator trail records it. `asOperator` skips the ownership question for the
+ * admin route, whose own gate already asked it.
+ *
+ * Ruling 2 of 2026-11-08: only the registering account's own uses (and a use a module names as a
+ * plain string) answer 409 IN_USE, and the refusal names only those. Another account's receiver
+ * holds its own copy of the compiled schema and keeps checking messages against it, so it does not
+ * block the delete; its owner gets a notice that the CSM was removed, and the answer counts them.
  */
 export async function deleteCsmAs(deps: CsmDeps, caller: CallerContext, name: string, opts: { asOperator?: boolean } = {}) {
   const record = await deps.storage.getCsm(name);
@@ -541,7 +636,7 @@ export async function deleteCsmAs(deps: CsmDeps, caller: CallerContext, name: st
   if (!opts.asOperator) {
     const who = mayWrite(caller);
     if (isRefusal(who)) return who;
-    const own = record?.registeredBy === who.account;
+    const own = !!record && await isRegisteringAccount(deps.storage, record, who.account);
     // Asked without writing anything; the trail line is written below, once nothing refuses.
     const operator = !!record && !own && await caller.operator();
     if (!record || (!own && !operator && !(await csmMayRead(deps.storage, record, caller)))) return notFound(name);
@@ -549,9 +644,10 @@ export async function deleteCsmAs(deps: CsmDeps, caller: CallerContext, name: st
     trail = operator;
   }
   if (!record) return notFound(name);
-  const users = await csmUsers(name);
-  if (users.length) {
-    return refuse(409, 'IN_USE', `CSM service "${name}" is in use by ${users.join(', ')}. Stop those first, then delete it.`, { users });
+  const uses = await csmUses(name);
+  const blocking = uses.filter(u => u.account === null || u.account === record.registeredBy).map(u => u.label);
+  if (blocking.length) {
+    return refuse(409, 'IN_USE', `CSM service "${name}" is in use by ${blocking.join(', ')}. Stop those first, then delete it.`, { users: blocking });
   }
   // The operator deleting another person's CSM writes the operator trail (secaudit 2026-10, C2).
   if (trail && !(await operatorOverride(deps.storage, deps.config, caller.auth, { ownerOf: record.registeredBy, area: 'csm', action: 'delete', subject: name }))) {
@@ -560,7 +656,11 @@ export async function deleteCsmAs(deps: CsmDeps, caller: CallerContext, name: st
   await deps.storage.deleteSchema(record.jsonSchemaKey);
   await deps.storage.deleteCsm(name);
   emitChange('csm');
-  return { ok: true as const, status: 200, data: { deleted: true, name, schema_deleted: record.jsonSchemaKey } };
+  const told = await tellOtherUsers(deps.storage, deps.config, name, uses);
+  return {
+    ok: true as const, status: 200,
+    data: { deleted: true, name, schema_deleted: record.jsonSchemaKey, ...(told ? { other_accounts_told: told } : {}) },
+  };
 }
 
 // ── Draft from a sample ────────────────────────────────────────────────────

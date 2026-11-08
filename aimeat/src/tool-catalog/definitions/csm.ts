@@ -15,6 +15,7 @@
  *   const checked = checkCsmInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-08 — The delete summary says only the account's own uses refuse it (ruling 2 of 2026-11-08; secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (CSM owner prefix, visibility, versions, csm:write, draft; Jouni, 2026-11-07).
  */
 import { z } from 'zod';
@@ -68,7 +69,7 @@ export const CSM_ACTIONS: Record<string, CsmAction> = {
     set_visibility: { fields: F(['name', 'visibility'], []), scope: 'csm:write',
         summary: 'change who may read a CSM' },
     delete: { fields: F(['name'], []), scope: 'csm:write',
-        summary: 'delete a CSM and its versions; refused with IN_USE while something still uses it' },
+        summary: 'delete a CSM and its versions; refused with IN_USE while your own account still uses it (another account\'s receiver keeps its copy, and its owner is told)' },
 };
 
 export const CSM_ACTION_NAMES = Object.keys(CSM_ACTIONS);

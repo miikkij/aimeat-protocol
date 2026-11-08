@@ -24,6 +24,8 @@
  *     registers, on a dry run too: a node-wide pattern, another organism's records or a key another
  *     account's lock governs is refused with the rule's code (package-schema-lock.ts; secaudit2026nov08
  *     round 14).
+ *   2026-11-08 — registeredNameFor gives a new CSM component the installer's account prefix, as
+ *     POST /v1/csm does (secaudit2026nov08 round 14).
  *   v1.15.0 — 2026-10-31 — A package its author sells to accounts installs for an account holding a
  *     paid purchase (packageVisibleTo); anyone else gets 402 PURCHASE_REQUIRED while it is listed for
  *     sale (sale/package-account-entitlement.ts).
@@ -112,6 +114,7 @@ import { logger } from '../../../utils/logger.js';
 import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { installRoleRefusal } from '../../extension-install-role.js';
 import { packageLockCaller, cortexLockRuleRefusal } from './package-schema-lock.js';
+import { ownerPrefixed } from '../../csm-service.js';
 
 export interface PackageInstallDeps {
     storage: Storage;
@@ -265,6 +268,11 @@ function sortByDependencies(components: PackageComponent[]): string[] {
  * no subdomain changes either.
  *
  * Only NEW installs. An app already installed under a bare filename keeps it.
+ *
+ * A CSM's name is node-global and starts with its owner's account and a dot (csm-service.ts ruling 1
+ * of 2026-11-07), so a CSM component's name gets the installer's prefix: a package named
+ * `bob.weather` installed by mallory is `mallory.bob.weather-…`, not a name in bob's prefix. A CSM
+ * already installed keeps its name (secaudit2026nov08 round 14).
  */
 export function registeredNameFor(
     packageName: string, owner: string, shortId: string,
@@ -274,6 +282,7 @@ export function registeredNameFor(
     // A skill keeps its own name: that is the name its owner's AI loads it by, and the one a
     // collision with the owner's own skill is decided on (package-skill-component.ts).
     if (comp.type === 'skill') return skillComponentName(comp.content ?? '') ?? base;
+    if (comp.type === 'csm') return ownerPrefixed(base, owner);
     return comp.type === 'app' && !/\.html?$/i.test(base) ? `${base}.html` : base;
 }
 
