@@ -15,6 +15,9 @@
  * @structure renderBoardsView · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.17.0 -- 2026-11-08 -- The own-board form's settings explain themselves: boards.whoSees,
+ *     boards.whoPublishes and boards.noticeLifetime on their Choices; the grey hints under them are
+ *     gone, their words are in the explanations (.claude/rules/page-guidance.md).
  *   v1.16.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart on the cover and the title's question mark concept.board; the head's paragraph is
  *     two sentences, the rest of it is in the concept.
@@ -189,16 +192,16 @@ function secPublic(ctx) {
 export function ownBoardForm(ctx) {
   const f = ctx.form;
   const set = (k, v) => ctx.setForm({ ...f, [k]: v });
-  const choice = (key, label, hint, options) => html`<${Choice} label=${label} hint=${hint} value=${f[key]} onChange=${(v) => set(key, v)} options=${options} />`;
+  const choice = (key, label, help, options) => html`<${Choice} label=${label} help=${help} value=${f[key]} onChange=${(v) => set(key, v)} options=${options} />`;
   return html`
     <${Fields}>
       <${TextField} id="bp-f-name" label=${c('fName')} value=${f.name} onInput=${(v) => set('name', v)} placeholder=${t('profile.boards.namePlaceholder')} />
       <${TextField} id="bp-f-desc" label=${c('fDesc')} value=${f.description} onInput=${(v) => set('description', v)} placeholder=${t('profile.boards.descPlaceholder')} />
       <${Fields} cols=${2}>
-        ${choice('visibility', c('fSees'), f.visibility === 'public' ? c('seesAllHint') : f.visibility === 'shared' ? c('seesChosenHint') : c('seesMeHint'), [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}
-        ${choice('posting', c('fPosts'), c('postsHint'), [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}
+        ${choice('visibility', c('fSees'), 'boards.whoSees', [['private', c('seesMe')], ['shared', c('seesChosen')], ['public', c('seesAll')]])}
+        ${choice('posting', c('fPosts'), 'boards.whoPublishes', [['owner', c('postsMe')], ['members', c('postsMembers')], ['anyone', c('postsAnyone')]])}
         <${TextField} id="bp-f-cats" label=${c('fCategories')} hint=${c('categoriesHint')} value=${f.categories} onInput=${(v) => set('categories', v)} placeholder=${c('categoriesPlaceholder')} />
-        ${choice('ttl', c('fLifetime'), c('lifetimeHint'), [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
+        ${choice('ttl', c('fLifetime'), 'boards.noticeLifetime', [['72', c('life3')], ['168', c('life7')], ['720', c('life30')], ['8760', c('lifeYear')]])}
       <//>
       ${f.visibility === 'public' ? html`<${TextField} id="bp-f-price" size="short" label=${c('fPrice')} help="commerce.morsels" hint=${c('priceHint')} type="number" min="0" step="1" value=${f.price} onInput=${(v) => set('price', v)} />` : null}
       <${Actions}>

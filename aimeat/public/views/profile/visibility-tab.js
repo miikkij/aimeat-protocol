@@ -16,13 +16,20 @@
  *   HOW IT EXPLAINS ITSELF (.claude/rules/page-guidance.md): the title's question mark is
  *   concept.ai_visibility (what is counted, what is never seen, when to use What others can see
  *   instead), and the page's start (PageStart) says what the page is for, gives the prompt that has
- *   one's own AI read the same report, and says what happens next.
+ *   one's own AI read the same report, and says what happens next. Each setting a label cannot
+ *   explain has its own question mark (explain.aiVisibility.*), with facts from the services that
+ *   enforce it (services/visibility/visibility-settings.ts, behaviour-settings.ts, behaviour-fixer.ts).
  *
  *   IT BORROWS NOTHING AND INVENTS NOTHING: SettingsPage, PageStart, Tabs, FigureStrip, List, Note,
- *   Check and TextField; the page writes no class.
+ *   Check, TextField and HelpLabel; the page writes no class.
  * @structure PARTS · PERIODS · VisibilityTab (default) · the six parts as small functions
  * @usage Registered in views/profile.js as the `visibility` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.2.0 — 2026-11-08 — The settings explain themselves (question marks): counting
+ *     (aiVisibility.counting), the Clarity and GA4 ids (aiVisibility.clarityId, aiVisibility.ga4Id),
+ *     the per-app switch through the heading of the app list (aiVisibility.appBehaviour, one question
+ *     mark for the whole list) and the weekly corrected draft (aiVisibility.fixer), whose grey hint
+ *     the explanation now carries.
  *   v1.1.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head and the title's question mark, concept.ai_visibility.
  *   v1.0.1 — 2026-10-11 — A purchase total in morsels reads "pacing N morsels": a morsel is pacing, not a price.
@@ -43,6 +50,7 @@ import { Row as Line, Space } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Check } from '/components/Check.js';
 import { TextField } from '/components/TextField.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Action } from '/components/Action.js';
 import { apiGet, apiPut, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
@@ -157,23 +165,25 @@ function Settings({ s, bs, apps, onSave }) {
   const [ga4, setGa4] = useState(s.ga4_measurement_id || '');
   return html`
     <${SubHeading} level=${3} desc=${v('countingWhy')}>${v('countingTitle')}<//>
-    <${Check} checked=${s.enabled} onChange=${(on) => onSave('settings', { enabled: on })}>${v('countingOn')}<//>
+    <${Check} checked=${s.enabled} onChange=${(on) => onSave('settings', { enabled: on })} help="aiVisibility.counting">${v('countingOn')}<//>
     ${s.node_enabled ? null : html`<${Note} kind="quiet">${v('nodeOff')}<//>`}
 
     <${SubHeading} level=${3} desc=${v('tagsWhy')}>${v('tagsTitle')}<//>
-    <${TextField} label=${v('clarityLabel')} value=${clarity} onInput=${setClarity} />
-    <${TextField} label=${v('ga4Label')} value=${ga4} onInput=${setGa4} />
+    <${TextField} label=${v('clarityLabel')} help="aiVisibility.clarityId" value=${clarity} onInput=${setClarity} />
+    <${TextField} label=${v('ga4Label')} help="aiVisibility.ga4Id" value=${ga4} onInput=${setGa4} />
     <${Line} gap="small">
       <${Action} small onClick=${() => onSave('settings', { clarity_project_id: clarity.trim() || null, ga4_measurement_id: ga4.trim() || null })}>${v('saveTags')}<//>
     <//>
     ${s.tags_warning ? html`<${Note} kind="aside" size="small">${v('tagsWarning')}<//>` : null}
 
-    <${SubHeading} level=${3} desc=${v('behaviourWhy')}>${v('behaviourTitle')}<//>
+    <${SubHeading} level=${3} desc=${v('behaviourWhy')}>
+      <${HelpLabel} term="aiVisibility.appBehaviour" label=${v('behaviourTitle')}>${v('behaviourTitle')}<//>
+    <//>
     ${apps.map((name) => html`
       <${Check} key=${name} checked=${!bs.off_apps.includes(name)} onChange=${(on) => onSave('behaviour', { app: name, app_enabled: on })}>${name}<//>`)}
 
     <${SubHeading} level=${3} desc=${v('fixerWhy')}>${v('fixerTitle')}<//>
-    <${Check} checked=${bs.fixer} onChange=${(on) => onSave('behaviour', { fixer: on })} hint=${v('fixerHint')}>${v('fixerOn')}<//>
+    <${Check} checked=${bs.fixer} onChange=${(on) => onSave('behaviour', { fixer: on })} help="aiVisibility.fixer">${v('fixerOn')}<//>
     ${bs.runs?.length ? html`
       <${SubHeading} level=${4}>${v('runsTitle')}<//>
       ${table([v('colApp'), v('colWhen'), v('colDraft')],

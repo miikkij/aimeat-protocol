@@ -9,6 +9,8 @@
  *   page's start (PageStart id "security") opens the account's own list as its action and folds once
  *   the account has a list of its own.
  * @version-history
+ *   v1.25.0 -- 2026-11-08 -- The Allowed Origins card's title opens its explanation
+ *     (security.allowedOrigins): what one entry may be, how the list is split, and what an empty list does.
  *   v1.24.1 -- 2026-11-08 -- The origin lists open for editing one origin per line: they were joined
  *     with a literal backslash-n, so saving two or more stored one broken origin.
  *   v1.24.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
@@ -85,6 +87,7 @@ import { Card } from '/components/Card.js';
 import { Note } from '/components/Note.js';
 import { Mark } from '/components/Mark.js';
 import { PageStart } from '/components/PageStart.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Action, Loud } from '/components/Action.js';
 import { TextArea } from '/components/TextField.js';
 import { SubHeading } from '/components/SubHeading.js';
@@ -224,7 +227,8 @@ export default function SecurityTab({ session, showToast }) {
 
       <${Space} above="section"><${SubHeading} level=${3}>${t('profile.security.ghiiTitle')}<//><//>
       <${Space} below="large"><${Note}>${t('profile.security.ghiiDesc')}<//><//>
-      <${Card} tone="section" title=${t('profile.security.allowedOrigins')}
+      <${Card} tone="section"
+        title=${html`<${HelpLabel} term="security.allowedOrigins" label=${t('profile.security.allowedOrigins')}>${t('profile.security.allowedOrigins')}<//>`}
         aside=${html`<${Mark} tone=${isInherited ? undefined : 'ink'}>${isInherited ? t('profile.security.inherited') : t('profile.security.custom')}<//>`}>
         <${Stack}>
           <${Note}>

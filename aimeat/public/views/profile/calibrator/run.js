@@ -12,6 +12,7 @@
  *   stepReflect · proposalList · stepSynthesize · output · pasteBox
  * @usage import { runRow, emptiesRow } from './run.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-08 -- The checkpoints' Weight column head opens the explanation of how a checkpoint's weight makes the score (term calibrator.weight; .claude/rules/page-guidance.md).
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the row is the List's Row with its Panel, a score the Figure, what opens the Run view (components/RunView.js: the steps as folds, the model blocks, the checkpoints, the proposals, a folded output, the paste box), the options the boxed Choice with its radio dots, the lines Note (component plan, page group G4).
  *   v1.18.0 -- 2026-09-26 -- A folded output is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -50,6 +51,7 @@ import { Row, Name, Desc, Cell, Doors } from '/components/List.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Figure, Tinted } from '/components/Figure.js';
 import { Choice } from '/components/Choice.js';
 import { TextArea } from '/components/TextField.js';
@@ -187,7 +189,7 @@ function stepAnalyze(ctx, run, detail) {
       <${RunModel} key=${m.modelId} name=${labelWords(m.modelLabel)}
         figure=${a.overallScore != null ? `${a.overallScore} %` : null} tone=${scoreTone(a.overallScore)}
         meta=${a.status === 'error' ? html`<${Tinted} tone="notice">${a.error}<//>` : a.status === 'done' ? x('checkpointsN', { n: dims.length, ok: dims.filter((d) => d.pass).length }) : x('stepRightPending')}>
-        ${dims.length ? html`<${RunChecks} head=${['', x('colCheckpoint'), x('colExpected'), x('colActual'), x('colWeight')]}
+        ${dims.length ? html`<${RunChecks} head=${['', x('colCheckpoint'), x('colExpected'), x('colActual'), html`<${HelpLabel} term="calibrator.weight" label=${x('colWeight')}>${x('colWeight')}<//>`]}
           rows=${dims.map((d, k) => ({ key: k, pass: !!d.pass, name: String(d.name || '').replace(/_/g, ' '), description: d.description, expected: d.expected, actual: d.actual, weight: x('severity.' + (d.severity || 'minor')) }))} />` : null}
         ${a.analysis ? output(x('viewAnalysis'), text(a.analysis)) : null}
         ${a.promptSent ? output(x('viewPromptSent'), a.promptSent) : null}

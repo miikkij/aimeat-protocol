@@ -9,6 +9,8 @@
  *   concept.node_stats after its heading's words, and the page's start (PageStart id "nodeStats")
  *   under the heading.
  * @version-history
+ *   v1.11.0 -- 2026-11-08 -- Owners, Agents and P95 Latency open their explanation
+ *     (nodeStats.owners, nodeStats.agents, nodeStats.latencyP95): what each figure counts.
  *   v1.10.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     the question mark concept.node_stats after the heading's words (HelpTip, as PageHead draws a
  *     page's), and PageStart "nodeStats" under the heading, with the prompt that has one's own AI
@@ -41,7 +43,7 @@ import { Card, CardGrid } from '/components/Card.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
-import { HelpTip } from '/components/HelpTip.js';
+import { HelpTip, HelpLabel } from '/components/HelpTip.js';
 import { PageStart } from '/components/PageStart.js';
 import { getNodeStats } from '/js/services/stats.js';
 import { num, dateTime as fmtDateTime, duration } from '/js/format.js';
@@ -61,6 +63,8 @@ function fmtBytes(b) {
 // (accent/success/purple/blue/warn/danger) were drawn in ink by the poster skin (.pf .stat-card-value
 // overrode them), so the strip draws them as it draws every figure.
 const fig = (label, value) => ({ n: value, label });
+// A figure whose word opens its own explanation (`explain.<term>.*`).
+const helpFig = (label, value, term) => ({ key: label, n: value, label: html`<${HelpLabel} term=${term} label=${label}>${label}<//>` });
 
 // A status code's name is its state (2xx fine, 4xx attention, 5xx danger), as main coloured it.
 const codeState = (code) => (code.startsWith('2') ? 'fine' : code.startsWith('4') ? 'attention' : code.startsWith('5') ? 'danger' : undefined);
@@ -110,8 +114,8 @@ export default function NodeStatsTab() {
     <${FigureStrip} lead items=${[
       fig(t('profile.nodeStats.uptime'), fmtUptime(s.uptime_seconds)),
       fig(t('profile.nodeStats.requests'), num(s.requests_total || 0)),
-      fig(t('profile.nodeStats.owners'), s.active_owners || 0),
-      fig(t('profile.nodeStats.agents'), s.active_agents || 0),
+      helpFig(t('profile.nodeStats.owners'), s.active_owners || 0, 'nodeStats.owners'),
+      helpFig(t('profile.nodeStats.agents'), s.active_agents || 0, 'nodeStats.agents'),
       fig(t('profile.nodeStats.memoryWrites'), num(s.memory_writes || 0)),
       fig(t('profile.nodeStats.memoryReads'), num(s.memory_reads || 0)),
     ]} />
@@ -132,7 +136,7 @@ export default function NodeStatsTab() {
       fig(t('profile.nodeStats.msgReceived'), num(s.tunnel.messages_received_total || 0)),
       fig(t('profile.nodeStats.deliveryFails'), s.tunnel.delivery_failures_total),
       fig(t('profile.nodeStats.latencyAvg'), (s.tunnel.delivery_latency_avg_ms || 0).toFixed(0) + ' ms'),
-      fig(t('profile.nodeStats.latencyP95'), (s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms'),
+      helpFig(t('profile.nodeStats.latencyP95'), (s.tunnel.delivery_latency_p95_ms || 0).toFixed(0) + ' ms', 'nodeStats.latencyP95'),
     ]) : null}
 
     ${s.mailbox ? section(t('profile.nodeStats.mailboxTitle'), [

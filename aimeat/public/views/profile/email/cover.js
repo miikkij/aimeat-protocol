@@ -14,6 +14,9 @@
  * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.23.0 -- 2026-11-08 -- Two letters explain themselves through their names (HelpLabel): the
+ *     digest with notify.digest, the same term as the Notifications page's digest card, and the
+ *     reminder with email.nudge (.claude/rules/page-guidance.md).
  *   v1.22.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart and the title's question mark concept.mailbox; the fold "Mail from a chat" (em-chat)
  *     is gone: its examples are in the concept, its prompt is the head's "Prompt for your AI".
@@ -69,6 +72,7 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Space } from '/components/Layout.js';
 import { c, rel, day, clock, providerWord, isSender, stateWord, kindWord, channelWord, statusWord, Switch, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const PAGE = 12;
 
@@ -223,10 +227,15 @@ function lettersFold(ctx) {
   const digest = s.emailDigest || { enabled: false, afterHours: 8 };
   const verified = !!ctx.me?.email_verified_at;
   const off = ctx.busy || !verified;
-  const row = (key, ctl) => html`
+  // `help`: the term whose explanation the row's name opens (HelpLabel), for a letter whose rules
+  // its words cannot carry: the digest's hours, the reminder's 14 and 60 days.
+  const named = (key, help) => (help
+    ? html`<${HelpLabel} term=${help} label=${c('letter.' + key + 'T')}>${c('letter.' + key + 'T')}<//>`
+    : c('letter.' + key + 'T'));
+  const row = (key, ctl, help) => html`
     <${Row} key=${key}>
       <${Lead} text="A" />
-      <${Name} meta=${c('letter.' + key + 'S')}>${c('letter.' + key + 'T')}<//>
+      <${Name} meta=${c('letter.' + key + 'S')}>${named(key, help)}<//>
       <${Desc}>${c('letter.' + key + 'D')}<//>
       <${Doors}>${ctl}<//>
     <//>`;
@@ -241,8 +250,8 @@ function lettersFold(ctx) {
       ${row('digest', html`
         ${digest.enabled ? html`<${Select} fit ariaLabel=${c('letter.digestT')} value=${String(digest.afterHours)} onChange=${(v) => setDigest({ afterHours: Number(v) })}
           options=${[2, 4, 8, 24, 72].map(h => [String(h), c('afterHours', { h })])} />` : null}
-        <${Switch} on=${digest.enabled} label=${c('emailWord')} disabled=${off} onToggle=${() => setDigest({ enabled: !digest.enabled })} />`)}
-      ${row('nudge', html`<${Switch} on=${em.nudge === true} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, nudge: em.nudge !== true } })} />`)}
+        <${Switch} on=${digest.enabled} label=${c('emailWord')} disabled=${off} onToggle=${() => setDigest({ enabled: !digest.enabled })} />`, 'notify.digest')}
+      ${row('nudge', html`<${Switch} on=${em.nudge === true} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, nudge: em.nudge !== true } })} />`, 'email.nudge')}
       ${row('agentAsks', html`<${Switch} on=${em.agentAsks !== false} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, agentAsks: em.agentAsks === false } })} />`)}
     <//>
     <${Hint}>${verified ? c('lettersHint') : c('lettersNeedVerified')}<//>

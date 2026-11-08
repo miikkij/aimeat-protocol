@@ -13,6 +13,7 @@
  * @structure renderPage · shelf · secNew · secAgent
  * @usage import { renderPage } from './skills/page.js';
  * @version-history
+ *   v1.26.0 -- 2026-11-08 -- The visibility choice in the editor and the AI section's visibility row open the setting's explanation (HelpLabel, term skills.visibility; .claude/rules/page-guidance.md); the editor's hint left, because the explanation's tip carries its words.
  *   v1.25.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md): PageStart "skills" (folded once the person has a skill of their own; its button opens the editor) and the title's question mark concept.skill; the lead that explained refs in section 05 moved into the concept, and the head's paragraph is two sentences.
  *   v1.24.0 -- 2026-09-26 -- On the component kit (page group G7): the empty lines and leads are the Note, the editor is the TextArea with the Tabs for who may see it and the Action doors, the rule an AI gets is the Box with its copy door; the workspace tag counts nothing yet in the dim tone again (main's og-chip--dim). The page writes no class.
  *   v1.23.0 -- 2026-09-26 -- A shelf's filters, search line, rows and more line are the List component (components/List.js: Filters, SearchLine, List, More): the page passes the words, the counts and the rows (component plan C1).
@@ -69,6 +70,7 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Roads, Road } from '/components/Roads.js';
 import { List, Filters, Filter, SearchLine, More } from '/components/List.js';
 import { PageStart } from '/components/PageStart.js';
+import { HelpLabel } from '/components/HelpTip.js';
 
 const PAGE = 20;
 const facet = (on, label, n, onClick, key) => html`<${Filter} key=${key} on=${on} count=${n} onClick=${onClick}>${label}<//>`;
@@ -190,13 +192,12 @@ function secNew(ctx, num) {
           ${e.open ? html`
             <${TextArea} rows=${16} value=${e.md} onInput=${(md) => ctx.setEditor({ md })} placeholder=${x('editorPlaceholder')} ariaLabel=${x('roadWrite')} />
             <${Actions}>
-              <${Label}>${x('vis.k')}<//>
+              <${Label}><${HelpLabel} term="skills.visibility" label=${x('vis.k')}>${x('vis.k')}<//><//>
               <${Tabs} label=${x('vis.k')} value=${e.visibility} onSelect=${(v) => ctx.setEditor({ visibility: v })}
                 items=${['owner', 'members', 'public'].map((v) => ({ value: v, label: visibilityWord(v) }))} />
               <${Action} small disabled=${e.publishing || !e.md.trim()} onClick=${() => ctx.publish()}>${e.publishing ? x('publishing') : x('publish')}<//>
               <${Action} small soft onClick=${() => ctx.closeEditor()}>${x('cancel')}<//>
-            <//>
-            <${Hint}>${x('editorHint')}<//>` : null}
+            <//>` : null}
         <//>
       <//>
     <//>`;
@@ -214,7 +215,7 @@ function secAgent(ctx, num, node) {
       <//>
       <${Facts} wide rows=${[
         { k: x('who.k'), v: x('aiWhoBody'), sub: x('aiWhoSub') },
-        { k: x('vis.k'), v: x('aiVisBody'), sub: x('aiVisSub', { n: pub, url: `${ctx.nodeUrl}/.well-known/agent-skills/index.json` }) },
+        { k: html`<${HelpLabel} term="skills.visibility" label=${x('vis.k')}>${x('vis.k')}<//>`, v: x('aiVisBody'), sub: x('aiVisSub', { n: pub, url: `${ctx.nodeUrl}/.well-known/agent-skills/index.json` }) },
         { k: x('aiVersionsK'), v: x('aiVersionsBody') },
         { k: x('aiInstallK'), v: html`${x('aiInstallBody')}<${Code}>aimeat skill install node:aimeat-node-guide<//>` },
       ]} />

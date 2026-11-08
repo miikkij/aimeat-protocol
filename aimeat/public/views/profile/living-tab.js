@@ -12,6 +12,9 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.26.0 -- 2026-11-08 -- The settings a label cannot explain carry their question mark: an open
+ *     document's cadence (living.cadence, on its word) and a template section's slot id (living.slotId,
+ *     beside the field, which has no label of its own) (.claude/rules/page-guidance.md).
  *   v1.25.0 -- 2026-11-08 -- The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head (folded once a template or a document exists, its button New template)
  *     and the title's question mark concept.living_document. The head's paragraph is two sentences and
@@ -92,6 +95,7 @@ import { Field, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Tab } from '/components/Tabs.js';
+import { HelpTip, HelpLabel } from '/components/HelpTip.js';
 import { SeriesBars } from '/components/SeriesBars.js';
 import * as living from '/js/services/living.js';
 import { listOrganisms, listWorkspaces } from '/js/services/organisms.js';
@@ -379,6 +383,7 @@ export default function LivingTab({ session, showToast }) {
               actions=${html`
                 <${TextField} placeholder=${t('profile.living.sectionDesc')} value=${s.desc} onInput=${v => patchSlot(i, { desc: v })} />
                 <${TextField} size="short" placeholder="slot-id" value=${s.slot} onInput=${v => patchSlot(i, { slot: v })} />
+                <${HelpTip} term="living.slotId" label="slot-id" />
                 <${Icon} small label=${t('field.remove')} onClick=${() => removeSlot(i)}>✕<//>`} />`)}
         <//>
         <${Line}><${Action} small onClick=${addSlot}>＋ ${t('profile.living.addSection')}<//><//>
@@ -432,7 +437,7 @@ export default function LivingTab({ session, showToast }) {
           <//>
           ${st.paused && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="attention">${t('profile.living.paused')}<//>`}
           ${st.health === 'retired' && html`<${Note} kind="meta" inline>·<//><${Mark} kind="status" tone="danger">${t('profile.living.retired')}: ${st.retired_reason || ''}<//>`}
-          <${Note} kind="meta" inline>· ${t('profile.living.cadence')}:<//>
+          <${Note} kind="meta" inline>· <${HelpLabel} term="living.cadence" label=${t('profile.living.cadence')}>${t('profile.living.cadence')}<//>:<//>
           <${Select} fit ariaLabel=${t('profile.living.cadence')} value=${opened.config.charter?.cadence || 'daily'} onChange=${v => changeCadence(v)}
             options=${[['hourly', t('profile.living.cadenceHourly')], ['daily', t('profile.living.cadenceDaily')], ['weekly', t('profile.living.cadenceWeekly')]]} />
         <//>

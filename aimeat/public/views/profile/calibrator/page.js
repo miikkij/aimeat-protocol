@@ -11,6 +11,7 @@
  * @structure renderPage · mast · strip · secRuns · secPrompt · versionRow · secTemplates · secRoads
  * @usage import { renderPage } from './page.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-08 -- The title of section 04 opens one explanation for the four instruction prompts (term calibrator.instructionPrompts; .claude/rules/page-guidance.md).
  *   v2.1.0 -- 2026-11-08 -- The title's question mark concept.calibration, the same explanation as on the list (.claude/rules/page-guidance.md).
  *   v2.0.0 -- 2026-09-26 -- The page passes data to the library's components and writes no class: the frame is SettingsPage (crumb, head with its rename field, strip, rail as data), the sections Section (the four instruction prompts still fold), the runs and the versions the List, the editors Field and Text area with the count beside the label, the roads Roads, the lines Note (component plan, page group G4).
  *   v1.17.0 -- 2026-09-26 -- The ready-made request is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
@@ -56,6 +57,7 @@ import { Note } from '/components/Note.js';
 import { Field, Fields } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Roads, Road } from '/components/Roads.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Stack } from '/components/Layout.js';
 import { x, dateWord, timeWord, isEmptyRun, runAverage, runsInOrder, judgeOf, candidatesOf, crumb, pageLinks } from './frame.js';
 import { ScoreChart } from './chart.js';
@@ -221,7 +223,7 @@ function versionRow(ctx, v, viewing) {
 
 function secTemplates(ctx) {
   return html`
-    <${Section} id="cal-templates" num="04" title=${x('secTemplates')} count=${null}>
+    <${Section} id="cal-templates" num="04" title=${html`<${HelpLabel} term="calibrator.instructionPrompts" label=${x('secTemplates')}>${x('secTemplates')}<//>`} count=${null}>
       <${Note} kind="lead">${x('templatesIntro')}<//>
       <${Folds}>
         ${TEMPLATES.map((tp, i) => {

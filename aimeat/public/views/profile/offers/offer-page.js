@@ -13,6 +13,7 @@
  * @structure renderOffer · SellingEditor · askWord
  * @usage import { renderOffer } from './offer-page.js';
  * @version-history
+ *   v2.3.0 — 2026-11-08 — The selling editor's Visibility opens its explanation (help offers.visibility): what private, unlisted and public let another account do.
  *   v2.2.1 — 2026-10-11 — The strip's selling figure carries the money price with its currency (or Free), and the line under it is the pacing amount alone; the visibility and the currency in that line cut it with an ellipsis at every width.
  *   v2.2.0 — 2026-10-11 — The selling editor asks for the offer's two values: the money price (empty = free) and the pacing amount (tollMorsels, empty = the node's default, question mark commerce.pacing_toll); the morsel price field is gone and the strip says Free and the pacing (ruling "morseli on tahdistus, ei hinta").
  *   v2.1.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
@@ -109,7 +110,7 @@ function SellingEditor({ it, ctx }) {
   const money = microsFromInput(moneyAmt) !== null;
   return html`
     <${Fields} cols=${4}>
-      <${Select} label=${c('colVisibility')} value=${vis} onChange=${setVis}
+      <${Select} label=${c('colVisibility')} help="offers.visibility" value=${vis} onChange=${setVis}
         options=${['private', 'unlisted', 'public'].map(v => [v, t('profile.offers.visibility.' + v)])} />
       <${TextField} label=${c('colPrice')} inputMode="decimal" value=${moneyAmt} placeholder="0.00" onInput=${setMoneyAmt} />
       <${Select} label="EUR / USD" value=${moneyCur} onChange=${setMoneyCur} options=${['EUR', 'USD']} />

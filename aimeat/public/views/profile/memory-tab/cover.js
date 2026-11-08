@@ -17,6 +17,8 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.31.0 -- 2026-11-08 -- The import's choice of what happens to a key that already exists has its
+ *     question mark beside it: memory.importMode (components/HelpTip.js).
  *   v1.30.0 -- 2026-10-30 -- A file kept in a named store says which under its name ("in your store
  *     "x"", "in the service's store "x""); a file in the database or the server's own store says nothing
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -94,6 +96,7 @@ import { Field, Fields, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Choice } from '/components/Choice.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { FileDrop } from '/components/FileDrop.js';
 import { FigureStrip } from '/components/FigureStrip.js';
 import { Figure } from '/components/Figure.js';
@@ -545,6 +548,7 @@ function renderOther(ctx, id) {
           <${Note} kind="hint">${c('importHint', 'A JSON backup made here or by an agent. Choose first what happens when a key already exists.')}<//>
           <${FormActions}>
             <${Choice} value=${importMode} onChange=${setImportMode} options=${['skip', 'overwrite', 'rename'].map(mode => [mode, t('profile.memory.importMode.' + mode) || mode])} />
+            <${HelpTip} term="memory.importMode" label=${t('profile.memory.importModeLabel')} />
             <${Loud} control disabled=${importing} onClick=${triggerImport}>${importing ? '…' : (t('profile.memory.importBtn') || 'Import')}<//>
           <//>
           <${FileDrop} hidden accept="application/json,.json" inputRef=${importFileRef} onChange=${handleImportFile} />

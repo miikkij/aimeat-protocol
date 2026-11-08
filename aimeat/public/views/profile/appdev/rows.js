@@ -10,6 +10,7 @@
  * @structure learnedRow · proposalRow · curatedRow
  * @usage import { learnedRow, proposalRow, curatedRow } from './rows.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-08 -- In an opened pitfall of your own, the word that says whether it is private or shared platform-wide opens the explanation of the two choices (term appdev.sharePitfall; .claude/rules/page-guidance.md).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): a row is
  *     the List's Row (an outdated pitfall faded), the severity the Status Mark and the tier the Tag in
  *     a Cell, the title the Name with its meta line, the area and model the Who, the doors Action; an
@@ -36,6 +37,7 @@ import { Row, Name, Who, Cell, Doors, Panel } from '/components/List.js';
 import { Action } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
 import { Facts } from '/components/Facts.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { a, day, areaLabel, sevLabel, modeLabel, appName, appUrlOf, appUrl } from './frame.js';
 
 /** A pitfall's severity as the Status: critical danger, info off, a warning attention. */
@@ -54,7 +56,7 @@ export function learnedRow(ctx, p) {
   const meta = [a('filedOn', { date: day(p.updated) }), p.app_ref ? appName(p.app_ref) : null, outdated ? a('outdatedMark') : null, !own ? a('communityMark') : null].filter(Boolean).join(' · ');
   const whence = html`${own ? a('whenceOwn', { model: p.model || '', date: day(p.updated) }) : a('whenceShared', { model: p.model || '', who: p.owner || '', date: day(p.updated) })}
     ${p.app_ref ? html` · <${Action} tone="link" href=${appUrlOf(p.app_ref)} newTab>${appName(p.app_ref)}<//>` : null}
-    ${own ? html` · ${p.shared ? a('stateShared') : a('statePrivate')}` : null}
+    ${own ? html` · <${HelpLabel} term="appdev.sharePitfall" label=${a('shareAll')}>${p.shared ? a('stateShared') : a('statePrivate')}<//>` : null}
     ${outdated ? html` · ${a('outdatedMark')}` : null}`;
   return html`
     <${Row} key=${key} faded=${outdated} open=${open}>

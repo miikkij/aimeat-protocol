@@ -17,6 +17,9 @@
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.27.0 — 2026-11-08 — The grant form's To whom, For what and Valid explain themselves (question
+ *     marks dataWallet.who, dataWallet.purpose, dataWallet.until), with facts from services/consent-write.ts,
+ *     storage/consent-recipient.ts and the form's submitGrant in data-wallet-tab.js.
  *   v1.26.0 — 2026-11-08 — The page explains itself the designed way (.claude/rules/page-guidance.md):
  *     PageStart under the head and the title's question mark, concept.data_wallet. The section "How
  *     your AI uses the data wallet" (dw-roads) and the head's way to it go: its request is the
@@ -241,7 +244,7 @@ function secGrant(ctx) {
     <${Section} fold id="dw-grant" num="04" title=${x('secGrant')} sub=${`${ctx.active.length} / ${ctx.quota}`} open=${f.open} onToggle=${() => ctx.toggleForm()}>
       <${Note} kind="lead">${x('grantIntro')}<//>
       <${Fields}>
-        <${Field} label=${x('form.who')} hint=${whoHint} group>
+        <${Field} label=${x('form.who')} help="dataWallet.who" hint=${whoHint} group>
           ${opt(ctx, 'whoKind', x('form.who'), [['contact', x('form.whoContact')], ['orgMembers', x('form.whoOrgMembers')], ['nodeUsers', x('form.whoNodeUsers')], ['all', x('form.whoAll')]])}
           ${whoIsPicker ? html`<${ContactPicker} value=${f.who} onChange=${(v) => ctx.setForm({ who: v })} valueMode="full" placeholder=${x('form.whoPlaceholder')} />` : null}
         <//>
@@ -256,10 +259,10 @@ function secGrant(ctx) {
         <//>
         <${Choice} label=${x('form.may')} hint=${x('form.mayHint')} value=${f.may} onChange=${(v) => ctx.setForm({ may: v })}
           options=${[['read', x('form.mayRead')], canWrite ? ['write', x('form.mayWrite')] : null].filter(Boolean)} />
-        <${TextField} label=${x('form.why')} value=${f.why} placeholder=${x('form.whyPlaceholder')} onInput=${(v) => ctx.setForm({ why: v })} />
+        <${TextField} label=${x('form.why')} help="dataWallet.purpose" value=${f.why} placeholder=${x('form.whyPlaceholder')} onInput=${(v) => ctx.setForm({ why: v })} />
         <${Choice} label=${x('form.scope')} help="consent.scope" value=${f.scope} onChange=${(v) => ctx.setForm({ scope: v })}
           options=${[['private', x('form.scopePrivate')], ['federation', x('form.scopeFederation')]]} />
-        <${Field} label=${x('form.until')} group>
+        <${Field} label=${x('form.until')} help="dataWallet.until" group>
           ${opt(ctx, 'untilKind', x('form.until'), [['never', x('form.untilNever')], ['date', x('form.untilDate')]])}
           ${f.untilKind === 'date' ? html`<${TextField} type="date" ariaLabel=${x('form.untilDate')} value=${f.until} onInput=${(v) => ctx.setForm({ until: v })} />` : null}
         <//>

@@ -15,6 +15,9 @@
  * @usage const [f, setF] = useState(EMPTY_STORE);
  *        html`<${StoreFields} kind=${kind} onKind=${setKind} f=${f} set=${set} onEnter=${send} />`
  * @version-history
+ *   v1.1.0 — 2026-11-08 — The address, the region and the addressing explain themselves behind a question
+ *     mark (storage.endpoint, storage.region, storage.addressing; the words hold for both forms); the
+ *     addressing hint goes, its words are in the explanation.
  *   v1.0.0 — 2026-10-30 — Initial: the field block of connect-form.js, shared with the admin form, plus
  *     the Azure address for the operator (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
@@ -71,16 +74,16 @@ export function StoreFields({ kind, onKind, f, set, onEnter, kindLabel, azureEnd
       options=${[['s3', W('kindS3')], ['azure', W('kindAzure')]]} />
     ${kind === 's3' ? html`
       <${Fields} cols=${2}>
-        <${TextField} label=${W('endpoint')} hint=${W('endpointHint')} value=${f.endpoint} code maxLength=${300}
+        <${TextField} label=${W('endpoint')} help="storage.endpoint" hint=${W('endpointHint')} value=${f.endpoint} code maxLength=${300}
           placeholder="https://…" onInput=${set('endpoint')} />
-        <${TextField} label=${W('region')} hint=${W('regionHint')} value=${f.region} code size="medium" maxLength=${64}
+        <${TextField} label=${W('region')} help="storage.region" hint=${W('regionHint')} value=${f.region} code size="medium" maxLength=${64}
           placeholder="eu-north-1" onInput=${set('region')} />
         <${TextField} label=${W('bucket')} hint=${W('bucketHint')} value=${f.bucket} code maxLength=${255} onInput=${set('bucket')} />
         <${TextField} label=${W('keyId')} value=${f.access_key_id} code maxLength=${256} onInput=${set('access_key_id')} />
         <${TextField} unmanaged label=${W('secret')} hint=${W('secretHint')} value=${f.secret_access_key} maxLength=${512}
           onInput=${set('secret_access_key')} onEnter=${onEnter} />
       <//>
-      <${Choice} label=${W('addressing')} hint=${W('addressingHint')} value=${f.addressing} onChange=${set('addressing')}
+      <${Choice} label=${W('addressing')} help="storage.addressing" value=${f.addressing} onChange=${set('addressing')}
         options=${[['auto', W('addrAuto')], ['path', W('addrPath')], ['host', W('addrHost')]]} />` : html`
       <${Fields} cols=${2}>
         <${TextField} label=${W('account')} hint=${W('accountHint')} value=${f.account} code maxLength=${64} onInput=${set('account')} />
