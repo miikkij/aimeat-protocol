@@ -1834,7 +1834,7 @@
   }
   function readAuthStep() {
     var step = takeParam("auth_step");
-    return step === "second_factor" || step === "two_step_setup" ? step : null;
+    return step === "second_factor" || step === "two_step_setup" || step === "key_credentials" ? step : null;
   }
   function readTwoStepToken() {
     var m = /(?:^#|&)two_step=([A-Za-z0-9_-]{43})(?:&|$)/.exec(location.hash || "");
@@ -2511,6 +2511,28 @@
     }
     if (regUser) regUser.addEventListener("input", syncUsernameRules);
   }
+  function wireEnterSubmits() {
+    [
+      ["aimeat-username", "aimeat-go-btn"],
+      ["aimeat-password", "aimeat-go-btn"],
+      ["aimeat-reg-username", "aimeat-reg-btn"],
+      ["aimeat-reg-email", "aimeat-reg-btn"],
+      ["aimeat-reg-password", "aimeat-reg-btn"],
+      ["aimeat-reg-displayname", "aimeat-reg-btn"]
+    ].forEach(function(pair) {
+      var el = document.getElementById(pair[0]);
+      if (!el) return;
+      el.addEventListener("keydown", function(e) {
+        if (e.key !== "Enter") return;
+        e.preventDefault();
+        var btn = (
+          /** @type {any} */
+          document.getElementById(pair[1])
+        );
+        if (btn && !btn.disabled) btn.click();
+      });
+    });
+  }
 
   // src/static/sdk-libs/auth/modal-two-step.js
   function onlyDigits2(value) {
@@ -2670,6 +2692,140 @@
     };
   }
 
+  // src/static/sdk-libs/auth/modal-key-credentials.js
+  function goTo3(target) {
+    var url;
+    try {
+      url = new URL(target, location.href);
+    } catch (e) {
+      console.warn("[aimeat-auth] The place to continue to is not an address:", e && /** @type {Error} */
+      e.message);
+      return false;
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    if (url.href === location.href) return false;
+    location.assign(url.href);
+    return true;
+  }
+  function keyCredentialsViewHtml(i, field) {
+    var copy = escHtml(i.keyCredCopy || "Copy");
+    return '<div id="aimeat-key-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.keyCredTitle || "Your sign-in details") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.keyCredDesc || "The access code you received no longer works. From now on, sign in with this username and password. Save the password now: it is shown only here.") + '</p><p class="aimeat-hint">' + escHtml(i.usernameLabel || "Username") + ': <code id="aimeat-kc-user" class="aimeat-ts-secret"></code> <button type="button" class="aimeat-cancel" data-kc-copy="aimeat-kc-user">' + copy + '</button></p><p class="aimeat-hint">' + escHtml(i.passwordLabel || "Password") + ': <code id="aimeat-kc-pass" class="aimeat-ts-secret" style="font-size:16px"></code> <button type="button" class="aimeat-cancel" data-kc-copy="aimeat-kc-pass">' + copy + '</button></p><div id="aimeat-kc-passkey"' + (passkeySupported() ? "" : ' style="display:none"') + '><h4 class="aimeat-sub-title" style="margin-top:28px">' + escHtml(i.keyCredPasskeyTitle || "Sign in without a password") + '</h4><p class="aimeat-sub-desc">' + escHtml(i.keyCredPasskeyDesc || "Add this device, and you sign in with your fingerprint, face or screen lock.") + '</p><div class="aimeat-actions"><button type="button" id="aimeat-kc-passkey-add" class="aimeat-cancel">' + escHtml(i.keyCredPasskeyAdd || "Add this device") + '</button></div><p id="aimeat-kc-passkey-msg" class="aimeat-hint" style="display:none"></p></div><h4 class="aimeat-sub-title" style="margin-top:28px">' + escHtml(i.keyCredEmailTitle || "Your email address") + '</h4><p id="aimeat-kc-email-now" class="aimeat-sub-desc"></p><div id="aimeat-kc-email-ask">' + field(i.emailLabel || "Email", '<input id="aimeat-kc-email" class="aimeat-inp" type="email" autocomplete="email">') + '<div class="aimeat-actions"><button type="button" id="aimeat-kc-email-send" class="aimeat-cancel">' + escHtml(i.sendVerificationCode || "Send Verification Code") + '</button></div></div><div id="aimeat-kc-email-code-step" style="display:none">' + field(i.keyCredEmailCode || "Code from the email", '<input id="aimeat-kc-email-code" class="aimeat-inp" inputmode="numeric" autocomplete="one-time-code" maxlength="6">') + '<div class="aimeat-actions"><button type="button" id="aimeat-kc-email-confirm" class="aimeat-cancel">' + escHtml(i.keyCredEmailConfirm || "Confirm address") + '</button></div></div><p id="aimeat-kc-email-msg" class="aimeat-hint" style="display:none"></p><div class="aimeat-actions"><button type="button" id="aimeat-kc-done" class="aimeat-go">' + escHtml(i.keyCredDone || "I saved the password, continue") + '</button></div><p id="aimeat-kc-err" class="aimeat-err"></p></div>';
+  }
+  function wireKeyCredentialsStep(ctx) {
+    var i = ctx.i;
+    var $ = function(id) {
+      return (
+        /** @type {any} */
+        document.getElementById(id)
+      );
+    };
+    var view = $("aimeat-key-view");
+    if (!view) return { open: function() {
+    } };
+    var jwt = "", continueTo = (
+      /** @type {string | null} */
+      null
+    ), verificationId = "";
+    var errEl = $("aimeat-kc-err"), emailMsg = $("aimeat-kc-email-msg");
+    function say(el, message) {
+      el.textContent = message;
+      el.style.display = "block";
+    }
+    view.querySelectorAll("[data-kc-copy]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var text = ($(btn.getAttribute("data-kc-copy")) || {}).textContent || "";
+        Promise.resolve().then(function() {
+          return navigator.clipboard.writeText(text);
+        }).then(function() {
+          btn.textContent = i.keyCredCopied || "Copied";
+        }).catch(function(e) {
+          console.warn("[aimeat-auth] Copy to the clipboard failed:", e && e.message);
+        });
+      });
+    });
+    function showAddress() {
+      authApi("/v1/ghii/me", jwt).then(function(me) {
+        var d = me && me.data || {};
+        var email = d.notification_email || "";
+        var proven = !!d.email_verified_at && email;
+        $("aimeat-kc-email-now").textContent = proven ? String(i.keyCredEmailNow || "Sign-in links and password resets go to {email}. If this address is not yours, enter your own.").replace("{email}", email) : i.keyCredEmailNone || "This account has no confirmed email address. Enter yours, so you can sign in with an emailed link and reset the password if you forget it.";
+        if (!proven && email) $("aimeat-kc-email").value = email;
+      }).catch(function(e) {
+        console.warn("[aimeat-auth] The account address could not be read:", e && e.message);
+      });
+    }
+    $("aimeat-kc-passkey-add").addEventListener("click", function() {
+      var btn = $("aimeat-kc-passkey-add"), msg = $("aimeat-kc-passkey-msg");
+      btn.disabled = true;
+      passkeyAdd(jwt, "").then(function() {
+        say(msg, i.keyCredPasskeyAdded || "Added. Next time you can sign in with this device.");
+        btn.style.display = "none";
+      }).catch(function(e) {
+        if (e && e.code !== "PASSKEY_CANCELLED") say(msg, e.message);
+        btn.disabled = false;
+      });
+    });
+    $("aimeat-kc-email-send").addEventListener("click", function() {
+      var email = String($("aimeat-kc-email").value || "").trim();
+      if (!email) {
+        $("aimeat-kc-email").focus();
+        return;
+      }
+      var btn = $("aimeat-kc-email-send");
+      btn.disabled = true;
+      authApi("/v1/ghii/email/verify", jwt, { method: "POST", body: JSON.stringify({ email }) }).then(function(r) {
+        verificationId = r.data && r.data.verification_id || "";
+        $("aimeat-kc-email-ask").style.display = "none";
+        $("aimeat-kc-email-code-step").style.display = "";
+        emailMsg.style.display = "none";
+        setTimeout(function() {
+          $("aimeat-kc-email-code").focus();
+        }, 50);
+      }).catch(function(e) {
+        say(emailMsg, e.message);
+      }).finally(function() {
+        btn.disabled = false;
+      });
+    });
+    $("aimeat-kc-email-confirm").addEventListener("click", function() {
+      var code = String($("aimeat-kc-email-code").value || "").replace(/\D/g, "");
+      if (!code) {
+        $("aimeat-kc-email-code").focus();
+        return;
+      }
+      var btn = $("aimeat-kc-email-confirm");
+      btn.disabled = true;
+      authApi("/v1/ghii/email/confirm", jwt, { method: "POST", body: JSON.stringify({ verification_id: verificationId, code }) }).then(function() {
+        $("aimeat-kc-email-code-step").style.display = "none";
+        say(emailMsg, i.keyCredEmailDone || "Confirmed. This is now your address.");
+        showAddress();
+      }).catch(function(e) {
+        say(emailMsg, e.message);
+      }).finally(function() {
+        btn.disabled = false;
+      });
+    });
+    $("aimeat-kc-done").addEventListener("click", function() {
+      var target = continueTo;
+      jwt = "";
+      continueTo = null;
+      $("aimeat-kc-pass").textContent = "";
+      ctx.onDone();
+      if (target) goTo3(target);
+    });
+    return {
+      open: function(details) {
+        jwt = details.jwt;
+        continueTo = details.continueTo || null;
+        errEl.style.display = "none";
+        $("aimeat-kc-user").textContent = details.credentials.username;
+        $("aimeat-kc-pass").textContent = details.credentials.password;
+        ctx.showView("key");
+        showAddress();
+      }
+    };
+  }
+
   // src/static/sdk-libs/auth/modal.js
   var NODE_HOST = (function() {
     try {
@@ -2773,7 +2929,7 @@
         i2.displayNameOptional || "optional"
       ) + '<div class="aimeat-actions"><button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i2.createAccountBtn || "Create account") + '</button><button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-reg-error" class="aimeat-err"></p></div>' + (AUTH_PROVIDERS.length ? '<div class="aimeat-or"><span></span><b>' + escHtml(i2.orLabel || "OR") + "</b><span></span></div>" + AUTH_PROVIDERS.map(function(p) {
         return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '">' + (PROVIDER_ICONS[p.id] || "") + escHtml(i2[p.i18nKey] || p.label) + "</button>";
-      }).join("") : "") + "</div>" + recoveryViewsHtml(i2, field) + loginLinkViewHtml(i2, field, linkFirst) + totpViewHtml(i2, field) + twoStepViewHtml(i2, field) + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
+      }).join("") : "") + "</div>" + recoveryViewsHtml(i2, field) + loginLinkViewHtml(i2, field, linkFirst) + totpViewHtml(i2, field) + twoStepViewHtml(i2, field) + keyCredentialsViewHtml(i2, field) + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
     }
     function wireModal() {
       modal.querySelectorAll(".aimeat-lang").forEach(function(b) {
@@ -2788,6 +2944,10 @@
         });
       });
       function holdsTypedInput() {
+        if (
+          /** @type {any} */
+          (document.getElementById("aimeat-key-view") || {}).style?.display === ""
+        ) return true;
         var inputs = modal.querySelectorAll(".aimeat-inp");
         for (var k = 0; k < inputs.length; k++) if (
           /** @type {any} */
@@ -2838,16 +2998,36 @@
         document.getElementById("aimeat-email-view").style.display = view === "email" ? "" : "none";
         document.getElementById("aimeat-totp-view").style.display = view === "totp" ? "" : "none";
         document.getElementById("aimeat-two-step-view").style.display = view === "two-step" ? "" : "none";
+        document.getElementById("aimeat-key-view").style.display = view === "key" ? "" : "none";
         var ll = document.getElementById("aimeat-login-link-view");
         if (ll) ll.style.display = view === "login-link" ? "" : "none";
-        var step = view === "totp" || view === "two-step";
+        var step = view === "totp" || view === "two-step" || view === "key";
         modal.querySelectorAll(".aimeat-headline, .aimeat-line, .aimeat-tabs").forEach(function(el) {
           el.style.display = step ? "none" : "";
         });
       }
       function finishLogin() {
+        var s = (
+          /** @type {any} */
+          typeof auth.getSession === "function" ? auth.getSession() : null
+        );
+        var kc = s && s._keyCredentials;
+        if (kc && kc.password) {
+          s._keyCredentials = null;
+          keyStep.open({ credentials: kc, jwt: s.jwt });
+          return;
+        }
         modal.remove();
         renderBtn();
+      }
+      var keyStep = wireKeyCredentialsStep({ i, showView, onDone: function() {
+        modal.remove();
+        renderBtn();
+      } });
+      if (opts.keyCredentials) {
+        var owed = opts.keyCredentials;
+        opts.keyCredentials = null;
+        keyStep.open(owed);
       }
       wirePasskeyButton({
         i,
@@ -3058,26 +3238,7 @@
         }
       });
       wireRecoveryViews({ i, api, showView });
-      [
-        ["aimeat-username", "aimeat-go-btn"],
-        ["aimeat-password", "aimeat-go-btn"],
-        ["aimeat-reg-username", "aimeat-reg-btn"],
-        ["aimeat-reg-email", "aimeat-reg-btn"],
-        ["aimeat-reg-password", "aimeat-reg-btn"],
-        ["aimeat-reg-displayname", "aimeat-reg-btn"]
-      ].forEach(function(pair) {
-        var el = document.getElementById(pair[0]);
-        if (!el) return;
-        el.addEventListener("keydown", function(e) {
-          if (e.key !== "Enter") return;
-          e.preventDefault();
-          var btn = (
-            /** @type {any} */
-            document.getElementById(pair[1])
-          );
-          if (btn && !btn.disabled) btn.click();
-        });
-      });
+      wireEnterSubmits();
       function releaseBtn(id, label) {
         var b = (
           /** @type {any} */
@@ -4375,6 +4536,26 @@
         });
       });
     }
+    if (step === "key_credentials") showOwedKeyCredentials();
+  }
+  function showOwedKeyCredentials() {
+    Promise.all([loadModalI18n(currentModalLang()), auth.login()]).then(function(got) {
+      var session = (
+        /** @type {any} */
+        got[1]
+      );
+      if (!session || !session.jwt) return null;
+      return authApi("/v1/ghii/key-credentials", session.jwt, { method: "POST", body: "{}" }).then(function(r) {
+        showLoginModal({ i18n: got[0] || {}, keyCredentials: {
+          credentials: r.data.key_credentials,
+          jwt: session.jwt,
+          continueTo: r.data.continue_to || null
+        } }, function() {
+        });
+      });
+    }).catch(function(e) {
+      console.warn("[aimeat-auth] The new sign-in details could not be shown:", e && e.message);
+    });
   }
   if (typeof document !== "undefined" && document.addEventListener) {
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", maybeShowAuthError);
@@ -4421,5 +4602,5 @@
     });
   }
   var ns = attach("auth", auth);
-  ns.version = "2026-11-05-001";
+  ns.version = "2026-11-08-001";
 })();

@@ -15,10 +15,13 @@
  *   view (modal-totp.js, link mode).
  *   The second is `two_step_setup`: the operator requires two-step sign-in, the emailed link's account
  *   has no authenticator app, and the setup token comes in the fragment (modal-two-step.js).
+ *   The third is `key_credentials`: a code key's first sign-in by a link or a provider, signed in, and
+ *   its new sign-in details wait for this browser (modal-key-credentials.js).
  * @structure takeParam(name) · readAuthError() · readAuthStep() · readTwoStepToken() · authErrorText(i, code) ·
  *   showAuthErrorIn(i, code)
  * @usage import { readAuthError, readAuthStep, showAuthErrorIn } from './auth-error.js';
  * @version-history
+ *   v1.4.0 — 2026-11-08 — readAuthStep() knows `key_credentials` (secaudit2026nov08 round 14).
  *   v1.3.0 — 2026-11-02 — readAuthStep() knows `two_step_setup`, and readTwoStepToken() reads its token
  *     from the fragment (required two-step sign-in).
  *   v1.2.0 — 2026-10-24 — The SECOND_FACTOR_EXPIRED sentence says to sign in again, which fits every
@@ -55,7 +58,7 @@ export function readAuthError() {
 /** The sign-in step the server asks for, removed from the address; null for none or an unknown one. */
 export function readAuthStep() {
   var step = takeParam('auth_step');
-  return step === 'second_factor' || step === 'two_step_setup' ? step : null;
+  return step === 'second_factor' || step === 'two_step_setup' || step === 'key_credentials' ? step : null;
 }
 
 /**

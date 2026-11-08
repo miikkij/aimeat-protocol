@@ -19,6 +19,8 @@
  *   POST /v1/ghii/magic-link/second-factor opens the session when the code is right
  *   (login-link-second-factor.ts).
  * @version-history
+ *   v1.5.0 — 2026-11-08 — A code key's first sign-in by the link goes to the sign-in details screen
+ *     first, and the key stops being the password (secaudit2026nov08 round 14).
  *   v1.4.0 — 2026-11-02 — On an account the required two-step policy covers and that has no TOTP, the
  *     link opens no session: a setup token and the front page's enrolment step,
  *     `?auth_step=two_step_setup#two_step=<token>` (login-two-step.ts; IT review).
@@ -71,8 +73,9 @@ export function registerLoginLinkOpenRoute(router: Router, config: AimeatConfig,
                 await twoStepSetupRedirect(storage, config, res, result.ghii, back);
                 return;
             }
-            await establishForGhii(storage, config, req, res, result.ghii);
-            res.redirect(back ?? `${config.baseUrl}/`);
+            // A code key's first sign-in shows its new sign-in details first, then continues to `back`.
+            const screen = await establishForGhii(storage, config, req, res, result.ghii, back);
+            res.redirect(screen ?? back ?? `${config.baseUrl}/`);
         } catch (err) {
             if (err instanceof AccountDisabledError) { fail('ACCOUNT_DISABLED'); return; }
             logger.error('login link sign-in failed', { error: String(err) });

@@ -20,6 +20,8 @@
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-11-08 — A code key's first sign-in by SAML goes to the sign-in details screen first
+ *     (secaudit2026nov08 round 14).
  *   2026-10-29 — The first sign-in into an account the directory adopted, when it has two-step sign-in,
  *     goes to the code step once (services/sso-adoption-notice.ts adoptionAsksCode; secaudit2026oct26
  *     round 8c, adoption-skips-second-factor).
@@ -265,7 +267,8 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
           return;
         }
 
-        await establishForGhii(storage, config, req, res, result.ghii);
+        // A code key's first sign-in shows its new sign-in details first (secaudit2026nov08 round 14).
+        const screen = await establishForGhii(storage, config, req, res, result.ghii, postLoginPath);
         await ensureSsoMembership(storage, conn, result.ghii.ownerName);
         // The organisation's sign-in opened an adopted account past its two-step code: the person
         // is told (services/sso-adoption-notice.ts; secaudit2026oct26).
@@ -279,7 +282,7 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
             .catch(err => logger.warn('lastLoginAt stamp failed', { connection: conn.id, error: String(err) }));
         }
 
-        res.redirect(`${config.baseUrl}${postLoginPath}`);
+        res.redirect(screen ?? `${config.baseUrl}${postLoginPath}`);
       } catch (err) {
         if (err instanceof AccountDisabledError) { fail('ACCOUNT_DISABLED'); return; }
         logger.error('SAML ACS failed', { connection: conn.id, error: String(err) });

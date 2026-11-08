@@ -79404,7 +79404,9 @@ paths:
                               the account's address when the account has verified it. When it has not,
                               nothing is mailed now, `email_held` is true and `email_note` says so, and the
                               mail goes when the address is verified (unless the password has changed by
-                              then).
+                              then), by a code asked for after this sign-in. A first sign-in by an emailed
+                              link or an identity provider replaces the key too; its details are given by
+                              `POST /v1/ghii/key-credentials`.
                             properties:
                               username: { type: string, description: The exact sign-in name }
                               password: { type: string, description: The new password that replaced the key }
@@ -79676,6 +79678,46 @@ paths:
                           verification_id: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /v1/ghii/key-credentials:
+    post:
+      operationId: takeGhiiKeyCredentials
+      tags: [GHII]
+      summary: The new sign-in details of a code key's first sign-in by a link or a provider
+      description: |
+        A code key's code is the account's password until the holder's first sign-in. When that
+        sign-in is an emailed sign-in link or an identity provider, the node replaces the code at
+        once and redirects the browser to `/?auth_step=key_credentials`; the page then asks here,
+        with the access token of the session that signed in, and gets a new password once. Another
+        session of the account, a second request, or a request after 24 hours gets 404. The details
+        are shown, not mailed. `continue_to` is where the sign-in was going.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The new sign-in details, once
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key_credentials:
+                            type: object
+                            properties:
+                              username: { type: string, description: The exact sign-in name }
+                              password: { type: string, description: The new password }
+                              email_sent: { type: boolean, description: Always false }
+                          continue_to: { type: string, nullable: true, description: Where the sign-in was going }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':

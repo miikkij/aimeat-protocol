@@ -17,6 +17,8 @@
  * @structure completeOwnerLogin(config, storage, req, res, args) -> writes the response itself
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
+ *   2026-11-08 — A code key's first sign-in is decided in establishOwnerSession by its invitation, not
+ *     here by the login count (secaudit2026nov08 round 14).
  *   2026-11-02 — args.extra: fields the calling route adds to the answer (the backup codes of a
  *     required two-step enrolment, routes/ghii/login-two-step.ts).
  *   2026-10-27 — The self-heal claim reads fromNodeMachine(req): a sign-in the node replays onto loopback for a remote agent (the connector tunnel) is not this machine's own (secaudit2026oct26).
@@ -42,7 +44,6 @@ import { claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type Opera
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { establishOwnerSession } from '../../services/owner-session.js';
-import { issueFirstLoginKeyCredentials } from '../../services/key-credentials.js';
 
 /**
  * Turn a checked credential into an owner session, or refuse a deactivated account.
@@ -69,19 +70,17 @@ export async function completeOwnerLogin(
   }
 
   // Password (+ TOTP if enabled) verified — track login
-  const isFirstLogin = (ghiiRecord.loginCount ?? 0) === 0;
   const loginNow = new Date().toISOString();
   await storage.updateGHII(ghiiRecord.ghii, {
       lastLoginAt: loginNow,
       loginCount: (ghiiRecord.loginCount ?? 0) + 1,
   });
 
-  // Provisioned-code ("key") account, first sign-in: rotate its dash-carrying bootstrap code to
-  // a durable, validator-clean password and hand the owner their real login (username + password),
-  // both in this response and by email. Runs exactly once (gated by the invite flipping accepted).
-  const keyCredentials = isFirstLogin
-      ? await issueFirstLoginKeyCredentials(storage, config, ghiiRecord)
-      : null;
+  // A provisioned-code ("key") account's first sign-in rotates its bootstrap code to a durable,
+  // validator-clean password and hands the owner their real login (username + password) in this
+  // response. It is decided in establishOwnerSession below (keyCredentials: 'answer') by the key's
+  // invitation still being unaccepted, for every sign-in road; the login count decided it here, so a
+  // first sign-in by a link or a provider left the key working (secaudit2026nov08 round 14).
 
   // Issue OWNER JWT (human users authenticate as owners, not agents)
   const ownerRecord = await storage.getOwner(loginName);
@@ -153,8 +152,8 @@ export async function completeOwnerLogin(
   // Establish an owner session: short-lived access JWT (bound to the session via
   // jti) + a rotating refresh token delivered as an httpOnly cookie. Refresh no
   // longer depends on the owner keypair, so other devices are never invalidated.
-  const { token, sessionId, expiresIn } = await establishOwnerSession(
-      storage, config, req, res, { owner: loginName, roles },
+  const { token, sessionId, expiresIn, keyCredentials } = await establishOwnerSession(
+      storage, config, req, res, { owner: loginName, roles, keyCredentials: 'answer' },
   );
 
   // SECURITY: Prevent caching of response containing private keys

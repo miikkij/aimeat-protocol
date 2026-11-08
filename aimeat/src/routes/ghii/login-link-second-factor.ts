@@ -32,6 +32,8 @@
  *   ghii, back, link?) · registerLoginLinkSecondFactorRoute(router, config, storage)
  * @usage registerLoginLinkSecondFactorRoute(router, config, storage);
  * @version-history
+ *   2026-11-08 — A code key's first sign-in answers the sign-in details screen as `redirect`
+ *     (secaudit2026nov08 round 14).
  *   2026-10-24 — The SECOND_FACTOR_EXPIRED message says to sign in again, which fits every way the step
  *     starts (secaudit2026oct22, external-login-skips-second-factor).
  *   2026-10-24 — The ticket can carry an external sign-in's provider identity (`link`), saved on the
@@ -211,6 +213,7 @@ export function registerLoginLinkSecondFactorRoute(router: Router, config: Aimea
             res.status(401).json(error(config.nodeId, 'SECOND_FACTOR_EXPIRED', EXPIRED_TEXT));
             return;
         }
+        let screen: string | null | undefined;
         try {
             let account = ghii;
             if (payload.link) {
@@ -230,7 +233,8 @@ export function registerLoginLinkSecondFactorRoute(router: Router, config: Aimea
                 }
                 account = (await storage.updateGHII(ghii.ghii, externalIdUpdate(ghii, payload.link.providerId, payload.link.sub))) ?? ghii;
             }
-            await establishForGhii(storage, config, req, res, account);
+            // A code key's first sign-in shows its new sign-in details first (secaudit2026nov08 round 14).
+            screen = await establishForGhii(storage, config, req, res, account, payload.back ?? null);
             if (payload.link?.sso) {
                 const conn = await storage.getSsoConnection(payload.link.sso);
                 if (conn) await ensureSsoMembership(storage, conn, account.ownerName);
@@ -244,6 +248,6 @@ export function registerLoginLinkSecondFactorRoute(router: Router, config: Aimea
             res.status(500).json(keepErrorMessage(error(config.nodeId, 'LOGIN_LINK_FAILED', 'Sign-in did not go through. Ask for a new sign-in link.')));
             return;
         }
-        res.json(success(config.nodeId, { redirect: payload.back ?? `${config.baseUrl}/` }));
+        res.json(success(config.nodeId, { redirect: screen ?? payload.back ?? `${config.baseUrl}/` }));
     });
 }

@@ -19,6 +19,8 @@
  * @usage app.use(ghiiRouter(config, storage, emailService)) from server.ts
  *
  * @version-history
+ *   2026-11-08 — POST /v1/ghii/key-credentials (ghii/key-credentials-screen.ts): a code key's first
+ *     sign-in by a link or a provider shows its new sign-in details (secaudit2026nov08 round 14).
  *   2026-11-02 — POST /v1/ghii/login/two-step/start and /finish (ghii/login-two-step.ts): the enrolment of
  *     a required two-step sign-in (services/sign-in-policy.ts).
  *   2026-10-25 — GET and PUT /v1/ghii/me/secret-host-ask (ghii/secret-host-ask.ts; secaudit2026oct22).
@@ -44,6 +46,7 @@ import { registerWebVerifyRoutes } from './ghii/web-verify.js';
 import { registerRecoveryRoutes } from './ghii/recovery.js';
 import { registerProfileRoutes } from './ghii/profile.js';
 import { registerSecretHostAskRoutes } from './ghii/secret-host-ask.js';
+import { registerKeyCredentialsScreenRoute } from './ghii/key-credentials-screen.js';
 
 export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService, onDirectoryChange?: () => void, peers?: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -60,6 +63,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     registerLoginTwoStepRoutes(router, config, storage);
     registerWebVerifyRoutes(router, config, storage, emailService, onDirectoryChange, registrationLimit);
     registerRecoveryRoutes(router, config, storage, emailService);
+    registerKeyCredentialsScreenRoute(router, config, storage);
     registerSecretHostAskRoutes(router, config, storage);
     registerProfileRoutes(router, config, storage, onDirectoryChange);
 

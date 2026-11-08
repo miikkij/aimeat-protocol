@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.21.0 — 2026-11-08 — A code key's first sign-in opens the sign-in details step (modal-key-credentials.js)
+ *     before the dialog closes, and opts.keyCredentials opens it from the front page (secaudit2026nov08 round 14).
  *   v1.20.0 — 2026-11-04 — opts.line replaces the line under the headline on both tabs: why the person is here.
  *   v1.19.0 — 2026-11-02 — The operator's sign-in policy. With password sign-in off the dialog shows no
  *     password form and says which ways in remain; with `operators` the form stands under a line
@@ -101,8 +103,9 @@ import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-
 import { showAuthErrorIn } from './auth-error.js';
 import { signupInProgress } from './signup-state.js';
 import { EMAIL_RE, OWNER_NAME_RE, passwordRefusalText, operatorsOnlyNoteHtml } from './modal-constants.js';
-import { captureInputs, restoreInputs, wireUsernameRules } from './modal-fields.js';
+import { captureInputs, restoreInputs, wireUsernameRules, wireEnterSubmits } from './modal-fields.js';
 import { twoStepViewHtml, wireTwoStepStep } from './modal-two-step.js';
+import { keyCredentialsViewHtml, wireKeyCredentialsStep } from './modal-key-credentials.js';
 
 /** The domain in the crumb above the headline: this node's own, so a self-hosted node shows its
  *  domain there and the wordmark beside it says what the software is. */
@@ -329,6 +332,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + totpViewHtml(i, field)
       // Two-step enrolment (hidden): the operator requires two-step sign-in (modal-two-step.js).
       + twoStepViewHtml(i, field)
+      // A code key's first sign-in: the new sign-in details (modal-key-credentials.js).
+      + keyCredentialsViewHtml(i, field)
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
       // A returning person signing in does not need to be sold the thing they already have. A
       // numbered index under an ink rule, the last line in bold.
@@ -358,6 +363,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     // behind the dialog, and Escape, close only while nothing has been typed, because losing
     // a half-filled form to a stray click is worse than a dialog that stays.
     function holdsTypedInput() {
+      // The sign-in details step holds a password shown once: only its own button closes it.
+      if (/** @type {any} */ (document.getElementById('aimeat-key-view') || {}).style?.display === '') return true;
       var inputs = modal.querySelectorAll('.aimeat-inp');
       for (var k = 0; k < inputs.length; k++) if (/** @type {any} */ (inputs[k]).value) return true;
       return false;
@@ -412,18 +419,25 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       document.getElementById('aimeat-email-view').style.display = view === 'email' ? '' : 'none';
       document.getElementById('aimeat-totp-view').style.display = view === 'totp' ? '' : 'none';
       document.getElementById('aimeat-two-step-view').style.display = view === 'two-step' ? '' : 'none';
+      document.getElementById('aimeat-key-view').style.display = view === 'key' ? '' : 'none';
       var ll = document.getElementById('aimeat-login-link-view'); if (ll) ll.style.display = view === 'login-link' ? '' : 'none';
-      // The code step and the two-step enrolment carry their own heading: the masthead and the tabs go.
-      var step = view === 'totp' || view === 'two-step';
+      // The code step, the two-step enrolment and the sign-in details carry their own heading.
+      var step = view === 'totp' || view === 'two-step' || view === 'key';
       modal.querySelectorAll('.aimeat-headline, .aimeat-line, .aimeat-tabs').forEach(function (el) { /** @type {any} */ (el).style.display = step ? 'none' : ''; });
     }
 
     /** A finished sign-in, whichever step produced it. The caller's onLogin is not called here: the
      *  session core's 'login' event reaches it through on-login.js, once, with the road it came by. */
     function finishLogin() {
+      // A code key's first sign-in answered new sign-in details: they are shown before the dialog goes.
+      var s = /** @type {any} */ (typeof auth.getSession === 'function' ? auth.getSession() : null);
+      var kc = s && s._keyCredentials;
+      if (kc && kc.password) { s._keyCredentials = null; keyStep.open({ credentials: kc, jwt: s.jwt }); return; }
       modal.remove();
       renderBtn();
     }
+    var keyStep = wireKeyCredentialsStep({ i: i, showView: showView, onDone: function () { modal.remove(); renderBtn(); } });
+    if (opts.keyCredentials) { var owed = opts.keyCredentials; opts.keyCredentials = null; keyStep.open(owed); }
 
     // The passkey button. Its whole ceremony lives in the auth lib; the modal only says where the
     // finished session goes, which is the same place every other sign-in ends.
@@ -629,20 +643,8 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     // Forgot password and forgot username.
     wireRecoveryViews({ i: i, api: api, showView: showView });
 
-    // Enter submits the tab the field belongs to.
-    [['aimeat-username', 'aimeat-go-btn'], ['aimeat-password', 'aimeat-go-btn'],
-      ['aimeat-reg-username', 'aimeat-reg-btn'], ['aimeat-reg-email', 'aimeat-reg-btn'],
-      ['aimeat-reg-password', 'aimeat-reg-btn'], ['aimeat-reg-displayname', 'aimeat-reg-btn'],
-    ].forEach(function (pair) {
-      var el = document.getElementById(pair[0]);
-      if (!el) return;
-      el.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        var btn = /** @type {any} */ (document.getElementById(pair[1]));
-        if (btn && !btn.disabled) btn.click();
-      });
-    });
+    // Enter submits the tab the field belongs to (modal-fields.js).
+    wireEnterSubmits();
 
     /** Restore a submit button after a failed attempt. */
     function releaseBtn(id, label) {
