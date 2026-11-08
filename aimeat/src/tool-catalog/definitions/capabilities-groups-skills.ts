@@ -7,6 +7,8 @@
  * @version-history
  *   (2026-11-08) aimeat_appdev_pitfall_list names each row's `open` call instead of a rule to pick one.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
+ *   2026-11-08 — aimeat_consent_grant takes `role` (read | write), the field POST /v1/consent reads, so
+ *     the role reaches the AI too; write keeps the route's rules and names aimeat_workspace_member_grant.
  *   2026-11-01 — aimeat_consent_grant takes a party recipient with pinned_version, allow_url_key and
  *     terms_required: a named share of a data package (plan doc-mvwxcas3dom3, D3.4).
  *   2026-10-29 — The two operator propose-then-confirm tools moved unchanged to ./operator-config.ts (max-file-lines).
@@ -221,6 +223,7 @@ export const capabilitiesGroupsSkillsTools = [
             pinned_version: { type: 'string', description: 'For a party recipient: share one version of the package (sha256:<hex>) instead of the newest.', zod: z.string().max(80) },
             allow_url_key: { type: 'boolean', description: 'For a party recipient: the CSV address may carry the party key (Google Sheets). Off by default.' },
             terms_required: { type: 'boolean', description: 'For a party recipient: the party accepts the terms before the first read. Default true for a person, false for a program.' },
+            role: { type: 'string', description: 'What the recipient may do: read (the default) or write. Write is the contributor role on ONE workspace (data_pattern organism.<organism>.w.<workspace>.**) for ONE person on this node (target_gaii ghii:<name>@<this node>), and only the workspace\'s creator gives it with a consent, signed in as themselves; any other write is refused with WRITE_NOT_SUPPORTED and the reason. An agent gives a member write with aimeat_workspace_member_grant. The purpose text never decides the role.', zod: z.enum(['read', 'write']) },
         },
     },
     {
