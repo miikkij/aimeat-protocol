@@ -30,6 +30,9 @@
  *   const compiled = await getCsmCompiled(storage, 'alice.sensor');  // { name, version, jsonSchema, hash }
  *   const out = await createCsmAs({ storage, config }, caller, { yaml });  // { ok, status, data } | refusal
  * @version-history
+ *   2026-11-08 — lockSchema: a lock another principal set on `csm.<name>` before the CSM was
+ *     registered passes to the registering account; its own and a seeded `system@` lock stay as they
+ *     are (secaudit2026nov08 round 14, lockSchema-keeps-foreign-lock-holder).
  *   v1.0.0 — 2026-11-07 — Initial (CSM owner prefix, visibility, versions, csm:write, draft, in-use; Jouni, 2026-11-07).
  */
 import { createHash } from 'node:crypto';
@@ -47,6 +50,7 @@ import { operatorOverride } from './operator-override.js';
 import { emitChange } from './event-bus.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { localAccountOf } from '../utils/gaii.js';
+import { isOwnersLock } from './packages/compose/package-component-collisions.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { logger } from '../utils/logger.js';
 
@@ -367,16 +371,28 @@ function semanticOf(def: CsmDefinition): Record<string, unknown> | undefined {
   return def.service.semantic && typeof def.service.semantic === 'object' ? def.service.semantic as Record<string, unknown> : undefined;
 }
 
-async function lockSchema(storage: Storage, def: CsmDefinition, schemaKey: string, jsonSchema: Record<string, unknown>, lockedBy: string, now: string): Promise<void> {
+/**
+ * The CSM's lock at `csm.<name>`, which currentSchema reads as the CSM's schema, set to `jsonSchema`
+ * and held by the registering account `lockedBy`. A holder that is that account (its bare name, its
+ * GHII or one of its agents) or the node's seeder (`system@`) stays the holder. Any other holder set
+ * the lock before the CSM was registered, so the registering account takes it over: a CSM's
+ * published schema and the receivers that copy it answer to the account that registered it
+ * (secaudit2026nov08 round 14, lockSchema-keeps-foreign-lock-holder).
+ */
+async function lockSchema(storage: Storage, def: CsmDefinition, schemaKey: string, jsonSchema: Record<string, unknown>, lockedBy: string, now: string, nodeId: string): Promise<void> {
   const semantic = semanticOf(def);
   const existing = await storage.getSchema(schemaKey, 'prefix');
+  const kept = !!existing && (isOwnersLock(existing.lockedBy, lockedBy, `${lockedBy}@${nodeId}`) || existing.lockedBy.startsWith('system@'));
+  if (existing && !kept) {
+    logger.warn('csm: the registering account takes over a lock another principal set on its CSM key', { key: schemaKey, previous: existing.lockedBy, now: lockedBy });
+  }
   await storage.setSchema({
     keyPattern: schemaKey,
     applyTo: 'prefix',
     schemaJson: jsonSchema,
     schemaMode: def.schemaMode,
-    lockedBy: existing?.lockedBy ?? lockedBy,
-    setAt: existing?.setAt ?? now,
+    lockedBy: kept ? existing!.lockedBy : lockedBy,
+    setAt: kept ? existing!.setAt : now,
     updatedAt: now,
     ...(semantic ? { semanticContext: { '@context': semantic['@context'] as Record<string, string> | undefined, '@type': semantic['@type'] as string | undefined } } : {}),
   });
@@ -426,7 +442,7 @@ export async function createCsmAs(deps: CsmDeps, caller: CallerContext, input: C
     throw err;
   }
   // After the record: a name another writer took a moment earlier is refused above without a lock.
-  await lockSchema(deps.storage, def, schemaKey, jsonSchema, who.account, now);
+  await lockSchema(deps.storage, def, schemaKey, jsonSchema, who.account, now, deps.config.nodeId);
   emitChange('csm');
   return {
     ok: true as const, status: 201,
@@ -489,7 +505,7 @@ export async function updateCsmAs(deps: CsmDeps, caller: CallerContext, name: st
     const fresh = await deps.storage.getCsm(name);
     return refuse(409, 'VERSION_CONFLICT', `CSM service "${name}" changed while this one was written. Read it again and send your change on its new version.`, { current_version: fresh?.version ?? null });
   }
-  await lockSchema(deps.storage, def, record.jsonSchemaKey, jsonSchema, who.account, now);
+  await lockSchema(deps.storage, def, record.jsonSchemaKey, jsonSchema, who.account, now, deps.config.nodeId);
   emitChange('csm');
   return {
     ok: true as const, status: 200,

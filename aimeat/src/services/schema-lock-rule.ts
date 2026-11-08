@@ -28,19 +28,31 @@
  *     3. A lock that another account holds on the same pattern, under the other `apply_to`, is not
  *        shadowed by a lock beside it.
  *     4. A key that another account's lock already governs is not taken over with a more specific
- *        lock.
+ *        lock. A wildcard pattern also counts as taking over every key it shares with another
+ *        account's lock that it outranks: the lookup ranks a wildcard prefix lock above every plain
+ *        prefix lock, and above a wildcard lock of fewer segments, so `family.*.*` would govern the
+ *        keys of another account's `family.italian` (secaudit2026nov08 round 14).
+ *     5. A key under `csm.` holds a registered CSM's structure (services/csm-service.ts reads the lock
+ *        at `csm.<name>` as the CSM's schema). Only the account that registered the CSM, or for a
+ *        name nobody registered yet the account whose name the CSM name starts with, may lock it;
+ *        a pattern over every CSM is the operator's (secaudit2026nov08 round 14).
  *   The operator passes 3 and 4 through the operator override, which writes the operator trail.
  *   A plain key family (`notes`, `recipes`) stays lockable by any account holder: Core 6.6 says an
  *   owner can lock a key or a key prefix, and the first account to lock a family holds it.
- * @structure SchemaLockCaller · SchemaLockRefusal · schemaPatternRefusal() · schemaLockRefusal()
+ * @structure SchemaLockCaller · SchemaLockRefusal · schemaPatternRefusal() · schemaLockRefusal() ·
+ *   wildcardTakesOver()
  * @usage
  *   const refusal = await schemaLockRefusal({ storage, config }, caller, key, applyTo, ownerOf => operatorPass(ownerOf));
  *   if (refusal) return res.status(refusal.status).json(error(nodeId, refusal.code, refusal.message, refusal.status, refusal.details));
  * @version-history
+ *   2026-11-08 — Rule 4 also refuses a wildcard pattern that outranks another account's lock on keys
+ *     both reach, and rule 5 reserves the `csm.` lock family to each CSM's registering account
+ *     (secaudit2026nov08 round 14: rule4-literal-key-vs-wildcard-ranking,
+ *     lockSchema-keeps-foreign-lock-holder).
  *   2026-10-16 — Initial (QA audit S2-04, F05a-01, S7-01).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, SchemaRecord } from '../storage/interface.js';
 import { checkOrganismNamespaceAccess, type OrganismAccessCaller } from './organism-namespace-access.js';
 import { isOwnersLock } from './packages/compose/package-component-collisions.js';
 
@@ -88,7 +100,86 @@ function reachesWholeNode(keyPattern: string): boolean {
 }
 
 /**
- * Rules 1 and 2: whether this caller may lock this pattern at all, whatever is stored. Reads only.
+ * A key pattern as the lock lookup reads it (storage/pattern-utils.ts matchWildcardPattern): the
+ * trailing-star form is a text prefix, every other pattern a list of dot-segments in which `*` is
+ * one segment and `**` one or more to the end.
+ */
+type PatternShape = { glued: string } | { parts: string[] };
+
+function shapeOf(pattern: string): PatternShape {
+    const star = pattern.indexOf('*');
+    if (star > 0 && star === pattern.length - 1 && pattern[star - 1] !== '.') return { glued: pattern.slice(0, -1) };
+    return { parts: pattern.split('.') };
+}
+
+/** Whether some key matches both segment lists. */
+function partsMeet(a: string[], b: string[], i = 0, j = 0): boolean {
+    if (i < a.length && a[i] === '**') return j < b.length;
+    if (j < b.length && b[j] === '**') return i < a.length;
+    if (i === a.length || j === b.length) return i === a.length && j === b.length;
+    if (a[i] === '*' || b[j] === '*' || a[i] === b[j]) return partsMeet(a, b, i + 1, j + 1);
+    return false;
+}
+
+/** The text every key of a segment pattern starts with, and whether the key goes on past it. */
+function leadOf(parts: string[]): { lead: string; more: boolean } {
+    const i = parts.findIndex(p => p === '*' || p === '**');
+    if (i < 0) return { lead: parts.join('.'), more: false };
+    return { lead: i > 0 ? `${parts.slice(0, i).join('.')}.` : '', more: true };
+}
+
+/** Whether some key matches both patterns. Errs towards yes on the trailing-star form. */
+function shapesMeet(a: PatternShape, b: PatternShape): boolean {
+    if ('glued' in a && 'glued' in b) return a.glued.startsWith(b.glued) || b.glued.startsWith(a.glued);
+    if ('glued' in a || 'glued' in b) {
+        const glued = 'glued' in a ? a.glued : (b as { glued: string }).glued;
+        const { lead, more } = leadOf('parts' in a ? a.parts : (b as { parts: string[] }).parts);
+        return more ? lead.startsWith(glued) || glued.startsWith(lead) : lead.startsWith(glued);
+    }
+    return partsMeet(a.parts, b.parts);
+}
+
+/**
+ * Whether a new wildcard prefix lock on `pattern` would govern a key that `other` governs today.
+ * storage findApplicableSchema answers an exact lock first, then the matching wildcard prefix lock
+ * with the most segments, then the longest plain prefix: so the new lock wins every key it shares
+ * with a plain prefix lock, and with a wildcard lock of no more segments than its own.
+ */
+export function wildcardTakesOver(pattern: string, other: Pick<SchemaRecord, 'keyPattern' | 'applyTo'>): boolean {
+    if (!WILDCARD.test(pattern) || other.applyTo !== 'prefix' || other.keyPattern === pattern) return false;
+    const otherIsWild = WILDCARD.test(other.keyPattern);
+    if (otherIsWild && other.keyPattern.split('.').length > pattern.split('.').length) return false;
+    // A plain prefix lock governs the keys below it, never its own literal key.
+    const reach: PatternShape = otherIsWild ? shapeOf(other.keyPattern) : { parts: [...other.keyPattern.split('.'), '**'] };
+    return shapesMeet(shapeOf(pattern), reach);
+}
+
+/**
+ * Rule 5: a pattern under `csm.` is the registering account's of every CSM it reaches, or, where it
+ * reaches none, the account whose name the CSM name starts with (a new CSM's name carries its
+ * account's prefix, csm-service.ts ownerPrefixed). A pattern with no literal name is every CSM's.
+ */
+async function csmFamilyRefusal(storage: Storage, caller: SchemaLockCaller, ownerGhii: string, keyPattern: string): Promise<SchemaLockRefusal | null> {
+    if (keyPattern !== 'csm' && !keyPattern.startsWith('csm.')) return null;
+    const segments = keyPattern === 'csm' ? [] : keyPattern.slice('csm.'.length).split('.');
+    const firstWild = segments.findIndex(s => WILDCARD.test(s));
+    const literal = firstWild < 0 ? segments : segments.slice(0, firstWild);
+    const refusal = (reason: string): SchemaLockRefusal => ({
+        status: 403, code: 'SCHEMA_PATTERN_NOT_YOURS',
+        message: 'Keys under "csm." carry the structure of a registered CSM, so only the account that registered it, its agents, or whoever runs the node can lock them. Change your own CSM with PUT /v1/csm/{name}; the name of a CSM of yours starts with your account name and a dot.',
+        details: { key_pattern: keyPattern, reason },
+    });
+    if (literal.length === 0) return refusal('every_csm');
+    const name = literal.join('.');
+    const reached = (await storage.listCsms()).filter(c => c.name === name || c.name.startsWith(`${name}.`) || name.startsWith(`${c.name}.`));
+    if (reached.length > 0) {
+        return reached.every(c => isOwnersLock(c.registeredBy, caller.owner, ownerGhii)) ? null : refusal('registered_by_other');
+    }
+    return literal[0] === caller.owner ? null : refusal('another_account_name');
+}
+
+/**
+ * Rules 1, 2 and 5: whether this caller may lock this pattern at all, whatever is stored. Reads only.
  */
 export async function schemaPatternRefusal(
     deps: { storage: Storage; config: AimeatConfig },
@@ -121,7 +212,7 @@ export async function schemaPatternRefusal(
             };
         }
     }
-    return null;
+    return csmFamilyRefusal(deps.storage, caller, `${caller.owner}@${deps.config.nodeId}`, keyPattern);
 }
 
 /**
@@ -159,6 +250,14 @@ export async function schemaLockRefusal(
     if (governing && governing.keyPattern !== keyPattern && !mine(governing.lockedBy)
         && !(await operatorPass(governing.lockedBy))) {
         return lockedByOther(governing.lockedBy);
+    }
+    // Rule 4 for the keys a wildcard reaches: the lock that governs the pattern's literal text above
+    // misses a deeper plain lock (`family.italian` under `family.*.*`), which the new lock outranks.
+    if (applyTo === 'prefix' && WILDCARD.test(keyPattern)) {
+        for (const other of await storage.listSchemas()) {
+            if (mine(other.lockedBy) || !wildcardTakesOver(keyPattern, other)) continue;
+            if (!(await operatorPass(other.lockedBy))) return lockedByOther(other.lockedBy);
+        }
     }
     return null;
 }
