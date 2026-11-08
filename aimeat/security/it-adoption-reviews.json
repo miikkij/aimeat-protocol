@@ -154,7 +154,7 @@
         "aimeat/src/services/receivers/receive.ts",
         "aimeat/src/services/receivers/contract.ts"
       ],
-      "digest": "sha256:6705811f9c2f689734d15905"
+      "digest": "sha256:feddf1398ce6ea70c001a240"
     },
     "14-compliance-mapping.md": {
       "reviewedOn": "2026-11-04",
@@ -370,7 +370,7 @@
       "aimeat/src/services/mcp-client/capability-consent.ts": "0c5c747d1d1aafc7",
       "aimeat/src/services/mcp-client/capability-use-setting.ts": "c79f3a0670fd31eb",
       "aimeat/src/services/receivers/receive.ts": "eb48bc222c34b250",
-      "aimeat/src/services/receivers/contract.ts": "6a9461ef8fcba462"
+      "aimeat/src/services/receivers/contract.ts": "e0d05e6a43614044"
     },
     "14-compliance-mapping.md": {
       "aimeat/src/services/compliance/derived.ts": "84d7a9e9d58f6d53",

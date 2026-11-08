@@ -10,6 +10,8 @@
  * @structure RECEIVERS_SKILL_ENTRY
  * @usage import { RECEIVERS_SKILL_ENTRY } from './builtin-skills.receivers.js';
  * @version-history
+ *   v1.2.0 — 2026-11-08 — A rotation answers the key to the caller, and removing it names the receiver
+ *     too (secaudit2026nov08b round 15).
  *   v1.1.0 — 2026-11-08 — The receiver outlives its maker and waits while the account is deactivated
  *     (ACCOUNT_DISABLED) (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-07 — Initial (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
@@ -79,7 +81,8 @@ shown to them, never to you. If you hold receivers:manage (the person ticks it o
 does not carry it), \`create\` makes it at once and answers \`key\` ONCE: put it straight into the
 program's secret store (AWS Secrets Manager, an environment secret) and nowhere else, not in a chat, a
 repository or a memory record. The receiver is the person's, not yours: it keeps working if you are
-removed later, and the person is told then which receivers you made.
+removed later, and the person is told then which receivers you made. The same goes for \`rotate\`: the
+new key is answered to you once, so the person is told of that receiver too when you are removed.
 
 ## 4. Wire the program
 

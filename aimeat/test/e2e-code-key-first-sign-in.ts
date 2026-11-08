@@ -24,14 +24,22 @@
  *   new password and the code stops working; cancelling an un-used key still removes its account; the
  *   owner of another organism is refused the cancel (403).
  *
+ *   (3) An agent key POST /v1/ghii/verify-email handed out before the first sign-in, to whoever proved
+ *   an address with the code, stops at that sign-in: it mints no token and its tokens are refused, and
+ *   the answer says so (`agent_keys_ended`). Kept: no line when no such key exists, and a sign-in link
+ *   after the first sign-in, or on an account no key made, gives an agent key that works.
+ *
  *   Runs on the runner's node (no mail needed): the address is marked verified and the link issued
  *   behind the server's back (helpers/seed-password.ts seedSignInLink).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-code-key-first-sign-in
  * @version-history
+ *   v1.1.0 — 2026-11-08 — (3), secaudit2026nov08b round 15 (pre-first-sign-in-app-agent-key-survives-rotation).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14).
  */
 import { registerOwner } from './helpers/owner-login.js';
 import { seedSignInLink } from './helpers/seed-password.js';
+import { seedEmailVerification } from './helpers/verified-email.js';
+import { sign } from '../src/auth/keypair.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const STAMP = `${Date.now() % 1_000_000}${Math.floor(Math.random() * 100)}`;
@@ -167,6 +175,70 @@ await test('the owner of another organism cannot cancel this organism\'s key, an
 await test('POST /v1/ghii/key-credentials refuses a caller with no sign-in', async () => {
     const r = await json('/v1/ghii/key-credentials', { method: 'POST', body: '{}' });
     assert(r.status === 401, `no token: ${r.status}`);
+});
+
+// ── An agent key handed out with the code before the first sign-in (secaudit2026nov08b round 15) ──
+
+/** Mint an agent token with the agent's private key, as a program does at POST /v1/auth/token. */
+async function agentTokenWith(gaii: string, privateKey: string): Promise<{ status: number; body: any }> {
+    const timestamp = new Date().toISOString();
+    const signature = await sign(privateKey, gaii + timestamp);
+    return json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature }) });
+}
+
+await test('an agent key given out with the code before the holder\'s first sign-in stops at that sign-in, and the answer says so', async () => {
+    const holder = `ckagent${STAMP}`, code = 'AgentKeyCode-1234';
+    await mintKey(alice.token, aliceOrg, holder, code);
+    // Whoever knows the code proves an address of their own on the account before the holder signs in.
+    const other = `minter-${holder}@example.test`;
+    const attach = await json('/v1/ghii/login/attach-email', { method: 'POST', body: JSON.stringify({ username: holder, password: code, email: other }) });
+    assert(attach.status === 200, `attach-email with the code ${attach.status}: ${JSON.stringify(attach.body?.error)}`);
+    const id = await seedEmailVerification(holder, other, '515151');
+    const proved = await json('/v1/ghii/verify-email', { method: 'POST', body: JSON.stringify({ verification_id: id, code: '515151' }) });
+    assert(proved.status === 200 && typeof proved.body.data?.agent_private_key === 'string', `verify-email ${proved.status}: ${JSON.stringify(proved.body?.error)}`);
+    const gaii = proved.body.data.agent.gaii as string, privateKey = proved.body.data.agent_private_key as string;
+    const early = proved.body.data.token as string;
+    const before = await agentTokenWith(gaii, privateKey);
+    assert(before.status === 200, `the agent key mints a token before the first sign-in: ${before.status}`);
+    const first = await login(holder, code);
+    assert(first.status === 200 && typeof first.body.data.key_credentials?.password === 'string', `first sign-in ${first.status}: ${JSON.stringify(first.body?.error)}`);
+    const after = await agentTokenWith(gaii, privateKey);
+    assert(after.status === 401, `the agent key from before the first sign-in still mints a token: ${after.status}`);
+    for (const t of [early, before.body.data?.token as string]) {
+        const read = await json('/v1/memory', { headers: auth(t) });
+        assert(read.status === 401, `an agent token from before the first sign-in still reads: ${read.status}`);
+    }
+    assert(first.body.data.key_credentials.agent_keys_ended === 1, `the answer says an agent key stopped: ${JSON.stringify(first.body.data.key_credentials)}`);
+});
+
+await test('kept: a holder with no agent key from before the first sign-in is told of none', async () => {
+    const holder = `cknoagent${STAMP}`, code = 'NoAgentKeyCode-12';
+    await mintKey(alice.token, aliceOrg, holder, code);
+    const first = await login(holder, code);
+    assert(first.status === 200 && typeof first.body.data.key_credentials?.password === 'string', `first sign-in ${first.status}`);
+    assert(first.body.data.key_credentials.agent_keys_ended === undefined, `no agent key, no line: ${JSON.stringify(first.body.data.key_credentials)}`);
+});
+
+await test('kept: after the first sign-in, a sign-in link gives the holder an agent key that works', async () => {
+    const holder = `ckagent${STAMP}`;
+    const link = await seedSignInLink(BASE, holder, `minter-${holder}@example.test`);
+    const token = new URL(link).searchParams.get('token') ?? '';
+    const entered = await json(`/v1/ghii/magic-link/verify?token=${encodeURIComponent(token)}`);
+    assert(entered.status === 200 && typeof entered.body.data?.agent_private_key === 'string', `magic-link/verify ${entered.status}: ${JSON.stringify(entered.body?.error)}`);
+    const minted = await agentTokenWith(entered.body.data.agent.gaii, entered.body.data.agent_private_key);
+    assert(minted.status === 200, `the agent key given after the first sign-in mints a token: ${minted.status}`);
+    const read = await json('/v1/memory', { headers: auth(minted.body.data.token) });
+    assert(read.status === 200, `its token reads: ${read.status}`);
+});
+
+await test('kept: an account that is no code key gets a working agent key from a sign-in link', async () => {
+    const plain = await registerOwner(BASE, `ckplain${STAMP}`);
+    const link = await seedSignInLink(BASE, plain.name, `${plain.name}@example.test`);
+    const token = new URL(link).searchParams.get('token') ?? '';
+    const entered = await json(`/v1/ghii/magic-link/verify?token=${encodeURIComponent(token)}`);
+    assert(entered.status === 200, `magic-link/verify ${entered.status}: ${JSON.stringify(entered.body?.error)}`);
+    const minted = await agentTokenWith(entered.body.data.agent.gaii, entered.body.data.agent_private_key);
+    assert(minted.status === 200, `the agent key mints a token: ${minted.status}`);
 });
 
 console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total`);

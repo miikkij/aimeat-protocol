@@ -12,50 +12,85 @@
  *   delete answer names it (`receivers_kept`), and the owner gets one notice that says the receivers
  *   go on and where to pause them. Nothing is paused for the owner: the node never stops the owner's
  *   receiver on its own.
+ *
+ *   A KEY HOLDER IS TOLD OF THE SAME WAY. An agent or app that rotated a receiver another principal
+ *   made was answered its current key in plain text just as a maker is (./manage.ts rotateKey), so a
+ *   receiver whose working key it was answered (ReceiverRecord.keyAnsweredTo, and the replaced key's
+ *   holder while its overlap lasts) is listed too, with `why: 'key'`, and the owner gets a notice of
+ *   its own for those (secaudit2026nov08b round 15, rotated-key-holder-not-surfaced).
  * @structure KeptReceivers · receiversMadeBy(storage, ownerGhii, maker) · noticeReceiversKept(storage, ownerGhii, label, kept)
  * @usage
  *   const kept = await receiversMadeBy(storage, ownerGhii, agent.gaii);     // before the delete
  *   await noticeReceiversKept(storage, ownerGhii, agent.name, kept);         // after it
  * @version-history
+ *   v1.1.0 — 2026-11-08 — Receivers whose working key the removed principal was answered are listed
+ *     (`why: 'key'`) with a notice of their own (secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14, maker-lifecycle-not-surfaced).
  */
 import type { Storage } from '../../storage/interface.js';
-import { effectiveState } from './contract.js';
+import { effectiveState, keyHoldersOf } from './contract.js';
 import { listReceivers } from './store.js';
 import { notify } from '../notify.js';
 import { logger } from '../../utils/logger.js';
 
-/** The receivers one maker made, as the delete answer carries them. */
+/** The receivers one maker made or holds the key of, as the delete answer carries them. */
 export interface KeptReceivers {
     count: number;
-    receivers: Array<{ name: string; display_name: string; state: string }>;
+    /** `why`: 'made' when the principal made it, 'key' when it was only answered its working key. */
+    receivers: Array<{ name: string; display_name: string; state: string; why: 'made' | 'key' }>;
 }
 
-/** The owner's receivers whose maker (createdBy) is `maker`, an agent's GAII or an ecosystem app's GEAI. */
+/**
+ * The owner's receivers whose maker (createdBy) is `maker`, an agent's GAII or an ecosystem app's GEAI,
+ * and those whose working key `maker` was answered.
+ */
 export async function receiversMadeBy(storage: Storage, ownerGhii: string, maker: string): Promise<KeptReceivers> {
-    const mine = (await listReceivers(storage, ownerGhii)).filter(r => r.createdBy === maker);
+    const now = Date.now();
+    const mine = (await listReceivers(storage, ownerGhii)).filter(r => r.createdBy === maker || keyHoldersOf(r, now).includes(maker));
     return {
         count: mine.length,
-        receivers: mine.map(r => ({ name: r.name, display_name: r.displayName, state: effectiveState(r) })),
+        receivers: mine.map(r => ({
+            name: r.name, display_name: r.displayName, state: effectiveState(r),
+            why: r.createdBy === maker ? 'made' as const : 'key' as const,
+        })),
     };
 }
 
 /** How many names the notice lists before it says "and N more". */
 const NAMES_SHOWN = 5;
 
+function namesOf(list: KeptReceivers['receivers']): string {
+    const shown = list.slice(0, NAMES_SHOWN).map(r => r.display_name || r.name);
+    return list.length > NAMES_SHOWN ? `${shown.join(', ')} (+${list.length - NAMES_SHOWN})` : shown.join(', ');
+}
+
 /**
- * Tell the owner that the receivers a removed maker made keep working. Nothing is sent when it made
- * none. `label` is the agent's or the app's name as the owner knows it. Never throws.
+ * Tell the owner that the receivers a removed maker made, or holds the key of, keep working. Nothing
+ * is sent when there are none. `label` is the agent's or the app's name as the owner knows it. Never
+ * throws.
  */
 export async function noticeReceiversKept(storage: Storage, ownerGhii: string, label: string, kept: KeptReceivers): Promise<void> {
-    if (kept.count === 0) return;
-    const shown = kept.receivers.slice(0, NAMES_SHOWN).map(r => r.display_name || r.name);
-    const names = kept.count > NAMES_SHOWN ? `${shown.join(', ')} (+${kept.count - NAMES_SHOWN})` : shown.join(', ');
-    await notify(storage, ownerGhii, {
-        type: 'receivers_kept_after_maker',
-        title: `${label} is removed, and the receivers it made keep working`,
-        body: `${label} made ${kept.count} receiver(s): ${names}. They are yours, so they keep working: a program that holds a receiver's key still writes into your data. If you do not know that program, pause or delete the receiver on the Receivers page.`,
-        link: '/v1/profile?tab=receivers',
-        i18n: { key: 'receivers_kept_after_maker', vars: { maker: label, count: kept.count, names } },
-    }).catch((err: unknown) => logger.warn('receivers: the owner could not be told about the receivers a removed maker made', { maker: label, error: String(err) }));
+    const made = kept.receivers.filter(r => r.why === 'made');
+    const held = kept.receivers.filter(r => r.why === 'key');
+    const failed = (err: unknown) => logger.warn('receivers: the owner could not be told about the receivers a removed maker made', { maker: label, error: String(err) });
+    if (made.length) {
+        const names = namesOf(made);
+        await notify(storage, ownerGhii, {
+            type: 'receivers_kept_after_maker',
+            title: `${label} is removed, and the receivers it made keep working`,
+            body: `${label} made ${made.length} receiver(s): ${names}. They are yours, so they keep working: a program that holds a receiver's key still writes into your data. If you do not know that program, pause or delete the receiver on the Receivers page.`,
+            link: '/v1/profile?tab=receivers',
+            i18n: { key: 'receivers_kept_after_maker', vars: { maker: label, count: made.length, names } },
+        }).catch(failed);
+    }
+    if (held.length) {
+        const names = namesOf(held);
+        await notify(storage, ownerGhii, {
+            type: 'receivers_key_kept_after_holder',
+            title: `${label} is removed, and the receivers whose key it changed keep working`,
+            body: `${label} changed the key of ${held.length} receiver(s) and got the new key: ${names}. They are yours, so they keep working: a program that holds a receiver's key still writes into your data. If you do not know that program, change the key or pause the receiver on the Receivers page.`,
+            link: '/v1/profile?tab=receivers',
+            i18n: { key: 'receivers_key_kept_after_holder', vars: { maker: label, count: held.length, names } },
+        }).catch(failed);
+    }
 }

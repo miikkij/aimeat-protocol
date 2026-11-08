@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-08 — An app agent key verify-email or the magic link hands out before a code key's first
+ *     sign-in is recorded, and that sign-in ends it (key-credentials.ts notePreSignInAgentKey;
+ *     secaudit2026nov08b round 15).
  *   2026-11-08 — The held first sign-in credentials go only to an address whose code was asked for after
  *     that sign-in; a code key is the account's only while the account is the one the key made
  *     (secaudit2026nov08 round 14).
@@ -106,7 +109,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
-import { sendHeldKeyCredentials, keyCredentialsPending } from '../../services/key-credentials.js';
+import { sendHeldKeyCredentials, keyCredentialsPending, notePreSignInAgentKey } from '../../services/key-credentials.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
@@ -165,7 +168,7 @@ async function appAgentWithFreshKey(
     config: AimeatConfig,
     ownerName: string,
     now: string,
-): Promise<{ agent: { gaii: string; defaultScopes?: string[] }; privateKey: string }> {
+): Promise<{ agent: { gaii: string; defaultScopes?: string[] }; privateKey: string; publicKey: string }> {
     const keys = await generateKeyPair();
     const existing = (await storage.getAgentsByOwner(ownerName)).find(a => a.name === 'app');
     // The person's own proof approves the app agent, so on a store place it gets the place's default here,
@@ -174,7 +177,7 @@ async function appAgentWithFreshKey(
         const defaultScopes = await applyPlaceDefault(storage, config, existing.gaii,
             Array.isArray(existing.defaultScopes) ? existing.defaultScopes : [...config.defaultAgentScopes]);
         await storage.updateAgent(existing.gaii, { publicKey: keys.publicKey, defaultScopes });
-        return { agent: { ...existing, defaultScopes }, privateKey: keys.privateKey };
+        return { agent: { ...existing, defaultScopes }, privateKey: keys.privateKey, publicKey: keys.publicKey };
     }
     const gaii = buildGAII('app', ownerName, config.nodeId);
     const agent = await storage.createAgent({
@@ -194,7 +197,7 @@ async function appAgentWithFreshKey(
         ...agentListingTags(config),
         ...newAgentClearance(config),
     });
-    return { agent, privateKey: keys.privateKey };
+    return { agent, privateKey: keys.privateKey, publicKey: keys.publicKey };
 }
 
 export function registerWebVerifyRoutes(
@@ -544,7 +547,10 @@ export function registerWebVerifyRoutes(
         await sendHeldKeyCredentials(storage, config, ghii, record.createdAt);
 
         // Create an agent if not exists, then issue JWT
-        const { agent, privateKey: agentPrivKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);
+        const { agent, privateKey: agentPrivKey, publicKey: agentPubKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);
+        // Before a code key's first sign-in, whoever knew the code may be the one proving this address:
+        // the key is recorded, and the first sign-in ends it (services/key-credentials.ts).
+        if (keyFirstSignInPending) await notePreSignInAgentKey(storage, ghii, agent.gaii, agentPubKey);
 
         // Issue JWT
         //
@@ -673,7 +679,9 @@ export function registerWebVerifyRoutes(
         // credential below; a person signs in through GET /v1/ghii/magic-link/open.
 
         // Find or create a default agent
-        const { agent, privateKey: agentPrivKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);
+        const { agent, privateKey: agentPrivKey, publicKey: agentPubKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);
+        // As at verify-email above: a key handed out before a code key's first sign-in ends at it.
+        if (keyFirstSignInPending) await notePreSignInAgentKey(storage, ghii, agent.gaii, agentPubKey);
 
         // Issue JWT
         //
