@@ -5,6 +5,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-08 — aimeat_organism_archive names the archived memory key limit and its QUOTA_EXCEEDED
+ *     (secaudit2026nov08b round 15b).
  *   2026-11-07 — aimeat_workspace_update, aimeat_workspace_create and aimeat_workspace_read say a ROW
  *     space may carry a JSON Schema in `schemas`, that it binds every writer, and that a changed
  *     schema applies to writes from then on (developer ruling 2026-11-07).
@@ -623,7 +625,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_organism_archive',
-        description: 'ARCHIVE or UNARCHIVE organism content (creator/admin only). Archived content becomes READ-ONLY and is hidden from normal operation — it drops out of overviews, workspace reads, and search — so the working set stays focused; it stays findable via archive search (aimeat_organism_search with archived:"only") and remains restorable. Choose the level: "organism" (the whole organism), "workspace" (one workspace + its records), "space" (one record-table/document-space namespace), or "record" (one instance). Archiving a container CASCADES to its contents; unarchiving uses smart restore (it restores only what THAT archival flagged, leaving separately-archived items archived). Use action:"unarchive" to reverse.',
+        description: 'ARCHIVE or UNARCHIVE organism content (creator/admin only). Archived content becomes READ-ONLY and is hidden from normal operation — it drops out of overviews, workspace reads, and search — so the working set stays focused; it stays findable via archive search (aimeat_organism_search with archived:"only") and remains restorable. Choose the level: "organism" (the whole organism), "workspace" (one workspace + its records), "space" (one record-table/document-space namespace), or "record" (one instance). Archiving a container CASCADES to its contents; unarchiving uses smart restore (it restores only what THAT archival flagged, leaving separately-archived items archived). Use action:"unarchive" to reverse. Archived keys count toward an archived memory key limit of their own (memoryMaxArchivedKeysPerAgent): an archive past it answers QUOTA_EXCEEDED and archives nothing, so delete archived content that is no longer needed.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Archive / Unarchive Organism Content', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
