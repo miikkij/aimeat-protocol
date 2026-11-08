@@ -12,6 +12,7 @@
  * @usage
  *   import { scriptedTranscript } from './scripted.js';
  * @version-history
+ *   v1.3.0 — 2026-11-08 — A play for share-with-family-member: the partner is added as a member with a viewer grant.
  *   v1.2.0 — 2026-11-08 — share-to-workspace publishes the rules, which its stricter check now asks for.
  *   v1.1.0 — 2026-10-02 — A play for propose-agent.
  *   v1.0.0 — 2026-09-18 — Initial.
@@ -147,6 +148,31 @@ const PLAYS: Record<string, Play> = {
             },
         ],
         say: (c) => `The house rules are written down in the workspace "${c.marker}". Your family can read them once you invite them to the group.`,
+    },
+    'share-with-family-member': {
+        steps: (c) => [
+            { tool: 'aimeat_organism_create', args: { name: `Home ${c.marker}`, description: 'Our home.' } },
+            {
+                tool: 'aimeat_workspace_create',
+                args: (seen) => ({
+                    organism_id: field(seen[0], 'id'), name: c.marker,
+                    manifest: {
+                        manifestVersion: '1.0', name: c.marker, kind: 'project', status: 'active',
+                        objectTypes: [{ name: 'rules', schemaRef: 'schema:rules@1', namespace: 'shared.rules', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'document' }],
+                    },
+                }),
+            },
+            {
+                tool: 'aimeat_workspace_write',
+                args: (seen) => ({ organism_id: field(seen[0], 'id'), ws: field(seen[1], 'ws'), space: 'rules', value: { title: 'House rules', markdown: '- Shoes off at the door\n- Quiet after ten\n- Whoever cooks does not wash up' } }),
+            },
+            {
+                tool: 'aimeat_workspace_publish',
+                args: (seen) => ({ organism_id: field(seen[0], 'id'), ws: field(seen[1], 'ws'), namespace: 'rules', id: field(seen[2], 'id') }),
+            },
+            { tool: 'aimeat_organism_member_add', args: (seen) => ({ organism_id: field(seen[0], 'id'), ghii: c.otherOwnerName, workspaces: [{ ws: field(seen[1], 'ws'), role: 'viewer' }] }) },
+        ],
+        say: (c) => `The house rules are in the workspace "${c.marker}", and ${c.otherOwnerName} can read them.`,
     },
 };
 

@@ -226,7 +226,7 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     const owner = s.owners[0];
     const other = s.owners[1] ?? owner;
     const base = { baseUrl: s.baseUrl, ownerName: owner.name, ownerToken: owner.token, agentToken: s.agent!.token, otherOwnerName: other.name, otherOwnerToken: other.token, marker };
-    const fill = (text: string) => text.replaceAll('{marker}', marker).replaceAll('{baseUrl}', s.baseUrl).replaceAll('{ownerName}', owner.name);
+    const fill = (text: string) => text.replaceAll('{marker}', marker).replaceAll('{baseUrl}', s.baseUrl).replaceAll('{ownerName}', owner.name).replaceAll('{otherOwnerName}', other.name);
     const prompt = (args.preface ? fill(readFileSync(args.preface, 'utf8')).trimEnd() + '\n\n' : '') + fill(task.prompt);
     await task.setup?.(base);
 

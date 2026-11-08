@@ -25,7 +25,8 @@
  *   2026-11-08 — share-to-workspace passes only when the three rules are in the workspace and
  *     published; the workspace's name was enough before. Later the same day: each rule is read as
  *     a sentence from the document's body (house-rules.ts), because the word check passed the
- *     rules turned round and a title holding the words.
+ *     rules turned round and a title holding the words. share-with-family-member (by name): the
+ *     partner is named, and the check reads the rules with the partner's own token.
  *   2026-10-30 — build-structure-flow (by name): three turns through the structure page, from the
  *     drawn layouts to a published app built by the person's picks; followUps on a task.
  *   2026-10-29 — build-structure (by name): a new app's first message carries the structure page's
@@ -63,7 +64,7 @@ export interface TaskContext {
 export interface Task {
     id: string;
     door: Door;
-    /** What the person says. `{marker}` and `{baseUrl}` are filled in. */
+    /** What the person says. `{marker}`, `{baseUrl}`, `{ownerName}` and `{otherOwnerName}` are filled in. */
     prompt: string;
     goodTools: string[];
     /** Left out of a run that names no tasks; asked for with `--tasks <id>`. */
@@ -170,6 +171,42 @@ export const TASKS: Task[] = [
                 };
             }
             return { ok: false, detail: 'no workspace by that name in any of the owner\'s organisms' };
+        },
+    },
+    {
+        // share-to-workspace names no family member, so nobody else's read can be checked there. This
+        // one names the partner, and the check reads the rules AS the partner: accepting an
+        // invitation the agent sent is the partner's own step, so verify takes it, then reads with the
+        // partner's token. The owner reading their own workspace proves nothing about the partner
+        // (instruction audit re-check, 2026-11-08). By name only, so the default suite stays the one
+        // earlier reports were measured on.
+        id: 'share-with-family-member',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'Write down our house rules as a short document and share it with my partner {otherOwnerName}, who has an account on this node, in a workspace called "{marker}". The rules: shoes off at the door, quiet after ten, whoever cooks does not wash up.',
+        goodTools: ['aimeat_organism_create', 'aimeat_organism_member_add', 'aimeat_organism_invite', 'aimeat_workspace_create', 'aimeat_workspace_write', 'aimeat_workspace_publish'],
+        verify: async (ctx) => {
+            // The partner accepts what they were invited to, as they would on their own screen.
+            const mine = await api<{ invitations?: { organism?: { id: string } }[] }>(ctx.baseUrl, '/v1/organisms/invitations/mine', ctx.otherOwnerToken);
+            let accepted = 0;
+            for (const inv of mine.data?.invitations ?? []) {
+                if (!inv.organism?.id) continue;
+                const r = await api(ctx.baseUrl, `/v1/organisms/${inv.organism.id}/invitations/accept`, ctx.otherOwnerToken, { method: 'POST', body: {} });
+                if (r.status < 300) accepted++;
+            }
+            const orgs = await api<{ organisms: { id: string }[] }>(ctx.baseUrl, `/v1/organisms?member=${encodeURIComponent(ctx.otherOwnerName)}`, ctx.otherOwnerToken);
+            for (const o of orgs.data?.organisms ?? []) {
+                const list = await api<{ workspaces?: { id: string; name?: string }[] }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspaces`, ctx.otherOwnerToken);
+                const hit = (list.data?.workspaces ?? []).find(w => JSON.stringify(w).includes(ctx.marker));
+                if (!hit) continue;
+                const read = await api<{ objects?: unknown }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspace?ws=${encodeURIComponent(hit.id)}`, ctx.otherOwnerToken);
+                if (read.status >= 300) return { ok: false, detail: `the partner is in the organism and reading the workspace answered ${read.status}` };
+                const missing = houseRulesMissing(documentBodies(read.data?.objects));
+                return missing.length === 0
+                    ? { ok: true, detail: `the partner reads the three rules in workspace ${hit.id}${accepted ? ' (after accepting the invitation)' : ''}` }
+                    : { ok: false, detail: `the partner reads the workspace, and its published document does not keep: ${missing.join('; ')}` };
+            }
+            return { ok: false, detail: `the partner ${ctx.otherOwnerName} is in no organism with a workspace by that name${accepted ? ', after accepting every invitation' : ''}` };
         },
     },
     {
