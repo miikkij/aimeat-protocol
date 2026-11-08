@@ -6,15 +6,17 @@
  *   secaudit2026nov08 round 14 (services/csm/erased-lock-holders.ts), with the real store (PostgreSQL too
  *   when DATABASE_URL is set).
  *
- *   Attack: a lock an erased account set (as the bare name, the GHII and an agent's GAII) still names
- *   the account, so a later account of that name would hold it; the step gives all three ONE pseudonym.
+ *   Attack: a lock an erased account set (as the bare name, the GHII, an agent's GAII and an ecosystem
+ *   app's identity) still names the account, so a later account of that name would hold it; the step
+ *   gives all four ONE pseudonym.
  *   Ambiguous: a lock older than the account that holds its holder's name now is left as it is and
  *   named on the Security page; the operator's 'pseudonymise' moves it, 'keep' leaves it. Usage: a live
- *   holder's lock, the system's, a reserved name's, an extension's, an ecosystem app's, another node's
- *   and a pseudonym's are untouched. A second run does nothing, and a node whose locks are all live
+ *   holder's lock, the system's, a reserved name's, an extension's, another node's (an ecosystem app's
+ *   of another node included) and a pseudonym's are untouched. A second run does nothing, and a node whose locks are all live
  *   sees no change and no incident.
  * @usage cd aimeat && pnpm exec vitest run test/unit/erased-lock-holders.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-08 — An ecosystem app's lock of an erased account moves too (developer, 2026-11-08).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14b, item C).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -66,9 +68,10 @@ describe('lockHolderAccount', () => {
         expect(lockHolderAccount('alice', node)).toBe('alice');
         expect(lockHolderAccount(`alice@${node}`, node)).toBe('alice');
         expect(lockHolderAccount(`bot#alice@${node}`, node)).toBe('alice');
+        expect(lockHolderAccount(`eco:drum#alice@${node}`, node)).toBe('alice');
     });
     it('names nobody for the system, a reserved name, a principal that is not an account\'s, another node or a pseudonym', () => {
-        for (const h of [`system@${node}`, 'operator', `operator@${node}`, 'ext:notes', `eco:drum#alice@${node}`, 'schedule:abc',
+        for (const h of [`system@${node}`, 'operator', `operator@${node}`, 'ext:notes', 'eco:drum', `eco:drum#alice@aimeat-other-002-node`, 'schedule:abc',
             'erased:0123456789abcdef01234567', 'alice@aimeat-other-002-node', `bot#alice@aimeat-other-002-node`, 'bot#alice', 'A B', '']) {
             expect(lockHolderAccount(h, node), h).toBeNull();
         }
@@ -86,17 +89,18 @@ describe.each([['sqlite'], ...(PG_URL ? [['postgres-kysely']] : [])])('the locks
         await storage.createOwner({ name: reborn, displayName: reborn, publicKey: 'pk', roles: ['owner'], createdAt: new Date().toISOString() } as never);
 
         const p = `t${s}`;
-        const goneLocks = [lock(`${p}.gone-bare`, gone), lock(`${p}.gone-ghii`, `${gone}@${node}`), lock(`${p}.gone-agent`, `bot#${gone}@${node}`)];
+        const goneLocks = [lock(`${p}.gone-bare`, gone), lock(`${p}.gone-ghii`, `${gone}@${node}`), lock(`${p}.gone-agent`, `bot#${gone}@${node}`),
+            lock(`${p}.gone-eco`, `eco:drum#${gone}@${node}`)];
         const rebornLock = lock(`${p}.reborn`, `${reborn}@${node}`);
         const left = [
             lock(`${p}.alive`, `${alive}@${node}`), lock(`${p}.system`, `system@${node}`), lock(`${p}.reserved`, 'operator'),
-            lock(`${p}.ext`, 'ext:notes'), lock(`${p}.eco`, `eco:drum#${gone}@${node}`), lock(`${p}.other-node`, `${gone}@aimeat-other-002-node`),
+            lock(`${p}.ext`, 'ext:notes'), lock(`${p}.eco-other-node`, `eco:drum#${gone}@aimeat-other-002-node`), lock(`${p}.other-node`, `${gone}@aimeat-other-002-node`),
             lock(`${p}.erased`, 'erased:0123456789abcdef01234567'),
         ];
         for (const l of [...goneLocks, rebornLock, ...left]) await storage.setSchema(l);
 
         const ran = await moveErasedLockHoldersOnce(storage, config);
-        expect(ran?.moved).toBeGreaterThanOrEqual(3);
+        expect(ran?.moved).toBeGreaterThanOrEqual(4);
 
         // The attack's red line: before the step, a later account named `gone` held these three locks.
         const after = await Promise.all(goneLocks.map(l => storage.getSchema(l.keyPattern, 'prefix')));

@@ -14,10 +14,10 @@
  *
  *   POSITIVE EVIDENCE ONLY (.claude/rules/backend.md: a migration that can hide data acts only on
  *   positive evidence, and anything ambiguous goes to the operator's page):
- *   - Moved: a lock whose holder is the bare name, `name@<this node>` or `<x>#name@<this node>` of an
- *     account that does not exist now. Never `system@<node>`, a reserved name (utils/gaii.ts
- *     RESERVED_NAMES, the operator's word among them), an `ext:`, `eco:` or `schedule:` principal, a
- *     holder of another node, or one that is `erased:` already. ONE pseudonym is drawn per missing
+ *   - Moved: a lock whose holder is the bare name, `name@<this node>`, `<x>#name@<this node>` or an
+ *     ecosystem app's `eco:<app>#name@<this node>` of an account that does not exist now. Never
+ *     `system@<node>`, a reserved name (utils/gaii.ts RESERVED_NAMES, the operator's word among them),
+ *     an `ext:` or `schedule:` principal, a holder of another node, or one that is `erased:` already. ONE pseudonym is drawn per missing
  *     name and written on all of that name's locks, as one erasure does. The lock keeps governing, no
  *     account matches its holder, and the operator still changes and removes it.
  *   - Asked: a lock whose holder's account exists now but was registered after the lock was set
@@ -40,6 +40,8 @@
  *   moveErasedLockHoldersOnce() · pseudonymiseLockEntry()
  * @usage await moveErasedLockHoldersOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   v1.1.0 — 2026-11-08 — An ecosystem app's `eco:<app>#name@<node>` names its account, so an erased
+ *     account's app locks move too, as the round-14 erasure moves them (developer, 2026-11-08).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14b, item C).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -57,15 +59,24 @@ export const ERASED_LOCK_HOLDERS_KEY = 'migrations.secaudit2026nov08.erased-lock
 export const ERASED_LOCK_INCIDENT_TYPE = 'erased_lock_holders';
 
 /** Principals that are not an account's, whatever follows the prefix. */
-const NOT_AN_ACCOUNT = ['ext:', 'eco:', 'schedule:', ERASED_PARTY_PREFIX];
+const NOT_AN_ACCOUNT = ['ext:', 'schedule:', ERASED_PARTY_PREFIX];
+
+/** An ecosystem app's identity, `eco:<app>#name@<node>`: the app acts for that account. */
+const ECO_PREFIX = 'eco:';
 
 /**
  * The account name a lock holder names on this node, or null when it names none this step may act
  * on: another node's identity, a reserved name (system, operator and the rest), a principal of an
- * extension, an ecosystem app or a schedule, a pseudonym, or a value that is not an identity.
+ * extension or a schedule, a pseudonym, or a value that is not an identity. An ecosystem app's
+ * `eco:<app>#name@<node>` names the account it acts for, as an agent's GAII does, because the
+ * round-14 erasure moves that form too (developer, 2026-11-08).
  */
 export function lockHolderAccount(lockedBy: string, nodeId: string): string | null {
-  const s = String(lockedBy ?? '');
+  let s = String(lockedBy ?? '');
+  if (s.startsWith(ECO_PREFIX)) {
+    if (!s.includes('#')) return null;
+    s = s.slice(ECO_PREFIX.length);
+  }
   if (!s || NOT_AN_ACCOUNT.some(p => s.startsWith(p))) return null;
   const hasAt = s.includes('@');
   if (s.includes('#') && !hasAt) return null;
