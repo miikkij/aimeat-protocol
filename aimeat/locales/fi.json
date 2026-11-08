@@ -12367,6 +12367,8 @@
   "notiftext.app_published_by_app.body": "Annoit sovellukselle {publisher} luvan julkaista sovelluksia puolestasi, ja se julkaisi version {version}. Kun avaat sovelluksen {app} seuraavan kerran, näet, mitä uusi versio haluaa tehdä, ja päätät, sallitko sen.",
   "notiftext.csm_removed.title": "Tietokuvaus {csm} poistettiin",
   "notiftext.csm_removed.body": "Tietokuvauksen (CSM) {csm} omistaja tai palvelun ylläpitäjä poisti sen. Vastaanottimesi, jotka käyttävät sitä: {uses}. Ne tarkistavat viestit edelleen muodon kopiota vasten, jonka ne ovat tallentaneet, joten ne toimivat kuten ennenkin. Jos haluat käyttää toista muotoa, tee uusi vastaanotin.",
+  "notiftext.csm_lock_yours.title": "Tietokuvauksesi {csm} lukko on nyt sinun",
+  "notiftext.csm_lock_yours.body": "Avaimen {pattern} lukko kuuluu tietokuvaukseesi (CSM) {csm}. Lukkoa piti toinen tili, koska lukko tehtiin ennen kuin palvelin alkoi tarkistaa, kuka saa lukita. Nyt lukko on sinun. Palvelin tarkistaa yhä jokaisen kirjoituksen tähän avaimeen lukon muotoa vasten. Jos muoto ei ole sinun, tallenna kuvauksesi uudelleen tai poista lukko.",
   "notiftext.content_pdf_text_not_read_time.title": "PDF-tiedostosi {key} tekstiä ei luettu",
   "notiftext.content_pdf_text_not_read_time.body": "Tiedosto on tallessa sellaisenaan. Tekstin lukeminen olisi kestänyt kauemmin kuin tämän AIMEATin aikaraja {limit}. Raja koskee PDF-tiedostoa, jonka kokoa ei voi tarkistaa ennen lukemista. Sama tieto näkyy Tietolompakko-sivullasi tämän tiedoston kohdalla.",
   "notiftext.content_pdf_text_not_read_memory.title": "PDF-tiedostosi {key} tekstiä ei luettu",

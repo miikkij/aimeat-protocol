@@ -11081,6 +11081,8 @@
   "notiftext.app_published_by_app.body": "Le diste permiso a {publisher} para publicar aplicaciones por ti, y publicó la versión {version}. La próxima vez que abras {app}, verás qué quiere hacer la nueva versión, y tú eliges si lo permites.",
   "notiftext.csm_removed.title": "Se eliminó la descripción de datos {csm}",
   "notiftext.csm_removed.body": "Su propietario o quien gestiona este servicio eliminó la descripción de datos (CSM) {csm}. Tus receptores que la usan: {uses}. Siguen comprobando los mensajes con la copia de su forma que guardaron, así que siguen funcionando. Para usar otra forma, crea un receptor nuevo.",
+  "notiftext.csm_lock_yours.title": "El bloqueo de tu descripción de datos {csm} ahora es tuyo",
+  "notiftext.csm_lock_yours.body": "Otra cuenta tenía el bloqueo de {pattern}, bajo tu descripción de datos (CSM) {csm}, desde antes de que este servidor comprobara quién puede bloquear. Ahora es tuyo. Cada escritura bajo esa clave se sigue comprobando con la forma que tiene el bloqueo. Si esa forma no es la tuya, guarda tu descripción de nuevo o quita el bloqueo.",
   "notiftext.content_pdf_text_not_read_time.title": "No se leyó el texto de tu PDF {key}",
   "notiftext.content_pdf_text_not_read_time.body": "El archivo quedó guardado tal como estaba. Leer su texto habría tardado más que el límite de {limit} de este AIMEAT. El límite se aplica a un PDF cuyo tamaño no se puede comprobar antes de leerlo. Tu página Billetera de datos dice lo mismo sobre este archivo.",
   "notiftext.content_pdf_text_not_read_memory.title": "No se leyó el texto de tu PDF {key}",

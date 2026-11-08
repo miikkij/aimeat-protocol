@@ -11630,6 +11630,8 @@
   "notiftext.app_published_by_app.body": "You gave {publisher} permission to publish apps for you, and it published version {version}. The next time you open {app}, you see what the new version wants to do, and you choose whether to allow it.",
   "notiftext.csm_removed.title": "The data description {csm} was removed",
   "notiftext.csm_removed.body": "Its owner or whoever runs this service removed the data description (CSM) {csm}. Your receivers that use it: {uses}. They keep checking messages against the copy of its shape they hold, so they go on working. To use another shape, make a new receiver.",
+  "notiftext.csm_lock_yours.title": "A lock on your data description {csm} is yours now",
+  "notiftext.csm_lock_yours.body": "Another account held the lock on {pattern}, under your data description (CSM) {csm}, from before this server checked who may lock it. You hold it now. Every write under that key is still checked against the shape the lock holds. If that shape is not yours, save your description again, or remove the lock.",
   "notiftext.content_pdf_text_not_read_time.title": "The text of your PDF {key} was not read",
   "notiftext.content_pdf_text_not_read_time.body": "The file is stored as it was. Reading its text took longer than the limit of {limit} on this AIMEAT. The limit applies to a PDF whose size cannot be checked before it is read. Your Data Wallet page says the same about this file.",
   "notiftext.content_pdf_text_not_read_memory.title": "The text of your PDF {key} was not read",
