@@ -219,7 +219,7 @@
         "aimeat/src/services/workflow/engine-lock.ts",
         "aimeat/src/services/ephemeral-claims.ts"
       ],
-      "digest": "sha256:34cdaf6100a605e98a043f0d"
+      "digest": "sha256:cdec56623e37c08d92f96486"
     },
     "README.md": {
       "reviewedOn": "2026-11-04",
@@ -437,7 +437,7 @@
       "aimeat/src/services/process-lease.ts": "56b5c28544c3d11b",
       "aimeat/src/services/ai-jobs/reclaim.ts": "46edaddf7925f44c",
       "aimeat/src/services/workflow/engine-lock.ts": "51637ef3a2de157d",
-      "aimeat/src/services/ephemeral-claims.ts": "f8fd097fce4ade97"
+      "aimeat/src/services/ephemeral-claims.ts": "74d9857f74a11e6c"
     }
   }
 }
