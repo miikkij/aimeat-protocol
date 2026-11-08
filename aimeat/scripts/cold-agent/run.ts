@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm cold-agent --suite context-private --fixtures "<dir>" --onto on   # own material (context-private.ts)
  *   cd aimeat && pnpm cold-agent --suite context-large --onto off   # invented material at real scale (context-large.ts)
  * @version-history
+ *   v1.6.0 — 2026-11-08 — `--onto graph` for the private suite: the context's ontology and its use
+ *     rules are seeded beside the context (context-private.ts v1.2.0).
  *   v1.5.0 — 2026-11-08 — `--suite context-large`: the context questions over a 40-session invented
  *     context and a second context that shares words with it (context-large.ts), with the same
  *     `--onto` arms. A session's budget defaults to $3 there, since the answer is in one of forty
@@ -73,7 +75,7 @@ import { scriptedTranscript } from './scripted.js';
 import { skillTasks } from './skill-cases.js';
 import { contextTasks, type Onto } from './context-cases.js';
 import { largeContextTasks } from './context-large.js';
-import { privateContextTasks } from './context-private.js';
+import { privateContextTasks, type PrivateArm } from './context-private.js';
 import { SANDBOX_MAX_APPS } from '../lib/sandbox-limits.js';
 
 const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -86,7 +88,8 @@ interface Args {
      *  `context-large`: the same on the committed invented fixture at real scale (context-large.ts). */
     suite: 'tasks' | 'skills' | 'context' | 'context-private' | 'context-large';
     /** The context suite's arm: whether each seeded context carries its concepts block. */
-    onto: Onto;
+    /** `graph` only with --suite context-private: the context's ontology is seeded beside it. */
+    onto: PrivateArm;
     /** `--fixtures <dir>`: the context-private suite's fixture directory, kept outside the repository. */
     fixtures: string | null;
     model: string;
@@ -121,7 +124,7 @@ function parseArgs(argv: string[]): Args {
     return {
         driver: get('driver') === 'scripted' ? 'scripted' : 'claude',
         suite,
-        onto: onto === 'on' || onto === 'auto' ? onto : 'off',
+        onto: onto === 'on' || onto === 'auto' || onto === 'graph' ? onto : 'off',
         fixtures: get('fixtures') ?? null,
         // Opus, by the developer's ruling of 2026-09-18: the point is what a GOOD model does here.
         // Tuning the node's guidance until a weaker model copes measures the wrong reader, and the
@@ -314,6 +317,12 @@ async function refuseAFullCatalogue(s: Sandbox, taskIds: string[], runs: number,
     }
 }
 
+/** The `graph` arm exists only for the private suite, whose fixture carries the ontology. */
+function ontoOnly(arm: PrivateArm): Onto {
+    if (arm === 'graph') throw new Error('--onto graph works only with --suite context-private, whose fixture carries the ontology.');
+    return arm;
+}
+
 async function main(): Promise<void> {
     const args = parseArgs(process.argv.slice(2));
     if (args.compare) { console.log(compareReports(args.compare[0], args.compare[1])); return; }
@@ -325,9 +334,9 @@ async function main(): Promise<void> {
     if (args.fixtures && !existsSync(args.fixtures)) throw new Error(`--fixtures ${args.fixtures}: no such directory`);
     const s = loadSandbox();
     const suite = args.suite === 'skills' ? skillTasks()
-        : args.suite === 'context' ? contextTasks(args.onto)
+        : args.suite === 'context' ? contextTasks(ontoOnly(args.onto))
             : args.suite === 'context-private' ? privateContextTasks(args.onto, args.fixtures!)
-                : args.suite === 'context-large' ? largeContextTasks(args.onto)
+                : args.suite === 'context-large' ? largeContextTasks(ontoOnly(args.onto))
                     : TASKS;
     // A task marked `byNameOnly` runs when it is asked for and never as part of "everything": the
     // ten-task baseline is compared run to run, and a three-dollar build must not join it by default.

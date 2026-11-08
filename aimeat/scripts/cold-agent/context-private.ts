@@ -38,6 +38,9 @@
  * @usage
  *   cd aimeat && pnpm cold-agent --suite context-private --fixtures "<dir>" --onto on --runs 3
  * @version-history
+ *   v1.2.0 — 2026-11-08 — `--onto graph`: the context's ontology (a shared core, a registry of
+ *     people and groups, the context's own modules, and the use rules) is seeded beside it from
+ *     the fixture's ontology/ folder, and the context record points at it.
  *   v1.1.0 — 2026-11-08 — `draftOnly`: a boundary task's forbidden words and judge read the drafted
  *     message only (draftOf), after the first run failed clean drafts on their covering note.
  *   v1.0.0 — 2026-11-08 — Initial: the fixture format, seeding by reference, keyword and judge
@@ -59,6 +62,8 @@ interface PrivateContext {
     includes?: string[];
     excludes?: string[];
     material?: string;
+    /** The context's own ontology modules (memory keys under ontology/), seeded in the graph arm. */
+    ontologyModules?: string[];
 }
 
 interface PrivateTask {
@@ -164,20 +169,56 @@ const judgeContext = (cs: PrivateContext[]): string => cs.map(c => [
     c.excludes?.length ? `Excludes: ${c.excludes.join('; ')}` : '',
 ].filter(Boolean).join('\n')).join('\n\n');
 
-export function privateContextTasks(onto: Onto, dir: string): Task[] {
+/**
+ * The `graph` arm: the context's ontology is seeded beside it. `ontology/*.json` in the fixture are
+ * vocabulary records (the file name without .json is the memory key, e.g. vocab.ctx.core), and
+ * `ontology/rules.md` is the use rules. Every `vocab.ctx.core*` and `vocab.ctx.registry*` record is
+ * shared and seeded with any context; a context names its own modules in `ontologyModules`.
+ */
+interface Ontology { records: Map<string, unknown>; rules: string }
+
+function loadOntology(dir: string): Ontology | null {
+    const oDir = join(dir, 'ontology');
+    if (!existsSync(oDir)) return null;
+    const records = new Map<string, unknown>();
+    for (const f of readdirSync(oDir).filter(n => n.endsWith('.json'))) records.set(basename(f, '.json'), readJson<unknown>(join(oDir, f)));
+    const rulesPath = join(oDir, 'rules.md');
+    return { records, rules: existsSync(rulesPath) ? readFileSync(rulesPath, 'utf8') : '' };
+}
+
+export type PrivateArm = Onto | 'graph';
+
+export function privateContextTasks(arm: PrivateArm, dir: string): Task[] {
     const fx = loadFixture(dir);
+    const onto = arm === 'graph' ? 'off' : arm;
+    const ontology = arm === 'graph' ? loadOntology(dir) : null;
+    if (arm === 'graph' && !ontology) throw new Error(`--onto graph needs ${join(dir, 'ontology')} with the vocabulary records and rules.md`);
+    const shared = ontology ? [...ontology.records.keys()].filter(k => /^vocab\.ctx\.(core|registry)/.test(k)) : [];
     return fx.tasks.map((t): Task => {
         const seeded = t.seed.map(s => fx.contexts.get(s)!);
         const recordKeys = [...new Set(seeded.flatMap(memoryRefs))];
-        const allKeys = [...seeded.map(c => `context.${c.slug}`), ...recordKeys];
+        const modules = ontology ? [...new Set(seeded.flatMap(c => c.ontologyModules ?? []))].filter(k => ontology.records.has(k)) : [];
+        const ontoKeys = ontology ? [...shared, ...modules] : [];
+        const allKeys = [...seeded.map(c => `context.${c.slug}`), ...recordKeys, ...ontoKeys];
         return {
-            id: `priv-${t.id}:${onto}`,
+            id: `priv-${t.id}:${arm}`,
             door: 'mcp',
             prompt: t.prompt,
             goodTools: GOOD,
             setup: async (c) => {
                 for (const k of recordKeys) await put(c, k, fx.records.get(k));
-                for (const ctxRec of seeded) await put(c, `context.${ctxRec.slug}`, record(ctxRec, onto));
+                for (const k of ontoKeys) await put(c, k, ontology!.records.get(k));
+                for (const ctxRec of seeded) {
+                    const rec = record(ctxRec, onto);
+                    // The graph arm points the context at its ontology and carries the use rules, so
+                    // an AI that opens the context finds both without any other guidance.
+                    if (ontology) Object.assign(rec, {
+                        ontology: 'graph',
+                        ontologyRecords: [...shared, ...(ctxRec.ontologyModules ?? []).filter(k => ontology.records.has(k))],
+                        ontologyRules: ontology.rules,
+                    });
+                    await put(c, `context.${ctxRec.slug}`, rec);
+                }
             },
             verify: async (ctx: TaskContext) => {
                 try {
