@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-08 -- e2e-workspace-reserved-parts.ts joins the list (not the guard tier): the node-reserved parts of a workspace are no space of any manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
  *   2026-11-07 -- e2e-csm.ts joins the list (not the guard tier): a new CSM's name gets the owner's prefix, its visibility filters every read, PUT keeps versions and refuses a stale one, the draft stores nothing, an agent needs csm:write (developer ruling 2026-11-07).
  *   2026-11-07 -- e2e-receivers.ts joins the list (not the guard tier): receivers, the address and key an outside program writes into one place of an owner's data with (wish-vastaanottimet-receivers-ulkopuolinen-ohjelma-kirjoittaa-yht).
  *   2026-11-07 -- e2e-rows-schema.ts joins the list (not the guard tier): a row space's JSON Schema binds every writer, and only the creator or an admin changes it (developer ruling 2026-11-07).
@@ -1501,6 +1502,9 @@ const ALL_SUITES = [
     'test/e2e-workspace-fenced-space.ts',
     // A record id with a dot lists under its whole id and no longer makes the index unreadable (secaudit2026oct31w2).
     'test/e2e-workspace-dotted-id.ts',
+    // The node-reserved parts of a workspace (share, access requests, fingerprints) are no space of any
+    // manifest, and the MCP access tools name the creator the REST gate names (secaudit2026nov08 round 14).
+    'test/e2e-workspace-reserved-parts.ts',
     'test/e2e-workspace-rows.ts',
     // A row space's JSON Schema binds every writer: owner, member, agent over REST and MCP, app (ruling 2026-11-07).
     'test/e2e-rows-schema.ts',
