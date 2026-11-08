@@ -821,7 +821,15 @@
       "tryLabel": "Pruébalo",
       "aiLabel": "O dale esto a tu IA",
       "aiHint": "La frase del servidor para una IA, en inglés. Nombra la dirección y dónde está la clave de API, nunca la clave.",
-      "done": "Listo, la clave de API está guardada"
+      "done": "Listo, la clave de API está guardada",
+      "commandsBody": "Pega uno de estos comandos en una terminal y ejecútalo. Escribe un valor de prueba donde escribe este webhook entrante: {target}. La dirección, la clave de API y el mensaje ya están en el comando, así que no tienes que cambiar nada.",
+      "commandsDryBody": "Pega uno de estos comandos en una terminal y ejecútalo. El servidor comprueba el mensaje como cualquier mensaje y no guarda nada. La dirección, la clave de API y el mensaje ya están en el comando.",
+      "commandsDry": "Solo prueba, sin guardar (agrega ?dry_run=true)",
+      "bashLabel": "macOS, Linux o Git Bash",
+      "psLabel": "Windows PowerShell",
+      "copyBash": "Copiar para macOS y Linux",
+      "copyPs": "Copiar para PowerShell",
+      "commandsOnce": "Los comandos llevan la clave de API. Igual que la clave, solo se muestran ahora."
     },
     "dry": {
       "title": "Prueba sin guardar",

@@ -11,11 +11,13 @@
  *   A receiver is an address and a key through which an outside program (a Lambda, a home sensor, a
  *   CRM export) writes into exactly one place of the owner's data over plain REST.
  * @structure x · api (list, get, deliveries, create, decide, patch, pause, resume, rotate, remove,
- *   csms) · targetWords · stateWord · stateTone · byWords · limitsWords · verbsWords · deliveryWords ·
+ *   csms, csmVersion) · targetWords · stateWord · stateTone · byWords · limitsWords · verbsWords · deliveryWords ·
  *   statusTone · addressPath · subFor · curlFor · dryRun · refusalWords · validName · validKey ·
  *   crumb · pageLinks · LIMITS
  * @usage import { x, api, targetWords, curlFor } from './frame.js';
  * @version-history
+ *   v1.3.0 — 2026-11-09 — api.csmVersion: the compiled schema of the version an incoming webhook checks
+ *     against, for the key-once view's example message (secaudit2026nov08b round 15d).
  *   v1.2.0 — 2026-11-08 — sayToAi removed: the page start (components/PageStart.js) carries the
  *     prompt for one's own AI.
  *   v1.1.0 — 2026-11-08 — refusalWords knows ACCOUNT_DISABLED, a write refused while the account is
@@ -47,6 +49,8 @@ export const api = {
   remove: async (name) => (await apiDelete(`/v1/receivers/${enc(name)}`))?.data,
   /** The CSMs this account may read (GET /v1/csm), each { name, version, service_type }. */
   csms: async () => (await apiGet('/v1/csm'))?.data?.services || [],
+  /** One version of a CSM with its compiled JSON Schema (GET /v1/csm/{name}/versions/{version}). */
+  csmVersion: async (name, version) => (await apiGet(`/v1/csm/${enc(name)}/versions/${enc(version)}`))?.data || null,
 };
 
 /** The limits the server takes (RECEIVER_DEFAULTS and RECEIVER_MAXIMA in contract.ts). */
