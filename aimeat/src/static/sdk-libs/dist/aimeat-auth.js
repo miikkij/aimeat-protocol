@@ -1991,6 +1991,17 @@
       }, 50);
     }
     return {
+      /** What the step holds while it is on screen, for the language switch (modal-view-keep.js). */
+      keep: function() {
+        if (!pending) return null;
+        return { pending, code: codeEl.value, backup: backupEl.value };
+      },
+      /** Draw the step again with what keep() returned: the same sign-in waits for its code. */
+      resume: function(state) {
+        open(state.pending);
+        codeEl.value = state.code || "";
+        backupEl.value = state.backup || "";
+      },
       /** The password was right and the server asked for the second factor. */
       openTotpStep: function(username, password) {
         open({ username, password });
@@ -2088,6 +2099,44 @@
       msgEl.textContent = i.usernameSent || "If an account with that email exists, your username was sent.";
       msgEl.style.display = "block";
     });
+    var $ = function(id) {
+      return (
+        /** @type {any} */
+        document.getElementById(id)
+      );
+    };
+    return {
+      forgotPw: {
+        keep: function() {
+          return {
+            step2: $("aimeat-fpw-step2").style.display !== "none",
+            username: $("aimeat-fpw-username").value,
+            code: $("aimeat-fpw-code").value,
+            newPass: $("aimeat-fpw-newpass").value
+          };
+        },
+        resume: function(state) {
+          showView("forgot-pw");
+          $("aimeat-fpw-step1").style.display = state.step2 ? "none" : "";
+          $("aimeat-fpw-step2").style.display = state.step2 ? "" : "none";
+          $("aimeat-fpw-username").value = state.username || "";
+          $("aimeat-fpw-code").value = state.code || "";
+          $("aimeat-fpw-newpass").value = state.newPass || "";
+        }
+      },
+      forgotUser: {
+        keep: function() {
+          return { email: $("aimeat-fu-email").value, sent: $("aimeat-fu-msg").style.display === "block" };
+        },
+        resume: function(state) {
+          showView("forgot-user");
+          $("aimeat-fu-email").value = state.email || "";
+          if (!state.sent) return;
+          $("aimeat-fu-msg").textContent = i.usernameSent || "If an account with that email exists, your username was sent.";
+          $("aimeat-fu-msg").style.display = "block";
+        }
+      }
+    };
   }
 
   // src/static/sdk-libs/auth/passkey.js
@@ -2419,7 +2468,21 @@
       first.linkFirstOpened = true;
       open();
     }
-    return { open };
+    return {
+      open,
+      /** The typed address and whether the link was sent, for the language switch (modal-view-keep.js). */
+      keep: function() {
+        return { email: emailEl.value, sent: msgEl.style.display === "block" };
+      },
+      /** Draw the step again with what keep() returned, the sent line in this drawing's words. Sends nothing. */
+      resume: function(state) {
+        open();
+        emailEl.value = state.email || "";
+        if (!state.sent) return;
+        msgEl.textContent = i.loginLinkSent || "If an account here has this verified address, we sent a sign-in link to it. Check your inbox.";
+        msgEl.style.display = "block";
+      }
+    };
   }
 
   // src/static/sdk-libs/auth/signup-state.js
@@ -2658,36 +2721,75 @@
         fail(e.message);
       }
     });
+    function open(setupToken) {
+      token = setupToken;
+      finished = null;
+      codeEl.value = "";
+      errEl.style.display = "none";
+      setupEl.style.display = "";
+      doneEl.style.display = "none";
+      if (qrEl) qrEl.style.display = "none";
+      if (secretEl) secretEl.textContent = "";
+      rawSecret = "";
+      ctx.showView("two-step");
+      api("/v1/ghii/login/two-step/start", { method: "POST", body: JSON.stringify({ setup_token: setupToken }) }).then(function(r) {
+        var d = r.data || {};
+        if (qrEl && typeof d.qr_data_url === "string" && d.qr_data_url.indexOf("data:image/") === 0) {
+          qrEl.src = d.qr_data_url;
+          qrEl.style.display = "";
+        }
+        rawSecret = String(d.secret || "");
+        if (secretEl) secretEl.textContent = rawSecret.replace(/(.{4})(?=.)/g, "$1 ");
+        setTimeout(function() {
+          codeEl.focus();
+        }, 50);
+      }).catch(function(e) {
+        if (e.code === "SETUP_TOKEN_EXPIRED") {
+          token = null;
+          fail(expiredText());
+        } else fail(e.message);
+      });
+    }
+    function showCodes(answer) {
+      var codes = answer && answer.data && answer.data.backup_codes || [];
+      codesEl.innerHTML = codes.map(function(c) {
+        return "<li><code>" + escHtml(String(c)) + "</code></li>";
+      }).join("");
+    }
     return {
-      /** A checked sign-in that stops at the enrolment: ask the node for the secret and show it. */
-      open: function(setupToken) {
-        token = setupToken;
-        finished = null;
-        codeEl.value = "";
+      open,
+      /** What the step holds while it is on screen, for the language switch (modal-view-keep.js). */
+      keep: function() {
+        var view = $("aimeat-two-step-view");
+        if (!view || view.style.display === "none" || !token && !finished) return null;
+        return {
+          token,
+          finished,
+          secret: rawSecret,
+          code: codeEl.value,
+          qr: qrEl && qrEl.style.display !== "none" ? String(qrEl.src || "") : ""
+        };
+      },
+      /** Draw the step again with what keep() returned. The node is asked again only when its key had not arrived yet. */
+      resume: function(state) {
+        if (!state.finished && !state.secret) {
+          if (state.token) open(state.token);
+          return;
+        }
+        token = state.token;
+        finished = state.finished;
+        rawSecret = state.secret || "";
         errEl.style.display = "none";
-        setupEl.style.display = "";
-        doneEl.style.display = "none";
-        if (qrEl) qrEl.style.display = "none";
-        if (secretEl) secretEl.textContent = "";
-        rawSecret = "";
+        if (qrEl && state.qr.indexOf("data:image/") === 0) {
+          qrEl.src = state.qr;
+          qrEl.style.display = "";
+        }
+        if (secretEl) secretEl.textContent = rawSecret.replace(/(.{4})(?=.)/g, "$1 ");
+        codeEl.value = state.code || "";
+        setupEl.style.display = finished ? "none" : "";
+        doneEl.style.display = finished ? "" : "none";
+        if (finished) showCodes(finished);
         ctx.showView("two-step");
-        api("/v1/ghii/login/two-step/start", { method: "POST", body: JSON.stringify({ setup_token: setupToken }) }).then(function(r) {
-          var d = r.data || {};
-          if (qrEl && typeof d.qr_data_url === "string" && d.qr_data_url.indexOf("data:image/") === 0) {
-            qrEl.src = d.qr_data_url;
-            qrEl.style.display = "";
-          }
-          rawSecret = String(d.secret || "");
-          if (secretEl) secretEl.textContent = rawSecret.replace(/(.{4})(?=.)/g, "$1 ");
-          setTimeout(function() {
-            codeEl.focus();
-          }, 50);
-        }).catch(function(e) {
-          if (e.code === "SETUP_TOKEN_EXPIRED") {
-            token = null;
-            fail(expiredText());
-          } else fail(e.message);
-        });
       }
     };
   }
@@ -2809,22 +2911,290 @@
       var target = continueTo;
       jwt = "";
       continueTo = null;
+      shown = null;
       $("aimeat-kc-pass").textContent = "";
       ctx.onDone();
       if (target) goTo3(target);
     });
+    var shown = (
+      /** @type {any} */
+      null
+    );
+    function open(details) {
+      shown = details;
+      jwt = details.jwt;
+      continueTo = details.continueTo || null;
+      errEl.style.display = "none";
+      $("aimeat-kc-user").textContent = details.credentials.username;
+      $("aimeat-kc-pass").textContent = details.credentials.password;
+      $("aimeat-kc-agents").style.display = details.credentials.agent_keys_ended > 0 ? "" : "none";
+      ctx.showView("key");
+      showAddress();
+    }
     return {
-      open: function(details) {
-        jwt = details.jwt;
-        continueTo = details.continueTo || null;
-        errEl.style.display = "none";
-        $("aimeat-kc-user").textContent = details.credentials.username;
-        $("aimeat-kc-pass").textContent = details.credentials.password;
-        $("aimeat-kc-agents").style.display = details.credentials.agent_keys_ended > 0 ? "" : "none";
-        ctx.showView("key");
-        showAddress();
+      open,
+      /** What the step holds while it is on screen, for the language switch (modal-view-keep.js). */
+      keep: function() {
+        if (!shown || view.style.display === "none") return null;
+        var hidden = function(id) {
+          return $(id).style.display === "none";
+        };
+        return {
+          details: { credentials: shown.credentials, jwt, continueTo },
+          verificationId,
+          email: $("aimeat-kc-email").value,
+          code: $("aimeat-kc-email-code").value,
+          // 'ask' before a code was sent, 'code' while one is awaited, 'done' once the address is confirmed.
+          phase: !hidden("aimeat-kc-email-code-step") ? "code" : hidden("aimeat-kc-email-ask") ? "done" : "ask",
+          passkeyAdded: hidden("aimeat-kc-passkey-add")
+        };
+      },
+      /** Draw the step again with what keep() returned, in this drawing's words. Sends nothing. */
+      resume: function(state) {
+        open(state.details);
+        verificationId = state.verificationId || "";
+        $("aimeat-kc-email").value = state.email || "";
+        $("aimeat-kc-email-code").value = state.code || "";
+        if (state.phase !== "ask") $("aimeat-kc-email-ask").style.display = "none";
+        if (state.phase === "code") $("aimeat-kc-email-code-step").style.display = "";
+        if (state.phase === "done") say(emailMsg, i.keyCredEmailDone || "Confirmed. This is now your address.");
+        if (state.passkeyAdded) {
+          $("aimeat-kc-passkey-add").style.display = "none";
+          say($("aimeat-kc-passkey-msg"), i.keyCredPasskeyAdded || "Added. Next time you can sign in with this device.");
+        }
       }
     };
+  }
+
+  // src/static/sdk-libs/auth/modal-email-step.js
+  function wireEmailStep(ctx) {
+    var i = ctx.i, api2 = ctx.api, auth2 = ctx.auth, showView = ctx.showView;
+    var finishLogin = ctx.finishLogin, twoStepAsked = ctx.twoStepAsked, totpStep = ctx.totpStep;
+    var pendingEmailLogin = null;
+    function openEmailCompletion(user, pass, hasEmail, mode, displayName, prefillEmail) {
+      pendingEmailLogin = { username: user, password: pass, mode: mode || "attach", displayName: displayName || user, hasEmail: !!hasEmail };
+      showView("email");
+      document.getElementById("aimeat-em-step1").style.display = "";
+      document.getElementById("aimeat-em-step2").style.display = "none";
+      var emailInput = (
+        /** @type {any} */
+        document.getElementById("aimeat-em-email")
+      );
+      emailInput.value = prefillEmail || "";
+      var titleEl = document.querySelector("#aimeat-em-step1 h3");
+      var desc = document.querySelector("#aimeat-em-step1 p");
+      if (pendingEmailLogin.mode === "register") {
+        if (titleEl) titleEl.textContent = i.registerEmailTitle || "Add your email";
+        if (desc) desc.textContent = i.registerEmailDesc || "Enter your email to create your account. We’ll send a verification code to confirm it.";
+      } else {
+        if (titleEl) titleEl.textContent = i.completeAccountTitle || "One last step";
+        if (desc) {
+          desc.textContent = hasEmail ? i.completeAccountDescResend || "Confirm your email to finish signing in. We’ll send a verification code — edit the address if it’s wrong." : i.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.";
+        }
+      }
+      document.getElementById("aimeat-em-err").style.display = "none";
+      if (prefillEmail) {
+        sendEmailCode();
+        return;
+      }
+      setTimeout(function() {
+        emailInput.focus();
+      }, 50);
+    }
+    function attachEmail(pending, email) {
+      return api2("/v1/ghii/login/attach-email", {
+        method: "POST",
+        body: JSON.stringify({ username: pending.username, password: pending.password, email })
+      });
+    }
+    async function sendEmailCode() {
+      var email = (
+        /** @type {any} */
+        document.getElementById("aimeat-em-email").value.trim()
+      );
+      var errEl = document.getElementById("aimeat-em-err");
+      errEl.style.display = "none";
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errEl.textContent = i.errEmailInvalid || "Please enter a valid email address.";
+        errEl.style.display = "block";
+        return;
+      }
+      if (!pendingEmailLogin) {
+        showView("login");
+        return;
+      }
+      var btn = (
+        /** @type {any} */
+        document.getElementById("aimeat-em-send")
+      );
+      btn.textContent = i.working || "Working...";
+      btn.disabled = true;
+      var pending = pendingEmailLogin;
+      try {
+        var res;
+        if (pending.mode === "register") {
+          res = await api2("/v1/ghii", {
+            method: "POST",
+            credentials: "include",
+            body: JSON.stringify({
+              username: pending.username,
+              display_name: pending.displayName,
+              password: pending.password,
+              email,
+              // The account's locale, so the verification code arrives in the language the
+              // person is reading right now. Without it every account was created locale-less
+              // and every system email fell back to English (UX-remake v3, measured).
+              locale: currentModalLang()
+            })
+          }).catch(function(e) {
+            if (e.code !== "NAME_TAKEN") throw e;
+            return attachEmail(pending, email).catch(function(e2) {
+              if (e2.code === "ALREADY_VERIFIED") return null;
+              throw e;
+            });
+          });
+          if (res === null) {
+            try {
+              await auth2.loginWithPassword(pending.username, pending.password);
+            } catch (le) {
+              if (twoStepAsked(le)) return;
+              if (le.code !== "TOTP_REQUIRED") throw le;
+              totpStep.openTotpStep(pending.username, pending.password);
+              return;
+            }
+            pendingEmailLogin = null;
+            finishLogin();
+            return;
+          }
+        } else {
+          res = await attachEmail(pending, email);
+        }
+        pending.verificationId = res.data && res.data.verification_id;
+        document.getElementById("aimeat-em-step1").style.display = "none";
+        document.getElementById("aimeat-em-step2").style.display = "";
+        setTimeout(function() {
+          document.getElementById("aimeat-em-code").focus();
+        }, 50);
+      } catch (e) {
+        errEl.textContent = e.code === "NAME_TAKEN" ? i.errNameTaken || "That username is taken. If it is yours, sign in instead." : e.message;
+        errEl.style.display = "block";
+      } finally {
+        btn.textContent = i.sendVerificationCode || "Send Verification Code";
+        btn.disabled = false;
+      }
+    }
+    document.getElementById("aimeat-em-send").addEventListener("click", sendEmailCode);
+    document.getElementById("aimeat-em-confirm").addEventListener("click", async function() {
+      var code = (
+        /** @type {any} */
+        document.getElementById("aimeat-em-code").value.trim()
+      );
+      var msgEl = document.getElementById("aimeat-em-msg2");
+      var errEl = document.getElementById("aimeat-em-err2");
+      msgEl.style.display = "none";
+      errEl.style.display = "none";
+      if (!code) {
+        errEl.textContent = i.errCodeRequired || "Enter the verification code.";
+        errEl.style.display = "block";
+        return;
+      }
+      if (!pendingEmailLogin) {
+        showView("login");
+        return;
+      }
+      var btn = (
+        /** @type {any} */
+        document.getElementById("aimeat-em-confirm")
+      );
+      btn.textContent = i.working || "Working...";
+      btn.disabled = true;
+      try {
+        await api2("/v1/ghii/verify-email", {
+          method: "POST",
+          body: JSON.stringify({ verification_id: pendingEmailLogin.verificationId, code })
+        });
+        msgEl.textContent = i.emailVerifiedSigningIn || "Verified! Signing you in...";
+        msgEl.style.display = "block";
+        await auth2.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
+        pendingEmailLogin = null;
+        finishLogin();
+      } catch (e) {
+        if (twoStepAsked(e)) {
+          pendingEmailLogin = null;
+          return;
+        }
+        errEl.textContent = e.message;
+        errEl.style.display = "block";
+        btn.textContent = i.confirmAndSignIn || "Confirm & Sign In";
+        btn.disabled = false;
+      }
+    });
+    return {
+      open: openEmailCompletion,
+      /** What the step holds while it is on screen, for the language switch; null when it is not. */
+      keep: function() {
+        if (!pendingEmailLogin) return null;
+        var val = function(id) {
+          var el = (
+            /** @type {any} */
+            document.getElementById(id)
+          );
+          return el ? el.value : "";
+        };
+        var step2 = (
+          /** @type {any} */
+          document.getElementById("aimeat-em-step2")
+        );
+        return {
+          pending: pendingEmailLogin,
+          step2: !!step2 && step2.style.display !== "none",
+          email: val("aimeat-em-email"),
+          code: val("aimeat-em-code")
+        };
+      },
+      /** Draw the step again with what keep() returned. Sends nothing: a code already sent stays valid. */
+      resume: function(state) {
+        var p = state.pending;
+        openEmailCompletion(p.username, p.password, p.hasEmail, p.mode, p.displayName);
+        pendingEmailLogin.verificationId = p.verificationId;
+        document.getElementById("aimeat-em-email").value = state.email || "";
+        if (!state.step2) return;
+        document.getElementById("aimeat-em-step1").style.display = "none";
+        document.getElementById("aimeat-em-step2").style.display = "";
+        document.getElementById("aimeat-em-code").value = state.code || "";
+      }
+    };
+  }
+
+  // src/static/sdk-libs/auth/modal-view-keep.js
+  var VIEWS = {
+    "forgot-pw": "aimeat-forgot-pw-view",
+    "forgot-user": "aimeat-forgot-user-view",
+    email: "aimeat-email-view",
+    totp: "aimeat-totp-view",
+    "two-step": "aimeat-two-step-view",
+    key: "aimeat-key-view",
+    "login-link": "aimeat-login-link-view"
+  };
+  function viewOnScreen() {
+    for (var name in VIEWS) {
+      var el = (
+        /** @type {any} */
+        document.getElementById(VIEWS[name])
+      );
+      if (el && el.style && el.style.display !== "none") return name;
+    }
+    return "login";
+  }
+  function keepView(steps) {
+    var view = viewOnScreen();
+    var step = steps[view];
+    return { view, state: step && typeof step.keep === "function" ? step.keep() : null };
+  }
+  function resumeView(steps, kept) {
+    if (!kept || kept.view === "login" || kept.state == null) return;
+    var step = steps[kept.view];
+    if (step && typeof step.resume === "function") step.resume(kept.state);
   }
 
   // src/static/sdk-libs/auth/modal.js
@@ -2853,15 +3223,18 @@
         onClosed();
       };
     }
+    var steps = {};
     function switchLang(next) {
       if (next === lang) return;
       writeLang(next);
       var vals = captureInputs();
+      var kept = keepView(steps);
       loadModalI18n(next).then(function(fresh) {
         lang = next;
         if (fresh && Object.keys(fresh).length) i = fresh;
         render(false);
         restoreInputs(vals);
+        resumeView(steps, kept);
       });
     }
     function busyOrAway() {
@@ -3037,7 +3410,7 @@
         },
         onSuccess: finishLogin
       });
-      wireLoginLinkStep({ i, api, showView, redirect: opts.redirect, openFirst: linkFirst && tab === "signin" ? opts : null });
+      var linkStep = wireLoginLinkStep({ i, api, showView, redirect: opts.redirect, openFirst: linkFirst && tab === "signin" ? opts : null });
       var totpStep = wireTotpStep({
         i,
         showView,
@@ -3064,37 +3437,8 @@
         opts.twoStepSetup = null;
         twoStep.open(setupToken);
       }
-      var pendingEmailLogin = null;
-      function openEmailCompletion(user, pass, hasEmail, mode, displayName, prefillEmail) {
-        pendingEmailLogin = { username: user, password: pass, mode: mode || "attach", displayName: displayName || user };
-        showView("email");
-        document.getElementById("aimeat-em-step1").style.display = "";
-        document.getElementById("aimeat-em-step2").style.display = "none";
-        var emailInput = (
-          /** @type {any} */
-          document.getElementById("aimeat-em-email")
-        );
-        emailInput.value = prefillEmail || "";
-        var titleEl = document.querySelector("#aimeat-em-step1 h3");
-        var desc = document.querySelector("#aimeat-em-step1 p");
-        if (pendingEmailLogin.mode === "register") {
-          if (titleEl) titleEl.textContent = i.registerEmailTitle || "Add your email";
-          if (desc) desc.textContent = i.registerEmailDesc || "Enter your email to create your account. We’ll send a verification code to confirm it.";
-        } else {
-          if (titleEl) titleEl.textContent = i.completeAccountTitle || "One last step";
-          if (desc) {
-            desc.textContent = hasEmail ? i.completeAccountDescResend || "Confirm your email to finish signing in. We’ll send a verification code — edit the address if it’s wrong." : i.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.";
-          }
-        }
-        document.getElementById("aimeat-em-err").style.display = "none";
-        if (prefillEmail) {
-          sendEmailCode();
-          return;
-        }
-        setTimeout(function() {
-          emailInput.focus();
-        }, 50);
-      }
+      var emailStep = wireEmailStep({ i, api, auth, showView, finishLogin, twoStepAsked, totpStep });
+      var openEmailCompletion = emailStep.open;
       document.getElementById("aimeat-forgot-pw").addEventListener("click", function(e) {
         e.preventDefault();
         showView("forgot-pw");
@@ -3110,135 +3454,16 @@
           showView("login");
         });
       });
-      function attachEmail(pending, email) {
-        return api("/v1/ghii/login/attach-email", {
-          method: "POST",
-          body: JSON.stringify({ username: pending.username, password: pending.password, email })
-        });
-      }
-      async function sendEmailCode() {
-        var email = (
-          /** @type {any} */
-          document.getElementById("aimeat-em-email").value.trim()
-        );
-        var errEl = document.getElementById("aimeat-em-err");
-        errEl.style.display = "none";
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          errEl.textContent = i.errEmailInvalid || "Please enter a valid email address.";
-          errEl.style.display = "block";
-          return;
-        }
-        if (!pendingEmailLogin) {
-          showView("login");
-          return;
-        }
-        var btn = (
-          /** @type {any} */
-          document.getElementById("aimeat-em-send")
-        );
-        btn.textContent = i.working || "Working...";
-        btn.disabled = true;
-        var pending = pendingEmailLogin;
-        try {
-          var res;
-          if (pending.mode === "register") {
-            res = await api("/v1/ghii", {
-              method: "POST",
-              credentials: "include",
-              body: JSON.stringify({
-                username: pending.username,
-                display_name: pending.displayName,
-                password: pending.password,
-                email,
-                // The account's locale, so the verification code arrives in the language the
-                // person is reading right now. Without it every account was created locale-less
-                // and every system email fell back to English (UX-remake v3, measured).
-                locale: currentModalLang()
-              })
-            }).catch(function(e) {
-              if (e.code !== "NAME_TAKEN") throw e;
-              return attachEmail(pending, email).catch(function(e2) {
-                if (e2.code === "ALREADY_VERIFIED") return null;
-                throw e;
-              });
-            });
-            if (res === null) {
-              try {
-                await auth.loginWithPassword(pending.username, pending.password);
-              } catch (le) {
-                if (twoStepAsked(le)) return;
-                if (le.code !== "TOTP_REQUIRED") throw le;
-                totpStep.openTotpStep(pending.username, pending.password);
-                return;
-              }
-              pendingEmailLogin = null;
-              finishLogin();
-              return;
-            }
-          } else {
-            res = await attachEmail(pending, email);
-          }
-          pending.verificationId = res.data && res.data.verification_id;
-          document.getElementById("aimeat-em-step1").style.display = "none";
-          document.getElementById("aimeat-em-step2").style.display = "";
-          setTimeout(function() {
-            document.getElementById("aimeat-em-code").focus();
-          }, 50);
-        } catch (e) {
-          errEl.textContent = e.code === "NAME_TAKEN" ? i.errNameTaken || "That username is taken. If it is yours, sign in instead." : e.message;
-          errEl.style.display = "block";
-        } finally {
-          btn.textContent = i.sendVerificationCode || "Send Verification Code";
-          btn.disabled = false;
-        }
-      }
-      document.getElementById("aimeat-em-send").addEventListener("click", sendEmailCode);
-      document.getElementById("aimeat-em-confirm").addEventListener("click", async function() {
-        var code = (
-          /** @type {any} */
-          document.getElementById("aimeat-em-code").value.trim()
-        );
-        var msgEl = document.getElementById("aimeat-em-msg2");
-        var errEl = document.getElementById("aimeat-em-err2");
-        msgEl.style.display = "none";
-        errEl.style.display = "none";
-        if (!code) {
-          errEl.textContent = i.errCodeRequired || "Enter the verification code.";
-          errEl.style.display = "block";
-          return;
-        }
-        if (!pendingEmailLogin) {
-          showView("login");
-          return;
-        }
-        var btn = (
-          /** @type {any} */
-          document.getElementById("aimeat-em-confirm")
-        );
-        btn.textContent = i.working || "Working...";
-        btn.disabled = true;
-        try {
-          await api("/v1/ghii/verify-email", {
-            method: "POST",
-            body: JSON.stringify({ verification_id: pendingEmailLogin.verificationId, code })
-          });
-          msgEl.textContent = i.emailVerifiedSigningIn || "Verified! Signing you in...";
-          msgEl.style.display = "block";
-          await auth.loginWithPassword(pendingEmailLogin.username, pendingEmailLogin.password);
-          pendingEmailLogin = null;
-          finishLogin();
-        } catch (e) {
-          if (twoStepAsked(e)) {
-            pendingEmailLogin = null;
-            return;
-          }
-          errEl.textContent = e.message;
-          errEl.style.display = "block";
-          btn.textContent = i.confirmAndSignIn || "Confirm & Sign In";
-          btn.disabled = false;
-        }
-      });
-      wireRecoveryViews({ i, api, showView });
+      var recovery = wireRecoveryViews({ i, api, showView });
+      steps = {
+        key: keyStep,
+        "two-step": twoStep,
+        totp: totpStep,
+        "login-link": linkStep,
+        email: emailStep,
+        "forgot-pw": recovery.forgotPw,
+        "forgot-user": recovery.forgotUser
+      };
       wireEnterSubmits();
       function releaseBtn(id, label) {
         var b = (

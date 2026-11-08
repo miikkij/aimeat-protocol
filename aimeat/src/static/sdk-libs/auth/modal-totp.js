@@ -23,9 +23,11 @@
  *   the link was asked from.
  *
  * @structure totpViewHtml(i, field) → the view's markup · submitLinkCode(secondFactor) ·
- *   wireTotpStep(ctx) → { openTotpStep, openLinkStep }
+ *   wireTotpStep(ctx) → { openTotpStep, openLinkStep, keep, resume }
  * @usage import { totpViewHtml, wireTotpStep } from './modal-totp.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-08 -- keep() and resume(): the language switch draws the code step again with the
+ *     sign-in that waits for its code (modal-view-keep.js; secaudit2026nov08b round 15b).
  *   v1.1.0 — 2026-10-09 — Link mode: openLinkStep() finishes an emailed sign-in link with the code
  *     (secaudit 2026-10-09, S1).
  *   v1.0.0 — 2026-09-04 — Initial. Before this the modal had no code step at all: an account with
@@ -98,7 +100,8 @@ export function totpViewHtml(i, field) {
  *   Runs the login with the second factor and resolves with the session.
  * @param {(session: any) => void} ctx.onSuccess What the modal does when a session comes back.
  * @param {() => Promise<any>} ctx.restoreSession Link mode: reads the session from the refresh cookie.
- * @returns {{ openTotpStep: (username: string, password: string) => void, openLinkStep: () => void }}
+ * @returns {{ openTotpStep: (username: string, password: string) => void, openLinkStep: () => void,
+ *   keep?: () => any, resume?: (state: any) => void }}
  */
 export function wireTotpStep(ctx) {
   var i = ctx.i;
@@ -197,6 +200,17 @@ export function wireTotpStep(ctx) {
   }
 
   return {
+    /** What the step holds while it is on screen, for the language switch (modal-view-keep.js). */
+    keep: function () {
+      if (!pending) return null;
+      return { pending: pending, code: codeEl.value, backup: backupEl.value };
+    },
+    /** Draw the step again with what keep() returned: the same sign-in waits for its code. */
+    resume: function (state) {
+      open(state.pending);
+      codeEl.value = state.code || '';
+      backupEl.value = state.backup || '';
+    },
     /** The password was right and the server asked for the second factor. */
     openTotpStep: function (username, password) { open({ username: username, password: password }); },
     /** An emailed sign-in link was spent and its ticket waits for the code (`?auth_step=second_factor`). */

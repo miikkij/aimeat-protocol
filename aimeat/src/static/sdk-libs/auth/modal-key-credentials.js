@@ -19,9 +19,12 @@
  *   browser has WebAuthn), and the account's address: the address that receives sign-in links and
  *   password resets now, and a field for the person's own (POST /v1/ghii/email/verify, then
  *   /v1/ghii/email/confirm with the code). The password stays on screen until the person presses Done.
- * @structure keyCredentialsViewHtml(i, field) · wireKeyCredentialsStep(ctx) → { open(details) }
+ * @structure keyCredentialsViewHtml(i, field) · wireKeyCredentialsStep(ctx) → { open(details), keep(), resume(state) }
  * @usage import { keyCredentialsViewHtml, wireKeyCredentialsStep } from './modal-key-credentials.js';
  * @version-history
+ *   v1.2.0 -- 2026-11-08 -- keep() and resume(): the language switch draws the step again in the new
+ *     language with the username, the password, the address step and the passkey line it showed
+ *     (modal-view-keep.js; secaudit2026nov08b round 15b).
  *   v1.1.0 — 2026-11-08 — A line says when an agent key handed out with the code before this sign-in
  *     stopped at it (`agent_keys_ended`; secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-11-08 — Initial (secaudit2026nov08 round 14; the developer's ruling 1 of 2026-11-08).
@@ -87,7 +90,8 @@ export function keyCredentialsViewHtml(i, field) {
  * @param {Record<string, string>} ctx.i Modal strings.
  * @param {(view: string) => void} ctx.showView The modal's view switcher.
  * @param {() => void} ctx.onDone What the modal does when the person has seen the details.
- * @returns {{ open: (details: { credentials: { username: string, password: string, agent_keys_ended?: number }, jwt: string, continueTo?: string | null }) => void }}
+ * @returns {{ open: (details: { credentials: { username: string, password: string, agent_keys_ended?: number }, jwt: string, continueTo?: string | null }) => void,
+ *   keep?: () => any, resume?: (state: any) => void }}
  */
 export function wireKeyCredentialsStep(ctx) {
   var i = ctx.i;
@@ -165,23 +169,57 @@ export function wireKeyCredentialsStep(ctx) {
 
   $('aimeat-kc-done').addEventListener('click', function () {
     var target = continueTo;
-    jwt = ''; continueTo = null;
+    jwt = ''; continueTo = null; shown = null;
     $('aimeat-kc-pass').textContent = '';
     ctx.onDone();
     if (target) goTo(target);
   });
 
+  /** The details the step was opened with, until Done: keep() hands them to the next drawing. */
+  var shown = /** @type {any} */ (null);
+
+  /** @param {{ credentials: { username: string, password: string, agent_keys_ended?: number }, jwt: string, continueTo?: string | null }} details */
+  function open(details) {
+    shown = details;
+    jwt = details.jwt;
+    continueTo = details.continueTo || null;
+    errEl.style.display = 'none';
+    $('aimeat-kc-user').textContent = details.credentials.username;
+    $('aimeat-kc-pass').textContent = details.credentials.password;
+    // An agent key handed out with the code before this sign-in stopped at it (agent_keys_ended).
+    $('aimeat-kc-agents').style.display = details.credentials.agent_keys_ended > 0 ? '' : 'none';
+    ctx.showView('key');
+    showAddress();
+  }
+
   return {
-    open: function (details) {
-      jwt = details.jwt;
-      continueTo = details.continueTo || null;
-      errEl.style.display = 'none';
-      $('aimeat-kc-user').textContent = details.credentials.username;
-      $('aimeat-kc-pass').textContent = details.credentials.password;
-      // An agent key handed out with the code before this sign-in stopped at it (agent_keys_ended).
-      $('aimeat-kc-agents').style.display = details.credentials.agent_keys_ended > 0 ? '' : 'none';
-      ctx.showView('key');
-      showAddress();
+    open: open,
+    /** What the step holds while it is on screen, for the language switch (modal-view-keep.js). */
+    keep: function () {
+      if (!shown || view.style.display === 'none') return null;
+      var hidden = function (id) { return $(id).style.display === 'none'; };
+      return {
+        details: { credentials: shown.credentials, jwt: jwt, continueTo: continueTo },
+        verificationId: verificationId,
+        email: $('aimeat-kc-email').value, code: $('aimeat-kc-email-code').value,
+        // 'ask' before a code was sent, 'code' while one is awaited, 'done' once the address is confirmed.
+        phase: !hidden('aimeat-kc-email-code-step') ? 'code' : (hidden('aimeat-kc-email-ask') ? 'done' : 'ask'),
+        passkeyAdded: hidden('aimeat-kc-passkey-add'),
+      };
+    },
+    /** Draw the step again with what keep() returned, in this drawing's words. Sends nothing. */
+    resume: function (state) {
+      open(state.details);
+      verificationId = state.verificationId || '';
+      $('aimeat-kc-email').value = state.email || '';
+      $('aimeat-kc-email-code').value = state.code || '';
+      if (state.phase !== 'ask') $('aimeat-kc-email-ask').style.display = 'none';
+      if (state.phase === 'code') $('aimeat-kc-email-code-step').style.display = '';
+      if (state.phase === 'done') say(emailMsg, i.keyCredEmailDone || 'Confirmed. This is now your address.');
+      if (state.passkeyAdded) {
+        $('aimeat-kc-passkey-add').style.display = 'none';
+        say($('aimeat-kc-passkey-msg'), i.keyCredPasskeyAdded || 'Added. Next time you can sign in with this device.');
+      }
     },
   };
 }
