@@ -3,8 +3,24 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
-## Unreleased
+## 0.39.1 - 2026-11-08
 
+- **A stored agent token goes only to that agent's own node.** When one connector home holds
+  agents on two nodes, `decide()`, `capabilities()`, `node_llm()` and a crew's node LLM sent the
+  second agent's stored token to the node of the first agent, because they read the address from
+  the home's `config.yaml`, which the connector writes for the first agent it connects. Now they
+  read the address from the agent's own settings (`agents/<owner>/<agent>/config.yaml`), as the
+  Node connector does. The home's `config.yaml` is used only when it names this agent or names no
+  agent. When it names another agent and the agent has no settings of its own, the call goes
+  through the connector daemon if one serves the agent, and otherwise stops before it sends
+  anything, with a message that names the file and says how to give the address.
+- **The liaison publishes only its own offers.** The liaison's `aimeat_offers_publish` tool takes
+  the agent name from the model. On a connector daemon that serves several agents, a call that
+  named another served agent published that agent's offers with that agent's credential. Now
+  `create_liaison_agent` binds the tool to the liaison's own agent: a call with the liaison's own
+  name, or with no name, publishes as before, and a call with another name is refused and sends
+  nothing. `offers_tools(agent_name=...)` gives the same binding to your own tool list;
+  `offers_tools()` with no name, `offers_publish()` and `publish_offers()` work as before.
 - **The liaison's backstory describes AIMEAT as the project now does**: it multiplies what AI can
   do and makes those powers easy to use, so people and their AIs can work together in a controlled,
   safe and reliable way (docs/AIMEAT-Story.md). It said "an open protocol for AI agent

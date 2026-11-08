@@ -23,6 +23,9 @@
  *   import { inwardShape } from './hooks-shapes.js';
  *   const shape = inwardShape({ id, node, doc, graph, langs, base });
  * @version-history
+ *   v0.7.1 — 2026-11-08 — The two copyable curl lines quote their JSON body for the shell: a single
+ *     quote in the live value becomes '\'' inside the quoted argument, so the value stays one argument.
+ *     A value without a single quote gives the same line as before (secaudit2026nov08 round 14).
  *   v0.7.0 — 2026-11-07 — The inward shape carries `receiver`: the owner's Receivers page with this key
  *     filled in, and the call a program sends through a receiver. The memory road's own call needs a
  *     session of the owner, which a program must not hold.
@@ -63,6 +66,17 @@ export function receiverNameFor(doc, id) {
   return (slug || 'living-value').slice(0, 40).replace(/-$/, '');
 }
 
+/**
+ * One shell argument in single quotes, for a line a person copies into a terminal. A single quote in
+ * the text becomes '\'' (close, an escaped quote, open again), so a live value that holds one stays
+ * inside the argument. Text without a single quote comes out as before: the text between two quotes.
+ * @param {string} text
+ * @returns {string}
+ */
+function shellQuoted(text) {
+  return "'" + String(text).replace(/'/g, "'\\''") + "'";
+}
+
 /** The program road of the inward dialog: where the owner makes the receiver, and the call a program sends. */
 function receiverRoad(base, key, doc, id, sample) {
   const name = receiverNameFor(doc, id);
@@ -75,7 +89,7 @@ function receiverRoad(base, key, doc, id, sample) {
     curl: 'curl -X POST ' + address
       + ' -H "Content-Type: application/json"'
       + ' -H "Authorization: Bearer <the receiver key>"'
-      + " -d '" + JSON.stringify({ value: sample }) + "'",
+      + ' -d ' + shellQuoted(JSON.stringify({ value: sample })),
   };
 }
 
@@ -135,7 +149,7 @@ export function inwardShape(ctx) {
       curl: 'curl -X POST ' + base + '/v1/memory'
         + ' -H "Content-Type: application/json"'
         + ' -H "Authorization: Bearer <your token>"'
-        + " -d '" + JSON.stringify(body) + "'",
+        + ' -d ' + shellQuoted(JSON.stringify(body)),
     },
     /**
      * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through

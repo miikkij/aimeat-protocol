@@ -49,8 +49,24 @@ def offers_publish(offers_json: Any, agent_name: str, node_url: str | None = Non
     return json.dumps(body, ensure_ascii=False)
 
 
-def offers_tools() -> list[Any]:
+def _bound_name(bound: str, given: str | None) -> str | None:
+    """The agent a bound publish tool runs as: ``bound`` when the model named no agent, named
+    ``bound`` itself, or named the bare part of a bound full identity; None for any other name."""
+    if not given or given in (bound, bound.partition("#")[0]):
+        return bound
+    return None
+
+
+def offers_tools(agent_name: str | None = None) -> list[Any]:
     """Return CrewAI tools [offers_check, offers_publish] for the liaison's toolset.
+
+    ``agent_name`` binds the publish tool to one agent: it publishes only to that agent's
+    ``agents.<name>.offers`` with that agent's credential, and a call that names another agent is
+    refused with a message and sends nothing. ``create_liaison_agent`` binds it to the liaison's
+    own agent, because a connector daemon can serve several agents from one home and the name in a
+    tool call is written by the model (secaudit2026nov08 round 14). Without ``agent_name`` the tool
+    publishes for the agent named in each call, as before; that is for code that builds its own tool
+    list for one agent.
 
     Raises ImportError if crewai is not installed (the underlying functions
     offers_check/offers_publish work without it)."""
@@ -66,10 +82,28 @@ def offers_tools() -> list[Any]:
         Input: the offers document as a JSON string. Use this BEFORE publishing."""
         return offers_check(offers_json)
 
-    @tool("aimeat_offers_publish")
-    def _publish(offers_json: str, agent_name: str) -> str:
-        """Validate and publish an AIMEAT offers document to agents.{agent_name}.offers.
-        Input: the offers document as a JSON string and the bare agent name."""
-        return offers_publish(offers_json, agent_name)
+    if not agent_name:
+        @tool("aimeat_offers_publish")
+        def _publish(offers_json: str, agent_name: str) -> str:
+            """Validate and publish an AIMEAT offers document to agents.{agent_name}.offers.
+            Input: the offers document as a JSON string and the bare agent name."""
+            return offers_publish(offers_json, agent_name)
 
-    return [_check, _publish]
+        return [_check, _publish]
+
+    bound = agent_name
+
+    @tool("aimeat_offers_publish")
+    def _publish_bound(offers_json: str, agent_name: str = "") -> str:
+        """Validate and publish an AIMEAT offers document to agents.{agent_name}.offers.
+        Input: the offers document as a JSON string and your own agent name. This tool
+        publishes only your own agent's offers."""
+        name = _bound_name(bound, agent_name)
+        if name is None:
+            return (
+                f"publish refused: this tool publishes the offers of {bound}, the agent this crew runs as, "
+                f"and the call named {agent_name}. Nothing was sent. Pass {bound} as agent_name, or leave it out."
+            )
+        return offers_publish(offers_json, name)
+
+    return [_check, _publish_bound]

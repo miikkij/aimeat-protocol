@@ -5359,6 +5359,9 @@
     const slug = raw.replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     return (slug || "living-value").slice(0, 40).replace(/-$/, "");
   }
+  function shellQuoted(text) {
+    return "'" + String(text).replace(/'/g, "'\\''") + "'";
+  }
   function receiverRoad(base, key, doc, id, sample) {
     const name = receiverNameFor(doc, id);
     const address = base + "/v1/receive/<owner>/" + name;
@@ -5367,7 +5370,7 @@
       key,
       settings: base + "/v1/profile?tab=receivers&new=key&key=" + encodeURIComponent(key) + "&name=" + encodeURIComponent(name),
       address,
-      curl: "curl -X POST " + address + ` -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>" -d '` + JSON.stringify({ value: sample }) + "'"
+      curl: "curl -X POST " + address + ' -H "Content-Type: application/json" -H "Authorization: Bearer <the receiver key>" -d ' + shellQuoted(JSON.stringify({ value: sample }))
     };
   }
   function inwardShape(ctx) {
@@ -5410,7 +5413,7 @@
           headers: { "Content-Type": "application/json", Authorization: "Bearer <your token>" },
           body
         },
-        curl: "curl -X POST " + base + `/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d '` + JSON.stringify(body) + "'"
+        curl: "curl -X POST " + base + '/v1/memory -H "Content-Type: application/json" -H "Authorization: Bearer <your token>" -d ' + shellQuoted(JSON.stringify(body))
       },
       /**
        * The program road (2026-11-07): an outside program (a sensor, a Lambda) writes this value through

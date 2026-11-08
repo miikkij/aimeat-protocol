@@ -53,3 +53,14 @@ def connector_node_url() -> str | None:
         return None
     match = _NODE_URL_LINE.search(text)
     return match.group(1).rstrip("/") if match else None
+
+
+def read_config_scalar(path: Path, key: str) -> str | None:
+    """One top-level scalar (``node_url``, ``agent``, ``owner``) of a connector ``config.yaml``, or
+    None when the file or the line is missing. The same pattern as ``connector_node_url``."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(rf"""^{re.escape(key)}:\s*['"]?([^'"\s#]+)""", text, re.MULTILINE)
+    return match.group(1) if match else None
