@@ -7,6 +7,9 @@
  *   with an empty template pulses to completion without one, which is exactly what makes the scan
  *   path testable.
  * @version-history
+ *   2026-11-08 -- The owner's allowance for a config another account published holds for that content:
+ *     the member's next publish of other sections calls no AI until the owner allows it again with one
+ *     press (secaudit2026nov08 round 14, living-pulse-spend.ts:allowLivingSpend:allowance-bound-to-spender-not-config-content).
  *   2026-11-02 -- A config a member of another account published over gathers nothing and calls no AI
  *     until the owner allows it; a draft of that member the owner publishes calls the AI as before
  *     (secaudit2026nov02d round 13, publishDraft:cross-account-living-config-outside-pulse-spend-tally).
@@ -413,6 +416,52 @@ await test('Usage: a draft of another account that the owner publishes is the ow
     const events = await ledgerEvents('xown');
     assert(events.some(e => AI_ATTEMPT.includes(e)) && !events.includes('derive-waiting'), `the owner's publish did not call the AI as before: ${JSON.stringify(events)}`);
     assert(!(await spendAsks()).some(q => q.target?.key === spendKey('xown')), 'asked about the owner\'s own publish');
+});
+
+// ── The owner's allowance holds for the content the owner was asked about (secaudit2026nov08 round 14) ──
+// The allowance was stored per writer, so after one press the same member could publish new sections,
+// which choose what of the owner's material the pulse searches and copies, and the pulse ran them on the
+// owner's reach and AI with no new question.
+const countOf = (events: string[], wanted: string[]) => events.filter(e => wanted.includes(e)).length;
+
+await test('Usage: after the owner allows the other account\'s config, the next pulse calls the AI', async () => {
+    const ask = (await spendAsks()).find(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner');
+    assert(!!ask, 'the question is there');
+    const yes = await json(`/v1/publish-requests/${ask.id}/decision`, { method: 'POST', headers: auth(token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve: ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    await new Promise(r => setTimeout(r, 50));
+    const before = countOf(await ledgerEvents('xacct'), AI_ATTEMPT);
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xacct'), AI_ATTEMPT) > before, 'the allowed config did not call the AI');
+    await triggerPulse();
+    assert(!(await spendAsks()).some(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner'), 'the pulse asked again with nothing changed');
+});
+
+await test('Refused: when that member publishes other sections, the pulse calls no AI and asks the owner again with one press', async () => {
+    const d = await json('/v1/memory', { method: 'POST', headers: auth(bobToken), body: JSON.stringify({
+        key: `organism.${orgId}.w.${WS}.living.xacct.draft`, value: { ...spendConfig('xacct'), template: [{ slot: 'b', section: `${spendWord('xacct')} changed` }] }, visibility: 'private' }) });
+    assert(d.status === 201 || d.status === 200, `draft: ${d.status}: ${JSON.stringify(d.body.error)}`);
+    const p = await publishAs(bobToken, 'xacct');
+    assert(p.status === 200, `publish: ${p.status}: ${JSON.stringify(p.body.error)}`);
+    const before = await ledgerEvents('xacct');
+    await triggerPulse();
+    const after = await ledgerEvents('xacct');
+    assert(countOf(after, AI_ATTEMPT) === countOf(before, AI_ATTEMPT), `the pulse called the owner's AI for the changed config: ${JSON.stringify(after)}`);
+    assert(countOf(after, ['derive-waiting']) > countOf(before, ['derive-waiting']), `the ledger says the section waits: ${JSON.stringify(after)}`);
+    const waiting = (await spendAsks()).filter(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner');
+    assert(waiting.length === 1, `one new waiting question: ${JSON.stringify(waiting)}`);
+    assert(String(waiting[0].requested_by?.principal ?? '').startsWith(`${bobName}@`), `the question names the member: ${JSON.stringify(waiting[0].requested_by)}`);
+});
+
+await test('Usage: the owner allows the changed config with one press, and the next pulse calls the AI', async () => {
+    const ask = (await spendAsks()).find(q => q.target?.key === spendKey('xacct') && q.state === 'awaiting_owner');
+    assert(!!ask, 'the new question is there');
+    const yes = await json(`/v1/publish-requests/${ask.id}/decision`, { method: 'POST', headers: auth(token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve: ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    await new Promise(r => setTimeout(r, 50));
+    const before = countOf(await ledgerEvents('xacct'), AI_ATTEMPT);
+    await triggerPulse();
+    assert(countOf(await ledgerEvents('xacct'), AI_ATTEMPT) > before, 'the allowed changed config did not call the AI');
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

@@ -11867,6 +11867,8 @@
   "notiftext.approval_goal_model_spend.body": "{agent} added the task \"{work}\" to your goal \"{goal}\" for AIMEAT's AI. {agent} may not use your AI itself, so the cost of the task waits for you. If you allow it, the AI does this task and the AI tasks {agent} adds to this goal later. If you do not, this task is not done.",
   "notiftext.approval_living_ai_spend.title": "{who} set up a living document that would use your AI",
   "notiftext.approval_living_ai_spend.body": "{writer} set up the living document \"{document}\". It updates itself with your AI, and you pay for it from your own key or your AI allowance. {writer} may not use your AI itself, so the update waits for you. If you allow it, the document updates itself on its schedule. If you do not, the AI does not update it and nothing is spent.",
+  "notiftext.approval_living_ai_spend_changed.title": "{who} changed a living document that uses your AI",
+  "notiftext.approval_living_ai_spend_changed.body": "{writer} changed the living document \"{document}\" after you allowed it to update itself with your AI. The sections of {writer} choose what of your material the document searches and copies into the workspace, so you are asked again. If you allow it, the document updates itself on its schedule, at your cost. If you do not, the AI does not update it and nothing is spent.",
   "notiftext.approval_company_page_write.title": "{who} asks to change the web page of your company {company}",
   "notiftext.approval_company_page_write.body": "{writer} tried to save a new web page for your company {company}. Everyone sees this page at the company's address. {writer} may save your files, but it may not change your companies' web pages. If you allow it, {writer} can change and remove this company's web page from now on. If you do not, the page stays as it is.",
   "notiftext.approval_mcp_capability_use.title": "{who} asks to use your own sign-in at {server} for a tool from {publisher}",
@@ -28773,6 +28775,17 @@
         "high": "The AI does not update the document. Nothing is spent.",
         "tipLabel": "When to allow",
         "tip": "Allow if you want this document to stay current. If the agent or app may always use your AI, give it that permission, and then it no longer asks."
+      },
+      "approval_living_ai_spend_changed": {
+        "title": "A living document changed after you allowed it",
+        "short": "A person of another account changed a living document that your AI updates, after you allowed it.",
+        "what": "A living document updates its sections on a schedule with your AI, at your cost. Its sections choose what of your material it searches and copies into the shared workspace. You allowed this document before. The person who set it up changed it after that, so your earlier answer does not cover the new version. That is why you are asked again.",
+        "lowLabel": "If you allow",
+        "low": "The changed document updates itself on its schedule, at your cost.",
+        "highLabel": "If you do not allow",
+        "high": "The AI does not update the document. Nothing is spent.",
+        "tipLabel": "When to allow",
+        "tip": "Open the document and read its sections first. Allow if you want it to search your material for these sections."
       },
       "approval_company_page_write": {
         "title": "An app asks to change your company's web page",

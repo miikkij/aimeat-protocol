@@ -12604,6 +12604,8 @@
   "notiftext.approval_goal_model_spend.body": "{agent} lisäsi tavoitteeseesi ”{goal}” tehtävän ”{work}” AIMEATin tekoälylle. {agent} ei itse saa käyttää tekoälyäsi, joten tehtävän kulu odottaa sinun päätöstäsi. Jos sallit, tekoäly tekee tämän tehtävän ja ne tekoälytehtävät, jotka {agent} lisää tähän tavoitteeseen myöhemmin. Jos et salli, tätä tehtävää ei tehdä.",
   "notiftext.approval_living_ai_spend.title": "{who} loi elävän dokumentin, joka käyttäisi tekoälyäsi",
   "notiftext.approval_living_ai_spend.body": "{writer} loi elävän dokumentin ”{document}”. Dokumentti päivittyy tekoälysi avulla, ja sinä maksat sen omalla avaimellasi tai tekoälysaldostasi. {writer} ei itse saa käyttää tekoälyäsi, joten päivitys odottaa sinun päätöstäsi. Jos sallit, dokumentti päivittyy aikataulunsa mukaan. Jos et salli, tekoäly ei päivitä sitä, eikä rahaa kulu.",
+  "notiftext.approval_living_ai_spend_changed.title": "{who} muutti elävää dokumenttia, joka käyttää tekoälyäsi",
+  "notiftext.approval_living_ai_spend_changed.body": "{writer} muutti elävää dokumenttia ”{document}”, kun olit jo sallinut sen päivittyä tekoälysi avulla. {writer} valitsee osioillaan, mitä aineistostasi dokumentti hakee ja kopioi työtilaan. Siksi sinulta kysytään uudelleen. Jos sallit, dokumentti päivittyy aikataulunsa mukaan, ja sinä maksat päivitykset. Jos et salli, tekoäly ei päivitä sitä, eikä rahaa kulu.",
   "notiftext.approval_company_page_write.title": "{who} pyytää lupaa muuttaa yrityksesi {company} verkkosivua",
   "notiftext.approval_company_page_write.body": "{writer} yritti tallentaa yrityksellesi {company} uuden verkkosivun. Kaikki näkevät tämän sivun yrityksen osoitteessa. {writer} saa tallentaa tiedostojasi, mutta se ei saa muuttaa yritystesi verkkosivuja. Jos sallit, {writer} voi tästä eteenpäin muuttaa ja poistaa tämän yrityksen verkkosivun. Jos et salli, sivu pysyy ennallaan.",
   "notiftext.approval_mcp_capability_use.title": "{who} pyytää, että käyttäjän {publisher} työkalu saa käyttää kirjautumistasi palvelimella {server}",
@@ -29495,6 +29497,17 @@
         "high": "Tekoäly ei päivitä dokumenttia, eikä rahaa kulu.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos haluat dokumentin pysyvän ajan tasalla. Jos agentti tai sovellus saa aina käyttää tekoälyäsi, anna sille tämä lupa. Silloin se ei enää kysy."
+      },
+      "approval_living_ai_spend_changed": {
+        "title": "Elävä dokumentti muuttui, kun olit jo sallinut sen",
+        "short": "Toisen tilin käyttäjä muutti elävää dokumenttia, jota tekoälysi päivittää. Olit jo sallinut dokumentin.",
+        "what": "Elävä dokumentti päivittää osionsa aikataulun mukaan tekoälysi avulla, ja sinä maksat päivitykset. Osiot ratkaisevat, mitä aineistostasi dokumentti hakee ja kopioi yhteiseen työtilaan. Sallit tämän dokumentin aiemmin. Dokumentin tekijä muutti sitä sen jälkeen, joten aiempi vastauksesi ei koske uutta versiota. Siksi sinulta kysytään uudelleen.",
+        "lowLabel": "Jos sallit",
+        "low": "Muutettu dokumentti päivittyy aikataulunsa mukaan. Sinä maksat päivitykset.",
+        "highLabel": "Jos et salli",
+        "high": "Tekoäly ei päivitä dokumenttia, eikä rahaa kulu.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Avaa dokumentti ja lue sen osiot ensin. Salli, jos haluat, että dokumentti hakee aineistoasi näihin osioihin."
       },
       "approval_company_page_write": {
         "title": "Sovellus pyytää lupaa muuttaa yrityksesi verkkosivua",

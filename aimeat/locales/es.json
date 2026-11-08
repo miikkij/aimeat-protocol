@@ -11318,6 +11318,8 @@
   "notiftext.approval_goal_model_spend.body": "{agent} agregó la tarea «{work}» a tu objetivo «{goal}» para la IA de AIMEAT. {agent} no puede usar tu IA por sí mismo, así que el costo de la tarea espera tu respuesta. Si lo permites, la IA hace esta tarea y las tareas de IA que {agent} agregue a este objetivo más adelante. Si no lo permites, esta tarea no se hace.",
   "notiftext.approval_living_ai_spend.title": "{who} creó un documento vivo que usaría tu IA",
   "notiftext.approval_living_ai_spend.body": "{writer} creó el documento vivo «{document}». Se actualiza con tu IA, y tú lo pagas con tu propia clave o con tu saldo de IA. {writer} no puede usar tu IA por sí mismo, así que la actualización espera tu respuesta. Si lo permites, el documento se actualiza según su horario. Si no lo permites, la IA no lo actualiza y no se gasta nada.",
+  "notiftext.approval_living_ai_spend_changed.title": "{who} cambió un documento vivo que usa tu IA",
+  "notiftext.approval_living_ai_spend_changed.body": "{writer} cambió el documento vivo «{document}» después de que permitieras que se actualizara con tu IA. Las secciones de {writer} eligen qué parte de tu material busca el documento y copia en el espacio de trabajo, así que se te pregunta de nuevo. Si lo permites, el documento se actualiza según su horario, a tu costo. Si no lo permites, la IA no lo actualiza y no se gasta nada.",
   "notiftext.approval_company_page_write.title": "{who} pide permiso para cambiar la página web de tu empresa {company}",
   "notiftext.approval_company_page_write.body": "{writer} intentó guardar una nueva página web para tu empresa {company}. Todos ven esta página en la dirección de la empresa. {writer} puede guardar tus archivos, pero no puede cambiar las páginas web de tus empresas. Si lo permites, {writer} puede cambiar y quitar la página web de esta empresa a partir de ahora. Si no lo permites, la página se queda como está.",
   "notiftext.approval_mcp_capability_use.title": "{who} pide que una herramienta de {publisher} use tu propia sesión en {server}",
@@ -27136,6 +27138,17 @@
         "high": "La IA no actualiza el documento. No se gasta nada.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si quieres que este documento esté al día. Si el agente o la aplicación siempre puede usar tu IA, dale ese permiso, y así ya no pregunta."
+      },
+      "approval_living_ai_spend_changed": {
+        "title": "Un documento vivo cambió después de que lo permitieras",
+        "short": "Una persona de otra cuenta cambió un documento vivo que tu IA actualiza, después de que lo permitieras.",
+        "what": "Un documento vivo actualiza sus secciones según un horario con tu IA, y tú pagas cada actualización. Sus secciones eligen qué parte de tu material busca y copia en el espacio de trabajo compartido. Ya permitiste este documento. La persona que lo creó lo cambió después, así que tu respuesta anterior no cubre la nueva versión. Por eso se te pregunta de nuevo.",
+        "lowLabel": "Si lo permites",
+        "low": "El documento cambiado se actualiza según su horario, a tu costo.",
+        "highLabel": "Si no lo permites",
+        "high": "La IA no actualiza el documento. No se gasta nada.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Abre el documento y lee primero sus secciones. Permítelo si quieres que busque tu material para estas secciones."
       },
       "approval_company_page_write": {
         "title": "Una aplicación pide cambiar la página web de tu empresa",

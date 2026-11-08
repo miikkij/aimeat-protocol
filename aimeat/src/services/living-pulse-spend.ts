@@ -26,13 +26,20 @@
  *   save of the config, or ai:use given to the writer, lets it run.
  *
  *   THE RECORD is service-owned (utils/reserved-keys.ts `living-spend-hold.`), one per config in the
- *   owner's GHII namespace: { spenders: { <principal>: { allowedAt?, declinedAt?, waiting? } } }.
- * @structure LIVING_SPEND_HOLD_PREFIX · LIVING_AI_SCOPE · livingSpendHoldKey · pulseSpender ·
- *   spenderMayUseAi · livingSpendHold · allowLivingSpend
+ *   owner's GHII namespace: { spenders: { <principal>: { allowedAt?, allowedFor?, declinedAt?, waiting? } } }.
+ * @structure LIVING_SPEND_HOLD_PREFIX · LIVING_AI_SCOPE · livingSpendHoldKey · livingConfigContent ·
+ *   pulseSpender · spenderMayUseAi · livingSpendHold · allowLivingSpend
  * @usage
  *   const held = await livingSpendHold(deps, ownerGhii, holder, configKey, title);   // before the model is called
  *   if (held) { ...skip the derive, note held.requestId... }
  * @version-history
+ *   v1.2.0 -- 2026-11-08 -- The owner's allowance for a writer of another account holds for the config
+ *     content the owner was asked about (livingConfigContent: everything but the pulse's own `status`),
+ *     not for the writer: when that writer publishes other content, the next pulse holds again and asks
+ *     the owner once more with one press, saying the document changed. An allowance stored before binds
+ *     to the content in force at its first pulse after the update. The question says the writer's
+ *     sections choose what of the owner's material is searched and copied (secaudit2026nov08 round 14,
+ *     living-pulse-spend.ts:allowLivingSpend:allowance-bound-to-spender-not-config-content).
  *   v1.1.0 -- 2026-11-02 -- A member of another account who published over the owner's config is its
  *     latest writer (the publish records the publisher in the tally), and such a writer never spends the
  *     owner's AI without the owner's one press; the living pulse reads and asks nothing for it until
@@ -40,7 +47,9 @@
  *     publishDraft:cross-account-living-config-outside-pulse-spend-tally).
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10, f-2026aug-ai-paths-3).
  */
+import { createHash } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { canonicalJson } from '../utils/memory-content.js';
 import type { AimeatConfig } from '../config.js';
 import { appSlug, isGEAI, isSameOwner, localAccountName, parseGAII, parseGaiiLoose } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -56,7 +65,12 @@ export const LIVING_SPEND_HOLD_PREFIX = 'living-spend-hold.';
 export const LIVING_AI_SCOPE = 'ai:use';
 
 type Deps = { storage: Storage; config: AimeatConfig };
-interface SpenderState { allowedAt?: string; declinedAt?: string; waiting?: { requestId: string; at: string } }
+/**
+ * `allowedFor` is the content the owner allowed (livingConfigContent) when the writer is of another
+ * account: a later publish of other content by that writer asks again. An allowance stored before
+ * this field binds to the content in force at its first pulse after the update.
+ */
+interface SpenderState { allowedAt?: string; allowedFor?: string; declinedAt?: string; waiting?: { requestId: string; at: string } }
 interface Hold { spenders: Record<string, SpenderState> }
 
 export const livingSpendHoldKey = (configKey: string): string => `${LIVING_SPEND_HOLD_PREFIX}${configKey}`;
@@ -65,6 +79,18 @@ const parseHold = (v: unknown): Hold => {
   return { spenders: s && typeof s === 'object' ? { ...(s as Record<string, SpenderState>) } : {} };
 };
 const ownerGhiiOf = (deps: Deps, holder: string) => `${localAccountName(holder)}@${deps.config.nodeId}`;
+
+/**
+ * What a config says, as one hash: everything but `status`, which the pulse itself rewrites on every
+ * run. Its sections, charter and title decide what of the owner's material is searched and copied and
+ * what the owner's AI is asked, so the owner's allowance holds for this content and no other.
+ */
+export function livingConfigContent(value: unknown): string {
+  const rest = value && typeof value === 'object' && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([k]) => k !== 'status'))
+    : value;
+  return 'sha256:' + createHash('sha256').update(canonicalJson(rest ?? null)).digest('hex');
+}
 
 /** An agent or app principal of `owner` on this node: `name#owner@node` or `eco:name#owner@node`. */
 function ownPrincipal(principal: string, owner: string, nodeId: string): boolean {
@@ -137,8 +163,23 @@ export async function livingSpendHold(
     if (!spender || await spenderMayUseAi(deps, spender, holder)) return null;
     const ownerGhii = ownerGhiiOf(deps, holder);
     const hold = parseHold((await deps.storage.getMemory(ownerGhii, livingSpendHoldKey(configKey)))?.value);
-    const state = hold.spenders[spender] ?? {};
-    if (state.allowedAt) return null;
+    let state = hold.spenders[spender] ?? {};
+    // A writer of another account: the allowance holds for the content the owner was asked about.
+    // Another publish of theirs is a new question (secaudit2026nov08 round 14).
+    const otherAccount = spenderOfOtherAccount(deps, holder, spender);
+    const content = otherAccount ? livingConfigContent((await deps.storage.getMemory(holder, configKey))?.value) : undefined;
+    let changed = false;
+    if (state.allowedAt) {
+      if (!otherAccount || state.allowedFor === content) return null;
+      if (!state.allowedFor) {
+        // Allowed before the allowance named its content: it holds for what is in force now.
+        await writeHold(deps, ownerGhii, configKey, cur => (cur.spenders[spender]?.allowedAt && !cur.spenders[spender]!.allowedFor
+          ? { spenders: { ...cur.spenders, [spender]: { ...cur.spenders[spender], allowedFor: content } } } : UNCHANGED));
+        return null;
+      }
+      changed = true;
+      state = {};
+    }
     if (state.declinedAt) return { requestId: null, declined: true };
     if (state.waiting) {
       const request = await readPublishRequest(deps.storage, ownerGhii, state.waiting.requestId);
@@ -153,17 +194,19 @@ export async function livingSpendHold(
     const kind = isGEAI(spender) ? 'app' : spender.includes('#') ? 'agent' : 'person';
     const filed = await fileAsk(deps, localAccountName(holder), { principal: spender, kind, sub: spender }, {
       kind: 'living-ai-spend',
-      target: { key: configKey, holder, spender },
+      target: { key: configKey, holder, spender, ...(content ? { content } : {}) },
       title: `the living document "${title}" refreshing itself with your AI`,
       name: title,
       change: { field: 'living.ai.spend', from: null, to: 'allowed' },
       approval: {
         approver: 'owner',
         asks: `let the living document "${title}" refresh itself with your AI, at your cost`,
-        why: `${who} set up this living document, and ${who} does not have the permission to use your AI, so it may not spend your AI allowance or your key itself. `
+        why: (changed ? `${who} changed this living document after you allowed it. ` : '')
+          + `${who} set up this living document, and ${who} does not have the permission to use your AI, so it may not spend your AI allowance or your key itself. `
+          + (otherAccount ? `${who}'s sections choose what of your material the document searches and copies into the workspace. ` : '')
           + 'If you do not allow it, the document is not refreshed by the AI. Nothing is spent.',
         approve_scope: LIVING_AI_SCOPE,
-        i18n: { key: 'approval_living_ai_spend', vars: { writer: who, document: title } },
+        i18n: { key: changed ? 'approval_living_ai_spend_changed' : 'approval_living_ai_spend', vars: { writer: who, document: title } },
       },
     });
     if (!filed.ok) return { requestId: null, declined: false };
@@ -176,8 +219,14 @@ export async function livingSpendHold(
   }
 }
 
-/** The owner allowed `spender` to spend for this config (apply-living-ai-spend.ts). */
-export async function allowLivingSpend(deps: Deps, holder: string, configKey: string, spender: string, requestId: string): Promise<boolean> {
+/**
+ * The owner allowed `spender` to spend for this config (apply-living-ai-spend.ts). `content` is the
+ * config content the request asked about (livingConfigContent), named when the writer is of another
+ * account; the allowance holds for that content only.
+ */
+export async function allowLivingSpend(
+  deps: Deps, holder: string, configKey: string, spender: string, requestId: string, content?: string,
+): Promise<boolean> {
   const ownerGhii = ownerGhiiOf(deps, holder);
   if (!(await deps.storage.getMemory(holder, configKey))) return false;
   let changed = false;
@@ -186,7 +235,7 @@ export async function allowLivingSpend(deps: Deps, holder: string, configKey: st
     if (s?.allowedAt) return UNCHANGED;
     if (s?.waiting && s.waiting.requestId !== requestId) return UNCHANGED;
     changed = true;
-    return { spenders: { ...cur.spenders, [spender]: { allowedAt: new Date().toISOString() } } };
+    return { spenders: { ...cur.spenders, [spender]: { allowedAt: new Date().toISOString(), ...(content ? { allowedFor: content } : {}) } } };
   });
   return changed;
 }
