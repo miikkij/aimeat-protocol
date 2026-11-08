@@ -10,6 +10,7 @@
  * @structure ephemeralClaimMethods
  * @usage Object.assign(PostgresKyselyStorage.prototype, ephemeralClaimMethods) in ../index.ts
  * @version-history
+ *   2026-11-08 — releaseEphemeralCounter (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-04 — Initial (codebase analysis 2026-11-03, high-availability stage 2).
  */
 import { sql } from 'kysely';
@@ -85,6 +86,15 @@ export const ephemeralClaimMethods = {
       .returning(['count', 'expiresAt'])
       .executeTakeFirstOrThrow();
     return { count: n(row.count), expiresAt: n(row.expiresAt) };
+  },
+
+  async releaseEphemeralCounter(this: PostgresKyselyStorage, kind: string, id: string, now: number): Promise<void> {
+    await this.db.updateTable('EphemeralClaim')
+      .set({ count: sql`"count" - 1` })
+      .where('kind', '=', kind).where('id', '=', id)
+      .where(sql<boolean>`"count" > 0`)
+      .where('expiresAt', '>', String(now))
+      .execute();
   },
 
   async readEphemeralCounter(this: PostgresKyselyStorage, kind: string, id: string): Promise<EphemeralCount | null> {
