@@ -25,6 +25,8 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-11-08 — livingSpendHold takes the config the pulse runs, so the owner's allowance for a writer
+ *     of another account is matched against exactly that content (secaudit2026nov08 round 14).
  *   2026-11-04 — No plain setMemory for a storage without setMemoryIfVersion or createMemoryIfAbsent:
  *     both are required on Storage (codebase analysis 2026-11-03, item D-e).
  *   2026-11-04 — The retirement notice goes through mail-gate.ts sendMail as an owner mail (codebase analysis 2026-11-03, item B3).
@@ -442,7 +444,7 @@ export async function pulseInstanceServer(
   // the gather would copy the owner's material into the shared workspace for that member's sections.
   const latestSpender = await pulseSpender({ storage, config }, ownerGaii, configKey(loc));
   const foreignWriter = !!latestSpender && spenderOfOtherAccount({ storage, config }, ownerGaii, latestSpender);
-  if (foreignWriter) spendHold = await livingSpendHold({ storage, config }, ownerGaii, configKey(loc), String(cfg.title || 'Living document'));
+  if (foreignWriter) spendHold = await livingSpendHold({ storage, config }, ownerGaii, configKey(loc), String(cfg.title || 'Living document'), cfg);
 
   for (const sec of sections) {
     const slot = String(sec.slot);
@@ -489,7 +491,7 @@ export async function pulseInstanceServer(
     if (!active.length) continue;
     // The owner's AI is called for the owner's own config or a writer that may use it (ai:use);
     // otherwise the owner is asked once and the section waits (living-pulse-spend.ts).
-    if (spendHold === undefined) spendHold = await livingSpendHold({ storage, config }, ownerGaii, configKey(loc), String(cfg.title || 'Living document'));
+    if (spendHold === undefined) spendHold = await livingSpendHold({ storage, config }, ownerGaii, configKey(loc), String(cfg.title || 'Living document'), cfg);
     if (spendHold) {
       await addLedger(storage, ownerGaii, loc, { event: 'derive-waiting', slot, request_id: spendHold.requestId, declined: spendHold.declined });
       continue;

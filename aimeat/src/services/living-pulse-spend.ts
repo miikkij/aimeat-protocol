@@ -30,7 +30,7 @@
  * @structure LIVING_SPEND_HOLD_PREFIX · LIVING_AI_SCOPE · livingSpendHoldKey · livingConfigContent ·
  *   pulseSpender · spenderMayUseAi · livingSpendHold · allowLivingSpend
  * @usage
- *   const held = await livingSpendHold(deps, ownerGhii, holder, configKey, title);   // before the model is called
+ *   const held = await livingSpendHold(deps, holder, configKey, title, cfg);   // before the model is called
  *   if (held) { ...skip the derive, note held.requestId... }
  * @version-history
  *   v1.2.0 -- 2026-11-08 -- The owner's allowance for a writer of another account holds for the config
@@ -157,6 +157,8 @@ const nameOf = (principal: string) => parseGaiiLoose(principal).agent || localAc
  */
 export async function livingSpendHold(
   deps: Deps, holder: string, configKey: string, title: string,
+  /** The config value the pulse runs: an allowance of a writer of another account holds for its content. */
+  cfg: unknown,
 ): Promise<{ requestId: string | null; declined: boolean } | null> {
   try {
     const spender = await pulseSpender(deps, holder, configKey);
@@ -167,7 +169,7 @@ export async function livingSpendHold(
     // A writer of another account: the allowance holds for the content the owner was asked about.
     // Another publish of theirs is a new question (secaudit2026nov08 round 14).
     const otherAccount = spenderOfOtherAccount(deps, holder, spender);
-    const content = otherAccount ? livingConfigContent((await deps.storage.getMemory(holder, configKey))?.value) : undefined;
+    const content = otherAccount ? livingConfigContent(cfg) : undefined;
     let changed = false;
     if (state.allowedAt) {
       if (!otherAccount || state.allowedFor === content) return null;
