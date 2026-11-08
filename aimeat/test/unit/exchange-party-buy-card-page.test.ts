@@ -17,6 +17,8 @@
  *   sale behind the refund.
  * @usage cd aimeat && pnpm exec vitest run test/unit/exchange-party-buy-card-page.test.ts
  * @version-history
+ *   2026-11-08 -- A card page paid for a provider deactivated since is refunded, and the refusal names
+ *     the deactivation (secaudit2026nov08b round 15).
  *   v1.0.0 — 2026-11-03 — Initial (secaudit2026nov02d round 13b, party-buy).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -196,6 +198,24 @@ describe('paid on the card page inside the hour, back after it', () => {
         expect(refunds.length, 'the card payment for a delisted offering was kept').toBe(1);
         expect(!r.ok && r.message).toMatch(/the payment was refunded\.$/);
         expect(await remaining('delisted')).toBe(0);
+    });
+
+    it('money paid on the card page for a provider deactivated since goes back, and the refusal names the deactivation', async () => {
+        // secaudit2026nov08b round 15: every read of a deactivated provider's party is refused, so the
+        // completion takes the refund an offering that cannot be sold takes.
+        const uid = await renewingParty('deactivated');
+        const id = await seed({ name: 'deactivated', renewalOf: uid });
+        const realGetOwner = storage.getOwner.bind(storage);
+        vi.spyOn(storage, 'getOwner').mockImplementation(async (name: string) => (
+            name === OWNER ? { ...((await realGetOwner(name)) ?? { name: OWNER }), disabledAt: '2026-11-08T10:00:00.000Z' } as never : realGetOwner(name)));
+        stripeSays('cs_deactivated', id);
+        const r = await returns(id, 'cs_deactivated');
+        expect(!r.ok && r.code).toBe('ACCOUNT_DISABLED');
+        expect(refunds.length, 'the card payment for a deactivated provider was kept').toBe(1);
+        expect(!r.ok && r.message).toMatch(/deactivated on 2026-11-08/);
+        expect(!r.ok && r.message).toMatch(/the payment was refunded\.$/);
+        expect(await remaining('deactivated')).toBe(0);
+        expect((await readPartyPurchase(storage, NODE, id))?.status).toBe('open');
     });
 
     it('designed use: a buyer who comes back inside the hour completes as before', async () => {
