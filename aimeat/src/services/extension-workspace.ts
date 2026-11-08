@@ -55,6 +55,9 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.8.0 — 2026-11-08 — `trail`: get() and the row calls record the label addresses of what they
+ *     returned, so a package the run publishes keeps those labels (secaudit2026nov08b round 15,
+ *     datapackage/ext-capability:publish-drops-label-source-of-run-reads).
  *   v1.7.0 — 2026-10-18 — A person's own call to an extension that can reach no model writes the
  *     person's text, without the node's AI stamp (guard 5). A client typed "Toimii!!" into an app
  *     and the record said AI had produced it and nobody had read it
@@ -107,6 +110,7 @@ import { extensionMarker, fencedSpaceRefusal } from './fenced-space.js';
 import { emitChange, emitWorkspaceChange } from './event-bus.js';
 import { isNonHumanPrincipal } from './ai/provenance.js';
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
+import { tracedReader, type LabelTrail } from './datapackage/label-trail.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)
 // is the leaf module extension-workspace-declaration.ts, so the manifest builder and the CRUD
@@ -143,6 +147,9 @@ export interface ExtensionWorkspaceDeps {
     /** The extension holds the `ai` or the `network` capability, so its script may have had a model
      *  produce what it writes (guard 5). */
     reachesModel: boolean;
+    /** The run's label trail: what get() and the row calls read is recorded, so a package the run
+     *  publishes keeps those labels (datapackage/label-trail.ts). Absent records nothing. */
+    trail?: LabelTrail;
 }
 
 export interface ExtensionWorkspaceCapability {
@@ -173,8 +180,11 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
     // own call nothing at all (guard 5).
     const through = extensionMarker(deps.installer, extName);
     const opsCaller: WorkspaceOpsCaller = workspaceCallerOf({ principal: caller.gaii, ownerName: caller.owner, roles: caller.roles, scopes: caller.scopes, extension: through }, config);
-    // The classification reader of the caller who invoked the action (TARGET-082).
+    // The classification reader of the caller who invoked the action (TARGET-082). The content reads
+    // (get, the row calls) record what they returned in the run's label trail; the index lists ids
+    // and copies nothing.
     const reader = readerForCaller({ storage, config }, caller);
+    const contentReader = tracedReader(reader, deps.trail);
     let last: ExtensionWorkspaceRefusal | null = null;
 
     const refuse = (status: number, code: string, message: string): never => {
@@ -225,7 +235,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         get: async (organismId, ws, ids, opts) => {
             allow('read');
             if (!Array.isArray(ids) || ids.length === 0) refuse(400, 'INVALID_INPUT', 'get() needs a non-empty array of instance ids');
-            return settle(await readWorkspaceOp(ops, opsCaller, { organismId, ws, ids: ids.map(String), space: opts?.space, reader }));
+            return settle(await readWorkspaceOp(ops, opsCaller, { organismId, ws, ids: ids.map(String), space: opts?.space, reader: contentReader }));
         },
         write: async (organismId, ws, space, id, value, opts) => {
             allow('write');
@@ -280,7 +290,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             if (r.ok) { emitChange('organisms'); emitWorkspaceChange(organismId, ws); }
             return settle(r);
         },
-        ...buildRowCalls({ config, storage, extName, installer: deps.installer, declaration, reader, refuse }),
+        ...buildRowCalls({ config, storage, extName, installer: deps.installer, declaration, reader: contentReader, refuse }),
     };
 
     return { workspace, lastRefusal: () => last };
@@ -292,6 +302,7 @@ export interface AttachExtensionWorkspaceArgs {
     ext: Pick<ExtensionRecord, 'name' | 'config' | 'installedBy' | 'actions' | 'limits'>;
     actionId: string;
     caller: { gaii: string; owner: string; roles: string[]; scopes: string[] };
+    trail?: LabelTrail;
 }
 
 /** What a road hands to buildExtensionCtx: the capability when the manifest declares it, and
@@ -305,6 +316,7 @@ export function attachExtensionWorkspace(args: AttachExtensionWorkspaceArgs): Pa
     return buildExtensionWorkspace({
         config: args.config, storage: args.storage, extName: args.ext.name, actionId: args.actionId,
         declaration, installer: args.ext.installedBy, caller: args.caller, reachesModel: caps.ai || caps.network,
+        ...(args.trail ? { trail: args.trail } : {}),
     });
 }
 

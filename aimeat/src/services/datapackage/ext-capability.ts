@@ -28,11 +28,19 @@
  *   publish gate about the principals behind the run (`publishers`, services/publish-actors.ts), as
  *   POST /v1/datapackages asks about its caller. One the owner is asked about gets the version
  *   published at the level the package had and a request filed, returned as `publishRequest`.
+ *
+ *   THE VERSION KEEPS THE LABELS OF WHAT THE RUN READ. The rows cross by value, so the node cannot
+ *   tell which read they came from; the run's label trail (./label-trail.ts) is recorded as the
+ *   version's label source, as a data product records its sources' (./source-labels.ts).
  * @structure makeExtensionDataPackage — the ctx.datapackage factory
  * @usage
  *   const datapackage = makeExtensionDataPackage({ storage, config, ownerGhii, producedBy, publishers });
  *   const ctx = buildExtensionCtx({ …, datapackage });
  * @version-history
+ *   v1.4.0 -- 2026-11-08 -- `trail`: publish() records the labels of what the run read through ctx as
+ *     the version's label source, so a reader those labels keep out reads no row of it; rows() adds the
+ *     version it read (secaudit2026nov08b round 15,
+ *     datapackage/ext-capability:publish-drops-label-source-of-run-reads).
  *   v1.3.0 -- 2026-10-22 -- `reader` and `narrowedNote`: an unattended run the owner set to read as
  *     its installer opens and reads packages as that principal, and a package the owner in person
  *     could open but the narrowed principal may not is refused with the note, as ctx.files refuses a
@@ -52,7 +60,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { PublishInput, TableSchema } from './contract.js';
 import { inferSchema, validateRows, type ValidationIssue } from './table.js';
-import { openPackage, publishPackage, readRows, recordFailure, type ProducedBy } from './store.js';
+import { openPackage, parseRef, publishPackage, readRows, recordFailure, type ProducedBy } from './store.js';
+import { packageCopyTargets, versionSourceTargets } from './source-labels.js';
+import type { LabelTrail } from './label-trail.js';
 import { ownerAuthOf, type DatapackageReader } from './audience.js';
 import { datapackageGateOf, fileDatapackageAsk } from './publish-ask.js';
 import { askActors, type PublishActor } from '../publish-actors.js';
@@ -114,6 +124,11 @@ export function makeExtensionDataPackage(deps: {
     reader?: DatapackageReader;
     /** Said in the refusal when `reader` is what kept a package out, so the owner can change it. */
     narrowedNote?: string;
+    /**
+     * The run's label trail (./label-trail.ts): what the run read through ctx, recorded as the label
+     * source of every version publish() makes. rows() adds the version it read. Absent records nothing.
+     */
+    trail?: LabelTrail;
 }): ExtensionDataPackage {
     const { config, storage, ownerGhii, producedBy } = deps;
     const store = { storage, config };
@@ -142,7 +157,11 @@ export function makeExtensionDataPackage(deps: {
                 : null;
             if (gate?.kind === 'refused') throw new Error(`${gate.code}: ${gate.message}`);
             const level = gate?.kind === 'go' ? gate.visibility : undefined;
-            const out = await publishPackage(store, ownerGhii, level !== undefined ? { ...input, visibility: level } : input, producedBy);
+            // The version keeps the labels of what this run read (./label-trail.ts, ./source-labels.ts).
+            // A run that read nothing labelled records nothing, as before.
+            const labelSource = deps.trail ? await versionSourceTargets(store, deps.trail.targets()) : null;
+            const out = await publishPackage(store, ownerGhii, level !== undefined ? { ...input, visibility: level } : input, producedBy,
+                labelSource ? { labelSource } : {});
             if (!out.ok) {
                 // THROW, do not return a verdict. See the file header: an unattended road records a
                 // normal return as success, so a returned refusal is a green run that published
@@ -201,6 +220,14 @@ export function makeExtensionDataPackage(deps: {
         async rows(ref, resource, opts) {
             const out = await readRows(store, String(ref || ''), config.nodeId, String(resource || ''), opts ?? {}, readAs);
             if (!out) await refuseIfNarrowed(String(ref || ''));
+            // The version read and its file join the run's label trail.
+            if (out && deps.trail) {
+                const parsed = parseRef(String(ref || ''), config.nodeId);
+                const opened = parsed ? await openPackage(store, String(ref || ''), config.nodeId, readAs) : null;
+                if (parsed && opened) {
+                    await deps.trail.add(await packageCopyTargets(storage, parsed.ownerGhii, parsed.name, opened.descriptor.aimeat.contentHash, String(resource || '')));
+                }
+            }
             return out;
         },
 

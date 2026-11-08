@@ -52,6 +52,9 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.11.0 -- 2026-11-08 -- One label trail per run, shared by the row calls, ctx.files and
+ *     ctx.datapackage: a package the run publishes keeps the labels of what it read, and the result
+ *     names them (labelSources) for a data product's extension source (secaudit2026nov08b round 15).
  *   v1.10.2 -- 2026-11-01 -- ctx.datapackage's producer names the extension, for the personal-data check
  *     of a public publish (services/datapackage/personal-guard.ts; plan doc-mvwxcas3dom3, D1.7).
  *   v1.10.1 -- 2026-10-25 -- The extension is found through services/component-address.ts, the owner's
@@ -97,7 +100,7 @@
  *     the workflow engine gained an `extension` step and would otherwise have grown the second copy.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord, ContentLabelTarget } from '../storage/interface.js';
 import { isGEAI } from '../utils/gaii.js';
 import { saverAuthority } from './workflow/trigger-authority.js';
 import { executeExtensionAction } from './extension-runtime.js';
@@ -109,6 +112,7 @@ import type { ExtensionCtxDeps } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
 import { buildUnattendedExtensionWorkspace } from './extension-workspace-rows.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
+import { makeLabelTrail } from './datapackage/label-trail.js';
 import { installerActor, type PublishActor } from './publish-actors.js';
 import { getEncryptionKey } from './encryption.js';
 import { findExtension, extensionHoldersOf } from './component-address.js';
@@ -190,6 +194,9 @@ export interface SystemRunResult {
     result: unknown;
     reads: string[];
     writes: string[];
+    /** The label addresses of what the run read (services/datapackage/label-trail.ts), for a caller
+     *  that copies the answer into a package (a data product's extension source). */
+    labelSources?: ContentLabelTarget[];
 }
 
 /** The principal an unattended run's file reads are judged against. */
@@ -307,6 +314,10 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         };
     }
 
+    // One label trail for the run: what the row calls, ctx.files and ctx.datapackage read, so a package
+    // the run publishes keeps those labels, and the caller gets them back (labelSources) for a copy of
+    // the answer (services/datapackage/label-trail.ts).
+    const trail = makeLabelTrail({ storage, config });
     const baseCtx: ExtensionCtx = buildExtensionCtx({
         config,
         storage,
@@ -332,7 +343,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         // clock, which is what the scope guard on the attended code paths exists to refuse. The row
         // calls stand on the organism naming this extension in the space (row-service.ts,
         // authorizeExtension) and on the manifest's workspace.rows, never on the owner's session.
-        workspace: buildUnattendedExtensionWorkspace({ config, storage, ext, ownerGhii: storageOwnerGhii }).workspace,
+        workspace: buildUnattendedExtensionWorkspace({ config, storage, ext, ownerGhii: storageOwnerGhii, trail }).workspace,
         // The owner's namespace for a write, and for a read whichever authority the owner chose. See
         // the file header: handing the namespace in as the accessor was the whole defect, and which
         // principal answers the read is `unattendedReadAuthority`.
@@ -348,6 +359,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
                 narrowedNote: `This extension runs unattended with the reach of ${reader.gaii}, because you set it to read as its installer. Change it on the extension's page at /profile?tab=extensions.`,
             } : {}),
             publishers,
+            trail,
         }),
         // The deterministic producers live here, so this is the road ctx.datapackage exists for.
         // Owner namespace on both roads, and the producer block records WHICH unattended road it
@@ -369,6 +381,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
                 ...(args.producerSchedule ? { schedule: args.producerSchedule } : {}),
             },
             publishers,
+            trail,
             ...(narrowed ? {
                 reader: { sub: narrowed.gaii, owner: narrowed.owner, roles: narrowed.roles, scopes: narrowed.scopes },
                 narrowedNote: `This extension runs unattended with the reach of ${narrowed.gaii}, because you set it to read as its installer. `
@@ -405,5 +418,6 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         result,
         reads: tracked?.accessLog.reads ?? [],
         writes: tracked?.accessLog.writes ?? [],
+        labelSources: trail.targets(),
     };
 }

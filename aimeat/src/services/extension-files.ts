@@ -48,6 +48,9 @@
  *     readerGaii: installer.gaii, readerOwner: installer.owner,
  *     readerRoles: installer.roles, readerScopes: installer.scopes });
  * @version-history
+ *   v1.8.0 — 2026-11-08 — read() of a data package version's file asks the labels the version keeps, as
+ *     GET /v1/pub does, and `trail` records what read() returned, so a package the run publishes keeps
+ *     those labels (secaudit2026nov08b round 15).
  *   v1.7.0 — 2026-10-30 — read() answers the file's `visibility`, and `workspaceRef` when it is bound
  *     to workspaces, so an extension can tell whether the people it links the file for can open it.
  *   v1.6.0 — 2026-10-22 — `publishers`: a public write takes the closed node's level, the label's
@@ -86,6 +89,8 @@ import { checkStorageQuota } from './quota.js';
 import { localAccountName } from '../utils/gaii.js';
 import { readerForCaller } from './classification/reader.js';
 import { ClassificationError, fileTarget } from './classification/labels.js';
+import { fileCopyTargets, packageFileHiddenBySourceLabel } from './datapackage/source-labels.js';
+import type { LabelTrail } from './datapackage/label-trail.js';
 
 /** The warning a classified file carries when an AI caller is shown it (reader.show). */
 export interface ExtensionFileWarning { label: string; name: string; says: string }
@@ -187,6 +192,8 @@ export function makeExtensionFiles(deps: {
      * one. Absent asks nothing, as before.
      */
     publishers?: readonly PublishActor[];
+    /** The run's label trail: a file read() returns is recorded (services/datapackage/label-trail.ts). */
+    trail?: LabelTrail;
 }): {
     read(ref: string): Promise<{
         base64: string; mime: string; size: number; key: string; visibility: string; workspaceRef?: string;
@@ -245,10 +252,14 @@ export function makeExtensionFiles(deps: {
             }
             // And the classification check, as the same caller (TARGET-082): a file this caller may
             // not see is refused by name, and a warning label rides along on the answer.
+            // A data package version's file is also asked about the labels the version keeps, as
+            // GET /v1/pub asks (datapackage/source-labels.ts).
             const [shown] = await reader.show([file], () => fileTarget(gaii, key, file.workspaceRef));
-            if (!shown) {
+            if (!shown || await packageFileHiddenBySourceLabel({ storage, config }, reader, gaii, key)) {
                 throw new ClassificationError('CLASSIFIED', 403, `${gaii}/${key} is classified, and the principal this action runs for may not read it.${narrowedNote}`);
             }
+            // What the run read joins its label trail, so a package it publishes keeps these labels.
+            if (deps.trail) await deps.trail.add(await fileCopyTargets(storage, gaii, key, file.workspaceRef));
             const warning = (shown as { classificationWarning?: ExtensionFileWarning }).classificationWarning;
             if (file.size > MAX_EXT_FILE_BYTES) {
                 throw new Error(`File ${key} is ${Math.round(file.size / 1024)} kB, over the ${MAX_EXT_FILE_BYTES / 1024 / 1024} MB sandbox limit`);

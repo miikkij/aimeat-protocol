@@ -22,6 +22,9 @@
  * @usage
  *   workspace: buildUnattendedExtensionWorkspace({ config, storage, ext, ownerGhii }).workspace
  * @version-history
+ *   v1.2.0 — 2026-11-08 — `trail`: the unattended row calls record the label of every row they return,
+ *     so a package the run publishes keeps those labels (secaudit2026nov08b round 15). The label trail
+ *     imports only the classification and service-record modules, so the cycle note above holds.
  *   v1.1.0 — 2026-10-13 — `readRow`: one row by its id, null when there is none. An extension that
  *     held a row id (a tool reading one mail message) read up to five pages of rows to find it,
  *     and found nothing past the newest 500.
@@ -34,6 +37,7 @@ import type { ExtensionCtx } from './extension-runtime.js';
 import { systemReader, type ContentReader } from './classification/reader.js';
 import { workspaceDeclarationOf, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import { appendRows, readRows, readRow, WorkspaceRowError, type RowCaller } from './workspace-rows/row-service.js';
+import { tracedReader, type LabelTrail } from './datapackage/label-trail.js';
 
 /** A refusal a capability made, kept so the code path can answer with the service's status. */
 export interface ExtensionWorkspaceRefusal { status: number; code: string; message: string }
@@ -107,6 +111,8 @@ export interface UnattendedExtensionWorkspaceDeps {
     ext: Pick<ExtensionRecord, 'name' | 'config' | 'installedBy'>;
     /** The installer's GHII: whose data space the classification reader reads in. */
     ownerGhii: string;
+    /** The run's label trail: every row the row calls return is recorded (datapackage/label-trail.ts). */
+    trail?: LabelTrail;
 }
 
 /**
@@ -129,7 +135,8 @@ export function buildUnattendedExtensionWorkspace(deps: UnattendedExtensionWorks
         `Extension "${extName}" runs with nobody present here (a schedule or a workflow step), so it may only append to and read row spaces that name it. Records and documents need a caller.`);
     const rows = buildRowCalls({
         config: deps.config, storage: deps.storage, extName, installer: deps.ext.installedBy,
-        declaration, reader: systemReader({ storage: deps.storage, config: deps.config }, deps.ownerGhii), refuse,
+        // The system reader shows every row, so the trail records the label of every row read.
+        declaration, reader: tracedReader(systemReader({ storage: deps.storage, config: deps.config }, deps.ownerGhii), deps.trail), refuse,
     });
     const workspace: NonNullable<ExtensionCtx['workspace']> = {
         index: async () => unattended(),

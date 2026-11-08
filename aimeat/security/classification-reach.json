@@ -1556,6 +1556,12 @@
       },
       "why": "Reviewed 2026-11-02 (WP11), the node's own read: the names of the caller's own data product definitions (dataproducts.* keys under the caller's GHII), to mark which packages a product builds. No value is answered; the packages themselves come from visiblePackages (./visible.ts), which passes the caller's classification reader."
     },
+    "src/services/datapackage/source-labels.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-11-08 (secaudit2026nov08b round 15), the node's own read: the metadata of a data package version's resource file (packageCopyTargets), only for its workspaceRef, to name the file's label address beside the version's label source. No bytes are read and nothing of the file is answered; the rows the caller copies were read before through loadResourceRows, which passes the caller's classification reader."
+    },
     "src/services/datapackage/store.ts": {
       "reads": {
         "getStorageFileMeta": 1,
