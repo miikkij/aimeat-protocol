@@ -25,7 +25,9 @@
  *                            is split into parts. Seeded under the owner when a context that
  *                            references them is seeded.
  *     tasks.json             [{ id, prompt, seed: [slug...], expect?: { all?: string[][],
- *                            none?: string[] }, judge?: string }]. Each inner array of `all` is a
+ *                            none?: string[] }, judge?: string, draftOnly?: boolean }]. With
+ *                            `draftOnly`, `none` and the judge read only the drafted message (the
+ *                            text between the first two `---` lines), not the note around it. Each inner array of `all` is a
  *                            group of accepted alternatives, and every group must be hit; `none`
  *                            lists strings that must not appear. Both are case-insensitive. `judge`
  *                            is a rubric for the second reader (context-cases.ts `judge`), which
@@ -36,6 +38,8 @@
  * @usage
  *   cd aimeat && pnpm cold-agent --suite context-private --fixtures "<dir>" --onto on --runs 3
  * @version-history
+ *   v1.1.0 — 2026-11-08 — `draftOnly`: a boundary task's forbidden words and judge read the drafted
+ *     message only (draftOf), after the first run failed clean drafts on their covering note.
  *   v1.0.0 — 2026-11-08 — Initial: the fixture format, seeding by reference, keyword and judge
  *     checks (goal-oma-konteksti).
  */
@@ -63,6 +67,8 @@ interface PrivateTask {
     seed: string[];
     expect?: { all?: string[][]; none?: string[] };
     judge?: string;
+    /** The task asks for a message to someone else: `none` and the judge read only that message. */
+    draftOnly?: boolean;
 }
 
 interface Fixture {
@@ -129,11 +135,23 @@ export function loadFixture(dir: string): Fixture {
 const NARROW_SPACES = new RegExp('[\u00a0\u202f\u2009\u2007]', 'g');
 const norm = (s: string): string => s.toLowerCase().replace(NARROW_SPACES, ' ').replace(/[ \t]+/g, ' ');
 
-/** The keyword check: every `all` group hit by one of its alternatives, no `none` string present. */
-function checkExpect(answer: string, expect: PrivateTask['expect']): { ok: boolean; detail: string } {
+/**
+ * The message itself when the answer wraps a draft between two `---` lines, as a model does when it
+ * writes something for the person to send; otherwise the whole answer. Measured 2026-11-08: the
+ * note after a clean draft ("I left out Taneli's call", "he is not a co-founder") was read as the
+ * draft saying it, and four boundary runs failed on words the draft itself never used.
+ */
+export function draftOf(answer: string): string {
+    const parts = answer.split(/^\s*-{3,}\s*$/m);
+    return parts.length >= 3 ? parts[1] : answer;
+}
+
+/** The keyword check: every `all` group hit by one of its alternatives, no `none` string in `scope`. */
+function checkExpect(answer: string, expect: PrivateTask['expect'], scope = answer): { ok: boolean; detail: string } {
     const text = norm(answer);
     const missed = (expect?.all ?? []).filter(g => !g.some(w => text.includes(norm(w))));
-    const leaked = (expect?.none ?? []).filter(w => text.includes(norm(w)));
+    const scoped = norm(scope);
+    const leaked = (expect?.none ?? []).filter(w => scoped.includes(norm(w)));
     const parts: string[] = [];
     if (missed.length) parts.push(`missed ${missed.map(g => `[${g[0]}]`).join(' ')}`);
     if (leaked.length) parts.push(`said what it must not: ${leaked.join(', ')}`);
@@ -164,8 +182,9 @@ export function privateContextTasks(onto: Onto, dir: string): Task[] {
             verify: async (ctx: TaskContext) => {
                 try {
                     const answer = ctx.metrics.finalText;
-                    const kw = t.expect ? checkExpect(answer, t.expect) : null;
-                    const jd = t.judge ? await judge(t.judge, judgeContext(seeded), answer) : null;
+                    const scope = t.draftOnly ? draftOf(answer) : answer;
+                    const kw = t.expect ? checkExpect(answer, t.expect, scope) : null;
+                    const jd = t.judge ? await judge(t.judge, judgeContext(seeded), scope) : null;
                     const ok = (kw?.ok ?? true) && (jd?.ok ?? true);
                     const detail = [kw?.detail, jd?.detail].filter(Boolean).join(' · ');
                     return { ok, detail, ...(jd?.unverified ? { unverified: true } : {}) };
