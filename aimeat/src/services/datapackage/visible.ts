@@ -28,9 +28,13 @@
  *   packages are read once and cached with the catalogue scan (./catalogue-facts.ts), dropped on the same
  *   memory, file and catalogue changes.
  * @structure PackageReach · PACKAGE_REACHES · PackageViewer · VisibleWhy · VisiblePackage · trustedAudiences ·
- *   visiblePackages · viewerOf
+ *   visiblePackages · viewerOf · shareRow · versionFacts
  * @usage const rows = await visiblePackages(deps, viewerOf(config, req.auth), 'shared');
  * @version-history
+ *   2026-11-08 — A party's and a visitor's shares are listed through the reader the read builds from the
+ *     same share (publicOnly, the pin, the versions of a purchased interface), and a row carries the facts
+ *     of the version that read serves (secaudit2026nov08 round 14,
+ *     datapackage:visible:party-listing-reader-omits-share-limits).
  *   2026-11-04 — The cached audiences carry MEMORY_ANY_LEVEL_TAG: they read audience records of every
  *     level (codebase analysis 2026-11-03, item C4).
  *   v1.0.0 — 2026-11-02 — Initial (WP11, plan doc-mvwxcas3dom3; design canvas "Jaettu data").
@@ -44,11 +48,15 @@ import { memoryTarget } from '../classification/labels.js';
 import { resolveIdentity, isForeignPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { parseAudience } from '../audience.js';
-import { allDatasetFacts, DATASET_FACTS_CACHE_KEY, type DatasetFacts } from './catalogue-facts.js';
+import { allDatasetFacts, csvUrlOf, DATASET_FACTS_CACHE_KEY, type DatasetFacts } from './catalogue-facts.js';
 import { datapackageReadable, readsAsPackageOwner, type DatapackageReader } from './audience.js';
 import { audienceRecordsInPlace, trustedAudienceOf } from './audience-record.js';
-import { readPointer } from './version-audience.js';
-import { isLiveShare, packageOfPattern, partySharesOf, shareMetaOf } from '../parties/shares.js';
+import { i18nTitles, licenseOf, readPointer } from './version-audience.js';
+import { bare, packageId, type Descriptor } from './contract.js';
+import { openPackage } from './store.js';
+import { contractVersionHashes } from '../exchange-datapackage.js';
+import { isLiveShare, packageOfPattern, partySharesOf, shareMetaOf, standingShares } from '../parties/shares.js';
+import { shareOfUnversionedRead, shareReader } from '../parties/read-gate.js';
 import type { PartyContext } from '../parties/verify.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
@@ -186,16 +194,15 @@ export async function visiblePackages(deps: Deps, viewer: PackageViewer, reach: 
         case 'party': {
             const ctx = viewer.party;
             if (!ctx) return [];
-            const shares = (await partySharesOf(storage, ctx.ownerGhii, ctx.party, config.nodeId))
-                .filter(c => isLiveShare(c) && (!ctx.keyShare || c.id === ctx.keyShare));
+            const shares = await standingShares(storage, ctx.ownerGhii, (await partySharesOf(storage, ctx.ownerGhii, ctx.party, config.nodeId))
+                .filter(c => !ctx.keyShare || c.id === ctx.keyShare));
             const out: VisiblePackage[] = [];
             for (const f of all.filter(x => x.ownerGhii === ctx.ownerGhii)) {
                 const t = live(f);
                 const mine = shares.filter(c => packageOfPattern(c.dataPattern) === f.name);
                 if (!t || !mine.length) continue;
-                const reader: DatapackageReader = { sub: ctx.partyRef, party: { ownerGhii: ctx.ownerGhii, packageName: f.name, shareId: mine[0]!.id } };
-                if (!(await datapackageReadable(storage, f.ownerGhii, t.visibility, reader, f.name))) continue;
-                out.push({ facts: f, audience: audienceWord(t.visibility), why: { kind: 'share', share_id: mine[0]!.id, expires: mine[0]!.expires ?? null }, shares: mine });
+                const row = await shareRow(deps, ctx.partyRef, f, t, mine);
+                if (row) out.push(row);
             }
             return out;
         }
@@ -225,8 +232,62 @@ async function visitorShares(
             const t = live(f);
             const mine = shares.filter(c => packageOfPattern(c.dataPattern) === f.name);
             if (!t || !mine.length) continue;
-            out.push({ facts: f, audience: audienceWord(t.visibility), why: { kind: 'share', share_id: mine[0]!.id, expires: mine[0]!.expires ?? null }, shares: mine });
+            const row = await shareRow(deps, visitorGhii, f, t, mine);
+            if (row) out.push(row);
         }
     }
+    return out;
+}
+
+/**
+ * The row of a package a party or a visitor reads through `mine`, its live shares of that package, or
+ * null when the read through them is refused. The share and the reader are the read's own
+ * (services/parties/read-gate.ts shareOfUnversionedRead, shareReader): its pin, the versions of a
+ * purchased interface and `publicOnly`. The row's facts are those of the version a read that names no
+ * version serves, so a share pinned to an earlier version, or bound to an earlier interface, does not
+ * show the newest version's description, tables and row counts.
+ */
+async function shareRow(deps: Deps, sub: string, f: DatasetFacts, t: TrustedFacts, mine: ConsentRecord[]): Promise<VisiblePackage | null> {
+    const { storage, config } = deps;
+    const share = shareOfUnversionedRead(mine);
+    const meta = shareMetaOf(share);
+    const versions = meta.contract ? await contractVersionHashes(storage, f.ownerGhii, f.name, meta.contract.ifaceVersion) : undefined;
+    if (versions && !versions.length) return null;
+    const reader = shareReader(sub, f.ownerGhii, f.name, share, versions);
+    if (!(await datapackageReadable(storage, f.ownerGhii, t.visibility, reader, f.name))) return null;
+    const served = meta.pinnedVersion ?? versions?.[0];
+    let facts = f;
+    if (served && bare(served) !== bare(f.contentHash)) {
+        const opened = await openPackage(deps, `${packageId(f.owner, f.name)}@sha256:${bare(served)}`, config.nodeId, reader);
+        if (!opened) return null;
+        facts = versionFacts(f, opened.descriptor, opened.descriptorUrl);
+    }
+    return { facts, audience: audienceWord(t.visibility), why: { kind: 'share', share_id: share.id, expires: share.expires ?? null }, shares: mine };
+}
+
+/** The listing facts of one stored version, in place of the newest version's (`f`). */
+function versionFacts(f: DatasetFacts, d: Descriptor, descriptorUrl: string): DatasetFacts {
+    const out: DatasetFacts = {
+        ...f,
+        title: d.title ?? d.name,
+        keywords: [...new Set([d.name, ...(d.keywords ?? [])])],
+        contentHash: d.aimeat.contentHash,
+        descriptorUrl,
+        resources: d.resources.map(r => ({
+            name: r.name, rowCount: r.rowCount, fields: r.schema.fields.length, bytes: r.bytes,
+            ...(r.title ? { title: r.title } : {}),
+            csvUrl: csvUrlOf(descriptorUrl, r.name),
+        })),
+        modified: d.created,
+    };
+    // The words of this version, never the newest version's.
+    delete out.description;
+    delete out.i18n;
+    delete out.license;
+    const i18n = i18nTitles(d);
+    const license = licenseOf(d);
+    if (d.description) out.description = d.description;
+    if (i18n) out.i18n = i18n;
+    if (license) out.license = license;
     return out;
 }

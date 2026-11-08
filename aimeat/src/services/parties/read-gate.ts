@@ -19,9 +19,12 @@
  *   The answer is a package reader that admits this party to this package and nothing else
  *   (services/datapackage/audience.ts): it is never a node account, so the members and organism levels
  *   refuse it, and it carries no owner, so no owner rule reads it as the owner's principal.
- * @structure PartyReadTarget · PartyReadVerdict · partyReadVerdict
+ * @structure PartyReadTarget · PartyReadVerdict · shareOfUnversionedRead · shareReader · partyReadVerdict
  * @usage const v = await partyReadVerdict(deps, ctx, { name, version, what: 'rows' }); if (!v.ok) refuse(v);
  * @version-history
+ *   2026-11-08 — shareReader and shareOfUnversionedRead are exported, so the party and visitor listings
+ *     build the reader the read builds; a Dataspace agreement's share on a share offer reads only while
+ *     the share it stood on is live (secaudit2026nov08 round 14).
  *   v1.4.0 — 2026-11-02 — The reader carries the share's `publicOnly`, so a Dataspace agreement on an open
  *     offer reads what a public reader reads (secaudit2026nov02d round 13).
  *   v1.3.0 — 2026-11-01 — A key a DSP transfer minted reads only the share it names (plan D8.4).
@@ -35,7 +38,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { DatapackageReader } from '../datapackage/audience.js';
 import { bare } from '../datapackage/contract.js';
 import type { PartyContext } from './verify.js';
-import { isLiveShare, packageOfPattern, partySharesOf, shareMetaOf, type ShareContract } from './shares.js';
+import { packageOfPattern, partySharesOf, shareMetaOf, standingShares, type ShareContract } from './shares.js';
 import { logPartyRead, takeReadSlot } from './activity.js';
 import { contractVersionHashes } from '../exchange-datapackage.js';
 
@@ -62,6 +65,29 @@ export type PartyReadVerdict =
 
 const sameVersion = (a: string, b: string): boolean => bare(a) === bare(b);
 
+/** The share a read that names no version goes through: one without a pin first, else the first. */
+export function shareOfUnversionedRead(live: ConsentRecord[]): ConsentRecord {
+    return live.find(c => !shareMetaOf(c).pinnedVersion) ?? live[0]!;
+}
+
+/**
+ * The package reader one share admits: the package it names, the version it pins, the versions of the
+ * purchased interface (`versions`, for a share a purchase made) and `publicOnly`. The read gate and the
+ * listings of a party's or a visitor's shares (services/datapackage/visible.ts) build it here, so a list
+ * never names what the read through the same share refuses.
+ */
+export function shareReader(sub: string, ownerGhii: string, name: string, share: ConsentRecord, versions?: string[]): DatapackageReader {
+    const meta = shareMetaOf(share);
+    return {
+        sub,
+        party: {
+            ownerGhii, packageName: name, shareId: share.id,
+            ...(meta.pinnedVersion ? { pinnedVersion: meta.pinnedVersion } : {}), ...(versions ? { versions } : {}),
+            ...(meta.publicOnly ? { publicOnly: true } : {}),
+        },
+    };
+}
+
 /** Decide one read of `target` by the verified party `ctx`. */
 export async function partyReadVerdict(
     deps: { storage: Storage; config: AimeatConfig }, ctx: PartyContext, target: PartyReadTarget,
@@ -82,7 +108,8 @@ export async function partyReadVerdict(
     // A key a DSP transfer minted reads the one share its agreement made (plan D8.4).
     const shares = (await partySharesOf(storage, ctx.ownerGhii, ctx.party, config.nodeId))
         .filter(c => packageOfPattern(c.dataPattern) === target.name && (!ctx.keyShare || c.id === ctx.keyShare));
-    const live = shares.filter(c => isLiveShare(c));
+    // A Dataspace agreement's share on a share offer stands only while that share is live (./shares.ts).
+    const live = await standingShares(storage, ctx.ownerGhii, shares);
     if (!live.length) {
         if (!shares.length) return refuse(403, 'NOT_SHARED', 'The owner has not shared this data package with you.', null);
         const expired = shares.find(c => c.status === 'expired' || (c.status === 'active' && !!c.expires && Date.parse(c.expires) <= Date.now()));
@@ -99,7 +126,7 @@ export async function partyReadVerdict(
             return refuse(403, 'VERSION_NOT_SHARED', `This share covers version ${pinned} of the package only.`, live[0]!.id, { shared_version: pinned });
         }
     } else {
-        share = live.find(c => !shareMetaOf(c).pinnedVersion) ?? live[0]!;
+        share = shareOfUnversionedRead(live);
         version = shareMetaOf(share).pinnedVersion;
     }
     const meta = shareMetaOf(share);
@@ -123,14 +150,7 @@ export async function partyReadVerdict(
         version = version ?? versions[0];
     }
 
-    const reader: DatapackageReader = {
-        sub: ctx.partyRef,
-        party: {
-            ownerGhii: ctx.ownerGhii, packageName: target.name, shareId: share.id,
-            ...(meta.pinnedVersion ? { pinnedVersion: meta.pinnedVersion } : {}), ...(versions ? { versions } : {}),
-            ...(meta.publicOnly ? { publicOnly: true } : {}),
-        },
-    };
+    const reader = shareReader(ctx.partyRef, ctx.ownerGhii, target.name, share, versions);
     const shareId = share.id;
     const readVersion = version;
     // The served entry names the version when the request or the share named one (D6.4).

@@ -32,6 +32,8 @@
  *   withHistory · MAX_HISTORY · ARCHIVE_AFTER_DAYS · MAX_LIVE_PROCESSES · negotiationNext · transferNext
  * @usage const pid = negotiationPid('alice', newProcessHex()); const at = locatePid(pid);
  * @version-history
+ *   2026-11-08 — NegotiationRecord.agreeing: the call that makes the agreement claims the record first
+ *     (secaudit2026nov08 round 14).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8).
  */
 import { randomBytes } from 'node:crypto';
@@ -91,6 +93,12 @@ export interface NegotiationRecord {
     lastOfferFrom: 'consumer' | 'provider';
     /** Set while the request waits for the owner's approval. */
     waitingForOwner?: boolean;
+    /**
+     * The call that is making the agreement now (./negotiation.ts providerAgree): set before anything
+     * is written for the agreement, cleared when the record moves on. A second approval while it is
+     * fresh makes nothing.
+     */
+    agreeing?: { claim: string; at: string };
     decidedBy?: string;
     decidedAt?: string;
     agreementId?: string;
