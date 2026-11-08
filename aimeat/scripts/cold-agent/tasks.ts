@@ -22,6 +22,8 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-11-08 — share-to-workspace passes only when the three rules are in the workspace and
+ *     published; the workspace's name was enough before.
  *   2026-10-30 — build-structure-flow (by name): three turns through the structure page, from the
  *     drawn layouts to a published app built by the person's picks; followUps on a task.
  *   2026-10-29 — build-structure (by name): a new app's first message carries the structure page's
@@ -143,10 +145,25 @@ export const TASKS: Task[] = [
             // By MEMBER. The unfiltered list carries public organisms only, and an agent asked to
             // share something with a family rightly makes a private one: the first baseline scored
             // this task 0 of 3 while all three workspaces existed.
+            // The workspace existing is not the task: the rules must be in it, PUBLISHED, because a
+            // draft is the author's alone and the family reads only what is published (instruction
+            // audit 2026-11-08: this check passed on the workspace's name).
             const orgs = await api<{ organisms: { id: string }[] }>(ctx.baseUrl, `/v1/organisms?member=${encodeURIComponent(ctx.ownerName)}`, ctx.ownerToken);
+            const rules = (text: string) => ['shoe', 'quiet', 'wash'].filter(w => !text.includes(w));
             for (const o of orgs.data?.organisms ?? []) {
-                const ws = await api(ctx.baseUrl, `/v1/organisms/${o.id}/workspaces`, ctx.ownerToken);
-                if (JSON.stringify(ws.data ?? '').includes(ctx.marker)) return { ok: true, detail: `workspace found in organism ${o.id}` };
+                const list = await api<{ workspaces?: { id: string; name?: string }[] }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspaces`, ctx.ownerToken);
+                const hit = (list.data?.workspaces ?? []).find(w => JSON.stringify(w).includes(ctx.marker));
+                if (!hit) continue;
+                const read = await api<{ objects?: unknown; drafts?: unknown }>(ctx.baseUrl, `/v1/organisms/${o.id}/workspace?ws=${encodeURIComponent(hit.id)}`, ctx.ownerToken);
+                const published = rules(JSON.stringify(read.data?.objects ?? '').toLowerCase());
+                if (published.length === 0) return { ok: true, detail: `the rules are published in workspace ${hit.id} of organism ${o.id}` };
+                const drafted = rules(JSON.stringify(read.data?.drafts ?? '').toLowerCase());
+                return {
+                    ok: false,
+                    detail: drafted.length === 0
+                        ? 'the rules are written as a draft and never published, so the family cannot read them'
+                        : `the workspace exists and the published rules miss: ${published.join(', ')}`,
+                };
             }
             return { ok: false, detail: 'no workspace by that name in any of the owner\'s organisms' };
         },

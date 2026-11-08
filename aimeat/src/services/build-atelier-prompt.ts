@@ -28,6 +28,11 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.44.0 — 2026-11-08 — ADDITIVE (Jouni approved the instruction audit's fixes): the genre fork
+ *     and the register are scoped to the level `fine` where the text said "every app", matching the
+ *     publish gate (app-artifact-lint.ts, 2026-09-19); "Finishing" names the four things every app
+ *     owes after a publish (step 9 of the Atelier skill) and asks published, checked and accepted
+ *     to be reported apart.
  *   v1.43.0 — 2026-11-07 — ADDITIVE: the interview's introduction question after the data map, and the section "An introduction, when the owner asked for one" after "Data, in short" (build-introduction-step.ts); the spec token moves with the body.
  *   v1.42.0 — 2026-10-30 — ADDITIVE: THE STYLE KIT COMES BEFORE THE GENRE, first in "The Design Book first" (KIT_PROMPT_PARAGRAPH in design-book/kit.ts).
  *   v1.41.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew
@@ -341,14 +346,17 @@ function composeBody(config: AimeatConfig): string {
     + '/v1/prompts/build-app, whose vocabulary (daisyUI classes, hand-written boilerplate) does '
     + 'not apply here. The app declares `<meta name="aimeat-track" content="atelier">` so a '
     + 'later session loads the right guide.\n\n';
-  body += 'THE FIRST MOVE OF THE BUILD IS THE GENRE FORK. An app here starts from a committed '
+  body += 'ON THE LEVEL `fine`, THE FIRST MOVE OF THE BUILD IS THE GENRE FORK. A `fine` app (and a '
+    + 'page that states no level, which is held to `fine`) starts from a committed '
     + 'register, never from the bare shell: list the genres with `GET ' + base
     + '/v1/designbook?kind=genre`, fork the one that carries the page\'s register with `GET ' + base
     + '/v1/app-templates/genre-<id>`, and swap the words, sources and images (the genre section '
     + 'below has the menu). Every Atelier app declares the register it committed to — '
     + '`<meta name="aimeat-register" content="genre-<id>">`, which every genre already carries, '
     + 'or `custom:<name>` for a page that commits to a look of its own — and the publish REFUSES '
-    + 'an Atelier app that names none.\n\n';
+    + 'an Atelier app that names none. A `proto` or `plain` page is the one exception: it starts '
+    + 'from the Atelier shell, forks no genre and declares no register, and the publish asks for '
+    + 'none.\n\n';
   body += 'The shell is the frame the genres are built on — fetch it to learn the structure, '
     + 'never invent it:\n\n'
     + '```\n'
@@ -477,7 +485,8 @@ function composeBody(config: AimeatConfig): string {
     + '`<meta name="aimeat-register" content="custom:<name>">`, where the name says what the '
     + 'register is (custom:game, custom:ledger) and is never "default". The bare shell carries a '
     + 'REPLACE-ME line in that place, and the gate refuses it as served: the shell is a frame, '
-    + 'not a page.\n\n';
+    + 'not a page. This section is for the level `fine`; a `proto` or `plain` page forks no genre '
+    + 'and the publish asks it for no register.\n\n';
   body += 'Whatever the app is — a poster, a console, a departure board, a ledger — do not '
     + 'assemble blocks: FORK A GENRE. Each genre is a finished free-composition '
     + 'page in a committed register; fetch it with `GET ' + base + '/v1/app-templates/<id>`, swap '
@@ -738,7 +747,15 @@ function composeBody(config: AimeatConfig): string {
     + 'width; every state (loading, empty, error, signed-out) reached through `a.status(...)`; '
     + 'no console errors. Publish with `aimeat_app_publish` and pass `spec_token: '
     + SPEC_TOKEN_SLOT + '` — the digest of this document — so the node can tell the app was '
-    + 'built against the spec in force.\n\n';
+    + 'built against the spec in force. Then read `next_steps` in the publish answer, whole: the '
+    + 'app is not finished while one of the four things every app owes is missing, and a '
+    + 'successful publish does not mean they are there. They are the agent face '
+    + '(`agent_face_present`), a skill bound to the app (`bound_skills_count` above zero), the '
+    + 'data map (`data_map_present`, written with `aimeat_datamap_set`) and the design spec '
+    + '(`design_spec_present`, written with `aimeat_app_manage { action: "spec_set" }`); step 9 '
+    + 'of the skill `node:aimeat-app-builder-atelier` says what each one holds. Report published, '
+    + 'checked and accepted as three separate things: a check you could not run is said, never '
+    + 'counted as passed.\n\n';
 
   body += ATELIER_REVIEW_SECTION;
 

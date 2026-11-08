@@ -13,7 +13,9 @@ metadata:
 > **Canonical version lives on the node.** This baked-in copy is a bootstrap seed. If the
 > `aimeat_skill_get` tool is available, fetch `node:aimeat-app-builder` and follow THAT
 > version — it is kept current (research flow, pitfall registry, new tooling). Both versions
-> agree on the core rule: the live spec at `GET /v1/prompts/build-app` always wins.
+> agree on the core rule: the live spec of the app's track always wins over this file
+> (`GET /v1/prompts/build-app-atelier` for a new app, `GET /v1/prompts/build-app` for a
+> Classic one).
 >
 > **A new app is built on the Atelier track.** Load `node:aimeat-app-builder-atelier` and read
 > `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts (over HTTP,

@@ -16,6 +16,9 @@
  *   v1.41.0 — 2026-11-07 — The interview asks about an introduction (scope, diagrams or pictures,
  *     prompts for the person's AI), and the proposal offers three to five designs, one always the
  *     clean look (build-introduction-step.ts).
+ *   2026-11-08 — metadata.entry_point: "true", so the handbook's skill list names this skill although
+ *     its name begins with the Classic skill's (services/skills-by-situation.ts). "Every Atelier app
+ *     names its register" and step 8 are scoped to the level fine, as the spec now is.
  *   v1.40.0 — 2026-11-02 — Kit 0.69.0: fingerprint (the node's profile of a document) named beside the
  *     handbook, with the facts route the app reads it from. Read against describe-data.js after it joined.
  *   v1.39.0 — 2026-10-30 — A new app asks for its style kit (aimeat_designbook_kit) before it picks a genre, and a look the person wants again is saved as a kit.
@@ -161,6 +164,7 @@ description: Build and publish apps on the ATELIER track — the component-kit w
 license: MIT
 metadata:
   audience: agent
+  entry_point: "true"
 ---
 
 # Building AIMEAT apps on the Atelier track
@@ -205,7 +209,8 @@ guides produces an app that belongs to neither. The shell's
 \`<meta name="aimeat-track" content="atelier">\` records which guide built the file, and the
 publish path stores it, so a later session loads the right one.
 
-**Every Atelier app names its register.** \`<meta name="aimeat-register" content="genre-<id>">\`
+**Every Atelier app on the level \`fine\` names its register** (a \`proto\` or \`plain\` page forks no
+genre, declares none, and the publish asks it for none). \`<meta name="aimeat-register" content="genre-<id>">\`
 is in every genre's head already, so a fork carries it; a page that commits to a look of its own
 declares \`content="custom:<name>"\` (custom:game, custom:ledger; never "default"). The bare shell
 carries a REPLACE-ME line in that place and the publish refuses it: the shell is a frame, not a
@@ -449,7 +454,8 @@ moved under you says so.
    hand over the address, and say in one line what you could not check yourself (a microphone, a
    camera, a screen you cannot see). An app that sits unpublished waiting for a browser is an app
    the owner asked for and did not get.
-8. **Accept it beside the genre it forked.** An Atelier app is finished when a screenshot at 390
+8. **Accept it beside the genre it forked.** (A \`proto\` or \`plain\` page forked no genre: the
+   seven measured checks below are its acceptance.) An Atelier app is finished when a screenshot at 390
    and at 1440, in both themes, holds up NEXT TO the genre page it came from (open the genre at
    \`GET /v1/app-templates/genre-<id>\`, or the Design Book's genre shelf at
    \`GET /v1/designbook?kind=genre\`). Put the two pictures side by side and ask one question

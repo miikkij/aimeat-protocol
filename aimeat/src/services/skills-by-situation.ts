@@ -20,11 +20,17 @@
  *   WHAT IS LEFT OUT. A skill bound to one app (it teaches that app, and the app's own detail
  *   names it), a skill that names its replacement, and a skill that is a part of another listed
  *   skill: `aimeat-phaser-boot` sits under `aimeat-phaser`, which links out to it. The rule is the
- *   name: `<listed skill>-<anything>`. That keeps the section to the entry points.
- * @structure firstSentence() · skillsBySituation()
+ *   name: `<listed skill>-<anything>`. That keeps the section to the entry points. A skill whose
+ *   frontmatter says `metadata.entry_point: "true"` is an entry point of its own whatever its name
+ *   begins with: `aimeat-app-builder-atelier` is the guide for every new app, not a part of the
+ *   Classic `aimeat-app-builder`, and the name rule hid it from this list (instruction audit
+ *   2026-11-08: the handbook named only the Classic skill, so an agent scanning the list for apps
+ *   was sent to the track a new app is not built on).
+ * @structure firstSentence() · isEntryPoint() · skillsBySituation()
  * @usage
  *   const section = await skillsBySituation(storage, config, ownerName);
  * @version-history
+ *   v1.1.0 — 2026-11-08 — `metadata.entry_point` exempts a skill from the part-of-another rule.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -41,6 +47,12 @@ export function firstSentence(description: string): string {
     return sentence.length > LINE_MAX ? `${sentence.slice(0, LINE_MAX - 1).trimEnd()}…` : sentence;
 }
 
+/** True when the skill declares itself an entry point (`metadata.entry_point: "true"`). */
+export function isEntryPoint(metadata: Record<string, unknown> | undefined): boolean {
+    const v = metadata?.entry_point;
+    return v === true || v === 'true';
+}
+
 /**
  * Markdown for the handbook, or '' when the node has no skill this caller may read. `ownerName`
  * is the person the agent acts for; node-scope skills with visibility `members` need one.
@@ -50,7 +62,7 @@ export async function skillsBySituation(storage: Storage, config: AimeatConfig, 
     const entries = all.filter(s => !s.binding && !s.supersededBy);
     const names = new Set(entries.map(s => s.name));
     const isPartOfAnother = (name: string) => [...names].some(other => other !== name && name.startsWith(`${other}-`));
-    const listed = entries.filter(s => !isPartOfAnother(s.name)).sort((a, b) => a.name.localeCompare(b.name));
+    const listed = entries.filter(s => isEntryPoint(s.metadata) || !isPartOfAnother(s.name)).sort((a, b) => a.name.localeCompare(b.name));
     if (listed.length === 0) return '';
 
     return [

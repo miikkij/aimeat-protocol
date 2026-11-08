@@ -12,6 +12,7 @@
  * @usage
  *   import { scriptedTranscript } from './scripted.js';
  * @version-history
+ *   v1.2.0 — 2026-11-08 — share-to-workspace publishes the rules, which its stricter check now asks for.
  *   v1.1.0 — 2026-10-02 — A play for propose-agent.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
@@ -138,6 +139,11 @@ const PLAYS: Record<string, Play> = {
             {
                 tool: 'aimeat_workspace_write',
                 args: (seen) => ({ organism_id: field(seen[0], 'id'), ws: field(seen[1], 'ws'), space: 'rules', value: { title: 'House rules', markdown: '- Shoes off at the door\n- Quiet after ten\n- Whoever cooks does not wash up' } }),
+            },
+            // A write is a draft, and only the published version reaches the family.
+            {
+                tool: 'aimeat_workspace_publish',
+                args: (seen) => ({ organism_id: field(seen[0], 'id'), ws: field(seen[1], 'ws'), namespace: 'rules', id: field(seen[2], 'id') }),
             },
         ],
         say: (c) => `The house rules are written down in the workspace "${c.marker}". Your family can read them once you invite them to the group.`,

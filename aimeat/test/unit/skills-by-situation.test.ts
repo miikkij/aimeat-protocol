@@ -6,6 +6,8 @@
  *   built from the registry, it lists entry points only, and it is one line per skill.
  * @usage cd aimeat && pnpm exec vitest run test/unit/skills-by-situation.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-08 — An entry point named after another skill is listed (metadata.entry_point),
+ *     proved on the shipped app-builder texts.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -34,6 +36,28 @@ describe('skillsBySituation', () => {
         expect(md).not.toContain('aimeat-phaser-boot');
         expect(md).not.toContain('tinki-agent');
         expect(md).not.toContain('old-guide');
+    });
+
+    it('lists a skill that declares itself an entry point, whatever its name begins with', async () => {
+        // The shipped texts, parsed as the registry parses them: the instruction audit of
+        // 2026-11-08 found the handbook naming only the Classic app builder, because the Atelier
+        // skill's name begins with the Classic one's.
+        const { parseSkillMd } = await import('../../src/services/skill-md.js');
+        const { APP_BUILDER_SKILL_ENTRY } = await import('../../src/data/builtin-skills.app-builder.js');
+        const { APP_BUILDER_ATELIER_SKILL_ENTRY } = await import('../../src/data/builtin-skills.app-builder-atelier.js');
+        const asSummary = (md: string) => {
+            const fm = parseSkillMd(md).frontmatter;
+            return { name: fm.name, description: fm.description, metadata: fm.metadata, scope: 'node' };
+        };
+        const { listSkills } = await import('../../src/services/skills.js');
+        (listSkills as any).mockResolvedValueOnce([
+            asSummary(APP_BUILDER_SKILL_ENTRY.skillMd), asSummary(APP_BUILDER_ATELIER_SKILL_ENTRY.skillMd),
+        ]);
+        const md = await skillsBySituation({} as any, {} as any, 'alice');
+        expect(md).toContain('- `aimeat-app-builder-atelier`: ');
+        // The Classic line is all an agent reads of that skill here, so it names the Atelier one.
+        const classicLine = md.split('\n').find(l => l.startsWith('- `aimeat-app-builder`: '));
+        expect(classicLine).toContain('aimeat-app-builder-atelier');
     });
 
     it('says nothing on a node with no skill to offer', async () => {

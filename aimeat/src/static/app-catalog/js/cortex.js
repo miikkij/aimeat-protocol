@@ -7,6 +7,10 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   v1.5.0 — 2026-11-08 — The track picker is hidden for a new app too: a new app is built on
+ *     Atelier, as in the App Catalog's Create dialog, and the builder falls back to Classic only
+ *     when the node serves no Atelier guide (instruction audit 2026-11-08: the picker still offered
+ *     Classic for a new app here).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.4.1 — 2026-10-24 — cortexArg and the bar's card markup moved to cortex-card.js; the card's
  *     and the owner's edit button's onclick argument is JS-escaped with cortexArg (secaudit2026oct22).
@@ -357,7 +361,7 @@ function closeCortexEditor() {
 var pbSourceApp = null; // app being improved (null = new app mode)
 // The TRACK is the first decision and the guides never mix (TARGET-074): Classic reads
 // /v1/prompts/build-app, Atelier reads /v1/prompts/build-app-atelier. A new app
-// starts on Atelier; Classic stays selectable.
+// is built on Atelier; Classic is for an app already on it (or a node without Atelier).
 var pbTrack = 'atelier';
 
 function pbApplyTrackUi() {
@@ -379,13 +383,14 @@ function openPromptBuilder(app) {
   var tplSel0 = document.getElementById('pb-template');
   if (tplSel0) tplSel0.value = '';
 
-  // The track: improving an app inherits ITS track (recorded in the manifest at publish);
-  // a new app starts on Atelier and the person may choose Classic. The picker hides in improve mode,
-  // because an existing app's track is a fact, not a choice.
+  // The track: improving an app inherits ITS track (recorded in the manifest at publish), and a
+  // new app is built on Atelier, as in the App Catalog's Create dialog (2026-10-25). The picker
+  // stays hidden in both cases; loadPbCore() falls back to Classic only when the node serves no
+  // Atelier guide (this file also runs offline against an older node).
   pbTrack = (!pbSourceApp || pbSourceApp.track === 'atelier') ? 'atelier' : 'classic';
   var trackRow = document.getElementById('pb-track');
   if (trackRow) {
-    trackRow.style.display = pbSourceApp ? 'none' : '';
+    trackRow.style.display = 'none';
     var radios2 = trackRow.querySelectorAll('input[name="pb-track"]');
     radios2.forEach(function (r) {
       r.checked = r.value === pbTrack;
@@ -452,9 +457,24 @@ function loadPbCore() {
       .then(function (d) {
         var full = d && d.data && d.data.prompt;
         if (full && typeof full === 'string') { pbCoreAtelier[mode] = full; updatePbPreview(); }
+        else pbAtelierMissing(mode);
       })
-      .catch(function () { /* older node without the Atelier track — the picker still shows, the preview says loading */ });
+      .catch(function (err) {
+        console.warn('Atelier build guide not loaded; using Classic for a new app', err);
+        pbAtelierMissing(mode);
+      });
   });
+}
+
+// An older node serves no Atelier guide: a new app can then only be built on Classic, so the
+// builder switches to it rather than showing a preview that never loads.
+function pbAtelierMissing(mode) {
+  if (mode !== 'new' || pbSourceApp || pbTrack !== 'atelier') return;
+  pbTrack = 'classic';
+  var radios = document.querySelectorAll('input[name="pb-track"]');
+  radios.forEach(function (r) { r.checked = r.value === 'classic'; });
+  pbApplyTrackUi();
+  updatePbPreview();
 }
 
 // Booster-kit: populate the "Start from a template" picker from /v1/app-templates and, on

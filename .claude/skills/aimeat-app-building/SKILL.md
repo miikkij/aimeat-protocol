@@ -35,7 +35,7 @@ Where a new lesson goes depends on who needs it, and the three are not interchan
 
 Non-negotiables that flow enforces:
 
-- Never hardcode theme colours. Light default plus `:root[data-theme="dark"]` CSS variables, or the styling stack every node serves itself: vendored Tailwind `/lib/tailwindcss@4.js` + daisyUI `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css`. The bridge loads after daisyUI and gives it the person's chosen theme in both modes, so the app hardcodes no colour.
+- Never hardcode theme colours in an app that follows the person's theme. An Atelier genre that keeps its own palette (`<meta name="aimeat-light" content="fixed">`) is the exception the Atelier spec names ("Fixed colours or following their theme?"), and the owner chooses it. On Classic: light default plus `:root[data-theme="dark"]` CSS variables, or the styling stack every node serves itself: vendored Tailwind `/lib/tailwindcss@4.js` + daisyUI `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css`. The bridge loads after daisyUI and gives it the person's chosen theme in both modes, so the app hardcodes no colour.
 - Include `<meta name="aimeat-scopes">`, and use only scopes that exist in the node's vocabulary. An invented scope means `INVALID_SCOPE` and nobody can log in.
 - AIMEAT SDK libs load from `/v1/libs/`; vendored styling from `/lib/`. Do not mix the two.
 - **Touch input goes through `aimeat-input`, never a hand-rolled `touchstart` listener.** `AIMEAT.input.tappable(el, fn)` for every button, card and row (built on `click`, so tap, mouse and Enter/Space each arrive once and a screen reader announces it); `AIMEAT.input.on(el, handlers, { axis })` when a click is not enough, declaring `axis` on anything that also scrolls. A hand-rolled touch listener fires twice, triggers mid-scroll, and locks out the keyboard. The mobile rules in the build-app prompt cover LAYOUT; this is the other half.
@@ -68,11 +68,14 @@ Three habits keep them from being forgotten:
 
 ## The app-building prompt system
 
-The canonical prompt is **node-served** at `GET /v1/prompts/build-app`; source of truth is `src/services/build-app-prompt.ts`. It builds single-file HTML apps.
+There are two specifications, one per track, and both are **node-served**. Each one is canonical for its own track only.
 
-Two consumers: the app-catalog "Create new app" flow fetches it (`src/static/app-catalog/js/cortex.js` keeps only an offline fallback), and the OpenHands app-builder (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) fetches the same spec at runtime. Agent-facing discovery is `/llms.txt` plus the bootstrap `app_building` block.
+- **Atelier**, the track every new app is built on: `GET /v1/prompts/build-app-atelier` (over MCP `aimeat_handbook_get { tier: "build-app-atelier" }`, in parts). Source of truth: `src/services/build-atelier-prompt.ts` and its siblings `build-atelier-*.ts`.
+- **Classic**, for an app already on Classic or when the owner asks for it by name: `GET /v1/prompts/build-app`. Source of truth: `src/services/build-app-prompt.ts`.
 
-**Improve app-building guidance in the node service (`build-app-prompt.ts`), never in the catalog fallback.**
+Consumers: the App Catalog's "Create" dialog (`public/views/appcat/dialogs/generate-prompt.js`) sends a connected AI to Atelier and keeps the long Classic prompt folded for an AI that cannot connect; the old `/app-catalog.html` (`src/static/app-catalog/js/cortex.js`, an offline fallback) takes the track of the app it improves and Atelier for a new one; the OpenHands app-builder (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) fetches the spec of the track at runtime. Agent-facing discovery is `/llms.txt` plus the bootstrap `app_building` block.
+
+**Improve app-building guidance in the node services (`build-atelier-*.ts`, `build-app-prompt.ts`), never in the catalog fallback.**
 
 When editing that prompt or any app-building guidance, verify every API claim against the served browser SDK sources under `src/static/sdk-libs/<name>/` and `public/cortex-bundled/*.js`:
 

@@ -7301,7 +7301,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     pbTrack = !pbSourceApp || pbSourceApp.track === "atelier" ? "atelier" : "classic";
     var trackRow = document.getElementById("pb-track");
     if (trackRow) {
-      trackRow.style.display = pbSourceApp ? "none" : "";
+      trackRow.style.display = "none";
       var radios2 = trackRow.querySelectorAll('input[name="pb-track"]');
       radios2.forEach(function(r) {
         r.checked = r.value === pbTrack;
@@ -7361,10 +7361,22 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
         if (full && typeof full === "string") {
           pbCoreAtelier[mode] = full;
           updatePbPreview();
-        }
-      }).catch(function() {
+        } else pbAtelierMissing(mode);
+      }).catch(function(err) {
+        console.warn("Atelier build guide not loaded; using Classic for a new app", err);
+        pbAtelierMissing(mode);
       });
     });
+  }
+  function pbAtelierMissing(mode) {
+    if (mode !== "new" || pbSourceApp || pbTrack !== "atelier") return;
+    pbTrack = "classic";
+    var radios = document.querySelectorAll('input[name="pb-track"]');
+    radios.forEach(function(r) {
+      r.checked = r.value === "classic";
+    });
+    pbApplyTrackUi();
+    updatePbPreview();
   }
   function loadPbTemplates() {
     var sel = document.getElementById("pb-template");

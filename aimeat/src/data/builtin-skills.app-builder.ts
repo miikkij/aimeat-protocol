@@ -5,7 +5,8 @@
  * @description The `aimeat-app-builder` built-in skill: the paved path for building and publishing
  *   an app on this node.
  *
- *   WHY IT MOVED OUT OF builtin-skills.ts, AND WHAT THAT FIXED. Seeding is create-if-missing, so a
+ *   WHY IT MOVED OUT OF builtin-skills.ts, AND WHAT THAT FIXED. Seeding was create-if-missing then
+ *   (it now updates a copy nobody edited, by fingerprint: services/skill-seeds.ts), so a
  *   built-in skill has two places it can be edited and no reconciliation between them: the repo,
  *   which never reaches a node that already has the skill, and the node itself, which never comes
  *   back here. Both happened. On 2026-08-16 the node's copy gained a whole section — "Say it in
@@ -24,6 +25,9 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   2026-11-08 — The description's first sentence says a new app is built with
+ *     aimeat-app-builder-atelier: the handbook's skill list shows the first sentence only, and the
+ *     old one named the Classic track and nothing else (instruction audit 2026-11-08).
  *   2026-11-07 — The extension section says when server-side work outgrows an extension and points at
  *     aimeat_appdev_overview's `microservices` and aimeat-extension-builder section 11.
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
@@ -75,7 +79,7 @@ export const APP_BUILDER_SKILL_ENTRY: BuiltinSkill =
     visibility: 'public',
     skillMd: `---
 name: aimeat-app-builder
-description: The Classic track's guide to apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. Use it to improve an app that is already Classic, or when the owner asks for Classic by name. For a NEW app, game or tool, load aimeat-app-builder-atelier instead. On Classic it fetches the canonical build spec first, researches what already exists, builds a single-file app from a template, verifies, publishes, and reports the live URL.
+description: The Classic track's guide, for an app already on Classic or when the owner asks for Classic by name; a NEW app, game or tool is built with aimeat-app-builder-atelier instead. It covers apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. On Classic it fetches the canonical build spec first, researches what already exists, builds a single-file app from a template, verifies, publishes, and reports the live URL.
 license: MIT
 metadata:
   audience: agent

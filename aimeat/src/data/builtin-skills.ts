@@ -11,6 +11,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-08 -- install-skills-locally: other agents' skill folders (Codex, Goose, OpenHands), a
+ *     copy kept as the node's text with local rules in a skill of their own, the update check
+ *     before a new task and over HTTP by the discovery index's digest (instruction audit
+ *     2026-11-08: a hand-edited local copy sat at 1.0.0 while the node served 1.0.20).
  *   2026-11-07 -- diagnose-a-workflow: a step's model set aside by the operator's lock, and AI_MODEL_NOT_ALLOWED from the operator's list.
  *   (2026-11-07) The node skill's first sentence follows the story (docs/AIMEAT-Story.md).
  *   (2026-11-07) aimeat-receivers joins from its own file: an outside program writing in through a receiver.
@@ -551,7 +555,7 @@ skill as that app's own guide.
     name: 'install-skills-locally',
     skillMd: `---
 name: install-skills-locally
-description: How to install an AIMEAT registry skill into Claude Code, Claude Desktop/Cowork, or claude.ai — and how to check for updates. Use when the owner asks to "install" a skill from the node, or wants a registry skill available without the AIMEAT connector.
+description: How to install an AIMEAT registry skill into Claude Code, Claude Desktop/Cowork, claude.ai, or any other agent that reads Agent Skills folders (Codex, Goose, OpenHands and the like) — and how to check for updates. Use when the owner asks to "install" a skill from the node, or wants a registry skill available without the AIMEAT connector.
 license: MIT
 metadata:
   audience: agent
@@ -582,9 +586,20 @@ skill discovery.)
   a Download .zip button) and upload it in claude.ai Settings → Skills — the ZIP is already in the
   expected \`{name}/SKILL.md\` layout.
 
+## Another agent (Codex, Goose, OpenHands and the like)
+Write the files the same way, into the folder that agent reads Agent Skills from (for example
+\`~/.agents/skills/{name}/\`), and stamp the same two lines. Copy the node's text as it is: a rule
+of your own for this machine (its shell, its launcher) goes into a separate skill, never into the
+copy, so the copy can be replaced whole when the node's version moves on. A hand-edited copy is
+the one that goes stale: it keeps its agent on instructions the node has replaced.
+
 ## Checking for updates
+Check before an installed skill is used for a new task, not only when someone asks.
 1. Read the local SKILL.md's \`metadata.aimeat_ref\` (e.g. \`node:manage-my-agents@1.0.0\`).
 2. \`aimeat_skill_get\` with \`manifest_only: true\` on the UNPINNED ref — compare \`version\`.
+   Without MCP: \`GET {node url}/.well-known/agent-skills/index.json\` gives each public skill's
+   \`digest\`, the sha256 of its SKILL.md as served at \`.../agent-skills/{name}/SKILL.md\`. A copy
+   that differs from that file in anything but the two stamped lines is out of date.
 3. Newer? Re-fetch and overwrite the local directory (remove files not in the new index).
 
 ## Principles
