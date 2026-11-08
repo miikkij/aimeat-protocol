@@ -24,6 +24,8 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.9.0 — 2026-11-09 — The fork says the genre's masthead is the only top bar and the node's pill
+ *     sits in it as it comes (look and functions kept, restyled only when the owner asks).
  *   v1.8.0 — 2026-11-08 — The proposal repeats the level the interview asked first; the Design Book
  *     line is owed on `fine` (a prototype and an ordinary page do not read the book).
  *   v1.7.1 — 2026-11-08 — The fork's sign-in sample uses onSession: with onLogin a person who comes
@@ -129,7 +131,7 @@ export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answe
 
 /** In the body, right after the genre section, so it travels in part `genre`. */
 export const ATELIER_FORK_PEOPLE_SECTION = '## A fork people sign in to, in two languages\n\n'
-  + 'A genre is a finished page with no sign-in, no language switch and its words in one language. Your fork adds all three, the same way every time. Do not write a header or a sign-in control of your own: the bar below is the node\'s, it carries the language switch and the light and dark control, and a hand-made one is the first thing a review sends back.\n\n'
+  + 'A genre is a finished page with no sign-in, no language switch and its words in one language. Your fork adds all three, the same way every time. THE GENRE\'S MASTHEAD IS THE ONLY TOP BAR, and the node\'s pill always sits in it AS IT COMES: its look and its functions stay, restyled only when the owner asks. No other header or sign-in control: the pill carries the language switch and light and dark, and spending work on the bar is work taken from the app.\n\n'
   + '**Two languages is the default: `en fi`.** Keep both unless the owner asked for one. Every word the page shows goes through a dictionary; a string typed into the markup is a string that cannot change language, and a page where the bar is Finnish and the content English is refused at review.\n\n'
   + '```html\n'
   + '<!-- head: the languages you ACTUALLY carry, and every scope the app uses -->\n'

@@ -22,6 +22,10 @@
  * @usage
  *   const piece = atelierPiece(buildAtelierPrompt(config, { mode: 'new' }).full, 'genre', config.baseUrl);
  * @version-history
+ *   v1.7.0 — 2026-11-09 — "The pattern shelf" moved from `genre` to `look`, and "Finishing" from
+ *     `start` to `libraries` (pure moves; every level reads `libraries`): the genre part needed room
+ *     for the one-top-bar rule a real build met as a contradiction, and `start` stood 16 characters
+ *     under its limit.
  *   v1.6.0 — 2026-11-08 — Reading by level: `libraries` and `patterns` before any code on every level,
  *     `genre` and `book` on `fine` (a prototype read 36 000 characters of genres and Design Book it is
  *     told not to use, in a real build on aimeat.io).
@@ -51,12 +55,12 @@ export type AtelierPartId = 'start' | 'genre' | 'libraries' | 'book' | 'patterns
 
 /** In reading order. `what` is the line the first part shows for each of the others. */
 export const ATELIER_PARTS: Array<{ id: AtelierPartId; what: string }> = [
-  { id: 'start', what: 'The interview with its data map and introduction questions, the proposal, what the Atelier track is, the component kit, how to finish and publish, and what is never done.' },
-  { id: 'genre', what: 'REQUIRED before any code: on the level `fine` (and on a page that states no level) an app starts from a genre, a complete page in a committed register, and the publish refuses it without a register; a `proto` or `plain` app starts from the shell `shell-atelier`. Also the pattern shelf, the Design Book and the signature.' },
-  { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, AI inside the app, data (personal, team and public) and what the review always catches. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist. It also says how to start the app\'s structure page, the link you give the person first, and how an introduction is built when the owner asked for one.' },
+  { id: 'start', what: 'The interview with its data map and introduction questions, the proposal, what the Atelier track is, the component kit and what is never done.' },
+  { id: 'genre', what: 'REQUIRED before any code: on the level `fine` (and on a page that states no level) an app starts from a genre, a complete page in a committed register, and the publish refuses it without a register; a `proto` or `plain` app starts from the shell `shell-atelier`. Also the one top bar, the Design Book and the signature.' },
+  { id: 'libraries', what: 'REQUIRED before any code: every library this node serves, with what it is for, AI inside the app, data (personal, team and public) and what the review always catches. Speech, audio, files, live updates, notifications, printing, calendars and decisions are already written. An address that is not in it does not exist. It also says how to start the app\'s structure page, the link you give the person first, and how an introduction is built when the owner asked for one. And how to finish and publish: the size matrix, the spec token and the four things every app owes.' },
   { id: 'book', what: 'REQUIRED before any code on `fine`: the Design Book. How a proven part reaches a page forked from a genre (the working screen is a mosaic), the components other apps made, how a kit component that is nearly right is customised instead of copied, writing down why you took, passed over and made each thing, and the whole Book on one page, every part on a line.' },
   { id: 'patterns', what: 'How the code is written: six patterns to copy, the living record, and the mosaic that arranges a screen from outside the file.' },
-  { id: 'look', what: 'The look presets, the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
+  { id: 'look', what: 'The look presets, the pattern shelf (backgrounds), the one ambient layer, effects and imagery. Read it before you change anything the genre did not decide for you.' },
   { id: 'motion', what: 'What already moves, the attention gesture, and the controls that answer the hand. Read it before you make anything move.' },
 ];
 
@@ -75,12 +79,12 @@ export const ATELIER_HEADING_PART: Record<string, AtelierPartId> = {
   // `start` past the limit: it is about customising a component instead of making a copy, which
   // is what `book` says about the components other apps made.
   'A COMPONENT THAT IS NEARLY RIGHT IS CUSTOMISED, NEVER COPIED': 'book',
-  'Finishing': 'start',
+  'Finishing': 'libraries',
   'Never': 'start',
 
   'Start from a GENRE — a complete committed register, and the register is required': 'genre',
   'A fork people sign in to, in two languages': 'genre',
-  'The pattern shelf': 'genre',
+  'The pattern shelf': 'look',
   'The signature: this app\'s own hand': 'genre',
 
   'The node\'s libraries: read this list before you write a mechanism': 'libraries',
@@ -137,8 +141,11 @@ export function splitAtelierSpec(full: string): AtelierSection[] {
 }
 
 /** What the first part says about the rest, placed right after "The Atelier track". */
-function partsIndex(nodeUrl: string): string {
+function partsIndex(nodeUrl: string, specToken: string | null): string {
   let out = '### This specification comes in parts\n';
+  // The token travels in the first part, though "Finishing" moved to `libraries` (2026-11-09):
+  // a publish that sends it proves the build read this specification.
+  if (specToken) out += 'Publish with `spec_token: ' + specToken + '`; section "Finishing" (part `libraries`) says what is owed after it.\n';
   out += 'You are reading part `start`. The others belong to the same specification and carry the same authority. '
     + 'Read `libraries` and `patterns` BEFORE you write any code, and on `fine` `genre` and `book` too: on `fine` an Atelier app is forked from a genre and the publish refuses one that names no register (a `proto` or `plain` app starts from `shell-atelier`), a mechanism you write by hand is usually one this node already serves, and a piece of page you make by hand is often one the Design Book already holds. '
     + 'Over MCP: `aimeat_handbook_get { tier: "build-app-atelier/<id>" }`. Over HTTP the whole text in one piece: `GET ' + nodeUrl + '/v1/prompts/build-app-atelier?format=txt`.\n';
@@ -156,11 +163,12 @@ export function atelierPiece(full: string, id: string, baseUrl: string): Atelier
   if (id !== 'start') return { id: id as AtelierPartId, text: mine.map(s => s.text).join('\n') };
   const out: string[] = [];
   let indexed = false;
+  const token = /spec_token: (atelier-[0-9a-f]{12})/.exec(full)?.[1] ?? null;
   for (const s of mine) {
     out.push(s.text);
-    if (!indexed && s.title === 'The Atelier track') { out.push(partsIndex(baseUrl.replace(/\/+$/, ''))); indexed = true; }
+    if (!indexed && s.title === 'The Atelier track') { out.push(partsIndex(baseUrl.replace(/\/+$/, ''), token)); indexed = true; }
   }
-  if (!indexed) out.push(partsIndex(baseUrl.replace(/\/+$/, '')));
+  if (!indexed) out.push(partsIndex(baseUrl.replace(/\/+$/, ''), token));
   return { id: 'start', text: out.join('\n') };
 }
 

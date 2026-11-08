@@ -66,6 +66,16 @@ describe('the Atelier specification in parts', () => {
     expect(interview).toMatch(/`fine` or no answer: all of it/);
   });
 
+  // 2026-11-09: a real build met "the shell's bar is the ONLY top bar" beside "the genre is the
+  // frame, no app shell", built a header of its own and restyled the pill (Jouni's ruling: B).
+  it('says one top bar: the genre\'s masthead on a fork, with the node\'s pill as it comes', () => {
+    const genre = atelierPiece(full, 'genre', config.baseUrl)!.text;
+    expect(genre).toMatch(/THE GENRE'S MASTHEAD IS THE ONLY TOP BAR/);
+    expect(genre).toMatch(/restyled only when the owner asks/);
+    expect(full).not.toMatch(/The shell's bar is the ONLY top bar/);
+    expect(full).toMatch(/ONE top bar: the shell's bar on a shell app, the genre's masthead on a genre fork/);
+  });
+
   it('the interview opens with the model rule, by quality and naming no model', () => {
     // Measured 2026-10-01: a lighter model built the asked app on this track in 1 of 3 runs, a strong
     // one in 3 of 3. Since 2026-11-08 the rule names no model (Jouni): quality, and a plain word to

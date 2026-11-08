@@ -13,6 +13,10 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   2026-11-09 — Step 3: one top bar. On a genre fork the genre's masthead is the only top bar, with
+ *     the node's pill in it as it comes, restyled only when the owner asks (Jouni). A real build met
+ *     "the shell's bar is the only top bar" and "the genre is the frame, no app shell" side by side,
+ *     built a header of its own and restyled the pill.
  *   2026-11-08 — Step 1 asks the level first and lets it decide the rest: a prototype skips drawn
  *     layouts, the introduction, the data map unless shared, and the genre and Design Book parts; an
  *     ordinary page skips the introduction and those two parts; the finest is unchanged. Two real
@@ -348,6 +352,9 @@ moved under you says so.
    \`AIMEAT.atelier.fx(el, { id })\` in your code: still on the words, a moment on a cue with
    \`fxPlay\`, and living motion only as \`ambient.post\` behind the words (the spec lists the
    nine, where each lands, and the knobs).
+   **One top bar.** On a genre fork the genre's masthead is the only top bar, and the node's pill
+   always sits in it as it comes: its look and its functions stay, restyled only when the owner
+   asks. No header or sign-in control of your own; the work goes into the app, not the bar.
    **The working screen is a MOSAIC inside the genre.** The genre is the frame; the part of the
    page that is this app (the list, the numbers, the form, the history) is
    \`AIMEAT.atelier.mosaic({ target: '#work', sources, fallback })\` mounted into one element of
