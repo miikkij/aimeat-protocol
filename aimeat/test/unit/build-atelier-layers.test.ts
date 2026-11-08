@@ -17,6 +17,7 @@
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
+import { MODEL_QUALITY_ADVICE } from '../../src/services/model-recommendation.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { buildAtelierPrompt } from '../../src/services/build-atelier-prompt.js';
 import { ATELIER_PARTS, atelierPiece, splitAtelierSpec, MAX_PART_CHARS } from '../../src/services/build-atelier-layers.js';
@@ -65,13 +66,14 @@ describe('the Atelier specification in parts', () => {
     expect(interview).toMatch(/`fine` or no answer: all of it/);
   });
 
-  it('the interview first tells the person which models build the better app', () => {
-    // Measured 2026-10-01: Sonnet 5.5 built the asked app on this track in 1 of 3 runs, Opus 5.5
-    // in 3 of 3. The person decides which model builds, so the interview says so before the questions.
+  it('the interview opens with the model rule, by quality and naming no model', () => {
+    // Measured 2026-10-01: a lighter model built the asked app on this track in 1 of 3 runs, a strong
+    // one in 3 of 3. Since 2026-11-08 the rule names no model (Jouni): quality, and a plain word to
+    // the person when errors keep coming.
     const start = atelierPiece(full, 'start', config.baseUrl)!.text;
     const interview = start.slice(start.indexOf('## First, a short interview'), start.indexOf('1. What should the app do'));
-    expect(interview).toMatch(/Claude Opus or Claude Fable/);
-    expect(interview).toMatch(/turn out (noticeably )?better/);
+    expect(interview).toContain(MODEL_QUALITY_ADVICE);
+    expect(interview).not.toMatch(/Claude Opus|Claude Fable/);
   });
 
   it('carries the layout rules for a settings page and a queue page in one part, with the numbers', () => {

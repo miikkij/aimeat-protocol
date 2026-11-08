@@ -22,7 +22,8 @@
  *     skill and the spec name; it said 390 and 1440, which a real build met as a contradiction.
  *     `legal_pages` says which recommended legal pages are missing and how to write them (the
  *     structure page was the first place a build met them), and `agent_face` names its library and
- *     says the record is public.
+ *     says the record is public. The design spec's next calls name the app's owner, so a builder of
+ *     another owner's app reads and writes that app's spec and not one of its own by the same name.
  *   v1.3.0 — 2026-10-10 — `data_map` and `design_spec`, with `data_map_present` and
  *     `design_spec_present`: stated on every publish, present or not, like the face and the skill.
  *     The answer named two of the four things an app owes, and the two it named got done: the
@@ -82,8 +83,8 @@ export function documentSteps(ownerName: string, filename: string, d: DocumentsB
       ? `This app has a data map, and ${d.dataMapRowsWithoutWhy} row(s) in it say no \`why\` yet. Read it with aimeat_datamap_get { app: "${app}" }, fill what you know, and update it if this change moved or added data.`
       : `This app has a data map. If this change moved or added where data lives, read it (aimeat_datamap_get { app: "${app}" }) and write the whole map back with aimeat_datamap_set.`;
   const designSpec = d.designSpecVersion === undefined
-    ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", filename: "${filename}", markdown }: what the app is for, its screens, where its data lives, what was decided and why, what is open, and what bit you; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
-    : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
+    ? `No design spec yet. Write one with aimeat_app_manage { action: "spec_set", owner: "${ownerName}", filename: "${filename}", markdown }: what the app is for, its screens, where its data lives, what was decided and why, what is open, and what bit you; { action: "spec" } answers an outline to start from. The next builder, and your own next session, reads it before touching the app.`
+    : `The design spec was written against version ${d.designSpecVersion}; this publish made version ${d.newVersion}. Read it with aimeat_app_manage { action: "spec", owner: "${ownerName}", filename: "${filename}" } and write it back with what changed; the same text again marks it current.`;
   return {
     data_map_present: !d.dataMapMissing,
     design_spec_present: d.designSpecVersion !== undefined,

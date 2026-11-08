@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   (2026-11-08) The Apps line says the model rule by quality (MODEL_QUALITY_ADVICE), never by name (Jouni).
  *   (2026-11-04) A new app is sent to the Atelier track; Classic stays for an app already on it.
  *   v1.19.0 — 2026-11-01 — The data table paragraph names a run on a source change, a share to someone on
  *     another AIMEAT by `recipient`, and the AI's description draft (WP9c).
@@ -49,6 +50,7 @@
  */
 import { SCREEN_ONLY_MD } from '../../data/screen-only.js';
 import { NEW_AGENT_MD } from './new-agent.js';
+import { MODEL_QUALITY_ADVICE } from '../model-recommendation.js';
 
 export const FULL_HANDBOOK = `# Working here with everything
 
@@ -63,9 +65,7 @@ Three grounds carry most of the work:
   \`aimeat_memory_search\` finds by content. A feature here is usually a memory record under a key
   prefix plus something that reads it, so look before you build.
 - **Apps** are single-file web apps published on this node. \`aimeat_app_list\` gives each one the
-  \`url\` you hand the person. Unless you are Claude Opus or Claude Fable, say once, before you
-  build, that apps built with Claude Opus or Claude Fable turn out noticeably better, and that the
-  person can switch now or go on with you. Before you build one, load the skill
+  \`url\` you hand the person. ${MODEL_QUALITY_ADVICE} Before you build one, load the skill
   \`node:aimeat-app-builder-atelier\`: a new app is built on the Atelier track, from a genre, and its
   specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts. \`{ tier:
   "build-app" }\` is the Classic track's, for an app that is already Classic. **A new app's first
