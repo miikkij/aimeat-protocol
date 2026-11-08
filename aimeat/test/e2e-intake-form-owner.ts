@@ -99,6 +99,14 @@ async function main() {
         assert(read.status === 200, `the definer does not hold the submission: ${read.status}`);
     });
 
+    await test('refused: bob cannot define or replace a form on alice\'s workspace (403)', async () => {
+        const r = await json('/v1/intake/forms', {
+            method: 'POST', headers: bearer(bobToken),
+            body: JSON.stringify({ organism_id: a.org, ws: a.ws, namespace: 'crm.leads', form_id: FORM, allowed_fields: ['nimi'] }),
+        });
+        assert(r.status === 403, `bob defined a form on alice's workspace: ${r.status}`);
+    });
+
     await test('refused: a form config a manager wrote naming another account writes nothing as that account', async () => {
         const now = new Date().toISOString();
         const cfg = {

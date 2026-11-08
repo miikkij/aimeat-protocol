@@ -1,5 +1,5 @@
 /**
- * @file src/services/living-config-publish.ts
+ * @file src/services/living/config-publish.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The `status` of a living-document config that a member of another account publishes
@@ -21,16 +21,19 @@
  *   before, and the allowance hash still decides whether the pulse may spend for it. A publish by the
  *   holder or by the holder's own agents is unchanged, and so are the owner's plain saves and the
  *   pulse's own status write, which do not publish.
- * @structure isLivingConfigLatestKey · holderLivingStatus
- * @usage const value = holderLivingStatus(`${base}.latest`, draftValue, existingLatest?.value, publisherGhii, holderGhii);
+ *
  *   A publish that changes the content (sections, charter, title) leaves the cadence clock
  *   (status.last_pulse) out, so the pulse asks the owner about the change at once, as it did before;
  *   the owner's answer comes before any spend.
+ * @structure isLivingConfigLatestKey · holderLivingStatus
+ * @usage const value = holderLivingStatus(`${base}.latest`, draftValue, existingLatest?.value, publisherGhii, holderGhii);
  * @version-history
+ *   v1.0.1 -- 2026-11-08 -- Moved from src/services/living-config-publish.ts into a domain folder
+ *     (check:services-flat); no behaviour change.
  *   v1.0.0 -- 2026-11-08 -- Initial (secaudit2026nov08b round 15,
  *     living-pulse-spend.ts:livingConfigContent:status-outside-allowance-hash).
  */
-import { canonicalJson } from '../utils/memory-content.js';
+import { canonicalJson } from '../../utils/memory-content.js';
 
 const LIVING_LATEST_RE = /^organism\.(.+?)\.w\.(.+?)\.living\.([^.]+)\.latest$/;
 

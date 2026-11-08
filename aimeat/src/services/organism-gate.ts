@@ -12,7 +12,7 @@
  * @usage const H = createOrganismGate(config, storage); await H.writeDecision(organismId, by, summary, refs);
  * @version-history
  *   2026-11-08 — publishDraft and publishDraftsBatch keep the holder's `status` when a publisher of
- *     another account publishes over a living-document config (services/living-config-publish.ts): a
+ *     another account publishes over a living-document config (services/living/config-publish.ts): a
  *     member's republish resumed a paused document or revived a retired one (secaudit2026nov08b round 15,
  *     living-pulse-spend.ts:livingConfigContent:status-outside-allowance-hash).
  *   2026-11-04 — The fallbacks for a storage without listMemoryKeysByPrefix, bulkDeleteMemory,
@@ -134,7 +134,7 @@ import type { ResolvedShare } from '../routes/organisms/share-types.js';
 import { readShareMetaOf, redactShareOf, memberRoleOf } from './workspace-share.js';
 import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
-import { holderLivingStatus } from './living-config-publish.js';
+import { holderLivingStatus } from './living/config-publish.js';
 
 export type OrganismGate = ReturnType<typeof createOrganismGate>;
 
@@ -270,7 +270,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     const tags = draft.tags ?? [];
     const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
     // A living config published over by another account keeps its holder's status (pause, retirement,
-    // pulse count, cadence clock): services/living-config-publish.ts.
+    // pulse count, cadence clock): services/living/config-publish.ts.
     if (existingLatest) draftValue = holderLivingStatus(`${base}.latest`, draftValue, existingLatest.value, ownerGhii, ownerGhiiOf(existingLatest.ownerGaii));
 
     // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
