@@ -90,7 +90,7 @@ export function EcoPendingAccess({ request, ticks, onTick, wordTicks, onWordTick
           <${Hint}>${t('profile.ecosystem.ownTickTitle')}<//>
           ${words.map((w) => html`
             <${Check} key=${w} checked=${(wordTicks || {})[w] === true} onChange=${(v) => onWordTick?.(w, v)}>
-              ${wordLabel(w)} <${Code}>${w}<//>
+              ${wordLabel(w)} (${w})
             <//>`)}
         </div>`}
     <//>`;
