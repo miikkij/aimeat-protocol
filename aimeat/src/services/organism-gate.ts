@@ -11,6 +11,10 @@
  * @structure createOrganismGate(config, storage) · OrganismGate · BatchPublishItemResult
  * @usage const H = createOrganismGate(config, storage); await H.writeDecision(organismId, by, summary, refs);
  * @version-history
+ *   2026-11-08 — publishDraft and publishDraftsBatch keep the holder's `status` when a publisher of
+ *     another account publishes over a living-document config (services/living-config-publish.ts): a
+ *     member's republish resumed a paused document or revived a retired one (secaudit2026nov08b round 15,
+ *     living-pulse-spend.ts:livingConfigContent:status-outside-allowance-hash).
  *   2026-11-04 — The fallbacks for a storage without listMemoryKeysByPrefix, bulkDeleteMemory,
  *     bulkSetMemory or getMemoryByKeysAnyOwner are gone: all four are required on Storage (codebase
  *     analysis 2026-11-03, item D-e).
@@ -130,6 +134,7 @@ import type { ResolvedShare } from '../routes/organisms/share-types.js';
 import { readShareMetaOf, redactShareOf, memberRoleOf } from './workspace-share.js';
 import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
+import { holderLivingStatus } from './living-config-publish.js';
 
 export type OrganismGate = ReturnType<typeof createOrganismGate>;
 
@@ -244,7 +249,7 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     // embedded file readable by the workspace's members as a side effect, and the line below can
     // still refuse the publish. Same ordering defect as the draft door, same fix (doc-images.ts
     // scopeDocImagesToWorkspace). The rewritten URL is identical either way.
-    const draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
+    let draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
 
     // An HTML page is checked without the node's own page fields (services/html-page.ts).
     const docSpace = pubOt?.mode === 'document' || (!pubOt?.mode && pubOt?.kind === 'document');
@@ -264,6 +269,9 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
     const vis = draft.visibility;
     const tags = draft.tags ?? [];
     const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
+    // A living config published over by another account keeps its holder's status (pause, retirement,
+    // pulse count, cadence clock): services/living-config-publish.ts.
+    if (existingLatest) draftValue = holderLivingStatus(`${base}.latest`, draftValue, existingLatest.value, ownerGhii, ownerGhiiOf(existingLatest.ownerGaii));
 
     // Change-guard: an unchanged re-publish (contract agents re-publish the same draft on every poll
     // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
@@ -421,11 +429,15 @@ export function createOrganismGate(config: AimeatConfig, storage: Storage) {
       // embedded file readable by the workspace's members as a side effect, and this record's own
       // refusals below (append-only, expected version, schema) can still refuse it. Opened after the
       // batch has written, for the records that passed, as publishDraft does (N1).
-      const draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
+      const normalized = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
       const expectedVersion = expectedVersions?.[instance] ?? null;
 
       const maxN = maxVersionOf(versionsByBase.get(base) ?? []);
       const existingLatest = existingLatestEarly;
+      // As publishDraft: a living config published over by another account keeps its holder's status.
+      const draftValue = existingLatest
+        ? holderLivingStatus(`${base}.latest`, normalized, existingLatest.value, ownerGhii, ownerGhiiOf(existingLatest.ownerGaii))
+        : normalized;
       const vis = draft.visibility;
       const tags = draft.tags ?? [];
 
