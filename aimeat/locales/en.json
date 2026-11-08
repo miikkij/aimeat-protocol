@@ -1860,6 +1860,7 @@
           "classification_default_caps": "Limits on who may see classified content",
           "anonymous_principal_records": "What the shared anonymous agent wrote",
           "erasure_leftover_schedules": "Scheduled tasks that deleted accounts left behind",
+          "erased_lock_holders": "Locks that may be a deleted account's",
           "subdomain_site_origin": "Other people's apps at addresses on your own domain",
           "platform_fee_records": "Money fee records whose writer is not known",
           "federation_settlement": "Settlements a peer sent past the daily ceiling"
@@ -1897,6 +1898,7 @@
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
             "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose.",
+            "erased_lock_holders": "These locks were set before the account that holds the username now was registered. A lock decides what every account may write under its key, and the account that holds it can change or remove it. Before 8 November 2026, deleting an account did not take its locks from the username. So a lock below may be a deleted account's, and the account that registered the same name later holds it now. For each lock, choose whose it is. Nothing changes until you choose. At start, the server already took from every account the locks whose username no account uses now.",
             "subdomain_site_origin": "An app that another person published also opens at an address on your own domain. For each address, choose where the app opens from now on. Until you choose, everything works as before.",
             "platform_fee_records": "Before 27 October 2026, any account could write a money fee record into its own memory, and the Economy page counted it in the fees owed to you. For each record below, choose whether it counts. Nothing is deleted, and until you choose, every record counts as before."
           },
@@ -1909,15 +1911,18 @@
           },
           "action": {
             "subdomain": "App only",
-            "platform_fee": "Do not count"
+            "platform_fee": "Do not count",
+            "schema_lock": "A deleted account's"
           },
           "keepAction": {
             "subdomain": "My own site",
-            "platform_fee": "Count"
+            "platform_fee": "Count",
+            "schema_lock": "This account's"
           },
           "confirm": {
             "subdomain": "Make this an app address only? {line} A visitor who opens it at your own domain is taken to the app's own address, where the app works as before.",
-            "platform_fee": "Leave this record out of your money fees? {line} The record stays, and the Economy page no longer counts it."
+            "platform_fee": "Leave this record out of your money fees? {line} The record stays, and the Economy page no longer counts it.",
+            "schema_lock": "Take this lock from the account? {line} The lock stays in force, but no account holds it. You can still change or remove it."
           },
           "rowResolved": "Every record is decided.",
           "clear": "Clear",
@@ -1936,7 +1941,8 @@
             "datapackage": "The data package {name}, with its files",
             "schedule": "The scheduled task \"{label}\", made by {maker} for the account {owner} (runs: {cron})",
             "subdomain": "{label}: the app {app}, published by {owner}",
-            "platform_fee": "{amount} in the memory of {owner} ({key}), seller {seller}, buyer {buyer}"
+            "platform_fee": "{amount} in the memory of {owner} ({key}), seller {seller}, buyer {buyer}",
+            "schema_lock": "The lock on {pattern}, held by {holder} since {setAt}. The account {account} was registered on {registered}."
           }
         },
         "source": {

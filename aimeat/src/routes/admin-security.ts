@@ -15,6 +15,9 @@
  *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one case)
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.9.0 -- 2026-11-08 -- An entry's action can be "pseudonymise" (a schema lock older than the account
+ *     that holds its name takes the erasure pseudonym); the refusal of a malformed body names it
+ *     (secaudit2026nov08 round 14b).
  *   v1.8.0 -- 2026-10-29 -- An entry's action can be "uncount" (a platform-fee record is left out of the
  *     dashboard's money fees); the refusal of a malformed body names it (secaudit2026oct26 round 8c).
  *   v1.7.0 -- 2026-10-27 -- An entry's action can be "app_only" (an address of the subdomain incident is
@@ -101,14 +104,14 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
    * - a default audience cap the start offered (classification_default_caps): 'apply' puts the cap
    *   on that classification in the node's policy, 'keep' leaves it without one. No content changes;
    * - an entry of an incident that names records to act on (services/incident-entries.ts): the
-   *   entry's action, 'clear' or 'delete', or 'keep'.
+   *   entry's action ('clear', 'delete', 'app_only', 'uncount' or 'pseudonymise'), or 'keep'.
    * Such an incident closes with its last case. */
   router.post('/v1/admin/security/incidents/:id/resolve', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const body = (req.body ?? {}) as { name?: unknown; resolution?: unknown };
     if (body.name !== undefined || body.resolution !== undefined) {
       if (typeof body.name !== 'string' || body.name === '' || typeof body.resolution !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear", "delete", "app_only" or "uncount") or "keep" for an entry.'));
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear", "delete", "app_only", "uncount" or "pseudonymise") or "keep" for an entry.'));
         return;
       }
       // An agent or an ecosystem app decides as an AI, anyone else as a person (the policy history says which).

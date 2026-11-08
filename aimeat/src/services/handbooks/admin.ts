@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.35.0 -- 2026-11-08 -- The erased lock holders incident's locks are entries decided with "pseudonymise"
+ *     or "keep" (secaudit2026nov08 round 14b).
  *   v1.34.0 -- 2026-11-07 -- aimeat_admin_receivers and visibility.receivers_mode: every receiver, the stop and the decision.
  *   v1.33.0 -- 2026-11-05 -- aimeat_admin_key_reencrypt: replacing the data key (codebase analysis
  *     2026-11-03, decision 4a of 2026-11-05).
@@ -355,7 +357,7 @@ account is deactivated, its schedules, workflow triggers and unattended extensio
 with a log line that names the deactivation; nothing is deleted, and they run again after enable.
 
 **Security incidents that name records (operator).** Some incidents list \`entries\`, each with an
-\`id\`, an \`action\` ("clear", "delete", "app_only" or "uncount") and a status: the records the shared anonymous agent wrote
+\`id\`, an \`action\` ("clear", "delete", "app_only", "uncount" or "pseudonymise") and a status: the records the shared anonymous agent wrote
 before its token was refused there (type \`anonymous_principal_records\`: its webhook, tags and
 capabilities, and the skills and data packages it published), the schedules that account
 erasures before 2026-10-25 left (type \`erasure_leftover_schedules\`, the entry id is the schedule id:
@@ -364,7 +366,11 @@ subdomain addresses the start step could not tell apart as the operator's own si
 publish gave an app (type \`subdomain_site_origin\`, the entry id is the label: "app_only" serves it only
 at its app address, "keep" leaves it at both addresses), and the money platform-fee records outside an
 operator's account whose writer the start step could not tell (type \`platform_fee_records\`, the entry id
-is \`<owner>/<key>\`: "uncount" leaves it out of the dashboard's money fees, "keep" counts it). Read them with
+is \`<owner>/<key>\`: "uncount" leaves it out of the dashboard's money fees, "keep" counts it), and the schema
+locks set before the account that holds their holder's name was registered, which may be an account's erased
+before 2026-11-08 (type \`erased_lock_holders\`, the entry id is \`<applyTo>:<keyPattern>\`: "pseudonymise" keeps
+the lock in force under the erasure pseudonym so no account holds it, "keep" leaves it the current account's;
+the locks of accounts that no longer exist were moved to a pseudonym at start without a question). Read them with
 \`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
 \`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
 the operator says. The incident is resolved with the last entry.

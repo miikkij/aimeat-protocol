@@ -21,6 +21,9 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-08 -- moveErasedLockHoldersOnce, after the leftover schedules step: the schema locks of accounts
+ *     erased before round 14 take the erasure pseudonym, the undecidable ones named on the Security page
+ *     (secaudit2026nov08 round 14b).
  *   2026-11-05 -- givePlaceDefaultToEveryAgent, last: on a store place every agent that has not had the place's
  *     default gets it, once per agent (codebase analysis 2026-11-03, decision 8b of 2026-11-05).
  *   2026-11-01 -- moveEcosystemSubscriptionsByOwnerOnce, after the welcome page step: the node-wide ecosystem
@@ -106,6 +109,7 @@ import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js'
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
 import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
+import { moveErasedLockHoldersOnce } from '../services/csm/erased-lock-holders.js';
 import { settleUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
 import { markPlatformFeeWritersOnce } from '../commerce/platform-fee-writers.js';
 import { askUncertainAccountantGrantsOnce } from '../services/finance/accountant-grant-ask.js';
@@ -228,6 +232,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // per schedule, nothing changed (services/erasure-leftover-schedules.ts).
   await reportErasureLeftoverSchedulesOnce(storage, config)
     .catch(err => logger.error('Failed to look for the schedules older account erasures left; the next boot tries again', { error: String(err) }));
+  // The schema locks of accounts erased before 2026-11-08 take one erasure pseudonym per name; a lock
+  // older than the account that holds its name now is named on the Security page, nothing changed
+  // (services/csm/erased-lock-holders.ts). Awaited, so no request meets a later holder of the name as a lock's holder.
+  await moveErasedLockHoldersOnce(storage, config)
+    .catch(err => logger.error('Failed to move the schema locks of older account erasures; the next boot tries again', { error: String(err) }));
   // The capabilities stored with a visibility word the node does not know are set to private, which
   // changes no reach, and each owner is told (services/capability-visibility-words.ts).
   await settleUnknownCapabilityVisibilityOnce(storage, config)
