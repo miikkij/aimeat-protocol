@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-11-08 — The schema lock is asked with the caller: a CSM's own lock does not govern a caller that
+ *     CSM's visibility refuses (secaudit2026nov08b round 15).
  *   2026-11-05 — visibility 'group' on a record that has no group is refused with 400 INVALID_INPUT:
  *     this route takes no group id (storage/memory-sharing.ts).
  *   2026-11-04 — The running workflow engine is read from nodeContext() (services/node-context.ts) in place of
@@ -369,8 +371,9 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       bytesForAlarm = quotaCheck.currentBytes - existingSize + mergedSize;
 
       // The MERGED value is what gets stored, so the merged value is what the schema must accept. A
-      // patch that is individually harmless can still produce an invalid record.
-      const validation = await validateMemoryWrite(key, merged, storage);
+      // patch that is individually harmless can still produce an invalid record. A CSM's own lock does
+      // not govern a caller that CSM's visibility refuses (round 15).
+      const validation = await validateMemoryWrite(key, merged, storage, undefined, req.auth ?? null);
       if (!validation.valid) {
         res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
           'Merged value does not match the schema for this key', 422, {

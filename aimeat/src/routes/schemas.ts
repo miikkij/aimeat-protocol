@@ -11,6 +11,9 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   2026-11-08 — DELETE refuses the holder of a CSM's own lock row (`csm.<name>`, prefix) that is not
+ *     the CSM's registering account, its agent or the operator, with 403 SCHEMA_PATTERN_NOT_YOURS, as
+ *     PUT refuses it by rule 5 (secaudit2026nov08b round 15, D1).
  *   2026-11-08 — GET /v1/schemas and GET /v1/memory/:key/schema leave out the lock row a CSM owns when
  *     the CSM's visibility refuses the caller, so a private, members or organism CSM's name, account
  *     and compiled schema are not public (secaudit2026nov08 round 14).
@@ -45,7 +48,7 @@ import { SchemaSetSchema } from '../models/schemas.js';
 import { semanticContextErrors } from '../utils/onto-context.js';
 import { emitChange } from '../services/event-bus.js';
 import { operatorOverride } from '../services/operator-override.js';
-import { schemaLockRefusal } from '../services/schema-lock-rule.js';
+import { schemaLockRefusal, csmLockRemovalRefusal } from '../services/schema-lock-rule.js';
 import { csmLockShownTo } from '../services/csm-service.js';
 import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
@@ -217,10 +220,21 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    if (!isCallersLock(record.lockedBy, req.auth!, config.nodeId) && !(await operatorOverride(storage, config, req.auth,
+    const holds = isCallersLock(record.lockedBy, req.auth!, config.nodeId);
+    if (!holds && !(await operatorOverride(storage, config, req.auth,
       { ownerOf: record.lockedBy, area: 'schema', action: 'delete', subject: key }))) {
       res.status(403).json(error(config.nodeId, 'NOT_SCHEMA_OWNER', 'Only whoever set this structure, or whoever runs the node, can remove it. Ask one of them.'));
       return;
+    }
+    // The holder of a CSM's own lock row removes it only as that CSM's registering account, as only that
+    // account sets it (rule 5; services/schema-lock-rule.ts csmLockRemovalRefusal).
+    if (holds) {
+      const caller = callerOf(req, config.nodeId, storage);
+      const notYours = await csmLockRemovalRefusal(storage, { ...caller.principalView, isOperator: await caller.operator() }, record);
+      if (notYours) {
+        res.status(notYours.status).json(error(config.nodeId, notYours.code, notYours.message, notYours.status, notYours.details));
+        return;
+      }
     }
 
     await storage.deleteSchema(key, record.applyTo);
