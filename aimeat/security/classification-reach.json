@@ -1103,9 +1103,10 @@
     "src/services/archive.ts": {
       "reads": {
         "listAllMemory": 2,
-        "getMemory": 1
+        "getMemory": 1,
+        "listAllMemoryMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index and a record's archived flag."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index and a record's archived flag. 2026-11-08 (secaudit2026nov08 round 14): archivedOwnersUnder reads value-free meta rows of archived records only for their ownerGaii, so an unarchive can ask each holder's memory limits; no value or content leaves the function."
     },
     "src/services/attachment-duplication.ts": {
       "reads": {
